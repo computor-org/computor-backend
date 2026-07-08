@@ -1,221 +1,23 @@
 'use client';
 
 import Image from 'next/image';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { apiFetch, API_BASE_URL } from '../utils/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../hooks/usePermissions';
-
-interface SubItem {
-  id: string;
-  label: string;
-  path: string;
-}
-
-interface NavItem {
-  id: string;
-  label: string;
-  path: string;
-  icon: string;
-  subItems?: SubItem[];
-  /** Only used for course view navigation — matched against user's available views */
-  view?: string;
-  /**
-   * Set when the parent has its own landing page at `path`. Default (unset) for a
-   * parent WITH sub-items means "no dedicated page" — clicking it hops to the
-   * first sub-item instead (e.g. System → Maintenance).
-   */
-  ownPage?: boolean;
-}
-
-// Always-visible navigation (every authenticated user sees their courses).
-const coursesNavigation: NavItem[] = [
-  {
-    id: 'courses',
-    label: 'Courses',
-    path: '/courses',
-    icon: 'courses',
-  },
-];
-
-// Workspaces — gated by workspace access (_workspace_user / admin).
-const workspacesNavigation: NavItem[] = [
-  {
-    id: 'workspaces',
-    label: 'Workspaces',
-    path: '/workspaces',
-    icon: 'workspaces',
-    ownPage: true,
-    subItems: [
-      { id: 'ws-list', label: 'Workspaces', path: '/workspaces' },
-      { id: 'ws-templates', label: 'Templates', path: '/workspaces/templates' },
-      { id: 'ws-provision', label: 'Provision', path: '/workspaces/provision' },
-      { id: 'ws-admin', label: 'Administration', path: '/workspaces/admin' },
-    ],
-  },
-];
-
-// Management — the org → course-family → course pipeline. Shown to the
-// lecturer-view cohort (admins, organization managers, org/family role holders);
-// the actual create actions on each page are gated finer.
-const managementNavigation: NavItem[] = [
-  {
-    id: 'management',
-    label: 'Organizations',
-    path: '/organizations',
-    icon: 'lecturer',
-    ownPage: true,
-    subItems: [
-      { id: 'mgmt-orgs', label: 'Organizations', path: '/organizations' },
-      { id: 'mgmt-families', label: 'Course Families', path: '/course-families' },
-      { id: 'mgmt-examples', label: 'Examples', path: '/examples' },
-      { id: 'mgmt-example-repos', label: 'Example Repositories', path: '/example-repositories' },
-      { id: 'mgmt-gitservers', label: 'Git Servers', path: '/admin/git-servers' },
-    ],
-  },
-];
-
-// Admin-only navigation items
-const adminNavigation: NavItem[] = [
-  {
-    id: 'system',
-    label: 'System',
-    path: '/admin',
-    icon: 'admin',
-    subItems: [
-      { id: 'sys-maintenance', label: 'Maintenance', path: '/admin/maintenance' },
-      { id: 'sys-consent', label: 'Privacy Notices', path: '/admin/consent' },
-    ],
-  },
-];
-
-// User management navigation (admin or _user_manager)
-const userMgmtNavigation: NavItem[] = [
-  {
-    id: 'user-management',
-    label: 'Users',
-    path: '/admin/users',
-    icon: 'users',
-    ownPage: true,
-    subItems: [
-      { id: 'um-users', label: 'Users', path: '/admin/users' },
-      { id: 'um-invites', label: 'Invite Links', path: '/admin/users/invites' },
-      { id: 'um-roles', label: 'Roles & Claims', path: '/admin/users/roles' },
-    ],
-  },
-];
-
-// Navigation structure for view-based navigation (when in course context)
-const getViewNavigation = (courseId: string): NavItem[] => [
-  {
-    id: 'student-view',
-    view: 'student',
-    label: 'Student',
-    path: `/courses/${courseId}/student`,
-    icon: 'student',
-    ownPage: true,
-    subItems: [
-      { id: 'student-assignments', label: 'Assignments', path: `/courses/${courseId}/student/assignments` },
-    ],
-  },
-  {
-    id: 'tutor-view',
-    view: 'tutor',
-    label: 'Tutor',
-    path: `/courses/${courseId}/tutor`,
-    icon: 'tutor',
-    ownPage: true,
-    // The Tutor landing IS the student progress overview; no sub-pages yet
-    // (submissions/grading are still stubs).
-  },
-  {
-    id: 'lecturer-view',
-    view: 'lecturer',
-    label: 'Lecturer',
-    path: `/courses/${courseId}/lecturer`,
-    icon: 'lecturer',
-    ownPage: true,
-    subItems: [
-      { id: 'lecturer-assignments', label: 'Assignments', path: `/courses/${courseId}/lecturer/assignments` },
-      { id: 'lecturer-students', label: 'Students', path: `/courses/${courseId}/lecturer/students` },
-      // Grading Overview isn't implemented yet — re-add the link once
-      // /courses/[id]/lecturer/grading has a real page.
-    ],
-  },
-  {
-    id: 'management-view',
-    view: 'management',
-    label: 'Management',
-    path: `/courses/${courseId}/management`,
-    icon: 'admin',
-    subItems: [
-      { id: 'management-members', label: 'Course Members', path: `/courses/${courseId}/management/members` },
-      { id: 'management-groups', label: 'Course Groups', path: `/courses/${courseId}/management/groups` },
-    ],
-  },
-];
-
-/**
- * Given a list of nav items and the current pathname, return which
- * item IDs should be auto-expanded (pathname is inside a sub-item).
- */
-/** Is `pathname` on this item's own path or anywhere beneath it? */
-function pathMatches(itemPath: string, pathname: string): boolean {
-  return pathname === itemPath || pathname.startsWith(itemPath + '/');
-}
-
-
-const icons: Record<string, React.ReactElement> = {
-  courses: (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-    </svg>
-  ),
-  student: (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-    </svg>
-  ),
-  tutor: (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-    </svg>
-  ),
-  lecturer: (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-    </svg>
-  ),
-  overview: (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-    </svg>
-  ),
-  workspaces: (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-    </svg>
-  ),
-  admin: (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  ),
-  users: (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-    </svg>
-  ),
-  chevronDown: (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  ),
-};
+import { useCourseViews } from '../hooks/useCourseViews';
+import { icons } from './icons';
+import {
+  NavItem,
+  coursesNavigation,
+  workspacesNavigation,
+  managementNavigation,
+  adminNavigation,
+  userMgmtNavigation,
+  getViewNavigation,
+  pathMatches,
+} from '../config/navigation';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -227,46 +29,10 @@ export default function Sidebar() {
   // the active route is always rendered expanded (see renderNavItems), so this
   // only needs to track manual expand/collapse.
   const [expandedViews, setExpandedViews] = useState<Record<string, boolean>>({});
-  const [courseViews, setCourseViews] = useState<string[]>([]);
 
-  // Detect if we're in a course context. Only treat the segment as a course id
-  // when it's UUID-shaped — static routes like `/courses/create` must not be
-  // mistaken for a course (otherwise we'd call /user/views/create and 500 on
-  // the UUID cast).
-  const courseMatch = pathname.match(/^\/courses\/([^/]+)/);
-  const currentCourseId =
-    courseMatch && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(courseMatch[1])
-      ? courseMatch[1]
-      : null;
-
-  // Fetch course-specific views when in course context
-  useEffect(() => {
-    // Only fetch if user is authenticated
-    if (!user) {
-      return;
-    }
-
-    if (currentCourseId) {
-      async function fetchCourseViews() {
-        try {
-          const response = await apiFetch(
-            `${API_BASE_URL}/user/views/${currentCourseId}`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            setCourseViews(data);
-          }
-        } catch (error) {
-          console.error('Failed to fetch course views:', error);
-          // Leave course views empty on failure — do NOT fall back to global
-          // views, or a non-member (e.g. an org-manager) would be shown course
-          // role views (student/tutor/lecturer) they don't hold for this course.
-          setCourseViews([]);
-        }
-      }
-      fetchCourseViews();
-    }
-  }, [currentCourseId, user]);
+  // Course context + the per-course views the user holds (UUID guard + fetch
+  // live in the hook).
+  const { currentCourseId, courseViews } = useCourseViews();
 
   const toggleView = (viewId: string) => {
     setExpandedViews(prev => ({
