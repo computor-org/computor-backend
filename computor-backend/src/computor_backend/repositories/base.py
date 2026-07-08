@@ -353,16 +353,19 @@ class BaseRepository(ABC, Generic[T]):
         """
         try:
             self.db.add(entity)
-            self.db.commit()
+            # Flush (not commit): the surrounding request/session is a single
+            # unit of work committed once by get_db/get_db_session. Refresh so
+            # server defaults (id, timestamps) are populated for the caller.
+            self.db.flush()
             self.db.refresh(entity)
 
-            # Invalidate caches if enabled
+            # Cache invalidation + post-write hooks run only after the write
+            # actually commits (see database.register_post_commit).
             if self._use_cache():
                 tags = self.get_entity_tags(entity)
                 if tags:
-                    self.cache.invalidate_tags(*tags)
-
-            self._after_create(entity)
+                    self._defer_invalidation(tags)
+            self._defer_post_commit(lambda: self._after_create(entity))
 
             return entity
         except IntegrityError as e:
@@ -398,17 +401,16 @@ class BaseRepository(ABC, Generic[T]):
                 if hasattr(entity, key):
                     setattr(entity, key, value)
 
-            self.db.commit()
+            self.db.flush()
             self.db.refresh(entity)
 
-            # Invalidate caches if enabled
+            # Invalidate caches after the write commits (deferred)
             if self._use_cache():
                 tags = self.get_entity_tags(entity)
                 tags.add(f"{self.entity_type}:{entity_id}")  # Ensure entity key invalidated
                 if tags:
-                    self.cache.invalidate_tags(*tags)
-
-            self._after_update(entity)
+                    self._defer_invalidation(tags)
+            self._defer_post_commit(lambda: self._after_update(entity))
 
             return entity
         except SQLAlchemyError as e:
@@ -442,23 +444,22 @@ class BaseRepository(ABC, Generic[T]):
                 if hasattr(entity, key):
                     setattr(entity, key, value)
 
-            self.db.commit()
+            self.db.flush()
             self.db.refresh(entity)
 
-            # Invalidate caches if enabled
+            # Invalidate caches after the write commits (deferred)
             if self._use_cache() and entity_id:
                 tags = self.get_entity_tags(entity)
                 tags.add(f"{self.entity_type}:{entity_id}")  # Ensure entity key invalidated
                 if tags:
-                    self.cache.invalidate_tags(*tags)
-
-            self._after_update(entity)
+                    self._defer_invalidation(tags)
+            self._defer_post_commit(lambda: self._after_update(entity))
 
             return entity
         except SQLAlchemyError as e:
             self.db.rollback()
             raise RepositoryError(f"Failed to update {self.model.__name__}: {str(e)}") from e
-    
+
     def delete(self, entity_id: Any) -> bool:
         """
         Delete an entity by ID and invalidate related caches.
@@ -483,18 +484,37 @@ class BaseRepository(ABC, Generic[T]):
 
         try:
             self.db.delete(entity)
-            self.db.commit()
+            self.db.flush()
 
-            # Invalidate caches if enabled
+            # Invalidate caches after the delete commits (deferred)
             if tags:
-                self.cache.invalidate_tags(*tags)
-
-            self._after_delete(entity)
+                self._defer_invalidation(tags)
+            self._defer_post_commit(lambda: self._after_delete(entity))
 
             return True
         except SQLAlchemyError as e:
             self.db.rollback()
             raise RepositoryError(f"Failed to delete {self.model.__name__}: {str(e)}") from e
+
+    # ------------------------------------------------------------------
+    # Deferred post-commit side effects
+    # ------------------------------------------------------------------
+
+    def _defer_post_commit(self, callback) -> None:
+        """Run ``callback`` after the session commits (or immediately if the
+        session is not one of ours, e.g. a bare test session)."""
+        from computor_backend.database import register_post_commit
+
+        try:
+            register_post_commit(self.db, callback)
+        except Exception:
+            # Session doesn't support info-based deferral — run inline.
+            callback()
+
+    def _defer_invalidation(self, tags: Set[str]) -> None:
+        """Invalidate the given cache tags once the write commits."""
+        cache = self.cache
+        self._defer_post_commit(lambda: cache.invalidate_tags(*tags))
     
     def exists(self, entity_id: Any) -> bool:
         """
