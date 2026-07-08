@@ -9,11 +9,11 @@ import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
 import SystemRoleCheckboxes from '@/src/components/SystemRoleCheckboxes';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
-import { UserClient } from '@/src/generated/clients/UserClient';
+import { UserRolesClient } from '@/src/generated/clients/UserRolesClient';
 import type { UserCreate } from 'types/generated';
 
 const usersClient = new UsersClient();
-const userClient = new UserClient();
+const userClient = new UserRolesClient();
 
 export default function UserCreatePage() {
   const router = useRouter();

@@ -15,11 +15,6 @@ from computor_types.course_member_accounts import (
     CourseMemberReadinessStatus,
     CourseMemberValidationRequest,
 )
-from computor_types.user_roles import (
-    UserRoleCreate,
-    UserRoleGet,
-    UserRoleList,
-)
 from computor_types.users import UserGet
 
 from computor_client.http import AsyncHTTPClient
@@ -32,46 +27,6 @@ class UserClient:
 
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
-
-    async def user_roles(
-        self,
-        **kwargs: Any,
-    ) -> List[UserRoleList]:
-        """List User Roles"""
-        response = await self._http.get(f"/user-roles", params=kwargs)
-        data = response.json()
-        if isinstance(data, list):
-            return [UserRoleList.model_validate(item) for item in data]
-        return []
-
-    async def post_user_roles(
-        self,
-        data: Union[UserRoleCreate, Dict[str, Any]],
-        **kwargs: Any,
-    ) -> UserRoleGet:
-        """Create User Role"""
-        response = await self._http.post(f"/user-roles", json_data=data, params=kwargs)
-        return UserRoleGet.model_validate(response.json())
-
-    async def get_user_roles_users_roles(
-        self,
-        user_id: str,
-        role_id: str,
-        **kwargs: Any,
-    ) -> UserRoleGet:
-        """Get User Role Endpoint"""
-        response = await self._http.get(f"/user-roles/users/{user_id}/roles/{role_id}", params=kwargs)
-        return UserRoleGet.model_validate(response.json())
-
-    async def delete_user_roles_users_roles(
-        self,
-        user_id: str,
-        role_id: str,
-        **kwargs: Any,
-    ) -> None:
-        """Delete User Role Endpoint"""
-        await self._http.delete(f"/user-roles/users/{user_id}/roles/{role_id}", params=kwargs)
-        return
 
     async def list(
         self,

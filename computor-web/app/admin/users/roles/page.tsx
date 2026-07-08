@@ -11,13 +11,13 @@ import { useNotify } from '@/src/contexts/NotificationContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { RolesClient } from '@/src/generated/clients/RolesClient';
 import { RoleClaimClient } from '@/src/generated/clients/RoleClaimClient';
-import { UserClient } from '@/src/generated/clients/UserClient';
+import { UserRolesClient } from '@/src/generated/clients/UserRolesClient';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import type { RoleList, RoleGet, RoleClaimList, UserRoleList, UserList } from 'types/generated';
 
 const rolesClient = new RolesClient();
 const roleClaimsClient = new RoleClaimClient();
-const userRolesClient = new UserClient();
+const userRolesClient = new UserRolesClient();
 const usersClient = new UsersClient();
 
 // Readable label per claim_value prefix

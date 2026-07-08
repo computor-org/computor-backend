@@ -14,12 +14,12 @@ import Forbidden from '@/src/components/Forbidden';
 import SystemRoleCheckboxes from '@/src/components/SystemRoleCheckboxes';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
-import { UserClient } from '@/src/generated/clients/UserClient';
+import { UserRolesClient } from '@/src/generated/clients/UserRolesClient';
 import { AccountsClient } from '@/src/generated/clients/AccountsClient';
 import type { UserGet, AccountList, AccountProvider } from 'types/generated';
 
 const usersClient = new UsersClient();
-const userClient = new UserClient();
+const userClient = new UserRolesClient();
 const accountsClient = new AccountsClient();
 
 export default function UserDetailPage() {

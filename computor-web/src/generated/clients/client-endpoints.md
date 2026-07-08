@@ -698,7 +698,7 @@
 | `getCourseViewsForCurrentUserUserViewsGet` | GET | `/user/views` | — | `string[]` |
 | `getCourseViewsForCurrentUserByCourseUserViewsCourseIdGet` | GET | `/user/views/{course_id}` | — | `string[]` |
 
-## UserClient
+## UserRolesClient
 - Base path: `/user-roles`
 - Note: custom operations discovered from OpenAPI schema
 
