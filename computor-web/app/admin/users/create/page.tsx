@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
@@ -10,9 +9,11 @@ import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
 import SystemRoleCheckboxes from '@/src/components/SystemRoleCheckboxes';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
+import { UserClient } from '@/src/generated/clients/UserClient';
 import type { UserCreate } from 'types/generated';
 
 const usersClient = new UsersClient();
+const userClient = new UserClient();
 
 export default function UserCreatePage() {
   const router = useRouter();
@@ -40,7 +41,7 @@ export default function UserCreatePage() {
       };
       const created = await usersClient.createUsersUsersPost({ body: payload });
       for (const roleId of roles) {
-        await api.post('/user-roles', { user_id: created.id, role_id: roleId }).catch(() => {});
+        await userClient.createUserRoleUserRolesPost({ body: { user_id: created.id, role_id: roleId } }).catch(() => {});
       }
       router.push(`/admin/users/${created.id}`);
     } catch (e) {

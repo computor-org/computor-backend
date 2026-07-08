@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
 import type { CourseFamilyGet } from '@/src/generated/types/courses';
+import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
+
+const courseFamiliesClient = new CourseFamiliesClient();
 
 export default function CourseFamilyEditPage() {
   const familyId = useParams().id as string;
@@ -26,8 +28,8 @@ export default function CourseFamilyEditPage() {
   useEffect(() => {
     if (authLoading || !isAuthenticated || !canManage) return;
     let cancelled = false;
-    api
-      .get<CourseFamilyGet>(`/course-families/${familyId}`)
+    courseFamiliesClient
+      .getCourseFamiliesCourseFamiliesIdGet({ id: familyId })
       .then((f) => {
         if (cancelled) return;
         setFamily(f);
@@ -45,7 +47,10 @@ export default function CourseFamilyEditPage() {
     setSaving(true);
     setError(null);
     try {
-      await api.patch(`/course-families/${familyId}`, { title: title.trim() || null, description: description.trim() || null });
+      await courseFamiliesClient.updateCourseFamiliesCourseFamiliesIdPatch({
+        id: familyId,
+        body: { title: title.trim() || null, description: description.trim() || null },
+      });
       router.push(`/course-families/${familyId}`);
     } catch (e) {
       setSaving(false);

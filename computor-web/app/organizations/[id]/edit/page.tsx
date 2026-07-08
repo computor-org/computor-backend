@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
 import type { OrganizationGet, OrganizationType } from '@/src/generated/types/organizations';
+import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
+
+const organizationsClient = new OrganizationsClient();
 
 const ORG_TYPES: OrganizationType[] = ['organization', 'community', 'user'];
 
@@ -29,8 +31,8 @@ export default function OrganizationEditPage() {
   useEffect(() => {
     if (authLoading || !isAuthenticated || !canManage) return;
     let cancelled = false;
-    api
-      .get<OrganizationGet>(`/organizations/${orgId}`)
+    organizationsClient
+      .getOrganizationsOrganizationsIdGet({ id: orgId })
       .then((o) => {
         if (cancelled) return;
         setOrg(o);
@@ -49,10 +51,13 @@ export default function OrganizationEditPage() {
     setSaving(true);
     setError(null);
     try {
-      await api.patch(`/organizations/${orgId}`, {
-        title: title.trim() || null,
-        description: description.trim() || null,
-        organization_type: orgType,
+      await organizationsClient.updateOrganizationsOrganizationsIdPatch({
+        id: orgId,
+        body: {
+          title: title.trim() || null,
+          description: description.trim() || null,
+          organization_type: orgType,
+        },
       });
       router.push(`/organizations/${orgId}`);
     } catch (e) {

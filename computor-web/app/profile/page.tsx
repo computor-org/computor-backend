@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/src/utils/api';
+import { UsersClient } from '@/src/generated/clients/UsersClient';
+import { ProfilesClient } from '@/src/generated/clients/ProfilesClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
@@ -9,7 +11,10 @@ import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Avatar, { rgbIntToHex } from '@/src/components/Avatar';
 import { Field, inputCls } from '@/src/components/FormPanel';
-import type { UserGet, ProfileGet } from 'types/generated';
+import type { UserGet } from 'types/generated';
+
+const usersClient = new UsersClient();
+const profilesClient = new ProfilesClient();
 
 const DEFAULT_AVATAR_HEX = '#2563eb';
 
@@ -74,9 +79,12 @@ export default function ProfilePage() {
     setSaved(false);
     try {
       // Identity (name) lives on the user record.
-      await api.patch<UserGet>(`/users/${user.id}`, {
-        given_name: givenName.trim() || null,
-        family_name: familyName.trim() || null,
+      await usersClient.updateUsersUsersIdPatch({
+        id: user.id,
+        body: {
+          given_name: givenName.trim() || null,
+          family_name: familyName.trim() || null,
+        },
       });
 
       // Profile fields — patch the existing profile or create one on first save.
@@ -90,9 +98,9 @@ export default function ProfilePage() {
         avatar_color: colorInt === null || Number.isNaN(colorInt) ? null : colorInt,
       };
       if (user.profile) {
-        await api.patch<ProfileGet>(`/profiles/${user.profile.id}`, profileBody);
+        await profilesClient.updateProfileEndpointProfilesIdPatch({ id: user.profile.id, body: profileBody });
       } else {
-        await api.post<ProfileGet>('/profiles', { user_id: user.id, ...profileBody });
+        await profilesClient.createProfileEndpointProfilesPost({ body: { user_id: user.id, ...profileBody } });
       }
 
       // Re-read so the header + avatar reflect what was saved.

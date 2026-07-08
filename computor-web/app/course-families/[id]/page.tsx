@@ -11,7 +11,11 @@ import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPa
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
-import type { CourseFamilyGet, CourseList } from '@/src/generated/types/courses';
+import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
+import { CoursesClient } from '@/src/generated/clients/CoursesClient';
+
+const courseFamiliesClient = new CourseFamiliesClient();
+const coursesClient = new CoursesClient();
 
 export default function CourseFamilyDetailPage() {
   const familyId = useParams().id as string;
@@ -21,8 +25,8 @@ export default function CourseFamilyDetailPage() {
 
   const { data, loading, error } = useResource(
     async () => ({
-      family: await api.get<CourseFamilyGet>(`/course-families/${familyId}`),
-      courses: await api.get<CourseList[]>(`/courses?course_family_id=${familyId}`),
+      family: await courseFamiliesClient.getCourseFamiliesCourseFamiliesIdGet({ id: familyId }),
+      courses: await coursesClient.listCoursesCoursesGet({ courseFamilyId: familyId }),
     }),
     [familyId],
   );

@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -13,7 +12,9 @@ import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
-import type { GitServerGet } from '@/src/generated/types/common';
+import { GitServersClient } from '@/src/generated/clients/GitServersClient';
+
+const gitServersClient = new GitServersClient();
 
 export default function GitServerDetailPage() {
   const serverId = useParams().id as string;
@@ -23,13 +24,13 @@ export default function GitServerDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { data: server, loading, error } = useResource(
-    () => api.get<GitServerGet>(`/git-servers/${serverId}`),
+    () => gitServersClient.getGitServerEndpointGitServersServerIdGet({ serverId }),
     [serverId],
     { enabled: canManage },
   );
 
   async function doDelete() {
-    await api.del(`/git-servers/${serverId}`);
+    await gitServersClient.deleteGitServerEndpointGitServersServerIdDelete({ serverId });
     router.push('/admin/git-servers');
   }
 

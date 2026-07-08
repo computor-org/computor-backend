@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
+import { MessagesClient } from '@/src/generated/clients/MessagesClient';
 import type { MessageList } from 'types/generated';
+
+const messagesClient = new MessagesClient();
 
 function authorName(m: MessageList): string {
   const n = [m.author?.given_name, m.author?.family_name].filter(Boolean).join(' ');
@@ -39,7 +41,7 @@ export default function NotificationsPage() {
     let cancelled = false;
     (async () => {
       try {
-        const items = await api.get<MessageList[]>('/messages?scope=global&limit=100');
+        const items = await messagesClient.listMessagesMessagesGet({ scope: 'global', limit: 100 });
         if (cancelled) return;
         items.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
         setMessages(items);
@@ -48,7 +50,7 @@ export default function NotificationsPage() {
         const unread = items.filter((m) => !m.is_read);
         setSeenUnread(new Set(unread.map((m) => m.id)));
         if (unread.length > 0) {
-          await Promise.allSettled(unread.map((m) => api.post(`/messages/${m.id}/reads`)));
+          await Promise.allSettled(unread.map((m) => messagesClient.markMessageReadMessagesIdReadsPost({ id: m.id })));
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load notifications');

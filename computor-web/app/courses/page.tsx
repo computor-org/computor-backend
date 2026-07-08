@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { api } from '@/src/utils/api';
+import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
@@ -12,9 +12,11 @@ import EmptyState from '@/src/components/EmptyState';
 import Badge from '@/src/components/Badge';
 import type { CourseList } from 'types/generated';
 
+const coursesClient = new CoursesClient();
+
 export default function CoursesPage() {
   const { courseRole, canCreateCourse } = usePermissions();
-  const { data, loading, error } = useResource(() => api.get<CourseList[]>('/courses'), []);
+  const { data, loading, error } = useResource(() => coursesClient.listCoursesCoursesGet({}), []);
   const courses = data ?? [];
 
   return (

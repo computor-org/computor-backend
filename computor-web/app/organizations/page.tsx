@@ -1,22 +1,25 @@
 'use client';
 
 import Link from 'next/link';
-import { api } from '@/src/utils/api';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
-import type { OrganizationList } from '@/src/generated/types/organizations';
+import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
+import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
+
+const organizationsClient = new OrganizationsClient();
+const courseFamiliesClient = new CourseFamiliesClient();
 
 export default function OrganizationsPage() {
   const { canCreateOrganization } = usePermissions();
 
   const { data, loading, error } = useResource(async () => {
     const [orgs, fams] = await Promise.all([
-      api.get<OrganizationList[]>('/organizations'),
-      api.get<Array<{ organization_id: string }>>('/course-families'),
+      organizationsClient.listOrganizationsOrganizationsGet({}),
+      courseFamiliesClient.listCourseFamiliesCourseFamiliesGet({}),
     ]);
     const familyCounts: Record<string, number> = {};
     for (const f of fams) familyCounts[f.organization_id] = (familyCounts[f.organization_id] ?? 0) + 1;

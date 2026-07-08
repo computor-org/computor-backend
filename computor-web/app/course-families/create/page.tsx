@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
@@ -11,6 +10,11 @@ import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
 import type { CourseFamilyGet } from '@/src/generated/types/courses';
 import type { OrganizationList } from '@/src/generated/types/organizations';
+import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
+import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
+
+const organizationsClient = new OrganizationsClient();
+const courseFamiliesClient = new CourseFamiliesClient();
 
 function CreateInner() {
   const router = useRouter();
@@ -28,8 +32,8 @@ function CreateInner() {
 
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
-    api
-      .get<OrganizationList[]>('/organizations')
+    organizationsClient
+      .listOrganizationsOrganizationsGet({})
       .then((all) => {
         const creatable = all.filter((o) => canCreateCourseFamily(o.id));
         setOrgs(creatable);
@@ -43,11 +47,13 @@ function CreateInner() {
     setSaving(true);
     setError(null);
     try {
-      const fam = await api.post<CourseFamilyGet>('/course-families', {
-        path: path.trim(),
-        organization_id: organizationId,
-        title: title.trim() || null,
-        description: description.trim() || null,
+      const fam = await courseFamiliesClient.createCourseFamiliesCourseFamiliesPost({
+        body: {
+          path: path.trim(),
+          organization_id: organizationId,
+          title: title.trim() || null,
+          description: description.trim() || null,
+        },
       });
       router.push(`/course-families/${fam.id}`);
     } catch (e) {

@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { api } from '@/src/utils/api';
+import { ExamplesClient } from '@/src/generated/clients/ExamplesClient';
+import { ExampleRepositoriesClient } from '@/src/generated/clients/ExampleRepositoriesClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -11,7 +12,10 @@ import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPa
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
-import type { ExampleList, ExampleRepositoryList } from 'types/generated';
+import type { ExampleRepositoryList } from 'types/generated';
+
+const examplesClient = new ExamplesClient();
+const exampleRepositoriesClient = new ExampleRepositoriesClient();
 
 export default function ExamplesPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -20,8 +24,8 @@ export default function ExamplesPage() {
 
   const { data, loading, error } = useResource(
     async () => ({
-      examples: await api.get<ExampleList[]>('/examples?limit=1000'),
-      repos: await api.get<ExampleRepositoryList[]>('/example-repositories?limit=200').catch(() => [] as ExampleRepositoryList[]),
+      examples: await examplesClient.listExamplesExamplesGet({ limit: 1000 }),
+      repos: await exampleRepositoriesClient.listExampleRepositoriesExampleRepositoriesGet({ limit: 200 }).catch(() => [] as ExampleRepositoryList[]),
     }),
     [],
     { enabled: canViewExamples },

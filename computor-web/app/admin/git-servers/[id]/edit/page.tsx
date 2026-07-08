@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { api } from '@/src/utils/api';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
-import type { GitServerGet } from '@/src/generated/types/common';
+import { GitServersClient } from '@/src/generated/clients/GitServersClient';
+import type { GitServerGet, GitServerUpdate } from '@/src/generated/types/common';
+
+const gitServersClient = new GitServersClient();
 
 export default function GitServerEditPage() {
   const serverId = useParams().id as string;
@@ -27,8 +29,8 @@ export default function GitServerEditPage() {
   useEffect(() => {
     if (authLoading || !isAuthenticated || !canManage) return;
     let cancelled = false;
-    api
-      .get<GitServerGet>(`/git-servers/${serverId}`)
+    gitServersClient
+      .getGitServerEndpointGitServersServerIdGet({ serverId })
       .then((s) => {
         if (cancelled) return;
         setServer(s);
@@ -47,9 +49,9 @@ export default function GitServerEditPage() {
     setError(null);
     try {
       // Only send token when touched: undefined keeps the existing one; "" would clear it.
-      const body: Record<string, unknown> = { name: name.trim() || null, managed };
+      const body: GitServerUpdate = { name: name.trim() || null, managed };
       if (token.length > 0) body.token = token.trim();
-      await api.patch(`/git-servers/${serverId}`, body);
+      await gitServersClient.updateGitServerEndpointGitServersServerIdPatch({ serverId, body });
       router.push(`/admin/git-servers/${serverId}`);
     } catch (e) {
       setSaving(false);

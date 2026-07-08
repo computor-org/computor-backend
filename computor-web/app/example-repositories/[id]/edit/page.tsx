@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { api } from '@/src/utils/api';
+import { ExampleRepositoriesClient } from '@/src/generated/clients/ExampleRepositoriesClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field, inputCls } from '@/src/components/FormPanel';
 import type { ExampleRepositoryGet } from 'types/generated';
+
+const exampleRepositoriesClient = new ExampleRepositoriesClient();
 
 export default function ExampleRepositoryEditPage() {
   const repoId = useParams().id as string;
@@ -26,8 +28,8 @@ export default function ExampleRepositoryEditPage() {
   useEffect(() => {
     if (authLoading || !isAuthenticated || !canManage) return;
     let cancelled = false;
-    api
-      .get<ExampleRepositoryGet>(`/example-repositories/${repoId}`)
+    exampleRepositoriesClient
+      .getExampleRepositoriesExampleRepositoriesIdGet({ id: repoId })
       .then((r) => {
         if (cancelled) return;
         setRepo(r);
@@ -45,7 +47,7 @@ export default function ExampleRepositoryEditPage() {
     setSaving(true);
     setError(null);
     try {
-      await api.patch(`/example-repositories/${repoId}`, { name: name.trim(), description: description.trim() || null });
+      await exampleRepositoriesClient.updateExampleRepositoriesExampleRepositoriesIdPatch({ id: repoId, body: { name: name.trim(), description: description.trim() || null } });
       router.push(`/example-repositories/${repoId}`);
     } catch (e) {
       setSaving(false);
