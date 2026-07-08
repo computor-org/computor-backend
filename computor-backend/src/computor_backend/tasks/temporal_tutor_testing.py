@@ -36,8 +36,8 @@ from .registry import register_task
 from .temporal_student_testing import (
     fetch_example_version_with_dependencies,
     execute_tests_activity,
-    EXAMPLE_CACHE_DIR,
 )
+from .worker_settings import get_worker_settings
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +226,7 @@ async def run_tutor_test_activity(
             reference_data = await fetch_example_version_with_dependencies(
                 example_version_id=example_version_id,
                 api_config=api_config,
-                target_base_dir=EXAMPLE_CACHE_DIR,
+                target_base_dir=get_worker_settings().example_cache_dir,
             )
 
             reference_path = reference_data["main_path"]
