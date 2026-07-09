@@ -23,14 +23,17 @@ def mint_workspace_token(
     cache,
     target_user_id: str,
     created_by: str,
+    workspace_name: str,
     ttl_days: Optional[int] = 30,
 ) -> Optional[str]:
     """
     Mint an API token for workspace auto-login.
 
-    This creates a singleton token named "workspace-auto-login" for the user.
-    If a token with this name already exists, it is revoked first (rotation), so
-    each provision hands the workspace a fresh token and invalidates the old one.
+    This creates a per-workspace singleton token named
+    "workspace-auto-login:{workspace_name}". If a token with this name already
+    exists, it is revoked first (rotation), so each provision hands THAT
+    workspace a fresh token and invalidates its old one — tokens of the user's
+    other workspaces stay valid.
 
     The token is given a bounded lifetime (``ttl_days``) so a leaked
     COMPUTOR_AUTH_TOKEN cannot be used indefinitely; an actively-used workspace
@@ -41,18 +44,29 @@ def mint_workspace_token(
         cache: Redis cache instance
         target_user_id: User ID to create the token for
         created_by: User ID of the admin creating the token
+        workspace_name: Effective (sanitized) workspace name the token is for
         ttl_days: Token lifetime in days; ``None`` or <= 0 means never expire
 
     Returns:
         The full token string if successful, None if failed
     """
-    logger.info(f"mint_workspace_token called: target={target_user_id}, by={created_by}")
+    logger.info(
+        f"mint_workspace_token called: target={target_user_id}, by={created_by}, "
+        f"workspace={workspace_name}"
+    )
     try:
         token_repo = ApiTokenRepository(db, cache)
-        token_name = "workspace-auto-login"
+        token_name = f"workspace-auto-login:{workspace_name}"
 
-        # Revoke existing tokens with this name (singleton pattern)
+        # Revoke existing tokens with this name (per-workspace singleton)
         existing = token_repo.find_all_active_by_name(target_user_id, token_name)
+        # Tokens minted before the per-workspace scheme were named plain
+        # "workspace-auto-login" and belonged to the old default workspace
+        # ("workspace") — rotate those too when re-provisioning it.
+        if workspace_name == "workspace":
+            existing = list(existing) + list(
+                token_repo.find_all_active_by_name(target_user_id, "workspace-auto-login")
+            )
         for old_token in existing:
             token_repo.revoke(str(old_token.id), reason="replaced by new workspace provision")
             logger.info(f"Revoked existing workspace token: {old_token.id}")

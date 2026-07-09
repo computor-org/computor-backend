@@ -24,15 +24,22 @@ def _admin():
     return Principal(user_id="u1", roles=["_admin"])
 
 
+def _settings():
+    # The endpoint reads settings.default_template when the request omits one.
+    settings = MagicMock()
+    settings.default_template = "python-workspace"
+    return settings
+
+
 @pytest.mark.asyncio
 async def test_template_not_found_propagates_as_service_unavailable():
-    request = WorkspaceProvisionRequest()  # default template = python-workspace
+    request = WorkspaceProvisionRequest()  # template omitted -> settings default
     client = MagicMock()
     client.get_template_id = AsyncMock(side_effect=CoderTemplateNotFoundError("python-workspace"))
 
     with patch("computor_backend.api.coder._check_workspace_access"):
         with pytest.raises(ServiceUnavailableException) as exc:
-            await provision_workspace(request, _admin(), MagicMock(), client, MagicMock(), MagicMock())
+            await provision_workspace(request, _admin(), _settings(), client, MagicMock(), MagicMock())
 
     # The typed 503 (not a NameError, not a generic 500) reaches the caller intact.
     assert "not yet available" in str(exc.value)
@@ -46,7 +53,7 @@ async def test_unexpected_coder_error_is_mapped_not_nameerror():
 
     with patch("computor_backend.api.coder._check_workspace_access"):
         with pytest.raises(ServiceUnavailableException) as exc:
-            await provision_workspace(request, _admin(), MagicMock(), client, MagicMock(), MagicMock())
+            await provision_workspace(request, _admin(), _settings(), client, MagicMock(), MagicMock())
 
     # Mapped by _handle_coder_error (the `except Exception` path), not a NameError.
     assert "connect to Coder" in str(exc.value)

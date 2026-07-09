@@ -9,6 +9,9 @@ directory must contain a `template.json` manifest with:
   - coder_template_name: Name used in Coder (e.g. "python-workspace")
   - image_name: Docker image name (e.g. "computor-workspace-python3.13")
   - build_args_env: List of env var names to pass as Docker build args (optional)
+  - display_name / description / icon: Template display metadata PATCHed into
+    Coder after each push; the web UI renders these. Icon is a Coder built-in
+    path like "/icon/python.svg" or an absolute URL. (optional)
 """
 import asyncio
 import json
@@ -292,17 +295,29 @@ async def push_coder_template(
         except FileNotFoundError:
             return {"success": False, "template": template_key, "error": "coder CLI not found on PATH"}
 
-        # Step 3: set TTL via REST API (through the client)
+        # Step 3: set TTL + display metadata via REST API (through the client).
+        # The manifest is the source of truth for display_name/description/icon,
+        # so they are always sent ("" clears a previously-set value).
         try:
             template_id = (await client.get_template(coder_template_name))["id"]
-            await client.patch_template_ttl(template_id, ttl_ms, activity_bump_ms)
-            logger.info(f"TTL set for {coder_template_name}: default={ttl_ms}ms, bump={activity_bump_ms}ms")
+            await client.patch_template_meta(
+                template_id,
+                ttl_ms=ttl_ms,
+                activity_bump_ms=activity_bump_ms,
+                display_name=info.get("display_name", ""),
+                description=info.get("description", ""),
+                icon=info.get("icon", ""),
+            )
+            logger.info(
+                f"Meta set for {coder_template_name}: ttl={ttl_ms}ms, bump={activity_bump_ms}ms, "
+                f"display_name={info.get('display_name', '')!r}"
+            )
         except Exception as e:
-            logger.warning(f"Template pushed but TTL update failed for {template_key}: {e}")
+            logger.warning(f"Template pushed but meta update failed for {template_key}: {e}")
             return {
                 "success": True,
                 "template": template_key,
-                "warning": f"Template pushed but TTL update failed: {e}",
+                "warning": f"Template pushed but meta update failed: {e}",
             }
 
     return {

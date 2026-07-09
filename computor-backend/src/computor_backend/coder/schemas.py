@@ -9,13 +9,6 @@ from typing import Any, Optional, Union
 from pydantic import BaseModel, Field
 
 
-class WorkspaceTemplate(str, Enum):
-    """Available workspace templates."""
-
-    PYTHON = "python-workspace"
-    MATLAB = "matlab-workspace"
-
-
 class WorkspaceStatus(str, Enum):
     """Workspace status from Coder API."""
 
@@ -60,15 +53,15 @@ class CoderUserCreate(BaseModel):
 class CoderWorkspaceCreate(BaseModel):
     """Schema for creating a Coder workspace."""
 
-    name: Optional[str] = Field(
-        None,
+    name: str = Field(
+        ...,
         min_length=1,
         max_length=100,
-        description="Workspace name (defaults to {username}-workspace)"
+        description="Workspace name"
     )
-    template: WorkspaceTemplate = Field(
-        WorkspaceTemplate.PYTHON,
-        description="Workspace template to use"
+    template: str = Field(
+        ...,
+        description="Workspace template name (must exist in Coder)"
     )
     code_server_password: Optional[str] = Field(
         None,
@@ -113,7 +106,8 @@ class CoderWorkspace(BaseModel):
     owner_id: str = Field(..., description="Owner user ID")
     owner_name: Optional[str] = Field(None, description="Owner username")
     template_id: str = Field(..., description="Template ID")
-    template_name: Optional[str] = Field(None, description="Template name")
+    template_name: Optional[str] = Field(None, description="Raw template name (stable identifier, e.g. 'python-workspace')")
+    template_display_name: Optional[str] = Field(None, description="Human-readable template display name")
     template_version_id: Optional[str] = Field(
         None, description="Template version the latest build ran (for fleet/update views)"
     )
