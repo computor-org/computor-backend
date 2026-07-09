@@ -11,6 +11,7 @@ import { UsersClient } from '@/src/generated/clients/UsersClient';
 import type { CourseGroupList, UserList } from 'types/generated';
 import type { CourseRoleId } from '@/src/utils/courseRoles';
 import { Table, Tbody, Th } from '@/src/components/ui/Table';
+import Button from '@/src/components/ui/Button';
 
 const PAGE_SIZE = 10;
 const membersClient = new CourseMembersClient();
@@ -191,13 +192,14 @@ export default function AddFromUserList({
                       {isAdded ? (
                         <span className="text-sm text-green-700">Added ✓</span>
                       ) : (
-                        <button
+                        <Button
+                          size="sm"
                           onClick={() => addUser(u)}
-                          disabled={addingId === u.id}
-                          className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                          loading={addingId === u.id}
+                          loadingLabel="Adding…"
                         >
-                          {addingId === u.id ? 'Adding…' : 'Add'}
-                        </button>
+                          Add
+                        </Button>
                       )}
                     </td>
                   </tr>
@@ -218,20 +220,22 @@ export default function AddFromUserList({
       <div className="flex items-center justify-between">
         <span className="text-sm text-gray-500">Page {page + 1}</span>
         <div className="flex gap-2">
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             disabled={page === 0 || usersLoading}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
           >
             Previous
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setPage((p) => p + 1)}
             disabled={!hasNext || usersLoading}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
           >
             Next
-          </button>
+          </Button>
         </div>
       </div>
     </div>

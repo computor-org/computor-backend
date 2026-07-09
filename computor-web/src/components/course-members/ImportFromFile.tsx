@@ -8,6 +8,7 @@ import { fileToBase64 } from '@/src/utils/file';
 import type { CourseMemberImportRow } from 'types/generated';
 import type { CourseRoleId } from '@/src/utils/courseRoles';
 import { Table, Tbody, Th } from '@/src/components/ui/Table';
+import Button from '@/src/components/ui/Button';
 
 const importClient = new CourseMemberImportClient();
 
@@ -189,13 +190,14 @@ export default function ImportFromFile({
             </Table>
           </div>
           <div className="flex items-center gap-3">
-            <button
+            <Button
               onClick={importParsed}
-              disabled={fileImporting || selectedFileCount === 0}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              disabled={selectedFileCount === 0}
+              loading={fileImporting}
+              loadingLabel="Importing…"
             >
-              {fileImporting ? 'Importing…' : `Import ${selectedFileCount} selected`}
-            </button>
+              {`Import ${selectedFileCount} selected`}
+            </Button>
             {fileSummary && <span className="text-sm text-gray-600">{fileSummary}</span>}
           </div>
         </>

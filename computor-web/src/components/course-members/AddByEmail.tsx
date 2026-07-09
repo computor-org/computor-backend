@@ -4,6 +4,7 @@ import { useState } from 'react';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import { Field } from '@/src/components/FormPanel';
 import { inputCls } from '@/src/components/ui/tokens';
+import Button from '@/src/components/ui/Button';
 import RoleSelect from '@/src/components/course-members/RoleSelect';
 import { CourseMemberImportClient } from '@/src/generated/clients/CourseMemberImportClient';
 import type { CourseRoleId } from '@/src/utils/courseRoles';
@@ -113,13 +114,14 @@ export default function AddByEmail({
         </Field>
       </div>
 
-      <button
+      <Button
         type="submit"
-        disabled={importing || !email.trim()}
-        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+        disabled={!email.trim()}
+        loading={importing}
+        loadingLabel="Adding…"
       >
-        {importing ? 'Adding…' : 'Add by email'}
-      </button>
+        Add by email
+      </Button>
     </form>
   );
 }

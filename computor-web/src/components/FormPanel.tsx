@@ -5,6 +5,7 @@ import { type Crumb } from './Breadcrumbs';
 import ListPageLayout, { ScrollArea } from './ListPageLayout';
 import PageHeader from './PageHeader';
 import ErrorBanner from './ErrorBanner';
+import Button from './ui/Button';
 
 export function Field({
   label,
@@ -79,21 +80,18 @@ export default function FormPanel({
         subtitle={description}
         actions={
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
-            >
+            <Button variant="ghost" onClick={onCancel}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               form={formId}
-              disabled={submitting || disabled}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              disabled={disabled}
+              loading={submitting}
+              loadingLabel="Saving…"
             >
-              {submitting ? 'Saving…' : submitLabel}
-            </button>
+              {submitLabel}
+            </Button>
           </div>
         }
       />
