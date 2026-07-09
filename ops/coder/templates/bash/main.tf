@@ -19,14 +19,14 @@ variable "docker_socket" {
   type        = string
 }
 
-variable "code_server_port" {
-  default     = 13337
-  description = "Port for code-server"
+variable "ttyd_port" {
+  default     = 7681
+  description = "Port for the ttyd browser terminal"
   type        = number
 }
 
 variable "workspace_image" {
-  default     = "localhost:5000/computor-workspace-python3.13:latest"
+  default     = "localhost:5000/computor-workspace-bash:latest"
   description = "Pre-built workspace image from local registry"
   type        = string
 }
@@ -45,7 +45,7 @@ variable "docker_network" {
 
 variable "coder_base_path" {
   default     = "/coder"
-  description = "Base path prefix for code-server access via Traefik"
+  description = "Base path prefix for workspace access via Traefik"
   type        = string
 }
 
@@ -59,21 +59,11 @@ variable "computor_backend_internal" {
   type        = string
 }
 
-variable "code_server_password" {
-  default     = ""
-  description = "Password for code-server access (empty = no password required)"
-  type        = string
-  sensitive   = true
-}
-
 variable "dev_forward_ports" {
   default     = ""
   description = "Comma-separated localhost ports to forward to host.docker.internal (dev only, empty = disabled)"
   type        = string
 }
-
-# NOTE: computor_auth_token is now defined as a coder_parameter below
-# to allow per-workspace values via rich_parameter_values API
 
 ###########################
 # DATA SOURCES
@@ -91,7 +81,7 @@ data "coder_workspace_owner" "me" {}
 data "coder_parameter" "computor_auth_token" {
   name         = "computor_auth_token"
   type         = "string"
-  description  = "Pre-minted API token for automatic VSCode extension authentication"
+  description  = "Pre-minted API token for automatic Computor authentication"
   mutable      = true
   default      = ""
   display_name = "Computor Auth Token"
@@ -138,21 +128,6 @@ resource "coder_agent" "main" {
     # Create default workspace folder
     mkdir -p ~/workspace
 
-    # Create Computor extension config directory and file
-    mkdir -p ~/.computor
-    cat > ~/.computor/config.json << COMPUTOR_EOF
-{
-  "version": "1.0.0",
-  "authentication": {
-    "baseUrl": "${var.computor_backend_url}",
-    "autoLogin": true
-  }
-}
-COMPUTOR_EOF
-
-    # Create workspace marker file (triggers extension activation)
-    touch ~/workspace/.computor
-
     # User personalization hook: with the shared per-user home, apt-installed
     # software is per-workspace and lost on rebuild — users can re-apply such
     # setup in an executable ~/personalize script.
@@ -160,32 +135,16 @@ COMPUTOR_EOF
       "$HOME/personalize" >/tmp/personalize.log 2>&1 || true
     fi
 
-    # Start code-server in background
-    # Configure abs-proxy-base-path for Traefik routing at /coder prefix
-    # Bind to 0.0.0.0 so Traefik can reach it from outside the container
-    # Use password auth if password is provided, otherwise no auth
-    # The home is shared across the user's workspaces, so code-server state
-    # (open editors, machine settings) is scoped per workspace via user-data-dir
-    %{ if var.code_server_password != "" }
-    export PASSWORD="${var.code_server_password}"
-    code-server \
-      --auth password \
-      --bind-addr 0.0.0.0:${var.code_server_port} \
-      --abs-proxy-base-path "${var.coder_base_path}/${data.coder_workspace_owner.me.name}/${data.coder_workspace.me.name}" \
-      --extensions-dir /opt/code-server/extensions \
-      --user-data-dir "/home/coder/.local/share/code-server-${lower(data.coder_workspace.me.name)}" \
-      /home/coder/workspace \
-      >/tmp/code-server.log 2>&1 &
-    %{ else }
-    code-server \
-      --auth none \
-      --bind-addr 0.0.0.0:${var.code_server_port} \
-      --abs-proxy-base-path "${var.coder_base_path}/${data.coder_workspace_owner.me.name}/${data.coder_workspace.me.name}" \
-      --extensions-dir /opt/code-server/extensions \
-      --user-data-dir "/home/coder/.local/share/code-server-${lower(data.coder_workspace.me.name)}" \
-      /home/coder/workspace \
-      >/tmp/code-server.log 2>&1 &
-    %{ endif }
+    # Start the browser terminal in background.
+    # Traefik strips the /coder/{user}/{workspace} prefix, so ttyd serves at
+    # root; its asset and websocket URLs are relative, which resolves correctly
+    # as long as the workspace URL ends with a trailing slash.
+    ttyd \
+      --port ${var.ttyd_port} \
+      --interface 0.0.0.0 \
+      --writable \
+      bash --login \
+      >/tmp/ttyd.log 2>&1 &
   EOT
 
   env = {
@@ -223,34 +182,14 @@ COMPUTOR_EOF
 }
 
 ###########################
-# MODULES
-###########################
-
-# NOTE: code-server is started manually in the startup_script above
-# to support --abs-proxy-base-path for Traefik routing at /coder/{user}/{workspace}
-# Do NOT add the code-server module here as it will conflict (EADDRINUSE)
-
-# JetBrains Gateway
-module "jetbrains" {
-  count      = data.coder_workspace.me.start_count
-  source     = "registry.coder.com/coder/jetbrains/coder"
-  version    = "~> 1.1"
-  agent_id   = coder_agent.main.id
-  agent_name = "main"
-  folder     = "/home/coder"
-}
-
-###########################
 # DOCKER RESOURCES
 ###########################
 
 # Shared per-USER home volume: every workspace of a user mounts the same
-# /home/coder, so files and user-space installs (pip --user, venvs, npm, ...)
-# follow the user across workspaces. The volume is deliberately NOT a
-# Terraform resource — the docker engine auto-creates it on first mount, and
-# because Terraform never owns it, deleting a workspace can never destroy the
-# user's home. System (apt) packages live in the image/container rootfs and
-# are NOT shared or persisted.
+# /home/coder, so files and user-space installs follow the user across
+# workspaces. The volume is deliberately NOT a Terraform resource — the docker
+# engine auto-creates it on first mount, and because Terraform never owns it,
+# deleting a workspace can never destroy the user's home.
 locals {
   home_volume_name = "coder-home-${data.coder_workspace_owner.me.id}"
 }
@@ -269,8 +208,6 @@ resource "docker_container" "workspace" {
   hostname = data.coder_workspace.me.name
 
   # Fix for agent connection: replace localhost URLs with internal Coder URL
-  # The init script contains URLs like http://localhost/bin/...
-  # We need to replace with http://coder:7080/bin/...
   entrypoint = [
     "sh", "-c",
     replace(
@@ -308,7 +245,7 @@ resource "docker_container" "workspace" {
     value = data.coder_workspace.me.id
   }
 
-  # Traefik labels for direct code-server access at /coder/{username}/{workspace}
+  # Traefik labels for terminal access at /coder/{username}/{workspace}
   labels {
     label = "traefik.enable"
     value = "true"
@@ -326,7 +263,7 @@ resource "docker_container" "workspace" {
 
   labels {
     label = "traefik.http.services.coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.loadbalancer.server.port"
-    value = "${var.code_server_port}"
+    value = "${var.ttyd_port}"
   }
 
   # Middleware to strip the /coder/{username}/{workspace} prefix before forwarding

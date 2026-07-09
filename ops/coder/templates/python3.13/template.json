@@ -1,5 +1,8 @@
 {
     "coder_template_name": "python-workspace",
     "image_name": "computor-workspace-python3.13",
-    "build_args_env": []
+    "build_args_env": [],
+    "display_name": "Python 3.13",
+    "description": "Python 3.13 with VS Code in the browser and the Computor extension.",
+    "icon": "/icon/python.svg"
 }

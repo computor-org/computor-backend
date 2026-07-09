@@ -1,0 +1,8 @@
+{
+    "coder_template_name": "debian-workspace",
+    "image_name": "computor-workspace-debian",
+    "build_args_env": [],
+    "display_name": "Debian (VS Code)",
+    "description": "Plain Debian with VS Code in the browser and the Computor extension. No preinstalled language toolchains.",
+    "icon": "/icon/debian.svg"
+}

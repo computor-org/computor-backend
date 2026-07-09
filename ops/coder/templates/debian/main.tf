@@ -26,7 +26,7 @@ variable "code_server_port" {
 }
 
 variable "workspace_image" {
-  default     = "localhost:5000/computor-workspace-python3.13:latest"
+  default     = "localhost:5000/computor-workspace-debian:latest"
   description = "Pre-built workspace image from local registry"
   type        = string
 }

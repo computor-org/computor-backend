@@ -35,8 +35,16 @@ echo -e "\n${YELLOW}Stopping all Coder services via docker compose...${NC}"
 docker compose $COMPOSE_FILES stop coder-postgres coder coder-registry temporal-worker-coder 2>/dev/null
 docker compose $COMPOSE_FILES rm -f coder-postgres coder coder-registry temporal-worker-coder 2>/dev/null
 
+echo -e "\n${YELLOW}Removing Coder workspace containers...${NC}"
+# Workspace containers carry the coder.owner label (set by the Terraform template)
+docker ps -aq --filter "label=coder.owner" | xargs -r docker rm -f 2>/dev/null
+
 echo -e "\n${YELLOW}Removing Coder Docker volumes...${NC}"
 docker volume rm -f computor-coder-home computor-coder-registry 2>/dev/null
+# Legacy per-workspace home volumes (labelled by Terraform) ...
+docker volume ls -q --filter "label=coder.owner" | xargs -r docker volume rm -f 2>/dev/null
+# ... and shared per-user home volumes (engine-created, unlabelled: coder-home-<owner-id>)
+docker volume ls -q --filter "name=coder-home-" | xargs -r docker volume rm -f 2>/dev/null
 
 echo -e "\n${YELLOW}Removing Coder database (separate from main DB)...${NC}"
 # Remove Coder database files (bind mount) — always attempt, not just when container is running

@@ -50,9 +50,15 @@ docker compose $COMPOSE_FILES stop coder-postgres coder coder-registry temporal-
 docker compose $COMPOSE_FILES rm -f coder-postgres coder coder-registry temporal-worker-coder 2>/dev/null
 echo "  Coder containers stopped and removed"
 
-echo -e "\n${YELLOW}2. Removing Coder Docker volumes...${NC}"
+echo -e "\n${YELLOW}2. Removing Coder workspace containers and volumes...${NC}"
+# Workspace containers carry the coder.owner label (set by the Terraform template)
+docker ps -aq --filter "label=coder.owner" | xargs -r docker rm -f 2>/dev/null
 docker volume rm -f computor-coder-home computor-coder-registry 2>/dev/null
-echo "  Volumes removed"
+# Legacy per-workspace home volumes (labelled by Terraform) ...
+docker volume ls -q --filter "label=coder.owner" | xargs -r docker volume rm -f 2>/dev/null
+# ... and shared per-user home volumes (engine-created, unlabelled: coder-home-<owner-id>)
+docker volume ls -q --filter "name=coder-home-" | xargs -r docker volume rm -f 2>/dev/null
+echo "  Workspace containers and volumes removed"
 
 echo -e "\n${YELLOW}3. Wiping Coder database (separate from main DB)...${NC}"
 # Remove Coder database directory (bind mount) — always attempt, not just when container is running
