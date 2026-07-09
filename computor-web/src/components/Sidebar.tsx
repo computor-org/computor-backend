@@ -11,7 +11,7 @@ import { icons } from './icons';
 import {
   NavItem,
   coursesNavigation,
-  workspacesNavigation,
+  getWorkspacesNavigation,
   managementNavigation,
   adminNavigation,
   userMgmtNavigation,
@@ -22,7 +22,7 @@ import {
 export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
-  const { isAdmin, isOrganizationManager, isUserManager, isWorkspaceUser, isExampleManager, showManagement } = usePermissions();
+  const { isAdmin, isOrganizationManager, isUserManager, isWorkspaceUser, isWorkspaceMaintainer, isExampleManager, showManagement } = usePermissions();
   const [collapsed, setCollapsed] = useState(false);
 
   // Sub-sections the user has explicitly toggled open. The section containing
@@ -281,7 +281,7 @@ export default function Sidebar() {
                 })),
           )}
         {isUserManager && renderNavItems(userMgmtNavigation)}
-        {isWorkspaceUser && renderNavItems(workspacesNavigation)}
+        {isWorkspaceUser && renderNavItems(getWorkspacesNavigation(isWorkspaceMaintainer))}
         {isAdmin && renderNavItems(adminNavigation)}
       </nav>
 

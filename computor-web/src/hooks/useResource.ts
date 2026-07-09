@@ -8,6 +8,9 @@ interface UseResourceResult<T> {
   loading: boolean;
   error: string | null;
   reload: () => Promise<void>;
+  /** Like `reload` but silent — refreshes data without flipping `loading`
+   *  (for after-action refreshes that shouldn't flash the page). */
+  refresh: () => Promise<void>;
   setData: (value: T | null) => void;
 }
 
@@ -55,6 +58,7 @@ export function useResource<T>(
   }, deps);
 
   const reload = useCallback(() => run(false), [run]);
+  const refresh = useCallback(() => run(true), [run]);
 
   useEffect(() => {
     if (authLoading || !isAuthenticated || !enabled) return;
@@ -63,9 +67,20 @@ export function useResource<T>(
 
   useEffect(() => {
     if (authLoading || !isAuthenticated || !enabled || !refetchInterval) return;
-    const id = setInterval(() => run(true), refetchInterval);
-    return () => clearInterval(id);
+    // Skip ticks while the tab is hidden (no point polling a page nobody sees)
+    // and refresh immediately when it becomes visible again.
+    const id = setInterval(() => {
+      if (!document.hidden) run(true);
+    }, refetchInterval);
+    const handleVisibility = () => {
+      if (!document.hidden) run(true);
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [authLoading, isAuthenticated, enabled, refetchInterval, run]);
 
-  return { data, loading, error, reload, setData };
+  return { data, loading, error, reload, refresh, setData };
 }

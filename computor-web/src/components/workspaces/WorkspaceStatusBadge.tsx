@@ -1,5 +1,6 @@
 'use client';
 
+import Badge, { type BadgeColor } from '@/src/components/Badge';
 import type { WorkspaceBuildStatus } from '@/src/types/workspaces';
 
 type StatusCategory = 'running' | 'stopped' | 'pending' | 'failed' | 'unknown';
@@ -14,12 +15,12 @@ function categorizeStatus(status?: WorkspaceBuildStatus | string | null): Status
   return 'unknown';
 }
 
-const categoryStyles: Record<StatusCategory, string> = {
-  running: 'bg-green-100 text-green-700',
-  stopped: 'bg-gray-100 text-gray-700',
-  pending: 'bg-yellow-100 text-yellow-700',
-  failed: 'bg-red-100 text-red-700',
-  unknown: 'bg-gray-100 text-gray-500',
+const categoryColor: Record<StatusCategory, BadgeColor> = {
+  running: 'green',
+  stopped: 'gray',
+  pending: 'yellow',
+  failed: 'red',
+  unknown: 'gray',
 };
 
 const categoryDots: Record<StatusCategory, string> = {
@@ -30,22 +31,18 @@ const categoryDots: Record<StatusCategory, string> = {
   unknown: 'bg-gray-400',
 };
 
-interface WorkspaceStatusBadgeProps {
+/** Live workspace status as a shared Badge pill with a state dot. */
+export default function WorkspaceStatusBadge({
+  status,
+}: {
   status?: WorkspaceBuildStatus | string | null;
-  size?: 'sm' | 'md';
-}
-
-export default function WorkspaceStatusBadge({ status, size = 'md' }: WorkspaceStatusBadgeProps) {
+}) {
   const category = categorizeStatus(status);
-  const label = status || 'unknown';
-
-  const sizeClasses = size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-xs';
-
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full font-medium ${sizeClasses} ${categoryStyles[category]}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${categoryDots[category]}`} />
-      {label}
-    </span>
+    <Badge color={categoryColor[category]} pill>
+      <span className={`h-1.5 w-1.5 rounded-full mr-1.5 ${categoryDots[category]}`} />
+      {status || 'unknown'}
+    </Badge>
   );
 }
 

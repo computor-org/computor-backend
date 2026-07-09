@@ -8,17 +8,21 @@ import Link from 'next/link';
  * that were previously copy-pasted across pages — use this instead of raw
  * class strings so the palette stays in one place.
  */
-export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
-export type ButtonSize = 'sm' | 'md';
+export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'dangerGhost' | 'ghost';
+export type ButtonSize = 'xs' | 'sm' | 'md';
 
 const VARIANT_CLS: Record<ButtonVariant, string> = {
   primary: 'bg-blue-600 text-white hover:bg-blue-700',
   secondary: 'border border-gray-300 text-gray-700 bg-white hover:bg-gray-50',
   danger: 'bg-red-600 text-white hover:bg-red-700',
+  // Low-emphasis destructive action (e.g. Delete in a table row) — red text
+  // without the solid fill that would shout from every row.
+  dangerGhost: 'text-red-600 hover:bg-red-50',
   ghost: 'text-gray-600 hover:bg-gray-100',
 };
 
 const SIZE_CLS: Record<ButtonSize, string> = {
+  xs: 'px-2.5 py-1 text-xs',
   sm: 'px-3 py-1.5 text-sm',
   md: 'px-4 py-2 text-sm',
 };

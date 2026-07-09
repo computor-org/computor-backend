@@ -62,6 +62,10 @@ export function usePermissions() {
   // Coder/workspace access is controlled by the _workspace_user system role
   // (admins bypass). Gates the Workspaces sidebar section.
   const isWorkspaceUser = isAdmin || systemRoles.includes('_workspace_user');
+  // Provisioning, templates and workspace administration are reserved to
+  // _workspace_maintainer (admins bypass) — mirrors the backend claims
+  // (workspace:provision / workspace:templates / workspace:manage).
+  const isWorkspaceMaintainer = isAdmin || systemRoles.includes('_workspace_maintainer');
 
   const hasView = (view: string) => views.includes(view);
 
@@ -136,6 +140,7 @@ export function usePermissions() {
     canManageExamples,
     canViewExamples,
     isWorkspaceUser,
+    isWorkspaceMaintainer,
     hasView,
     views,
     scopes,

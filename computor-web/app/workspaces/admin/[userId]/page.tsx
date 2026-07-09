@@ -5,31 +5,39 @@ import { useParams } from 'next/navigation';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import { useResource } from '@/src/hooks/useResource';
+import { useWorkspaceActions } from '@/src/hooks/useWorkspaceActions';
+import { useCoderTemplates } from '@/src/hooks/useCoderTemplates';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { WorkspaceRolesClient } from '@/src/clients/WorkspaceRolesClient';
 import WorkspaceTable from '@/src/components/workspaces/WorkspaceTable';
+import WorkspaceDetailsModal from '@/src/components/workspaces/WorkspaceDetailsModal';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
-import { useNotify } from '@/src/contexts/NotificationContext';
-import type { CoderWorkspace, WorkspaceTemplate } from '@/src/types/workspaces';
+import Button from '@/src/components/ui/Button';
+import { inputCls } from '@/src/components/ui/tokens';
+import type { CoderWorkspace, WorkspaceDetails } from '@/src/types/workspaces';
 
 const coderClient = new CoderClient();
 const rolesClient = new WorkspaceRolesClient();
 
 export default function UserDetailPage() {
   const { userId } = useParams<{ userId: string }>();
-  const notify = useNotify();
 
   const [deleteTarget, setDeleteTarget] = useState<{ owner: string; name: string } | null>(null);
+  const [detailsData, setDetailsData] = useState<WorkspaceDetails | null>(null);
   const [provisioning, setProvisioning] = useState(false);
+  const [template, setTemplate] = useState('');
+
+  const { templates } = useCoderTemplates();
 
   const {
     data,
     loading,
     error,
     reload: fetchUserAndWorkspaces,
+    refresh,
   } = useResource(async () => {
     // Fetch user info from the role users list
     const allUsers = await rolesClient.listUsers();
@@ -51,66 +59,25 @@ export default function UserDetailPage() {
   const user = data?.user ?? null;
   const workspaces = data?.workspaces ?? [];
 
+  const actions = useWorkspaceActions(refresh);
+
   const handleProvision = async () => {
     if (!user?.email) return;
     setProvisioning(true);
-    try {
-      await coderClient.provisionWorkspace({
-        body: { email: user.email, template: 'python-workspace' as WorkspaceTemplate },
-      });
-      notify('Workspace provisioned', 'success');
-      await fetchUserAndWorkspaces();
-    } catch (err) {
-      notify(err instanceof Error ? err.message : 'Provisioning failed', 'error');
-    } finally {
-      setProvisioning(false);
-    }
-  };
-
-  const handleStart = async (owner: string, name: string) => {
-    try {
-      await coderClient.startWorkspace({ username: owner, workspaceName: name });
-      notify('Workspace starting...', 'success');
-      setTimeout(fetchUserAndWorkspaces, 2000);
-    } catch (err) {
-      notify(err instanceof Error ? err.message : 'Failed to start', 'error');
-    }
-  };
-
-  const handleStop = async (owner: string, name: string) => {
-    try {
-      await coderClient.stopWorkspace({ username: owner, workspaceName: name });
-      notify('Workspace stopping...', 'success');
-      setTimeout(fetchUserAndWorkspaces, 2000);
-    } catch (err) {
-      notify(err instanceof Error ? err.message : 'Failed to stop', 'error');
-    }
+    // Omitted template = server default; the select allows a specific type.
+    await actions.provision({ email: user.email, template: template || null });
+    setProvisioning(false);
   };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    try {
-      await coderClient.deleteWorkspace({ username: deleteTarget.owner, workspaceName: deleteTarget.name });
-      notify('Workspace deleted', 'success');
-      setDeleteTarget(null);
-      await fetchUserAndWorkspaces();
-    } catch (err) {
-      notify(err instanceof Error ? err.message : 'Failed to delete', 'error');
-      setDeleteTarget(null);
-    }
+    await actions.remove(deleteTarget.owner, deleteTarget.name);
+    setDeleteTarget(null);
   };
 
   const handleOpenWorkspace = async (owner: string, name: string) => {
-    try {
-      const data = await coderClient.getWorkspaceDetails({ username: owner, workspaceName: name });
-      if (data.code_server_url || data.access_url) {
-        window.open((data.code_server_url || data.access_url)!, '_blank');
-      } else {
-        notify('No access URL available', 'error');
-      }
-    } catch (err) {
-      notify(err instanceof Error ? err.message : 'Failed to open', 'error');
-    }
+    const details = await actions.openOrDetails(owner, name);
+    if (details) setDetailsData(details);
   };
 
   return (
@@ -126,21 +93,32 @@ export default function UserDetailPage() {
           title="User Detail"
           actions={
             user && (
-              <>
-                <button
-                  onClick={fetchUserAndWorkspaces}
-                  className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                >
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" onClick={fetchUserAndWorkspaces}>
                   Refresh
-                </button>
-                <button
-                  onClick={handleProvision}
-                  disabled={provisioning || !user.email}
-                  className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                </Button>
+                <select
+                  value={template}
+                  onChange={(e) => setTemplate(e.target.value)}
+                  className={`${inputCls} w-auto`}
+                  aria-label="Workspace template"
                 >
-                  {provisioning ? 'Provisioning...' : 'Provision New Workspace'}
-                </button>
-              </>
+                  <option value="">Default template</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.name}>
+                      {t.display_name || t.name}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  onClick={handleProvision}
+                  disabled={!user.email}
+                  loading={provisioning}
+                  loadingLabel="Provisioning..."
+                >
+                  Provision Workspace
+                </Button>
+              </div>
             )
           }
         />
@@ -212,8 +190,8 @@ export default function UserDetailPage() {
               ) : (
                 <WorkspaceTable
                   workspaces={workspaces}
-                  onStart={handleStart}
-                  onStop={handleStop}
+                  onStart={actions.start}
+                  onStop={actions.stop}
                   onDelete={(owner, name) => setDeleteTarget({ owner, name })}
                   onViewDetails={handleOpenWorkspace}
                 />
@@ -227,12 +205,17 @@ export default function UserDetailPage() {
         <ConfirmDialog
           open={deleteTarget !== null}
           title="Delete Workspace"
-          message={`Are you sure you want to delete workspace "${deleteTarget?.name}"? This action cannot be undone.`}
+          message={`Are you sure you want to delete workspace "${deleteTarget?.name}"? The user's shared home directory will NOT be deleted.`}
           confirmLabel="Delete"
           variant="danger"
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
         />
+
+        {/* Details modal */}
+        {detailsData && (
+          <WorkspaceDetailsModal details={detailsData} onClose={() => setDetailsData(null)} />
+        )}
       </ListPageLayout>
     </AuthenticatedLayout>
   );
