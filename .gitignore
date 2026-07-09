@@ -66,6 +66,9 @@ startup.sh.old
 # Coder deployment environment
 ops/coder/.env
 
+# Runtime pprof debug socket the coder CLI drops in its working directory
+.coder/
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

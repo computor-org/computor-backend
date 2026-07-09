@@ -13,9 +13,14 @@
 # computor env is ABI-compatible.
 FROM python:3.10-slim
 
+# git: the task registry imports EVERY task module on every worker, and
+# git_ops imports GitPython, which refuses to import without a git binary —
+# without it the coder worker crash-loops at startup (computor-base has git,
+# but this runtime is python:3.10-slim, not computor-base).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         docker.io \
+        git \
     && rm -rf /var/lib/apt/lists/* \
     && curl -fsSL https://coder.com/install.sh | sh
 
