@@ -1,0 +1,8 @@
+{
+    "coder_template_name": "jupyterlab-workspace",
+    "image_name": "computor-workspace-jupyter",
+    "build_args_env": [],
+    "display_name": "JupyterLab",
+    "description": "JupyterLab in the browser with a scientific Python stack (NumPy, pandas, Matplotlib, SciPy, SymPy).",
+    "icon": "/icon/jupyter.svg"
+}

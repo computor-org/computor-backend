@@ -87,6 +87,9 @@ docker run --rm \
    `loadbalancer.server.port` label in `container.tf` to the app's port. Keep the
    ForwardAuth + stripprefix middleware chain and the shared home mount as-is. Apps must
    work behind a stripped path prefix (relative asset/websocket URLs), like ttyd and
-   KasmVNC do; code-server needs `--abs-proxy-base-path`.
+   KasmVNC do; code-server needs `--abs-proxy-base-path`. Alternatively, an app that can
+   serve under a base path (e.g. JupyterLab's `--ServerApp.base_url`) can own the full
+   `/coder/{owner}/{workspace}` prefix — for that template, drop the stripprefix
+   middleware so the prefix reaches the container intact (see `jupyter`).
 5. Run `startup.sh` (or copy the dir into the deployed templates dir) and push via
    `POST /coder/admin/templates/push {"templates": ["<dir-name>"], "build_images": true}`.
