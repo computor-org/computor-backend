@@ -72,6 +72,24 @@ variable "dev_forward_ports" {
   type        = string
 }
 
+variable "pids_limit" {
+  default     = 1024
+  description = "Max processes per workspace — a fork-bomb guard. 0 = unlimited."
+  type        = number
+}
+
+variable "memory_mb" {
+  default     = 0
+  description = "Workspace memory cap in MiB. 0 = unlimited; set per host capacity to bound RAM use."
+  type        = number
+}
+
+variable "cpu_shares" {
+  default     = 0
+  description = "Relative CPU weight under contention (Docker default 1024). 0 = Docker default."
+  type        = number
+}
+
 # NOTE: computor_auth_token is now defined as a coder_parameter below
 # to allow per-workspace values via rich_parameter_values API
 
@@ -267,6 +285,13 @@ resource "docker_container" "workspace" {
   image    = docker_image.workspace_image.name
   name     = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
   hostname = data.coder_workspace.me.name
+
+  # Resource limits so one workspace (whose user has sudo) cannot exhaust the
+  # host. pids_limit is an always-on fork-bomb guard; memory and cpu_shares are
+  # opt-in caps (0 = unlimited/default) — set them per host capacity.
+  pids_limit = var.pids_limit
+  memory     = var.memory_mb
+  cpu_shares = var.cpu_shares
 
   # Fix for agent connection: replace localhost URLs with internal Coder URL
   # The init script contains URLs like http://localhost/bin/...
