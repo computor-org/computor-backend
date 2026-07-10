@@ -10,7 +10,8 @@ A template directory must contain:
 | File | Purpose |
 |---|---|
 | `template.json` | Manifest (see below). Its presence makes the directory a template. |
-| `main.tf` | Coder Terraform template: agent, workspace container, Traefik routing. |
+| `*.tf` | Coder Terraform template. Terraform loads every `.tf` in the dir, so it is split by concern: `versions.tf` (providers), `variables.tf`, `main.tf` (data sources/locals/parameter), `agent.tf` (coder_agent + IDE modules), `container.tf` (workspace container + Traefik routing). |
+| `startup.sh.tftpl` | Agent startup script, loaded from `agent.tf` via `templatefile()`. Bash/awk vars use the single-`$` form; Terraform interpolation uses `${...}` and the passed vars map. |
 | `Dockerfile` | Optional. When present, the image build workflow builds & pushes it to the local registry. |
 
 `template.json` fields:
@@ -82,10 +83,10 @@ docker run --rm \
    `ubuntu-desktop` for GUI-based types).
 2. Adjust `template.json` (unique `coder_template_name` + `image_name`, display metadata).
 3. Adjust the `Dockerfile` (keep the uid-1000 `coder` user and `/home/coder` home).
-4. In `main.tf` adjust the app the agent starts and the Traefik
-   `loadbalancer.server.port` label to the app's port. Keep the ForwardAuth + stripprefix
-   middleware chain and the shared home mount as-is. Apps must work behind a stripped path
-   prefix (relative asset/websocket URLs), like ttyd and KasmVNC do; code-server needs
-   `--abs-proxy-base-path`.
+4. Adjust the app the agent starts in `startup.sh.tftpl` and the Traefik
+   `loadbalancer.server.port` label in `container.tf` to the app's port. Keep the
+   ForwardAuth + stripprefix middleware chain and the shared home mount as-is. Apps must
+   work behind a stripped path prefix (relative asset/websocket URLs), like ttyd and
+   KasmVNC do; code-server needs `--abs-proxy-base-path`.
 5. Run `startup.sh` (or copy the dir into the deployed templates dir) and push via
    `POST /coder/admin/templates/push {"templates": ["<dir-name>"], "build_images": true}`.
