@@ -17,12 +17,12 @@ A template directory must contain:
 
 ```json
 {
-    "coder_template_name": "python-workspace",
-    "image_name": "computor-workspace-python3.13",
+    "coder_template_name": "vscode-workspace",
+    "image_name": "computor-workspace-vscode",
     "build_args_env": [],
-    "display_name": "Python 3.13",
+    "display_name": "VS Code",
     "description": "Shown in the workspace-create UI.",
-    "icon": "/icon/python.svg"
+    "icon": "/icon/code.svg"
 }
 ```
 
@@ -78,7 +78,7 @@ docker run --rm \
 
 ## Adding a new workspace type
 
-1. Copy an existing template dir (`python3.13` for editor-based, `bash` for terminal-based,
+1. Copy an existing template dir (`vscode` for editor-based, `bash` for terminal-based,
    `ubuntu-desktop` for GUI-based types).
 2. Adjust `template.json` (unique `coder_template_name` + `image_name`, display metadata).
 3. Adjust the `Dockerfile` (keep the uid-1000 `coder` user and `/home/coder` home).

@@ -1,0 +1,8 @@
+{
+    "coder_template_name": "vscode-workspace",
+    "image_name": "computor-workspace-vscode",
+    "build_args_env": [],
+    "display_name": "VS Code",
+    "description": "VS Code in the browser (code-server) with the Computor extension. Ships Python 3.13.",
+    "icon": "/icon/code.svg"
+}
