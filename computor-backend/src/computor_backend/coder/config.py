@@ -8,8 +8,6 @@ from typing import Optional
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from .schemas import WorkspaceTemplate
-
 
 class CoderSettings(BaseSettings):
     """
@@ -56,9 +54,9 @@ class CoderSettings(BaseSettings):
     )
 
     # Default settings
-    default_template: WorkspaceTemplate = Field(
-        default=WorkspaceTemplate.PYTHON,
-        description="Default workspace template"
+    default_template: str = Field(
+        default="python-workspace",
+        description="Default workspace template name (must exist in Coder)"
     )
 
     # Plugin enable flag

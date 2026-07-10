@@ -8,11 +8,6 @@
 
 // --- Enums ---
 
-export enum WorkspaceTemplate {
-  PYTHON = 'python-workspace',
-  MATLAB = 'matlab-workspace',
-}
-
 export enum WorkspaceStatus {
   PENDING = 'pending',
   STARTING = 'starting',
@@ -56,7 +51,10 @@ export interface CoderWorkspace {
   owner_id: string;
   owner_name?: string | null;
   template_id: string;
+  /** Raw template name (stable identifier, e.g. 'python-workspace'). */
   template_name?: string | null;
+  /** Human-readable template display name; fall back to template_name. */
+  template_display_name?: string | null;
   template_version_id?: string | null;
   template_version_name?: string | null;
   latest_build_transition?: string | null;
@@ -133,7 +131,9 @@ export interface WorkspaceRoleAssign {
 
 export interface WorkspaceProvisionRequest {
   email?: string | null;
-  template?: WorkspaceTemplate;
+  /** Raw template name; omit for the server default. */
+  template?: string | null;
+  /** Custom workspace name; omit for a name derived from the template. */
   workspace_name?: string | null;
 }
 

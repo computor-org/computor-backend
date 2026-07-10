@@ -22,6 +22,7 @@ from .exceptions import (
     CoderWorkspaceExistsError,
     CoderWorkspaceNotFoundError,
 )
+from .naming import derive_workspace_name, sanitize_workspace_name
 from .schemas import (
     CoderTemplate,
     CoderUser,
@@ -31,7 +32,6 @@ from .schemas import (
     ProvisionResult,
     WorkspaceDetails,
     WorkspaceStatus,
-    WorkspaceTemplate,
 )
 
 logger = logging.getLogger(__name__)
@@ -601,21 +601,39 @@ class CoderClient:
         )
         return resp.json()
 
-    async def patch_template_ttl(
+    async def patch_template_meta(
         self,
         template_id: str,
+        *,
         ttl_ms: int,
         activity_bump_ms: int,
+        display_name: Optional[str] = None,
+        description: Optional[str] = None,
+        icon: Optional[str] = None,
     ) -> dict:
-        """Patch a template's TTL settings and return the updated record.
+        """Patch a template's TTL settings and display metadata, returning the
+        updated record.
+
+        Metadata fields are only included in the PATCH when not None; pass an
+        empty string to explicitly clear a field.
 
         Raises:
             CoderAPIError: If the patch is rejected.
         """
+        payload: dict[str, Any] = {
+            "default_ttl_ms": ttl_ms,
+            "activity_bump_ms": activity_bump_ms,
+        }
+        if display_name is not None:
+            payload["display_name"] = display_name
+        if description is not None:
+            payload["description"] = description
+        if icon is not None:
+            payload["icon"] = icon
         resp = await self._request(
             "PATCH",
             f"/api/v2/templates/{template_id}",
-            json={"default_ttl_ms": ttl_ms, "activity_bump_ms": activity_bump_ms},
+            json=payload,
             ok=(200,),
         )
         return resp.json()
@@ -634,7 +652,8 @@ class CoderClient:
             owner_id=ws["owner_id"],
             owner_name=ws.get("owner_name"),
             template_id=ws["template_id"],
-            template_name=ws.get("template_display_name") or ws.get("template_name"),
+            template_name=ws.get("template_name"),
+            template_display_name=ws.get("template_display_name"),
             template_version_id=latest.get("template_version_id"),
             template_version_name=latest.get("template_version_name"),
             latest_build_transition=latest.get("transition"),
@@ -658,14 +677,14 @@ class CoderClient:
     async def get_workspace(
         self,
         username: str,
-        workspace_name: Optional[str] = None,
+        workspace_name: str,
     ) -> WorkspaceDetails:
         """
         Get workspace details for a user.
 
         Args:
             username: User's username
-            workspace_name: Workspace name (defaults to {username}-workspace)
+            workspace_name: Workspace name
 
         Returns:
             WorkspaceDetails instance
@@ -673,8 +692,6 @@ class CoderClient:
         Raises:
             CoderWorkspaceNotFoundError: If workspace not found
         """
-        workspace_name = workspace_name or f"{username}-workspace"
-
         # ``ok=None`` preserves the original behavior of mapping every non-200
         # to CoderWorkspaceNotFoundError.
         resp = await self._request(
@@ -711,14 +728,14 @@ class CoderClient:
     async def workspace_exists(
         self,
         username: str,
-        workspace_name: Optional[str] = None,
+        workspace_name: str,
     ) -> bool:
         """
         Check if a workspace exists for a user.
 
         Args:
             username: User's username
-            workspace_name: Workspace name (defaults to {username}-workspace)
+            workspace_name: Workspace name
 
         Returns:
             True if workspace exists
@@ -748,9 +765,9 @@ class CoderClient:
             CoderWorkspaceExistsError: If workspace already exists
             CoderAPIError: If creation fails
         """
-        template_id = await self.get_template_id(workspace_data.template.value)
+        template_id = await self.get_template_id(workspace_data.template)
 
-        workspace_name = workspace_data.name or f"{username}-workspace"
+        workspace_name = workspace_data.name
 
         payload: dict[str, Any] = {
             "name": workspace_name,
@@ -797,7 +814,8 @@ class CoderClient:
             owner_id=data["owner_id"],
             owner_name=data.get("owner_name"),
             template_id=data["template_id"],
-            template_name=data.get("template_display_name") or data.get("template_name"),
+            template_name=data.get("template_name"),
+            template_display_name=data.get("template_display_name"),
             latest_build_status=data.get("latest_build", {}).get("status"),
             created_at=data.get("created_at"),
         )
@@ -805,19 +823,18 @@ class CoderClient:
     async def delete_workspace(
         self,
         username: str,
-        workspace_name: Optional[str] = None,
+        workspace_name: str,
     ) -> bool:
         """
         Delete a workspace.
 
         Args:
             username: User's username
-            workspace_name: Workspace name (defaults to {username}-workspace)
+            workspace_name: Workspace name
 
         Returns:
             True if deleted successfully
         """
-        workspace_name = workspace_name or f"{username}-workspace"
         logger.info(f"delete_workspace called: username={username}, workspace_name={workspace_name}")
 
         # First get workspace ID
@@ -850,14 +867,14 @@ class CoderClient:
     async def start_workspace(
         self,
         username: str,
-        workspace_name: Optional[str] = None,
+        workspace_name: str,
     ) -> bool:
         """
         Start a stopped workspace.
 
         Args:
             username: User's username
-            workspace_name: Workspace name (defaults to {username}-workspace)
+            workspace_name: Workspace name
 
         Returns:
             True if start initiated successfully
@@ -871,14 +888,14 @@ class CoderClient:
     async def stop_workspace(
         self,
         username: str,
-        workspace_name: Optional[str] = None,
+        workspace_name: str,
     ) -> bool:
         """
         Stop a running workspace.
 
         Args:
             username: User's username
-            workspace_name: Workspace name (defaults to {username}-workspace)
+            workspace_name: Workspace name
 
         Returns:
             True if stop initiated successfully
@@ -931,7 +948,8 @@ class CoderClient:
             owner_id=data["owner_id"],
             owner_name=data.get("owner_name"),
             template_id=data["template_id"],
-            template_name=data.get("template_display_name") or data.get("template_name"),
+            template_name=data.get("template_name"),
+            template_display_name=data.get("template_display_name"),
             latest_build_status=data.get("latest_build", {}).get("status"),
             created_at=data.get("created_at"),
             updated_at=data.get("updated_at"),
@@ -1196,7 +1214,7 @@ class CoderClient:
         user_email: str,
         username: Optional[str] = None,
         full_name: Optional[str] = None,
-        template: WorkspaceTemplate = WorkspaceTemplate.PYTHON,
+        template: Optional[str] = None,
         workspace_name: Optional[str] = None,
         computor_auth_token: Optional[str] = None,
     ) -> ProvisionResult:
@@ -1212,12 +1230,17 @@ class CoderClient:
             user_email: User's email (must match backend user)
             username: Username (derived from email if not provided)
             full_name: User's display name
-            template: Workspace template to use
-            workspace_name: Custom workspace name
+            template: Workspace template name (defaults to settings.default_template)
+            workspace_name: Custom workspace name (defaults to a name derived
+                from the template, e.g. 'python-workspace' -> 'python')
             computor_auth_token: Pre-minted API token for extension auto-login
 
         Returns:
             ProvisionResult with user and workspace info
+
+        Raises:
+            CoderWorkspaceExistsError: If a workspace with this name exists but
+                was created from a different template
         """
         # Username is required - must be user's UUID (will be sanitized to u{uuid} format)
         if not username:
@@ -1229,6 +1252,8 @@ class CoderClient:
         # Sanitize username for Coder requirements (UUID -> u{uuid} format)
         username = self._sanitize_username(username)
 
+        template = template or self.settings.default_template
+
         # Get or create user (random password - never used, auth is via ForwardAuth)
         user_data = CoderUserCreate(
             username=username,
@@ -1238,21 +1263,28 @@ class CoderClient:
         )
         user, user_created = await self.get_or_create_user(user_data)
 
-        # Check if workspace already exists
-        # Workspace names are scoped per user, so we use a simple default name
-        # Coder workspace names also have length limits (~32 chars)
-        if not workspace_name:
-            workspace_name = "workspace"
-        # Sanitize workspace name (NO 'u' prefix - that's only for usernames)
-        import re
-        workspace_name = re.sub(r"[^a-z0-9-]", "", workspace_name.lower())[:32].rstrip("-")
+        # Workspace names are scoped per user; default is derived from the
+        # template so each template maps to its own workspace.
+        if workspace_name:
+            workspace_name = sanitize_workspace_name(workspace_name)
+        else:
+            workspace_name = derive_workspace_name(template)
         workspace = None
         workspace_created = False
 
         try:
             details = await self.get_workspace(user.username, workspace_name)
             workspace = details.workspace
-            # Workspace exists - update it with new token by triggering a rebuild
+            # Re-provisioning refreshes the existing workspace's token — it must
+            # not silently rebuild a workspace of a DIFFERENT template.
+            if workspace.template_name and workspace.template_name != template:
+                raise CoderWorkspaceExistsError(
+                    workspace_name,
+                    detail=(
+                        f"Workspace '{workspace_name}' already exists with template "
+                        f"'{workspace.template_name}'. Delete it or choose another name."
+                    ),
+                )
             if computor_auth_token:
                 logger.info(f"Workspace exists, updating with new token (prefix: {computor_auth_token[:15]}...)")
                 await self._update_workspace_token(

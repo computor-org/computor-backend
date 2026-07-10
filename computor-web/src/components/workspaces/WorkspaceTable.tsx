@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { CoderWorkspace } from '@/src/types/workspaces';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/src/components/ui/Table';
+import Button from '@/src/components/ui/Button';
 import WorkspaceStatusBadge, { categorizeStatus } from './WorkspaceStatusBadge';
 
 interface WorkspaceTableProps {
@@ -12,9 +13,6 @@ interface WorkspaceTableProps {
   onDelete: (owner: string, name: string) => void;
   onViewDetails: (owner: string, name: string) => void;
 }
-
-const actionBtn =
-  'px-2.5 py-1 text-xs font-medium rounded-md transition-colors disabled:opacity-50';
 
 function WorkspaceRow({
   workspace,
@@ -48,9 +46,11 @@ function WorkspaceRow({
       <Td>
         <span className="font-medium text-gray-900 text-sm">{workspace.name}</span>
       </Td>
-      <Td className="text-sm text-gray-600">{workspace.template_name || '—'}</Td>
+      <Td className="text-sm text-gray-600">
+        {workspace.template_display_name || workspace.template_name || '—'}
+      </Td>
       <Td>
-        <WorkspaceStatusBadge status={workspace.latest_build_status} size="sm" />
+        <WorkspaceStatusBadge status={workspace.latest_build_status} />
       </Td>
       <Td className="text-sm text-gray-500 whitespace-nowrap">
         {workspace.created_at ? new Date(workspace.created_at).toLocaleDateString() : '—'}
@@ -59,47 +59,41 @@ function WorkspaceRow({
         <div className="flex items-center justify-end gap-1.5">
           {category === 'running' && (
             <>
-              <button
-                onClick={() => onViewDetails(owner, workspace.name)}
-                className={`${actionBtn} text-blue-700 bg-blue-50 hover:bg-blue-100`}
-              >
+              <Button size="xs" onClick={() => onViewDetails(owner, workspace.name)}>
                 Open
-              </button>
-              <button
+              </Button>
+              <Button
+                size="xs"
+                variant="secondary"
                 onClick={() => runAction('stop', onStop)}
-                disabled={actionLoading === 'stop'}
-                className={`${actionBtn} text-gray-700 bg-gray-100 hover:bg-gray-200`}
+                loading={actionLoading === 'stop'}
+                loadingLabel="Stopping…"
               >
-                {actionLoading === 'stop' ? 'Stopping…' : 'Stop'}
-              </button>
+                Stop
+              </Button>
             </>
           )}
           {(category === 'stopped' || category === 'failed') && (
-            <button
+            <Button
+              size="xs"
               onClick={() => runAction('start', onStart)}
-              disabled={actionLoading === 'start'}
-              className={`${actionBtn} text-green-700 bg-green-50 hover:bg-green-100`}
+              loading={actionLoading === 'start'}
+              loadingLabel="Starting…"
             >
-              {actionLoading === 'start' ? 'Starting…' : 'Start'}
-            </button>
+              Start
+            </Button>
           )}
           {category === 'pending' && (
-            <span className={`${actionBtn} text-yellow-700 bg-yellow-50`}>
+            <span className="px-2.5 py-1 text-xs font-medium text-yellow-700">
               {workspace.latest_build_status}…
             </span>
           )}
-          <button
-            onClick={() => onViewDetails(owner, workspace.name)}
-            className={`${actionBtn} text-gray-600 hover:bg-gray-100`}
-          >
+          <Button size="xs" variant="ghost" onClick={() => onViewDetails(owner, workspace.name)}>
             Details
-          </button>
-          <button
-            onClick={() => onDelete(owner, workspace.name)}
-            className={`${actionBtn} text-red-600 hover:bg-red-50`}
-          >
+          </Button>
+          <Button size="xs" variant="dangerGhost" onClick={() => onDelete(owner, workspace.name)}>
             Delete
-          </button>
+          </Button>
         </div>
       </Td>
     </Tr>

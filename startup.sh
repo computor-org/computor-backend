@@ -265,16 +265,28 @@ if [ "$CODER_ENABLED" = "true" ]; then
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder/registry"
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder/templates"
 
-    # Seed default templates from repo (only copies missing ones, never overwrites)
+    # Seed/sync default templates from repo. Deployed template dirs carrying a
+    # .computor-managed marker are re-synced from the repo on every startup so
+    # template changes actually propagate; dirs WITHOUT the marker (operator-
+    # customized, or seeded before markers existed) are never touched — delete
+    # such a dir once to adopt syncing.
     if [ -d "${SCRIPT_DIR}/ops/coder/templates" ]; then
         echo -e "  ${GREEN}Seeding Coder templates...${NC}"
         for tpl_dir in "${SCRIPT_DIR}/ops/coder/templates"/*/; do
             tpl_name=$(basename "$tpl_dir")
-            if [ ! -d "${SYSTEM_DEPLOYMENT_PATH}/coder/templates/${tpl_name}" ]; then
+            deployed_dir="${SYSTEM_DEPLOYMENT_PATH}/coder/templates/${tpl_name}"
+            if [ ! -d "$deployed_dir" ]; then
                 echo "    Copying template: ${tpl_name}"
-                cp -r "$tpl_dir" "${SYSTEM_DEPLOYMENT_PATH}/coder/templates/${tpl_name}"
+                cp -r "$tpl_dir" "$deployed_dir"
+                touch "$deployed_dir/.computor-managed"
+            elif [ -f "$deployed_dir/.computor-managed" ]; then
+                echo "    Syncing managed template: ${tpl_name}"
+                rm -rf "$deployed_dir"
+                cp -r "$tpl_dir" "$deployed_dir"
+                touch "$deployed_dir/.computor-managed"
             else
-                echo "    Template already exists: ${tpl_name} (skipping)"
+                echo -e "    ${YELLOW}Template ${tpl_name} is unmanaged (no .computor-managed marker) — left as-is.${NC}"
+                echo "      Delete ${deployed_dir} once to adopt automatic syncing."
             fi
         done
     fi

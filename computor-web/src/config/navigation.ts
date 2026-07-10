@@ -33,20 +33,23 @@ export const coursesNavigation: NavItem[] = [
   },
 ];
 
-// Workspaces — gated by workspace access (_workspace_user / admin).
-export const workspacesNavigation: NavItem[] = [
+// Workspaces — gated by workspace access (_workspace_user / admin). Template
+// browsing/provisioning lives on /workspaces/create (maintainer-only), so the
+// Administration sub-item only appears for maintainers; plain workspace users
+// get a single flat entry.
+export const getWorkspacesNavigation = (includeAdmin: boolean): NavItem[] => [
   {
     id: 'workspaces',
     label: 'Workspaces',
     path: '/workspaces',
     icon: 'workspaces',
     ownPage: true,
-    subItems: [
-      { id: 'ws-list', label: 'Workspaces', path: '/workspaces' },
-      { id: 'ws-templates', label: 'Templates', path: '/workspaces/templates' },
-      { id: 'ws-provision', label: 'Provision', path: '/workspaces/provision' },
-      { id: 'ws-admin', label: 'Administration', path: '/workspaces/admin' },
-    ],
+    subItems: includeAdmin
+      ? [
+          { id: 'ws-list', label: 'Workspaces', path: '/workspaces' },
+          { id: 'ws-admin', label: 'Administration', path: '/workspaces/admin' },
+        ]
+      : undefined,
   },
 ];
 

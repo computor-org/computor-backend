@@ -6,6 +6,15 @@
 # (configured in workspace Terraform template via Docker labels)
 
 services:
+  # Attach Traefik (defined in base) to the isolated workspace network so it
+  # can route ingress to workspace containers, which no longer live on
+  # computor-network. Compose merges this additively into the base service.
+  # Workspaces set `traefik.docker.network=computor-coder-workspaces` so Traefik
+  # dials them on this network despite the global --providers.docker.network pin.
+  traefik:
+    networks:
+      - computor-coder-workspaces
+
   # Dedicated PostgreSQL database for Coder (separate from main DB)
   coder-postgres:
     image: postgres:16
@@ -41,8 +50,11 @@ services:
   # Coder server (internal only - not exposed via Traefik)
   coder:
     image: ghcr.io/coder/coder:latest
+    # Also on the isolated workspace network so the workspace agents can reach
+    # coder:7080 (CODER_ACCESS_URL) without workspaces touching computor-network.
     networks:
       - computor-network
+      - computor-coder-workspaces
     container_name: computor-coder
     restart: unless-stopped
     security_opt:
@@ -86,9 +98,10 @@ services:
 
   # Local Docker registry for workspace images.
   #
-  # Deliberately NOT attached to computor-network. Workspace containers
-  # (which DO live on computor-network) therefore can't reach the registry
-  # over TCP and can't push poisoned images. The host docker daemon still
+  # Deliberately NOT attached to any shared network. Workspace containers live
+  # on the isolated computor-coder-workspaces network and therefore can't reach
+  # the registry over TCP and can't push poisoned images. The host docker daemon
+  # still
   # reaches the registry via the 127.0.0.1:5000 port binding — sufficient
   # for both pushes (from temporal-worker-coder) and pulls (from terraform
   # at workspace creation), since both go through the docker socket.
@@ -158,4 +171,15 @@ services:
     depends_on:
       coder:
         condition: service_healthy
+
+networks:
+  # Isolated bridge for Coder workspace containers. Workspaces are untrusted —
+  # the user has passwordless sudo — so they must NOT share computor-network
+  # with the platform's databases, IdP (Keycloak), object store (MinIO), Redis,
+  # Temporal, etc. Only Traefik (ingress) and the Coder server (agent
+  # connections) are also attached here. computor-network itself is defined in
+  # docker-compose.base.yaml and merged in at deploy time.
+  computor-coder-workspaces:
+    name: computor-coder-workspaces
+    driver: bridge
 

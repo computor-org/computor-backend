@@ -1,0 +1,48 @@
+set -e
+
+# Dev mode: forward localhost ports to host machine via socat
+%{ if dev_forward_ports != "" }
+for port in $(echo "${dev_forward_ports}" | tr ',' ' '); do
+  echo "Forwarding localhost:$port -> host.docker.internal:$port"
+  socat TCP-LISTEN:$port,fork,reuseaddr TCP:host.docker.internal:$port &
+done
+%{ endif }
+
+# Initialize home directory from skeleton if first run
+if [ ! -f ~/.init_done ]; then
+  cp -rT /etc/skel ~
+  touch ~/.init_done
+fi
+
+# Configure git with user info
+git config --global user.name "${full_name}"
+git config --global user.email "${email}"
+
+# Create default workspace folder
+mkdir -p ~/workspace
+
+# User personalization hook: with the shared per-user home, apt/pip-installed
+# software is per-workspace and lost on rebuild — users can re-apply such setup
+# in an executable ~/personalize script (e.g. pip install --user ...).
+if [ -x "$HOME/personalize" ]; then
+  "$HOME/personalize" >/tmp/personalize.log 2>&1 || true
+fi
+
+# Start JupyterLab in the background. Unlike the other templates, Traefik does
+# NOT strip the path prefix for JupyterLab: it builds absolute asset/API/kernel-
+# websocket URLs, so it must own the full public base_url. Auth is disabled here
+# because Traefik ForwardAuth already gates access (same model as the other
+# workspace types); allow_origin='*' + trust_xheaders let kernel websockets work
+# through the proxy.
+jupyter lab \
+  --no-browser \
+  --ServerApp.ip=0.0.0.0 \
+  --ServerApp.port=${jupyter_port} \
+  --ServerApp.base_url="${coder_base_path}/${owner_name}/${workspace_name}/" \
+  --ServerApp.root_dir=/home/coder/workspace \
+  --IdentityProvider.token='' \
+  --ServerApp.password='' \
+  --ServerApp.allow_origin='*' \
+  --ServerApp.allow_remote_access=True \
+  --ServerApp.trust_xheaders=True \
+  >/tmp/jupyterlab.log 2>&1 &

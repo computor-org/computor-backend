@@ -1,10 +1,8 @@
-import asyncio
 import os
 import logging
 import sys
 import uvicorn
 from computor_backend.settings import settings
-from computor_backend.server import startup_logic
 
 
 class ColoredFormatter(logging.Formatter):
@@ -167,8 +165,9 @@ if __name__ == "__main__":
 
     print(f"Starting server with WebSocket log level: {ws_level}, Uvicorn log level: {uvicorn_log_level}")
 
-    if settings.DEBUG_MODE != "production":
-        asyncio.run(startup_logic())
+    # Startup side effects (including Coder template initialization) run from
+    # the FastAPI lifespan in computor_backend.server. Do not run startup_logic
+    # here as well: development mode would submit every startup workflow twice.
 
     # Create custom uvicorn log config to use our formatter
     log_config = {

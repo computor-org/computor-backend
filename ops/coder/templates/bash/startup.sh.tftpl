@@ -1,0 +1,40 @@
+set -e
+
+# Dev mode: forward localhost ports to host machine via socat
+%{ if dev_forward_ports != "" }
+for port in $(echo "${dev_forward_ports}" | tr ',' ' '); do
+  echo "Forwarding localhost:$port -> host.docker.internal:$port"
+  socat TCP-LISTEN:$port,fork,reuseaddr TCP:host.docker.internal:$port &
+done
+%{ endif }
+
+# Initialize home directory from skeleton if first run
+if [ ! -f ~/.init_done ]; then
+  cp -rT /etc/skel ~
+  touch ~/.init_done
+fi
+
+# Configure git with user info
+git config --global user.name "${full_name}"
+git config --global user.email "${email}"
+
+# Create default workspace folder
+mkdir -p ~/workspace
+
+# User personalization hook: with the shared per-user home, apt-installed
+# software is per-workspace and lost on rebuild — users can re-apply such
+# setup in an executable ~/personalize script.
+if [ -x "$HOME/personalize" ]; then
+  "$HOME/personalize" >/tmp/personalize.log 2>&1 || true
+fi
+
+# Start the browser terminal in background.
+# Traefik strips the /coder/{user}/{workspace} prefix, so ttyd serves at
+# root; its asset and websocket URLs are relative, which resolves correctly
+# as long as the workspace URL ends with a trailing slash.
+ttyd \
+  --port ${ttyd_port} \
+  --interface 0.0.0.0 \
+  --writable \
+  bash --login \
+  >/tmp/ttyd.log 2>&1 &

@@ -294,12 +294,23 @@ async def startup_logic():
                         params["build_images"] = True
 
                         executor = get_task_executor()
-                        workflow_id = await executor.submit_task(TaskSubmission(
-                            task_name="push_coder_templates",
-                            parameters=params,
-                            queue="coder-tasks",
-                        ))
-                        print(f"[STARTUP] Template build+push workflow submitted: {workflow_id}")
+                        running_tasks = await executor.list_tasks(limit=1000, status="STARTED")
+                        template_push_running = any(
+                            task.get("task_name") == "push_coder_templates"
+                            for task in running_tasks.get("tasks", [])
+                        )
+                        if template_push_running:
+                            print(
+                                "[STARTUP] Template build+push already running — "
+                                "skipping duplicate submission"
+                            )
+                        else:
+                            workflow_id = await executor.submit_task(TaskSubmission(
+                                task_name="push_coder_templates",
+                                parameters=params,
+                                queue="coder-tasks",
+                            ))
+                            print(f"[STARTUP] Template build+push workflow submitted: {workflow_id}")
                     else:
                         print(f"[STARTUP] Coder has {len(templates)} template(s) — skipping auto-push")
                 except Exception as e:

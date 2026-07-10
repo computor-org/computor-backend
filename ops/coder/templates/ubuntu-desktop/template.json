@@ -1,0 +1,8 @@
+{
+    "coder_template_name": "ubuntu-desktop-workspace",
+    "image_name": "computor-workspace-ubuntu-desktop",
+    "build_args_env": [],
+    "display_name": "Ubuntu Desktop",
+    "description": "Full Ubuntu XFCE desktop in the browser (KasmVNC). Heavier than the editor workspaces; the user has sudo.",
+    "icon": "/icon/ubuntu.svg"
+}

@@ -1,0 +1,8 @@
+{
+    "coder_template_name": "bash-workspace",
+    "image_name": "computor-workspace-bash",
+    "build_args_env": [],
+    "display_name": "Bash Terminal",
+    "description": "Minimal Debian with a bash terminal in the browser (ttyd). No editor.",
+    "icon": "/icon/terminal.svg"
+}

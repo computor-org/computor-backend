@@ -16,14 +16,17 @@ from computor_backend.coder.config import CoderSettings, get_coder_settings
 from computor_backend.coder.exceptions import (
     CoderAPIError,
     CoderAuthenticationError,
+    CoderConflictError,
     CoderConnectionError,
     CoderDisabledError,
     CoderNotFoundError,
     CoderTemplateNotFoundError,
 )
+from computor_backend.coder.naming import derive_workspace_name, sanitize_workspace_name
 from computor_backend.exceptions import (
     BadRequestException,
     ComputorException,
+    ConflictException,
     ForbiddenException,
     InternalServerException,
     NotFoundException,
@@ -87,6 +90,9 @@ def _handle_coder_error(e: Exception) -> ComputorException:
         )
     if isinstance(e, CoderNotFoundError):
         return NotFoundException(detail=str(e))
+    if isinstance(e, CoderConflictError):
+        # e.g. workspace name already taken by a different template
+        return ConflictException(detail=e.detail or str(e))
     if isinstance(e, CoderAPIError):
         # CoderAPIError carries its own status_code; surface 4xx as bad request,
         # 5xx as internal — handlers will pick the right log severity.
@@ -144,10 +150,12 @@ async def health_check(
     summary="List available workspace templates",
 )
 async def list_templates(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
 ) -> TemplateListResponse:
-    """List all available workspace templates."""
+    """List all available workspace templates. Requires workspace:templates."""
+    _check_workspace_access(permissions, "templates")
     try:
         templates = await client.list_templates()
         return TemplateListResponse(
@@ -184,12 +192,24 @@ async def provision_workspace(
     _check_workspace_access(permissions, "provision")
     try:
         # Verify template exists in Coder before minting a token
+        template = request.template or settings.default_template
         try:
-            await client.get_template_id(request.template.value)
+            await client.get_template_id(template)
         except CoderTemplateNotFoundError as e:
             raise ServiceUnavailableException(
-                detail=f"Template '{request.template.value}' is not yet available. Coder may still be initializing.",
+                detail=f"Template '{template}' is not yet available. Coder may still be initializing.",
             ) from e
+
+        # Resolve the effective workspace name BEFORE minting, so the
+        # per-workspace token name matches the actual workspace name.
+        if request.workspace_name:
+            workspace_name = sanitize_workspace_name(request.workspace_name)
+            if not workspace_name:
+                raise BadRequestException(
+                    detail=f"Invalid workspace name '{request.workspace_name}'",
+                )
+        else:
+            workspace_name = derive_workspace_name(template)
 
         # Resolve target user
         if request.email:
@@ -201,9 +221,11 @@ async def provision_workspace(
         else:
             target_user = get_user_by_id(db, cache, str(permissions.user_id))
 
-        # Mint workspace token (bounded lifetime; rotated on each provision)
+        # Mint workspace token (bounded lifetime; rotated on each provision of
+        # this workspace — tokens of the user's other workspaces stay valid)
         workspace_token = mint_workspace_token(
             db, cache, str(target_user.id), str(permissions.user_id),
+            workspace_name=workspace_name,
             ttl_days=settings.workspace_token_ttl_days,
         )
         if workspace_token:
@@ -215,8 +237,8 @@ async def provision_workspace(
             user_email=get_user_email(target_user),
             username=str(target_user.id),
             full_name=get_user_fullname(target_user),
-            template=request.template,
-            workspace_name=request.workspace_name,
+            template=template,
+            workspace_name=workspace_name,
             computor_auth_token=workspace_token,
         )
         return result
