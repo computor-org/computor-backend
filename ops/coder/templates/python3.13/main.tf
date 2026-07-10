@@ -281,10 +281,18 @@ resource "docker_container" "workspace" {
 
   env = ["CODER_AGENT_TOKEN=${coder_agent.main.token}"]
 
-  # Allow container to reach host machine (for development)
-  host {
-    host = "host.docker.internal"
-    ip   = "host-gateway"
+  # Host-gateway route to the host machine. Only needed in DEV, where the
+  # backend runs on the host (host.docker.internal) and dev port-forwarding
+  # targets it. In PROD the backend is the `uvicorn` container, so this route
+  # would only needlessly expose the host (SSH, host-run services) to an
+  # untrusted workspace that has sudo — omit it. `computor_backend_internal`
+  # is host.docker.internal in dev and uvicorn in prod: a reliable signal.
+  dynamic "host" {
+    for_each = length(regexall("host.docker.internal", var.computor_backend_internal)) > 0 ? [1] : []
+    content {
+      host = "host.docker.internal"
+      ip   = "host-gateway"
+    }
   }
 
   # Connect to the same network as Coder services
