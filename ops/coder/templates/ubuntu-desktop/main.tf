@@ -65,12 +65,6 @@ variable "dev_forward_ports" {
   type        = string
 }
 
-variable "pids_limit" {
-  default     = 1024
-  description = "Max processes per workspace — a fork-bomb guard. 0 = unlimited."
-  type        = number
-}
-
 variable "memory_mb" {
   default     = 0
   description = "Workspace memory cap in MiB. 0 = unlimited; set per host capacity to bound RAM use."
@@ -262,9 +256,9 @@ resource "docker_container" "workspace" {
   hostname = data.coder_workspace.me.name
 
   # Resource limits so one workspace (whose user has sudo) cannot exhaust the
-  # host. pids_limit is an always-on fork-bomb guard; memory and cpu_shares are
-  # opt-in caps (0 = unlimited/default) — set them per host capacity.
-  pids_limit = var.pids_limit
+  # host. Opt-in caps (0 = unlimited/default) — set per host capacity. NOTE: the
+  # docker provider exposes no per-container pids_limit; use dockerd
+  # --default-pids-limit for a host-wide fork-bomb guard.
   memory     = var.memory_mb
   cpu_shares = var.cpu_shares
 
