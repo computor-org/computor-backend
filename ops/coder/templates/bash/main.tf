@@ -38,8 +38,8 @@ variable "coder_internal_url" {
 }
 
 variable "docker_network" {
-  default     = "computor-network"
-  description = "Docker network for workspace containers (must match Traefik network)"
+  default     = "computor-coder-workspaces"
+  description = "Isolated Docker network for workspace containers. Kept off computor-network so untrusted workspaces (the user has sudo) cannot reach platform services; Traefik and Coder are dual-homed onto it. Must match the traefik.docker.network label below."
   type        = string
 }
 
@@ -282,6 +282,13 @@ resource "docker_container" "workspace" {
   labels {
     label = "traefik.enable"
     value = "true"
+  }
+
+  # Route to this container on the isolated workspace network, overriding
+  # Traefik's global --providers.docker.network pin (computor-network).
+  labels {
+    label = "traefik.docker.network"
+    value = var.docker_network
   }
 
   labels {
