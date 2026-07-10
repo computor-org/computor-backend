@@ -108,12 +108,12 @@ resource "coder_agent" "main" {
     set -e
 
     # Dev mode: forward localhost ports to host machine via socat
-    %{ if var.dev_forward_ports != "" }
+    %{if var.dev_forward_ports != ""}
     for port in $(echo "${var.dev_forward_ports}" | tr ',' ' '); do
       echo "Forwarding localhost:$port -> host.docker.internal:$port"
       socat TCP-LISTEN:$port,fork,reuseaddr TCP:host.docker.internal:$port &
     done
-    %{ endif }
+    %{endif}
 
     # Initialize home directory from skeleton if first run
     if [ ! -f ~/.init_done ]; then
@@ -150,7 +150,27 @@ network:
     pem_key:
   udp:
     public_ip: 127.0.0.1
+command_line:
+  # Never block the non-interactive Coder startup script on a prompt.
+  prompt: false
 KASM_EOF
+
+    # KasmVNC requires at least one user with write permission even when
+    # BasicAuth is disabled. The shared home volume may not contain the
+    # password file yet, so create a runtime-only random-password user or
+    # upgrade the existing coder user in place.
+    KASM_PASSFILE="$HOME/.kasmpasswd"
+    if ! awk -F: '$1 == "coder" && $3 ~ /w/ { found = 1 } END { exit found ? 0 : 1 }' "$KASM_PASSFILE" 2>/dev/null; then
+      if grep -q '^coder:' "$KASM_PASSFILE" 2>/dev/null; then
+        kasmvncpasswd -u coder -w -n "$KASM_PASSFILE"
+      else
+        umask 077
+        KASM_PASSWORD="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+        printf '%s\n%s\n' "$KASM_PASSWORD" "$KASM_PASSWORD" |
+          kasmvncpasswd -u coder -w "$KASM_PASSFILE"
+        unset KASM_PASSWORD
+      fi
+    fi
 
     # Start the XFCE desktop served by KasmVNC's built-in web server.
     # Traefik strips the /coder/{user}/{workspace} prefix; the KasmVNC web
@@ -279,7 +299,7 @@ resource "docker_container" "workspace" {
 
   labels {
     label = "traefik.http.services.coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.loadbalancer.server.port"
-    value = "${var.kasmvnc_port}"
+    value = var.kasmvnc_port
   }
 
   # Middleware to strip the /coder/{username}/{workspace} prefix before forwarding
