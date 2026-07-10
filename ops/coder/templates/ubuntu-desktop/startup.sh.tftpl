@@ -1,0 +1,76 @@
+set -e
+
+# Dev mode: forward localhost ports to host machine via socat
+%{if dev_forward_ports != ""}
+for port in $(echo "${dev_forward_ports}" | tr ',' ' '); do
+  echo "Forwarding localhost:$port -> host.docker.internal:$port"
+  socat TCP-LISTEN:$port,fork,reuseaddr TCP:host.docker.internal:$port &
+done
+%{endif}
+
+# Initialize home directory from skeleton if first run
+if [ ! -f ~/.init_done ]; then
+  cp -rT /etc/skel ~
+  touch ~/.init_done
+fi
+
+# Configure git with user info
+git config --global user.name "${full_name}"
+git config --global user.email "${email}"
+
+# Create default workspace folder
+mkdir -p ~/workspace
+
+# User personalization hook: with the shared per-user home, apt-installed
+# software is per-workspace and lost on rebuild — users can re-apply such
+# setup in an executable ~/personalize script.
+if [ -x "$HOME/personalize" ]; then
+  "$HOME/personalize" >/tmp/personalize.log 2>&1 || true
+fi
+
+# Configure KasmVNC: plain HTTP websocket transport on all interfaces —
+# TLS and authentication are Traefik's job (ForwardAuth in front of the
+# workspace, same as every other workspace type).
+mkdir -p "$HOME/.vnc"
+cat > "$HOME/.vnc/kasmvnc.yaml" << KASM_EOF
+network:
+  protocol: http
+  interface: 0.0.0.0
+  websocket_port: ${kasmvnc_port}
+  ssl:
+    require_ssl: false
+    pem_certificate:
+    pem_key:
+  udp:
+    public_ip: 127.0.0.1
+command_line:
+  # Never block the non-interactive Coder startup script on a prompt.
+  prompt: false
+KASM_EOF
+
+# KasmVNC requires at least one user with write permission even when
+# BasicAuth is disabled. The shared home volume may not contain the
+# password file yet, so create a runtime-only random-password user or
+# upgrade the existing coder user in place.
+KASM_PASSFILE="$HOME/.kasmpasswd"
+if ! awk -F: '$1 == "coder" && $3 ~ /w/ { found = 1 } END { exit found ? 0 : 1 }' "$KASM_PASSFILE" 2>/dev/null; then
+  if grep -q '^coder:' "$KASM_PASSFILE" 2>/dev/null; then
+    kasmvncpasswd -u coder -w -n "$KASM_PASSFILE"
+  else
+    umask 077
+    KASM_PASSWORD="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+    printf '%s\n%s\n' "$KASM_PASSWORD" "$KASM_PASSWORD" |
+      kasmvncpasswd -u coder -w "$KASM_PASSFILE"
+    unset KASM_PASSWORD
+  fi
+fi
+
+# Start the XFCE desktop served by KasmVNC's built-in web server.
+# Traefik strips the /coder/{user}/{workspace} prefix; the KasmVNC web
+# client uses relative asset/websocket URLs, which resolve correctly as
+# long as the workspace URL ends with a trailing slash.
+vncserver -kill :1 >/dev/null 2>&1 || true
+vncserver :1 \
+  -select-de xfce \
+  -disableBasicAuth \
+  >/tmp/kasmvnc.log 2>&1

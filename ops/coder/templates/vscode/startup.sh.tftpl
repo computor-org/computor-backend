@@ -1,0 +1,71 @@
+set -e
+
+# Dev mode: forward localhost ports to host machine via socat
+%{ if dev_forward_ports != "" }
+for port in $(echo "${dev_forward_ports}" | tr ',' ' '); do
+  echo "Forwarding localhost:$port -> host.docker.internal:$port"
+  socat TCP-LISTEN:$port,fork,reuseaddr TCP:host.docker.internal:$port &
+done
+%{ endif }
+
+# Initialize home directory from skeleton if first run
+if [ ! -f ~/.init_done ]; then
+  cp -rT /etc/skel ~
+  touch ~/.init_done
+fi
+
+# Configure git with user info
+git config --global user.name "${full_name}"
+git config --global user.email "${email}"
+
+# Create default workspace folder
+mkdir -p ~/workspace
+
+# Create Computor extension config directory and file
+mkdir -p ~/.computor
+cat > ~/.computor/config.json << COMPUTOR_EOF
+{
+  "version": "1.0.0",
+  "authentication": {
+    "baseUrl": "${computor_backend_url}",
+    "autoLogin": true
+  }
+}
+COMPUTOR_EOF
+
+# Create workspace marker file (triggers extension activation)
+touch ~/workspace/.computor
+
+# User personalization hook: with the shared per-user home, apt-installed
+# software is per-workspace and lost on rebuild — users can re-apply such
+# setup in an executable ~/personalize script.
+if [ -x "$HOME/personalize" ]; then
+  "$HOME/personalize" >/tmp/personalize.log 2>&1 || true
+fi
+
+# Start code-server in background
+# Configure abs-proxy-base-path for Traefik routing at /coder prefix
+# Bind to 0.0.0.0 so Traefik can reach it from outside the container
+# Use password auth if password is provided, otherwise no auth
+# The home is shared across the user's workspaces, so code-server state
+# (open editors, machine settings) is scoped per workspace via user-data-dir
+%{ if code_server_password != "" }
+export PASSWORD="${code_server_password}"
+code-server \
+  --auth password \
+  --bind-addr 0.0.0.0:${code_server_port} \
+  --abs-proxy-base-path "${coder_base_path}/${owner_name}/${workspace_name}" \
+  --extensions-dir /opt/code-server/extensions \
+  --user-data-dir "/home/coder/.local/share/code-server-${workspace_name_lower}" \
+  /home/coder/workspace \
+  >/tmp/code-server.log 2>&1 &
+%{ else }
+code-server \
+  --auth none \
+  --bind-addr 0.0.0.0:${code_server_port} \
+  --abs-proxy-base-path "${coder_base_path}/${owner_name}/${workspace_name}" \
+  --extensions-dir /opt/code-server/extensions \
+  --user-data-dir "/home/coder/.local/share/code-server-${workspace_name_lower}" \
+  /home/coder/workspace \
+  >/tmp/code-server.log 2>&1 &
+%{ endif }
