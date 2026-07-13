@@ -1,4 +1,6 @@
-"""Business logic for message operations with audit logging."""
+"""Message lifecycle: soft-delete, audited update, and audit-log access.
+
+(Formerly business_logic/message_operations.py.)"""
 from datetime import datetime, timezone
 from uuid import UUID
 from typing import Optional

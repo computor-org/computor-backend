@@ -434,7 +434,7 @@ class MessagePermissionHandler(PermissionHandler):
     +-----------------------+-----------------------------------------------+
 
     Write rules are enforced in ``business_logic.messages`` (create) and
-    ``business_logic.message_operations`` (update/delete: author only).
+    ``business_logic.messages`` (update/delete: author only).
     The build_query restriction below additionally blocks update/delete
     of targets whose CREATE path is not implemented yet, so the audit
     trail can't disagree with the create-side guard.

@@ -102,7 +102,10 @@ def _stub_helpers(monkeypatch):
         )
     }
     for name, mock in mocks.items():
-        monkeypatch.setattr(messages_bl, name, mock)
+        # Patch where the name is looked up: create_message_with_author lives
+        # in the ``messages.core`` submodule and resolves the per-scope helpers
+        # in that namespace (imported via ``from .permissions import ...``).
+        monkeypatch.setattr(messages_bl.core, name, mock)
     return mocks
 
 
@@ -238,7 +241,7 @@ class TestPrimaryTargetDispatch:
         # at module import time before any stubbing).
         _stub_helpers(monkeypatch)
         monkeypatch.setattr(
-            messages_bl,
+            messages_bl.core,
             "_check_user_message_write_permission",
             _real_user_check,
         )

@@ -61,7 +61,7 @@ from computor_backend.business_logic.messages import (
     sync_message_mentions,
     validate_message_mentions,
 )
-from computor_backend.business_logic.message_operations import (
+from computor_backend.business_logic.messages import (
     soft_delete_message,
     update_message_with_audit,
     create_message_audit,
