@@ -7,7 +7,7 @@ import remarkGfm from 'remark-gfm';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
+import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import type { CourseContentStudentGet } from 'types/generated';
 
@@ -54,12 +54,7 @@ export default function AssignmentDetailPage() {
   if (loading) {
     return (
       <AuthenticatedLayout>
-        <div className="p-6">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-            <div className="h-64 bg-gray-200 rounded"></div>
-          </div>
-        </div>
+        <ListLoading />
       </AuthenticatedLayout>
     );
   }
