@@ -124,10 +124,13 @@ export interface WorkspaceRoleUser {
   roles: string[];
 }
 
-export interface WorkspaceRoleAssign {
-  email: string;
-  role_id: string;
-}
+// Identical to the backend schema, so re-export the generated type rather
+// than re-declaring it — this one can't drift (TASK-412). The other coder
+// schemas below still lack generated equivalents (their endpoints aren't in
+// the client/type codegen yet); WorkspaceProvisionRequest is kept hand-written
+// on purpose — it accepts a permissive `template?: string | null` rather than
+// the generated WorkspaceTemplate union.
+export type { WorkspaceRoleAssign } from 'types/generated';
 
 export interface WorkspaceProvisionRequest {
   email?: string | null;
