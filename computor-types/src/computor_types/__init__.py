@@ -23,10 +23,14 @@ def get_all_dtos():
     """
     import pkgutil
     import inspect
+    import logging
     import computor_types
+
+    logger = logging.getLogger(__name__)
 
     interfaces = []
     seen_names = set()
+    failures: list[tuple[str, Exception]] = []
 
     for module_info in pkgutil.walk_packages(
         computor_types.__path__,
@@ -44,9 +48,25 @@ def get_all_dtos():
                 ):
                     interfaces.append(obj)
                     seen_names.add(name)
-        except Exception:
-            # Skip modules that can't be imported
-            continue
+        except Exception as exc:
+            # Do NOT silently skip: a module that fails to import here would
+            # drop every EntityInterface it defines, which in the backend
+            # degrades to silently-missing permissions. Record and surface.
+            logger.error(
+                "get_all_dtos(): failed to import %s: %s: %s",
+                module_info.name, type(exc).__name__, exc, exc_info=exc,
+            )
+            failures.append((module_info.name, exc))
+
+    if failures:
+        # Fail loudly — permission setup depends on a complete interface list.
+        names = ", ".join(name for name, _ in failures)
+        raise ImportError(
+            f"get_all_dtos(): {len(failures)} computor_types module(s) failed "
+            f"to import and were excluded from DTO discovery: {names}. "
+            "Fix the import error(s) above — a missing module silently drops "
+            "its EntityInterfaces (and their backend permissions)."
+        ) from failures[0][1]
 
     return interfaces
 
