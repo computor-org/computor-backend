@@ -47,9 +47,9 @@ async def upload_file(
     """Upload a file to storage with security validation"""
     # Check permissions
     if not permissions.has_any_course_role("_tutor"):
-        raise ForbiddenException("Requires tutor role or higher to access storage")
+        raise ForbiddenException(detail="Requires tutor role or higher to access storage")
     if not permissions.permitted("storage", "create"):
-        raise ForbiddenException("You don't have permission to upload files")
+        raise ForbiddenException(detail="You don't have permission to upload files")
     
     # Read file content once for validation
     file_content = await file.read()
@@ -81,7 +81,7 @@ async def upload_file(
             import json
             custom_metadata = json.loads(metadata)
         except json.JSONDecodeError:
-            raise BadRequestException("Invalid metadata format. Must be valid JSON")
+            raise BadRequestException(detail="Invalid metadata format. Must be valid JSON")
     
     # Add security metadata
     if custom_metadata is None:
@@ -133,9 +133,9 @@ async def download_file(
     """Download a file from storage"""
     # Check permissions
     if not permissions.has_any_course_role("_tutor"):
-        raise ForbiddenException("Requires tutor role or higher to access storage")
+        raise ForbiddenException(detail="Requires tutor role or higher to access storage")
     if not permissions.permitted("storage", "get"):
-        raise ForbiddenException("You don't have permission to download files")
+        raise ForbiddenException(detail="You don't have permission to download files")
     
     # Get file stream and metadata
     file_stream, metadata = await storage_service.get_file_stream(
@@ -164,9 +164,9 @@ async def list_objects(
     """List objects in storage with optional filtering"""
     # Check permissions
     if not permissions.has_any_course_role("_tutor"):
-        raise ForbiddenException("Requires tutor role or higher to access storage")
+        raise ForbiddenException(detail="Requires tutor role or higher to access storage")
     if not permissions.permitted("storage","list"):
-        raise ForbiddenException("You don't have permission to list files")
+        raise ForbiddenException(detail="You don't have permission to list files")
     
     # Check cache
     cache_key = f"storage:list:{query.bucket_name}:{query.prefix}:{query.skip}:{query.limit}"
@@ -221,9 +221,9 @@ async def get_object_info(
     """Get metadata for a specific object"""
     # Check permissions
     if not permissions.has_any_course_role("_tutor"):
-        raise ForbiddenException("Requires tutor role or higher to access storage")
+        raise ForbiddenException(detail="Requires tutor role or higher to access storage")
     if not permissions.permitted("storage", "get"):
-        raise ForbiddenException("You don't have permission to view file info")
+        raise ForbiddenException(detail="You don't have permission to view file info")
     
     # Get object metadata
     metadata = await storage_service.get_object_info(
@@ -262,9 +262,9 @@ async def delete_object(
     """Delete an object from storage"""
     # Check permissions
     if not permissions.has_any_course_role("_tutor"):
-        raise ForbiddenException("Requires tutor role or higher to access storage")
+        raise ForbiddenException(detail="Requires tutor role or higher to access storage")
     if not permissions.permitted("storage", "delete"):
-        raise ForbiddenException("You don't have permission to delete files")
+        raise ForbiddenException(detail="You don't have permission to delete files")
     
     # Delete object
     success = await storage_service.delete_file(
@@ -293,9 +293,9 @@ async def copy_object(
     """Copy an object within or between buckets"""
     # Check permissions
     if not permissions.has_any_course_role("_tutor"):
-        raise ForbiddenException("Requires tutor role or higher to access storage")
+        raise ForbiddenException(detail="Requires tutor role or higher to access storage")
     if not permissions.permitted("storage", "create"):
-        raise ForbiddenException("You don't have permission to copy files")
+        raise ForbiddenException(detail="You don't have permission to copy files")
     
     # Parse metadata if provided
     custom_metadata = None
@@ -303,7 +303,7 @@ async def copy_object(
         try:
             custom_metadata = json.loads(metadata)
         except (json.JSONDecodeError, Exception):
-            raise BadRequestException("Invalid metadata format. Must be valid JSON")
+            raise BadRequestException(detail="Invalid metadata format. Must be valid JSON")
     
     # Copy object
     result = await storage_service.copy_object(
@@ -329,13 +329,13 @@ async def generate_presigned_url(
     """Generate a presigned URL for direct object access"""
     # Check permissions based on method
     if not permissions.has_any_course_role("_tutor"):
-        raise ForbiddenException("Requires tutor role or higher to access storage")
+        raise ForbiddenException(detail="Requires tutor role or higher to access storage")
     if request.method == "GET" and not permissions.permitted("storage", "get"):
-        raise ForbiddenException("You don't have permission to generate download URLs")
+        raise ForbiddenException(detail="You don't have permission to generate download URLs")
     elif request.method in ["PUT", "POST"] and not permissions.permitted("storage", "create"):
-        raise ForbiddenException("You don't have permission to generate upload URLs")
+        raise ForbiddenException(detail="You don't have permission to generate upload URLs")
     elif request.method == "DELETE" and not permissions.permitted("storage", "delete"):
-        raise ForbiddenException("You don't have permission to generate delete URLs")
+        raise ForbiddenException(detail="You don't have permission to generate delete URLs")
     
     # Generate presigned URL
     return await storage_service.generate_presigned_url(
@@ -355,7 +355,7 @@ async def list_buckets(
     """List all available buckets"""
     # Check permissions
     if not permissions.permitted("storage", "admin"):
-        raise ForbiddenException("You don't have permission to list buckets")
+        raise ForbiddenException(detail="You don't have permission to list buckets")
     
     return await storage_service.list_buckets()
 
@@ -368,7 +368,7 @@ async def create_bucket(
     """Create a new storage bucket"""
     # Check permissions
     if not permissions.permitted("storage", "admin"):
-        raise ForbiddenException("You don't have permission to create buckets")
+        raise ForbiddenException(detail="You don't have permission to create buckets")
     
     return await storage_service.create_bucket(
         bucket_name=bucket.bucket_name,
@@ -385,7 +385,7 @@ async def delete_bucket(
     """Delete a storage bucket"""
     # Check permissions
     if not permissions.permitted("storage", "admin"):
-        raise ForbiddenException("You don't have permission to delete buckets")
+        raise ForbiddenException(detail="You don't have permission to delete buckets")
     
     success = await storage_service.delete_bucket(bucket_name, force=force)
     
@@ -401,7 +401,7 @@ async def get_bucket_stats(
     """Get usage statistics for a bucket"""
     # Check permissions
     if not permissions.permitted("storage", "get"):
-        raise ForbiddenException("You don't have permission to view bucket statistics")
+        raise ForbiddenException(detail="You don't have permission to view bucket statistics")
     
     # Check cache
     cache_key = f"storage:stats:{bucket_name}"

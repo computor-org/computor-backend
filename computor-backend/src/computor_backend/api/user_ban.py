@@ -49,13 +49,13 @@ def _require_user_manager(principal: Principal, db: Session) -> None:
         .first()
     )
     if not role:
-        raise ForbiddenException("Requires _admin or _user_manager role")
+        raise ForbiddenException(detail="Requires _admin or _user_manager role")
 
 
 def _load_target(user_id: str, db: Session) -> User:
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
-        raise NotFoundException("User not found")
+        raise NotFoundException(detail="User not found")
     return user
 
 
@@ -76,7 +76,7 @@ async def ban_user(
     user = _load_target(user_id, db)
 
     if str(user.id) == str(principal.user_id):
-        raise BadRequestException("You cannot ban yourself")
+        raise BadRequestException(detail="You cannot ban yourself")
 
     target_is_admin = (
         db.query(UserRole)
@@ -85,7 +85,7 @@ async def ban_user(
         is not None
     )
     if target_is_admin:
-        raise ForbiddenException("Admin users cannot be banned")
+        raise ForbiddenException(detail="Admin users cannot be banned")
 
     if user.banned_at is None:
         user.banned_at = datetime.now(timezone.utc)

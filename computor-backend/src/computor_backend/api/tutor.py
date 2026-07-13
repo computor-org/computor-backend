@@ -261,10 +261,10 @@ async def _get_example_version_for_course_content(
 
     # Only support MinIO/S3 repositories
     if repository.source_type == "git":
-        raise NotImplementedException("Git download not implemented - use git clone instead")
+        raise NotImplementedException(detail="Git download not implemented - use git clone instead")
 
     if repository.source_type not in ["minio", "s3"]:
-        raise BadRequestException(f"Download not supported for {repository.source_type} repositories")
+        raise BadRequestException(detail=f"Download not supported for {repository.source_type} repositories")
 
     return course_content, version, repository
 

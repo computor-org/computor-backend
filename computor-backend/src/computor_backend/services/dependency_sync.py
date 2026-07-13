@@ -70,7 +70,7 @@ class DependencySyncService:
         if missing_dependencies:
             missing_list = ", ".join(missing_dependencies)
             raise BadRequestException(
-                f"Cannot upload example '{example.identifier}'. "
+                detail=f"Cannot upload example '{example.identifier}'. "
                 f"Missing dependencies: {missing_list}. "
                 f"Please upload the dependency examples first."
             )

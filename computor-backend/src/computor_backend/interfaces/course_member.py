@@ -96,14 +96,14 @@ def guard_course_member_delete(entity, permissions: Principal, db: Session) -> N
 
     if str(entity.user_id) == permissions.user_id:
         raise ForbiddenException(
-            "You cannot remove your own course membership. Please contact an administrator."
+            detail="You cannot remove your own course membership. Please contact an administrator."
         )
 
     ceiling = permissions.get_course_authority_ceiling(str(entity.course_id))
     target_level = course_role_hierarchy.get_role_level(entity.course_role_id)
     if not ceiling or target_level >= course_role_hierarchy.get_role_level(ceiling):
         raise ForbiddenException(
-            f"You cannot remove a course member with role '{entity.course_role_id}'. "
+            detail=f"You cannot remove a course member with role '{entity.course_role_id}'. "
             f"You can only remove members with lower privilege levels."
         )
 
@@ -156,14 +156,14 @@ def custom_permissions_course_member(
     authority = permissions.get_course_authority_ceiling(course_id)
     if not authority or course_role_hierarchy.get_role_level(authority) < course_role_hierarchy.get_role_level("_lecturer"):
         raise ForbiddenException(
-            "You don't have permission to update course members. "
+            detail="You don't have permission to update course members. "
             "Lecturer role or higher is required."
         )
 
     # Check if trying to modify their own course role
     if str(course_member.user_id) == permissions.user_id:
         raise ForbiddenException(
-            "You cannot modify your own course membership. Please contact an administrator."
+            detail="You cannot modify your own course membership. Please contact an administrator."
         )
 
     # Check if target course member has equal or higher role - cannot modify peers or superiors
@@ -173,7 +173,7 @@ def custom_permissions_course_member(
         authority_level = course_role_hierarchy.get_role_level(authority)
         if target_current_level >= authority_level:
             raise ForbiddenException(
-                f"You cannot modify a course member with role '{target_current_role}'. "
+                detail=f"You cannot modify a course member with role '{target_current_role}'. "
                 f"Your role '{authority}' can only modify members with lower privilege levels."
             )
 

@@ -87,7 +87,7 @@ async def initiate_login(
 
     # Check if provider exists and is enabled
     if provider not in registry.get_enabled_plugins():
-        raise NotFoundException(f"Authentication provider not found or not enabled: {provider}")
+        raise NotFoundException(detail=f"Authentication provider not found or not enabled: {provider}")
 
     # If the plugin is enabled but not yet loaded (e.g. Keycloak wasn't ready at startup), try now
     if registry.get_plugin(provider) is None:
@@ -185,7 +185,7 @@ async def handle_callback(
 
         # Validate provider matches
         if state_data["provider"] != provider:
-            raise BadRequestException("Provider mismatch in state parameter")
+            raise BadRequestException(detail="Provider mismatch in state parameter")
 
     try:
         _api_base = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
@@ -371,7 +371,7 @@ async def list_all_plugins(principal: Principal = Depends(get_current_principal)
     """
     # Check admin permission
     if "_admin" not in principal.roles:
-        raise UnauthorizedException("Admin access required")
+        raise UnauthorizedException(detail="Admin access required")
     
     registry = get_plugin_registry()
     
@@ -399,7 +399,7 @@ async def enable_plugin(
     """Enable a plugin (admin only)."""
     # Check admin permission
     if "_admin" not in principal.roles:
-        raise UnauthorizedException("Admin access required")
+        raise UnauthorizedException(detail="Admin access required")
     
     registry = get_plugin_registry()
     
@@ -421,7 +421,7 @@ async def disable_plugin(
     """Disable a plugin (admin only)."""
     # Check admin permission
     if "_admin" not in principal.roles:
-        raise UnauthorizedException("Admin access required")
+        raise UnauthorizedException(detail="Admin access required")
 
     registry = get_plugin_registry()
 
@@ -438,7 +438,7 @@ async def reload_plugins(principal: Principal = Depends(get_current_principal)) 
     """Reload all plugins (admin only)."""
     # Check admin permission
     if "_admin" not in principal.roles:
-        raise UnauthorizedException("Admin access required")
+        raise UnauthorizedException(detail="Admin access required")
     
     registry = get_plugin_registry()
     await registry.reload_all()
@@ -497,7 +497,7 @@ async def refresh_token(
 
     refresh_token_value = body.refresh_token or request.cookies.get("ct_refresh_token")
     if not refresh_token_value:
-        raise UnauthorizedException("No refresh token provided")
+        raise UnauthorizedException(detail="No refresh token provided")
 
     result = await refresh_sso_token(
         refresh_token=refresh_token_value,

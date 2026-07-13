@@ -127,7 +127,7 @@ def resolve_git_server_ref(
             cfg = get_git_server_settings()
             if not (cfg.is_forgejo and cfg.git_server_url):
                 raise BadRequestException(
-                    "No in-system managed Forgejo is configured "
+                    detail="No in-system managed Forgejo is configured "
                     "(set GIT_SERVER=forgejo and GIT_SERVER_URL)."
                 )
             url = cfg.git_server_url.rstrip("/")
@@ -138,14 +138,14 @@ def resolve_git_server_ref(
         )
         if server is None:
             raise BadRequestException(
-                f"No Forgejo git server is registered at {url}. The managed Forgejo "
+                detail=f"No Forgejo git server is registered at {url}. The managed Forgejo "
                 f"is auto-registered at startup once it is reachable."
             )
         return server
 
     if provider == "gitlab":
         if not url:
-            raise BadRequestException("An external GitLab reference requires 'base_url'.")
+            raise BadRequestException(detail="An external GitLab reference requires 'base_url'.")
         server = (
             db.query(GitServer)
             .filter(GitServer.type == "gitlab", GitServer.base_url == url)
@@ -164,7 +164,7 @@ def resolve_git_server_ref(
         return server
 
     raise BadRequestException(
-        f"Unsupported git provider {provider!r} (expected 'forgejo' or 'gitlab')."
+        detail=f"Unsupported git provider {provider!r} (expected 'forgejo' or 'gitlab')."
     )
 
 
@@ -176,7 +176,7 @@ def is_registry_admin(principal: Principal) -> bool:
 def _require_registry_admin(principal: Principal) -> None:
     if not is_registry_admin(principal):
         raise ForbiddenException(
-            "Managing the git server registry requires admin or _organization_manager."
+            detail="Managing the git server registry requires admin or _organization_manager."
         )
 
 
@@ -221,7 +221,7 @@ def list_git_servers(principal: Principal, db: Session) -> List[GitServerGet]:
     # course creator picking a server when configuring a course's git. Creating /
     # updating / deleting registry entries stays registry-admin only.
     if not principal.get_user_id():
-        raise ForbiddenException("Authentication is required to list git servers.")
+        raise ForbiddenException(detail="Authentication is required to list git servers.")
     servers = db.query(GitServer).order_by(GitServer.created_at).all()
     return [_to_get(s) for s in servers]
 
@@ -230,7 +230,7 @@ def get_git_server(server_id: UUID | str, principal: Principal, db: Session) -> 
     _require_registry_admin(principal)
     server = db.query(GitServer).filter(GitServer.id == str(server_id)).first()
     if not server:
-        raise NotFoundException("Git server not found")
+        raise NotFoundException(detail="Git server not found")
     return _to_get(server)
 
 
@@ -240,7 +240,7 @@ def update_git_server(
     _require_registry_admin(principal)
     server = db.query(GitServer).filter(GitServer.id == str(server_id)).first()
     if not server:
-        raise NotFoundException("Git server not found")
+        raise NotFoundException(detail="Git server not found")
 
     if data.name is not None:
         server.name = data.name
@@ -268,7 +268,7 @@ def delete_git_server(server_id: UUID | str, principal: Principal, db: Session) 
     _require_registry_admin(principal)
     server = db.query(GitServer).filter(GitServer.id == str(server_id)).first()
     if not server:
-        raise NotFoundException("Git server not found")
+        raise NotFoundException(detail="Git server not found")
     try:
         db.delete(server)
         db.commit()
@@ -276,5 +276,5 @@ def delete_git_server(server_id: UUID | str, principal: Principal, db: Session) 
         # course_git_binding.git_server_id is ON DELETE RESTRICT.
         db.rollback()
         raise BadRequestException(
-            "Git server is still referenced by one or more course bindings; rebind those courses first."
+            detail="Git server is still referenced by one or more course bindings; rebind those courses first."
         )

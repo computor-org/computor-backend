@@ -69,7 +69,7 @@ async def import_course_member(
 
     if not course:
         raise ForbiddenException(
-            "You don't have permission to import course members. "
+            detail="You don't have permission to import course members. "
             "Lecturer role or higher is required."
         )
 
@@ -83,7 +83,7 @@ async def import_course_member(
 
     if not authority:
         raise ForbiddenException(
-            "You don't have a role in this course"
+            detail="You don't have a role in this course"
         )
 
     if not assign_ceiling or not course_role_hierarchy.can_assign_role(assign_ceiling, target_role):
@@ -122,7 +122,7 @@ async def import_course_member(
         # Prevent users from modifying their own course role (unless admin)
         if str(user.id) == permissions.user_id and not permissions.is_admin:
             raise ForbiddenException(
-                "You cannot modify your own course role. Please contact an administrator."
+                detail="You cannot modify your own course role. Please contact an administrator."
             )
 
         # Handle course group
@@ -165,7 +165,7 @@ async def import_course_member(
                 authority_level = course_role_hierarchy.get_role_level(authority)
                 if target_current_level >= authority_level:
                     raise ForbiddenException(
-                        f"You cannot modify a course member with role '{target_current_role}'. "
+                        detail=f"You cannot modify a course member with role '{target_current_role}'. "
                         f"Your role '{authority}' can only modify members with lower privilege levels."
                     )
 
@@ -190,7 +190,7 @@ async def import_course_member(
             # clear message instead of letting the raw constraint error surface.
             if member_request.course_role_id == "_student" and course_group_id is None:
                 raise BadRequestException(
-                    "Students must be assigned to a course group. Provide a group "
+                    detail="Students must be assigned to a course group. Provide a group "
                     "for this member (create_missing_group creates it if needed)."
                 )
             # Create new course member

@@ -309,7 +309,7 @@ async def create_version(
     # reader (example:get) can see the example but is denied this action, so
     # keep 403 (action-denial on a visible resource), not a 404 hide (TASK-209).
     if not permissions.permitted("example", "create"):
-        raise ForbiddenException("You don't have permission to create versions")
+        raise ForbiddenException(detail="You don't have permission to create versions")
 
     # Initialize repository
     version_repo = ExampleVersionRepository(db, get_cache())
@@ -317,11 +317,11 @@ async def create_version(
     # Verify example exists
     example = db.query(Example).filter(Example.id == example_id).first()
     if not example:
-        raise NotFoundException(f"Example {example_id} not found")
+        raise NotFoundException(detail=f"Example {example_id} not found")
 
     # Ensure example_id matches
     if version.example_id != example_id:
-        raise BadRequestException("Example ID mismatch")
+        raise BadRequestException(detail="Example ID mismatch")
 
     # Resolve testing service before persisting — catches missing/unknown
     # executionBackend at the doorstep instead of letting the broken row
@@ -364,7 +364,7 @@ async def list_versions(
     # with example:get/download in the reader role). A caller lacking it
     # cannot see the example at all, so hide its existence with a 404 (TASK-209).
     if not permissions.permitted("example", "list"):
-        raise PermissionDeniedAsNotFound("You don't have permission to view versions")
+        raise PermissionDeniedAsNotFound(detail="You don't have permission to view versions")
 
     # Initialize repository
     version_repo = ExampleVersionRepository(db, get_cache())
@@ -407,7 +407,7 @@ async def get_version(
     # Check permissions — ``example:get`` is a visibility gate; a caller
     # lacking it cannot see the example, so hide existence with a 404 (TASK-209).
     if not permissions.permitted("example", "get"):
-        raise PermissionDeniedAsNotFound("You don't have permission to view versions")
+        raise PermissionDeniedAsNotFound(detail="You don't have permission to view versions")
 
     # Initialize repository
     version_repo = ExampleVersionRepository(db, get_cache())
@@ -416,7 +416,7 @@ async def get_version(
     version = version_repo.get_by_id(version_id)
 
     if not version:
-        raise NotFoundException(f"Version {version_id} not found")
+        raise NotFoundException(detail=f"Version {version_id} not found")
 
     # Convert to response model
     return ExampleVersionGet.model_validate(version)
@@ -444,11 +444,11 @@ async def delete_example_version_endpoint(
     # ``example:delete`` is a write/action capability; a reader can see the
     # version but is denied deletion → keep 403 (action-denial), not a 404 hide.
     if not permissions.permitted("example", "delete"):
-        raise ForbiddenException("Deletion requires the _example_manager role or admin")
+        raise ForbiddenException(detail="Deletion requires the _example_manager role or admin")
 
     version = db.query(ExampleVersion).filter(ExampleVersion.id == version_id).first()
     if not version:
-        raise NotFoundException(f"Version {version_id} not found")
+        raise NotFoundException(detail=f"Version {version_id} not found")
 
     # Active references only: rows on `course_content_deployment` whose
     # `example_version_id` points at this version. That is the user-facing
@@ -514,7 +514,7 @@ async def delete_example_version_endpoint(
     repo = version.example.repository if version.example else None
     if not repo or not repo.source_url:
         raise BadRequestException(
-            f"Cannot resolve bucket for version {version_id}: "
+            detail=f"Cannot resolve bucket for version {version_id}: "
             "example.repository.source_url is missing"
         )
     bucket_name = repo.source_url.split("/")[0]
@@ -559,7 +559,7 @@ async def add_dependency(
     # Check permissions — ``example:update`` is a write/action capability; a
     # reader can see the example but is denied modifying it → keep 403 (TASK-209).
     if not permissions.permitted("example", "update"):
-        raise ForbiddenException("You don't have permission to modify dependencies")
+        raise ForbiddenException(detail="You don't have permission to modify dependencies")
 
     # Initialize repository
     dependency_repo = ExampleDependencyRepository(db, get_cache())
@@ -567,29 +567,29 @@ async def add_dependency(
     # Verify example exists
     example = db.query(Example).filter(Example.id == example_id).first()
     if not example:
-        raise NotFoundException(f"Example {example_id} not found")
+        raise NotFoundException(detail=f"Example {example_id} not found")
 
     # Verify dependency exists
     depends_on = db.query(Example).filter(Example.id == dependency.depends_id).first()
     if not depends_on:
-        raise NotFoundException(f"Dependency example {dependency.depends_id} not found")
+        raise NotFoundException(detail=f"Dependency example {dependency.depends_id} not found")
 
     # Ensure example_id matches
     if dependency.example_id != example_id:
-        raise BadRequestException("Example ID mismatch")
+        raise BadRequestException(detail="Example ID mismatch")
 
     # Check for circular dependencies
     if dependency.depends_id == example_id:
-        raise BadRequestException("An example cannot depend on itself")
+        raise BadRequestException(detail="An example cannot depend on itself")
 
     # Check if dependency already exists
     existing = dependency_repo.find_dependency_between(example_id, dependency.depends_id)
     if existing:
-        raise BadRequestException(f"Dependency already exists between {example_id} and {dependency.depends_id}")
+        raise BadRequestException(detail=f"Dependency already exists between {example_id} and {dependency.depends_id}")
 
     # Check for circular dependencies (advanced)
     if dependency_repo.has_circular_dependency(example_id, dependency.depends_id):
-        raise BadRequestException("Adding this dependency would create a circular dependency")
+        raise BadRequestException(detail="Adding this dependency would create a circular dependency")
 
     # Create dependency via repository (cache invalidation automatic)
     db_dependency = ExampleDependency(**dependency.model_dump())
@@ -607,12 +607,12 @@ async def list_dependencies(
     # Check permissions — ``example:list`` is a visibility gate; a caller
     # lacking it cannot see the example, so hide existence with a 404 (TASK-209).
     if not permissions.permitted("example", "list"):
-        raise PermissionDeniedAsNotFound("You don't have permission to view dependencies")
+        raise PermissionDeniedAsNotFound(detail="You don't have permission to view dependencies")
 
     # Verify example exists
     example = db.query(Example).filter(Example.id == example_id).first()
     if not example:
-        raise NotFoundException(f"Example {example_id} not found")
+        raise NotFoundException(detail=f"Example {example_id} not found")
 
     # Initialize repository
     dependency_repo = ExampleDependencyRepository(db, get_cache())
@@ -636,7 +636,7 @@ async def remove_dependency(
     # Check permissions — ``example:update`` is a write/action capability; a
     # reader can see the example but is denied modifying it → keep 403 (TASK-209).
     if not permissions.permitted("example", "update"):
-        raise ForbiddenException("You don't have permission to modify dependencies")
+        raise ForbiddenException(detail="You don't have permission to modify dependencies")
 
     # Initialize repository
     dependency_repo = ExampleDependencyRepository(db, get_cache())
@@ -645,7 +645,7 @@ async def remove_dependency(
     dependency = dependency_repo.get_by_id(dependency_id)
 
     if not dependency or str(dependency.example_id) != example_id:
-        raise NotFoundException(f"Dependency {dependency_id} not found for example {example_id}")
+        raise NotFoundException(detail=f"Dependency {dependency_id} not found for example {example_id}")
 
     # Delete dependency via repository (cache invalidation automatic)
     dependency_repo.delete(dependency)
@@ -669,7 +669,7 @@ async def upload_example(
     # Check permissions — ``example:upload`` is a write/action capability; a
     # reader can see examples but is denied uploading → keep 403 (TASK-209).
     if not permissions.permitted("example", "upload"):
-        raise ForbiddenException("You don't have permission to upload examples")
+        raise ForbiddenException(detail="You don't have permission to upload examples")
 
     # Set user context for audit tracking
     set_db_user(db, permissions.user_id)
@@ -680,13 +680,13 @@ async def upload_example(
     ).first()
     
     if not repository:
-        raise NotFoundException(f"Repository {request.repository_id} not found")
+        raise NotFoundException(detail=f"Repository {request.repository_id} not found")
     
     if repository.source_type == "git":
-        raise NotImplementedException("Git upload not implemented - use git push instead")
+        raise NotImplementedException(detail="Git upload not implemented - use git push instead")
     
     if repository.source_type not in ["minio", "s3"]:
-        raise BadRequestException(f"Upload not supported for {repository.source_type} repositories")
+        raise BadRequestException(detail=f"Upload not supported for {repository.source_type} repositories")
     
     # Support two input modes:
     # 1) Classic: request.files contains all files including 'meta.yaml'
@@ -731,14 +731,14 @@ async def upload_example(
                 extracted_files = files
         except Exception as e:
             logger.exception("Failed to extract uploaded zip for example")
-            raise BadRequestException(f"Invalid zip upload: {e}") from e
+            raise BadRequestException(detail=f"Invalid zip upload: {e}") from e
 
     # Choose file source
     incoming_files = extracted_files if extracted_files is not None else request.files
 
     # Validate that meta.yaml is included
     if 'meta.yaml' not in incoming_files:
-        raise BadRequestException("meta.yaml file is required")
+        raise BadRequestException(detail="meta.yaml file is required")
     
     # Parse meta.yaml to extract example metadata
     try:
@@ -749,7 +749,7 @@ async def upload_example(
             meta_str = str(meta_content)
         meta_data = yaml.safe_load(meta_str)
     except yaml.YAMLError as e:
-        raise BadRequestException(f"Invalid meta.yaml format: {str(e)}") from e
+        raise BadRequestException(detail=f"Invalid meta.yaml format: {str(e)}") from e
     
     # Extract metadata from meta.yaml
     title = meta_data.get('title', request.directory.replace('-', ' ').replace('_', ' ').title())
@@ -765,7 +765,7 @@ async def upload_example(
         SemanticVersion.from_string(version_tag)
     except ValueError as e:
         raise BadRequestException(
-            f"Invalid version format in meta.yaml: {str(e)}"
+            detail=f"Invalid version format in meta.yaml: {str(e)}"
         ) from e
 
     # Extract tags and other metadata
@@ -936,12 +936,12 @@ async def download_example_latest(
     # (get/list/download); a caller lacking it cannot see the example, so hide
     # existence with a 404 (TASK-209).
     if not permissions.permitted("example", "download"):
-        raise PermissionDeniedAsNotFound("You don't have permission to download examples")
+        raise PermissionDeniedAsNotFound(detail="You don't have permission to download examples")
     
     # Get example with repository relationship
     example = db.query(Example).filter(Example.id == example_id).first()
     if not example:
-        raise NotFoundException(f"Example {example_id} not found")
+        raise NotFoundException(detail=f"Example {example_id} not found")
     
     # Initialize repository
     version_repo = ExampleVersionRepository(db, get_cache())
@@ -957,7 +957,7 @@ async def download_example_latest(
         ).first()
         
         if not repository:
-            raise NotFoundException(f"Repository for example {example_id} not found")
+            raise NotFoundException(detail=f"Repository for example {example_id} not found")
         
         # For Git repositories, we can't download directly
         if repository.source_type == "git":
@@ -984,7 +984,7 @@ async def download_example_latest(
                 dependencies=None,
             )
         
-        raise NotFoundException(f"No versions found for example {example_id}")
+        raise NotFoundException(detail=f"No versions found for example {example_id}")
     
     # Use the existing download logic with the version ID
     return await download_example_version(
@@ -1008,7 +1008,7 @@ async def download_example_version(
     # (get/list/download); a caller lacking it cannot see the example, so hide
     # existence with a 404 (TASK-209).
     if not permissions.permitted("example", "download"):
-        raise PermissionDeniedAsNotFound("You don't have permission to download examples")
+        raise PermissionDeniedAsNotFound(detail="You don't have permission to download examples")
     
     # Initialize repository
     version_repo = ExampleVersionRepository(db, get_cache())
@@ -1017,7 +1017,7 @@ async def download_example_version(
     version = version_repo.get_with_relationships(version_id)
 
     if not version:
-        raise NotFoundException(f"Version {version_id} not found")
+        raise NotFoundException(detail=f"Version {version_id} not found")
 
     # Get example and repository (now safely loaded)
     example = version.example
@@ -1064,10 +1064,10 @@ async def download_example_version(
         ex_repository = ex_example.repository
         
         if ex_repository.source_type == "git":
-            raise NotImplementedException("Git download not implemented - use git clone instead")
+            raise NotImplementedException(detail="Git download not implemented - use git clone instead")
         
         if ex_repository.source_type not in ["minio", "s3"]:
-            raise BadRequestException(f"Download not supported for {ex_repository.source_type} repositories")
+            raise BadRequestException(detail=f"Download not supported for {ex_repository.source_type} repositories")
         
         # Get files from MinIO
         bucket_name = ex_repository.source_url.split('/')[0]
@@ -1198,7 +1198,7 @@ async def delete_examples_by_pattern_endpoint(
     # ``example:delete`` is a write/action capability; a reader can see the
     # examples but is denied deletion → keep 403 (action-denial), not a 404 hide.
     if not permissions.permitted("example", "delete"):
-        raise ForbiddenException("Deletion requires the _example_manager role or admin")
+        raise ForbiddenException(detail="Deletion requires the _example_manager role or admin")
 
     # Build request object from query params
     request = ExampleBulkDeleteRequest(

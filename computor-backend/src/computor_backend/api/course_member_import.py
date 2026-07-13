@@ -145,7 +145,7 @@ async def parse_member_file(
         ).first()
     if not course:
         raise ForbiddenException(
-            "You don't have permission to import course members. "
+            detail="You don't have permission to import course members. "
             "Lecturer role or higher is required."
         )
 

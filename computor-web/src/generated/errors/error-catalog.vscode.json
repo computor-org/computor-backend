@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "error_count": 71,
+  "error_count": 73,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -766,6 +766,32 @@
         "plain": "The GitLab username format is invalid.",
         "markdown": "**Invalid GitLab Username**\n\nThe provided GitLab username is empty or has invalid format. Please provide a valid GitLab username.",
         "html": "<strong>Invalid GitLab Username</strong><p>Please provide a valid GitLab username.</p>"
+      },
+      "retry_after": null
+    },
+    "GIT_001": {
+      "code": "GIT_001",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Course Not Configured For Git",
+      "message": {
+        "plain": "This course is not configured for git provisioning.",
+        "markdown": "**Course Not Configured For Git**\n\nThis course does not use git-hosted assignments, so there is no repository to provision. Contact your instructor if you expected one.",
+        "html": "<strong>Course Not Configured For Git</strong><p>This course does not use git-hosted assignments, so there is no repository to provision. Contact your instructor if you expected one.</p>"
+      },
+      "retry_after": null
+    },
+    "GIT_002": {
+      "code": "GIT_002",
+      "http_status": 404,
+      "category": "not_found",
+      "severity": "warning",
+      "title": "Not A Course Member",
+      "message": {
+        "plain": "You are not a member of this course.",
+        "markdown": "**Not A Course Member**\n\nYou are not enrolled in this course, so its repositories are not available to you.",
+        "html": "<strong>Not A Course Member</strong><p>You are not enrolled in this course, so its repositories are not available to you.</p>"
       },
       "retry_after": null
     },

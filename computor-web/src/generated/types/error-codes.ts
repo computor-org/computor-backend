@@ -119,6 +119,8 @@ export const ErrorCodes = {
   GITLAB_006: "GITLAB_006", // GitLab Token Invalid
   GITLAB_007: "GITLAB_007", // GitLab API Unreachable
   GITLAB_008: "GITLAB_008", // Invalid GitLab Username
+  GIT_001: "GIT_001", // Course Not Configured For Git
+  GIT_002: "GIT_002", // Not A Course Member
   EXT_001: "EXT_001", // GitLab Service Unavailable
   EXT_002: "EXT_002", // GitLab Authentication Failed
   EXT_003: "EXT_003", // MinIO Service Unavailable
@@ -980,6 +982,34 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
     },
     retryAfter: undefined,
     documentationUrl: "/docs/integrations/gitlab#registration",
+  },
+  GIT_001: {
+    code: "GIT_001",
+    httpStatus: 400,
+    category: ErrorCategory.VALIDATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Course Not Configured For Git",
+    message: {
+      plain: "This course is not configured for git provisioning.",
+      markdown: "**Course Not Configured For Git**\n\nThis course does not use git-hosted assignments, so there is no repository to provision. Contact your instructor if you expected one.",
+      html: "<strong>Course Not Configured For Git</strong><p>This course does not use git-hosted assignments, so there is no repository to provision. Contact your instructor if you expected one.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/courses/git",
+  },
+  GIT_002: {
+    code: "GIT_002",
+    httpStatus: 404,
+    category: ErrorCategory.NOT_FOUND,
+    severity: ErrorSeverity.WARNING,
+    title: "Not A Course Member",
+    message: {
+      plain: "You are not a member of this course.",
+      markdown: "**Not A Course Member**\n\nYou are not enrolled in this course, so its repositories are not available to you.",
+      html: "<strong>Not A Course Member</strong><p>You are not enrolled in this course, so its repositories are not available to you.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/courses#enrollment",
   },
   EXT_001: {
     code: "EXT_001",

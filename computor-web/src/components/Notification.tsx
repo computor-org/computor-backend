@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type NotificationType = 'success' | 'error' | 'warning' | 'info';
 
@@ -10,6 +10,9 @@ interface NotificationProps {
   onClose: () => void;
   duration?: number;
 }
+
+// Exit-transition length; keep in sync with the `duration-300` class below.
+const EXIT_MS = 300;
 
 const typeStyles: Record<NotificationType, { bg: string; icon: string; text: string }> = {
   success: { bg: 'bg-green-50 border-green-200', icon: 'text-green-500', text: 'text-green-800' },
@@ -47,19 +50,52 @@ const typeIcons: Record<NotificationType, React.ReactElement> = {
  * rendering this directly.
  */
 export default function Notification({ message, type, onClose, duration = 5000 }: NotificationProps) {
+  // `visible` drives the enter transition; `leaving` drives the exit one.
+  const [visible, setVisible] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+
+  // Hold the latest onClose in a ref so the auto-dismiss timer below can run
+  // once and NOT reset when the provider re-renders (adding another toast hands
+  // every sibling a fresh onClose identity — depending on it would restart all
+  // their timers, making them expire together instead of on their own clock).
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Start the exit transition, then actually unmount once it has played.
+  const startLeave = useCallback(() => {
+    setLeaving((already) => {
+      if (already) return already; // guard double-trigger (timer + manual close)
+      exitTimer.current = setTimeout(() => onCloseRef.current(), EXIT_MS);
+      return true;
+    });
+  }, []);
+
   useEffect(() => {
-    const timer = setTimeout(onClose, duration);
-    return () => clearTimeout(timer);
-  }, [onClose, duration]);
+    // Flip to visible on the next frame so the enter transition plays.
+    const raf = requestAnimationFrame(() => setVisible(true));
+    // Independent per-toast auto-dismiss; stable deps → never reset by siblings.
+    const dismiss = setTimeout(startLeave, duration);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(dismiss);
+      if (exitTimer.current) clearTimeout(exitTimer.current);
+    };
+  }, [duration, startLeave]);
 
   const styles = typeStyles[type];
+  const shown = visible && !leaving;
 
   return (
-    <div className={`max-w-sm border rounded-lg p-4 shadow-lg ${styles.bg}`}>
+    <div
+      className={`max-w-sm border rounded-lg p-4 shadow-lg transition-all duration-300 ease-out ${styles.bg} ${
+        shown ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'
+      }`}
+    >
       <div className="flex items-start gap-3">
         <span className={styles.icon}>{typeIcons[type]}</span>
         <p className={`text-sm font-medium flex-1 ${styles.text}`}>{message}</p>
-        <button onClick={onClose} aria-label="Dismiss notification" className="text-gray-400 hover:text-gray-600">
+        <button onClick={startLeave} aria-label="Dismiss notification" className="text-gray-400 hover:text-gray-600">
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>

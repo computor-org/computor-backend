@@ -44,12 +44,12 @@ async def delete_course_endpoint(
 ) -> CascadeDeleteResult:
     """Delete course and all course-specific data."""
     if not permissions.is_admin:
-        raise ForbiddenException("Deletion requires admin permissions")
+        raise ForbiddenException(detail="Deletion requires admin permissions")
 
     # Verify course exists
     course = db.query(Course).filter(Course.id == str(course_id)).first()
     if not course:
-        raise NotFoundException(f"Course not found: {course_id}")
+        raise NotFoundException(detail=f"Course not found: {course_id}")
 
     storage = get_storage_service()
     result = await delete_course_cascade(

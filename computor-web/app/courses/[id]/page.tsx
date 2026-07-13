@@ -9,6 +9,7 @@ import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient
 import { UserClient } from '@/src/generated/clients/UserClient';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useNotify } from '@/src/contexts/NotificationContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -40,7 +41,7 @@ export default function CoursePage() {
   const { data, loading, error, reload } = useResource(
     async () => {
       const course = await coursesClient.getCoursesCoursesIdGet({ id: courseId });
-      const [courseViews, organization, courseFamily, gitBinding, myRepo] = await Promise.all([
+      const [courseViews, organization, courseFamily, gitBinding, myRepo, gitDescriptor] = await Promise.all([
         userClient.getCourseViewsForCurrentUserByCourseUserViewsCourseIdGet({ courseId }).catch(() => [] as string[]),
         organizationsClient.getOrganizationsOrganizationsIdGet({ id: course.organization_id }).catch(() => null),
         courseFamiliesClient.getCourseFamiliesCourseFamiliesIdGet({ id: course.course_family_id }).catch(() => null),
@@ -50,8 +51,11 @@ export default function CoursePage() {
           : Promise.resolve(null),
         // The caller's own repository. 404s (→ null) when they aren't a member.
         userClient.getStudentRepositoryEndpointUserCoursesCourseIdRepositoryGet({ courseId }).catch(() => null),
+        // Whether this course provisions git at all — drives the repo section
+        // (everyone), so a non-git course never shows the provision button.
+        userClient.getCourseGitDescriptorEndpointUserCoursesCourseIdGitGet({ courseId }).catch(() => null),
       ]);
-      return { course, courseViews, organization, courseFamily, gitBinding, myRepo };
+      return { course, courseViews, organization, courseFamily, gitBinding, myRepo, gitDescriptor };
     },
     [courseId, canManageMembers],
   );
@@ -61,27 +65,28 @@ export default function CoursePage() {
   const courseFamily = data?.courseFamily ?? null;
   const gitBinding = data?.gitBinding ?? null;
   const myRepo = data?.myRepo ?? null;
+  const gitDescriptor = data?.gitDescriptor ?? null;
+  // The course actually provisions git repos — the exact condition under which
+  // provision-repository succeeds (binding present + git delivery). Gate the
+  // repo section on this so a non-git course never offers the provision button.
+  const gitConfigured = gitDescriptor?.configured === true && gitDescriptor?.delivery === 'git';
 
+  const notify = useNotify();
   const [ensuring, setEnsuring] = useState(false);
-  const [ensureMsg, setEnsureMsg] = useState<string | null>(null);
-  const [ensureErr, setEnsureErr] = useState(false);
   const [provisioned, setProvisioned] = useState<StudentRepositoryProvisioned | null>(null);
 
   async function ensureGitAccess() {
     setEnsuring(true);
-    setEnsureMsg(null);
-    setEnsureErr(false);
     setProvisioned(null);
     try {
       const r = await userClient.provisionStudentRepositoryEndpointUserCoursesCourseIdProvisionRepositoryPost(
         { courseId },
       );
       setProvisioned(r);
-      setEnsureMsg('Git access ensured.');
+      notify('Git access ensured.', 'success');
       await reload(); // refresh the persisted repository details below
     } catch (e) {
-      setEnsureErr(true);
-      setEnsureMsg(e instanceof Error ? e.message : 'Failed to ensure git access');
+      notify(e instanceof Error ? e.message : 'Failed to ensure git access', 'error');
     } finally {
       setEnsuring(false);
     }
@@ -266,12 +271,16 @@ export default function CoursePage() {
           </dl>
         </div>
 
-        {/* Git — the caller's own repository (+ ensure access), then the course
-            binding for managers. */}
+        {/* Git — the caller's own repository (+ ensure access) when the course
+            uses git, then the course binding for managers. Hidden entirely for a
+            student on a course that doesn't provision git. */}
+        {(gitConfigured || canManageMembers) && (
         <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
           <h2 className="text-lg font-semibold text-gray-900">Git</h2>
 
-          {/* Your repository (everyone) */}
+          {/* Your repository — only when the course actually provisions git, so
+              the provision button is never offered on a non-git course. */}
+          {gitConfigured && (
           <div>
             <h3 className="text-sm font-semibold text-gray-900 mb-2">Your repository</h3>
             {myRepo ? (
@@ -305,9 +314,6 @@ export default function CoursePage() {
               Creates or repairs your repository for this course
               {canManage ? ' — as staff this also grants access to the template and reference repos.' : '.'}
             </p>
-            {ensureMsg && (
-              <p className={`mt-3 text-sm break-all ${ensureErr ? 'text-red-600' : 'text-green-700'}`}>{ensureMsg}</p>
-            )}
             {provisioned?.clone_token && (
               <div className="mt-3 p-3 rounded border border-amber-200 bg-amber-50 text-sm text-amber-900">
                 <p className="font-medium">One-time clone credential — copy it now, it won&apos;t be shown again.</p>
@@ -322,6 +328,7 @@ export default function CoursePage() {
               </div>
             )}
           </div>
+          )}
 
           {/* Course configuration (managers only) */}
           {canManageMembers && (
@@ -388,6 +395,7 @@ export default function CoursePage() {
             </div>
           )}
         </div>
+        )}
         </ScrollArea>
       </ListPageLayout>
     </AuthenticatedLayout>

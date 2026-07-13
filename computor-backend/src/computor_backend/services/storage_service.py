@@ -37,7 +37,7 @@ class StorageService:
                 logger.info(f"Created bucket: {bucket}")
         except S3Error as e:
             logger.error(f"Error ensuring bucket exists: {e}")
-            raise ServiceUnavailableException(f"Storage service error: {e}") from e
+            raise ServiceUnavailableException(detail=f"Storage service error: {e}") from e
         return bucket
     
     async def upload_file(
@@ -90,8 +90,8 @@ class StorageService:
         except S3Error as e:
             logger.error(f"Error uploading file: {e}")
             if e.code == 'NoSuchBucket':
-                raise NotFoundException(f"Bucket not found: {bucket}") from e
-            raise ServiceUnavailableException(f"Storage upload error: {e}")
+                raise NotFoundException(detail=f"Bucket not found: {bucket}") from e
+            raise ServiceUnavailableException(detail=f"Storage upload error: {e}")
     
     async def download_file(
         self, 
@@ -113,10 +113,10 @@ class StorageService:
         except S3Error as e:
             logger.error(f"Error downloading file: {e}")
             if e.code == 'NoSuchKey':
-                raise NotFoundException(f"Object not found: {object_key}") from e
+                raise NotFoundException(detail=f"Object not found: {object_key}") from e
             if e.code == 'NoSuchBucket':
-                raise NotFoundException(f"Bucket not found: {bucket}")
-            raise ServiceUnavailableException(f"Storage download error: {e}")
+                raise NotFoundException(detail=f"Bucket not found: {bucket}")
+            raise ServiceUnavailableException(detail=f"Storage download error: {e}")
     
     async def get_file_stream(
         self, 
@@ -144,10 +144,10 @@ class StorageService:
         except S3Error as e:
             logger.error(f"Error getting file stream: {e}")
             if e.code == 'NoSuchKey':
-                raise NotFoundException(f"Object not found: {object_key}") from e
+                raise NotFoundException(detail=f"Object not found: {object_key}") from e
             if e.code == 'NoSuchBucket':
-                raise NotFoundException(f"Bucket not found: {bucket}")
-            raise ServiceUnavailableException(f"Storage stream error: {e}")
+                raise NotFoundException(detail=f"Bucket not found: {bucket}")
+            raise ServiceUnavailableException(detail=f"Storage stream error: {e}")
     
     async def delete_file(
         self, 
@@ -165,10 +165,10 @@ class StorageService:
         except S3Error as e:
             logger.error(f"Error deleting file: {e}")
             if e.code == 'NoSuchKey':
-                raise NotFoundException(f"Object not found: {object_key}") from e
+                raise NotFoundException(detail=f"Object not found: {object_key}") from e
             if e.code == 'NoSuchBucket':
-                raise NotFoundException(f"Bucket not found: {bucket}")
-            raise ServiceUnavailableException(f"Storage delete error: {e}")
+                raise NotFoundException(detail=f"Bucket not found: {bucket}")
+            raise ServiceUnavailableException(detail=f"Storage delete error: {e}")
     
     async def list_objects(
         self,
@@ -193,8 +193,8 @@ class StorageService:
         except S3Error as e:
             logger.error(f"Error listing objects: {e}")
             if e.code == 'NoSuchBucket':
-                raise NotFoundException(f"Bucket not found: {bucket}") from e
-            raise ServiceUnavailableException(f"Storage list error: {e}")
+                raise NotFoundException(detail=f"Bucket not found: {bucket}") from e
+            raise ServiceUnavailableException(detail=f"Storage list error: {e}")
     
     async def get_object_info(
         self,
@@ -218,10 +218,10 @@ class StorageService:
         except S3Error as e:
             logger.error(f"Error getting object info: {e}")
             if e.code == 'NoSuchKey':
-                raise NotFoundException(f"Object not found: {object_key}") from e
+                raise NotFoundException(detail=f"Object not found: {object_key}") from e
             if e.code == 'NoSuchBucket':
-                raise NotFoundException(f"Bucket not found: {bucket}")
-            raise ServiceUnavailableException(f"Storage info error: {e}")
+                raise NotFoundException(detail=f"Bucket not found: {bucket}")
+            raise ServiceUnavailableException(detail=f"Storage info error: {e}")
     
     async def copy_object(
         self,
@@ -269,10 +269,10 @@ class StorageService:
         except S3Error as e:
             logger.error(f"Error copying object: {e}")
             if e.code == 'NoSuchKey':
-                raise NotFoundException(f"Source object not found: {source_object}") from e
+                raise NotFoundException(detail=f"Source object not found: {source_object}") from e
             if e.code == 'NoSuchBucket':
-                raise NotFoundException(f"Bucket not found")
-            raise ServiceUnavailableException(f"Storage copy error: {e}")
+                raise NotFoundException(detail=f"Bucket not found")
+            raise ServiceUnavailableException(detail=f"Storage copy error: {e}")
     
     async def generate_presigned_url(
         self,
@@ -298,7 +298,7 @@ class StorageService:
                     expires=timedelta(seconds=expiry_seconds)
                 )
             else:
-                raise BadRequestException(f"Unsupported method for presigned URL: {method}")
+                raise BadRequestException(detail=f"Unsupported method for presigned URL: {method}")
             
             expires_at = datetime.now(timezone.utc) + timedelta(seconds=expiry_seconds)
             
@@ -310,7 +310,7 @@ class StorageService:
             
         except S3Error as e:
             logger.error(f"Error generating presigned URL: {e}")
-            raise ServiceUnavailableException(f"Presigned URL error: {e}") from e
+            raise ServiceUnavailableException(detail=f"Presigned URL error: {e}") from e
     
     async def list_buckets(self) -> List[BucketInfo]:
         """List all buckets"""
@@ -327,13 +327,13 @@ class StorageService:
             
         except S3Error as e:
             logger.error(f"Error listing buckets: {e}")
-            raise ServiceUnavailableException(f"Bucket list error: {e}") from e
+            raise ServiceUnavailableException(detail=f"Bucket list error: {e}") from e
     
     async def create_bucket(self, bucket_name: str, region: Optional[str] = None) -> BucketInfo:
         """Create a new bucket"""
         try:
             if self.client.bucket_exists(bucket_name):
-                raise BadRequestException(f"Bucket already exists: {bucket_name}")
+                raise BadRequestException(detail=f"Bucket already exists: {bucket_name}")
             
             self.client.make_bucket(bucket_name, location=region)
             logger.info(f"Created bucket: {bucket_name}")
@@ -346,7 +346,7 @@ class StorageService:
             
         except S3Error as e:
             logger.error(f"Error creating bucket: {e}")
-            raise ServiceUnavailableException(f"Bucket creation error: {e}") from e
+            raise ServiceUnavailableException(detail=f"Bucket creation error: {e}") from e
     
     async def delete_bucket(self, bucket_name: str, force: bool = False) -> bool:
         """Delete a bucket"""
@@ -365,10 +365,10 @@ class StorageService:
         except S3Error as e:
             logger.error(f"Error deleting bucket: {e}")
             if e.code == 'NoSuchBucket':
-                raise NotFoundException(f"Bucket not found: {bucket_name}") from e
+                raise NotFoundException(detail=f"Bucket not found: {bucket_name}") from e
             if e.code == 'BucketNotEmpty':
-                raise BadRequestException(f"Bucket not empty: {bucket_name}. Use force=true to delete all objects.")
-            raise ServiceUnavailableException(f"Bucket deletion error: {e}")
+                raise BadRequestException(detail=f"Bucket not empty: {bucket_name}. Use force=true to delete all objects.")
+            raise ServiceUnavailableException(detail=f"Bucket deletion error: {e}")
     
     async def get_bucket_stats(self, bucket_name: Optional[str] = None) -> StorageUsageStats:
         """Get storage usage statistics for a bucket"""
@@ -394,8 +394,8 @@ class StorageService:
         except S3Error as e:
             logger.error(f"Error getting bucket stats: {e}")
             if e.code == 'NoSuchBucket':
-                raise NotFoundException(f"Bucket not found: {bucket}") from e
-            raise ServiceUnavailableException(f"Bucket stats error: {e}")
+                raise NotFoundException(detail=f"Bucket not found: {bucket}") from e
+            raise ServiceUnavailableException(detail=f"Bucket stats error: {e}")
     
     def _extract_custom_metadata(self, metadata: Dict[str, str]) -> Dict[str, str]:
         """Extract custom metadata from MinIO metadata"""

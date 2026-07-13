@@ -171,7 +171,7 @@ def deploy_from_configuration(
     """
     # Check admin permissions
     if not check_admin(permissions):
-        raise ForbiddenException("Admin permissions required for deployment")
+        raise ForbiddenException(detail="Admin permissions required for deployment")
 
     # Validate configuration
     config = ComputorDeploymentConfig(**deployment_config)

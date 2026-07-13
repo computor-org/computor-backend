@@ -149,14 +149,14 @@ async def refresh_local_token(
     refresh_data_raw = await redis_client.get(refresh_key)
 
     if not refresh_data_raw:
-        raise UnauthorizedException("Invalid or expired refresh token")
+        raise UnauthorizedException(detail="Invalid or expired refresh token")
 
     try:
         refresh_data = json.loads(refresh_data_raw)
         user_id = refresh_data.get("user_id")
 
         if not user_id:
-            raise UnauthorizedException("Invalid refresh token data")
+            raise UnauthorizedException(detail="Invalid refresh token data")
 
         # Check absolute expiration (expires_at field from login)
         expires_at_str = refresh_data.get("expires_at")
@@ -169,20 +169,20 @@ async def refresh_local_token(
                     expires_at = expires_at.replace(tzinfo=timezone.utc)
                 if expires_at < now:
                     logger.info(f"Refresh token expired for user {user_id} (absolute expiration)")
-                    raise UnauthorizedException("Refresh token has expired")
+                    raise UnauthorizedException(detail="Refresh token has expired")
             except (ValueError, AttributeError) as e:
                 logger.warning(f"Failed to parse expires_at: {e}, using fallback")
 
         # Verify the refresh token belongs to the authenticated user (if principal is available)
         if principal and str(user_id) != str(principal.user_id):
-            raise UnauthorizedException("Refresh token does not belong to authenticated user")
+            raise UnauthorizedException(detail="Refresh token does not belong to authenticated user")
 
         # Verify user still exists (wrap blocking DB query)
         user = await run_in_threadpool(
             lambda: db.query(User).filter(User.id == user_id).first()
         )
         if not user:
-            raise NotFoundException("User not found")
+            raise NotFoundException(detail="User not found")
 
         # Generate new access token
         new_access_token = generate_token(32)
@@ -224,7 +224,7 @@ async def refresh_local_token(
                 logger.debug(f"Updated refresh token with {remaining_ttl}s remaining TTL")
             else:
                 # Should have been caught earlier, but safety check
-                raise UnauthorizedException("Refresh token has expired")
+                raise UnauthorizedException(detail="Refresh token has expired")
         else:
             # Fallback for old tokens without expires_at
             await redis_client.set(
@@ -263,7 +263,7 @@ async def refresh_local_token(
         )
 
     except json.JSONDecodeError:
-        raise UnauthorizedException("Invalid refresh token format")
+        raise UnauthorizedException(detail="Invalid refresh token format")
 
 
 async def logout_session(
@@ -400,13 +400,13 @@ async def handle_sso_callback(
 
     if auth_result.status != AuthStatus.SUCCESS:
         raise UnauthorizedException(
-            f"Authentication failed: {auth_result.error_message}"
+            detail=f"Authentication failed: {auth_result.error_message}"
         )
 
     # Get user info
     user_info = auth_result.user_info
     if not user_info:
-        raise BadRequestException("No user information received from provider")
+        raise BadRequestException(detail="No user information received from provider")
 
     # Find or create user account (wrap blocking DB operations)
     def _find_or_create_account():
@@ -488,7 +488,7 @@ async def handle_sso_callback(
                         # Data predating the uniqueness trigger could map one email
                         # to several users — never guess which to log in as.
                         raise BadRequestException(
-                            f"Email '{user_info.email}' is associated with multiple "
+                            detail=f"Email '{user_info.email}' is associated with multiple "
                             "accounts; SSO login cannot be resolved automatically."
                         )
 
@@ -642,12 +642,12 @@ async def refresh_sso_token(
 
     # Validate provider
     if provider not in registry.get_enabled_plugins():
-        raise BadRequestException(f"Authentication provider not enabled: {provider}")
+        raise BadRequestException(detail=f"Authentication provider not enabled: {provider}")
 
     # Get the plugin
     plugin = registry.get_plugin(provider)
     if not plugin:
-        raise NotFoundException(f"Authentication provider not found: {provider}")
+        raise NotFoundException(detail=f"Authentication provider not found: {provider}")
 
     # Use the plugin's refresh token method
     if hasattr(plugin, "refresh_token"):
@@ -655,13 +655,13 @@ async def refresh_sso_token(
 
         if auth_result.status != AuthStatus.SUCCESS:
             raise UnauthorizedException(
-                f"Token refresh failed: {auth_result.error_message}"
+                detail=f"Token refresh failed: {auth_result.error_message}"
             )
 
         # Get user info from the refreshed token
         user_info = auth_result.user_info
         if not user_info:
-            raise BadRequestException("No user information received from provider")
+            raise BadRequestException(detail="No user information received from provider")
 
         # Find the user account (wrap blocking query)
         account = await run_in_threadpool(
@@ -674,13 +674,13 @@ async def refresh_sso_token(
         )
 
         if not account:
-            raise NotFoundException("User account not found")
+            raise NotFoundException(detail="User account not found")
 
         user = account.user
 
         # Verify the account belongs to the authenticated user
         if str(user.id) != str(principal.user_id):
-            raise UnauthorizedException("Refresh token does not belong to authenticated user")
+            raise UnauthorizedException(detail="Refresh token does not belong to authenticated user")
 
         # Generate new API session token
         new_session_token = secrets.token_urlsafe(32)
@@ -728,7 +728,7 @@ async def refresh_sso_token(
 
     else:
         raise BadRequestException(
-            f"Token refresh not supported by provider: {provider}"
+            detail=f"Token refresh not supported by provider: {provider}"
         )
 
 

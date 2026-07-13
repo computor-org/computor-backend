@@ -50,7 +50,7 @@ async def get_current_session(
     # Extract token from Authorization header
     authorization = request.headers.get("Authorization", "")
     if not authorization.startswith("Bearer "):
-        raise UnauthorizedException("No valid token provided")
+        raise UnauthorizedException(detail="No valid token provided")
 
     token = authorization.replace("Bearer ", "")
     token_hash = hash_token(token)
@@ -59,11 +59,11 @@ async def get_current_session(
     session = session_repo.find_by_session_id_hash(token_hash)
 
     if not session:
-        raise NotFoundException("Current session not found")
+        raise NotFoundException(detail="Current session not found")
 
     # Verify session belongs to authenticated user
     if str(session.user_id) != str(principal.user_id):
-        raise UnauthorizedException("Session does not belong to authenticated user")
+        raise UnauthorizedException(detail="Session does not belong to authenticated user")
 
     return SessionGet.model_validate(session, from_attributes=True)
 
@@ -86,11 +86,11 @@ async def revoke_my_session(
     session = session_repo.get(session_id)
 
     if not session:
-        raise NotFoundException("Session not found")
+        raise NotFoundException(detail="Session not found")
 
     # CRITICAL: Verify session belongs to user
     if str(session.user_id) != str(principal.user_id):
-        raise UnauthorizedException("Cannot revoke another user's session")
+        raise UnauthorizedException(detail="Cannot revoke another user's session")
 
     # Revoke in database
     session_repo.revoke_session(session_id, reason="User revoked via API")
@@ -167,7 +167,7 @@ async def list_user_sessions_admin(
     """List sessions for any user (admin only)."""
     # Check admin permission
     if "_admin" not in principal.roles and "_maintainer" not in principal.roles:
-        raise UnauthorizedException("Admin or maintainer access required")
+        raise UnauthorizedException(detail="Admin or maintainer access required")
 
     session_repo = SessionRepository(db, cache)
 
@@ -195,13 +195,13 @@ async def revoke_session_admin(
 
     # Check admin permission
     if "_admin" not in principal.roles and "_maintainer" not in principal.roles:
-        raise UnauthorizedException("Admin or maintainer access required")
+        raise UnauthorizedException(detail="Admin or maintainer access required")
 
     session_repo = SessionRepository(db, cache)
     session = session_repo.get(session_id)
 
     if not session:
-        raise NotFoundException("Session not found")
+        raise NotFoundException(detail="Session not found")
 
     # Revoke with admin reason
     session_repo.revoke_session(
@@ -236,7 +236,7 @@ async def revoke_all_user_sessions_admin(
 
     # Check admin permission
     if "_admin" not in principal.roles and "_maintainer" not in principal.roles:
-        raise UnauthorizedException("Admin or maintainer access required")
+        raise UnauthorizedException(detail="Admin or maintainer access required")
 
     session_repo = SessionRepository(db, cache)
     count = session_repo.revoke_all_user_sessions(
@@ -267,7 +267,7 @@ async def get_session_stats(
 ):
     """Get session statistics (admin only)."""
     if "_admin" not in principal.roles:
-        raise UnauthorizedException("Admin access required")
+        raise UnauthorizedException(detail="Admin access required")
 
     from datetime import datetime, timezone, timedelta
 

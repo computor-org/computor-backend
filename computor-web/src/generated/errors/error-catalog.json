@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "error_count": 71,
+  "error_count": 73,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -1652,6 +1652,60 @@
       "resolution_steps": [
         "Provide your GitLab username",
         "Verify username is not empty"
+      ]
+    },
+    "GIT_001": {
+      "code": "GIT_001",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Course Not Configured For Git",
+      "message": {
+        "plain": "This course is not configured for git provisioning.",
+        "markdown": "**Course Not Configured For Git**\n\nThis course does not use git-hosted assignments, so there is no repository to provision. Contact your instructor if you expected one.",
+        "html": "<strong>Course Not Configured For Git</strong><p>This course does not use git-hosted assignments, so there is no repository to provision. Contact your instructor if you expected one.</p>"
+      },
+      "retry_after": null,
+      "documentation_url": "/docs/courses/git",
+      "internal_description": "Course has no CourseGitBinding, or the binding's delivery is not 'git'",
+      "affected_functions": [
+        "provision_student_repository",
+        "get_course_git_descriptor"
+      ],
+      "common_causes": [
+        "Course created without a git binding",
+        "Course delivers assignments as downloads, not git"
+      ],
+      "resolution_steps": [
+        "Configure a git binding for the course (staff)",
+        "Contact your instructor"
+      ]
+    },
+    "GIT_002": {
+      "code": "GIT_002",
+      "http_status": 404,
+      "category": "not_found",
+      "severity": "warning",
+      "title": "Not A Course Member",
+      "message": {
+        "plain": "You are not a member of this course.",
+        "markdown": "**Not A Course Member**\n\nYou are not enrolled in this course, so its repositories are not available to you.",
+        "html": "<strong>Not A Course Member</strong><p>You are not enrolled in this course, so its repositories are not available to you.</p>"
+      },
+      "retry_after": null,
+      "documentation_url": "/docs/courses#enrollment",
+      "internal_description": "No CourseMember row links the caller to this course",
+      "affected_functions": [
+        "provision_student_repository",
+        "get_student_repository"
+      ],
+      "common_causes": [
+        "User is not enrolled in the course",
+        "Enrollment not yet processed"
+      ],
+      "resolution_steps": [
+        "Ask an instructor to add you to the course",
+        "Check your enrollment status"
       ]
     },
     "EXT_001": {

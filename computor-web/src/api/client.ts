@@ -7,6 +7,62 @@ interface RequestOptions extends RequestInit {
 }
 
 /**
+ * A non-2xx API response, surfaced as a throwable Error.
+ *
+ * The backend returns structured error bodies (`{ message, error_code? }`,
+ * see computor-backend error_registry.yaml + generate.sh). This parses that
+ * shape so `error.message` is the human-readable backend message — safe to
+ * drop straight into `notify(err.message, 'error')` — while `errorCode` lets
+ * callers branch on a stable code (looked up in
+ * `@/src/generated/types/error-codes`). Extends Error, so existing
+ * `catch (e) { e instanceof Error ? e.message : … }` sites keep working and
+ * now show the real message instead of raw JSON.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly errorCode?: string;
+  readonly details?: unknown;
+
+  constructor(message: string, opts: { status: number; errorCode?: string; details?: unknown }) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = opts.status;
+    this.errorCode = opts.errorCode;
+    this.details = opts.details;
+  }
+}
+
+/**
+ * Build an ApiError from a non-2xx Response, extracting the backend's
+ * `{ message, error_code, details }` (falling back to `detail`, then the raw
+ * body text, then a status line). Never throws — always resolves to an ApiError.
+ */
+async function buildApiError(response: Response): Promise<ApiError> {
+  const status = response.status;
+  const raw = await response.text().catch(() => '');
+  let message = raw;
+  let errorCode: string | undefined;
+  let details: unknown;
+
+  if (raw) {
+    try {
+      const body = JSON.parse(raw) as Record<string, unknown>;
+      if (body && typeof body === 'object') {
+        const m = body.message ?? body.detail;
+        if (typeof m === 'string') message = m;
+        if (typeof body.error_code === 'string') errorCode = body.error_code;
+        details = body.details;
+      }
+    } catch {
+      // Body isn't JSON — keep the raw text as the message.
+    }
+  }
+
+  if (!message) message = `HTTP error! status: ${status}`;
+  return new ApiError(message, { status, errorCode, details });
+}
+
+/**
  * Configuration for APIClient
  */
 interface APIClientConfig {
@@ -50,8 +106,7 @@ class APIClient {
    */
   private async handleResponse<T>(response: Response, method?: string): Promise<T> {
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(error || `HTTP error! status: ${response.status}`);
+      throw await buildApiError(response);
     }
 
     if (response.status === 204 || (method && method.toUpperCase() === 'HEAD')) {

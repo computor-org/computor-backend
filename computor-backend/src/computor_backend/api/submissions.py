@@ -124,18 +124,18 @@ def _sanitize_archive_path(name: str) -> str:
     """Normalize and sanitize a path from inside a ZIP archive."""
     path = PurePosixPath(name)
     if path.is_absolute():
-        raise BadRequestException("Archive entries must use relative paths")
+        raise BadRequestException(detail="Archive entries must use relative paths")
 
     parts: List[str] = []
     for idx, part in enumerate(path.parts):
         if part in ("", "."):
             continue
         if part == "..":
-            raise BadRequestException("Archive contains invalid path traversal sequences")
+            raise BadRequestException(detail="Archive contains invalid path traversal sequences")
         parts.append(_sanitize_path_segment(part, is_file=(idx == len(path.parts) - 1)))
 
     if not parts:
-        raise BadRequestException("Archive contains an empty file path")
+        raise BadRequestException(detail="Archive contains an empty file path")
 
     return "/".join(parts)
 

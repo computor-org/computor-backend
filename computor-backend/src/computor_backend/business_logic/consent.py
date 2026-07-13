@@ -159,9 +159,9 @@ class ConsentService:
         """Record consent for policy_version, which must equal required_version
         (the gate-enforced version resolved by the caller)."""
         if required_version is None:
-            raise BadRequestException("No policy version is configured; consent is not required")
+            raise BadRequestException(detail="No policy version is configured; consent is not required")
         if policy_version != required_version:
-            raise BadRequestException(f"Policy version mismatch: current version is '{required_version}'")
+            raise BadRequestException(detail=f"Policy version mismatch: current version is '{required_version}'")
         return self.consents.create_consent(
             user_id=user_id,
             policy_version=policy_version,
@@ -183,7 +183,7 @@ class ConsentService:
             return FALLBACK_LANGUAGE
         if languages:
             return languages[0]
-        raise NotFoundException(f"Policy version '{policy.version}' has no language variants")
+        raise NotFoundException(detail=f"Policy version '{policy.version}' has no language variants")
 
     async def get_policy_text(self, required_version: Optional[str], lang: Optional[str] = None) -> dict:
         """Policy version + Markdown text, with language fallback.
@@ -192,10 +192,10 @@ class ConsentService:
         MinIO is only hit on a cache miss.
         """
         if required_version is None:
-            raise NotFoundException("No policy version is configured")
+            raise NotFoundException(detail="No policy version is configured")
         policy = self.policy_versions.get_by_version(required_version)
         if policy is None:
-            raise NotFoundException(f"Policy version '{required_version}' not found")
+            raise NotFoundException(detail=f"Policy version '{required_version}' not found")
         served_lang = self.resolve_language(policy, lang)
 
         content = await _get_policy_text_cached(policy.version, served_lang)
@@ -224,7 +224,7 @@ class ConsentService:
         publish would burn the version name forever.
         """
         if self.policy_versions.get_by_version(version) is not None:
-            raise BadRequestException(f"Policy version '{version}' already exists (versions are immutable)")
+            raise BadRequestException(detail=f"Policy version '{version}' already exists (versions are immutable)")
 
         from computor_backend.services.storage_service import StorageService
         storage = StorageService()
@@ -255,7 +255,7 @@ class ConsentService:
             # wins. content_hashes on the winning row remain the tamper check
             # if the loser's uploads landed last.
             self.db.rollback()
-            raise BadRequestException(f"Policy version '{version}' already exists (versions are immutable)")
+            raise BadRequestException(detail=f"Policy version '{version}' already exists (versions are immutable)")
         self.db.refresh(policy)
 
         await invalidate_current_version_cache()

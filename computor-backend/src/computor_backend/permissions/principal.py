@@ -207,7 +207,7 @@ class Principal(BaseModel):
     def get_user_id_or_throw(self) -> str:
         """Get user ID or raise exception"""
         if self.user_id is None:
-            raise NotFoundException("User ID not found")
+            raise NotFoundException(detail="User ID not found")
         return self.user_id
     
     def has_general_permission(self, resource: str, action: str) -> bool:

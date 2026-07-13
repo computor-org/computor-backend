@@ -72,18 +72,18 @@ def _sanitize_archive_path(name: str) -> str:
     """Normalize and sanitize a path from inside a ZIP archive."""
     path = PurePosixPath(name)
     if path.is_absolute():
-        raise BadRequestException("Archive entries must use relative paths")
+        raise BadRequestException(detail="Archive entries must use relative paths")
 
     parts: List[str] = []
     for idx, part in enumerate(path.parts):
         if part in ("", "."):
             continue
         if part == "..":
-            raise BadRequestException("Archive contains invalid path traversal sequences")
+            raise BadRequestException(detail="Archive contains invalid path traversal sequences")
         parts.append(_sanitize_path_segment(part, is_file=(idx == len(path.parts) - 1)))
 
     if not parts:
-        raise BadRequestException("Archive contains an empty file path")
+        raise BadRequestException(detail="Archive contains an empty file path")
 
     return "/".join(parts)
 
@@ -319,7 +319,7 @@ async def upload_submission_artifact(
 
     archive_suffix = PurePosixPath(filename or "").suffix.lower()
     if archive_suffix != ".zip":
-        raise BadRequestException("Only ZIP archives are supported for submissions")
+        raise BadRequestException(detail="Only ZIP archives are supported for submissions")
 
     # Validate and filter ZIP file content, then upload individual files
     file_data.seek(0)
@@ -330,14 +330,14 @@ async def upload_submission_artifact(
         with zipfile.ZipFile(file_data, 'r') as source_archive:
             members = [info for info in source_archive.infolist() if not info.is_dir()]
             if not members:
-                raise BadRequestException("Archive does not contain any files")
+                raise BadRequestException(detail="Archive does not contain any files")
 
             total_unpacked_size = sum(info.file_size for info in members)
             if total_unpacked_size == 0:
-                raise BadRequestException("Archive contains only empty files")
+                raise BadRequestException(detail="Archive contains only empty files")
             if total_unpacked_size > MAX_UPLOAD_SIZE:
                 raise BadRequestException(
-                    f"Extracted content exceeds maximum allowed size of {format_bytes(MAX_UPLOAD_SIZE)}"
+                    detail=f"Extracted content exceeds maximum allowed size of {format_bytes(MAX_UPLOAD_SIZE)}"
                 )
 
             # Detect and strip common root directory if all files are under it
@@ -440,10 +440,10 @@ async def upload_submission_artifact(
                 logger.debug(f"Uploaded file to MinIO: {object_key} ({format_bytes(file_size)})")
 
             if not files_included:
-                raise BadRequestException("No valid files found in archive after filtering")
+                raise BadRequestException(detail="No valid files found in archive after filtering")
 
     except zipfile.BadZipFile as exc:
-        raise BadRequestException("Uploaded file is not a valid ZIP archive") from exc
+        raise BadRequestException(detail="Uploaded file is not a valid ZIP archive") from exc
 
     # Create single SubmissionArtifact record representing this submission
     # The object_key is the full path prefix in MinIO

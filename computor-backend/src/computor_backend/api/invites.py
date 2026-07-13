@@ -45,7 +45,7 @@ def _require_invite_manager(principal: Principal, db: Session) -> None:
         UserRole.role_id == "_user_manager",
     ).first()
     if not user_role:
-        raise ForbiddenException("Requires _admin or _user_manager role")
+        raise ForbiddenException(detail="Requires _admin or _user_manager role")
 
 
 # ---------------------------------------------------------------------------
@@ -102,7 +102,7 @@ async def get_invite(
     _require_invite_manager(principal, db)
     invite = db.query(InviteLink).filter(InviteLink.id == invite_id).first()
     if not invite:
-        raise NotFoundException("Invite not found")
+        raise NotFoundException(detail="Invite not found")
     return _to_get(invite)
 
 
@@ -116,7 +116,7 @@ async def revoke_invite(
     _require_invite_manager(principal, db)
     invite = db.query(InviteLink).filter(InviteLink.id == invite_id).first()
     if not invite:
-        raise NotFoundException("Invite not found")
+        raise NotFoundException(detail="Invite not found")
     invite.revoked_at = datetime.now(timezone.utc)
     db.commit()
     logger.info(f"Invite {invite_id} revoked by {principal.user_id}")
@@ -159,11 +159,11 @@ async def accept_invite(
 
     # Email restriction check
     if invite.email and invite.email.lower() != payload.email.lower():
-        raise BadRequestException("This invite is restricted to a different email address")
+        raise BadRequestException(detail="This invite is restricted to a different email address")
 
     # Duplicate email check
     if db.query(User).filter(User.email == payload.email).first():
-        raise BadRequestException(f"Email '{payload.email}' is already registered")
+        raise BadRequestException(detail=f"Email '{payload.email}' is already registered")
 
     # Provision the Keycloak login first (invite token is the authorization
     # proof). If this fails we neither create the user nor consume the invite.
@@ -208,17 +208,17 @@ def _resolve_token(token: str, db: Session) -> InviteLink:
     """Validate a token and return the InviteLink, raising on any problem."""
     invite = db.query(InviteLink).filter(InviteLink.token == token).first()
     if not invite:
-        raise NotFoundException("Invite not found or invalid")
+        raise NotFoundException(detail="Invite not found or invalid")
     if invite.revoked_at is not None:
-        raise BadRequestException("This invite has been revoked")
+        raise BadRequestException(detail="This invite has been revoked")
     now = datetime.now(timezone.utc)
     exp = invite.expires_at
     if exp.tzinfo is None:
         exp = exp.replace(tzinfo=timezone.utc)
     if now > exp:
-        raise BadRequestException("This invite has expired")
+        raise BadRequestException(detail="This invite has expired")
     if invite.use_count >= invite.max_uses:
-        raise BadRequestException("This invite has already been used the maximum number of times")
+        raise BadRequestException(detail="This invite has already been used the maximum number of times")
     return invite
 
 

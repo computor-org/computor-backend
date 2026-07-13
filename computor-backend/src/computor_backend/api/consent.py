@@ -133,7 +133,7 @@ async def list_policy_versions(
 ) -> List[PolicyVersionGet]:
     """List all policy versions (admin)."""
     if not principal.is_admin:
-        raise ForbiddenException("Requires _admin role")
+        raise ForbiddenException(detail="Requires _admin role")
     service = ConsentService(db)
     return [_policy_to_get(p) for p in service.policy_versions.list_versions()]
 
@@ -152,7 +152,7 @@ async def publish_policy_version(
     re-gated on their next request.
     """
     if not principal.is_admin:
-        raise ForbiddenException("Requires _admin role")
+        raise ForbiddenException(detail="Requires _admin role")
     service = ConsentService(db)
     policy = await service.publish_policy_version(
         version=payload.version,

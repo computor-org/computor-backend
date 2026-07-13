@@ -65,7 +65,7 @@ def ensure_tutor_tests_bucket_exists() -> None:
             )
     except Exception as e:
         logger.error(f"Error ensuring tutor-tests bucket exists: {e}")
-        raise ServiceUnavailableException(f"Storage service error: {e}") from e
+        raise ServiceUnavailableException(detail=f"Storage service error: {e}") from e
 
 
 async def store_tutor_test_input(
@@ -102,7 +102,7 @@ async def store_tutor_test_input(
             file_list = zip_file.namelist()
             if len(file_list) > 1000:
                 raise ServiceUnavailableException(
-                    "ZIP contains too many files (max 1000)"
+                    detail="ZIP contains too many files (max 1000)"
                 )
 
             for filename in file_list:
@@ -122,7 +122,7 @@ async def store_tutor_test_input(
                 # Security check: max 100MB total
                 if total_size > 100 * 1024 * 1024:
                     raise ServiceUnavailableException(
-                        "ZIP total size exceeds 100MB limit"
+                        detail="ZIP total size exceeds 100MB limit"
                     )
 
                 # Store in MinIO
@@ -158,10 +158,10 @@ async def store_tutor_test_input(
         }
 
     except zipfile.BadZipFile:
-        raise ServiceUnavailableException("Invalid ZIP file")
+        raise ServiceUnavailableException(detail="Invalid ZIP file")
     except Exception as e:
         logger.error(f"Error storing tutor test input: {e}")
-        raise ServiceUnavailableException(f"Storage error: {e}") from e
+        raise ServiceUnavailableException(detail=f"Storage error: {e}") from e
 
 
 async def get_tutor_test_input_path(test_id: str | UUID) -> str:
@@ -202,7 +202,7 @@ async def download_tutor_test_input_as_zip(test_id: str | UUID) -> bytes:
         ))
 
         if not objects:
-            raise NotFoundException(f"No input files found for test {test_id_str}")
+            raise NotFoundException(detail=f"No input files found for test {test_id_str}")
 
         zip_buffer = BytesIO()
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
@@ -227,7 +227,7 @@ async def download_tutor_test_input_as_zip(test_id: str | UUID) -> bytes:
         raise
     except Exception as e:
         logger.error(f"Error downloading tutor test input: {e}")
-        raise ServiceUnavailableException(f"Storage error: {e}") from e
+        raise ServiceUnavailableException(detail=f"Storage error: {e}") from e
 
 
 async def store_tutor_test_result(
@@ -271,7 +271,7 @@ async def store_tutor_test_result(
 
     except Exception as e:
         logger.error(f"Error storing tutor test result: {e}")
-        raise ServiceUnavailableException(f"Storage error: {e}") from e
+        raise ServiceUnavailableException(detail=f"Storage error: {e}") from e
 
 
 async def retrieve_tutor_test_result(test_id: str | UUID) -> Optional[dict]:
@@ -364,7 +364,7 @@ async def store_tutor_test_artifact(
 
     except Exception as e:
         logger.error(f"Error storing tutor test artifact: {e}")
-        raise ServiceUnavailableException(f"Storage error: {e}") from e
+        raise ServiceUnavailableException(detail=f"Storage error: {e}") from e
 
 
 async def store_tutor_test_artifacts_from_zip(
@@ -408,7 +408,7 @@ async def store_tutor_test_artifacts_from_zip(
 
     except Exception as e:
         logger.error(f"Error storing tutor test artifacts: {e}")
-        raise ServiceUnavailableException(f"Storage error: {e}") from e
+        raise ServiceUnavailableException(detail=f"Storage error: {e}") from e
 
 
 async def list_tutor_test_artifacts(test_id: str | UUID) -> list[dict]:
@@ -531,7 +531,7 @@ async def extract_tutor_test_input_to_directory(
         ))
 
         if not objects:
-            raise NotFoundException(f"No input files found for test {test_id_str}")
+            raise NotFoundException(detail=f"No input files found for test {test_id_str}")
 
         os.makedirs(target_dir, exist_ok=True)
 
@@ -562,4 +562,4 @@ async def extract_tutor_test_input_to_directory(
         raise
     except Exception as e:
         logger.error(f"Error extracting tutor test input: {e}")
-        raise ServiceUnavailableException(f"Storage error: {e}") from e
+        raise ServiceUnavailableException(detail=f"Storage error: {e}") from e

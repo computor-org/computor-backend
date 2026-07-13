@@ -50,10 +50,10 @@ _SEGMENT_SANITIZER = re.compile(r"[^A-Za-z0-9._-]+")
 def _split_identity(identity: str) -> Tuple[str, str]:
     parts = identity.split(".", 1)
     if len(parts) != 2:
-        raise BadRequestException("Extension path must be in 'publisher.name' format")
+        raise BadRequestException(detail="Extension path must be in 'publisher.name' format")
     publisher, name = parts[0].strip(), parts[1].strip()
     if not publisher or not name:
-        raise BadRequestException("Extension publisher and name must be provided")
+        raise BadRequestException(detail="Extension publisher and name must be provided")
     return publisher, name
 
 def _sanitize_segment(value: str) -> str:
@@ -71,7 +71,7 @@ def _parse_version(value: str) -> Version:
     try:
         return Version(value)
     except InvalidVersion as exc:
-        raise BadRequestException(f"Invalid semantic version '{value}'") from exc
+        raise BadRequestException(detail=f"Invalid semantic version '{value}'") from exc
 
 def _caret_to_specifier(base_version: str) -> SpecifierSet:
     parsed = _parse_version(base_version)
@@ -115,7 +115,7 @@ def _decode_cursor(cursor: str) -> int:
         decoded = base64.urlsafe_b64decode(cursor.encode("utf-8")).decode("utf-8")
         return int(decoded)
     except Exception as exc:  # noqa: BLE001
-        raise BadRequestException("Invalid cursor token") from exc
+        raise BadRequestException(detail="Invalid cursor token") from exc
 
 def _get_extension_or_404(db: Session, publisher: str, name: str) -> Extension:
     extension = (
@@ -124,7 +124,7 @@ def _get_extension_or_404(db: Session, publisher: str, name: str) -> Extension:
         .first()
     )
     if not extension:
-        raise NotFoundException("Extension not found")
+        raise NotFoundException(detail="Extension not found")
     return extension
 
 def _get_or_create_extension(
@@ -190,7 +190,7 @@ async def publish_extension_version(
 ):
 
     if not permissions.permitted("extension", "create"):
-        raise ForbiddenException("You don't have permission to publish extensions")
+        raise ForbiddenException(detail="You don't have permission to publish extensions")
 
     # Set user context for audit tracking
     set_db_user(db, permissions.user_id)
@@ -205,32 +205,32 @@ async def publish_extension_version(
     )
 
     if not file.filename or not file.filename.lower().endswith(".vsix"):
-        raise BadRequestException("Uploaded file must be a .vsix package")
+        raise BadRequestException(detail="Uploaded file must be a .vsix package")
 
     file_bytes = await file.read()
     if not file_bytes:
-        raise BadRequestException("Uploaded VSIX file is empty")
+        raise BadRequestException(detail="Uploaded VSIX file is empty")
 
     try:
         manifest = parse_vsix_metadata(file_bytes)
     except VsixManifestError as exc:
-        raise BadRequestException(str(exc)) from exc
+        raise BadRequestException(detail=str(exc)) from exc
 
     target_version = publish_payload.version or manifest.version
 
     if publish_payload.version and manifest.version != publish_payload.version:
         raise BadRequestException(
-            "Provided version does not match the VSIX manifest version"
+            detail="Provided version does not match the VSIX manifest version"
         )
 
     if manifest.publisher.lower() != publisher.lower():
         raise BadRequestException(
-            "Publisher in manifest does not match the requested extension path"
+            detail="Publisher in manifest does not match the requested extension path"
         )
 
     if manifest.name.lower() != name.lower():
         raise BadRequestException(
-            "Extension identifier in manifest does not match the requested extension path"
+            detail="Extension identifier in manifest does not match the requested extension path"
         )
 
     parsed_version = _parse_version(target_version)
@@ -268,7 +268,7 @@ async def publish_extension_version(
         .first()
     )
     if existing_version:
-        raise BadRequestException("Version already exists for this extension")
+        raise BadRequestException(detail="Version already exists for this extension")
 
     max_version_number = (
         db.query(func.max(ExtensionVersion.version_number))
@@ -353,7 +353,7 @@ async def download_extension(
     versions = versions_query.all()
     matched = _select_version(versions, specifier)
     if not matched:
-        raise NotFoundException("No matching extension version found")
+        raise NotFoundException(detail="No matching extension version found")
 
     # Stream the VSIX bytes through the API rather than redirecting to a
     # presigned MinIO URL — the docker-internal ``minio:9000`` host the
@@ -504,7 +504,7 @@ async def update_extension_version(
 ):
 
     if not permissions.permitted("extension", "update"):
-        raise ForbiddenException("You don't have permission to modify extension versions")
+        raise ForbiddenException(detail="You don't have permission to modify extension versions")
 
     # Set user context for audit tracking
     set_db_user(db, permissions.user_id)
@@ -521,7 +521,7 @@ async def update_extension_version(
         .first()
     )
     if not target_version:
-        raise NotFoundException("Extension version not found")
+        raise NotFoundException(detail="Extension version not found")
 
     target_version.yanked = payload.yanked
     db.commit()

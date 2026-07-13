@@ -48,12 +48,12 @@ async def delete_course_family_endpoint(
 ) -> CascadeDeleteResult:
     """Delete course family — only when it has no courses left."""
     if not _may_delete_hierarchy(permissions):
-        raise ForbiddenException("Deletion requires admin or _organization_manager.")
+        raise ForbiddenException(detail="Deletion requires admin or _organization_manager.")
 
     # Verify course family exists
     family = db.query(CourseFamily).filter(CourseFamily.id == str(course_family_id)).first()
     if not family:
-        raise NotFoundException(f"Course family not found: {course_family_id}")
+        raise NotFoundException(detail=f"Course family not found: {course_family_id}")
 
     # Guard: never cascade through courses. A family with courses must be emptied
     # first (deleting a course tears down its Forgejo repos and members properly),

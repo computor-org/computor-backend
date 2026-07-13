@@ -72,12 +72,12 @@ async def delete_organization_endpoint(
 ) -> CascadeDeleteResult:
     """Delete organization — only when it has no course families left."""
     if not _may_delete_hierarchy(permissions):
-        raise ForbiddenException("Deletion requires admin or _organization_manager.")
+        raise ForbiddenException(detail="Deletion requires admin or _organization_manager.")
 
     # Verify organization exists
     org = db.query(Organization).filter(Organization.id == str(organization_id)).first()
     if not org:
-        raise NotFoundException(f"Organization not found: {organization_id}")
+        raise NotFoundException(detail=f"Organization not found: {organization_id}")
 
     # Guard: never cascade through course families (and their courses / Forgejo
     # repos / members). The organization must be emptied top-down first.

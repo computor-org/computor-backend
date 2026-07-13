@@ -269,14 +269,14 @@ def can_manage_course_git(principal: Principal, course: Course) -> bool:
 def _require_course_git_manage(principal: Principal, course: Course) -> None:
     if not can_manage_course_git(principal, course):
         raise ForbiddenException(
-            "You are not allowed to manage this course's git configuration."
+            detail="You are not allowed to manage this course's git configuration."
         )
 
 
 def _load_course_or_404(course_id: UUID | str, db: Session) -> Course:
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
-        raise NotFoundException("Course not found")
+        raise NotFoundException(detail="Course not found")
     return course
 
 
@@ -370,7 +370,7 @@ def _apply_course_git_binding(
     if data.git_server_id:
         server = db.query(GitServer).filter(GitServer.id == data.git_server_id).first()
         if not server:
-            raise NotFoundException("git_server_id does not reference a known git server")
+            raise NotFoundException(detail="git_server_id does not reference a known git server")
 
     template_repo = (data.template_repo or "").strip() or None
     template_url = (data.template_url or "").strip() or None
@@ -409,7 +409,7 @@ def _apply_course_git_binding(
             except Exception as exc:  # allocating the org is essential — fail loudly
                 logger.warning("Forgejo course-org allocation failed: %s", exc)
                 raise BadRequestException(
-                    "Could not provision the Forgejo organization for this course.",
+                    detail="Could not provision the Forgejo organization for this course.",
                     context={"error": str(exc)},
                 ) from exc
             template_repo = f"{owner}/template"
@@ -451,7 +451,7 @@ def _apply_course_git_binding(
             parent_group_id = data.parent_group_id or gl_server_props.get("parent_group_id")
             if not parent_group_id:
                 raise BadRequestException(
-                    "A managed GitLab course needs a parent_group_id — set it on the "
+                    detail="A managed GitLab course needs a parent_group_id — set it on the "
                     "course git binding (or, for a legacy managed server, on the server)."
                 )
             course_slug = str(course.path).replace(".", "-")
@@ -463,7 +463,7 @@ def _apply_course_git_binding(
             except Exception as exc:  # materialization is essential — fail loudly
                 logger.warning("GitLab course-structure provisioning failed: %s", exc)
                 raise BadRequestException(
-                    "Could not provision the GitLab course structure on the bound server.",
+                    detail="Could not provision the GitLab course structure on the bound server.",
                     context={"error": str(exc)},
                 ) from exc
             template_repo = gitlab_structure.get("template_path") or template_repo
@@ -520,7 +520,7 @@ def get_course_git_binding(
         .first()
     )
     if not binding:
-        raise NotFoundException("This course has no git binding")
+        raise NotFoundException(detail="This course has no git binding")
     return _binding_to_get(binding, db)
 
 
@@ -610,7 +610,7 @@ def get_student_repository(
         .first()
     )
     if member is None:
-        raise NotFoundException("You are not a member of this course")
+        raise NotFoundException(error_code="GIT_002", detail="You are not a member of this course")
 
     rec = (
         db.query(CourseMemberGitRepository)
@@ -803,14 +803,14 @@ def _provision_forgejo(
     it. The student is added as a write collaborator on their repo and a read
     collaborator on the template (best-effort, self-healing)."""
     if not binding.template_repo:
-        raise BadRequestException("This course has no Forgejo template configured")
+        raise BadRequestException(detail="This course has no Forgejo template configured")
     owner, _, repo = binding.template_repo.partition("/")
     if not owner or not repo:
-        raise BadRequestException("Forgejo template_repo must be in 'owner/repo' form")
+        raise BadRequestException(detail="Forgejo template_repo must be in 'owner/repo' form")
     handle = _resolve_oidc_handle(user_id, db)
     if not handle:
         raise BadRequestException(
-            "You have no Forgejo identity yet; sign in once via SSO before provisioning."
+            detail="You have no Forgejo identity yet; sign in once via SSO before provisioning."
         )
     # In the course_org layout the org already encodes the course, so the fork is
     # just the realm-unique handle; legacy bindings keep the {base}-{handle} form.
@@ -834,7 +834,7 @@ def _provision_forgejo(
     )
     if clash is not None:
         raise ConflictException(
-            f"Forgejo repository '{repo_ref}' is already in use by another course member"
+            detail=f"Forgejo repository '{repo_ref}' is already in use by another course member"
         )
     client = get_provider_client_for_server(server)
     result = client.provision_student_fork(owner, repo, owner, new_name, student_username=handle)
@@ -873,7 +873,7 @@ def _provision_gitlab_managed(
     students_group_id = gl_props.get("students_group_id")
     if not template_project_id or not students_group_id:
         raise BadRequestException(
-            "This course's managed-GitLab structure is not provisioned yet."
+            detail="This course's managed-GitLab structure is not provisioned yet."
         )
     handle = _resolve_oidc_handle(user_id, db) or str(member.id)
     slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", handle).strip("-._") or str(member.id)
@@ -937,7 +937,7 @@ def provision_student_repository(
         .first()
     )
     if member is None:
-        raise NotFoundException("You are not a member of this course")
+        raise NotFoundException(error_code="GIT_002", detail="You are not a member of this course")
 
     binding = (
         db.query(CourseGitBinding)
@@ -945,11 +945,11 @@ def provision_student_repository(
         .first()
     )
     if binding is None or binding.delivery != "git":
-        raise BadRequestException("This course is not configured for git provisioning")
+        raise BadRequestException(error_code="GIT_001", detail="This course is not configured for git provisioning")
 
     server = binding.git_server
     if not _binding_has_managed_creds(binding, server):
-        raise BadRequestException("No managed git server is bound to this course")
+        raise BadRequestException(detail="No managed git server is bound to this course")
 
     # Idempotent: one working repo per course membership. On re-provision,
     # self-heal a Forgejo write-collaborator that couldn't be granted the first
@@ -967,7 +967,7 @@ def provision_student_repository(
         return _provisioned_response(existing, user_id, db)
 
     if "managed" not in (binding.student_repo_modes or []):
-        raise BadRequestException("This course does not offer managed (system-hosted) repositories")
+        raise BadRequestException(detail="This course does not offer managed (system-hosted) repositories")
     # 'managed' is provider-agnostic; the bound server's type picks the backend.
     if server.type == "forgejo":
         # Make sure the member's Forgejo account exists first, so the fork's
@@ -978,7 +978,7 @@ def provision_student_repository(
     elif server.type == "gitlab":
         rec = _provision_gitlab_managed(member, binding, server, user_id, db)
     else:
-        raise BadRequestException(f"Unsupported managed server type '{server.type}'")
+        raise BadRequestException(detail=f"Unsupported managed server type '{server.type}'")
 
     # Every member gets their own fork (above); _lecturer+ additionally get admin
     # access to the canonical template + reference repos.
@@ -1015,7 +1015,7 @@ def get_template_access(
         .first()
     )
     if member is None:
-        raise NotFoundException("You are not a member of this course")
+        raise NotFoundException(error_code="GIT_002", detail="You are not a member of this course")
 
     binding = (
         db.query(CourseGitBinding)
@@ -1023,15 +1023,15 @@ def get_template_access(
         .first()
     )
     if binding is None or not binding.template_repo:
-        raise BadRequestException("This course has no template configured")
+        raise BadRequestException(detail="This course has no template configured")
     server = binding.git_server
     if server is None or server.type != "forgejo" or not _binding_has_managed_creds(binding, server):
         raise BadRequestException(
-            "Template access minting is only available for managed-Forgejo courses"
+            detail="Template access minting is only available for managed-Forgejo courses"
         )
     owner, _, t_repo = binding.template_repo.partition("/")
     if not owner or not t_repo:
-        raise BadRequestException("Forgejo template_repo must be in 'owner/repo' form")
+        raise BadRequestException(detail="Forgejo template_repo must be in 'owner/repo' form")
 
     result = TemplateAccessGet(
         server_type="forgejo",
@@ -1082,7 +1082,7 @@ def register_byo_repository(
         .first()
     )
     if member is None:
-        raise NotFoundException("You are not a member of this course")
+        raise NotFoundException(error_code="GIT_002", detail="You are not a member of this course")
 
     binding = (
         db.query(CourseGitBinding)
@@ -1091,7 +1091,7 @@ def register_byo_repository(
     )
     if binding is None or data.mode not in (binding.student_repo_modes or []):
         raise BadRequestException(
-            f"This course does not offer the '{data.mode}' student-repo mode"
+            detail=f"This course does not offer the '{data.mode}' student-repo mode"
         )
 
     rec = (
@@ -1142,7 +1142,7 @@ def _link_gitlab_account(user_id, provider_url, gitlab_username, gitlab_email, d
     if existing is not None:
         if (existing.provider_account_id or "").lower() != gitlab_username.lower():
             raise BadRequestException(
-                "The GitLab token does not match your linked GitLab account."
+                detail="The GitLab token does not match your linked GitLab account."
             )
         return existing
     conflict = (
@@ -1156,7 +1156,7 @@ def _link_gitlab_account(user_id, provider_url, gitlab_username, gitlab_email, d
         .first()
     )
     if conflict is not None:
-        raise BadRequestException("This GitLab account is already linked to another user.")
+        raise BadRequestException(detail="This GitLab account is already linked to another user.")
     account = Account(
         provider=provider,
         type="gitlab",
@@ -1198,7 +1198,7 @@ def register_gitlab_managed_access(
         .first()
     )
     if member is None:
-        raise NotFoundException("You are not a member of this course")
+        raise NotFoundException(error_code="GIT_002", detail="You are not a member of this course")
 
     binding = (
         db.query(CourseGitBinding)
@@ -1210,14 +1210,14 @@ def register_gitlab_managed_access(
         or binding.delivery != "git"
         or "managed" not in (binding.student_repo_modes or [])
     ):
-        raise BadRequestException("This course does not offer managed repositories")
+        raise BadRequestException(detail="This course does not offer managed repositories")
 
     server = binding.git_server
     if server is None or server.type != "gitlab" or not _binding_has_managed_creds(binding, server):
-        raise BadRequestException("No managed GitLab server is bound to this course")
+        raise BadRequestException(detail="No managed GitLab server is bound to this course")
 
     if not provider_access_token:
-        raise BadRequestException("A GitLab personal access token is required")
+        raise BadRequestException(detail="A GitLab personal access token is required")
 
     # The student's own PAT proves their GitLab identity (current-user endpoint).
     profile = _fetch_gitlab_user_profile(server.base_url, provider_access_token)
@@ -1225,7 +1225,7 @@ def register_gitlab_managed_access(
     gitlab_username = (profile or {}).get("username")
     gitlab_email = (profile or {}).get("email")
     if not gitlab_user_id or not gitlab_username:
-        raise BadRequestException("Could not determine the GitLab user from the provided token")
+        raise BadRequestException(detail="Could not determine the GitLab user from the provided token")
 
     _link_gitlab_account(member.user_id, server.base_url, gitlab_username, gitlab_email, db)
 
@@ -1241,7 +1241,7 @@ def register_gitlab_managed_access(
     project_id = ((rec.properties or {}).get("gitlab") or {}).get("project_id")
     if not project_id:
         raise BadRequestException(
-            "Your GitLab repository is missing its project id; re-provision and retry."
+            detail="Your GitLab repository is missing its project id; re-provision and retry."
         )
 
     client = get_gitlab_client_for_binding(binding, server)
@@ -1299,7 +1299,7 @@ def get_template_archive_source(
         .first()
     )
     if member is None:
-        raise NotFoundException("You are not a member of this course")
+        raise NotFoundException(error_code="GIT_002", detail="You are not a member of this course")
 
     binding = (
         db.query(CourseGitBinding)
@@ -1307,11 +1307,11 @@ def get_template_archive_source(
         .first()
     )
     if binding is None or not binding.git_server_id or not binding.template_repo:
-        raise BadRequestException("This course has no downloadable template")
+        raise BadRequestException(detail="This course has no downloadable template")
     server = binding.git_server
     binding_token = getattr(binding, "token", None)
     if server is None or not (binding_token or server.token):
-        raise BadRequestException("This course's git server is not available")
+        raise BadRequestException(detail="This course's git server is not available")
 
     token = decrypt_secret(binding_token or server.token)
     branch = binding.default_branch or "main"
@@ -1322,7 +1322,7 @@ def get_template_archive_source(
     if server.type == "forgejo":
         owner, _, name = repo.partition("/")
         if not owner or not name:
-            raise BadRequestException("Forgejo template_repo must be 'owner/repo'")
+            raise BadRequestException(detail="Forgejo template_repo must be 'owner/repo'")
         url = f"{base}/api/v1/repos/{owner}/{name}/archive/{branch}.zip"
         headers = {"Authorization": f"token {token}"}
         slug = name
@@ -1334,6 +1334,6 @@ def get_template_archive_source(
         headers = {"PRIVATE-TOKEN": token}
         slug = repo.rstrip("/").split("/")[-1]
     else:
-        raise BadRequestException(f"Unsupported git server type '{server.type}'")
+        raise BadRequestException(detail=f"Unsupported git server type '{server.type}'")
 
     return url, headers, f"{slug}.zip"

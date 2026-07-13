@@ -1,7 +1,7 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Total errors:** 71
+**Total errors:** 73
 
 To regenerate: `bash generate_error_codes.sh`
 
@@ -1372,6 +1372,33 @@ CourseMember lookup failed for user and course
 
 ---
 
+### GIT_002 - Not A Course Member
+
+**HTTP Status:** `404`  
+**Severity:** `warning`  
+**Category:** `not_found`  
+**Documentation:** [/docs/courses#enrollment](/docs/courses#enrollment)  
+
+**Description:**  
+No CourseMember row links the caller to this course
+
+**User Message:**  
+> You are not a member of this course.
+
+**Affected Functions:**
+- `provision_student_repository`
+- `get_student_repository`
+
+**Common Causes:**
+- User is not enrolled in the course
+- Enrollment not yet processed
+
+**Resolution Steps:**
+1. Ask an instructor to add you to the course
+2. Check your enrollment status
+
+---
+
 ## Not Implemented
 
 ### NIMPL_001 - Feature Not Implemented
@@ -2040,6 +2067,33 @@ Provider account ID is empty or whitespace-only
 **Resolution Steps:**
 1. Provide your GitLab username
 2. Verify username is not empty
+
+---
+
+### GIT_001 - Course Not Configured For Git
+
+**HTTP Status:** `400`  
+**Severity:** `warning`  
+**Category:** `validation`  
+**Documentation:** [/docs/courses/git](/docs/courses/git)  
+
+**Description:**  
+Course has no CourseGitBinding, or the binding's delivery is not 'git'
+
+**User Message:**  
+> This course is not configured for git provisioning.
+
+**Affected Functions:**
+- `provision_student_repository`
+- `get_course_git_descriptor`
+
+**Common Causes:**
+- Course created without a git binding
+- Course delivers assignments as downloads, not git
+
+**Resolution Steps:**
+1. Configure a git binding for the course (staff)
+2. Contact your instructor
 
 ---
 

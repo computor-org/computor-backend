@@ -392,7 +392,7 @@ def _guard_no_archive_admin(entity, permissions, db):
         UserRole.role_id == "_admin",
     ).first() is not None
     if is_admin_target:
-        raise ForbiddenException("Admin users cannot be archived")
+        raise ForbiddenException(detail="Admin users cannot be archived")
 
 _user_router = CrudRouter(UserInterface)
 _user_router.pre_archive.append(_guard_no_archive_admin)
@@ -675,7 +675,7 @@ async def get_public_extension_url():
     """
     download_link = os.environ.get("EXTENSION_PUBLIC_DOWNLOAD_URL", None)
     if not download_link:
-        raise NotFoundException("Public extension download URL not configured")
+        raise NotFoundException(detail="Public extension download URL not configured")
 
     return download_link
 
@@ -691,6 +691,6 @@ async def get_getting_started_url():
     """
     getting_started_link = os.environ.get("EXTENSION_GETTING_STARTED_URL", None)
     if not getting_started_link:
-        raise NotFoundException("Extension getting started guide URL not configured")
+        raise NotFoundException(detail="Extension getting started guide URL not configured")
 
     return getting_started_link

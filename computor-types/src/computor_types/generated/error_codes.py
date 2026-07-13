@@ -70,6 +70,8 @@ class ErrorCode(str, Enum):
     GITLAB_006 = "GITLAB_006"  # GitLab Token Invalid
     GITLAB_007 = "GITLAB_007"  # GitLab API Unreachable
     GITLAB_008 = "GITLAB_008"  # Invalid GitLab Username
+    GIT_001 = "GIT_001"  # Course Not Configured For Git
+    GIT_002 = "GIT_002"  # Not A Course Member
     EXT_001 = "EXT_001"  # GitLab Service Unavailable
     EXT_002 = "EXT_002"  # GitLab Authentication Failed
     EXT_003 = "EXT_003"  # MinIO Service Unavailable
@@ -159,6 +161,8 @@ ERROR_CATEGORIES = {
     ErrorCode.GITLAB_006: "external_service",
     ErrorCode.GITLAB_007: "external_service",
     ErrorCode.GITLAB_008: "validation",
+    ErrorCode.GIT_001: "validation",
+    ErrorCode.GIT_002: "not_found",
     ErrorCode.EXT_001: "external_service",
     ErrorCode.EXT_002: "external_service",
     ErrorCode.EXT_003: "external_service",

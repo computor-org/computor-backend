@@ -165,7 +165,7 @@ class AuthenticationService:
         session_data_raw = await redis_client.get(session_key)
 
         if not session_data_raw:
-            raise UnauthorizedException("Invalid or expired SSO token")
+            raise UnauthorizedException(detail="Invalid or expired SSO token")
 
         try:
             session_data = json.loads(session_data_raw)
@@ -173,7 +173,7 @@ class AuthenticationService:
             provider = session_data.get("provider", "sso")
 
             if not user_id:
-                raise UnauthorizedException("Invalid session data")
+                raise UnauthorizedException(detail="Invalid session data")
 
             # Get user roles
             results = (
@@ -191,10 +191,10 @@ class AuthenticationService:
             return AuthenticationResult(user_id, role_ids, provider)
 
         except json.JSONDecodeError:
-            raise UnauthorizedException("Invalid session data format")
+            raise UnauthorizedException(detail="Invalid session data format")
         except Exception as e:
             logger.error(f"Error during SSO authentication: {e}")
-            raise UnauthorizedException("SSO authentication failed") from e
+            raise UnauthorizedException(detail="SSO authentication failed") from e
 
     @staticmethod
     async def authenticate_api_token(token: str, db: Session) -> AuthenticationResult:
@@ -401,17 +401,17 @@ def parse_authorization_header(request: Request) -> Optional[SSOAuthCredentials 
         if access_token:
             logger.debug("Using access_token from cookie")
             return SSOAuthCredentials(token=access_token, scheme="Bearer")
-        raise UnauthorizedException("No authorization provided")
+        raise UnauthorizedException(detail="No authorization provided")
 
     scheme, param = get_authorization_scheme_param(authorization)
 
     if not param:
-        raise UnauthorizedException("Invalid authorization format")
+        raise UnauthorizedException(detail="Invalid authorization format")
 
     if scheme.lower() == "bearer":
         return SSOAuthCredentials(token=param, scheme="Bearer")
 
-    raise UnauthorizedException(f"Unsupported auth scheme: {scheme}")
+    raise UnauthorizedException(detail=f"Unsupported auth scheme: {scheme}")
 
 
 async def get_current_principal(
@@ -457,7 +457,7 @@ async def get_current_principal(
             principal = PrincipalBuilder.build(auth_result, db)
 
         else:
-            raise UnauthorizedException("Unknown authentication type")
+            raise UnauthorizedException(detail="Unknown authentication type")
 
         # Cache the result (if cacheable)
         if cache_key:
@@ -566,7 +566,7 @@ def get_permissions_from_mockup(user_id: str) -> Principal:
             )
             
             if not results:
-                raise NotFoundException(f"User {user_id} not found")
+                raise NotFoundException(detail=f"User {user_id} not found")
             
             actual_user_id = results[0][0]
             role_ids = [r[1] for r in results if r[1] is not None]
@@ -579,4 +579,4 @@ def get_permissions_from_mockup(user_id: str) -> Principal:
             
     except Exception as e:
         logger.error(f"Mockup auth error: {e}")
-        raise UnauthorizedException("Mockup authentication failed") from e
+        raise UnauthorizedException(detail="Mockup authentication failed") from e
