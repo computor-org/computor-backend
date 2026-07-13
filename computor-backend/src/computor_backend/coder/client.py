@@ -121,6 +121,10 @@ class CoderClient:
         client = await self._ensure_client()
 
         try:
+            # Drop any session cookie captured from a previous login response:
+            # a stale cookie shadows the header token on later requests AND
+            # trips Coder's CSRF check on this login POST itself.
+            client.cookies.clear()
             resp = await client.post(
                 "/api/v2/users/login",
                 json={
@@ -193,7 +197,9 @@ class CoderClient:
 
         Collapses the ``token = await self._get_session_token(); client =
         await self._ensure_client()`` boilerplate plus header building that
-        every endpoint used to repeat.
+        every endpoint used to repeat. On a 401 the cached session token is
+        dropped and the request is replayed once with a fresh admin login
+        (session tokens expire server-side).
 
         Args:
             method: HTTP method (GET/POST/PUT/PATCH/DELETE).
@@ -235,9 +241,21 @@ class CoderClient:
 
         resp = await client.request(method, path, **kwargs)
 
+        if resp.status_code == 401:
+            # Coder session tokens expire (idle sessions are not refreshed), but
+            # this client is a process-lifetime singleton that caches its token —
+            # without re-auth every call would keep failing until a restart.
+            logger.info("Coder session token rejected (401), re-authenticating")
+            self._session_token = None
+            token = await self._get_session_token()
+            kwargs["headers"] = (
+                self._get_headers(token) if admin_headers else {"Coder-Session-Token": token}
+            )
+            resp = await client.request(method, path, **kwargs)
+
         if ok is not None and resp.status_code not in ok:
             raise CoderAPIError(
-                f"Coder API request failed: {method} {path}",
+                f"Coder API request failed: {method} {path} (status {resp.status_code})",
                 status_code=resp.status_code,
                 detail=resp.text,
             )
