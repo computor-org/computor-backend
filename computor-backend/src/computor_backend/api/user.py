@@ -16,6 +16,7 @@ from computor_types.course_git import (
     CourseMemberRepositoryGet,
     CourseMemberRepositoryRegister,
     StudentRepositoryProvisioned,
+    TemplateAccessGet,
 )
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
@@ -38,6 +39,7 @@ from computor_backend.business_logic.course_accounts import (
 from computor_backend.business_logic.course_git import (
     get_course_git_descriptor,
     get_student_repository,
+    get_template_access,
     get_template_archive_source,
     provision_student_repository,
     register_byo_repository,
@@ -228,6 +230,27 @@ async def register_gitlab_managed_endpoint(
         permissions,
         db,
     )
+
+
+@user_router.post(
+    "/courses/{course_id}/template-access",
+    response_model=TemplateAccessGet,
+)
+async def template_access_endpoint(
+    course_id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    """Mint a one-time READ-ONLY git credential for the course's template.
+
+    Lets the current course member fetch the student-template over git — the
+    extension uses it to seed an external repo with full history and to merge
+    new template commits into the student's repo. The token is rotated on each
+    call under its own name (never touching the provisioning clone token) and
+    cannot push. `token` is null until the member's first git-server SSO login
+    (re-call afterwards). Managed-Forgejo courses only.
+    """
+    return get_template_access(course_id, permissions, db)
 
 
 @user_router.get("/courses/{course_id}/template/archive")

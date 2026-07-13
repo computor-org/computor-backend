@@ -191,53 +191,6 @@ class ForgejoProviderClient:
             }},
         )
 
-    def create_student_repository(
-        self,
-        course_member_id: str,
-        org: Organization,
-        course: Course,
-        username: str,
-        submission_group_ids: list,
-    ) -> StudentRepoResult:
-        org_name = self._org_name(org)
-        course_props = (course.properties or {}).get("forgejo", {})
-        team_id = course_props.get("team_id")
-        template_repo_name = course_props.get("template_repo")
-
-        if not template_repo_name:
-            raise ValueError(f"Course {course.id} has no Forgejo template_repo in properties")
-
-        repo_name = username
-        with self._client() as client:
-            # Fork template repo into the org under the student's username as repo name
-            r = client.get(f"{_BASE}/repos/{org_name}/{repo_name}")
-            if r.status_code != 200:
-                fork_payload = {
-                    "organization": org_name,
-                    "name": repo_name,
-                }
-                r = client.post(f"{_BASE}/repos/{org_name}/{template_repo_name}/forks", json=fork_payload)
-                r.raise_for_status()
-            repo = r.json() if r.status_code == 200 else client.get(f"{_BASE}/repos/{org_name}/{repo_name}").json()
-
-            # Add student as collaborator with write access
-            client.put(f"{_BASE}/repos/{org_name}/{repo_name}/collaborators/{username}", json={"permission": "write"})
-
-            if team_id:
-                self._add_repo_to_team(client, team_id, org_name, repo_name)
-
-        return StudentRepoResult(
-            http_url=repo.get("clone_url", ""),
-            ssh_url=repo.get("ssh_url", ""),
-            web_url=repo.get("html_url", ""),
-            provider_project_id=str(repo.get("id", "")),
-            properties={"forgejo": {
-                "org_name": org_name,
-                "repo_name": repo_name,
-                "repo_id": repo.get("id"),
-            }},
-        )
-
     def provision_student_fork(
         self,
         template_owner: str,
@@ -366,6 +319,7 @@ class ForgejoProviderClient:
         admin_username: str,
         admin_password: str,
         name: str = "computor-vscode",
+        scopes: list[str] | None = None,
     ) -> str | None:
         """Mint a repo-scoped personal access token for ``username`` so they can
         clone/push their repo over HTTP.
@@ -373,7 +327,10 @@ class ForgejoProviderClient:
         Token creation requires **basic auth** (a token cannot create another
         token), so the caller passes the managed instance's admin credentials.
         Rotates: deletes any same-named token first, so every call returns a
-        fresh, usable token. Returns the token (shown once) or ``None`` on
+        fresh, usable token — rotation is keyed by ``name``, so differently-named
+        tokens (e.g. the read-only ``computor-template`` one) never invalidate
+        each other. ``scopes`` overrides the default read+write repository
+        scopes. Returns the token (shown once) or ``None`` on
         failure — e.g. the student has not completed their first Forgejo login
         yet, so a later retry will succeed.
         """
@@ -384,7 +341,7 @@ class ForgejoProviderClient:
             client.delete(f"{_BASE}/users/{username}/tokens/{name}")
             r = client.post(
                 f"{_BASE}/users/{username}/tokens",
-                json={"name": name, "scopes": ["read:repository", "write:repository"]},
+                json={"name": name, "scopes": scopes or ["read:repository", "write:repository"]},
             )
         if r.status_code in (200, 201):
             return r.json().get("sha1")
@@ -551,21 +508,3 @@ class ForgejoProviderClient:
         )
         return False
 
-    def sync_member_permissions(
-        self,
-        org: Organization,
-        course: Course,
-        username: str,
-        role: str,
-        user_access_token: str | None,
-    ) -> None:
-        org_name = self._org_name(org)
-        course_props = (course.properties or {}).get("forgejo", {})
-        team_id = course_props.get("team_id")
-
-        if not team_id:
-            logger.warning(f"No Forgejo team_id on course {course.id}, skipping permission sync")
-            return
-
-        with self._client() as client:
-            client.put(f"{_BASE}/teams/{team_id}/members/{username}")
