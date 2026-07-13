@@ -112,7 +112,7 @@ This directory contains precise, self-contained refactoring plans intended to be
 | 508 | Give computor-utils a purpose (or fold it away) | P3 | S | todo |
 | 509 | Dedupe per-command CLI boilerplate | P3 | S | todo |
 | 510 | Harden computor_types get_all_dtos (silent failures) | P3 | M | todo |
-| 511 | Rename colliding test-spec modules | P3 | S | todo |
+| 511 | Rename colliding test-spec modules | P3 | S | done (merged; git mv computor_types/tests.py → test_jobs.py (TestJob/TestCreate job-dispatch DTOs) with a cross-ref docstring distinguishing it from testing.py (test.yaml spec) and testing_report.py (report). Left tests.py as a deprecation re-export shim (verified same-object identity) so the 2 importers + generated client keep working. Updated the non-generated backend importer (api/tests.py) and all 3 codegen module-maps (generate_python_clients ×2, generate_openapi_clients ×1) so future regens emit computor_types.test_jobs. computor-testing package had no imports. Verified: test_jobs + shim + server + generated computor-client all import OK.) |
 
 ## Global verification commands
 

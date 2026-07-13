@@ -881,7 +881,7 @@ except Exception as e:
     'TaskResult': 'tasks',
     'TaskSubmission': 'tasks',
     'TaskInfo': 'tasks',
-    'TestCreate': 'tests',
+    'TestCreate': 'test_jobs',
     # Tutor
     'TutorCourseMemberCourseContent': 'tutor_course_members',
     'TutorCourseMemberGet': 'tutor_course_members',

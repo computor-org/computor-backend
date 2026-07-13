@@ -35,7 +35,7 @@ from computor_backend.repositories import (
 from computor_types.results import ResultCreate, ResultList
 from computor_types.repositories import Repository
 from computor_types.tasks import TaskStatus, map_task_status_to_int
-from computor_types.tests import TestCreate, TestJob
+from computor_types.test_jobs import TestCreate, TestJob
 from computor_backend.model.artifact import SubmissionArtifact
 from computor_backend.model.result import Result
 from computor_backend.model.course import (
