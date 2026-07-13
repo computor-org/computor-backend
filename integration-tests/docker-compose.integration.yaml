@@ -27,6 +27,9 @@ volumes:
   temporal-postgres-data:
   redis-data:
   minio-data:
+  keycloak-db-data:
+  forgejo-db-data:
+  forgejo-data:
   shared-data:
 
 services:
@@ -134,6 +137,152 @@ services:
       timeout: 5s
       retries: 10
 
+  # ---- Keycloak (SSO — the only auth path) --------------------------------
+  # Blueprint: ops/docker/docker-compose.keycloak.yaml. Realm `computor` is
+  # imported ON FIRST BOOT ONLY from the staged import dir (make env writes
+  # keycloak-import/computor-realm.json, substituting the IT client secret).
+  # Changing the realm/secret requires `make clean` (fresh keycloak-db volume).
+
+  keycloak-db:
+    image: postgres:16
+    networks: [computor-it]
+    environment:
+      TZ: UTC
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?set KEYCLOAK_DB_PASSWORD in .env.integration}
+      POSTGRES_DB: keycloak
+      PGPORT: 5438
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -p 5438"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0.6
+    networks: [computor-it]
+    ports:
+      - "${IT_KEYCLOAK_PORT:-18180}:8080"
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?set KEYCLOAK_ADMIN in .env.integration}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env.integration}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5438/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?set KEYCLOAK_DB_PASSWORD in .env.integration}
+      # Browser-facing base URL (issuer / redirect URIs). Backend token calls go
+      # over the docker network to keycloak:8080; BACKCHANNEL_DYNAMIC lets those
+      # resolve from the request host so both sides agree.
+      KC_HOSTNAME: "http://localhost:${IT_KEYCLOAK_PORT:-18180}"
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_PORT: 8080
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_RELATIVE_PATH: "/"
+    command: ["start-dev", "--import-realm"]
+    volumes:
+      - ./keycloak-import:/opt/keycloak/data/import:ro
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    healthcheck:
+      # Keycloak 25 exposes health on the mgmt interface (:9000); the image has
+      # no curl/wget, so probe via bash /dev/tcp.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q 'UP' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+
+  # ---- Forgejo (the only git server) --------------------------------------
+  # Blueprint: ops/docker/docker-compose.forgejo.yaml. forgejo-bootstrap creates
+  # the admin user; the backend then auto-registers this as a managed GitServer
+  # and mints its service token (GIT_SERVER=forgejo). Student repos are provisioned
+  # by SELF-migration (a full clone of the course template), so ALLOW_LOCALNETWORKS
+  # + an ALLOWED_DOMAINS allowlist that includes this container's own host are
+  # required.
+
+  forgejo-db:
+    image: postgres:16
+    networks: [computor-it]
+    environment:
+      TZ: UTC
+      PGPORT: 5441
+      POSTGRES_DB: forgejo
+      POSTGRES_USER: forgejo
+      POSTGRES_PASSWORD: ${FORGEJO_DB_PASSWORD:?set FORGEJO_DB_PASSWORD in .env.integration}
+    volumes:
+      - forgejo-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forgejo -p 5441"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:9
+    networks: [computor-it]
+    ports:
+      - "${IT_FORGEJO_PORT:-13030}:3030"
+    environment:
+      TZ: UTC
+      FORGEJO__security__INSTALL_LOCK: "true"
+      FORGEJO__database__DB_TYPE: postgres
+      FORGEJO__database__HOST: forgejo-db:5441
+      FORGEJO__database__NAME: forgejo
+      FORGEJO__database__USER: forgejo
+      FORGEJO__database__PASSWD: ${FORGEJO_DB_PASSWORD:?set FORGEJO_DB_PASSWORD in .env.integration}
+      FORGEJO__server__DOMAIN: localhost
+      FORGEJO__server__HTTP_PORT: 3030
+      # Host-reachable root URL so `git clone` from the host (student-workflow
+      # tests) and public-URL rewriting resolve correctly.
+      FORGEJO__server__ROOT_URL: "http://localhost:${IT_FORGEJO_PORT:-13030}"
+      FORGEJO__server__DISABLE_SSH: "true"
+      FORGEJO__session__PROVIDER: "db"
+      FORGEJO__session__PROVIDER_CONFIG: ""
+      FORGEJO__service__DISABLE_REGISTRATION: "true"
+      FORGEJO__service__REQUIRE_SIGNIN_VIEW: "true"
+      FORGEJO__repository__DEFAULT_PRIVATE: "true"
+      FORGEJO__migrations__ALLOW_LOCALNETWORKS: "true"
+      # Must include this service's own network host (`forgejo`) — the clone
+      # source for self-migration is GIT_SERVER_URL (http://forgejo:3030).
+      FORGEJO__migrations__ALLOWED_DOMAINS: "forgejo,localhost,127.0.0.1"
+    volumes:
+      - forgejo-data:/data
+    depends_on:
+      forgejo-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3030/api/healthz 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  # One-shot: creates the Forgejo admin the backend uses for managed-server ops.
+  # Idempotent (forgejo returns non-zero if the user exists, which is ignored).
+  forgejo-bootstrap:
+    image: codeberg.org/forgejo/forgejo:9
+    user: "git"
+    networks: [computor-it]
+    restart: "no"
+    volumes:
+      - forgejo-data:/data
+      - ../computor-forgejo/scripts/bootstrap.sh:/bootstrap.sh:ro
+    environment:
+      GITEA_WORK_DIR: /data
+      FORGEJO_ADMIN_USERNAME: ${GIT_SERVER_ADMIN_USERNAME:?set GIT_SERVER_ADMIN_USERNAME in .env.integration}
+      FORGEJO_ADMIN_PASSWORD: ${GIT_SERVER_ADMIN_PASSWORD:?set GIT_SERVER_ADMIN_PASSWORD in .env.integration}
+      FORGEJO_ADMIN_EMAIL: ${FORGEJO_ADMIN_EMAIL:-admin@computor.local}
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+    depends_on:
+      forgejo:
+        condition: service_healthy
+
   # ---- Backend ------------------------------------------------------------
 
   api:
@@ -149,6 +298,7 @@ services:
       TZ: UTC
       RUNNING_IN_DOCKER: "true"
       API_ADMIN_USER: ${API_ADMIN_USER:-admin}
+      API_ADMIN_EMAIL: ${API_ADMIN_EMAIL:-admin@integration.test}
       API_ADMIN_PASSWORD: ${API_ADMIN_PASSWORD:-it-admin-pass}
       API_LOCAL_STORAGE_DIR: /home/uvicorn/shared
       POSTGRES_HOST: postgres
@@ -171,8 +321,28 @@ services:
       MINIO_SECURE: "false"
       MINIO_MAX_UPLOAD_SIZE: ${MINIO_MAX_UPLOAD_SIZE:-20971520}
       CODER_ENABLED: "false"
+      # Keycloak (SSO) — backend reaches Keycloak over the docker network.
+      KEYCLOAK_ENABLED: "true"
+      KEYCLOAK_SERVER_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-computor}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-computor-backend}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?set KEYCLOAK_CLIENT_SECRET in .env.integration}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?set KEYCLOAK_ADMIN in .env.integration}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env.integration}
+      # Forgejo (managed git server) — GIT_SERVER=forgejo triggers auto-registration.
+      GIT_SERVER: ${GIT_SERVER:-forgejo}
+      GIT_SERVER_URL: http://forgejo:3030
+      GIT_SERVER_URL_INTERNAL: http://forgejo:3030
+      GIT_SERVER_URL_PUBLIC: "http://localhost:${IT_FORGEJO_PORT:-13030}"
+      FORGEJO_ROOT_URL: "http://localhost:${IT_FORGEJO_PORT:-13030}"
+      GIT_SERVER_ADMIN_USERNAME: ${GIT_SERVER_ADMIN_USERNAME:?set GIT_SERVER_ADMIN_USERNAME in .env.integration}
+      GIT_SERVER_ADMIN_PASSWORD: ${GIT_SERVER_ADMIN_PASSWORD:?set GIT_SERVER_ADMIN_PASSWORD in .env.integration}
+      # Bootstrap services/example-repos: staged deployment YAMLs (ensure_bootstrap_services).
+      DEPLOYMENTS_DIR: /deployments
+      TESTING_WORKER_TOKEN: ${TESTING_WORKER_TOKEN:?set TESTING_WORKER_TOKEN (ctp_..., >=32 chars) in .env.integration}
     volumes:
       - shared-data:/home/uvicorn/shared
+      - ./deployments:/deployments:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -182,6 +352,10 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      forgejo-bootstrap:
+        condition: service_completed_successfully
 
   # ---- Temporal workers ---------------------------------------------------
   # MATLAB worker deliberately omitted (out of scope per issue #106).
@@ -190,7 +364,7 @@ services:
   temporal-worker:
     build:
       context: ../
-      dockerfile: docker/temporal-worker-dev/Dockerfile
+      dockerfile: docker/temporal-worker/Dockerfile
     image: computor-temporal-worker:integration
     networks: [computor-it]
     environment:
@@ -220,6 +394,15 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_SECURE: "false"
+      # Forgejo — the worker generates student-template repos and self-migrates
+      # student repos, so it needs to reach the git server and rewrite URLs.
+      GIT_SERVER: ${GIT_SERVER:-forgejo}
+      GIT_SERVER_URL: http://forgejo:3030
+      GIT_SERVER_URL_INTERNAL: http://forgejo:3030
+      GIT_SERVER_URL_PUBLIC: "http://localhost:${IT_FORGEJO_PORT:-13030}"
+      FORGEJO_ROOT_URL: "http://localhost:${IT_FORGEJO_PORT:-13030}"
+      GIT_SERVER_ADMIN_USERNAME: ${GIT_SERVER_ADMIN_USERNAME:?set GIT_SERVER_ADMIN_USERNAME in .env.integration}
+      GIT_SERVER_ADMIN_PASSWORD: ${GIT_SERVER_ADMIN_PASSWORD:?set GIT_SERVER_ADMIN_PASSWORD in .env.integration}
     volumes:
       - shared-data:/home/worker/shared
     restart: unless-stopped
@@ -231,6 +414,8 @@ services:
       temporal:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      forgejo:
         condition: service_healthy
 
   temporal-worker-testing:

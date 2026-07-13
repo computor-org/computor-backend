@@ -23,37 +23,41 @@ same branch name across sibling repos when applicable. Never push to `main`.
   rewritten. Token check: the `glpat-` values pointed at local throwaway GitLab
   containers — nothing to revoke.
   AC met: `grep -ri gitlab integration-tests/ --include='*.py' --include='*.yaml' --include='*.toml'` → empty.
-- [ ] **P1.2 Add Keycloak.** `keycloak` + `keycloak-db` services (blueprint
-  `ops/docker/docker-compose.keycloak.yaml`; host port 18180; health on mgmt `:9000`,
-  `start_period: 60s`). `make env` stages `data/keycloak/computor-realm.json` with the
-  IT client secret substituted into the import volume.
-  AC: fresh `make up` → realm `computor` answers `/.well-known/openid-configuration`.
-- [ ] **P1.3 Add Forgejo.** `forgejo` + `forgejo-db` + one-shot `forgejo-bootstrap`
-  (blueprint `ops/docker/docker-compose.forgejo.yaml`; host port 13030;
-  `ALLOW_LOCALNETWORKS=true` + `ALLOWED_DOMAINS` pinned; bootstrap admin creds from
-  env; `depends_on: service_completed_successfully`).
-  AC: `GET :13030/api/healthz` OK; admin token works.
-- [ ] **P1.4 Wire API/worker env.** On `api` (and workers where relevant):
-  `KEYCLOAK_*`, `API_ADMIN_EMAIL/_PASSWORD`, `GIT_SERVER=forgejo`,
-  `GIT_SERVER_URL=http://forgejo:3030`, `GIT_SERVER_URL_PUBLIC=http://localhost:13030`,
-  `GIT_SERVER_ADMIN_*`, `DEPLOYMENTS_DIR=/deployments` (bind-mount), ctp_-format
-  `TESTING_WORKER_TOKEN` in the template (≥32 chars).
-  AC: API boots; startup logs show managed-Forgejo registration and role seeding.
-- [ ] **P1.5 Stage bootstrap deployments.** New committed
-  `integration-tests/deployments/testing-worker.yaml` (`slug: itpcp.exec.py`,
-  `service_type_path: testing.temporal`, `task_queue: testing`,
-  `api_token.token: ${TESTING_WORKER_TOKEN}`) and `example-repository.yaml` (MinIO
-  default repo). → [02](02-architecture.md) §3.
-  AC: after boot, the Service and ExampleRepository rows exist (asserted by P1.6 smoke).
-- [ ] **P1.6 Rewrite smoke + wait script.** `suites/01_smoke/test_stack_reachable.py` and
-  `scripts/wait_for_services.sh` per [06](06-integration-suites.md) §01 (Keycloak,
-  Forgejo, managed-git-server row, `itpcp.exec.py` Service row).
-  AC: `make up && pytest suites/01_smoke` green from cold.
-- [ ] **P1.7 Docs & hygiene.** Rewrite `integration-tests/README.md` (new stack, `make
-  clean` = realm reset); fix `Makefile` targets; delete phantom `data/`/`helpers/`
-  claims, macOS paths, stale `.pytest_cache`; update markers in `pyproject.toml`
-  (drop `gitlab`/`deployment`, add `contracts`/`invites`/`forgejo`).
-  AC: README matches reality; `pytest --collect-only` clean.
+- [x] **P1.2 Add Keycloak.** ✅ Done + validated 2026-07-13. `keycloak` + `keycloak-db`
+  added (host port 18180, mgmt-`:9000` health, `start_period 60s`). `make env` gained a
+  `stage-realm` step: substitutes `KEYCLOAK_CLIENT_SECRET`/`FORGEJO_CLIENT_SECRET` into
+  the `PLACEHOLDER_*` slots of `data/keycloak/computor-realm.json` → `keycloak-import/`
+  (gitignored), bind-mounted to `/opt/keycloak/data/import`.
+  AC met: realm `computor` answers `/.well-known/openid-configuration` (smoke green).
+- [x] **P1.3 Add Forgejo.** ✅ Done + validated 2026-07-13. `forgejo` + `forgejo-db` +
+  one-shot `forgejo-bootstrap` (host port 13030; `ALLOW_LOCALNETWORKS=true`;
+  `ALLOWED_DOMAINS=forgejo,localhost,127.0.0.1`; `api depends_on … service_completed_successfully`).
+  AC met: `GET :13030/api/healthz` 200; admin created; backend minted its managed-server token.
+- [x] **P1.4 Wire API/worker env.** ✅ Done + validated 2026-07-13. api + temporal-worker
+  got `KEYCLOAK_*`, `API_ADMIN_EMAIL`, `GIT_SERVER=forgejo`, `GIT_SERVER_URL(_INTERNAL)=http://forgejo:3030`,
+  `GIT_SERVER_URL_PUBLIC/FORGEJO_ROOT_URL=http://localhost:13030`, `GIT_SERVER_ADMIN_*`,
+  `DEPLOYMENTS_DIR=/deployments`, ctp_ `TESTING_WORKER_TOKEN`.
+  **Gotcha found + fixed:** `TOKEN_SECRET` symmetrically encrypts the git-server token
+  via keycove/Fernet, so it MUST be a valid Fernet key (32 url-safe base64 bytes / 44
+  chars) — the old `it-token-secret-change-me` made managed-Forgejo registration fail
+  (non-fatally: `Fernet key must be 32 url-safe base64-encoded bytes`). Template now
+  ships a valid key. **Also fixed a pre-existing bug:** the `temporal-worker` build
+  pointed at the renamed-away `docker/temporal-worker-dev/` → `docker/temporal-worker/`.
+  AC met: managed Forgejo GitServer row exists with `managed=t, has_token=t`.
+- [x] **P1.5 Stage bootstrap deployments.** ✅ Done + validated 2026-07-13. Committed
+  `integration-tests/deployments/{testing-worker,example-repository}.yaml` (python-only
+  worker; MinIO repo), bind-mounted at `/deployments`.
+  AC met: startup logged `Bootstrap service 'itpcp.exec.py': created + token set` and
+  `Bootstrap example repository 'Default Examples': created`.
+- [x] **P1.6 Rewrite smoke + wait script.** ✅ Done + validated 2026-07-13. Smoke drops
+  the GitLab checks, adds `test_keycloak_realm_reachable` + `test_forgejo_health`;
+  `wait_for_services.sh` waits on keycloak(+db)/forgejo(+db).
+  AC met: `make up && pytest suites/01_smoke` → 6 passed from cold. (The authenticated
+  canaries — managed-server row + Service row via `GET /git-servers` — move to P2 once
+  the login fixture exists; both were verified here directly against the DB.)
+- [x] **P1.7 Docs & hygiene.** ✅ Done 2026-07-13 (with P1.1). READMEs rewritten,
+  Makefile targets fixed (+`stage-realm`), phantom `data/`/`helpers/` claims and macOS
+  paths gone, markers updated. `pytest --collect-only` clean (147 tests).
 
 ## P2 — Identity & personas (`integration-tests/fixtures/`) → [02](02-architecture.md) §4–5, [03](03-personas-and-scenario.md)
 

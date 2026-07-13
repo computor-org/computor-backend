@@ -43,6 +43,7 @@ FORGEJO__migrations__ALLOWED_DOMAINS: "forgejo"   # pinned to the container's ow
 | `GIT_SERVER_ADMIN_USERNAME` / `GIT_SERVER_ADMIN_PASSWORD` | IT values (match `forgejo-bootstrap`) | managed-server admin ops |
 | `DEPLOYMENTS_DIR` | `/deployments` (bind-mount `integration-tests/deployments/`) | see §3 |
 | `TESTING_WORKER_TOKEN` | **real `ctp_` format, ≥32 chars** | shared by api (YAML expansion) and worker (`API_TOKEN`); the old fallback `it-worker-token-change-me` fails `validate_token_format` (`permissions/auth.py:229`) |
+| `TOKEN_SECRET` | **valid Fernet key** (32 url-safe base64 bytes / 44 chars) | keycove/Fernet symmetrically encrypts the managed git-server token (`utils/encryption.py`); a non-Fernet value makes `ensure_managed_forgejo_registered` fail *non-fatally* with `Fernet key must be 32 url-safe base64-encoded bytes` and no managed server is registered. Generate with `Fernet.generate_key()`, **not** `openssl rand -base64 32` (non-url-safe) |
 
 Realm import: `make env` stages `data/keycloak/computor-realm.json` into the Keycloak
 import volume with the IT client secret substituted (same mechanism `startup.sh` uses via

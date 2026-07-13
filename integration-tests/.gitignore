@@ -1,5 +1,6 @@
 .env.integration
 .env.integration.local
+keycloak-import/
 .pytest_cache/
 __pycache__/
 *.egg-info/

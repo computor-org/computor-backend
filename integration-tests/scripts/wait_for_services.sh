@@ -8,9 +8,10 @@ cd "${SCRIPT_DIR}/.."
 
 COMPOSE="docker compose -f docker-compose.integration.yaml --env-file .env.integration"
 
-SERVICES=(postgres redis temporal-postgres temporal minio api)
-# Workers have no healthcheck; they're considered ready once started.
-# temporal-ui is optional and not gated on.
+SERVICES=(postgres redis temporal-postgres temporal minio keycloak-db keycloak forgejo-db forgejo api)
+# Keycloak is the slow one on a cold volume (~30-60s first-boot realm import).
+# Workers and the forgejo-bootstrap one-shot have no healthcheck; the api gates
+# on them via depends_on, so they're not listed here. temporal-ui is optional.
 
 TIMEOUT_SECONDS="${WAIT_TIMEOUT:-600}"
 INTERVAL=5

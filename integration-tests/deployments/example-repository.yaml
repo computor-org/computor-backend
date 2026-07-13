@@ -1,0 +1,12 @@
+# Integration-stack bootstrap: the default MinIO-backed Example Repository.
+#
+# Applied idempotently at API startup by ensure_bootstrap_services (via the
+# DEPLOYMENTS_DIR=/deployments mount). Without it, the first example upload has
+# no repository to target. source_url is the unique idempotency key; for minio
+# the first path segment is the bucket (computor-storage = MINIO_DEFAULT_BUCKETS),
+# ensured to exist at boot.
+example_repositories:
+  - name: Default Examples
+    description: Default MinIO-backed example repository (uploadable)
+    source_type: minio
+    source_url: computor-storage

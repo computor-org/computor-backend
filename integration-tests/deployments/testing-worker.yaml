@@ -1,0 +1,31 @@
+# Integration-stack bootstrap: the default Python testing-worker Service.
+#
+# Applied idempotently at API startup by ensure_bootstrap_services. The api
+# container mounts this directory at DEPLOYMENTS_DIR=/deployments, so this file
+# (not data/deployments/) is the source. An example's meta.yaml
+# executionBackend.slug (itpcp.exec.py) resolves to this Service at
+# submission / test time.
+#
+# api_token.token is os.path.expandvars'd from TESTING_WORKER_TOKEN — the SAME
+# value the temporal-worker-testing container uses as API_TOKEN, so the two
+# cannot drift. It MUST be a ctp_... token (>= 32 chars); the compose file and
+# .env.integration.template set it. (${...} here is a placeholder, not a secret.)
+#
+# Only the python worker is defined (matlab/octave/etc. are out of scope for the
+# integration stack).
+services:
+  - slug: itpcp.exec.py
+    service_type_path: testing.temporal   # resolves to the ServiceType seeded by migration
+    language: python
+    description: Integration testing worker (python)
+    user:
+      email: testing-worker@computor.integration
+      given_name: Testing
+      family_name: Worker
+    api_token:
+      token: ${TESTING_WORKER_TOKEN}      # expanded from the environment at apply time
+      name: Testing Worker Token
+      expires_days: 365
+    config:
+      temporal:
+        task_queue: testing               # MUST equal the worker's --queues=testing

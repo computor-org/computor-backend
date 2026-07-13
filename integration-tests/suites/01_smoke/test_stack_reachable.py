@@ -27,6 +27,24 @@ def test_api_openapi_reachable(api_base_url: str) -> None:
     assert "paths" in data and data["paths"], "OpenAPI advertises no paths"
 
 
+def test_keycloak_realm_reachable() -> None:
+    port = os.environ.get("IT_KEYCLOAK_PORT", "18180")
+    realm = os.environ.get("KEYCLOAK_REALM", "computor")
+    r = httpx.get(
+        f"http://localhost:{port}/realms/{realm}/.well-known/openid-configuration",
+        timeout=10,
+    )
+    assert r.status_code == 200, r.text
+    # Realm was imported and issuer is the host-facing URL (see KC_HOSTNAME).
+    assert r.json().get("issuer", "").endswith(f"/realms/{realm}"), r.text
+
+
+def test_forgejo_health() -> None:
+    port = os.environ.get("IT_FORGEJO_PORT", "13030")
+    r = httpx.get(f"http://localhost:{port}/api/healthz", timeout=10)
+    assert r.status_code == 200, r.text
+
+
 def test_minio_health() -> None:
     port = os.environ.get("IT_MINIO_API_PORT", "19000")
     r = httpx.get(f"http://localhost:{port}/minio/health/live", timeout=10)
