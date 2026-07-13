@@ -4,9 +4,9 @@ import Image from 'next/image';
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useAuth } from '../contexts/AuthContext';
-import { usePermissions } from '../hooks/usePermissions';
-import { useCourseViews } from '../hooks/useCourseViews';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { usePermissions } from '@/src/hooks/usePermissions';
+import { useCourseViews } from '@/src/hooks/useCourseViews';
 import { icons } from './icons';
 import {
   NavItem,
@@ -17,7 +17,7 @@ import {
   userMgmtNavigation,
   getViewNavigation,
   pathMatches,
-} from '../config/navigation';
+} from '@/src/config/navigation';
 
 export default function Sidebar() {
   const pathname = usePathname();

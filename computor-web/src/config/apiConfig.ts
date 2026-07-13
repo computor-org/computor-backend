@@ -6,8 +6,8 @@
  * with the HttpOnly cookies. Imported early in the app lifecycle.
  */
 
-import { ssoAuthService } from '../services/authInstances';
-import { setRefreshStrategy, directRefresh, type RefreshOutcome } from '../utils/tokenRefresh';
+import { ssoAuthService } from '@/src/services/authInstances';
+import { setRefreshStrategy, directRefresh, type RefreshOutcome } from '@/src/utils/tokenRefresh';
 
 /**
  * Install the provider-aware refresh strategy shared by all HTTP layers.

@@ -1,10 +1,10 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { AuthUser, AuthResponse } from '../types/auth';
-import { UserScopes } from '../generated/types/users';
-import { ssoAuthService } from '../services/authInstances';
-import { apiFetch, API_BASE_URL } from '../utils/apiClient';
+import { AuthUser, AuthResponse } from '@/src/types/auth';
+import { UserScopes } from '@/src/generated/types/users';
+import { ssoAuthService } from '@/src/services/authInstances';
+import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 // Side-effect import: wires the auth providers into the shared `apiClient`
 // singleton (used by all generated clients) so a 401 there refreshes the token
 // and clears the cached session on failure instead of bailing out blindly.

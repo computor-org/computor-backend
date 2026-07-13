@@ -2,12 +2,12 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/src/contexts/AuthContext';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import MaintenanceBanner from './MaintenanceBanner';
-import { API_BASE_URL, apiGet, redirectToConsent } from '../utils/apiClient';
-import type { ConsentStatus } from '../types/consent';
+import { API_BASE_URL, apiGet, redirectToConsent } from '@/src/utils/apiClient';
+import type { ConsentStatus } from '@/src/types/consent';
 
 // Consent bootstrap check runs once per authenticated session per page load;
 // mid-session changes (withdrawal, policy version bump) are caught by the 403

@@ -1,6 +1,6 @@
 'use client';
 
-import { useSystemRoles } from '../hooks/useSystemRoles';
+import { useSystemRoles } from '@/src/hooks/useSystemRoles';
 
 /**
  * Checkbox list of the builtin system roles, labelled with each role's

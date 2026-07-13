@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, type DependencyList } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '@/src/contexts/AuthContext';
 
 interface UseResourceResult<T> {
   data: T | null;

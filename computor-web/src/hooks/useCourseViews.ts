@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { apiFetch, API_BASE_URL } from '../utils/apiClient';
-import { useAuth } from '../contexts/AuthContext';
+import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { useAuth } from '@/src/contexts/AuthContext';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

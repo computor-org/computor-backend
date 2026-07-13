@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { RolesClient } from '../generated/clients/RolesClient';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { RolesClient } from '@/src/generated/clients/RolesClient';
 import type { RoleList } from 'types/generated';
 
 const rolesClient = new RolesClient();

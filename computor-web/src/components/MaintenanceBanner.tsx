@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { MaintenanceClient, MaintenanceStatus } from '../clients/MaintenanceClient';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { MaintenanceClient, MaintenanceStatus } from '@/src/clients/MaintenanceClient';
 
 const maintenanceClient = new MaintenanceClient();
 

@@ -10,7 +10,7 @@
 
 // Canonical definitions live in src/types/auth.ts — re-exported here so
 // existing imports keep working without a second, drift-prone copy.
-import type { AuthUser, AuthResponse } from '../types/auth';
+import type { AuthUser, AuthResponse } from '@/src/types/auth';
 
 export type { AuthUser, AuthResponse };
 

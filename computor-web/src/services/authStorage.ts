@@ -1,4 +1,4 @@
-import { AuthUser } from '../types/auth';
+import { AuthUser } from '@/src/types/auth';
 
 /**
  * Shared sessionStorage-backed auth session store.

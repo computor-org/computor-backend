@@ -1,7 +1,7 @@
-import { AuthResponse, AuthUser } from '../types/auth';
-import { ISSOAuthProvider } from '../interfaces/IAuthProvider';
-import { UserGet } from '../generated/types/users';
-import { apiFetch, API_BASE_URL } from '../utils/apiClient';
+import { AuthResponse, AuthUser } from '@/src/types/auth';
+import { ISSOAuthProvider } from '@/src/interfaces/IAuthProvider';
+import { UserGet } from '@/src/generated/types/users';
+import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import {
   clearStoredSession,
   determineRole,

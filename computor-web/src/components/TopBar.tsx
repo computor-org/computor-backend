@@ -4,8 +4,8 @@ import Image from 'next/image';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { apiFetch, API_BASE_URL } from '../utils/apiClient';
-import { useAuth } from '../contexts/AuthContext';
+import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { useAuth } from '@/src/contexts/AuthContext';
 import Avatar from './Avatar';
 
 export default function TopBar() {

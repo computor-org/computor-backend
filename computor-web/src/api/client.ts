@@ -1,4 +1,4 @@
-import { API_BASE_URL, apiFetch } from '../utils/apiClient';
+import { API_BASE_URL, apiFetch } from '@/src/utils/apiClient';
 
 interface RequestOptions extends RequestInit {
   skipAuth?: boolean;

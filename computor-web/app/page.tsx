@@ -4,8 +4,8 @@ import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '../src/contexts/AuthContext';
-import { API_BASE_URL, apiFetch } from '../src/utils/apiClient';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { API_BASE_URL, apiFetch } from '@/src/utils/apiClient';
 
 export default function Home() {
   const router = useRouter();
