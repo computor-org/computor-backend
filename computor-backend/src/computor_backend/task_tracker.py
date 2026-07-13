@@ -222,27 +222,8 @@ class TaskTracker:
             List of TaskTrackerEntry objects
         """
         try:
-            workflow_ids = set()
-
-            if permissions.is_admin:
-                # Admin sees all tasks
-                all_index_key = self._key("task_idx", "all")
-                all_ids = await self.redis.smembers(all_index_key)
-                workflow_ids.update(all_ids)
-            else:
-                # User's own tasks
-                user_index_key = self._key("task_idx", "user", permissions.user_id)
-                user_ids = await self.redis.smembers(user_index_key)
-                workflow_ids.update(user_ids)
-
-                # Tasks from courses where user is lecturer+
-                for course_id, role in permissions.course_roles.items():
-                    role_level = course_role_hierarchy.get_role_level(role)
-                    lecturer_level = course_role_hierarchy.get_role_level("_lecturer")
-                    if role_level >= lecturer_level:
-                        course_index_key = self._key("task_idx", "course", course_id)
-                        course_ids = await self.redis.smembers(course_index_key)
-                        workflow_ids.update(course_ids)
+            # Single source of truth for the admin/user/lecturer index union.
+            workflow_ids = await self.get_accessible_task_ids(permissions)
 
             # Fetch task entries
             entries = []
