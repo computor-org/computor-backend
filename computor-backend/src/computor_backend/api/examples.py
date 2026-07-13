@@ -515,6 +515,7 @@ from computor_types.example import ExampleVersionQuery
 @examples_router.get("/{example_id}/versions", response_model=List[ExampleVersionList])
 async def list_versions(
     example_id: str,
+    response: Response,
     params: ExampleVersionQuery = Depends(),
     db: Session = Depends(get_db),
     permissions: Principal = Depends(get_current_principal),
@@ -548,7 +549,14 @@ async def list_versions(
     # Convert to response model
     result = [ExampleVersionList.model_validate(v) for v in versions]
 
-    return result
+    # Apply the skip/limit the endpoint accepts (ExampleVersionQuery extends
+    # ListQuery) and stamp X-Total-Count. Previously these params were silently
+    # ignored and the full, unbounded list was returned.
+    total = len(result)
+    skip = params.skip or 0
+    page = result[skip:skip + params.limit] if params.limit is not None else result[skip:]
+
+    return paginated_list(page, total, response=response)
 
 @examples_router.get("/versions/{version_id}", response_model=ExampleVersionGet)
 async def get_version(
