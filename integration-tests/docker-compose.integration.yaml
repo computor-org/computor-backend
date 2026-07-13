@@ -1,4 +1,5 @@
-# Integration-test stack: backend + Temporal + Postgres + Redis + MinIO + GitLab CE.
+# Integration-test stack: backend + Temporal + Postgres + Redis + MinIO.
+# Keycloak and Forgejo join with the P1 harness rebuild (see testing-strategy/).
 #
 # Deliberately self-contained (no `include:` of ops/docker/*) so the test stack
 # stays insulated from dev/prod compose evolution. Uses named volumes (no host
@@ -26,9 +27,6 @@ volumes:
   temporal-postgres-data:
   redis-data:
   minio-data:
-  gitlab-config:
-  gitlab-logs:
-  gitlab-data:
   shared-data:
 
 services:
@@ -135,43 +133,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-
-  # ---- GitLab -------------------------------------------------------------
-  # Long boot (~3-5 min cold). Template: /Users/theta/computor/gitlab-server/docker-compose.yaml.
-  # Host ports differ from the standalone dev GitLab to avoid collisions.
-  #
-  # external_url: a later milestone (M4) will decide how API + host tests
-  # address GitLab with a single URL. For M1 we use `http://localhost:<port>`
-  # and only host-side access is tested.
-  gitlab:
-    image: gitlab/gitlab-ce:${GITLAB_CE_VERSION:-16.5.0-ce.0}
-    networks: [computor-it]
-    hostname: gitlab
-    ports:
-      # external_url sets both the listen port inside the container AND the
-      # URL GitLab advertises. Keep host port == container port so both the
-      # in-container healthcheck and the host-side tests agree.
-      - "${IT_GITLAB_HTTP_PORT:-8085}:${IT_GITLAB_HTTP_PORT:-8085}"
-      - "${IT_GITLAB_HTTPS_PORT:-8444}:443"
-      - "${IT_GITLAB_SSH_PORT:-2224}:22"
-    environment:
-      GITLAB_OMNIBUS_CONFIG: |
-        external_url 'http://localhost:${IT_GITLAB_HTTP_PORT:-8085}'
-        gitlab_rails['initial_root_password'] = '${GITLAB_ROOT_PASSWORD:-ChangeMeIntegration1!}'
-        gitlab_rails['gitlab_shell_ssh_port'] = ${IT_GITLAB_SSH_PORT:-2224}
-        gitlab_rails['monitoring_whitelist'] = ['0.0.0.0/0']
-        prometheus_monitoring['enable'] = false
-    volumes:
-      - gitlab-config:/etc/gitlab
-      - gitlab-logs:/var/log/gitlab
-      - gitlab-data:/var/opt/gitlab
-    shm_size: '256m'
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:${IT_GITLAB_HTTP_PORT:-8085}/-/health"]
-      interval: 15s
-      timeout: 10s
-      retries: 40
-      start_period: 180s
 
   # ---- Backend ------------------------------------------------------------
 

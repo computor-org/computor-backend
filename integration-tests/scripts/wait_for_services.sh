@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 # Wait for every integration-stack service to be healthy, or time out.
-#
-# GitLab is the slow one (3-5 min cold); others settle in seconds.
 
 set -euo pipefail
 
@@ -10,7 +8,7 @@ cd "${SCRIPT_DIR}/.."
 
 COMPOSE="docker compose -f docker-compose.integration.yaml --env-file .env.integration"
 
-SERVICES=(postgres redis temporal-postgres temporal minio gitlab api)
+SERVICES=(postgres redis temporal-postgres temporal minio api)
 # Workers have no healthcheck; they're considered ready once started.
 # temporal-ui is optional and not gated on.
 

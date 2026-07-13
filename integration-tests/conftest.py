@@ -45,7 +45,6 @@ pytest_plugins = [
     "fixtures.users",
     "fixtures.clients",
     "fixtures.permission_matrix",
-    "fixtures.gitlab",
     "reporting",
 ]
 
@@ -59,10 +58,4 @@ def it_env() -> dict[str, str]:
 @pytest.fixture(scope="session")
 def api_base_url() -> str:
     port = os.environ.get("IT_API_PORT", "18000")
-    return f"http://localhost:{port}"
-
-
-@pytest.fixture(scope="session")
-def gitlab_base_url() -> str:
-    port = os.environ.get("IT_GITLAB_HTTP_PORT", "8085")
     return f"http://localhost:{port}"
