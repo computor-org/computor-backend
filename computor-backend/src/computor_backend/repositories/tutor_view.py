@@ -25,6 +25,7 @@ from computor_types.student_course_contents import CourseContentStudentQuery
 from computor_backend.interfaces.student_course_contents import CourseContentStudentInterface
 from computor_types.tutor_courses import CourseTutorGet, CourseTutorList, CourseTutorRepository
 from ..model.course import Course, CourseMember
+from computor_backend.permissions.roles import CourseRole
 
 
 class TutorViewRepository(ViewRepository):
@@ -71,7 +72,7 @@ class TutorViewRepository(ViewRepository):
             return cached
 
         # Cache miss - now do permission check (requires DB)
-        course_member = check_course_permissions(permissions, CourseMember, "_tutor", self.db).filter(
+        course_member = check_course_permissions(permissions, CourseMember, CourseRole.TUTOR, self.db).filter(
             CourseMember.id == course_member_id
         ).first()
 
@@ -139,7 +140,7 @@ class TutorViewRepository(ViewRepository):
             return cached
 
         # Cache miss - now do permission check (requires DB)
-        course_member = check_course_permissions(permissions, CourseMember, "_tutor", self.db).filter(
+        course_member = check_course_permissions(permissions, CourseMember, CourseRole.TUTOR, self.db).filter(
             CourseMember.id == course_member_id
         ).first()
 
@@ -197,7 +198,7 @@ class TutorViewRepository(ViewRepository):
         return self._get_cached_course_dto(
             course_id,
             permissions,
-            role="_tutor",
+            role=CourseRole.TUTOR,
             view_type="tutor:course",
             dto_cls=CourseTutorGet,
             builder=_build,
@@ -238,7 +239,7 @@ class TutorViewRepository(ViewRepository):
         return self._list_cached_course_dtos(
             permissions,
             params,
-            role="_tutor",
+            role=CourseRole.TUTOR,
             view_type="tutor:courses",
             dto_cls=CourseTutorList,
             row_builder=_build_row,

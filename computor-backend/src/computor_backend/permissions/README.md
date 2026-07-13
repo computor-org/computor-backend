@@ -1,269 +1,95 @@
-# Permissions Module
+# Permissions
 
-This module contains the refactored permission system for the Computor backend.
+Authorization for the Computor backend: a **handler-registry** system that
+authenticates each request into a `Principal`, then answers "may this principal
+perform `<action>` on `<entity>`?" and builds permission-filtered queries.
 
-> **Status**: Built and ready, but **NOT YET INTEGRATED**. The application currently uses the old permission system in `api/permissions.py`.
+This is the live, integrated system used by the whole API — there is no separate
+"old" permission module (the former `api/permissions.py` and the
+`migration.py` / `integration.py` toggle layer were removed).
 
-## Directory Structure
+## Request flow
 
 ```
-permissions/
-├── __init__.py          # Package exports and initialization
-├── principal.py         # Enhanced Principal class with claims management
-├── handlers.py          # Base handler interface and registry
-├── handlers_impl.py     # Concrete handlers for each entity type
-├── query_builders.py    # Reusable query building utilities
-├── cache.py            # Two-tier caching system
-├── core.py             # Main permission logic and registration
-├── auth.py             # Authentication and Principal creation
-├── migration.py        # Tools for migrating from old system
-└── integration.py      # Integration module for switching between systems
+Request
+  → auth.get_current_principal   # build/validate Principal (Redis-cached per token hash)
+  → core.check_permissions(principal, Entity, action, db)
+  → entity PermissionHandler     # allow/deny + return a permission-filtered query
 ```
 
-## Module Descriptions
+Admins bypass every handler (`core.check_admin`). Every other decision goes
+through the registered handler for the entity.
 
-### `principal.py`
-Enhanced Principal class with:
-- **CourseRoleHierarchy**: Configurable role inheritance (_owner > _maintainer > _lecturer > _tutor > _student)
-- **Claims**: Structured claims with general and dependent permissions
-- **Built-in caching**: Permission checks are cached for performance
-- **Helper methods**: `has_course_role()`, `get_courses_with_role()`, etc.
+## Files
 
-### `handlers.py` & `handlers_impl.py`
-- **PermissionHandler**: Abstract base class for entity-specific permission logic
-- **PermissionRegistry**: Singleton registry managing all handlers
-- Concrete handlers for:
-  - `UserPermissionHandler`: User visibility and management
-  - `CoursePermissionHandler`: Course-based permissions
-  - `OrganizationPermissionHandler`: Organization filtering
-  - `CourseMemberPermissionHandler`: Course membership management
-  - `CourseContentPermissionHandler`: Course content access
-  - `ReadOnlyPermissionHandler`: For lookup tables (CourseRole, CourseContentKind)
+- `principal.py` — `Principal`, `Claims`, and the role hierarchies
+  (`CourseRoleHierarchy`, `ScopedRoleHierarchy`). Source of truth for role
+  inheritance.
+- `roles.py` — canonical role identifiers as `str` enums (`CourseRole`,
+  `ScopeRole`, `SystemRole`) plus derived role-list constants
+  (`LECTURER_AND_ABOVE`, `SCOPE_MANAGER_AND_ABOVE`, …). Prefer these over raw
+  `"_lecturer"` strings; the enums compare equal to their string value and work
+  directly in SQLAlchemy `==`/`.in_(...)` filters.
+- `handlers.py` — the `PermissionHandler` ABC (`can_perform_action` /
+  `build_query`) and the `PermissionRegistry` singleton.
+- `handlers_user.py` / `handlers_course.py` / `handlers_scoped.py` /
+  `handlers_misc.py` — concrete per-entity handlers (users/profiles, course &
+  content & members & results, org/course-family scopes, read-only lookups &
+  examples). `handlers_impl.py` is a thin re-export shim kept so pre-split
+  imports keep working.
+- `core.py` — `initialize_permission_handlers()` (registers every entity),
+  `check_permissions()` / `check_course_permissions()` /
+  `check_course_family_permissions()`, `get_permitted_course_ids()`, the admin
+  bypass, and the `db_get_*_claims` loaders.
+- `course_access.py` — shared course/submission-group access ladders
+  (`get_course_member_or_403`, `require_submission_group_access`).
+- `auth.py` — `AuthenticationService`, `PrincipalBuilder`, the FastAPI
+  dependencies `get_current_principal[_optional]`, principal cache keys, and the
+  user-ban cache.
+- `cache.py` — course-membership caching (`get_user_course_memberships`,
+  `get_user_courses_with_role`, `invalidate_*`), backed by Redis.
+- `query_builders.py` — reusable membership/visibility query fragments.
+- `role_setup.py` — claim sets for the built-in system roles.
+- `api_token_cache.py` — API-token → principal cache.
 
-### `query_builders.py`
-Reusable query building components:
-- **CoursePermissionQueryBuilder**: Filter by course membership with role hierarchy
-- **OrganizationPermissionQueryBuilder**: Filter organizations by course access
-- **UserPermissionQueryBuilder**: Filter visible users based on course relationships
+## Role hierarchy
 
-### `cache.py`
-Two-tier caching system:
-- **PermissionCache**: In-memory LRU + Redis caching for permission checks
-- **CoursePermissionCache**: Specialized cache for course membership queries
-- TTL-based expiration (default 5 minutes)
-- Cache invalidation methods for users and courses
+Course roles rank `_owner > _maintainer > _lecturer > _tutor > _student`;
+organization / course-family scope roles rank `_owner > _manager > _developer`;
+the system role is `_admin`. A check for role *R* is satisfied by *R or higher*
+(`course_role_hierarchy.get_allowed_roles(R)`).
 
-### `core.py`
-Main permission system:
-- `initialize_permission_handlers()`: Registers all entity handlers
-- `check_permissions()`: Main entry point using registry pattern
-- `db_get_claims()`: Fetch user claims from database
-- `db_get_course_claims()`: Fetch course-specific claims
-- Entity registration for all models
+## Claim structure
 
-### `auth.py`
-Refactored authentication:
-- **AuthenticationService**: Unified interface for Basic, GitLab, and SSO auth
-- **PrincipalBuilder**: Consistent Principal creation with caching
-- `get_current_principal()`: Main FastAPI dependency for authentication
-- Backward compatibility aliases
-
-### `migration.py`
-Migration utilities:
-- **PrincipalAdapter**: Convert between old and new Principal formats
-- **MigrationHelper**: Compare old vs new system results
-- Testing functions to verify handler coverage
-- A/B testing capabilities
-
-### `integration.py`
-Integration layer (for future use):
-- Environment variable `USE_NEW_PERMISSION_SYSTEM` to control which system is active
-- Adaptive functions that route to old or new system
-- Runtime toggling capabilities
-
-## How the New System Works
-
-### 1. Permission Flow
-```
-Request → Authentication → Principal Creation → Permission Check → Filtered Query
-```
-
-### 2. Handler Pattern
-Each entity has its own handler that defines:
-- Which actions are allowed (get, list, create, update, delete)
-- Minimum required roles for each action
-- How to build filtered queries based on permissions
-
-### 3. Course Role Hierarchy
-```
-_owner      → Full control
-_maintainer → Can modify course settings
-_lecturer   → Can create/modify content
-_tutor      → Can view all students, grade
-_student    → Can view own data
-```
-
-### 4. Claim Structure
 ```python
 Claims:
-  general:    # Global permissions
-    user: ["list", "get"]
+  general:              # global permissions granted by system roles
+    user:   ["list", "get"]
     course: ["create"]
-  
-  dependent:  # Resource-specific permissions
+  dependent:            # resource-scoped role grants
     course:
       "course-id-1": ["_lecturer"]
       "course-id-2": ["_student"]
 ```
 
-## Key Improvements Over Old System
+## Adding an entity handler
 
-| Aspect | Old System | New System |
-|--------|------------|------------|
-| **Code Structure** | Single 600+ line function | Modular handlers (~50 lines each) |
-| **Maintainability** | Hard to modify | Easy to add/modify entities |
-| **Performance** | No caching | Two-tier caching |
-| **Type Safety** | Limited | Full type hints |
-| **Testing** | Difficult to test | Each handler testable independently |
-| **Extensibility** | Requires modifying core code | Just add new handler |
+1. Subclass `PermissionHandler` in the matching `handlers_*.py` — usually just
+   set `ACTION_ROLE_MAP` and reuse a base `can_perform_action` / `build_query`.
 
-## Future Migration Plan
+   ```python
+   class MyEntityPermissionHandler(PermissionHandler):
+       ACTION_ROLE_MAP = {
+           "get": CourseRole.STUDENT,
+           "list": CourseRole.STUDENT,
+           "update": CourseRole.LECTURER,
+           "create": CourseRole.MAINTAINER,
+           "delete": CourseRole.OWNER,
+       }
+   ```
 
-### Phase 1: Testing (Current)
-- System is built but not active
-- Can be tested in isolation
-- Migration helper available for comparison
+2. Register it in `core.initialize_permission_handlers()`:
 
-### Phase 2: Gradual Rollout
-```bash
-# Enable for testing
-export USE_NEW_PERMISSION_SYSTEM=true
-
-# Or use runtime toggle
-python -c "from computor_backend.permissions.integration import toggle_system; toggle_system(True)"
-```
-
-### Phase 3: Full Migration
-1. Update all imports from `api.permissions` to `permissions`
-2. Update all `get_current_principal` to `get_current_principal`
-3. Remove old system files
-4. Remove integration layer
-
-## Quick Examples
-
-### Adding a New Entity Handler
-```python
-# In handlers_impl.py
-class MyEntityPermissionHandler(PermissionHandler):
-    ACTION_ROLE_MAP = {
-        "get": "_student",
-        "list": "_student",
-        "update": "_lecturer",
-        "create": "_maintainer",
-        "delete": "_owner"
-    }
-    
-    def can_perform_action(self, principal, action, resource_id=None):
-        # Custom logic here
-        pass
-    
-    def build_query(self, principal, action, db):
-        # Query building logic
-        pass
-
-# In core.py initialize_permission_handlers()
-permission_registry.register(MyEntity, MyEntityPermissionHandler(MyEntity))
-```
-
-### Testing the New System
-```python
-from computor_backend.permissions.migration import (
-    run_migration_tests,
-    verify_entity_handler_coverage,
-    MigrationHelper
-)
-
-# Check handler coverage
-coverage = verify_entity_handler_coverage()
-
-# Run tests
-results = run_migration_tests()
-
-# Compare old vs new
-comparison = MigrationHelper.compare_systems(principal, User, "list", db)
-print(f"Old: {comparison['old_count']}, New: {comparison['new_count']}")
-```
-
-## Configuration
-
-### Environment Variables
-- `USE_NEW_PERMISSION_SYSTEM`: Set to "true" to enable new system (default: "false")
-
-### Cache Settings
-```python
-from computor_backend.permissions.cache import PermissionCache
-# Configure TTL (seconds)
-cache = PermissionCache(ttl_seconds=600)  # 10 minutes
-```
-
-### Course Role Hierarchy
-```python
-from computor_backend.permissions.principal import CourseRoleHierarchy
-# Custom hierarchy
-hierarchy = CourseRoleHierarchy({
-    "_admin": ["_admin"],
-    "_teacher": ["_teacher", "_admin"],
-    "_student": ["_student", "_teacher", "_admin"]
-})
-```
-
-## Important Notes
-
-⚠️ **This system is NOT YET ACTIVE in production**
-- The old system in `api/permissions.py` is still in use
-- Migration should be done carefully with testing
-- The new system is designed for gradual adoption
-
-## Benefits When Activated
-
-- **50% reduction** in database queries through caching
-- **80% reduction** in code complexity
-- **Better performance** with optimized query builders
-- **Easier debugging** with modular structure
-- **Type safety** throughout the permission system
-- **Scalable** with distributed Redis caching
-
-## Files to Update During Migration
-
-When ready to migrate, these files will need updates:
-- All files importing from `computor_backend.api.permissions`
-- All files using `get_current_principal` dependency
-- API endpoints using `check_permissions`
-- CRUD operations in `api/crud.py`
-
-## Testing Before Migration
-
-```bash
-# Run comparison tests
-python -c "
-from computor_backend.permissions.migration import run_migration_tests
-results = run_migration_tests()
-print(results)
-"
-
-# Check specific endpoint
-python -c "
-from computor_backend.permissions.integration import toggle_system, get_active_system
-print(f'Current system: {get_active_system()}')
-toggle_system(True)
-print(f'After toggle: {get_active_system()}')
-"
-```
-
-## Support
-
-For questions about the new permission system:
-1. Review this documentation
-2. Check [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for detailed architecture and migration steps
-3. Use migration helper for testing
-4. Contact backend team before enabling in production
+   ```python
+   permission_registry.register(MyEntity, MyEntityPermissionHandler(MyEntity))
+   ```

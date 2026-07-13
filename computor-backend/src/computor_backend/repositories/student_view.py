@@ -32,6 +32,7 @@ from computor_types.student_courses import (
 )
 from computor_backend.interfaces.student_courses import CourseStudentInterface
 from ..model.course import Course
+from computor_backend.permissions.roles import CourseRole
 
 
 class StudentViewRepository(ViewRepository):
@@ -173,7 +174,7 @@ class StudentViewRepository(ViewRepository):
         return self._list_cached_course_dtos(
             permissions,
             params,
-            role="_student",
+            role=CourseRole.STUDENT,
             view_type="courses",
             dto_cls=CourseStudentList,
             row_builder=lambda course: CourseStudentList(
@@ -219,7 +220,7 @@ class StudentViewRepository(ViewRepository):
         return self._get_cached_course_dto(
             course_id,
             permissions,
-            role="_student",
+            role=CourseRole.STUDENT,
             view_type="course",
             dto_cls=CourseStudentGet,
             builder=_build,

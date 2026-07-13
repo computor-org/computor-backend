@@ -37,6 +37,7 @@ from computor_backend.exceptions.exceptions import ComputorException
 from computor_backend.model.course import CourseMember, SubmissionGroupMember
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.principal import Principal
+from computor_backend.permissions.roles import CourseRole
 
 
 def get_course_member_or_403(
@@ -44,7 +45,7 @@ def get_course_member_or_403(
     course_id: UUID | str,
     db: Session,
     *,
-    min_course_role: str = "_student",
+    min_course_role: str = CourseRole.STUDENT,
     detail: str = "You must be a course member to perform this action",
     error_code: Optional[str] = None,
     exception: Type[ComputorException] = ForbiddenException,
@@ -84,7 +85,7 @@ def require_submission_group_access(
     course_id: UUID | str,
     db: Session,
     *,
-    min_course_role: str = "_tutor",
+    min_course_role: str = CourseRole.TUTOR,
     detail: str = "You don't have permission to access this submission group",
     error_code: Optional[str] = None,
     exception: Type[ComputorException] = PermissionDeniedAsNotFound,

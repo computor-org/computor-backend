@@ -260,7 +260,7 @@ class CourseMemberGradingsRepository:
             )
             .filter(
                 CourseMember.course_id == course_id,
-                CourseMember.course_role_id == "_student",
+                CourseMember.course_role_id == "_student",  # literal: model CourseRole is imported here
             )
             .order_by(User.family_name, User.given_name)
             .all()

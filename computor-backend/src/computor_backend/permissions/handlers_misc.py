@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, Query
 from computor_backend.permissions.handlers import PermissionHandler
 from computor_backend.permissions.principal import Principal
 from computor_backend.exceptions import ForbiddenException
+from computor_backend.permissions.roles import CourseRole
 
 __all__ = [
     "ReadOnlyPermissionHandler",
@@ -147,16 +148,16 @@ class ExamplePermissionHandler(PermissionHandler):
     READ_ACTIONS = frozenset({"get", "list", "download"})
 
     ACTION_ROLE_MAP = {
-        "get": "_lecturer",
-        "list": "_lecturer",
-        "download": "_lecturer",
+        "get": CourseRole.LECTURER,
+        "list": CourseRole.LECTURER,
+        "download": CourseRole.LECTURER,
     }
 
     def _lecturer_read_allowed(self, principal: Principal, action: str) -> bool:
         """True if a lecturer-in-any-course may perform this (read-only) action."""
         if action not in self.READ_ACTIONS:
             return False
-        min_role = self.ACTION_ROLE_MAP.get(action, "_lecturer")
+        min_role = self.ACTION_ROLE_MAP.get(action, CourseRole.LECTURER)
         return bool(principal.get_courses_with_role(min_role))
 
     def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:

@@ -61,7 +61,7 @@ This directory contains precise, self-contained refactoring plans intended to be
 | 112 | Keycloak: remove prints + secret-bearing logs | P2 | S | done (merged) |
 | 113 | Consolidate config (8 modules, import-time side effects) | P3 | M | todo |
 | 114 | course_member_gradings: dedupe/delete parallel stats | P3 | M | todo |
-| 115 | Fix stale permission docs; role-string literals → enums | P3 | S | todo |
+| 115 | Fix stale permission docs; role-string literals → enums | P3 | S | done (merged; deleted MIGRATION_GUIDE.md; rewrote permissions/README.md to the current integrated architecture (post-109 handler split, no "NOT YET INTEGRATED"/migration/integration/PermissionCache references). Swapped 65 role literals → CourseRole/ScopeRole enums across handlers_course/scoped/misc, course_access, and 4 repo view files. KEPT as literals: principal.py's 20 (hierarchy source-of-truth + roles.py imports principal → circular), roles.py's 10 (enum defs), all docstring/comment examples, and the single sites in core.py + course_member_gradings.py where the SQLAlchemy MODEL `CourseRole` is already bound (enum import would shadow it — documented inline). Full server import OK; enum value-invariance asserted; permission unit tests 188 pass, 2 failures + 25 api.crud collection-errors confirmed PRE-EXISTING on base.) |
 | 201 | api/submissions duplicates business_logic verbatim | P1 | M | done (merged) |
 | 202 | Extract ~10× copy-pasted permission ladder | P1 | M | done (merged; helpers in permissions/course_access.py + matrix tests) |
 | 203 | examples.py duplicate route registrations | P1 | S | done (merged) |

@@ -24,6 +24,7 @@ from computor_backend.model.course import (
     SubmissionGroupMember,
 )
 from computor_backend.model.result import Result
+from computor_backend.permissions.roles import CourseRole, ScopeRole
 
 __all__ = [
     "CoursePermissionHandler",
@@ -39,9 +40,9 @@ class CoursePermissionHandler(PermissionHandler):
     """Permission handler for Course entity"""
 
     ACTION_ROLE_MAP = {
-        "get": "_student",
-        "list": "_student",
-        "update": "_lecturer",
+        "get": CourseRole.STUDENT,
+        "list": CourseRole.STUDENT,
+        "update": CourseRole.LECTURER,
         "create": None,  # Only through general permission
         "delete": None   # Only through general permission
     }
@@ -99,11 +100,11 @@ class CourseContentTypePermissionHandler(PermissionHandler):
     """
 
     ACTION_ROLE_MAP = {
-        "get": "_student",      # Students and higher can view
-        "list": "_student",     # Students and higher can list
-        "create": "_lecturer",  # Lecturers and higher can create
-        "update": "_lecturer",  # Lecturers and higher can update
-        "delete": "_lecturer"   # Lecturers and higher can delete
+        "get": CourseRole.STUDENT,      # Students and higher can view
+        "list": CourseRole.STUDENT,     # Students and higher can list
+        "create": CourseRole.LECTURER,  # Lecturers and higher can create
+        "update": CourseRole.LECTURER,  # Lecturers and higher can update
+        "delete": CourseRole.LECTURER   # Lecturers and higher can delete
     }
 
     def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
@@ -180,12 +181,12 @@ class CourseContentPermissionHandler(PermissionHandler):
     """Permission handler for CourseContent entity"""
 
     ACTION_ROLE_MAP = {
-        "get": "_student",
-        "list": "_student",
-        "create": "_lecturer",
-        "update": "_lecturer",
-        "delete": "_lecturer",
-        "archive": "_lecturer"
+        "get": CourseRole.STUDENT,
+        "list": CourseRole.STUDENT,
+        "create": CourseRole.LECTURER,
+        "update": CourseRole.LECTURER,
+        "delete": CourseRole.LECTURER,
+        "archive": CourseRole.LECTURER
     }
 
     def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
@@ -252,11 +253,11 @@ class CourseMemberPermissionHandler(PermissionHandler):
     """Permission handler for CourseMember entity"""
 
     ACTION_ROLE_MAP = {
-        "get": "_tutor",
-        "list": "_tutor",
-        "update": "_lecturer",
-        "create": "_lecturer",
-        "delete": "_lecturer"
+        "get": CourseRole.TUTOR,
+        "list": CourseRole.TUTOR,
+        "update": CourseRole.LECTURER,
+        "create": CourseRole.LECTURER,
+        "delete": CourseRole.LECTURER
     }
 
     def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
@@ -335,11 +336,11 @@ class ResultPermissionHandler(PermissionHandler):
     """Permission handler for Result entities that don't have direct course_id"""
 
     ACTION_ROLE_MAP = {
-        "get": ["_student"],      # Students can get their own results
-        "list": ["_student"],     # Students can list their own results
-        "create": ["_student"],   # Students can create results (via tests)
-        "update": ["_tutor"],     # Tutors can update results
-        "delete": ["_lecturer"],  # Only lecturers can delete results
+        "get": [CourseRole.STUDENT],      # Students can get their own results
+        "list": [CourseRole.STUDENT],     # Students can list their own results
+        "create": [CourseRole.STUDENT],   # Students can create results (via tests)
+        "update": [CourseRole.TUTOR],     # Tutors can update results
+        "delete": [CourseRole.LECTURER],  # Only lecturers can delete results
     }
 
     def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None) -> bool:
@@ -374,7 +375,7 @@ class ResultPermissionHandler(PermissionHandler):
 
             # Check if user has tutor+ role in any course - they can see all results in their courses
             tutor_courses = CoursePermissionQueryBuilder.user_courses_subquery(
-                principal.user_id, "_tutor", db
+                principal.user_id, CourseRole.TUTOR, db
             )
 
             # Check if user is a student in any course
@@ -530,13 +531,13 @@ class MessagePermissionHandler(PermissionHandler):
         # Explicit scoped-role visibility for org / family (additive on top of
         # the cascade above). ``_developer`` is the lowest org/family role.
         family_via_member_ids = principal.get_scoped_ids_with_role(
-            "course_family", "_developer"
+            "course_family", ScopeRole.DEVELOPER
         )
         if family_via_member_ids:
             filters.append(self.entity.course_family_id.in_(family_via_member_ids))
 
         org_via_member_ids = principal.get_scoped_ids_with_role(
-            "organization", "_developer"
+            "organization", ScopeRole.DEVELOPER
         )
         if org_via_member_ids:
             filters.append(self.entity.organization_id.in_(org_via_member_ids))
@@ -544,7 +545,7 @@ class MessagePermissionHandler(PermissionHandler):
         # Tutor / lecturer escalation: extra read access to all message
         # types within courses where the principal has an elevated role.
         permitted_courses = CoursePermissionQueryBuilder.user_courses_subquery(
-            principal.user_id, "_tutor", db
+            principal.user_id, CourseRole.TUTOR, db
         )
         if permitted_courses is not None:
             filters.append(

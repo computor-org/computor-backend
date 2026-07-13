@@ -25,6 +25,7 @@ from computor_types.deployment import CourseContentDeploymentList
 from computor_backend.interfaces.lecturer_course_contents import CourseContentLecturerInterface
 from ..model.course import Course, CourseContent
 from ..model.deployment import CourseContentDeployment
+from computor_backend.permissions.roles import CourseRole
 
 
 class LecturerViewRepository(ViewRepository):
@@ -67,7 +68,7 @@ class LecturerViewRepository(ViewRepository):
             return Course(**cached) if isinstance(cached, dict) else cached
 
         # Query from DB
-        course = check_course_permissions(permissions, Course, "_lecturer", self.db).filter(
+        course = check_course_permissions(permissions, Course, CourseRole.LECTURER, self.db).filter(
             Course.id == course_id
         ).first()
 
@@ -117,7 +118,7 @@ class LecturerViewRepository(ViewRepository):
             return [CourseList.model_validate(item, from_attributes=True) for item in cached]
 
         # Query from DB
-        query = check_course_permissions(permissions, Course, "_lecturer", self.db)
+        query = check_course_permissions(permissions, Course, CourseRole.LECTURER, self.db)
         result = CourseInterface.search(self.db, query, params)
 
         # Cache result with query-aware key
@@ -159,7 +160,7 @@ class LecturerViewRepository(ViewRepository):
 
         # Check permissions and get course content
         course_content = check_course_permissions(
-            permissions, CourseContent, "_lecturer", self.db
+            permissions, CourseContent, CourseRole.LECTURER, self.db
         ).filter(CourseContent.id == course_content_id).first()
 
         if course_content is None:
@@ -224,7 +225,7 @@ class LecturerViewRepository(ViewRepository):
 
         # Check permissions
         query = check_course_permissions(
-            permissions, CourseContent, "_lecturer", self.db
+            permissions, CourseContent, CourseRole.LECTURER, self.db
         )
 
         # Eager-load deployment and its example_version to avoid N+1 queries

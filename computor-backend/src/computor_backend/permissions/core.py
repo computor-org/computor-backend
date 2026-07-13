@@ -326,6 +326,9 @@ def db_get_course_claims(user_id: str, db: Session) -> List[tuple]: #TODO: PERMI
         course_claims.append(("permissions", f"course:{course_role_id}:{course_id}"))
         
         # Check if user is a lecturer in any course
+        # NOTE: literal kept — the model class ``CourseRole`` (course-role
+        # lookup table) is already bound in this module, so the roles enum
+        # cannot be imported here without shadowing it.
         if course_role_id in course_role_hierarchy.get_allowed_roles("_lecturer"):
             is_lecturer = True
     

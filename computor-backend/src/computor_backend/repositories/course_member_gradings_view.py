@@ -25,6 +25,7 @@ from computor_types.course_member_gradings import (
     CourseMemberGradingsList,
     CourseMemberGradingsQuery,
 )
+from computor_backend.permissions.roles import CourseRole
 
 logger = logging.getLogger(__name__)
 
@@ -196,7 +197,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
             # Permission check: Admin bypasses, otherwise lecturer or higher role required
             if not permissions.is_admin:
                 has_course_perms = check_course_permissions(
-                    permissions, CourseMember, "_lecturer", self.db
+                    permissions, CourseMember, CourseRole.LECTURER, self.db
                 ).filter(
                     CourseMember.course_id == course_id,
                     CourseMember.user_id == user_id
@@ -262,7 +263,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
         course_id = params.course_id or str(course_member.course_id)
 
         has_course_perms = check_course_permissions(
-            permissions, CourseMember, "_lecturer", self.db
+            permissions, CourseMember, CourseRole.LECTURER, self.db
         ).filter(
             CourseMember.course_id == course_id,
             CourseMember.user_id == user_id
@@ -371,7 +372,7 @@ class CourseMemberGradingsViewRepository(ViewRepository):
             return
 
         has_course_perms = check_course_permissions(
-            permissions, CourseMember, "_lecturer", self.db
+            permissions, CourseMember, CourseRole.LECTURER, self.db
         ).filter(
             CourseMember.course_id == course_id,
             CourseMember.user_id == user_id

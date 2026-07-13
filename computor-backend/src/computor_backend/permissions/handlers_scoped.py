@@ -23,6 +23,7 @@ from computor_backend.permissions.query_builders import CoursePermissionQueryBui
 from computor_backend.permissions.principal import Principal
 from computor_backend.exceptions import ForbiddenException
 from computor_backend.model.course import Course
+from computor_backend.permissions.roles import CourseRole, ScopeRole
 
 __all__ = [
     "_ScopedEntityPermissionHandler",
@@ -70,7 +71,7 @@ class _ScopedEntityPermissionHandler(PermissionHandler):
 
     # Course-membership cascade only powers the read filter. Identical for
     # both scopes today; kept as an attribute so subclasses may override.
-    READ_COURSE_ROLE = "_student"
+    READ_COURSE_ROLE = CourseRole.STUDENT
 
     def can_perform_action(
         self,
@@ -115,7 +116,7 @@ class _ScopedEntityPermissionHandler(PermissionHandler):
             )
 
             scope_via_member_ids = principal.get_scoped_ids_with_role(
-                self.SCOPE, "_developer"
+                self.SCOPE, ScopeRole.DEVELOPER
             )
             # _developer is the lowest scoped role; hierarchy includes
             # _manager and _owner.
@@ -155,9 +156,9 @@ class OrganizationPermissionHandler(_ScopedEntityPermissionHandler):
 
     # update / archive / delete: developer can edit, owner-only deletes.
     ACTION_ROLE_MAP = {
-        "update": "_developer",
-        "archive": "_owner",
-        "delete": "_owner",
+        "update": ScopeRole.DEVELOPER,
+        "archive": ScopeRole.OWNER,
+        "delete": ScopeRole.OWNER,
     }
 
 
@@ -172,9 +173,9 @@ class CourseFamilyPermissionHandler(_ScopedEntityPermissionHandler):
     COURSE_FK = "course_family_id"
 
     ACTION_ROLE_MAP = {
-        "update": "_developer",
-        "archive": "_owner",
-        "delete": "_owner",
+        "update": ScopeRole.DEVELOPER,
+        "archive": ScopeRole.OWNER,
+        "delete": ScopeRole.OWNER,
     }
 
 
@@ -233,12 +234,12 @@ class _ScopeMemberPermissionHandler(PermissionHandler):
                 return False
             scope_id = str(scope_id)
             # Owner can assign any role.
-            if principal.has_scope_role(self.SCOPE, scope_id, "_owner"):
+            if principal.has_scope_role(self.SCOPE, scope_id, ScopeRole.OWNER):
                 return True
             # Manager can assign anything except _owner.
             if (
-                principal.has_scope_role(self.SCOPE, scope_id, "_manager")
-                and target_role != "_owner"
+                principal.has_scope_role(self.SCOPE, scope_id, ScopeRole.MANAGER)
+                and target_role != ScopeRole.OWNER
             ):
                 return True
             return False
@@ -261,8 +262,8 @@ class _ScopeMemberPermissionHandler(PermissionHandler):
         if self.check_general_permission(principal, action):
             return db.query(self.entity)
 
-        owner_scopes = principal.get_scoped_ids_with_role(self.SCOPE, "_owner")
-        manager_scopes = principal.get_scoped_ids_with_role(self.SCOPE, "_manager")
+        owner_scopes = principal.get_scoped_ids_with_role(self.SCOPE, ScopeRole.OWNER)
+        manager_scopes = principal.get_scoped_ids_with_role(self.SCOPE, ScopeRole.MANAGER)
         # Restrict manager-only set to scopes where principal is NOT owner,
         # so each filter clause stays well-defined.
         manager_only_scopes = manager_scopes - owner_scopes
@@ -277,7 +278,7 @@ class _ScopeMemberPermissionHandler(PermissionHandler):
                 clauses.append(
                     and_(
                         scope_fk.in_(manager_only_scopes),
-                        role_fk != "_owner",
+                        role_fk != ScopeRole.OWNER,
                     )
                 )
             if not clauses:
@@ -348,7 +349,7 @@ def make_scope_member_custom_permissions(
         scope_id = str(getattr(row, scope_fk))
         current_role = getattr(row, role_fk)
 
-        if not principal.has_scope_role(scope, scope_id, "_manager"):
+        if not principal.has_scope_role(scope, scope_id, ScopeRole.MANAGER):
             raise ForbiddenException(
                 detail=(
                     f"You need at least _manager on this {scope} to modify "
@@ -356,9 +357,9 @@ def make_scope_member_custom_permissions(
                 )
             )
 
-        is_scope_owner = principal.has_scope_role(scope, scope_id, "_owner")
+        is_scope_owner = principal.has_scope_role(scope, scope_id, ScopeRole.OWNER)
 
-        if current_role == "_owner" and not is_scope_owner:
+        if current_role == ScopeRole.OWNER and not is_scope_owner:
             raise ForbiddenException(
                 error_code="AUTHZ_005",
                 detail="Only an _owner of this scope can modify an _owner membership",
@@ -366,7 +367,7 @@ def make_scope_member_custom_permissions(
             )
 
         new_role = getattr(entity, role_fk, None)
-        if new_role is not None and new_role == "_owner" and not is_scope_owner:
+        if new_role is not None and new_role == ScopeRole.OWNER and not is_scope_owner:
             raise ForbiddenException(
                 error_code="AUTHZ_005",
                 detail="Only an _owner of this scope can grant the _owner role",
