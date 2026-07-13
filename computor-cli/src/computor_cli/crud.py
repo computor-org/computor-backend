@@ -30,53 +30,37 @@ AVAILABLE_DTO_DEFINITIONS = [
 ]
 
 def GET_CLIENT_ATTRIBUTE(client, table: str):
-    """Map endpoint name to ComputorClient attribute."""
-    if endpoints.ORGANIZATIONS_ENDPOINT == table:
-        return client.organizations
-    elif endpoints.COURSE_FAMILIES_ENDPOINT == table:
-        return client.course_families
-    elif endpoints.COURSES_ENDPOINT == table:
-        return client.courses
-    elif endpoints.COURSE_CONTENTS_ENDPOINT == table:
-        return client.course_contents
-    elif endpoints.COURSE_CONTENT_TYPES_ENDPOINT == table:
-        return client.course_content_types
-    elif endpoints.COURSE_GROUPS_ENDPOINT == table:
-        return client.course_groups
-    elif endpoints.COURSE_MEMBERS_ENDPOINT == table:
-        return client.course_members
-    elif endpoints.COURSE_ROLES_ENDPOINT == table:
-        return client.course_roles
-    elif endpoints.USERS_ENDPOINT == table:
-        return client.users
-    elif endpoints.RESULTS_ENDPOINT == table:
-        return client.results
-    else:
+    """Map an endpoint name to its ComputorClient attribute.
+
+    Endpoint constants are the hyphenated URL names (e.g. ``course-families``);
+    the client exposes the underscored attribute (``client.course_families``)
+    via ``ComputorClient.__getattr__``, so a single dynamic lookup replaces the
+    per-endpoint branch table.
+    """
+    if table not in AVAILABLE_DTO_DEFINITIONS:
         raise Exception("Not found")
+    return getattr(client, table.replace('-', '_'))
+
+
+_QUERY_CLASSES = {
+    endpoints.ORGANIZATIONS_ENDPOINT: OrganizationQuery,
+    endpoints.COURSE_FAMILIES_ENDPOINT: CourseFamilyQuery,
+    endpoints.COURSES_ENDPOINT: CourseQuery,
+    endpoints.COURSE_CONTENTS_ENDPOINT: CourseContentQuery,
+    endpoints.COURSE_CONTENT_TYPES_ENDPOINT: CourseContentTypeQuery,
+    endpoints.COURSE_GROUPS_ENDPOINT: CourseGroupQuery,
+    endpoints.COURSE_MEMBERS_ENDPOINT: CourseMemberQuery,
+    endpoints.COURSE_ROLES_ENDPOINT: CourseRoleQuery,
+    endpoints.USERS_ENDPOINT: UserQuery,
+    endpoints.RESULTS_ENDPOINT: ResultQuery,
+}
+
 
 def GET_QUERY_CLASS(table: str):
-    """Map endpoint name to Query class."""
-    if endpoints.ORGANIZATIONS_ENDPOINT == table:
-        return OrganizationQuery
-    elif endpoints.COURSE_FAMILIES_ENDPOINT == table:
-        return CourseFamilyQuery
-    elif endpoints.COURSES_ENDPOINT == table:
-        return CourseQuery
-    elif endpoints.COURSE_CONTENTS_ENDPOINT == table:
-        return CourseContentQuery
-    elif endpoints.COURSE_CONTENT_TYPES_ENDPOINT == table:
-        return CourseContentTypeQuery
-    elif endpoints.COURSE_GROUPS_ENDPOINT == table:
-        return CourseGroupQuery
-    elif endpoints.COURSE_MEMBERS_ENDPOINT == table:
-        return CourseMemberQuery
-    elif endpoints.COURSE_ROLES_ENDPOINT == table:
-        return CourseRoleQuery
-    elif endpoints.USERS_ENDPOINT == table:
-        return UserQuery
-    elif endpoints.RESULTS_ENDPOINT == table:
-        return ResultQuery
-    else:
+    """Map an endpoint name to its Query class."""
+    try:
+        return _QUERY_CLASSES[table]
+    except KeyError:
         raise Exception("Not found")
 
 
