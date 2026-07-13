@@ -15,7 +15,7 @@ from typing import List, Optional, Tuple
 # UUID type removed - using str for all IDs
 from datetime import datetime, timezone
 from ..custom_types import Ltree
-from fastapi import APIRouter, Depends, Query, HTTPException, Response
+from fastapi import APIRouter, Depends, Query, HTTPException, Response, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func
 
@@ -784,7 +784,10 @@ async def list_dependencies(
 
     return [ExampleDependencyGet.model_validate(d) for d in dependencies]
 
-@examples_router.delete("/{example_id}/dependencies/{dependency_id}")
+@examples_router.delete(
+    "/{example_id}/dependencies/{dependency_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 async def remove_dependency(
     example_id: str,
     dependency_id: str,
@@ -809,7 +812,8 @@ async def remove_dependency(
     # Delete dependency via repository (cache invalidation automatic)
     dependency_repo.delete(dependency)
 
-    return {"message": "Dependency removed successfully"}
+    # 204 No Content — consistent with the other delete routes (TASK-212).
+    return None
 
 # ==============================================================================
 # Upload/Download Endpoints

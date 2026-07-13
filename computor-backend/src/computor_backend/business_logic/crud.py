@@ -424,7 +424,7 @@ async def delete_entity(
         db_type: SQLAlchemy model class
 
     Returns:
-        Dict with {"ok": True} on success
+        None — the route responds 204 No Content on success
 
     Raises:
         NotFoundException: If entity not found or user lacks permission
@@ -512,7 +512,7 @@ async def delete_entity(
             logger.exception("Unexpected error in delete_entity")
             raise InternalServerException(detail="An unexpected error occurred while deleting") from e
 
-        return {"ok": True}
+        return None  # delete/archive/unarchive routes are 204 No Content
 
     return await run_in_threadpool(_delete_entity)
 
@@ -535,7 +535,7 @@ async def archive_entity(
         db_item: Optional pre-fetched entity instance
 
     Returns:
-        Dict with {"ok": True} on success
+        None — the route responds 204 No Content on success
 
     Raises:
         NotFoundException: If entity not found or user lacks permission
@@ -575,7 +575,7 @@ async def archive_entity(
             logger.exception("Unexpected error in archive_entity")
             raise InternalServerException(detail="An unexpected error occurred while archiving") from e
 
-        return {"ok": True}
+        return None  # delete/archive/unarchive routes are 204 No Content
 
     return await run_in_threadpool(_archive_entity)
 
@@ -596,7 +596,7 @@ async def unarchive_entity(
         db_type: SQLAlchemy model class
 
     Returns:
-        Dict with {"ok": True} on success
+        None — the route responds 204 No Content on success
 
     Raises:
         NotFoundException: If entity not found or user lacks permission
@@ -631,7 +631,7 @@ async def unarchive_entity(
             logger.exception("Unexpected error in unarchive_entity")
             raise InternalServerException(detail="An unexpected error occurred while unarchiving") from e
 
-        return {"ok": True}
+        return None  # delete/archive/unarchive routes are 204 No Content
 
     return await run_in_threadpool(_unarchive_entity)
 
