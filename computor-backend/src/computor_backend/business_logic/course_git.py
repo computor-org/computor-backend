@@ -20,10 +20,14 @@ from computor_backend.exceptions import (
     ForbiddenException,
     NotFoundException,
 )
-from computor_backend.git_provider import get_provider_client_for_server
+from computor_backend.git_provider import (
+    backend_reachable_base_url,
+    get_provider_client_for_server,
+)
 from computor_backend.git_server.config import to_public_git_url
 from computor_backend.model.auth import Account
 from computor_backend.model.course import Course, CourseFamily, CourseMember
+from computor_backend.model.organization import Organization
 from computor_backend.model.git_server import (
     CourseGitBinding,
     CourseMemberGitRepository,
@@ -43,6 +47,7 @@ from computor_types.course_git import (
     CourseMemberRepositoryRegister,
     GitTemplateRef,
     StudentRepositoryProvisioned,
+    TemplateAccessGet,
 )
 from computor_backend.utils.encryption import decrypt_secret, encrypt_secret
 
@@ -92,14 +97,21 @@ def build_course_git_descriptor(
     course_id: UUID | str,
     binding: Optional[CourseGitBinding],
     server: Optional[GitServer],
+    legacy_template: Optional[GitTemplateRef] = None,
 ) -> CourseGitDescriptor:
     """Pure projection: (binding, server) -> client descriptor. No DB.
 
     ``server`` is the binding's ``GitServer`` (or None for pure download /
     unconfigured). Kept separate so this stays trivially unit-testable.
+    ``legacy_template`` is the synthesized template ref for un-migrated
+    org-GitLab courses (no binding): the descriptor stays ``configured=False``
+    (provisioning UI unaffected) but still carries the template location so the
+    extension's template-update sync works for legacy courses too.
     """
     if binding is None:
-        return CourseGitDescriptor(course_id=str(course_id), configured=False)
+        return CourseGitDescriptor(
+            course_id=str(course_id), configured=False, template=legacy_template
+        )
 
     template = None
     if server is not None:
@@ -172,7 +184,61 @@ def get_course_git_descriptor(
         .first()
     )
     server = binding.git_server if (binding and binding.git_server_id) else None
-    return build_course_git_descriptor(course_id, binding, server)
+    legacy_template = None
+    if binding is None:
+        legacy_template = _legacy_gitlab_template_ref(course_id, db)
+    return build_course_git_descriptor(
+        course_id, binding, server, legacy_template=legacy_template
+    )
+
+
+def _legacy_gitlab_template_ref(
+    course_id: UUID | str, db: Session
+) -> Optional[GitTemplateRef]:
+    """Synthesize the template ref for an un-migrated org-GitLab course.
+
+    Legacy courses (no ``CourseGitBinding``) keep their student-template
+    location in ``course.properties.gitlab``. The extension's template-update
+    sync used to read it from ``CourseStudentGet.repository``; that field was
+    removed in the course-git refactor, which silently broke the (previously
+    working) legacy update flow. Surfacing the template here restores it via
+    the descriptor instead. Defensive by design: any missing/partial legacy
+    property degrades to ``None`` (no template), never an error.
+    """
+    from urllib.parse import urlparse
+
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if course is None:
+        return None
+    gl = (course.properties or {}).get("gitlab") or {}
+    if not gl:
+        return None
+
+    org = (
+        db.query(Organization)
+        .filter(Organization.id == course.organization_id)
+        .first()
+    )
+    gitlab_url = ((org.properties or {}).get("gitlab") or {}).get("url") if org else None
+
+    template_url = gl.get("student_template_url")
+    if not template_url and gitlab_url and gl.get("full_path"):
+        template_url = f"{gitlab_url.rstrip('/')}/{gl['full_path']}/student-template"
+    if not template_url:
+        return None
+
+    parsed = urlparse(template_url)
+    if not parsed.scheme or not parsed.netloc:
+        return None
+    base_url = gitlab_url or f"{parsed.scheme}://{parsed.netloc}"
+    clone_url = template_url if template_url.endswith(".git") else f"{template_url}.git"
+    return GitTemplateRef(
+        server_type="gitlab",
+        base_url=base_url,
+        repo=parsed.path.strip("/") or None,
+        clone_url=clone_url,
+        default_branch="main",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -630,8 +696,9 @@ def _maybe_grant_forgejo_staff_access(
 ) -> None:
     """For ``_lecturer`` and above on a managed-Forgejo course, grant admin
     collaborator on the canonical template AND reference repos (creating the
-    reference repo if missing). Students/tutors get NOTHING here — only their own
-    fork; they never get access to the template directly or to the reference repo.
+    reference repo if missing). Students/tutors get nothing HERE — provisioning
+    gives them write on their own repo plus read on the template (for the
+    extension's template-update sync); the reference repo stays staff-only.
     Idempotent; the Forgejo account is ensured first so the grant succeeds without
     a manual login."""
     from computor_backend.permissions.principal import course_role_hierarchy
@@ -730,8 +797,9 @@ def _provision_forgejo(
     user_id: str,
     db: Session,
 ) -> CourseMemberGitRepository:
-    """Fork the Forgejo student-template into a repo for the student and record
-    it. The student is added as a write collaborator (best-effort, self-healing)."""
+    """Generate the student's repo from the Forgejo student-template and record
+    it. The student is added as a write collaborator on their repo and a read
+    collaborator on the template (best-effort, self-healing)."""
     if not binding.template_repo:
         raise BadRequestException("This course has no Forgejo template configured")
     owner, _, repo = binding.template_repo.partition("/")
@@ -915,6 +983,81 @@ def provision_student_repository(
     _maybe_grant_forgejo_staff_access(member, binding, server, user_id, db)
     _stamp_repo_on_submission_groups(member, db)
     return _provisioned_response(rec, user_id, db)
+
+
+def get_template_access(
+    course_id: UUID | str,
+    permissions: Principal,
+    db: Session,
+) -> TemplateAccessGet:
+    """Mint a one-time READ-ONLY credential for the course's student-template.
+
+    Lets any course member fetch the template over git — seeding an external
+    repo with full history, or merging new template commits into their repo
+    (the extension's template-update sync). The token is minted (rotating)
+    under its own name (``computor-template``) so it never invalidates the
+    provisioning clone token, and carries only ``read:repository`` scope; the
+    template collaborator grant is read-only too, so pushing is impossible.
+    Forgejo-bound courses only — managed-GitLab members already reach the
+    template with their own PAT (Reporter grant from ``register-gitlab``).
+    ``token`` stays null until the member has a git-server identity (first SSO
+    login); clients re-call afterwards.
+    """
+    user_id = permissions.get_user_id()
+    if not user_id:
+        raise NotFoundException()
+
+    member = (
+        check_course_permissions(permissions, CourseMember, "_student", db)
+        .filter(CourseMember.course_id == course_id, CourseMember.user_id == user_id)
+        .first()
+    )
+    if member is None:
+        raise NotFoundException("You are not a member of this course")
+
+    binding = (
+        db.query(CourseGitBinding)
+        .filter(CourseGitBinding.course_id == course_id)
+        .first()
+    )
+    if binding is None or not binding.template_repo:
+        raise BadRequestException("This course has no template configured")
+    server = binding.git_server
+    if server is None or server.type != "forgejo" or not _binding_has_managed_creds(binding, server):
+        raise BadRequestException(
+            "Template access minting is only available for managed-Forgejo courses"
+        )
+    owner, _, t_repo = binding.template_repo.partition("/")
+    if not owner or not t_repo:
+        raise BadRequestException("Forgejo template_repo must be in 'owner/repo' form")
+
+    result = TemplateAccessGet(
+        server_type="forgejo",
+        clone_url=to_public_git_url(binding.template_url),
+        default_branch=binding.default_branch or "main",
+    )
+
+    handle = _ensure_forgejo_account(user_id, server, db)
+    if not handle:
+        # No git-server identity yet — the client retries after first SSO login.
+        return result
+
+    client = get_provider_client_for_server(server)
+    if hasattr(client, "ensure_template_reader"):
+        client.ensure_template_reader(owner, t_repo, handle)
+    creds = _forgejo_admin_basic_auth_for(server)
+    if creds and hasattr(client, "mint_user_clone_token"):
+        token = client.mint_user_clone_token(
+            handle,
+            creds[0],
+            creds[1],
+            name="computor-template",
+            scopes=["read:repository"],
+        )
+        if token:
+            result.username = handle
+            result.token = token
+    return result
 
 
 def register_byo_repository(
@@ -1170,7 +1313,9 @@ def get_template_archive_source(
 
     token = decrypt_secret(binding_token or server.token)
     branch = binding.default_branch or "main"
-    base = server.base_url.rstrip("/")
+    # The backend fetches this URL itself, so it must be backend-reachable —
+    # the public base_url may not resolve from inside docker.
+    base = backend_reachable_base_url(server)
     repo = binding.template_repo
     if server.type == "forgejo":
         owner, _, name = repo.partition("/")

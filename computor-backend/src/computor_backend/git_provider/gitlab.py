@@ -199,26 +199,6 @@ class GitLabProviderClient:
             }},
         )
 
-    def create_student_repository(
-        self,
-        course_member_id: str,
-        org: Organization,
-        course: Course,
-        username: str,
-        submission_group_ids: list,
-    ) -> StudentRepoResult:
-        raise NotImplementedError("Use temporal_student_repository directly for now")
-
-    def sync_member_permissions(
-        self,
-        org: Organization,
-        course: Course,
-        username: str,
-        role: str,
-        user_access_token: str | None,
-    ) -> None:
-        raise NotImplementedError("Use lecturer_gitlab_sync directly for now")
-
     # ------------------------------------------------------------------
     # Course-level managed provisioning (GitServer registry + binding).
     #

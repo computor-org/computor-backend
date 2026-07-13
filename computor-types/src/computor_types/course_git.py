@@ -137,6 +137,26 @@ class StudentRepositoryProvisioned(CourseMemberRepositoryGet):
     clone_username: Optional[str] = Field(None, description="Forgejo username to pair with clone_token")
 
 
+class TemplateAccessGet(BaseModel):
+    """A **one-time, read-only** credential for the course's student-template.
+
+    Returned only by `POST .../template-access`. Lets any course member fetch
+    the template over git (seed an external repo with history, or merge new
+    template commits into their repo). `token` is a fresh read-only Forgejo PAT
+    minted (and rotated) on each call under its own token name, so it never
+    invalidates the provisioning `clone_token`. It is NOT persisted server-side.
+    Authenticate git as `https://<username>:<token>@<host>/<template>.git`.
+    `token` is null until the student has logged into the git server once
+    (re-call after their first login to obtain it).
+    """
+
+    server_type: str = Field(..., description="Git server type hosting the template: 'forgejo'")
+    clone_url: Optional[str] = Field(None, description="Public clone URL of the template")
+    default_branch: str = Field("main", description="Default branch of the template")
+    username: Optional[str] = Field(None, description="Git username to pair with token")
+    token: Optional[str] = Field(None, description="One-time READ-ONLY PAT for the template; do not persist")
+
+
 class CourseMemberRepositoryRegister(BaseModel):
     """Client-supplied location of a student's external repository (e.g. a repo on
     any git provider that the VSCode extension seeded from the course template and

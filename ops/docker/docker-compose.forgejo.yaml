@@ -106,6 +106,15 @@ services:
       FORGEJO__oauth2_client__USERNAME: "preferred_username"
       # Default repository visibility
       FORGEJO__repository__DEFAULT_PRIVATE: "true"
+      # Student repos are provisioned by SELF-migration (a full clone of the
+      # course template — preserves history, unlike /generate, and avoids the
+      # one-fork-per-owner limit that broke fork-based provisioning). The clone
+      # source is this instance's own (private-network) address, so local
+      # migration targets must be allowed — but ONLY this host: the domain
+      # allowlist keeps authenticated users from using /repos/migrate to reach
+      # anything else on the internal network.
+      FORGEJO__migrations__ALLOW_LOCALNETWORKS: "true"
+      FORGEJO__migrations__ALLOWED_DOMAINS: "computor-forgejo,localhost,127.0.0.1"
     labels:
       # Dev: traefik.enable=false — access via direct port binding (FORGEJO_PORT).
       # Prod: set FORGEJO_TRAEFIK_ENABLED=true in .env and expose Forgejo under the
