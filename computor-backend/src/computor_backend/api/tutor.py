@@ -193,7 +193,6 @@ async def _get_example_version_for_course_content(
         NotFoundException: If course content or example version not found
         ForbiddenException: If user doesn't have tutor permissions
     """
-    from computor_backend.repositories.example_version_repo import ExampleVersionRepository
 
     # Get course content using repository
     course_content_repo = CourseContentRepository(db, cache)
@@ -298,8 +297,6 @@ async def download_course_content_reference(
     Returns:
         StreamingResponse containing a ZIP file with the reference solution files
     """
-    import zipfile
-    import io
 
     course_content, version, repository = await _get_example_version_for_course_content(
         course_content_id, permissions, db, cache
@@ -402,8 +399,6 @@ async def download_course_content_description(
     Returns:
         StreamingResponse containing a ZIP file with the content/ directory
     """
-    import zipfile
-    import io
 
     course_content, version, repository = await _get_example_version_for_course_content(
         course_content_id, permissions, db, cache
@@ -486,6 +481,17 @@ from computor_types.tutor_tests import (
     TutorTestArtifactList,
     TutorTestArtifactInfo,
 )
+
+# Hoisted from function bodies (TASK-213):
+import io
+import json
+import zipfile
+from computor_backend.repositories.example_version_repo import ExampleVersionRepository
+from computor_backend.services.tutor_test_state import TutorTestStatus as TutorTestStatusEnum, create_tutor_test_entry, get_tutor_test_full, get_tutor_test_metadata, store_tutor_test_result as store_result_redis, update_tutor_test_status
+from computor_backend.services.tutor_test_storage import download_tutor_test_artifacts_as_zip, download_tutor_test_input_as_zip, get_tutor_test_result_from_minio, list_tutor_test_artifacts, store_tutor_test_artifacts_from_zip, store_tutor_test_input, store_tutor_test_result as store_result_minio
+from computor_backend.tasks import get_task_executor
+from datetime import datetime, timezone
+from io import BytesIO
 
 
 async def _check_tutor_permission_for_course_content(
@@ -575,7 +581,6 @@ async def create_tutor_test(
 
     **Response**: Returns test_id for polling status via GET /tutors/tests/{test_id}
     """
-    import json
 
     # Check permissions
     course_content, course = await _check_tutor_permission_for_course_content(
@@ -636,11 +641,9 @@ async def create_tutor_test(
     zip_data = await file.read()
 
     # Store input files in MinIO
-    from computor_backend.services.tutor_test_storage import store_tutor_test_input
     await store_tutor_test_input(test_id, zip_data)
 
     # Create Redis entry
-    from computor_backend.services.tutor_test_state import create_tutor_test_entry
     user_id = permissions.get_user_id()
 
     entry = await create_tutor_test_entry(
@@ -654,7 +657,6 @@ async def create_tutor_test(
     )
 
     # Start Temporal workflow
-    from computor_backend.tasks import get_task_executor
 
     workflow_id = f"tutor-testing-{test_id}"
 
@@ -707,17 +709,6 @@ async def _get_tutor_test_info_and_sync(
     Returns:
         Tuple of (test_info, current_status, artifacts)
     """
-    from computor_backend.services.tutor_test_state import (
-        get_tutor_test_full,
-        update_tutor_test_status,
-        store_tutor_test_result,
-        TutorTestStatus as TutorTestStatusEnum,
-    )
-    from computor_backend.services.tutor_test_storage import (
-        list_tutor_test_artifacts,
-        get_tutor_test_result_from_minio,
-    )
-    from datetime import datetime, timezone
 
     # Get test info from Redis
     test_info = await get_tutor_test_full(redis, test_id)
@@ -884,8 +875,6 @@ async def list_tutor_test_artifacts_endpoint(
 
     **Permissions**: Only the test owner or admin can list artifacts.
     """
-    from computor_backend.services.tutor_test_state import get_tutor_test_metadata
-    from computor_backend.services.tutor_test_storage import list_tutor_test_artifacts
 
     # Check test exists and get metadata
     metadata = await get_tutor_test_metadata(redis, test_id)
@@ -936,8 +925,6 @@ async def download_tutor_test_artifacts(
 
     **Permissions**: Only the test owner or admin can download artifacts.
     """
-    from computor_backend.services.tutor_test_state import get_tutor_test_metadata
-    from computor_backend.services.tutor_test_storage import download_tutor_test_artifacts_as_zip
 
     # Check test exists and get metadata
     metadata = await get_tutor_test_metadata(redis, test_id)
@@ -960,7 +947,6 @@ async def download_tutor_test_artifacts(
     if not zip_data:
         raise NotFoundException(detail="No artifacts found for this test")
 
-    from io import BytesIO
     zip_buffer = BytesIO(zip_data)
 
     return StreamingResponse(
@@ -997,8 +983,6 @@ async def download_tutor_test_input(
 
     **Permissions**: test owner, admin, or service account.
     """
-    from computor_backend.services.tutor_test_state import get_tutor_test_metadata
-    from computor_backend.services.tutor_test_storage import download_tutor_test_input_as_zip
 
     # Check test exists and permissions
     metadata = await get_tutor_test_metadata(redis, test_id)
@@ -1016,7 +1000,6 @@ async def download_tutor_test_input(
 
     zip_data = await download_tutor_test_input_as_zip(test_id)
 
-    from io import BytesIO
     zip_buffer = BytesIO(zip_data)
 
     return StreamingResponse(
@@ -1041,13 +1024,6 @@ async def submit_tutor_test_results(
     Used by the testing worker to report results after test execution.
     Stores result.json in MinIO and updates Redis state.
     """
-    from computor_backend.services.tutor_test_storage import (
-        store_tutor_test_result as store_result_minio,
-    )
-    from computor_backend.services.tutor_test_state import (
-        store_tutor_test_result as store_result_redis,
-        TutorTestStatus as TutorTestStatusEnum,
-    )
 
     # Store result.json in MinIO (persistent storage)
     await store_result_minio(test_id, result_data)
@@ -1080,9 +1056,6 @@ async def upload_tutor_test_artifacts(
     Used by the testing worker to upload generated artifacts (plots, figures,
     debug output) after test execution.
     """
-    from computor_backend.services.tutor_test_storage import (
-        store_tutor_test_artifacts_from_zip,
-    )
 
     artifacts_stored = await store_tutor_test_artifacts_from_zip(test_id, file)
 

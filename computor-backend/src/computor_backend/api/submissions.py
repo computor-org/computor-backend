@@ -8,6 +8,7 @@ from typing import Annotated, List, Optional
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Query, Response, status, File, Form, UploadFile, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload, contains_eager, aliased
 from sqlalchemy import and_, or_, exists, func as sql_func
 
@@ -18,7 +19,7 @@ from computor_backend.exceptions import (
     NotFoundException,
     PermissionDeniedAsNotFound,
 )
-from computor_backend.database import get_db
+from computor_backend.database import get_db, set_db_user
 from computor_backend.model.artifact import (
     SubmissionArtifact,
     SubmissionGrade,
@@ -346,7 +347,6 @@ async def download_latest_submission(
     - version_identifier: Filter by specific version (e.g., "v1.0.0", "commit-abc123")
     - submit_only: Only include official submissions (submit=True), default: True
     """
-    from fastapi.responses import StreamingResponse
 
     # Validate input: must provide either submission_group_id OR (course_content_id + course_member_id)
     if submission_group_id:
@@ -468,7 +468,6 @@ async def download_submission_artifact(
     storage_service = Depends(get_storage_service),
 ):
     """Download a specific submission artifact as a ZIP file by artifact ID."""
-    from fastapi.responses import StreamingResponse
 
     # Delegate to business logic layer
     zip_buffer, filename = await download_submission_as_zip(
@@ -714,7 +713,6 @@ async def update_artifact_grade(
     cache: Cache = Depends(get_cache),
 ):
     """Update an existing grade. Only the grader can update their own grade."""
-    from computor_backend.database import set_db_user
 
     # Set user context for audit tracking
     set_db_user(db, permissions.user_id)
@@ -739,7 +737,6 @@ async def delete_artifact_grade(
     cache: Cache = Depends(get_cache),
 ):
     """Delete a grade. Only the grader or an admin can delete."""
-    from computor_backend.database import set_db_user
 
     # Set user context for audit tracking
     set_db_user(db, permissions.user_id)
@@ -763,7 +760,6 @@ async def create_artifact_review_endpoint(
     db: Session = Depends(get_db),
 ):
     """Create a review for an artifact."""
-    from computor_backend.database import set_db_user
 
     # Set user context for audit tracking
     set_db_user(db, permissions.user_id)
@@ -824,7 +820,6 @@ async def update_artifact_review(
     db: Session = Depends(get_db),
 ):
     """Update an existing review. Only the reviewer can update their own review."""
-    from computor_backend.database import set_db_user
 
     # Set user context for audit tracking
     set_db_user(db, permissions.user_id)
@@ -846,7 +841,6 @@ async def delete_artifact_review(
     db: Session = Depends(get_db),
 ):
     """Delete a review. Only the reviewer or an admin can delete."""
-    from computor_backend.database import set_db_user
 
     # Set user context for audit tracking
     set_db_user(db, permissions.user_id)
@@ -869,7 +863,6 @@ async def create_test_result_endpoint(
     db: Session = Depends(get_db),
 ):
     """Create a test result for an artifact. Checks for test limitations."""
-    from computor_backend.database import set_db_user
 
     # Set user context for audit tracking
     set_db_user(db, permissions.user_id)

@@ -2,6 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Response, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from computor_backend.api._pagination import paginated_list
@@ -235,7 +236,6 @@ async def download_result_artifacts(
 
     Returns a ZIP archive containing all artifacts generated during test execution.
     """
-    from fastapi.responses import StreamingResponse
     from computor_backend.exceptions import NotFoundException
     import zipfile
     from io import BytesIO

@@ -27,7 +27,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..exceptions import BadRequestException, ForbiddenException, NotFoundException
-from ..database import get_db
+from ..database import get_db, set_db_user
 from computor_types.extensions import (
     ExtensionMetadata,
     ExtensionPublishRequest,
@@ -188,7 +188,6 @@ async def publish_extension_version(
     db: Session = Depends(get_db),
     storage_service=Depends(get_storage_service),
 ):
-    from computor_backend.database import set_db_user
 
     if not permissions.permitted("extension", "create"):
         raise ForbiddenException("You don't have permission to publish extensions")
@@ -503,7 +502,6 @@ async def update_extension_version(
     permissions: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
 ):
-    from computor_backend.database import set_db_user
 
     if not permissions.permitted("extension", "update"):
         raise ForbiddenException("You don't have permission to modify extension versions")

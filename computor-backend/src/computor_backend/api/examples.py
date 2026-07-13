@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func
 
-from ..database import get_db
+from ..database import get_db, set_db_user
 from computor_backend.permissions.principal import Principal
 from computor_types.example import (
     ExampleGet,
@@ -27,6 +27,7 @@ from computor_types.example import (
     ExampleVersionCreate,
     ExampleVersionGet,
     ExampleVersionList,
+    ExampleVersionQuery,
     ExampleDependencyCreate,
     ExampleDependencyGet,
     ExampleUploadRequest,
@@ -510,7 +511,6 @@ async def create_version(
 
     return db_version
 
-from computor_types.example import ExampleVersionQuery
 
 @examples_router.get("/{example_id}/versions", response_model=List[ExampleVersionList])
 async def list_versions(
@@ -823,7 +823,6 @@ async def upload_example(
     storage_service=Depends(get_storage_service),
 ):
     """Upload an example to storage (MinIO)."""
-    from computor_backend.database import set_db_user
 
     # Check permissions — ``example:upload`` is a write/action capability; a
     # reader can see examples but is denied uploading → keep 403 (TASK-209).

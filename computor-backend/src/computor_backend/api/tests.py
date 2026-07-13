@@ -25,7 +25,7 @@ from computor_backend.business_logic.testing_orchestration import (
     sync_result_status_from_temporal,
 )
 from computor_types.tasks import ResultStatus
-from computor_backend.database import get_db
+from computor_backend.database import get_db, set_db_user
 from computor_backend.redis_cache import get_redis_client, get_cache
 from computor_backend.cache import Cache
 from computor_backend.repositories import (
@@ -114,7 +114,6 @@ async def create_test_run(
 
     Returns 429 Too Many Requests if limit is exceeded.
     """
-    from computor_backend.database import set_db_user
 
     user_id = permissions.get_user_id()
 
