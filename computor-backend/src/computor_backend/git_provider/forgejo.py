@@ -246,30 +246,68 @@ class ForgejoProviderClient:
         new_name: str,
         student_username: str | None = None,
     ) -> StudentRepoResult:
-        """Fork ``template_owner/template_repo`` into ``target_owner/new_name``.
+        """Copy ``template_owner/template_repo`` to ``target_owner/new_name``.
 
         Course-level (binding-driven) replacement for ``create_student_repository``
         — takes explicit refs instead of reading ``course.properties.forgejo``, and
         the caller supplies a collision-free ``new_name`` (fixing the legacy
-        bare-username collision). Idempotent: if the target already exists it is
-        returned as-is. The student is added as a write collaborator when their
-        Forgejo username is known (best-effort — a 404 means they have not logged
-        into Forgejo yet, so access is granted on a later retry).
+        bare-username collision). The repo is created by *self-migration* (a full
+        clone), not a fork: Forgejo allows only ONE fork of a repo per owner, so
+        org-homed student repos would 409 for every student after the first. And
+        unlike ``/generate`` (which rewrites the copy into a fresh initial
+        commit), migration preserves the template's commits, so student repos
+        share ancestry with the template and the extension's merge-based
+        template-update sync works — the GitLab "update fork" equivalent.
+        Requires ``migrations.ALLOW_LOCALNETWORKS`` + own host in
+        ``ALLOWED_DOMAINS`` on the managed Forgejo (set in its compose file).
+        Idempotent: if the target already exists it is returned as-is. When the
+        student's Forgejo username is known they are added as a write
+        collaborator on their repo and a read collaborator on the template (so
+        the extension can sync template updates) — both best-effort: a 404 means
+        they have not logged into Forgejo yet, so access is granted on a later
+        retry.
         """
         with self._client() as client:
             existing = client.get(f"{_BASE}/repos/{target_owner}/{new_name}")
             if existing.status_code == 200:
                 repo = existing.json()
             else:
+                tpl = client.get(f"{_BASE}/repos/{template_owner}/{template_repo}")
+                tpl.raise_for_status()
+                tpl_data = tpl.json()
+                # The service token's own login authenticates the self-clone.
+                me = client.get(f"{_BASE}/user")
+                me.raise_for_status()
                 r = client.post(
-                    f"{_BASE}/repos/{template_owner}/{template_repo}/forks",
-                    json={"organization": target_owner, "name": new_name},
+                    f"{_BASE}/repos/migrate",
+                    json={
+                        # Forgejo resolves this itself, so it must be reachable
+                        # from inside the Forgejo container: the docker-internal
+                        # base URL (prod) or localhost:3030 (dev) both are.
+                        "clone_addr": f"{self._url}/{template_owner}/{template_repo}.git",
+                        "auth_username": me.json()["login"],
+                        "auth_password": self._token,
+                        "repo_owner": target_owner,
+                        "repo_name": new_name,
+                        "service": "git",
+                        # Forks inherit the base repo's visibility; keep that.
+                        "private": tpl_data.get("private", True),
+                    },
                 )
                 r.raise_for_status()
                 repo = r.json()
 
         collaborator_added = (
             self.ensure_collaborator(target_owner, new_name, student_username)
+            if student_username
+            else False
+        )
+        # Read on the template lets the student's clone token fetch template
+        # updates (the extension's fork-style sync merges new template commits
+        # into the student repo). Repo permission stays read-only there, so the
+        # token can never push to the template.
+        template_read_granted = (
+            self.ensure_template_reader(template_owner, template_repo, student_username)
             if student_username
             else False
         )
@@ -284,8 +322,21 @@ class ForgejoProviderClient:
                 "repo_name": new_name,
                 "repo_id": repo.get("id"),
                 "collaborator_added": collaborator_added,
+                "template_read_granted": template_read_granted,
             }},
         )
+
+    def ensure_template_reader(self, owner: str, repo: str, username: str) -> bool:
+        """Grant ``username`` read access on the course template repo so their
+        clone token can fetch template updates — unless they are already a
+        collaborator (staff hold admin there; never downgrade an existing
+        grant). Best-effort like :meth:`ensure_collaborator`: False until the
+        user's first Forgejo login, healed on a later provision."""
+        with self._client() as client:
+            r = client.get(f"{_BASE}/repos/{owner}/{repo}/collaborators/{username}")
+        if r.status_code == 204:
+            return True
+        return self.ensure_collaborator(owner, repo, username, permission="read")
 
     def ensure_collaborator(
         self, owner: str, repo: str, username: str, permission: str = "write"
@@ -351,7 +402,7 @@ class ForgejoProviderClient:
         """Mint a rotating service token for the admin user via **basic auth**.
 
         The course-level registry stores a service token per managed server which
-        the backend uses to create orgs/repos and fork student templates — but a
+        the backend uses to create orgs/repos and generate student repos — but a
         token cannot create a token, so seeding one requires the admin's basic-auth
         credentials. Scoped to org + repo + user operations. Rotates (drops any
         same-named token first, whose secret is unrecoverable). Returns the token

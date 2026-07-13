@@ -630,8 +630,9 @@ def _maybe_grant_forgejo_staff_access(
 ) -> None:
     """For ``_lecturer`` and above on a managed-Forgejo course, grant admin
     collaborator on the canonical template AND reference repos (creating the
-    reference repo if missing). Students/tutors get NOTHING here — only their own
-    fork; they never get access to the template directly or to the reference repo.
+    reference repo if missing). Students/tutors get nothing HERE — provisioning
+    gives them write on their own repo plus read on the template (for the
+    extension's template-update sync); the reference repo stays staff-only.
     Idempotent; the Forgejo account is ensured first so the grant succeeds without
     a manual login."""
     from computor_backend.permissions.principal import course_role_hierarchy
@@ -730,8 +731,9 @@ def _provision_forgejo(
     user_id: str,
     db: Session,
 ) -> CourseMemberGitRepository:
-    """Fork the Forgejo student-template into a repo for the student and record
-    it. The student is added as a write collaborator (best-effort, self-healing)."""
+    """Generate the student's repo from the Forgejo student-template and record
+    it. The student is added as a write collaborator on their repo and a read
+    collaborator on the template (best-effort, self-healing)."""
     if not binding.template_repo:
         raise BadRequestException("This course has no Forgejo template configured")
     owner, _, repo = binding.template_repo.partition("/")
