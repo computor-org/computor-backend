@@ -35,17 +35,14 @@ env:
 	fi
 	@$(MAKE) stage-realm
 
-# Stage the Keycloak realm into the import dir the keycloak container bind-mounts,
-# substituting the client secrets from .env.integration for the JSON placeholders.
-# Keycloak imports it ONLY on a fresh keycloak-db volume, so re-run `make clean`
-# after changing a secret.
+# Stage the Keycloak realm into the import dir the keycloak container bind-mounts:
+# sets the client secrets and adds the integration API callback to the
+# computor-backend client (see scripts/stage_realm.py). Keycloak imports it ONLY
+# on a fresh keycloak-db volume, so re-run `make clean` after changing a secret.
+PYTHON ?= $(shell [ -x ../.venv/bin/python ] && echo ../.venv/bin/python || echo python3)
 stage-realm:
 	@set -a; . ./.env.integration; set +a; \
-	mkdir -p keycloak-import; \
-	sed -e "s|PLACEHOLDER_CLIENT_SECRET|$${KEYCLOAK_CLIENT_SECRET}|g" \
-	    -e "s|PLACEHOLDER_FORGEJO_CLIENT_SECRET|$${FORGEJO_CLIENT_SECRET}|g" \
-	    ../data/keycloak/computor-realm.json > keycloak-import/computor-realm.json; \
-	echo "Staged Keycloak realm → keycloak-import/computor-realm.json"
+	$(PYTHON) scripts/stage_realm.py ../data/keycloak/computor-realm.json keycloak-import/computor-realm.json
 
 up: env
 	$(COMPOSE) up -d --build

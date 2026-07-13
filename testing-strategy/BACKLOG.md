@@ -61,10 +61,20 @@ same branch name across sibling repos when applicable. Never push to `main`.
 
 ## P2 — Identity & personas (`integration-tests/fixtures/`) → [02](02-architecture.md) §4–5, [03](03-personas-and-scenario.md)
 
-- [ ] **P2.1 Headless login helper.** New `fixtures/keycloak_auth.py`: authorization-code
-  form dance (login 302 → host-rewrite → form POST → callback → tokens from redirect
-  query). → [02](02-architecture.md) §4.
-  AC: admin (env-bootstrapped) gets a working Bearer; `GET /user` returns the admin.
+- [x] **P2.1 Headless login helper.** ✅ Done + validated 2026-07-13.
+  `fixtures/keycloak_auth.py` — `authenticate(email, password)` drives the SSO dance
+  (initiate 302 → fetch form → POST creds → backend callback → token from redirect query
+  / `ct_access_token` cookie); also a `bearer_client_factory` fixture. Validated: admin
+  logs in, `GET /user` → `admin@integration.test`, `/user/scopes` → `is_admin: True`.
+  **Two realm-staging fixes were required** (now in `scripts/stage_realm.py`, replacing
+  the sed substitution): (1) the canonical realm's `computor-backend` client only allows
+  the dev/prod redirect ports, so the integration callback `http://localhost:18000/*` is
+  appended to `redirectUris`/`webOrigins`; (2) the bootstrap admin is created without
+  firstName/lastName, so `VERIFY_PROFILE` is disabled to stop Keycloak interrupting the
+  dance with a profile-completion form. Also note: the backend emits the browser-facing
+  Keycloak host already (`localhost:18180`), so the internal→public rewrite is defensive.
+  Coupling to remember: wiping `keycloak-db` alone needs an `api` restart (the admin is
+  created by `ensure_keycloak_admin` at API startup); `make clean && make up` handles it.
 - [ ] **P2.2 Persona seeding.** Rewrite `fixtures/users.py`: admin login (grants
   `_admin` on first callback) → role invites for `uma`/`orga`/`exma` → `uma` invites
   `lena`/`tobi`/students → all accept + login. Idempotent (find-or-create on re-run).
