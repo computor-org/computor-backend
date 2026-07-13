@@ -38,7 +38,6 @@ RUN python3.10 -m pip install --upgrade pip "setuptools>=65.0,<70" wheel packagi
 # copied user-site; the MATLAB engine stays in the system site-packages.
 COPY --from=pybase /home/worker/.local           /home/worker/.local
 COPY --from=pybase /home/worker/computor-types    /home/worker/computor-types
-COPY --from=pybase /home/worker/computor-utils    /home/worker/computor-utils
 COPY --from=pybase /home/worker/computor-client   /home/worker/computor-client
 COPY --from=pybase /home/worker/computor-backend  /home/worker/computor-backend
 

@@ -11,7 +11,6 @@ A university programming course management platform with automated GitLab integr
 | `computor-cli` | Command-line interface for admin and dev tasks |
 | `computor-backend` | FastAPI server with business logic and Temporal workflows |
 | `computor-web` | Next.js frontend application |
-| `computor-utils` | Shared utility functions |
 
 ## Prerequisites
 

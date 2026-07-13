@@ -35,31 +35,27 @@ ENV PATH="/home/worker/.local/bin:${PATH}"
 # Only the manifests are copied here. A stub package per project lets pip build
 # each wheel and pull its declared dependencies without the real source — so a
 # source edit below does not bust this (expensive) layer. computor-types is
-# listed first because computor-utils/-client depend on it.
+# listed first because computor-client/-backend depend on it.
 COPY --chown=worker:worker computor-types/pyproject.toml    computor-types/README.md    computor-types/
-COPY --chown=worker:worker computor-utils/pyproject.toml    computor-utils/README.md    computor-utils/
 COPY --chown=worker:worker computor-client/pyproject.toml   computor-client/README.md   computor-client/
 COPY --chown=worker:worker computor-backend/pyproject.toml  computor-backend/README.md  computor-backend/
 RUN mkdir -p computor-types/src/computor_types \
-             computor-utils/src/computor_utils \
              computor-client/src/computor_client \
              computor-backend/src/computor_backend \
     && touch computor-types/src/computor_types/__init__.py \
-             computor-utils/src/computor_utils/__init__.py \
              computor-client/src/computor_client/__init__.py \
              computor-backend/src/computor_backend/__init__.py \
     && pip install --user --no-warn-script-location \
-        ./computor-types ./computor-utils ./computor-client ./computor-backend
+        ./computor-types ./computor-client ./computor-backend
 
 # ---------------------------------------------------------------------------
 # Layer 2: real source, re-installed editable (deps already satisfied → fast)
 # ---------------------------------------------------------------------------
 COPY --chown=worker:worker computor-types    computor-types
-COPY --chown=worker:worker computor-utils    computor-utils
 COPY --chown=worker:worker computor-client   computor-client
 COPY --chown=worker:worker computor-backend  computor-backend
 RUN pip install --user --no-deps --no-warn-script-location \
-        -e computor-types -e computor-utils -e computor-client -e computor-backend
+        -e computor-types -e computor-client -e computor-backend
 
 # Source on PYTHONPATH so imports resolve from the working tree (alembic, etc.).
 ENV PYTHONPATH=/home/worker/computor-backend/src

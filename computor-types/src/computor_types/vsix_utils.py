@@ -7,8 +7,8 @@ import zipfile
 from typing import Optional
 from xml.etree import ElementTree as ET
 
-from computor_types.extensions import VsixMetadata
-from computor_types.exceptions import VsixManifestError
+from .extensions import VsixMetadata
+from .exceptions import VsixManifestError
 
 
 _VSIX_MANIFEST_PATH = "extension.vsixmanifest"

@@ -11,9 +11,8 @@ consumes generated TypeScript.
 | **computor-types** | Pure Pydantic DTOs — the single source of truth for API contracts, `meta.yaml`/`test.yaml` formats, and deployment configs. Zero backend deps. | — |
 | **computor-testing** | Test-execution framework (`computor-tester`). One backend per language (Python, Octave/MATLAB, R, Julia, C, Fortran, Document). Re-exports its models from `computor-types`. | types |
 | **computor-client** | Auto-generated async HTTP client (`httpx`). One endpoint client per entity. | types |
-| **computor-utils** | Small shared helpers (e.g. VSIX metadata parsing). | types |
 | **computor-cli** | `computor` command — auth, CRUD (`rest`), `deployment`, tokens, docs sync, workers, codegen. | client, types |
-| **computor-backend** | FastAPI server + business logic + Temporal workflows. | types, utils |
+| **computor-backend** | FastAPI server + business logic + Temporal workflows. | types, client |
 | **computor-web** | Next.js frontend (yarn). Consumes generated TS types/clients. | (generated) |
 | **computor-coder** | Terraform templates + scripts for provisioning Coder workspaces (not a Python package). | — |
 

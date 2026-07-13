@@ -9,7 +9,7 @@ import re
 from datetime import datetime
 from typing import Iterable, List, Optional, Tuple
 
-from computor_utils.vsix_utils import parse_vsix_metadata
+from computor_types.vsix_utils import parse_vsix_metadata
 from computor_types.exceptions import VsixManifestError
 from fastapi import (
     APIRouter,

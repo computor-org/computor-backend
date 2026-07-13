@@ -14,7 +14,6 @@ FROM computor-testing-runtimes:latest
 # path + CPython 3.10, so the editable installs + their deps resolve.
 COPY --from=pybase --chown=worker:worker /home/worker/.local           /home/worker/.local
 COPY --from=pybase --chown=worker:worker /home/worker/computor-types    /home/worker/computor-types
-COPY --from=pybase --chown=worker:worker /home/worker/computor-utils    /home/worker/computor-utils
 COPY --from=pybase --chown=worker:worker /home/worker/computor-client   /home/worker/computor-client
 COPY --from=pybase --chown=worker:worker /home/worker/computor-backend  /home/worker/computor-backend
 

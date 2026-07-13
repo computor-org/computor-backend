@@ -8,7 +8,7 @@ from computor_cli.auth import get_computor_client
 from computor_cli.config import CLIAuthConfig
 from computor_cli.utils import run_async
 
-from computor_utils.vsix_utils import parse_vsix_metadata
+from computor_types.vsix_utils import parse_vsix_metadata
 from computor_types.exceptions import VsixManifestError
 
 

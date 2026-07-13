@@ -26,7 +26,6 @@ dependencies = [
     # computor_client (Temporal testing tasks). A standalone
     # `pip install ./computor-backend` requires the siblings installed first.
     "computor-types",
-    "computor-utils",
     "computor-client",
 
     # External dependencies

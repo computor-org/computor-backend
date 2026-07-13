@@ -45,11 +45,6 @@ FORBIDDEN_IMPORTS = {
         'flask': 'Web framework - client should only use httpx',
         'django': 'Web framework - client should only use httpx',
     },
-    'computor-utils': {
-        'computor_backend': 'Backend code - utils should be independent',
-        'fastapi': 'Web framework - utils should be framework-agnostic',
-        'starlette': 'ASGI framework - utils should be framework-agnostic',
-    },
 }
 
 
