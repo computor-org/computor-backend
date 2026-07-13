@@ -376,8 +376,12 @@ class TemporalTaskExecutor:
             }
             
         except Exception as e:
-            # Fallback to empty result on error, but log it
-            print(f"Error listing workflows: {e}")
+            # Contract: this is a soft-fail. Unlike ``get_task_status`` (which
+            # propagates), listing degrades to an empty page carrying an
+            # ``error`` key so the tasks UI stays reachable when Temporal
+            # visibility is briefly unavailable. The failure is logged with a
+            # traceback here rather than raised.
+            logger.exception("Error listing workflows")
             return {
                 "tasks": [],
                 "total": 0,
