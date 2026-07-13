@@ -777,16 +777,18 @@ def _provisioned_response(
 
 
 def _member_repo_to_get(rec: CourseMemberGitRepository) -> CourseMemberRepositoryGet:
+    # Stored URLs use the backend-internal git host; surface the public one.
+    # External (BYO) URLs don't match an internal host and pass through unchanged.
     return CourseMemberRepositoryGet(
         id=str(rec.id),
         course_member_id=str(rec.course_member_id),
         mode=rec.mode,
         provider_type=(rec.git_server.type if rec.git_server else None),
-        server_url=rec.server_url,
+        server_url=to_public_git_url(rec.server_url),
         repo_ref=rec.repo_ref,
-        http_url=rec.http_url,
-        ssh_url=rec.ssh_url,
-        web_url=rec.web_url,
+        http_url=to_public_git_url(rec.http_url),
+        ssh_url=to_public_git_url(rec.ssh_url),
+        web_url=to_public_git_url(rec.web_url),
     )
 
 

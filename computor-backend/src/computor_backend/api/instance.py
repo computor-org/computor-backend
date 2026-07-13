@@ -42,8 +42,9 @@ async def get_instance_info(
     web_url = _normalize_url(settings.WEB_APP_URL or settings.PUBLIC_DOMAIN)
 
     cfg = get_git_server_settings()
+    # Surface the user-reachable URL, never the backend-internal container host.
     forgejo_url = (
-        _normalize_url(cfg.git_server_url)
+        _normalize_url(cfg.public_url)
         if cfg.is_forgejo and cfg.git_server_url
         else None
     )
