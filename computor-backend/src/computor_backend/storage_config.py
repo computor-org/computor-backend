@@ -1,13 +1,19 @@
 """
 Storage configuration and security settings for MinIO integration.
 """
-import os
 from typing import Set, Dict
 
-# Size limits
-MAX_UPLOAD_SIZE = int(os.environ.get('MINIO_MAX_UPLOAD_SIZE', 10 * 1024 * 1024))  # 10MB default
-MAX_STORAGE_PER_USER = int(os.environ.get('MAX_STORAGE_PER_USER', 1024 * 1024 * 1024))  # 1GB default
-MAX_STORAGE_PER_COURSE = int(os.environ.get('MAX_STORAGE_PER_COURSE', 10 * 1024 * 1024 * 1024))  # 10GB default
+from computor_backend.config import get_settings as _get_settings
+
+# Size limits — now sourced from computor_backend.config.StorageSettings.
+# Env var names are unchanged (MINIO_MAX_UPLOAD_SIZE / MAX_STORAGE_PER_USER /
+# MAX_STORAGE_PER_COURSE); these module-level names are kept as shims so all
+# existing importers (storage_security, submissions, upload_limiter, …) work
+# unchanged.
+_storage = _get_settings().storage
+MAX_UPLOAD_SIZE = _storage.max_upload_size          # 10 MiB default
+MAX_STORAGE_PER_USER = _storage.max_storage_per_user      # 1 GiB default
+MAX_STORAGE_PER_COURSE = _storage.max_storage_per_course  # 10 GiB default
 
 # File type restrictions - Blacklist approach
 # Block dangerous executable and system file extensions
