@@ -171,6 +171,22 @@ same branch name across sibling repos when applicable. Never push to `main`.
   (`submit:true`), `POST /tests` with ≥1s spacing, poll to terminal, assert scores per
   case.
   AC: 3 students × 6 assignments all reach terminal results matching their case.
+  **IN PROGRESS (paused 2026-07-14).** Contracts mapped + validated live: provision
+  returns a one-time `clone_token` + `http_url` (public host); the submission-group id is
+  `students/course-contents[*].submission_group.id`; submit is multipart
+  (`submission_create` JSON + ZIP) → `{artifacts:[id,...]}`; `POST /tests {artifact_id}`
+  → result; `GET /tests/status/{id}` returns a **string** status (`queued`→`finished`).
+  **Blocker found + fixed:** the testing worker got 401 fetching the example reference, so
+  tests "finished" with `result: 0.0` and never ran the student code. Root cause: the
+  ctp_ token must be `ctp_` + **exactly 32** url-safe chars (`TOKEN_RANDOM_LENGTH`, exact
+  length — not `>=`); the old `ctp_it_worker_…` (42-char body) seeded fine but failed
+  `validate_token_format` at auth. Template token fixed to a valid 36-char value (auth now
+  200). **Follow-up (user hint): pre-create the worker token with the computor CLI** rather
+  than a hardcoded literal. Two more backend bugs to file for P4: `POST /tests` on an
+  already-tested (content-addressed) submission returns **500** (duplicate
+  `result_version_identifier_member_content_partial_key`) instead of a clean 4xx → the
+  fixture must reuse existing results; and the underscore-vs-length token mismatch between
+  bootstrap's loose check and `validate_token_format`.
 - [ ] **P5.5 Grading & final state.** `suites/08_full_lifecycle/`: tutor grades all 18
   (CORRECTED / CORRECTION_NECESSARY), aggregate + per-student + lecturer-view
   assertions, grading-outcome table in `reporting.py`.
