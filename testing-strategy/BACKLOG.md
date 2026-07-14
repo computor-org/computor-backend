@@ -134,10 +134,13 @@ same branch name across sibling repos when applicable. Never push to `main`.
 
 ## P5 — Golden-path lifecycle (`suites/05…08`) → [03](03-personas-and-scenario.md), [06](06-integration-suites.md)
 
-- [ ] **P5.1 Examples fixtures + suite.** New `fixtures/examples.py` (locate the 6
-  examples, build upload ZIPs, expose identifiers); `suites/05_examples/` upload +
-  list/versions/download + permission side-cases.
-  AC: 6 examples in `GET /examples`; re-run idempotent.
+- [x] **P5.1 Examples fixtures + suite.** ✅ Done + validated 2026-07-13.
+  `fixtures/examples.py` discovers the 6 `itpcp.pgph.py.*` examples, reads their text
+  files (skips binary content assets), resolves the seeded MinIO repo, and uploads via
+  `POST /examples/upload` (`{repository_id, directory, files}`); idempotent (VERSION_001
+  → fetch existing). Also exposes `correct_solution_files()` for P5.4. `suites/05_examples`
+  (5 passed): all 6 upload + list + version; lecturer/org-manager upload → 403.
+  AC met: 6 examples in `GET /examples`; re-run idempotent.
 - [ ] **P5.2 Hierarchy & binding.** `suites/06_release/`: org → family → course with
   Forgejo binding at creation (canonical: sync `POST /courses` + `PUT /courses/{id}/git`;
   the async deploy path gets one contract test); seat `lena`/`tobi` (`orga`).
