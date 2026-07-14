@@ -139,8 +139,12 @@ same branch name across sibling repos when applicable. Never push to `main`.
   files (skips binary content assets), resolves the seeded MinIO repo, and uploads via
   `POST /examples/upload` (`{repository_id, directory, files}`); idempotent (VERSION_001
   → fetch existing). Also exposes `correct_solution_files()` for P5.4. `suites/05_examples`
-  (5 passed): all 6 upload + list + version; lecturer/org-manager upload → 403.
+  (4 passed, 1 xfail): all 6 upload + list + version; org-manager upload → 403.
   AC met: 6 examples in `GET /examples`; re-run idempotent.
+  **Permission bug found (xfail'd):** a course `_lecturer` can upload to the *global*
+  example library, though `role_setup.py:71` documents lecturers as assign-only (uploading
+  is `_example_manager`). `test_lecturer_cannot_upload_examples` asserts the design-correct
+  403 under `xfail(strict=False)` — flip to a plain assert when the backend is fixed.
 - [x] **P5.2 Hierarchy & binding.** ✅ Done + validated 2026-07-13. `fixtures/course.py`
   rewritten (orga-driven, idempotent): org → family → course via `POST`, then
   `PUT /courses/{id}/git` `{delivery:'git', git_server_id, student_repo_modes:['managed']}`

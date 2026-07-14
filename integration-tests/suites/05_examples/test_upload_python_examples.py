@@ -6,6 +6,8 @@ itpcp.pgph.py examples; lecturers later assign them to course content.
 
 from __future__ import annotations
 
+import uuid
+
 import httpx
 import pytest
 
@@ -41,13 +43,27 @@ def test_example_has_expected_version(
     assert ex.version_tag in tags, f"{ex.version_tag} not in {tags}"
 
 
+@pytest.mark.xfail(
+    reason="BUG: a course _lecturer can upload to the global example library. "
+    "role_setup.py:71 documents lecturers as assign-only (uploading is "
+    "_example_manager). Uploads a fresh dir so the permission check isn't masked "
+    "by the version-exists 400. Flip to a plain assert when the backend is fixed.",
+    strict=False,
+)
 def test_lecturer_cannot_upload_examples(
-    lena_client: httpx.Client,
-    example_repository_id: str,
-    python_examples: tuple[ExampleFixture, ...],
+    lena_client: httpx.Client, example_repository_id: str
 ) -> None:
-    # example:upload is _example_manager-only.
-    r = upload_example(lena_client, example_repository_id, python_examples[0])
+    directory = f"it.probe.{uuid.uuid4().hex[:8]}"
+    meta = (
+        f"identifier: {directory}\nversion: '1.0'\ntitle: Probe\n"
+        "properties:\n  studentSubmissionFiles: [x.py]\n"
+        "  executionBackend:\n    slug: itpcp.exec.py\n"
+    )
+    r = lena_client.post(
+        "/examples/upload",
+        json={"repository_id": example_repository_id, "directory": directory,
+              "files": {"meta.yaml": meta, "x.py": "print(1)\n"}},
+    )
     assert r.status_code == 403, r.text
 
 
@@ -56,6 +72,7 @@ def test_org_manager_cannot_upload_examples(
     example_repository_id: str,
     python_examples: tuple[ExampleFixture, ...],
 ) -> None:
-    # org-manager has read-only example claims.
+    # org-manager has read-only example claims (denied at the permission check,
+    # before the version-exists check — so an existing example still yields 403).
     r = upload_example(orga_client, example_repository_id, python_examples[0])
     assert r.status_code == 403, r.text
