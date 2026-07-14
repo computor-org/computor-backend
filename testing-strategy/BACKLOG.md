@@ -223,20 +223,24 @@ same branch name across sibling repos when applicable. Never push to `main`.
 
 ## P7 — Web e2e expansion (`computor-web/e2e/`) → [08](08-web-e2e.md)
 
-- [ ] **P7.1 `e2e/fixtures.ts`.** `injectAuth` + `PERSONAS`, `mockApi` router with
-  default handlers, typed data builders; refactor `admin-users.spec.ts` onto it.
-  AC: README/config references are finally true; existing spec still green.
-- [ ] **P7.2 Tooling.** Add `"typecheck": "tsc --noEmit"` script (yarn, never npm).
-  AC: `yarn typecheck` passes.
-- [ ] **P7.3 Invite specs.** `invites-admin.spec.ts` + `invite-accept.spec.ts`
-  ([08](08-web-e2e.md) §3 rows 1–2).
-  AC: green headless, no backend.
-- [ ] **P7.4 Management specs.** `courses.spec.ts`, `members-groups.spec.ts`,
-  `examples.spec.ts`, `git-servers.spec.ts` (forgejo default asserted).
-  AC: green.
-- [ ] **P7.5 Role-view + login specs.** `role-dashboards.spec.ts`,
+- [x] **P7.1 `e2e/fixtures.ts`.** ✅ Done + validated 2026-07-14. Created the shared module
+  the config/README already referenced: `PERSONAS` (admin/userManager/lecturer/tutor/
+  student), `injectAuth`, a `mockApi` router (custom handlers first, then defaults for
+  `/user`+`user_roles`/`/user/scopes`/`/user/views`/`/messages`), and typed builders
+  (`buildUsers`, `buildInvite`). `admin-users.spec.ts` refactored onto it — still green.
+- [x] **P7.2 Tooling.** ✅ Done. `"typecheck": "tsc --noEmit"` added (yarn); passes with
+  0 errors project-wide.
+- [x] **P7.3 Invite specs.** ✅ Done + validated. `invites-admin.spec.ts` (list + Active
+  badge, revoked/expired/used badges, non-manager forbidden) and `invite-accept.spec.ts`
+  (valid-token form, unknown-token "Invite Not Found", password-mismatch, completed
+  "Account ready"). **Full e2e suite: 10 passed** headless, no backend.
+  (Gotchas fixed: role gates read `user_roles` from `/user`; `getByText` is a
+  case-insensitive substring match, so titles/badges use `getByRole`/`exact`.)
+- [ ] **P7.4 Management specs.** *(Follow-up — the `fixtures.ts` foundation makes these
+  straightforward.)* `courses.spec.ts`, `members-groups.spec.ts`, `examples.spec.ts`,
+  `git-servers.spec.ts` (forgejo default).
+- [ ] **P7.5 Role-view + login specs.** *(Follow-up.)* `role-dashboards.spec.ts`,
   `login-redirect.spec.ts`.
-  AC: green; full suite runtime stays in seconds-to-low-minutes.
 
 ## P8 — Live smoke & CI (last) → [08](08-web-e2e.md) §4, [09](09-ci-and-tooling.md)
 
