@@ -131,17 +131,19 @@ def claims_workspace_user() -> List[Tuple[str, str]]:
     """
     Generate claims for the workspace user role.
 
-    Basic access: view UI, list own workspaces, start/stop own workspaces.
-    Cannot provision, delete, or manage other users' workspaces.
+    Basic access: view UI, list own workspaces, start/stop own workspaces, and
+    self-provision one workspace per template. Cannot provision for other users,
+    delete, or manage other users' workspaces.
 
     Returns:
         List of (claim_type, claim_value) tuples for workspace access permissions
     """
     return [
-        ("permissions", "workspace:access"),       # Gate-keeper: can access workspace features
+        ("permissions", "workspace:access"),        # Gate-keeper: can access workspace features
         ("permissions", "workspace:list"),          # List own workspaces
         ("permissions", "workspace:start"),         # Start own workspace
         ("permissions", "workspace:stop"),          # Stop own workspace
+        ("permissions", "workspace:provision_self"),  # Self-provision one workspace per template
     ]
 
 
@@ -161,8 +163,9 @@ def claims_workspace_maintainer() -> List[Tuple[str, str]]:
         ("permissions", "workspace:list"),
         ("permissions", "workspace:start"),
         ("permissions", "workspace:stop"),
+        ("permissions", "workspace:provision_self"),
         # Maintainer-only claims
-        ("permissions", "workspace:provision"),     # Provision new workspaces
+        ("permissions", "workspace:provision"),     # Provision new workspaces (any user, custom names)
         ("permissions", "workspace:delete"),        # Delete workspaces
         ("permissions", "workspace:manage"),        # Query/manage any user's workspaces
         ("permissions", "workspace:session"),       # Create coder sessions

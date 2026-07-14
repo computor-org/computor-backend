@@ -21,7 +21,7 @@ function derivedName(template: string): string {
   return template.replace(/-workspace$/, '').replace(/[^a-z0-9-]/g, '') || 'workspace';
 }
 
-function CreateWorkspaceForm() {
+function CreateWorkspaceForm({ allowCustomName }: { allowCustomName: boolean }) {
   const router = useRouter();
   const notify = useNotify();
   const preselected = useSearchParam('template');
@@ -49,7 +49,7 @@ function CreateWorkspaceForm() {
     setError(null);
     try {
       await coderClient.provisionWorkspace({
-        body: { template, workspace_name: name.trim() || null },
+        body: { template, workspace_name: allowCustomName ? name.trim() || null : null },
       });
       notify('Workspace created', 'success');
       router.push('/workspaces');
@@ -64,7 +64,11 @@ function CreateWorkspaceForm() {
     <FormPanel
       breadcrumbs={[{ label: 'Workspaces', href: '/workspaces' }, { label: 'Create' }]}
       title="New workspace"
-      description="Pick a workspace type. All your workspaces share one home directory, so your files and user-space installs follow you."
+      description={
+        allowCustomName
+          ? 'Pick a workspace type. All your workspaces share one home directory, so your files and user-space installs follow you.'
+          : 'Pick a workspace type — you get one workspace per type. All your workspaces share one home directory, so your files and user-space installs follow you.'
+      }
       error={error ?? templatesError}
       onSubmit={handleSubmit}
       onCancel={() => router.push('/workspaces')}
@@ -80,35 +84,37 @@ function CreateWorkspaceForm() {
         )}
       </Field>
 
-      <Field
-        label="Workspace name"
-        hint={
-          template
-            ? `Optional — defaults to "${derivedName(template)}". Lowercase letters, digits and hyphens.`
-            : 'Optional — defaults to a name derived from the template.'
-        }
-      >
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className={inputCls}
-          placeholder={template ? derivedName(template) : ''}
-          maxLength={32}
-        />
-      </Field>
+      {allowCustomName && (
+        <Field
+          label="Workspace name"
+          hint={
+            template
+              ? `Optional — defaults to "${derivedName(template)}". Lowercase letters, digits and hyphens.`
+              : 'Optional — defaults to a name derived from the template.'
+          }
+        >
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className={inputCls}
+            placeholder={template ? derivedName(template) : ''}
+            maxLength={32}
+          />
+        </Field>
+      )}
     </FormPanel>
   );
 }
 
 export default function CreateWorkspacePage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { isWorkspaceMaintainer } = usePermissions();
+  const { canProvisionWorkspace, isWorkspaceMaintainer } = usePermissions();
 
-  if (!authLoading && isAuthenticated && !isWorkspaceMaintainer) {
+  if (!authLoading && isAuthenticated && !canProvisionWorkspace) {
     return (
       <Forbidden
-        message="Creating workspaces requires the workspace maintainer role."
+        message="Creating workspaces requires a workspace role."
         backLink="/workspaces"
         backText="Back to workspaces"
       />
@@ -118,7 +124,7 @@ export default function CreateWorkspacePage() {
   return (
     <AuthenticatedLayout>
       <Suspense>
-        <CreateWorkspaceForm />
+        <CreateWorkspaceForm allowCustomName={isWorkspaceMaintainer} />
       </Suspense>
     </AuthenticatedLayout>
   );

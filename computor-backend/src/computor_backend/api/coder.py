@@ -188,8 +188,30 @@ async def provision_workspace(
 
     If `email` is provided, provisions for that user (requires workspace:provision permission).
     If `email` is omitted, provisions for the current user.
+
+    Full provisioners (admin or workspace:provision) may provision for any user
+    with a custom name. Workspace users (workspace:provision_self) may provision
+    only for themselves, one workspace per template — the request is forced to
+    their own account and the derived per-template name, so Coder's per-user name
+    uniqueness caps them at one (re-provisioning idempotently refreshes its token).
     """
-    _check_workspace_access(permissions, "provision")
+    is_full_provisioner = permissions.is_admin or permissions.permitted("workspace", "provision")
+    if not is_full_provisioner:
+        if not permissions.permitted("workspace", "provision_self"):
+            raise ForbiddenException(
+                detail="Workspace 'provision' permission required. Contact your administrator.",
+            )
+        # Self-service: never allow targeting another user, and always use the
+        # derived per-template name so the user gets at most one per template.
+        if request.email:
+            own_user = get_user_by_id(db, cache, str(permissions.user_id))
+            own_email = (get_user_email(own_user) or "").lower() if own_user else ""
+            if request.email.strip().lower() != own_email:
+                raise ForbiddenException(
+                    detail="You may only provision a workspace for yourself.",
+                )
+            request.email = None
+        request.workspace_name = None
     try:
         # Verify template exists in Coder before minting a token
         template = request.template or settings.default_template

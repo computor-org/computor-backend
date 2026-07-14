@@ -19,7 +19,7 @@ import type { CoderHealthResponse, WorkspaceDetails } from '@/src/types/workspac
 const coderClient = new CoderClient();
 
 export default function WorkspacesPage() {
-  const { isWorkspaceMaintainer } = usePermissions();
+  const { canProvisionWorkspace } = usePermissions();
 
   // Workspace list with silent background polling (pauses on hidden tabs).
   const { data, loading, error, reload, refresh } = useResource(
@@ -67,7 +67,7 @@ export default function WorkspacesPage() {
               <Button variant="secondary" onClick={() => reload()} disabled={loading}>
                 Refresh
               </Button>
-              {isWorkspaceMaintainer && (
+              {canProvisionWorkspace && (
                 <ButtonLink href="/workspaces/create">New Workspace</ButtonLink>
               )}
             </div>
@@ -102,7 +102,7 @@ export default function WorkspacesPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
             <h3 className="mt-4 text-lg font-medium text-gray-900">No workspaces</h3>
-            {isWorkspaceMaintainer ? (
+            {canProvisionWorkspace ? (
               <>
                 <p className="mt-2 text-sm text-gray-500">Get started by creating your first workspace.</p>
                 <ButtonLink href="/workspaces/create" className="mt-4">

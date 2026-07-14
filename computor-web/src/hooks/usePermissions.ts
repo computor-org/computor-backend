@@ -66,6 +66,11 @@ export function usePermissions() {
   // _workspace_maintainer (admins bypass) — mirrors the backend claims
   // (workspace:provision / workspace:templates / workspace:manage).
   const isWorkspaceMaintainer = isAdmin || systemRoles.includes('_workspace_maintainer');
+  // Who may reach the workspace create page: workspace users self-provision one
+  // workspace per template (server forces the derived name); maintainers
+  // provision for anyone with custom names. Mirrors the backend claims
+  // workspace:provision_self / workspace:provision.
+  const canProvisionWorkspace = isWorkspaceUser || isWorkspaceMaintainer;
 
   const hasView = (view: string) => views.includes(view);
 
@@ -141,6 +146,7 @@ export function usePermissions() {
     canViewExamples,
     isWorkspaceUser,
     isWorkspaceMaintainer,
+    canProvisionWorkspace,
     hasView,
     views,
     scopes,
