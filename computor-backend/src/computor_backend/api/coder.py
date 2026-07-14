@@ -529,6 +529,14 @@ def _build_template_parameters(settings: CoderSettings) -> dict:
         "backend_internal_url": backend_internal,
         "backend_external_url": backend_external,
         "dev_forward_ports": forward_ports,
+        # Optional deployment-wide Terraform variables, applied at push time
+        # only to templates that declare them (coder rejects undeclared
+        # variables). Kept out of git in .env — add future settings here.
+        #   matlab_license_file: MATLAB site license (port@host or in-container
+        #   path); empty falls back to in-browser MathWorks sign-in.
+        "template_variables": {
+            "matlab_license_file": os.environ.get("MATLAB_MLM_LICENSE_FILE", ""),
+        },
         "ttl_ms": 3600000,
         "activity_bump_ms": 3600000,
     }

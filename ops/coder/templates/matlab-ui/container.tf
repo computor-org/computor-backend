@@ -23,7 +23,7 @@ resource "docker_container" "workspace" {
 
   env = concat(
     ["CODER_AGENT_TOKEN=${coder_agent.main.token}"],
-    data.coder_parameter.matlab_license_file.value != "" ? ["MLM_LICENSE_FILE=${data.coder_parameter.matlab_license_file.value}"] : []
+    var.matlab_license_file != "" ? ["MLM_LICENSE_FILE=${var.matlab_license_file}"] : []
   )
 
   dynamic "host" {

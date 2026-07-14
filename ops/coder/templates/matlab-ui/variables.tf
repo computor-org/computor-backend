@@ -10,6 +10,13 @@ variable "matlab_proxy_port" {
   type        = number
 }
 
+variable "matlab_license_file" {
+  default     = ""
+  description = "MATLAB license (port@host or in-container license path), pushed from the deployment's MATLAB_MLM_LICENSE_FILE env var. Empty falls back to in-browser MathWorks sign-in."
+  type        = string
+  sensitive   = true
+}
+
 variable "workspace_image" {
   default     = "localhost:5000/computor-workspace-matlab-ui:latest"
   description = "Pre-built workspace image from local registry"

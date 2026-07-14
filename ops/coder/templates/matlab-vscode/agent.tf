@@ -22,8 +22,8 @@ resource "coder_agent" "main" {
       GIT_COMMITTER_EMAIL = data.coder_workspace_owner.me.email
       COMPUTOR_AUTH_TOKEN = data.coder_parameter.computor_auth_token.value
     },
-    data.coder_parameter.matlab_license_file.value != "" ? {
-      MLM_LICENSE_FILE = data.coder_parameter.matlab_license_file.value
+    var.matlab_license_file != "" ? {
+      MLM_LICENSE_FILE = var.matlab_license_file
     } : {}
   )
 

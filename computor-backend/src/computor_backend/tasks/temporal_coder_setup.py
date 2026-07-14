@@ -183,6 +183,30 @@ def build_workspace_image(
         return {"success": False, "template": template_key, "error": str(e)}
 
 
+def _template_declares_variable(template_dir: str, name: str) -> bool:
+    """True if any .tf file in the template declares `variable "<name>"`.
+
+    `coder templates push --variable` rejects variables the template does not
+    declare, so deployment-wide-but-template-specific values (e.g. the MATLAB
+    license) must only be passed to templates that opt in by declaring them.
+    """
+    needle = f'variable "{name}"'
+    try:
+        entries = os.listdir(template_dir)
+    except OSError:
+        return False
+    for fn in entries:
+        if not fn.endswith(".tf"):
+            continue
+        try:
+            with open(os.path.join(template_dir, fn), "r", encoding="utf-8") as f:
+                if needle in f.read():
+                    return True
+        except OSError:
+            continue
+    return False
+
+
 @activity.defn(name="push_coder_template")
 async def push_coder_template(
     template_key: str,
@@ -197,6 +221,7 @@ async def push_coder_template(
     activity_bump_ms: int,
     registry_host: str = "localhost:5000",
     image_tag: str = "latest",
+    template_variables: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """
     Push a Coder template (Terraform config) using the coder CLI,
@@ -271,8 +296,14 @@ async def push_coder_template(
             "--variable", f"computor_backend_url={backend_external_url}",
             "--variable", f"dev_forward_ports={dev_forward_ports}",
             "--variable", f"workspace_image={image_ref}",
-            "--yes",
         ]
+        # Optional deployment-wide variables (e.g. the MATLAB license) are
+        # applied only to templates that declare them — `coder templates push`
+        # rejects undeclared variables. See _template_declares_variable.
+        for name, value in (template_variables or {}).items():
+            if value and _template_declares_variable(template_dir, name):
+                cmd += ["--variable", f"{name}={value}"]
+        cmd += ["--yes"]
         logger.info(f"Running: {' '.join(cmd)}")
 
         try:
@@ -438,6 +469,7 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
         backend_internal_url = parameters.get("backend_internal_url", "http://host.docker.internal:8000")
         backend_external_url = parameters.get("backend_external_url", "http://host.docker.internal:8000")
         dev_forward_ports = parameters.get("dev_forward_ports", "")
+        template_variables = parameters.get("template_variables", {})
         ttl_ms = parameters.get("ttl_ms", 3600000)  # 1 hour default
         activity_bump_ms = parameters.get("activity_bump_ms", 3600000)
         # One immutable image tag for this run, shared by the build and the
@@ -504,6 +536,7 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
                     activity_bump_ms,
                     registry_host,
                     image_tag,
+                    template_variables,
                 ],
                 start_to_close_timeout=timedelta(minutes=10),
                 retry_policy=RetryPolicy(
