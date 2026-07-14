@@ -42,7 +42,7 @@ pytest_plugins = [
     "fixtures.api",
     "fixtures.db",
     "fixtures.course",
-    "fixtures.users",
+    "fixtures.personas",
     "fixtures.clients",
     "fixtures.permission_matrix",
     "reporting",

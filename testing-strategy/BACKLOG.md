@@ -75,16 +75,26 @@ same branch name across sibling repos when applicable. Never push to `main`.
   Keycloak host already (`localhost:18180`), so the internal→public rewrite is defensive.
   Coupling to remember: wiping `keycloak-db` alone needs an `api` restart (the admin is
   created by `ensure_keycloak_admin` at API startup); `make clean && make up` handles it.
-- [ ] **P2.2 Persona seeding.** Rewrite `fixtures/users.py`: admin login (grants
-  `_admin` on first callback) → role invites for `uma`/`orga`/`exma` → `uma` invites
-  `lena`/`tobi`/students → all accept + login. Idempotent (find-or-create on re-run).
-  AC: `make test` twice in a row both green on the seeding fixture.
-- [ ] **P2.3 Persona clients.** Rewrite `fixtures/clients.py`: session-scoped bearer
-  `httpx.Client` per persona (9) + `anon`; one login per session.
-  AC: all suites import clients from here; no other file logs in.
-- [ ] **P2.4 Rebuild 02_auth.** SSO dance cases, refresh/logout, API tokens (kept),
-  invite lifecycle happy paths. → [06](06-integration-suites.md) §02.
-  AC: suite green; invite-created user's roles visible via `GET /user-roles`.
+- [x] **P2.2 Persona seeding.** ✅ Done + validated 2026-07-13. `fixtures/users.py`
+  replaced by `fixtures/personas.py`: `personas` session fixture runs the invite chain
+  (admin → role invites for `uma`/`orga`/`exma` → `uma` invites `lena`/`tobi`/3 students
+  → all accept + SSO-login), returning a `Persona` registry. Idempotent (skips creation
+  when the user already exists, via `GET /users?search=`). `fixtures/api.py` now logs the
+  admin in via the SSO dance (no local login).
+  AC met: seeding is idempotent; `test_key_role_personas_carry_their_system_role` confirms
+  roles via `GET /user-roles/users/{id}/roles/{role}`.
+- [x] **P2.3 Persona clients.** ✅ Done 2026-07-13. `fixtures/clients.py` exposes a
+  session bearer `httpx.Client` per persona (`uma_client`, `orga_client`, `exma_client`,
+  `lena_client`, `tobi_client`, `student_{correct,empty,mixed}_client`), surfaced from the
+  registry; `admin_client`/`anonymous_client` stay in `fixtures/api.py`. One login each.
+- [x] **P2.4 Rebuild 02_auth.** ✅ Done + validated 2026-07-13. Removed the local-login
+  tests; new `test_sso_login.py` (dance + whoami + bad/absent token → 401) and
+  `test_invites.py` (persona seeding assertion, who-may-invite 201/403, public metadata,
+  accept→loginable, single-use + revoked guards); `test_api_tokens.py` kept (email fix).
+  **Whole suite green from cold: 25 passed** (6 smoke + 19 auth), legacy `03_permissions`
+  visibly skipped (126, reworked in P3). Two fixes landed here: an api HTTP healthcheck
+  (uvicorn accepts connections before lifespan finishes and resets them → `make wait` now
+  gates on `/docs` returning 200), and `keycloak_auth` demoted to a pure helper module.
 
 ## P3 — Permission matrix (`suites/03_permissions/`) → [04](04-permission-matrix.md)
 

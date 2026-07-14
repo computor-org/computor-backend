@@ -16,7 +16,8 @@ we still rewrite the internal host -> public host defensively so this keeps work
 that ever changes. Invite-created users are login-ready immediately (enabled,
 emailVerified, non-temporary password, no required actions).
 
-Exposed as pytest fixtures (`keycloak_login`, `authenticate`) and usable standalone.
+This is a plain helper module (not a pytest plugin): `authenticate()` returns
+`Credentials`, and the persona/client fixtures in `fixtures.personas` build on it.
 """
 from __future__ import annotations
 
@@ -27,7 +28,6 @@ from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
 import httpx
-import pytest
 
 
 class LoginError(RuntimeError):
@@ -122,35 +122,3 @@ def authenticate(
             refresh_token=(q.get("refresh_token") or [None])[0] or c.cookies.get("ct_refresh_token"),
             user_id=(q.get("user_id") or [None])[0],
         )
-
-
-@pytest.fixture(scope="session")
-def keycloak_login():
-    """Return the `authenticate(email, password)` callable (one login per call)."""
-    return authenticate
-
-
-@pytest.fixture(scope="session")
-def bearer_client_factory(api_base_url: str):
-    """Factory: (email, password) -> a session bearer httpx.Client for that user.
-
-    Logs the user in once via the SSO dance and returns a client with the
-    Authorization header preset. Callers are responsible for closing clients, or
-    use the persona fixtures in `fixtures.clients` which manage lifecycle.
-    """
-    created: list[httpx.Client] = []
-
-    def _make(email: str, password: str) -> httpx.Client:
-        creds = authenticate(email, password, api_base=api_base_url)
-        client = httpx.Client(
-            base_url=api_base_url,
-            headers={"Authorization": f"Bearer {creds.token}"},
-            timeout=30.0,
-        )
-        client.creds = creds  # type: ignore[attr-defined]
-        created.append(client)
-        return client
-
-    yield _make
-    for client in created:
-        client.close()

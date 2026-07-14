@@ -1,8 +1,10 @@
 """HTTP client fixtures.
 
-No per-test reset: the admin session is established once per pytest
-session, tokens/cookies accumulate, and teardown is the stack wipe. This
-matches the real-run semantics agreed on in issue #106.
+Auth is SSO-only now (local password login was removed from the backend), so
+the admin session is established via the headless Keycloak dance in
+`fixtures.keycloak_auth`. No per-test reset: the admin session is established
+once per pytest session, state accumulates, and teardown is the stack wipe —
+matching the real-run semantics agreed on in issue #106.
 """
 
 from __future__ import annotations
@@ -13,13 +15,16 @@ from typing import Iterator
 import httpx
 import pytest
 
+from fixtures.keycloak_auth import authenticate
+
 DEFAULT_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 
 
 @pytest.fixture(scope="session")
 def admin_credentials() -> dict[str, str]:
+    """The env-bootstrapped admin's Keycloak login (email + password)."""
     return {
-        "username": os.environ["API_ADMIN_USER"],
+        "email": os.environ.get("API_ADMIN_EMAIL", "admin@integration.test"),
         "password": os.environ["API_ADMIN_PASSWORD"],
     }
 
@@ -31,51 +36,25 @@ def anonymous_client(api_base_url: str) -> Iterator[httpx.Client]:
 
 
 @pytest.fixture(scope="session")
-def admin_basic_client(
-    api_base_url: str, admin_credentials: dict[str, str]
-) -> Iterator[httpx.Client]:
-    auth = httpx.BasicAuth(admin_credentials["username"], admin_credentials["password"])
-    with httpx.Client(base_url=api_base_url, auth=auth, timeout=DEFAULT_TIMEOUT) as client:
-        yield client
+def admin_credentials_obj(api_base_url: str, admin_credentials: dict[str, str]):
+    """The admin's SSO credentials (token/refresh/user_id), logged in once."""
+    return authenticate(
+        admin_credentials["email"], admin_credentials["password"], api_base=api_base_url
+    )
 
 
 @pytest.fixture(scope="session")
-def admin_login(
-    anonymous_client: httpx.Client, admin_credentials: dict[str, str]
-) -> dict[str, object]:
-    """POST /auth/login with admin creds; returns the parsed response body.
-
-    The ``/auth/login`` endpoint rate-limits at 5/min per username.
-    Developers iterate fast — retry once after a short backoff if we trip
-    the limiter rather than forcing a full clock-wait.
-    """
-    import time
-
-    for attempt in range(3):
-        r = anonymous_client.post("/auth/login", json=admin_credentials)
-        if r.status_code == 429 and attempt < 2:
-            time.sleep(15)
-            continue
-        r.raise_for_status()
-        return r.json()
-    r.raise_for_status()
-    return r.json()
+def admin_access_token(admin_credentials_obj) -> str:
+    return admin_credentials_obj.token
 
 
 @pytest.fixture(scope="session")
-def admin_access_token(admin_login: dict[str, object]) -> str:
-    return admin_login["access_token"]  # type: ignore[return-value]
+def admin_refresh_token(admin_credentials_obj) -> str | None:
+    return admin_credentials_obj.refresh_token
 
 
 @pytest.fixture(scope="session")
-def admin_refresh_token(admin_login: dict[str, object]) -> str:
-    return admin_login["refresh_token"]  # type: ignore[return-value]
-
-
-@pytest.fixture(scope="session")
-def admin_client(
-    api_base_url: str, admin_access_token: str
-) -> Iterator[httpx.Client]:
+def admin_client(api_base_url: str, admin_access_token: str) -> Iterator[httpx.Client]:
     headers = {"Authorization": f"Bearer {admin_access_token}"}
     with httpx.Client(base_url=api_base_url, headers=headers, timeout=DEFAULT_TIMEOUT) as client:
         yield client

@@ -44,7 +44,7 @@ def test_api_token_authenticates_via_x_api_token_header(
     with api_token_client(api_base_url, admin_api_token["token"]) as c:  # type: ignore[arg-type]
         r = c.get("/user")
     assert r.status_code == 200, r.text
-    assert r.json()["username"] == admin_credentials["username"]
+    assert r.json()["email"] == admin_credentials["email"]
 
 
 def test_api_tokens_list_includes_created(

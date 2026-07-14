@@ -294,6 +294,16 @@ services:
     ports:
       - "${IT_API_PORT:-18000}:8000"
     command: ["sh", "startup.bash"]
+    # Uvicorn accepts connections before its lifespan startup (migrations +
+    # ensure_keycloak_admin + bootstrap services) finishes — and resets requests
+    # until it does. Gate readiness on /docs actually returning 200 so `make wait`
+    # doesn't hand tests a half-started app.
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/docs').read()\" || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 40s
     environment:
       TZ: UTC
       RUNNING_IN_DOCKER: "true"

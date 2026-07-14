@@ -1,81 +1,64 @@
-"""Session-scoped HTTP clients for each course role.
+"""Session-scoped HTTP clients, one per persona.
 
-Each role logs in exactly once per session (the `/auth/login` endpoint is
-rate-limited to 5/min per username, so re-logging-in in a fixture loop is
-unsafe). The bearer token is cached on the fixture and the `httpx.Client`
-reuses it for every request.
+Each persona logs in exactly once (in `fixtures.personas`) via the SSO dance;
+these fixtures just surface the persona's pre-authenticated `httpx.Client`.
+`admin_client` and `anonymous_client` live in `fixtures.api`.
 
-The fixtures build on `seed_role_users` from `fixtures.users`, which in turn
-drives the `target_course` hierarchy. `admin_client` and `anonymous_client`
-live in `fixtures.api` and are not re-exported here.
+The persona set and how they're seeded is documented in `fixtures.personas`.
 """
 
 from __future__ import annotations
 
-from typing import Iterator
-
 import httpx
 import pytest
 
-from fixtures.api import DEFAULT_TIMEOUT
+from fixtures.personas import Persona
 
 
-def _login_bearer(api_base_url: str, username: str, password: str) -> str:
-    with httpx.Client(base_url=api_base_url, timeout=DEFAULT_TIMEOUT) as c:
-        r = c.post("/auth/login", json={"username": username, "password": password})
-        r.raise_for_status()
-        token = r.json()["access_token"]
-    assert isinstance(token, str) and token, "login returned empty access_token"
-    return token
-
-
-def _bearer_session_client(
-    api_base_url: str, username: str, password: str
-) -> Iterator[httpx.Client]:
-    token = _login_bearer(api_base_url, username, password)
-    with httpx.Client(
-        base_url=api_base_url,
-        headers={"Authorization": f"Bearer {token}"},
-        timeout=DEFAULT_TIMEOUT,
-    ) as client:
-        yield client
+def _persona_client(personas: dict[str, Persona], name: str) -> httpx.Client:
+    return personas[name].client
 
 
 @pytest.fixture(scope="session")
-def owner_client(
-    api_base_url: str, seed_role_users: dict[str, dict]
-) -> Iterator[httpx.Client]:
-    u = seed_role_users["_owner"]
-    yield from _bearer_session_client(api_base_url, u["username"], u["password"])
+def uma_client(personas: dict[str, Persona]) -> httpx.Client:
+    """_user_manager."""
+    return _persona_client(personas, "uma")
 
 
 @pytest.fixture(scope="session")
-def maintainer_client(
-    api_base_url: str, seed_role_users: dict[str, dict]
-) -> Iterator[httpx.Client]:
-    u = seed_role_users["_maintainer"]
-    yield from _bearer_session_client(api_base_url, u["username"], u["password"])
+def orga_client(personas: dict[str, Persona]) -> httpx.Client:
+    """_organization_manager."""
+    return _persona_client(personas, "orga")
 
 
 @pytest.fixture(scope="session")
-def lecturer_client(
-    api_base_url: str, seed_role_users: dict[str, dict]
-) -> Iterator[httpx.Client]:
-    u = seed_role_users["_lecturer"]
-    yield from _bearer_session_client(api_base_url, u["username"], u["password"])
+def exma_client(personas: dict[str, Persona]) -> httpx.Client:
+    """_example_manager."""
+    return _persona_client(personas, "exma")
 
 
 @pytest.fixture(scope="session")
-def tutor_client(
-    api_base_url: str, seed_role_users: dict[str, dict]
-) -> Iterator[httpx.Client]:
-    u = seed_role_users["_tutor"]
-    yield from _bearer_session_client(api_base_url, u["username"], u["password"])
+def lena_client(personas: dict[str, Persona]) -> httpx.Client:
+    """Course lecturer (course role assigned during course setup)."""
+    return _persona_client(personas, "lena")
 
 
 @pytest.fixture(scope="session")
-def student_client(
-    api_base_url: str, seed_role_users: dict[str, dict]
-) -> Iterator[httpx.Client]:
-    u = seed_role_users["_student"]
-    yield from _bearer_session_client(api_base_url, u["username"], u["password"])
+def tobi_client(personas: dict[str, Persona]) -> httpx.Client:
+    """Course tutor (course role assigned during course setup)."""
+    return _persona_client(personas, "tobi")
+
+
+@pytest.fixture(scope="session")
+def student_correct_client(personas: dict[str, Persona]) -> httpx.Client:
+    return _persona_client(personas, "s_correct")
+
+
+@pytest.fixture(scope="session")
+def student_empty_client(personas: dict[str, Persona]) -> httpx.Client:
+    return _persona_client(personas, "s_empty")
+
+
+@pytest.fixture(scope="session")
+def student_mixed_client(personas: dict[str, Persona]) -> httpx.Client:
+    return _persona_client(personas, "s_mixed")
