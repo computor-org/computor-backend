@@ -249,10 +249,11 @@ same branch name across sibling repos when applicable. Never push to `main`.
   golden-path slice against the integration stack.
 - [ ] **P8.2 Make targets & report polish.** *(Follow-up.)* `make report`; committed
   `reports/example.md` snapshot.
-- [x] **P8.3 CI workflows.** ✅ Done 2026-07-14 (structure validated; first CI run will
-  shake out install steps). `.github/workflows/`: `web-e2e.yml` (typecheck + mocked
-  Playwright — hermetic, per-PR on `computor-web/**`), `backend-unit.yml` (the `-m unit`
-  subset per-PR — broader coverage pending the P6 marker sweep), `integration.yml` (the
-  full harness `make up`/`test`/`clean` nightly + manual, uploads `reports/latest.md`).
-  Triggers include `release/**`; nothing auto-pushes to `main`. The Python editable-install
-  lines are starting points — tune on the first run. All three parse as valid YAML.
+- [x] **P8.3 CI workflows (HELD, not active).** ✅ Written 2026-07-14, but **kept inactive
+  at the owner's request** in `testing-strategy/ci/` (GitHub only runs `.github/workflows/`,
+  so these never trigger). Three drafts: `web-e2e.yml` (typecheck + mocked Playwright —
+  hermetic, per-PR on `computor-web/**`), `backend-unit.yml` (the `-m unit` subset per-PR
+  — broader coverage pending the P6 sweep), `integration.yml` (full harness nightly +
+  manual, uploads `reports/latest.md`). To activate: `git mv testing-strategy/ci/*.yml
+  .github/workflows/` (see that dir's README). All parse as valid YAML; the Python
+  editable-install lines are starting points to tune on the first run.
