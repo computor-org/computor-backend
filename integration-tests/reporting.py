@@ -23,7 +23,7 @@ import pytest
 REPORT_DIR = Path(__file__).resolve().parent / "reports"
 REPORT_FILE = REPORT_DIR / "latest.md"
 
-ROLE_COLUMNS = ("admin", "owner", "maintainer", "lecturer", "tutor", "student", "anon")
+ROLE_COLUMNS = ("admin", "uma", "orga", "exma", "lena", "tobi", "student", "anon")
 
 OUTCOME_GLYPH = {
     "passed": "✓ PASS",

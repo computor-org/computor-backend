@@ -1,41 +1,38 @@
-"""RBAC permission matrix: one row per ``(method, path)`` with per-role
+"""RBAC permission matrix: one row per ``(method, path)`` with per-persona
 expected HTTP status codes.
 
-Lives under ``fixtures/`` so the test files in ``suites/03_permissions/``
-can import it cleanly (the suite directories are named with a leading
-digit, which is not a valid Python package identifier, so normal relative
-imports within ``suites/03_permissions/`` don't work).
+Lives under ``fixtures/`` so the test files in ``suites/03_permissions/`` can
+import it (suite dirs start with a digit → not importable as packages).
 
-Column keys (handoff):
-    admin       → system admin
-    owner       → course ``_owner``
-    maintainer  → course ``_maintainer``
-    lecturer    → course ``_lecturer``
-    tutor       → course ``_tutor``
-    student     → course ``_student``
-    anon        → unauthenticated
+Persona columns (see ``fixtures.personas``):
+    admin    → system ``_admin`` (bypasses every check)
+    uma      → ``_user_manager``
+    orga     → ``_organization_manager``
+    exma     → ``_example_manager``
+    lena     → course ``_lecturer``
+    tobi     → course ``_tutor``
+    student  → course ``_student`` (s_correct)
+    anon     → unauthenticated
 
-``_owner`` and ``_maintainer`` currently behave identically at the API
-surface; they stay as separate columns so the matrix is ready when they
-diverge.
+Expected statuses are **characterized** against the running backend (probe →
+calibrate), so this matrix documents the real conventions rather than an
+idealized one. Observed conventions locked in here:
+    - Unauthenticated → **401** on every authed endpoint.
+    - List reads are scope-filtered: **200** for any authed persona (payload
+      differs), authorization shows up as row visibility, not a 4xx.
+    - Example reads are claim-gated: only admin / example-manager / org-manager
+      (read-only) / lecturer see them; uma / tutor / student → **403**.
+    - Hierarchy detail reads gate by visibility: admin, org-manager and course
+      members (lecturer/tutor/student) → 200; non-members (uma/exma) → **404**.
+    - Course-git-binding reads are lecturer-cohort only (admin/orga/lecturer);
+      others → **403**.
+    - Mutations: org/family/course updates are admin + org-manager (course also
+      lecturer); everyone else → **404** (existence hidden on write even where the
+      read is 200). Invite creation is admin + user-manager (others 403). The
+      course role-assignment ceiling: a lecturer seating a ``_tutor`` → **403**.
 
-Observed backend conventions (locked in by this matrix, not prescribed):
-    - Unauthenticated requests to authed endpoints: **401**.
-    - Reads across the hierarchy gate by visibility: any course member
-      (including a student) sees the org/family/course they're enrolled
-      in. Non-members see **404**. The seeded student is a member of the
-      target course, so all read cells here are 200 for them; rows that
-      probe a non-member scope would see 404.
-    - Explicit permission denials on mutations return **403** for
-      organization/course-family, **404** for course/lower scopes.
-      This asymmetry is intentional to document.
-
-Path templates may embed ``{course_id}``, ``{organization_id}``, and
-``{course_family_id}``. Callers pass an ``ids`` dict sourced from the seed
-fixtures through :func:`resolve_path`.
-
-Cells marked ``UNSET`` are explicit "not yet asserted" placeholders so a
-role test file can skip rows the matrix hasn't decided on.
+``UNSET`` cells are deliberately-unasserted (e.g. an authorized POST we don't
+want to fire because it mutates or 500s); the per-persona test skips them.
 """
 
 from __future__ import annotations
@@ -48,7 +45,7 @@ import pytest
 
 UNSET = -1
 
-ROLE_KEYS = ("admin", "owner", "maintainer", "lecturer", "tutor", "student", "anon")
+ROLE_KEYS = ("admin", "uma", "orga", "exma", "lena", "tobi", "student", "anon")
 
 
 @dataclass(frozen=True)
@@ -65,127 +62,93 @@ class MatrixRow:
         return f"{self.method} {self.path}"
 
 
-def _row(
-    method: str,
-    path: str,
-    body: dict[str, Any] | None = None,
-    **expected: int,
-) -> MatrixRow:
+def _row(method: str, path: str, body: dict[str, Any] | None = None, **expected: int) -> MatrixRow:
     unknown = set(expected) - set(ROLE_KEYS)
     assert not unknown, f"unknown role key(s): {unknown}"
     return MatrixRow(method=method, path=path, expected=dict(expected), body=body)
 
 
-# Most authed endpoints share one of two permission shapes, so pull them
-# out to keep the matrix literal readable.
-_AUTHED_READ = dict(
-    admin=200, owner=200, maintainer=200, lecturer=200, tutor=200, student=200, anon=401
-)
-_PUBLIC = dict(
-    admin=200, owner=200, maintainer=200, lecturer=200, tutor=200, student=200, anon=200
-)
+def _all(**overrides: int) -> dict[str, int]:
+    """Every authed persona 200, anon 401, with per-persona overrides."""
+    base = {k: 200 for k in ROLE_KEYS if k != "anon"}
+    base["anon"] = 401
+    base.update(overrides)
+    return base
+
+
+_AUTHED_READ = _all()  # all authed 200, anon 401
+_PUBLIC = {k: 200 for k in ROLE_KEYS}
 
 
 MATRIX: tuple[MatrixRow, ...] = (
-    # ---- Public ------------------------------------------------------
+    # ---- Public -------------------------------------------------------
     _row("GET", "/auth/providers", **_PUBLIC),
-    # ---- Whoami / self ----------------------------------------------
+    # ---- Authed list reads / lookups (scope-filtered → 200) -----------
     _row("GET", "/user", **_AUTHED_READ),
-    _row("GET", "/user/views", **_AUTHED_READ),
-    # ---- Scope-filtered list reads (return 200 with a scope-filtered
-    #      payload; authorization manifests as row visibility rather
-    #      than a 4xx on the list endpoint itself) -----------------------
     _row("GET", "/users", **_AUTHED_READ),
     _row("GET", "/organizations", **_AUTHED_READ),
     _row("GET", "/course-families", **_AUTHED_READ),
     _row("GET", "/courses", **_AUTHED_READ),
     _row("GET", "/course-members", **_AUTHED_READ),
-    # ---- Hierarchy detail reads (visibility-gated) --------------------
-    _row("GET", "/organizations/{organization_id}", **_AUTHED_READ),
-    _row("GET", "/course-families/{course_family_id}", **_AUTHED_READ),
-    _row("GET", "/courses/{course_id}", **_AUTHED_READ),
-    # ---- Lookup tables (any authed user) -----------------------------
     _row("GET", "/course-roles", **_AUTHED_READ),
     _row("GET", "/roles", **_AUTHED_READ),
     _row("GET", "/languages", **_AUTHED_READ),
-    # ---- Personal resources (own tokens) -----------------------------
     _row("GET", "/api-tokens", **_AUTHED_READ),
-    # ---- Role-discriminating mutations -------------------------------
-    # Organization and course-family updates: admin-only; other authed
-    # roles get 403 (explicit denial rather than visibility-based 404).
-    _row(
-        "PATCH",
-        "/organizations/{organization_id}",
-        body={},
-        admin=200,
-        owner=403,
-        maintainer=403,
-        lecturer=403,
-        tutor=403,
-        student=403,
-        anon=401,
-    ),
-    _row(
-        "PATCH",
-        "/course-families/{course_family_id}",
-        body={},
-        admin=200,
-        owner=403,
-        maintainer=403,
-        lecturer=403,
-        tutor=403,
-        student=403,
-        anon=401,
-    ),
-    # Course update: anyone with _lecturer+ can update; tutor/student get
-    # 404 (visibility pattern, matching the detail GETs above).
-    _row(
-        "PATCH",
-        "/courses/{course_id}",
-        body={},
-        admin=200,
-        owner=200,
-        maintainer=200,
-        lecturer=200,
-        tutor=404,
-        student=404,
-        anon=401,
-    ),
+    _row("GET", "/git-servers", **_AUTHED_READ),
+    # ---- Example reads (claim-gated) ----------------------------------
+    _row("GET", "/examples", **_all(uma=403, tobi=403, student=403)),
+    # ---- Hierarchy detail reads (visibility-gated) --------------------
+    _row("GET", "/organizations/{organization_id}", **_all(uma=404, exma=404)),
+    _row("GET", "/course-families/{course_family_id}", **_all(uma=404, exma=404)),
+    _row("GET", "/courses/{course_id}", **_all(uma=404, exma=404)),
+    # ---- Course git binding read (lecturer cohort only) ---------------
+    _row("GET", "/courses/{course_id}/git", **_all(uma=403, exma=403, tobi=403, student=403)),
+    # ---- Idempotent mutations (PATCH {}) ------------------------------
+    # org/family: admin + org-manager only; everyone else 404 (hidden on write).
+    _row("PATCH", "/organizations/{organization_id}", body={},
+         **_all(uma=404, exma=404, lena=404, tobi=404, student=404)),
+    _row("PATCH", "/course-families/{course_family_id}", body={},
+         **_all(uma=404, exma=404, lena=404, tobi=404, student=404)),
+    # course: admin + org-manager + lecturer; tutor/student/others 404.
+    _row("PATCH", "/courses/{course_id}", body={},
+         **_all(uma=404, exma=404, tobi=404, student=404)),
+    # ---- Invite creation (admin + user-manager) -----------------------
+    _row("POST", "/admin/invites", body={"max_uses": 1, "expires_in_days": 7, "roles": []},
+         admin=201, uma=201, orga=403, exma=403, lena=403, tobi=403, student=403, anon=401),
+    # ---- Denial-only rows (authorized cell UNSET — would mutate) -------
+    # git-server create: everyone but admin/org-manager denied.
+    _row("POST", "/git-servers",
+         body={"type": "forgejo", "base_url": "http://example.invalid", "name": "matrix-probe"},
+         uma=403, exma=403, lena=403, tobi=403, student=403, anon=401),
+    # course-member seat _tutor: the ceiling — a lecturer is denied 403.
+    _row("POST", "/course-members",
+         body={"user_id": "{student_user_id}", "course_id": "{course_id}", "course_role_id": "_tutor"},
+         lena=403, uma=404, exma=404, tobi=404, student=404, anon=401),
 )
 
 
 def resolve_path(row: MatrixRow, ids: dict[str, str]) -> str:
-    """Substitute ``{course_id}`` etc. in a row's path template.
-
-    Raises KeyError for missing keys so a typo in the matrix surfaces as
-    a test-collection error rather than a silent 404 at runtime.
-    """
     return row.path.format(**ids)
 
 
-def call(
-    client: httpx.Client, row: MatrixRow, ids: dict[str, str]
-) -> httpx.Response:
-    """Dispatch a matrix row against the given client."""
+def _resolve_body(body: dict[str, Any] | None, ids: dict[str, str]) -> dict[str, Any] | None:
+    if not body:
+        return body
+    out: dict[str, Any] = {}
+    for k, v in body.items():
+        out[k] = v.format(**ids) if isinstance(v, str) and "{" in v else v
+    return out
+
+
+def call(client: httpx.Client, row: MatrixRow, ids: dict[str, str]) -> httpx.Response:
     kwargs: dict[str, Any] = {}
     if row.body is not None:
-        kwargs["json"] = row.body
+        kwargs["json"] = _resolve_body(row.body, ids)
     return client.request(row.method, resolve_path(row, ids), **kwargs)
 
 
-def check_matrix_row(
-    row: MatrixRow,
-    client: httpx.Client,
-    ids: dict[str, str],
-    role: str,
-    record_property=None,
-) -> None:
-    """Shared assertion body for the per-role matrix tests.
-
-    Also records a ``matrix_observation`` test property so the markdown
-    reporter (see ``conftest.py``) can render the endpoint × role cross
-    tab from a single source.
-    """
+def check_matrix_row(row, client, ids, role, record_property=None) -> None:
+    """Shared assertion body; also records a ``matrix_observation`` for the report."""
     expected = row.expected_for(role)
     if expected == UNSET:
         pytest.skip(f"matrix cell not asserted for {role}")
@@ -193,27 +156,27 @@ def check_matrix_row(
     if record_property is not None:
         record_property(
             "matrix_observation",
-            {
-                "role": role,
-                "method": row.method,
-                "path": row.path,
-                "expected": expected,
-                "observed": r.status_code,
-            },
+            {"role": role, "method": row.method, "path": row.path,
+             "expected": expected, "observed": r.status_code},
         )
     assert r.status_code == expected, (
-        f"{row.method} {r.request.url}: expected {expected}, got "
-        f"{r.status_code} — body={r.text[:200]}"
+        f"{row.method} {r.request.url}: expected {expected}, got {r.status_code} — body={r.text[:200]}"
     )
 
 
 @pytest.fixture(scope="session")
 def matrix_ids(
-    target_organization: dict, target_course_family: dict, target_course: dict
+    target_organization: dict,
+    target_course_family: dict,
+    target_course: dict,
+    enrolled_students: dict,
 ) -> dict[str, str]:
-    """The IDs used to materialise path-template placeholders."""
+    """IDs used to materialise path/body placeholders."""
     return {
         "organization_id": target_organization["id"],
         "course_family_id": target_course_family["id"],
         "course_id": target_course["id"],
+        # a real user id for the ceiling row (already enrolled → the ceiling
+        # 403/404 fires before any duplicate check, so it's a safe target).
+        "student_user_id": enrolled_students["s_empty"]["user_id"],
     }

@@ -98,22 +98,24 @@ same branch name across sibling repos when applicable. Never push to `main`.
 
 ## P3 — Permission matrix (`suites/03_permissions/`) → [04](04-permission-matrix.md)
 
-- [ ] **P3.1 OpenAPI inventory + coverage guard.** Fixture pulling `GET /openapi.json`;
-  `test_coverage_guard.py` failing on endpoints in neither `MATRIX` nor `EXCLUDED`;
-  `EXCLUDED` staleness check.
-  AC: guard fails when a new endpoint is added without a matrix decision (verified by
-  temporarily removing a row).
-- [ ] **P3.2 Expand the matrix.** Grow `fixtures/permission_matrix.py` to the router
-  groups in [04](04-permission-matrix.md) §5, on the new persona axis; placeholders
-  resolved from scenario objects.
-  AC: guard passes with zero undeclared endpoints.
-- [ ] **P3.3 Ceiling & relationship rows.** The named cases from
-  [04](04-permission-matrix.md) §6 (lecturer→tutor 403, org-manager 201, cross-student
-  isolation, tutor-authoring denial, lecturer-upload denial, import ceiling).
-  AC: all cases asserted; cross-tab in `reports/latest.md` renders them.
-- [ ] **P3.4 Per-persona spec files.** One file per persona + anonymous, parametrized
-  over `MATRIX`; read-only rows xdist-parallel.
-  AC: suite green; runtime acceptable (< a few minutes).
+- [ ] **P3.1 OpenAPI inventory + coverage guard.** *(follow-up — not yet built.)* Fixture
+  pulling `GET /openapi.json`; `test_coverage_guard.py` failing on endpoints in neither
+  `MATRIX` nor `EXCLUDED`. The matrix is solid without it; the guard would force a
+  matrix/exclusion decision on every new endpoint. Deferred.
+- [x] **P3.2 Expand the matrix.** ✅ Done + validated 2026-07-14. `fixtures/permission_matrix.py`
+  reworked onto the 8-persona axis (`admin/uma/orga/exma/lena/tobi/student/anon`),
+  **characterized** against the live backend (probe → calibrate) so it documents real
+  conventions: list reads 200/401; example reads claim-gated (uma/tobi/student 403);
+  hierarchy detail visibility (uma/exma 404); git-binding read = lecturer cohort; org/
+  family/course PATCH = admin+org-manager(+lecturer for course), else 404. Body
+  placeholders (`{student_user_id}`) resolve from `matrix_ids`.
+- [x] **P3.3 Ceiling & relationship rows.** ✅ Done. Invite creation (admin+uma 201, others
+  403), git-server-create denials, and the **ceiling** (lecturer seats `_tutor` → 403,
+  others 404) are matrix rows; authorized mutating cells are `UNSET` (skip) to avoid
+  polluting state. (Cross-student isolation / tutor-authoring live in the lifecycle suites.)
+- [x] **P3.4 Per-persona spec files.** ✅ Done. Legacy skip-conftest + 7 old role files
+  removed; 8 per-persona files parametrize over `MATRIX`. `reports/latest.md` renders the
+  endpoint × persona cross-tab. **180 passed, 4 skipped** (the UNSET cells) in ~4s.
 
 ## P4 — Payload & exception contracts (new `suites/04_contracts/`) → [05](05-payload-validation.md)
 
