@@ -149,8 +149,8 @@ def course_contents(
             content_types["assignment"]["id"],
             ex.meta.get("title", label),
             i,
-            max_submissions=10,
-            max_test_runs=20,
+            max_submissions=50,
+            max_test_runs=50,
         )
     return {"unit": unit, "assignments": assignments}
 

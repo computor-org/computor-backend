@@ -65,14 +65,31 @@ class ExampleFixture:
         return out
 
     def correct_solution_files(self) -> dict[str, str]:
-        """The student-submission files taken from localTests/correctSolution."""
+        """The full known-good submission from localTests/correctSolution.
+
+        Returns ALL files in that directory (submission + any additionalFiles /
+        data the test needs) — not just studentSubmissionFiles, because several
+        examples need supporting files to pass.
+        """
         src = self.path / "localTests" / "correctSolution"
         out: dict[str, str] = {}
-        for name in self.student_files:
-            candidate = src / name
-            if candidate.is_file():
-                out[name] = candidate.read_text(encoding="utf-8")
+        if src.is_dir():
+            for f in sorted(src.iterdir()):
+                if f.is_file():
+                    try:
+                        out[f.name] = f.read_text(encoding="utf-8")
+                    except UnicodeDecodeError:
+                        continue
         return out
+
+    def broken_files(self) -> dict[str, str]:
+        """A guaranteed-failing submission (the '_empty' case).
+
+        NOTE: the example student stubs ship pre-solved (stub == solution), so an
+        unsolved submission must be synthesised — an empty/no-op file per
+        studentSubmissionFile reliably fails the tests.
+        """
+        return {name: "# no solution\n" for name in self.student_files}
 
 
 def discover_examples() -> list[ExampleFixture]:

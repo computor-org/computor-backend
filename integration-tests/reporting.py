@@ -44,6 +44,7 @@ class TestRecord:
     longrepr: str = ""
     skip_reason: str = ""
     matrix_observations: list[dict[str, Any]] = field(default_factory=list)
+    grading_observations: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -84,11 +85,9 @@ def pytest_runtest_logreport(report: pytest.TestReport) -> None:
         file_part, _, name_part = nodeid.partition("::")
         file_path = Path(file_part)
         suite = str(file_path.parent) if file_path.parent != Path(".") else ""
-        obs = [
-            value
-            for (name, value) in getattr(report, "user_properties", [])
-            if name == "matrix_observation"
-        ]
+        props = getattr(report, "user_properties", [])
+        obs = [value for (name, value) in props if name == "matrix_observation"]
+        grading_obs = [value for (name, value) in props if name == "grading_outcome"]
         skip_reason = ""
         if report.outcome == "skipped" and isinstance(report.longrepr, tuple) and len(report.longrepr) >= 3:
             skip_reason = str(report.longrepr[2])
@@ -103,6 +102,7 @@ def pytest_runtest_logreport(report: pytest.TestReport) -> None:
                 longrepr=str(report.longrepr or "") if report.outcome in ("failed", "error") else "",
                 skip_reason=skip_reason,
                 matrix_observations=obs,
+                grading_observations=grading_obs,
             )
         )
 
@@ -164,6 +164,20 @@ def _render(records: list[TestRecord], duration: float) -> str:
         )
         lines.append("")
         lines.append(_render_matrix_table(observations))
+        lines.append("")
+
+    # Golden-path grading outcomes, if the lifecycle suite recorded any.
+    grading = [g for r in records for g in r.grading_observations]
+    if grading:
+        lines.append("## Golden-Path Grading Outcomes")
+        lines.append("")
+        lines.append(
+            "Each cell is the test result (0.0–1.0) for that student's submission; "
+            "the final column is the tutor's average grade. Correct ≈ 100%, "
+            "empty ≈ 0%, mixed ≈ 50% — the whole lifecycle, end to end."
+        )
+        lines.append("")
+        lines.append(_render_grading_table(grading))
         lines.append("")
 
     # Per-suite tables. Matrix tests are already represented in the cross
@@ -240,6 +254,37 @@ def _render_matrix_table(observations: list[dict[str, Any]]) -> str:
         label = f"`{method} {path}`"
         body_lines.append(f"| {label} | " + " | ".join(cells) + " |")
 
+    return "\n".join([header, separator, *body_lines])
+
+
+def _render_grading_table(observations: list[dict[str, Any]]) -> str:
+    # Pivot: rows = student, columns = assignment; cell = test result.
+    students: list[str] = []
+    assignments: list[str] = []
+    cell: dict[tuple[str, str], dict[str, Any]] = {}
+    for obs in observations:
+        student, assignment = obs["student"], obs["assignment"]
+        if student not in students:
+            students.append(student)
+        if assignment not in assignments:
+            assignments.append(assignment)
+        cell[(student, assignment)] = obs
+
+    header = "| Student | " + " | ".join(assignments) + " | Avg grade |"
+    separator = "|---|" + "|".join(":---:" for _ in assignments) + "|:---:|"
+    body_lines = []
+    for student in students:
+        cells = []
+        grades = []
+        for assignment in assignments:
+            obs = cell.get((student, assignment))
+            if obs is None:
+                cells.append("—")
+                continue
+            cells.append(f"{float(obs['result']):.2f}")
+            grades.append(float(obs["grade"]))
+        avg = sum(grades) / len(grades) if grades else 0.0
+        body_lines.append(f"| `{student}` | " + " | ".join(cells) + f" | **{avg:.2f}** |")
     return "\n".join([header, separator, *body_lines])
 
 

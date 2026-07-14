@@ -165,33 +165,33 @@ same branch name across sibling repos when applicable. Never push to `main`.
   `CourseContentType` Get/List DTOs (`color: str`) then 500 the whole list;
   (2) `POST /course-contents` drops the `position` default → NOT NULL violation.
   Both look like CrudRouter create using `exclude_unset` without DB column defaults.
-- [ ] **P5.4 Student workflow.** `suites/07_student_workflow/` + `fixtures/submissions.py`:
-  provision-repository + real `git clone` (public URL), ZIP per case
-  (correct/empty/mixed split per [03](03-personas-and-scenario.md)), submit
-  (`submit:true`), `POST /tests` with ≥1s spacing, poll to terminal, assert scores per
-  case.
-  AC: 3 students × 6 assignments all reach terminal results matching their case.
-  **IN PROGRESS (paused 2026-07-14).** Contracts mapped + validated live: provision
-  returns a one-time `clone_token` + `http_url` (public host); the submission-group id is
-  `students/course-contents[*].submission_group.id`; submit is multipart
-  (`submission_create` JSON + ZIP) → `{artifacts:[id,...]}`; `POST /tests {artifact_id}`
-  → result; `GET /tests/status/{id}` returns a **string** status (`queued`→`finished`).
-  **Blocker found + fixed:** the testing worker got 401 fetching the example reference, so
-  tests "finished" with `result: 0.0` and never ran the student code. Root cause: the
-  ctp_ token must be `ctp_` + **exactly 32** url-safe chars (`TOKEN_RANDOM_LENGTH`, exact
-  length — not `>=`); the old `ctp_it_worker_…` (42-char body) seeded fine but failed
-  `validate_token_format` at auth. Template token fixed to a valid 36-char value (auth now
-  200). **Follow-up (user hint): pre-create the worker token with the computor CLI** rather
-  than a hardcoded literal. Two more backend bugs to file for P4: `POST /tests` on an
-  already-tested (content-addressed) submission returns **500** (duplicate
-  `result_version_identifier_member_content_partial_key`) instead of a clean 4xx → the
-  fixture must reuse existing results; and the underscore-vs-length token mismatch between
-  bootstrap's loose check and `validate_token_format`.
-- [ ] **P5.5 Grading & final state.** `suites/08_full_lifecycle/`: tutor grades all 18
-  (CORRECTED / CORRECTION_NECESSARY), aggregate + per-student + lecturer-view
-  assertions, grading-outcome table in `reporting.py`.
-  AC: `reports/latest.md` shows the outcome table with s-correct ≈ 100%, s-empty ≈ 0%,
-  s-mixed ≈ 50%.
+- [x] **P5.4 Student workflow.** ✅ Done + validated 2026-07-14. `fixtures/submissions.py`:
+  each student provisions their Forgejo repo (one-time `clone_token`, public `http_url`),
+  then per assignment submits a ZIP (`submission_create` JSON + file → `{artifacts:[id]}`)
+  and triggers `POST /tests {artifact_id}` (1.2s spacing for the 1/s limit), polling
+  `GET /tests/status/{id}` (string status) to terminal. Reuse is tied to the content-
+  addressed `version_identifier` (dodges the duplicate-test 500). `suites/07_student_workflow`
+  (6 passed, slow): all provisioned, all results terminal, **correct scores 1.0 on all 6**,
+  empty < 1.0, mixed splits, and correct ≥ empty per assignment.
+  **Key realizations:** the example "stubs" ship *pre-solved* (stub == solution), so the
+  empty case submits synthesised broken content; the correct case submits **all**
+  correctSolution files (some tests need `additionalFiles`); some tests award partial
+  credit for broken input (slogic → 0.5), so "empty" asserts `< 1.0`, not `== 0.0`.
+  **Blocker found + fixed** (committed 460795b4): worker token must be `ctp_` + exactly 32
+  url-safe chars; the 42-char body seeded but failed auth (401) so tests never ran.
+  **Stale-session fix:** course-role claims bake into the token at login, but personas log
+  in before seating → lena/tobi/students re-authenticate after their membership fixture
+  (`fixtures/clients.py`). Follow-up (user hint): pre-create the worker token via the
+  computor CLI. Backend bugs for P4: duplicate-test **500** (should be 4xx); token
+  loose-vs-exact length mismatch (bootstrap accepts what auth rejects).
+- [x] **P5.5 Grading & final state.** ✅ Done + validated 2026-07-14. `fixtures/grading.py`:
+  tobi grades all 18 cells via `PATCH /tutors/course-members/{cm}/course-contents/{cc}`
+  (result==1.0 → CORRECTED@1.0, else CORRECTION_NECESSARY@0.0). `suites/08_full_lifecycle`
+  (5 passed): tutor lists submission-groups, every cell graded, `/course-member-gradings`
+  `overall_average_grading` = 1.0 / 0.0 / 0.5 for correct / empty / mixed (strict ordering
+  correct > mixed > empty), student sees own grade. `reporting.py` renders the
+  **Golden-Path Grading Outcomes** table into `reports/latest.md`.
+  AC met: table shows s_correct **1.00**, s_empty **0.00**, s_mixed **0.50**.
 
 ## P6 — Backend unit cleanup (`computor_backend/tests/`) → [07](07-backend-unit-suite.md)
 

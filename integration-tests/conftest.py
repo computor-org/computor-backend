@@ -47,6 +47,8 @@ pytest_plugins = [
     "fixtures.examples",
     "fixtures.forgejo",
     "fixtures.authoring",
+    "fixtures.submissions",
+    "fixtures.grading",
     "fixtures.permission_matrix",
     "reporting",
 ]
