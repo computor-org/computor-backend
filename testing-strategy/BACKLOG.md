@@ -152,10 +152,19 @@ same branch name across sibling repos when applicable. Never push to `main`.
   staff seated, and lecturer→seat-tutor = 403 (ceiling). Also asserts the template_url is
   the public host, not `forgejo:3030`.
   AC: `GET /courses/{id}/git` shows configured+locked binding on the managed server.
-- [ ] **P5.3 Authoring & release.** Groups, student enrolment, unit + 6 assignment
-  contents, `assign-example`, `generate-student-template`, workflow polling, Forgejo-side
-  template assertion (stubs present, `*_master.py`/`test.yaml` absent).
-  AC: template repo verified via Forgejo API.
+- [x] **P5.3 Authoring & release.** ✅ Done + validated 2026-07-13. `fixtures/authoring.py`:
+  lena creates a group, enrols the 3 students (with group), builds a unit + 6 assignment
+  contents, assigns each example **by `example_id`** (identifiers dot-mangle `_`→`.`), and
+  triggers `generate-student-template`; polls the Forgejo template repo until all 6
+  assignment folders land (folders are named by the example *identifier*, `_`→`.`).
+  `suites/06_release/test_authoring_and_release.py` (5 passed): enrolment, unit+6
+  assignments, examples assigned, template populated, and no `*_master.py`/`test.yaml`/
+  `localTests/` leakage into the student template.
+  **Two backend bugs found (worked around by sending explicit values; flagged for P4):**
+  (1) `POST /course-content-types` drops the DTO's `color` default → NULL row → the
+  `CourseContentType` Get/List DTOs (`color: str`) then 500 the whole list;
+  (2) `POST /course-contents` drops the `position` default → NOT NULL violation.
+  Both look like CrudRouter create using `exclude_unset` without DB column defaults.
 - [ ] **P5.4 Student workflow.** `suites/07_student_workflow/` + `fixtures/submissions.py`:
   provision-repository + real `git clone` (public URL), ZIP per case
   (correct/empty/mixed split per [03](03-personas-and-scenario.md)), submit
