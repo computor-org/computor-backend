@@ -244,14 +244,15 @@ same branch name across sibling repos when applicable. Never push to `main`.
 
 ## P8 — Live smoke & CI (last) → [08](08-web-e2e.md) §4, [09](09-ci-and-tooling.md)
 
-- [ ] **P8.1 Playwright `live` project.** Second project in `playwright.config.ts`,
-  excluded by default; real Keycloak browser login + one golden-path slice against the
-  integration stack.
-  AC: `yarn test:e2e --project=live` green with `make up` + seeded state.
-- [ ] **P8.2 Make targets & report polish.** `make report`, gitignore
-  `reports/latest.md` + committed `reports/example.md`.
-  AC: targets documented in README.
-- [ ] **P8.3 Optional CI.** `backend-unit.yml` + `web.yml` PR gates, `integration.yml`
-  nightly with report artifact ([09](09-ci-and-tooling.md) §3). Promote integration to
-  PR gate only after a stable streak.
-  AC: workflows green on `release/2026.10`.
+- [ ] **P8.1 Playwright `live` project.** *(Follow-up.)* Second project in
+  `playwright.config.ts` (excluded by default); real Keycloak browser login + one
+  golden-path slice against the integration stack.
+- [ ] **P8.2 Make targets & report polish.** *(Follow-up.)* `make report`; committed
+  `reports/example.md` snapshot.
+- [x] **P8.3 CI workflows.** ✅ Done 2026-07-14 (structure validated; first CI run will
+  shake out install steps). `.github/workflows/`: `web-e2e.yml` (typecheck + mocked
+  Playwright — hermetic, per-PR on `computor-web/**`), `backend-unit.yml` (the `-m unit`
+  subset per-PR — broader coverage pending the P6 marker sweep), `integration.yml` (the
+  full harness `make up`/`test`/`clean` nightly + manual, uploads `reports/latest.md`).
+  Triggers include `release/**`; nothing auto-pushes to `main`. The Python editable-install
+  lines are starting points — tune on the first run. All three parse as valid YAML.

@@ -1,0 +1,49 @@
+name: integration
+
+# The full integration harness: brings up the self-contained stack (Postgres,
+# Redis, MinIO, Temporal + workers, Keycloak, Forgejo) and runs the API
+# lifecycle suite. Heavy (image builds + ~18 real test executions), so it is
+# nightly + manual, NOT a per-PR gate.
+#
+# NOTE: a starting point — the first run may need runner resources / install
+# steps tuned (the stack builds several images and boots Keycloak + Forgejo).
+on:
+  schedule:
+    - cron: "0 3 * * *" # nightly, 03:00 UTC
+  workflow_dispatch:
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: integration-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install harness
+        run: pip install -e .
+
+      - name: Bring up the stack
+        run: make up
+
+      - name: Run the suite
+        run: make test
+
+      - name: Report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-report
+          path: integration-tests/reports/latest.md
+          retention-days: 14
+
+      - name: Tear down
+        if: always()
+        run: make clean
