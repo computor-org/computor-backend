@@ -13,6 +13,12 @@ from unittest.mock import MagicMock, patch
 
 from computor_backend.coder.service import mint_workspace_token
 
+import pytest
+
+# Quarantined from the default run — Coder feature is out of testing scope
+# (run with -m coder). These are mocked unit tests, but the feature is excluded.
+pytestmark = pytest.mark.coder
+
 
 @patch("computor_backend.coder.service.ApiTokenRepository")
 def test_mint_sets_bounded_expiry(mock_repo_cls):

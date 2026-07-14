@@ -201,22 +201,25 @@ same branch name across sibling repos when applicable. Never push to `main`.
 
 ## P6 — Backend unit cleanup (`computor_backend/tests/`) → [07](07-backend-unit-suite.md)
 
-- [ ] **P6.1 Marker discipline.** `pytest.ini`: markers `integration/keycloak/docker/coder`,
-  hermetic default via `addopts`; env-driven Postgres DSN in `fixtures.py`.
-  AC: `./test.sh` green with no services running.
-- [ ] **P6.2 Permission-suite consolidation.** Merge the five `test_permissions_*` into
-  one `test_permissions.py`; keep `test_course_access_matrix.py` behind `integration`.
-  AC: no duplicate case survives (diff the merged assertions); default run green.
-- [ ] **P6.3 Stale-behavior removal.** Delete local-login tests; resolve
-  `test_password_hashing.py` (verify token-hashing relevance first); **delete all
-  GitLab-era tests** (`test_gitlab_managed.py` + GitLab cases in `test_git_service.py`,
-  `test_git_ops.py`, `test_course_creation.py` — GitLab is omitted entirely); rewrite
-  `test_keycloak.py` as marked pytest.
-  AC: `grep -rl "auth/login\|password/admin/set" computor_backend/tests/` → empty;
-  `grep -ril gitlab computor_backend/tests/` → empty.
-- [ ] **P6.4 Coder quarantine.** Marker `coder` on `test_coder_forwardauth.py`,
-  `test_coder_provision_errors.py`, `test_workspace_token_ttl.py`.
-  AC: default run collects none of them; `-m coder` collects all.
+- [~] **P6.1 Marker discipline.** Partial (2026-07-14). `pytest.ini` gains `keycloak` +
+  `coder` markers and a default `-m "not coder and not keycloak"`; collection was
+  **unblocked** — two modules (`test_course_member_import.py`, `test_temporal_client.py`)
+  import symbols renamed/removed by backend refactors (`import_course_members` →
+  `import_course_member`; `TEMPORAL_HOST` gone) and were `collect_ignore`d in the tests
+  conftest (a single stale import was failing the whole 1005-test collection).
+  **Remaining:** marking the live-Postgres/Redis/MinIO tests so `./test.sh` is fully
+  hermetic-green, and env-driven Postgres DSN. (Suite now collects 1005 with 0 errors.)
+- [ ] **P6.2 Permission-suite consolidation.** *(Deferred — needs per-test review.)* Five
+  `test_permissions_*` files (9/16/8/10/11 tests) overlap; merging safely requires
+  diffing each assertion to avoid dropping unique coverage. Left as a scoped follow-up.
+- [~] **P6.3 Stale-behavior removal.** Partial. The two import-broken stale modules are
+  quarantined (`collect_ignore`) pending rewrite for the current API; deleting/rewriting
+  the GitLab-era + local-login tests is deferred (per-test review, sync with
+  `refactor/2026.10-cleanup`).
+- [x] **P6.4 Coder quarantine.** ✅ Done + validated 2026-07-14. `pytestmark =
+  pytest.mark.coder` on `test_coder_forwardauth.py`, `test_coder_provision_errors.py`,
+  `test_workspace_token_ttl.py` (+ `keycloak` on the two keycloak files). Verified:
+  `-m coder` → 14 tests, `-m keycloak` → 5, default run deselects all 19.
 
 ## P7 — Web e2e expansion (`computor-web/e2e/`) → [08](08-web-e2e.md)
 

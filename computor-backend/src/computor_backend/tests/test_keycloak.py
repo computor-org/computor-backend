@@ -20,6 +20,9 @@ from computor_backend.auth.keycloak import KeycloakAuthPlugin, KeycloakConfig
 from computor_backend.plugins.base import AuthStatus
 import pytest
 
+# Quarantined from the default run — requires a live Keycloak (run with -m keycloak).
+pytestmark = pytest.mark.keycloak
+
 @pytest.mark.asyncio
 @pytest.mark.skipif(os.environ.get("SKIP_KEYCLOAK_TESTS", "true").lower() == "true", 
                     reason="Keycloak service not available")

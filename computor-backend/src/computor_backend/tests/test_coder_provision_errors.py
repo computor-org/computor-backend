@@ -19,6 +19,9 @@ from computor_backend.exceptions import ServiceUnavailableException
 from computor_backend.permissions.principal import Principal
 from computor_types.workspace_roles import WorkspaceProvisionRequest
 
+# Quarantined from the default run — requires a live Coder (run with -m coder).
+pytestmark = pytest.mark.coder
+
 
 def _admin():
     return Principal(user_id="u1", roles=["_admin"])

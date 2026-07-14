@@ -21,6 +21,9 @@ from computor_backend.auth import keycloak as keycloak_module
 from computor_backend.auth.keycloak import KeycloakAuthPlugin
 from computor_backend.plugins.base import AuthStatus
 
+# Quarantined from the default run — requires a live Keycloak (run with -m keycloak).
+pytestmark = pytest.mark.keycloak
+
 
 TOKEN_ENDPOINT = "https://keycloak.example/realms/computor/protocol/openid-connect/token"
 

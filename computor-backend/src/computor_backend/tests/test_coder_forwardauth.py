@@ -12,6 +12,9 @@ import pytest
 from computor_backend.api.auth import verify_coder_access
 from computor_backend.permissions.principal import Principal
 
+# Quarantined from the default run — requires a live Coder (run with -m coder).
+pytestmark = pytest.mark.coder
+
 
 class _FakeURL:
     def __init__(self, path):
