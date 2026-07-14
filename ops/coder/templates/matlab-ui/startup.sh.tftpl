@@ -8,7 +8,12 @@ done
 %{ endif }
 
 if [ ! -f "$HOME/.matlab_workspace_init_done" ]; then
-  cp -a --update=none /opt/matlab-home-seed/. "$HOME"/
+  # Shared per-user home volume can retain foreign-owned/partial state from
+  # other workspace types or older image builds — heal it, and treat the seed
+  # as best-effort: it must never block matlab-proxy from starting.
+  sudo chown -R coder:coder "$HOME" 2>/dev/null || true
+  cp -a --update=none /opt/matlab-home-seed/. "$HOME"/ \
+    || echo "WARN: matlab home seed incomplete; continuing" >&2
   touch "$HOME/.matlab_workspace_init_done"
 fi
 
