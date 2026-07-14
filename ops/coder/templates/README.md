@@ -93,3 +93,17 @@ docker run --rm \
    middleware so the prefix reaches the container intact (see `jupyter`).
 5. Run `startup.sh` (or copy the dir into the deployed templates dir) and push via
    `POST /coder/admin/templates/push {"templates": ["<dir-name>"], "build_images": true}`.
+
+## MATLAB workspaces
+
+`matlab-vscode` and `matlab-ui` are based on `mathworks/matlab:r2024b` and are
+therefore substantially larger and slower to start than the general-purpose
+templates. The VS Code variant installs the official MathWorks MATLAB extension;
+the UI variant serves MathWorks' native browser interface through MATLAB Proxy.
+
+Both templates offer an optional, masked `matlab_license_file` workspace
+parameter. Set it to a network license manager such as `27000@licenses.example`
+or to a license-file path that already exists inside the container. A host path
+is not mounted automatically. Leave it empty to use MathWorks account sign-in.
+Input masking is cosmetic: the value is passed through Terraform and the Docker
+container environment and must not be treated as an opaque secret.

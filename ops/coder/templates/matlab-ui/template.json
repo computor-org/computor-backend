@@ -1,0 +1,8 @@
+{
+    "coder_template_name": "matlab-ui-workspace",
+    "image_name": "computor-workspace-matlab-ui",
+    "build_args_env": [],
+    "display_name": "MATLAB UI",
+    "description": "MATLAB R2024b native browser UI, served by the official MATLAB Proxy.",
+    "icon": "https://raw.githubusercontent.com/mathworks/MATLAB-extension-for-vscode/main/public/L-Membrane_RGB_128x128.png"
+}

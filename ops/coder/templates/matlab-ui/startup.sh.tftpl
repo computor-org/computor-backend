@@ -1,0 +1,30 @@
+set -e
+
+%{ if dev_forward_ports != "" }
+for port in $(echo "${dev_forward_ports}" | tr ',' ' '); do
+  echo "Forwarding localhost:$port -> host.docker.internal:$port"
+  socat TCP-LISTEN:$port,fork,reuseaddr TCP:host.docker.internal:$port &
+done
+%{ endif }
+
+if [ ! -f "$HOME/.matlab_workspace_init_done" ]; then
+  cp -a --update=none /opt/matlab-home-seed/. "$HOME"/
+  touch "$HOME/.matlab_workspace_init_done"
+fi
+
+git config --global user.name "${full_name}"
+git config --global user.email "${email}"
+mkdir -p "$HOME/workspace"
+
+if [ -x "$HOME/personalize" ]; then
+  "$HOME/personalize" >/tmp/personalize.log 2>&1 || true
+fi
+
+# MATLAB Proxy owns the complete Coder prefix. Traefik must not strip it.
+export MWI_BASE_URL="${coder_base_path}/${owner_name}/${workspace_name}"
+export MWI_APP_PORT="${matlab_proxy_port}"
+export MWI_APP_HOST="0.0.0.0"
+export MWI_ENABLE_TOKEN_AUTH="False"
+export MWI_LOG_FILE="/tmp/matlab-proxy.log"
+
+matlab-proxy-app >/tmp/matlab-proxy-stdout.log 2>&1 &

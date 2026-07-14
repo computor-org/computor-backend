@@ -1,0 +1,53 @@
+set -e
+
+%{ if dev_forward_ports != "" }
+for port in $(echo "${dev_forward_ports}" | tr ',' ' '); do
+  echo "Forwarding localhost:$port -> host.docker.internal:$port"
+  socat TCP-LISTEN:$port,fork,reuseaddr TCP:host.docker.internal:$port &
+done
+%{ endif }
+
+# Restore only missing files from MathWorks' original home. matlab-proxy's
+# generated scripts retain /home/matlab paths, which resolve through the image's
+# compatibility symlink to this shared home.
+if [ ! -f "$HOME/.matlab_workspace_init_done" ]; then
+  cp -a --update=none /opt/matlab-home-seed/. "$HOME"/
+  touch "$HOME/.matlab_workspace_init_done"
+fi
+
+git config --global user.name "${full_name}"
+git config --global user.email "${email}"
+mkdir -p "$HOME/workspace"
+
+if [ -x "$HOME/personalize" ]; then
+  "$HOME/personalize" >/tmp/personalize.log 2>&1 || true
+fi
+
+# Machine-level settings are scoped to this code-server instance. The official
+# extension uses this installation for language services, execution and debug.
+USER_DATA_DIR="/home/coder/.local/share/code-server-${workspace_name_lower}"
+mkdir -p "$USER_DATA_DIR/User"
+if [ ! -f "$USER_DATA_DIR/User/settings.json" ]; then
+  cat > "$USER_DATA_DIR/User/settings.json" <<'SETTINGS_EOF'
+{
+  "MATLAB.installPath": "/opt/matlab/R2024b",
+  "MATLAB.signIn": true
+}
+SETTINGS_EOF
+fi
+
+%{ if code_server_password != "" }
+export PASSWORD="${code_server_password}"
+CODE_SERVER_AUTH=password
+%{ else }
+CODE_SERVER_AUTH=none
+%{ endif }
+
+code-server \
+  --auth "$CODE_SERVER_AUTH" \
+  --bind-addr 0.0.0.0:${code_server_port} \
+  --abs-proxy-base-path "${coder_base_path}/${owner_name}/${workspace_name}" \
+  --extensions-dir /opt/code-server/extensions \
+  --user-data-dir "$USER_DATA_DIR" \
+  /home/coder/workspace \
+  >/tmp/code-server.log 2>&1 &
