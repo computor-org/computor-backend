@@ -141,11 +141,16 @@ same branch name across sibling repos when applicable. Never push to `main`.
   → fetch existing). Also exposes `correct_solution_files()` for P5.4. `suites/05_examples`
   (5 passed): all 6 upload + list + version; lecturer/org-manager upload → 403.
   AC met: 6 examples in `GET /examples`; re-run idempotent.
-- [ ] **P5.2 Hierarchy & binding.** `suites/06_release/`: org → family → course with
-  Forgejo binding at creation (canonical: sync `POST /courses` + `PUT /courses/{id}/git`;
-  the async deploy path gets one contract test); seat `lena`/`tobi` (`orga`).
-  New `fixtures/forgejo.py` (admin client, replaces deleted gitlab fixture); rewrite
-  `fixtures/course.py`.
+- [x] **P5.2 Hierarchy & binding.** ✅ Done + validated 2026-07-13. `fixtures/course.py`
+  rewritten (orga-driven, idempotent): org → family → course via `POST`, then
+  `PUT /courses/{id}/git` `{delivery:'git', git_server_id, student_repo_modes:['managed']}`
+  — which materializes the Forgejo template repo (`it_org-it_course_py/template`) and locks
+  the binding on first PUT (the old DB-fallback for course creation is obsolete). New
+  `fixtures/forgejo.py` (admin basic-auth client + `repo_exists`/`repo_tree` helpers,
+  replaces the deleted gitlab fixture). `suites/06_release/test_hierarchy_and_binding.py`
+  (5 passed): hierarchy, binding materialized+locked, template repo exists in Forgejo,
+  staff seated, and lecturer→seat-tutor = 403 (ceiling). Also asserts the template_url is
+  the public host, not `forgejo:3030`.
   AC: `GET /courses/{id}/git` shows configured+locked binding on the managed server.
 - [ ] **P5.3 Authoring & release.** Groups, student enrolment, unit + 6 assignment
   contents, `assign-example`, `generate-student-template`, workflow polling, Forgejo-side

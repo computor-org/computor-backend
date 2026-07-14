@@ -1,66 +1,63 @@
-"""Seed the canonical org → course-family → course hierarchy.
+"""Seed the org → course-family → course hierarchy with a Forgejo git binding.
 
-Uses the fictional identities listed in the handoff (acme-university /
-intro-to-programming / py-fall-2099). Idempotent so the suite can be re-run
-against a dirty stack without a full volume wipe.
+Golden-path phase 1 (03-personas §Phase 1): the org-manager (`orga`) builds the
+hierarchy, binds the course to the managed Forgejo (which materializes the
+student-template repo and locks the binding), and seats the lecturer + tutor —
+seating a `_tutor` needs authority above a plain lecturer (the assignment
+ceiling), which the org-manager has.
 
-Organization and CourseFamily are created via the admin API. Course is
-inserted directly via SQL because `CourseCreate` doesn't expose
-`organization_id` but the underlying table requires it (see fixtures/db.py
-for the note).
+All fixtures are session-scoped and idempotent (find-or-create), matching the
+no-reset run model.
 """
 
 from __future__ import annotations
 
-from typing import Iterator
-
 import httpx
-import psycopg
 import pytest
 
-ORG_PATH = "acme-university"
-ORG_TITLE = "ACME University"
-COURSE_FAMILY_PATH = "intro-to-programming"
-COURSE_FAMILY_TITLE = "Intro to Programming"
-COURSE_PATH = "py-fall-2099"
-COURSE_TITLE = "Python Fall 2099"
-COURSE_GROUP_TITLE = "Default Group"
+ORG_PATH = "it_org"
+ORG_TITLE = "IT Org"
+COURSE_FAMILY_PATH = "it_family"
+COURSE_FAMILY_TITLE = "IT Family"
+COURSE_PATH = "it_course_py"
+COURSE_TITLE = "IT Python Course"
 
 
 def _find_by_path(client: httpx.Client, resource: str, path: str) -> dict | None:
     r = client.get(f"/{resource}")
     r.raise_for_status()
-    for item in r.json():
-        if item.get("path") == path:
-            return item
-    return None
+    return next((x for x in r.json() if x.get("path") == path), None)
 
 
 @pytest.fixture(scope="session")
-def target_organization(admin_client: httpx.Client) -> dict:
-    existing = _find_by_path(admin_client, "organizations", ORG_PATH)
+def managed_git_server_id(orga_client: httpx.Client) -> str:
+    r = orga_client.get("/git-servers")
+    r.raise_for_status()
+    for server in r.json():
+        if server.get("type") == "forgejo" and server.get("managed"):
+            return server["id"]
+    raise AssertionError("no managed Forgejo git server registered")
+
+
+@pytest.fixture(scope="session")
+def target_organization(orga_client: httpx.Client) -> dict:
+    existing = _find_by_path(orga_client, "organizations", ORG_PATH)
     if existing is not None:
         return existing
-    r = admin_client.post(
+    r = orga_client.post(
         "/organizations",
-        json={
-            "path": ORG_PATH,
-            "organization_type": "organization",
-            "title": ORG_TITLE,
-        },
+        json={"path": ORG_PATH, "organization_type": "organization", "title": ORG_TITLE},
     )
     assert r.status_code in (200, 201), r.text
     return r.json()
 
 
 @pytest.fixture(scope="session")
-def target_course_family(
-    admin_client: httpx.Client, target_organization: dict
-) -> dict:
-    existing = _find_by_path(admin_client, "course-families", COURSE_FAMILY_PATH)
+def target_course_family(orga_client: httpx.Client, target_organization: dict) -> dict:
+    existing = _find_by_path(orga_client, "course-families", COURSE_FAMILY_PATH)
     if existing is not None:
         return existing
-    r = admin_client.post(
+    r = orga_client.post(
         "/course-families",
         json={
             "path": COURSE_FAMILY_PATH,
@@ -73,19 +70,11 @@ def target_course_family(
 
 
 @pytest.fixture(scope="session")
-def target_course(
-    db_conn: psycopg.Connection,
-    admin_client: httpx.Client,
-    target_course_family: dict,
-    target_organization: dict,
-) -> dict:
-    # Try the API first in case a future backend fix lands and this fallback
-    # becomes unnecessary.
-    existing = _find_by_path(admin_client, "courses", COURSE_PATH)
+def target_course(orga_client: httpx.Client, target_course_family: dict) -> dict:
+    existing = _find_by_path(orga_client, "courses", COURSE_PATH)
     if existing is not None:
         return existing
-
-    api_attempt = admin_client.post(
+    r = orga_client.post(
         "/courses",
         json={
             "path": COURSE_PATH,
@@ -93,55 +82,66 @@ def target_course(
             "title": COURSE_TITLE,
         },
     )
-    if api_attempt.status_code in (200, 201):
-        return api_attempt.json()
-
-    # DB fallback: organization_id NOT NULL, DTO doesn't expose it.
-    with db_conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO course (path, course_family_id, organization_id, title)
-            VALUES (%s, %s, %s, %s)
-            RETURNING id
-            """,
-            (
-                COURSE_PATH,
-                target_course_family["id"],
-                target_organization["id"],
-                COURSE_TITLE,
-            ),
-        )
-        row = cur.fetchone()
-        assert row is not None
-        course_id = row[0]
-
-    # Re-fetch through the API so the returned dict matches the CourseGet shape.
-    r = admin_client.get(f"/courses/{course_id}")
-    r.raise_for_status()
+    assert r.status_code in (200, 201), r.text
     return r.json()
 
 
 @pytest.fixture(scope="session")
-def target_course_group(
-    admin_client: httpx.Client, target_course: dict
+def target_course_git(
+    orga_client: httpx.Client, target_course: dict, managed_git_server_id: str
 ) -> dict:
-    """Default course group for student memberships.
+    """Bind the course to the managed Forgejo (idempotent).
 
-    The ``course_member`` table has a CHECK constraint requiring
-    ``course_group_id`` to be non-null when ``course_role_id = '_student'``,
-    so students need a group to land in.
+    The first PUT materializes the student-template repo and locks the binding,
+    so on re-run we detect the existing binding and skip the PUT.
     """
-    existing = admin_client.get(
-        "/course-groups", params={"course_id": target_course["id"]}
+    course_id = target_course["id"]
+    existing = orga_client.get(f"/courses/{course_id}/git")
+    if existing.status_code == 200 and existing.json().get("git_server_id"):
+        return existing.json()
+    r = orga_client.put(
+        f"/courses/{course_id}/git",
+        json={
+            "delivery": "git",
+            "git_server_id": managed_git_server_id,
+            "student_repo_modes": ["managed"],
+        },
     )
-    existing.raise_for_status()
-    for item in existing.json():
-        if item.get("course_id") == target_course["id"] and item.get("title") == COURSE_GROUP_TITLE:
-            return item
+    assert r.status_code == 200, r.text
+    return r.json()
 
-    r = admin_client.post(
-        "/course-groups",
-        json={"course_id": target_course["id"], "title": COURSE_GROUP_TITLE},
+
+def _ensure_course_member(
+    orga_client: httpx.Client,
+    course_id: str,
+    user_id: str,
+    course_role_id: str,
+    course_group_id: str | None = None,
+) -> dict:
+    listing = orga_client.get(
+        "/course-members", params={"course_id": course_id, "user_id": user_id}
     )
+    listing.raise_for_status()
+    for m in listing.json():
+        if m.get("user_id") == user_id and m.get("course_id") == course_id:
+            return m
+    body: dict = {"user_id": user_id, "course_id": course_id, "course_role_id": course_role_id}
+    if course_group_id is not None:
+        body["course_group_id"] = course_group_id
+    r = orga_client.post("/course-members", json=body)
     assert r.status_code in (200, 201), r.text
     return r.json()
+
+
+@pytest.fixture(scope="session")
+def seated_staff(orga_client: httpx.Client, target_course: dict, personas: dict) -> dict:
+    """Seat lena as _lecturer and tobi as _tutor (org-manager is uncapped)."""
+    course_id = target_course["id"]
+    return {
+        "lecturer": _ensure_course_member(
+            orga_client, course_id, personas["lena"].user_id, "_lecturer"
+        ),
+        "tutor": _ensure_course_member(
+            orga_client, course_id, personas["tobi"].user_id, "_tutor"
+        ),
+    }
