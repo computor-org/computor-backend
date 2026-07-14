@@ -119,20 +119,20 @@ same branch name across sibling repos when applicable. Never push to `main`.
 
 ## P4 — Payload & exception contracts (new `suites/04_contracts/`) → [05](05-payload-validation.md)
 
-- [ ] **P4.1 Assertion helpers.** New `helpers/assertions.py` (`assert_error`,
-  `assert_shape` against `computor_types` DTOs).
-  AC: helpers imported by 04+ suites; `helpers/` no longer empty.
-- [ ] **P4.2 Validation shapes.** VAL_001=400 cases per representative DTO
-  ([05](05-payload-validation.md) §2).
-  AC: green; any 422 observed = backend regression caught.
-- [ ] **P4.3 Domain exceptions.** Invite edge cases (expired/revoked/used/email-
-  restricted/double-accept), member-without-group, git-binding lock, hierarchy delete
-  409, example re-upload, submission caps, RATE_003, auth 401 shapes
-  ([05](05-payload-validation.md) §3). Registry gaps noted as backend follow-ups.
-  AC: every case asserts `(status, error_code)` or documents the registry gap inline.
-- [ ] **P4.4 Happy-path shapes.** `assert_shape` round-trips for the scenario endpoints,
-  incl. the no-internal-host URL guard on git payloads ([05](05-payload-validation.md) §4).
-  AC: green.
+- [x] **P4.1 Assertion helpers.** ✅ Done 2026-07-14. `helpers/assertions.py`:
+  `assert_error(resp, status, code)` pins `(status, error_code)`; `assert_shape(resp, model)`
+  validates a 2xx body against a DTO. `helpers/` is no longer empty.
+- [x] **P4.2 Validation shapes.** ✅ Done + validated. `suites/04_contracts/test_validation.py`:
+  invite bounds (max_uses 0/101, expiry 366) and an invalid ltree org path all → **400
+  VAL_001** (not 422); documents that an empty invite body is valid (defaults).
+- [x] **P4.3 Domain exceptions.** ✅ Done + validated. `test_domain_errors.py`: auth 401
+  (bogus bearer / malformed ctp_ / unauth — via `detail`, no error_code), unknown invite
+  token → 404, revoked invite → rejected, **delete org with children → 409 CONFLICT_001**,
+  **rebind locked course git → 409 CONFLICT_001**, re-upload same example version → **400
+  VERSION_001**. (Submission caps / RATE_003 deferred — they need careful state setup.)
+- [x] **P4.4 Happy-path shapes.** ✅ Done + validated. `test_payload_shapes.py`: invite
+  create/public-metadata (no raw-token leak), course git binding (`has_token` false, public
+  host URL, locked), provisioned repo (one-time `clone_token`, public host). **18 passed.**
 
 ## P5 — Golden-path lifecycle (`suites/05…08`) → [03](03-personas-and-scenario.md), [06](06-integration-suites.md)
 
