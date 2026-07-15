@@ -53,18 +53,19 @@ class TestUserValidation:
             id="123",
             given_name="John",
             family_name="Doe",
-            email="john@example.com"
+            email="john@example.com",
+            is_service=False,
         )
         assert user.full_name == "John Doe"
         assert user.display_name == "John Doe"
-        
+
         # Test with only given name
-        user_partial = UserGet(id="123", given_name="John")
+        user_partial = UserGet(id="123", given_name="John", is_service=False)
         assert user_partial.full_name == "John"
         assert user_partial.display_name == "John"
-        
+
         # Test with neither name (falls back to a stable id-based label)
-        user_minimal = UserGet(id="123")
+        user_minimal = UserGet(id="123", is_service=False)
         assert user_minimal.full_name == ""
         assert user_minimal.display_name == "User 123"
 
@@ -268,50 +269,54 @@ class TestSessionValidation:
         session = SessionCreate(
             user_id="user-123",
             session_id="session-abc123",
-            ip_address="192.168.1.1"
+            created_ip="192.168.1.1"
         )
-        assert session.ip_address == "192.168.1.1"
-    
+        assert session.created_ip == "192.168.1.1"
+
     def test_session_create_valid_ipv6(self):
         """Test SessionCreate with valid IPv6"""
         session = SessionCreate(
             user_id="user-123",
             session_id="session-abc123",
-            ip_address="2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+            created_ip="2001:0db8:85a3:0000:0000:8a2e:0370:7334"
         )
-        assert session.ip_address == "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
-    
+        assert session.created_ip == "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+
     def test_session_create_invalid_ip(self):
         """Test SessionCreate with invalid IP address"""
         with pytest.raises(ValidationError) as exc_info:
             SessionCreate(
                 user_id="user-123",
                 session_id="session-abc123",
-                ip_address="not.an.ip.address"
+                created_ip="not.an.ip.address"
             )
         assert "Invalid IP address format" in str(exc_info.value)
-    
+
     def test_session_get_computed_properties(self):
         """Test SessionGet computed properties"""
         session = SessionGet(
             id="123",
+            sid="sid-123",
             user_id="user-123",
             session_id="session-abc123456789",
-            ip_address="192.168.1.1",
+            created_ip="192.168.1.1",
+            device_label="Chrome on Windows",
             created_at=datetime(2023, 1, 1, 10, 0, 0),
-            logout_time=datetime(2023, 1, 1, 12, 0, 0)
+            ended_at=datetime(2023, 1, 1, 12, 0, 0)
         )
         assert session.is_active is False
         assert session.session_duration == 7200  # 2 hours in seconds
-        assert "session-" in session.display_name
-        assert "Logged out" in session.display_name
-        
+        assert "Chrome on Windows" in session.display_name
+        assert "Ended" in session.display_name
+
         # Test active session
         active_session = SessionGet(
             id="123",
+            sid="sid-active",
             user_id="user-123",
             session_id="session-active",
-            ip_address="192.168.1.1"
+            created_ip="192.168.1.1",
+            created_at=datetime(2023, 1, 1, 10, 0, 0)
         )
         assert active_session.is_active is True
         assert "Active" in active_session.display_name
@@ -323,21 +328,23 @@ class TestGroupValidation:
     def test_group_create_valid_data(self):
         """Test GroupCreate with valid data"""
         group = GroupCreate(
-            name="Developers",
+            title="Developers",
+            slug="developers",
             description="Software developers group",
-            group_type=GroupType.fixed
+            type=GroupType.fixed
         )
-        assert group.name == "Developers"
-        assert group.group_type == GroupType.fixed
-    
+        assert group.title == "Developers"
+        assert group.type == GroupType.fixed
+
     def test_group_create_empty_name(self):
-        """Test GroupCreate with empty name"""
+        """Test GroupCreate with empty title"""
         with pytest.raises(ValidationError) as exc_info:
             GroupCreate(
-                name="   ",
-                group_type=GroupType.fixed
+                title="   ",
+                slug="developers",
+                type=GroupType.fixed
             )
-        assert "Group name cannot be empty or only whitespace" in str(exc_info.value)
+        assert "Group title cannot be empty or only whitespace" in str(exc_info.value)
 
 
 class TestGroupClaimValidation:

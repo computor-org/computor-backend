@@ -39,16 +39,16 @@ class TestInterfaceImports:
     """Test that interface schemas can be imported."""
     
     def test_import_courses_interface(self):
-        """Test importing courses interface."""
+        """Test importing courses interface (schemas live in computor_types now)."""
         import computor_types.courses
-        assert computor_backend.interface.courses is not None
-    
+        assert computor_types.courses is not None
+
     def test_import_users_interface(self):
-        """Test importing users interface."""
+        """Test importing users interface (schemas live in computor_types now)."""
         import computor_types.users
-        assert computor_backend.interface.users is not None
-    
+        assert computor_types.users is not None
+
     def test_import_organizations_interface(self):
-        """Test importing organizations interface."""
+        """Test importing organizations interface (schemas live in computor_types now)."""
         import computor_types.organizations
-        assert computor_backend.interface.organizations is not None
+        assert computor_types.organizations is not None

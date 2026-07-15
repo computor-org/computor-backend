@@ -27,7 +27,10 @@ class TestGitService:
     def temp_dir(self):
         """Create a temporary directory for tests."""
         temp_dir = tempfile.mkdtemp()
-        yield Path(temp_dir)
+        # Resolve symlinks (on macOS /var -> /private/var) so paths derived from
+        # this dir match GitPython's working_tree_dir, which is always the real
+        # path — otherwise index.add() rejects them as "not in git repository".
+        yield Path(temp_dir).resolve()
         # Cleanup
         shutil.rmtree(temp_dir, ignore_errors=True)
     
@@ -425,9 +428,8 @@ class TestGitService:
         assert str(error) == "Test error"
         assert error.operation == "clone"
     
-    # Integration tests
-    
-    @pytest.mark.integration
+    # Full local workflow (hermetic — local Repo.init, push=False, no network)
+
     @pytest.mark.asyncio
     async def test_full_workflow(self, git_service, temp_dir):
         """Test complete workflow: create, commit, version."""

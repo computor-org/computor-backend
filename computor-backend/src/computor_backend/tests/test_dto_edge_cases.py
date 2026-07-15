@@ -202,9 +202,11 @@ class TestDataTypeEdgeCases:
         from computor_types.sessions import SessionGet
         session = SessionGet(
             id="123",
+            sid="sid-123",
             user_id="user-123",
             session_id="session-123",
-            ip_address="192.168.1.1",
+            created_ip="192.168.1.1",
+            created_at=datetime(2023, 1, 1, 10, 0, 0),
             logout_time=None
         )
         assert session.logout_time is None
@@ -325,9 +327,9 @@ class TestCornerCases:
             session = SessionCreate(
                 user_id="user-123",
                 session_id="session-123",
-                ip_address=ip
+                created_ip=ip
             )
-            assert session.ip_address == ip
+            assert session.created_ip == ip
         
         # Valid IPv6 edge cases
         valid_ipv6s = [
@@ -341,9 +343,9 @@ class TestCornerCases:
             session = SessionCreate(
                 user_id="user-123",
                 session_id="session-123",
-                ip_address=ip
+                created_ip=ip
             )
-            assert session.ip_address == ip
+            assert session.created_ip == ip
         
         # Invalid IP addresses
         invalid_ips = [
@@ -359,7 +361,7 @@ class TestCornerCases:
                 SessionCreate(
                     user_id="user-123",
                     session_id="session-123",
-                    ip_address=ip
+                    created_ip=ip
                 )
     
     def test_ltree_path_edge_cases(self):

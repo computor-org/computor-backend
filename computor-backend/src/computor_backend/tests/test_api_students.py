@@ -179,15 +179,20 @@ class TestStudentAPIImports:
         assert hasattr(computor_backend.api.students, 'student_router')
     
     def test_import_submission_groups_interfaces(self):
-        """Test importing submission groups interface."""
-        from computor_types.submission_groups import (
-            SubmissionGroupStudent, 
-            SubmissionGroupStudentQuery,
+        """Test importing submission groups interface.
+
+        SubmissionGroupStudent + the repository/member DTOs moved to
+        computor_types.student_course_contents (as SubmissionGroupStudentGet);
+        SubmissionGroupStudentQuery stays in submission_groups.
+        """
+        from computor_types.student_course_contents import (
+            SubmissionGroupStudentGet,
             SubmissionGroupRepository,
-            SubmissionGroupMemberBasic
+            SubmissionGroupMemberBasic,
         )
-        
-        assert SubmissionGroupStudent is not None
+        from computor_types.submission_groups import SubmissionGroupStudentQuery
+
+        assert SubmissionGroupStudentGet is not None
         assert SubmissionGroupStudentQuery is not None
         assert SubmissionGroupRepository is not None
         assert SubmissionGroupMemberBasic is not None
@@ -198,15 +203,12 @@ class TestSubmissionGroupsDataConsistency:
     """Test data consistency in submission groups queries"""
     
     def test_null_handling_in_response(self):
-        """Test that null values are properly handled in submission group responses"""
-        from computor_types.submission_groups import SubmissionGroupStudent
-        from pydantic import ValidationError
-        
-        # Test valid submission group with all optional fields as null
+        """Test that null/optional values are handled in submission group responses"""
+        from computor_types.student_course_contents import SubmissionGroupStudentGet
+
+        # The nullable optional fields stay None; the rest carry their defaults.
         valid_data = {
             "id": str(uuid4()),
-            "course_id": str(uuid4()),
-            "course_content_id": str(uuid4()),
             "course_content_title": None,
             "course_content_path": None,
             "example_identifier": None,
@@ -214,26 +216,22 @@ class TestSubmissionGroupsDataConsistency:
             "current_group_size": 1,
             "members": [],
             "repository": None,
-            "latest_grading": None,
-            "created_at": datetime.now(timezone.utc),
-            "updated_at": datetime.now(timezone.utc)
         }
-        
+
         # Should not raise ValidationError
-        submission_group = SubmissionGroupStudent(**valid_data)
+        submission_group = SubmissionGroupStudentGet(**valid_data)
         assert submission_group.example_identifier is None
         assert submission_group.course_content_title is None
         assert submission_group.repository is None
-        assert submission_group.latest_grading is None
     
     def test_example_identifier_field_presence(self):
-        """Test that example_identifier field is always present in SubmissionGroupStudent"""
-        from computor_types.submission_groups import SubmissionGroupStudent
-        
+        """Test that example_identifier field is always present in SubmissionGroupStudentGet"""
+        from computor_types.student_course_contents import SubmissionGroupStudentGet
+
         # Check that example_identifier is in the model fields
-        fields = SubmissionGroupStudent.model_fields
+        fields = SubmissionGroupStudentGet.model_fields
         assert 'example_identifier' in fields
-        
+
         # Check that it's Optional (can be None)
         field_info = fields['example_identifier']
         assert field_info.default is None

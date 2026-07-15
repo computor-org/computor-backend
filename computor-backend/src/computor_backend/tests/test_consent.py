@@ -155,7 +155,13 @@ class TestConsentGateMiddleware:
         seed_principal(fake_redis, TOKEN, USER)
         response = client.get("/protected", headers=bearer())
         assert response.status_code == 403
-        assert response.json() == {"error": "consent_required", "required_version": CURRENT}
+        body = response.json()
+        # Stable machine-readable fields are pinned; the human `message` just has
+        # to reference the required version.
+        assert body["error"] == "consent_required"
+        assert body["required_version"] == CURRENT
+        assert body["error_code"] == "AUTHZ_006"
+        assert CURRENT in body["message"]
 
     def test_consented_user_passes(self, client, fake_redis, gate_state):
         seed_principal(fake_redis, TOKEN, USER)

@@ -29,7 +29,8 @@ def _principal(roles: Optional[List[str]] = None, *claim_strings: str) -> Princi
 
 class TestLecturerPipelineView:
     def test_admin_always_gets_lecturer(self):
-        assert get_course_views_for_user(_principal(["_admin"])) == ["lecturer"]
+        # Admins now also carry the user_manager view alongside lecturer.
+        assert get_course_views_for_user(_principal(["_admin"])) == ["lecturer", "user_manager"]
 
     def test_organization_manager_gets_lecturer(self):
         assert get_course_views_for_user(

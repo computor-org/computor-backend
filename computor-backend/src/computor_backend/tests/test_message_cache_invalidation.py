@@ -27,7 +27,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from computor_backend.business_logic import messages as messages_bl
+# The invalidation helpers live in the messages.cache submodule; import it
+# directly so monkeypatching `_affected_course_ids_for_message` patches the
+# global that `invalidate_dashboard_views_for_message` actually calls.
+from computor_backend.business_logic.messages import cache as messages_bl
 
 
 # ---------------------------------------------------------------------------

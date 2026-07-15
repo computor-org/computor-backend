@@ -136,6 +136,7 @@ class TestTemporalTaskExecutor:
         
         # Mock describe result
         describe_result = MagicMock()
+        describe_result.workflow_type = "test-workflow"  # task_name derives from this (must be str)
         describe_result.status = WorkflowExecutionStatus.RUNNING
         describe_result.task_queue = "test-queue"
         describe_result.start_time = datetime.utcnow()
@@ -168,6 +169,7 @@ class TestTemporalTaskExecutor:
         
         # Mock describe result
         describe_result = MagicMock()
+        describe_result.workflow_type = "test-workflow"  # task_name derives from this (must be str)
         describe_result.status = WorkflowExecutionStatus.COMPLETED
         describe_result.task_queue = "test-queue"
         describe_result.start_time = datetime.utcnow()
@@ -223,6 +225,7 @@ class TestTemporalTaskExecutor:
         
         # Mock describe for fallback
         describe_result = MagicMock()
+        describe_result.workflow_type = "test-workflow"  # task_name derives from this (must be str)
         describe_result.status = WorkflowExecutionStatus.FAILED
         describe_result.close_time = datetime.utcnow()
         workflow_handle.describe = AsyncMock(return_value=describe_result)
