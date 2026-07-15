@@ -9,6 +9,12 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = Number(process.env.E2E_PORT ?? 3100);
 const API = process.env.E2E_API_URL ?? 'http://localhost:8000';
 
+// The `live` project drives a REAL Keycloak login against the running
+// integration stack; it is opt-in so the hermetic default run never touches it.
+// Enable with E2E_LIVE=1 and point the app at the integration API, e.g.:
+//   E2E_LIVE=1 E2E_API_URL=http://localhost:18000 npx playwright test --project=live
+const LIVE = !!process.env.E2E_LIVE;
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -21,7 +27,18 @@ export default defineConfig({
     trace: 'on-first-retry',
     headless: true,
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    // Hermetic, mocked-backend specs — the default run. Never picks up e2e/live/.
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: '**/live/**' },
+    // Live full-stack slice — only present when E2E_LIVE is set.
+    ...(LIVE
+      ? [{
+          name: 'live',
+          use: { ...devices['Desktop Chrome'] },
+          testMatch: '**/live/**/*.spec.ts',
+        }]
+      : []),
+  ],
   webServer: {
     command: `npx next dev -p ${PORT}`,
     url: `http://localhost:${PORT}`,
