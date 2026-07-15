@@ -103,6 +103,33 @@ class CoderSettings(BaseSettings):
                     "set <= 0 to never expire."
     )
 
+    # Workspace auto-stop (TTL) settings, applied to every template at push time.
+    # Coder never observes activity in this deployment (browsers reach code-server
+    # directly through Traefik, bypassing Coder's proxy), so the deadline is instead
+    # bumped from the ForwardAuth hook — see keepalive.py.
+    workspace_ttl_ms: int = Field(
+        default=14_400_000,  # 4 hours
+        description="Initial auto-stop deadline for a started workspace "
+                    "(default_ttl_ms on the Coder template). This is the longest a "
+                    "workspace lives after start if it never receives any proxied "
+                    "request; active workspaces are kept alive past it via the "
+                    "ForwardAuth keepalive."
+    )
+    workspace_activity_bump_ms: int = Field(
+        default=14_400_000,  # 4 hours
+        description="How far into the future the ForwardAuth keepalive pushes a "
+                    "workspace's auto-stop deadline on each authorized request. An "
+                    "idle workspace is reclaimed this long after its last request. "
+                    "Keep >= workspace_ttl_ms so a bump never shortens the deadline."
+    )
+    workspace_activity_bump_throttle_s: int = Field(
+        default=300,  # 5 minutes
+        description="Minimum interval between Coder deadline-extend calls per "
+                    "workspace. Throttles the ForwardAuth keepalive so it touches "
+                    "the Coder API at most once per window per workspace regardless "
+                    "of request volume."
+    )
+
 
 # Singleton instance
 _settings: Optional[CoderSettings] = None

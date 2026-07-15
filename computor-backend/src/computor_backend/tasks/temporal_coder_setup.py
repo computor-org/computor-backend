@@ -695,8 +695,8 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
         backend_external_url = parameters.get("backend_external_url", "http://host.docker.internal:8000")
         dev_forward_ports = parameters.get("dev_forward_ports", "")
         template_variables = parameters.get("template_variables", {})
-        ttl_ms = parameters.get("ttl_ms", 3600000)  # 1 hour default
-        activity_bump_ms = parameters.get("activity_bump_ms", 3600000)
+        ttl_ms = parameters.get("ttl_ms", 14400000)  # 4 hour default
+        activity_bump_ms = parameters.get("activity_bump_ms", 14400000)
         # One immutable image tag for this run, shared by the build and the
         # template's pinned workspace_image. workflow.now() is replay-safe.
         image_tag = parameters.get("image_tag") or ("v" + workflow.now().strftime("%Y%m%d-%H%M%S"))
