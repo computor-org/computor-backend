@@ -131,9 +131,10 @@ def claims_workspace_user() -> List[Tuple[str, str]]:
     """
     Generate claims for the workspace user role.
 
-    Basic access: view UI, list own workspaces, start/stop own workspaces, and
-    self-provision one workspace per template. Cannot provision for other users,
-    delete, or manage other users' workspaces.
+    Basic access: view UI, list own workspaces, start/stop own workspaces,
+    view (but not manage) templates, and self-provision one workspace per
+    template. Cannot provision for other users, delete, manage other users'
+    workspaces, or manage templates.
 
     Returns:
         List of (claim_type, claim_value) tuples for workspace access permissions
@@ -143,6 +144,7 @@ def claims_workspace_user() -> List[Tuple[str, str]]:
         ("permissions", "workspace:list"),          # List own workspaces
         ("permissions", "workspace:start"),         # Start own workspace
         ("permissions", "workspace:stop"),          # Stop own workspace
+        ("permissions", "workspace:templates"),     # View templates (read-only; managing them needs workspace:manage)
         ("permissions", "workspace:provision_self"),  # Self-provision one workspace per template
     ]
 
@@ -163,13 +165,13 @@ def claims_workspace_maintainer() -> List[Tuple[str, str]]:
         ("permissions", "workspace:list"),
         ("permissions", "workspace:start"),
         ("permissions", "workspace:stop"),
+        ("permissions", "workspace:templates"),     # View templates
         ("permissions", "workspace:provision_self"),
         # Maintainer-only claims
         ("permissions", "workspace:provision"),     # Provision new workspaces (any user, custom names)
         ("permissions", "workspace:delete"),        # Delete workspaces
-        ("permissions", "workspace:manage"),        # Query/manage any user's workspaces
+        ("permissions", "workspace:manage"),        # Query/manage any user's workspaces + manage templates (build/push/rollout)
         ("permissions", "workspace:session"),       # Create coder sessions
-        ("permissions", "workspace:templates"),     # View/manage templates
     ]
 
 
