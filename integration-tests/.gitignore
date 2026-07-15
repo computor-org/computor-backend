@@ -4,4 +4,5 @@ keycloak-import/
 .pytest_cache/
 __pycache__/
 *.egg-info/
-reports/
+reports/*
+!reports/example.md

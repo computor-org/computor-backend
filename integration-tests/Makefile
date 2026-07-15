@@ -11,7 +11,7 @@ SHELL := /usr/bin/env bash
 COMPOSE := docker compose -f docker-compose.integration.yaml --env-file .env.integration
 PYTEST := pytest
 
-.PHONY: help env stage-realm up wait down clean logs ps test shell-api
+.PHONY: help env stage-realm up wait down clean logs ps test report shell-api
 
 help:
 	@echo "Targets:"
@@ -20,6 +20,7 @@ help:
 	@echo "  up          Build, start, wait for health"
 	@echo "  wait        Wait for all services to be healthy"
 	@echo "  test        Run the pytest suite against the running stack"
+	@echo "  report      Run the suite and regenerate reports/latest.md"
 	@echo "  logs        Tail all service logs"
 	@echo "  ps          Show container status"
 	@echo "  down        Stop containers (preserves volumes)"
@@ -65,6 +66,13 @@ ps:
 
 test:
 	$(PYTEST)
+
+# Run the suite and surface the markdown report. reporting.py writes
+# reports/latest.md at session finish; a committed sample lives in
+# reports/example.md. The `-` lets the echo run even when tests fail.
+report:
+	-$(PYTEST)
+	@echo "📝 Report → reports/latest.md (committed sample: reports/example.md)"
 
 shell-api:
 	$(COMPOSE) exec api bash
