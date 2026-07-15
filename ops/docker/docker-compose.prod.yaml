@@ -105,6 +105,9 @@ services:
       CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
       CODER_ADMIN_API_SECRET: ${CODER_ADMIN_API_SECRET}
+      # Read by the API when pushing Coder templates (matlab_license_file
+      # template variable) — must reach this container, not just the host env.
+      MATLAB_MLM_LICENSE_FILE: ${MATLAB_MLM_LICENSE_FILE:-}
       BACKEND_EXTERNAL_URL: ${BACKEND_EXTERNAL_URL:-}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?}
       # Git server integration (if enabled) — uses the internal container URL
