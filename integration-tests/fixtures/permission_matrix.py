@@ -180,3 +180,58 @@ def matrix_ids(
         # 403/404 fires before any duplicate check, so it's a safe target).
         "student_user_id": enrolled_students["s_empty"]["user_id"],
     }
+
+
+# ---------------------------------------------------------------------------
+# P3.1 — OpenAPI inventory + coverage guard
+#
+# The guard (``suites/03_permissions/test_coverage_guard.py``) flags any live
+# endpoint that is in neither ``MATRIX`` nor the exclusions below, so adding an
+# endpoint forces a matrix-or-exclude decision. Exclusions are curated here.
+# ---------------------------------------------------------------------------
+
+# Path prefixes that are intentionally out of the permission matrix: public /
+# plumbing / streaming routes, and features out of the integration test scope.
+EXCLUDED_PREFIXES: tuple[str, ...] = (
+    "/auth",            # SSO login/callback/logout — covered by 02_auth
+    "/docs", "/redoc", "/openapi.json",  # API docs
+    "/health", "/healthz", "/livez", "/readyz",  # liveness/readiness probes
+    "/metrics",         # prometheus scrape
+    "/ws",              # websocket routes (not REST authz)
+    "/coder", "/workspace",  # Coder feature — excluded from scope (issue #106)
+    "/consent",         # consent-gate middleware — its own concern
+    "/results", "/tests",  # test-runner streaming/callbacks
+)
+
+# Exact (METHOD, path) escapes for anything not captured by a prefix.
+EXCLUDED: frozenset[tuple[str, str]] = frozenset({
+    ("GET", "/"),  # service root
+})
+
+_HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
+
+
+def matrix_coverage() -> set[tuple[str, str]]:
+    """The ``(METHOD, path)`` pairs the permission MATRIX already asserts."""
+    return {(row.method.upper(), row.path) for row in MATRIX}
+
+
+def is_excluded(method: str, path: str) -> bool:
+    """True when ``(method, path)`` is intentionally outside the matrix."""
+    if (method.upper(), path) in EXCLUDED:
+        return True
+    return any(path == p or path.startswith(p + "/") for p in EXCLUDED_PREFIXES)
+
+
+@pytest.fixture(scope="session")
+def openapi_inventory(admin_client: httpx.Client) -> set[tuple[str, str]]:
+    """Every ``(METHOD, path)`` the live backend advertises in ``/openapi.json``."""
+    resp = admin_client.get("/openapi.json")
+    resp.raise_for_status()
+    paths: dict[str, dict] = resp.json().get("paths", {})
+    return {
+        (method.upper(), path)
+        for path, operations in paths.items()
+        for method in operations
+        if method.upper() in _HTTP_METHODS
+    }
