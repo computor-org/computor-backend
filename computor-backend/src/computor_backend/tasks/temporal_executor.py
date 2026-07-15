@@ -15,6 +15,12 @@ from computor_types.tasks import TaskStatus, TaskResult, TaskInfo, TaskSubmissio
 
 logger = logging.getLogger(__name__)
 
+CODER_ADMIN_WORKFLOWS = {
+    "build_workspace_images",
+    "push_coder_templates",
+    "rollout_workspaces",
+}
+
 
 class TemporalTaskExecutor:
     """
@@ -135,7 +141,35 @@ class TemporalTaskExecutor:
             )
             
             # Extract task name from workflow type
-            task_name = description.workflow_type or "unknown"
+            raw_task_name = getattr(description, "workflow_type", None)
+            task_name = raw_task_name if isinstance(raw_task_name, str) else "unknown"
+
+            progress = None
+            logical_error = None
+            if task_name in CODER_ADMIN_WORKFLOWS:
+                try:
+                    progress = await handle.query("get_progress")
+                except Exception:
+                    # Workflows created before progress queries were introduced
+                    # deliberately retain their coarse Temporal status.
+                    logger.debug("No progress query for workflow %s", task_id)
+
+                if description.status == WorkflowExecutionStatus.COMPLETED:
+                    try:
+                        workflow_result = await handle.result()
+                        if isinstance(workflow_result, WorkflowResult):
+                            logical_error = workflow_result.error
+                            if progress is None:
+                                progress = {}
+                            progress = {
+                                **progress,
+                                "operation_status": workflow_result.status,
+                                "result": workflow_result.result,
+                            }
+                            if workflow_result.status == "failed":
+                                status = TaskStatus.FAILED
+                    except Exception:
+                        logger.debug("Could not read completed workflow result %s", task_id)
             
             # Create shortened task ID for better display
             short_task_id = task_id.split('-')[-1] if '-' in task_id else task_id
@@ -144,8 +178,8 @@ class TemporalTaskExecutor:
             has_result = description.status in [WorkflowExecutionStatus.COMPLETED, WorkflowExecutionStatus.FAILED]
 
             # Extract error message from failed workflows
-            error_message = None
-            if status == TaskStatus.FAILED:
+            error_message = logical_error
+            if description.status == WorkflowExecutionStatus.FAILED:
                 try:
                     raw_desc = description.raw_description
                     if raw_desc and hasattr(raw_desc, 'workflow_execution_info'):
@@ -180,7 +214,8 @@ class TemporalTaskExecutor:
                 workflow_id=task_id,
                 run_id=description.most_recent_execution_run_id if hasattr(description, 'most_recent_execution_run_id') else None,
                 execution_time=description.start_time,
-                history_length=getattr(description, 'history_length', None)
+                history_length=getattr(description, 'history_length', None),
+                progress=progress,
             )
             
             return task_info
@@ -217,7 +252,7 @@ class TemporalTaskExecutor:
                     task_id=task_id,
                     status=TaskStatus.FINISHED,
                     result=result.result if isinstance(result, WorkflowResult) else result,
-                    error=None,
+                    error=result.error if isinstance(result, WorkflowResult) else None,
                     created_at=datetime.now(timezone.utc),
                     finished_at=datetime.now(timezone.utc),
                 )

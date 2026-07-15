@@ -8,6 +8,8 @@ from typing import Any, Optional, Union
 
 from pydantic import BaseModel, Field
 
+from computor_types.tasks import TaskInfo
+
 
 class WorkspaceStatus(str, Enum):
     """Workspace status from Coder API."""
@@ -120,6 +122,10 @@ class CoderWorkspace(BaseModel):
     latest_build_status: Optional[WorkspaceBuildStatus] = Field(
         None,
         description="Latest build status"
+    )
+    automatic_updates: Optional[str] = Field(
+        None,
+        description="Coder automatic update policy: always | never",
     )
     created_at: Optional[datetime] = Field(None, description="Creation timestamp")
     updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
@@ -239,3 +245,34 @@ class CoderAdminTaskResponse(BaseModel):
     workflow_id: str = Field(..., description="Temporal workflow ID for tracking")
     task_name: str = Field(..., description="Name of the submitted task")
     status: str = Field("submitted", description="Initial task status")
+
+
+class CoderTemplateFleetStatus(BaseModel):
+    """Update readiness for one Coder template."""
+
+    id: str
+    name: str
+    display_name: Optional[str] = None
+    active_version_id: Optional[str] = None
+    workspace_count: int = 0
+    current_count: int = 0
+    outdated_count: int = 0
+    running_outdated_count: int = 0
+    scheduled_on_start_count: int = 0
+    actionable_count: int = 0
+    rollout_state: str
+
+
+class CoderFleetStatusResponse(BaseModel):
+    """Privileged template-centric fleet summary."""
+
+    healthy: bool
+    version: Optional[str] = None
+    templates: list[CoderTemplateFleetStatus] = Field(default_factory=list)
+    workspace_count: int = 0
+
+
+class CoderAdminTaskListResponse(BaseModel):
+    """Recent Coder image/template administration workflows."""
+
+    tasks: list[TaskInfo] = Field(default_factory=list)

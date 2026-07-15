@@ -187,6 +187,33 @@ class TestTemporalTaskExecutor:
             assert status.finished_at is not None
 
     @pytest.mark.asyncio
+    async def test_get_coder_task_status_includes_workflow_progress(self, executor, mock_client):
+        task_id = "push_coder_templates-progress"
+        workflow_handle = MagicMock()
+        workflow_handle.describe = AsyncMock()
+        workflow_handle.query = AsyncMock(return_value={
+            "phase": "building",
+            "completed": 1,
+            "total": 2,
+        })
+        description = MagicMock()
+        description.status = WorkflowExecutionStatus.RUNNING
+        description.workflow_type = "push_coder_templates"
+        description.task_queue = "coder-tasks"
+        description.start_time = datetime.utcnow()
+        description.close_time = None
+        description.most_recent_execution_run_id = "run-1"
+        description.history_length = 12
+        workflow_handle.describe.return_value = description
+        mock_client.get_workflow_handle = Mock(return_value=workflow_handle)
+
+        with patch('computor_backend.tasks.temporal_executor.get_temporal_client', return_value=mock_client):
+            status = await executor.get_task_status(task_id)
+
+        assert status.progress == {"phase": "building", "completed": 1, "total": 2}
+        workflow_handle.query.assert_awaited_once_with("get_progress")
+
+    @pytest.mark.asyncio
     async def test_get_task_result_success(self, executor, mock_client):
         """Test getting result of a successful task."""
         task_id = str(uuid4())

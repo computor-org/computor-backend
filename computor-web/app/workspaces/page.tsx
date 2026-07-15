@@ -87,7 +87,7 @@ export default function WorkspacesPage() {
             {health === null
               ? 'Checking Coder…'
               : health.healthy
-                ? `Coder healthy${health.version ? ` · v${health.version}` : ''}`
+                ? 'Coder healthy'
                 : 'Coder unreachable'}
           </span>
           <span className="text-gray-300">·</span>

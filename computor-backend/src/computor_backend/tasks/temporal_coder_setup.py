@@ -509,6 +509,38 @@ async def push_coder_template(
 # ---------------------------------------------------------------------------
 
 
+def _progress_templates(resolved: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return [
+        {
+            "key": item["dir_name"],
+            "name": item.get("coder_template_name", item["dir_name"]),
+            "display_name": item.get("display_name"),
+            "status": "pending",
+            "phase": "queued",
+            "error": None,
+        }
+        for item in resolved
+    ]
+
+
+def _update_template_progress(
+    progress: Dict[str, Any], key: str, **changes: Any
+) -> None:
+    for item in progress.get("templates", []):
+        if item.get("key") == key:
+            item.update(changes)
+            return
+
+
+def _finish_progress(progress: Dict[str, Any], failed: int) -> None:
+    progress["phase"] = "complete"
+    progress["current_template"] = None
+    progress["completed"] = progress.get("total", 0)
+    progress["operation_status"] = (
+        "completed_with_errors" if failed else "completed"
+    )
+
+
 @register_task
 @workflow.defn(name="build_workspace_images", sandboxed=False)
 class BuildWorkspaceImagesWorkflow(BaseWorkflow):
@@ -526,6 +558,20 @@ class BuildWorkspaceImagesWorkflow(BaseWorkflow):
     def get_execution_timeout(cls) -> timedelta:
         return timedelta(minutes=30)
 
+    def __init__(self) -> None:
+        self._progress: Dict[str, Any] = {
+            "phase": "queued",
+            "operation_status": "running",
+            "templates": [],
+            "current_template": None,
+            "completed": 0,
+            "total": 0,
+        }
+
+    @workflow.query
+    def get_progress(self) -> Dict[str, Any]:
+        return self._progress
+
     @workflow.run
     async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
         templates_dir = parameters.get("templates_dir", "/templates")
@@ -533,18 +579,19 @@ class BuildWorkspaceImagesWorkflow(BaseWorkflow):
         requested = parameters.get("templates")
         # One immutable image tag per run; workflow.now() is replay-deterministic.
         image_tag = parameters.get("image_tag") or ("v" + workflow.now().strftime("%Y%m%d-%H%M%S"))
+        self._progress.update({"phase": "discovering", "image_tag": image_tag})
 
         # Discovery happens inside the activity (which runs on the worker).
         # The workflow just needs to know which keys to iterate over.
         # Pass templates_dir so activities can discover at runtime.
-        template_keys = parameters.get("_resolved_keys")
-        if not template_keys:
-            # Fallback: resolve from requested names via a lightweight activity
-            template_keys = await workflow.execute_activity(
-                discover_template_keys,
+        resolved = parameters.get("_resolved_templates")
+        if not resolved:
+            resolved = await workflow.execute_activity(
+                discover_template_operations,
                 args=[templates_dir, requested],
                 start_to_close_timeout=timedelta(seconds=30),
             )
+        template_keys = [item["dir_name"] for item in resolved]
 
         if not template_keys:
             return WorkflowResult(
@@ -554,10 +601,18 @@ class BuildWorkspaceImagesWorkflow(BaseWorkflow):
                 metadata={"workflow_type": "build_workspace_images"},
             )
 
+        self._progress.update({
+            "phase": "building",
+            "templates": _progress_templates(resolved),
+            "total": len(template_keys),
+        })
+
         workflow.logger.info(f"Building images for templates: {template_keys}")
 
         results = []
         for key in template_keys:
+            self._progress.update({"phase": "building", "current_template": key})
+            _update_template_progress(self._progress, key, status="running", phase="building")
             result = await workflow.execute_activity(
                 build_workspace_image,
                 args=[key, templates_dir, registry_host, image_tag],
@@ -569,8 +624,19 @@ class BuildWorkspaceImagesWorkflow(BaseWorkflow):
                 ),
             )
             results.append(result)
+            ok = bool(result.get("success"))
+            _update_template_progress(
+                self._progress,
+                key,
+                status="succeeded" if ok else "failed",
+                phase="complete",
+                error=result.get("error"),
+                result=result,
+            )
+            self._progress["completed"] += 1
 
         failed = [r for r in results if not r.get("success")]
+        _finish_progress(self._progress, len(failed))
         if failed:
             return WorkflowResult(
                 status="completed_with_errors",
@@ -603,6 +669,20 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
     def get_execution_timeout(cls) -> timedelta:
         return timedelta(minutes=30)
 
+    def __init__(self) -> None:
+        self._progress: Dict[str, Any] = {
+            "phase": "queued",
+            "operation_status": "running",
+            "templates": [],
+            "current_template": None,
+            "completed": 0,
+            "total": 0,
+        }
+
+    @workflow.query
+    def get_progress(self) -> Dict[str, Any]:
+        return self._progress
+
     @workflow.run
     async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
         templates_dir = parameters.get("templates_dir", "/templates")
@@ -620,6 +700,7 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
         # One immutable image tag for this run, shared by the build and the
         # template's pinned workspace_image. workflow.now() is replay-safe.
         image_tag = parameters.get("image_tag") or ("v" + workflow.now().strftime("%Y%m%d-%H%M%S"))
+        self._progress.update({"phase": "discovering", "image_tag": image_tag})
 
         if not coder_admin_email or not coder_admin_password:
             return WorkflowResult(
@@ -632,11 +713,12 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
         requested = parameters.get("templates")
 
         # Discover available templates on the worker filesystem
-        template_keys = await workflow.execute_activity(
-            discover_template_keys,
+        resolved = await workflow.execute_activity(
+            discover_template_operations,
             args=[templates_dir, requested],
             start_to_close_timeout=timedelta(seconds=30),
         )
+        template_keys = [item["dir_name"] for item in resolved]
 
         if not template_keys:
             return WorkflowResult(
@@ -646,11 +728,20 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
                 metadata={"workflow_type": "push_coder_templates"},
             )
 
+        self._progress.update({
+            "phase": "building" if build_images else "pushing",
+            "templates": _progress_templates(resolved),
+            "total": len(template_keys),
+        })
+
         # Step 1: optionally build images
+        build_results: Dict[str, Dict[str, Any]] = {}
         if build_images:
             workflow.logger.info(f"Building images before pushing templates: {template_keys}")
             for key in template_keys:
-                await workflow.execute_activity(
+                self._progress.update({"phase": "building", "current_template": key})
+                _update_template_progress(self._progress, key, status="running", phase="building")
+                result = await workflow.execute_activity(
                     build_workspace_image,
                     args=[key, templates_dir, registry_host, image_tag],
                     start_to_close_timeout=timedelta(minutes=15),
@@ -660,12 +751,38 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
                         maximum_attempts=2,
                     ),
                 )
+                build_results[key] = result
+                if result.get("success"):
+                    _update_template_progress(
+                        self._progress, key, status="pending", phase="pushing", result=result
+                    )
+                else:
+                    _update_template_progress(
+                        self._progress,
+                        key,
+                        status="failed",
+                        phase="building",
+                        error=result.get("error"),
+                        result=result,
+                    )
+                    self._progress["completed"] += 1
 
         # Step 2: push templates
         workflow.logger.info(f"Pushing templates: {template_keys}")
 
         results = []
         for key in template_keys:
+            build_result = build_results.get(key)
+            if build_images and build_result and not build_result.get("success"):
+                results.append({
+                    "success": False,
+                    "template": key,
+                    "stage": "build",
+                    "error": build_result.get("error", "Image build failed"),
+                })
+                continue
+            self._progress.update({"phase": "pushing", "current_template": key})
+            _update_template_progress(self._progress, key, status="running", phase="pushing")
             result = await workflow.execute_activity(
                 push_coder_template,
                 args=[
@@ -691,6 +808,16 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
                 ),
             )
             results.append(result)
+            ok = bool(result.get("success"))
+            _update_template_progress(
+                self._progress,
+                key,
+                status="succeeded" if ok else "failed",
+                phase="complete",
+                error=result.get("error"),
+                result=result,
+            )
+            self._progress["completed"] += 1
 
         # Step 3: prune superseded image versions, but only for templates this
         # run just re-pinned to its fresh tag. Never on build_images=False
@@ -700,10 +827,11 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
         if build_images:
             pushed_ok = [
                 key for key, r in zip(template_keys, results)
-                if r.get("success") and not r.get("skipped")
+                if r.get("success") and not r.get("skipped") and r.get("stage") != "build"
             ]
             if pushed_ok:
                 try:
+                    self._progress.update({"phase": "cleanup", "current_template": None})
                     cleanup = await workflow.execute_activity(
                         cleanup_stale_workspace_images,
                         args=[pushed_ok, templates_dir, registry_host],
@@ -714,6 +842,7 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
                     workflow.logger.warning(f"Image cleanup failed (non-fatal): {e}")
 
         failed = [r for r in results if not r.get("success")]
+        _finish_progress(self._progress, len(failed))
         if failed:
             return WorkflowResult(
                 status="completed_with_errors",
@@ -766,7 +895,9 @@ async def rollout_template_workspaces(
                 try:
                     # Always enable auto-update so a stopped/failed workspace
                     # adopts this version on its next start.
-                    await client.set_workspace_auto_update(w.id, True)
+                    if not await client.set_workspace_auto_update(w.id, True):
+                        errors.append(f"{w.name}: could not enable automatic updates")
+                        continue
 
                     if w.template_version_id == version_id:
                         already_current += 1
@@ -816,16 +947,32 @@ class RolloutWorkspacesWorkflow(BaseWorkflow):
     def get_execution_timeout(cls) -> timedelta:
         return timedelta(minutes=40)
 
+    def __init__(self) -> None:
+        self._progress: Dict[str, Any] = {
+            "phase": "queued",
+            "operation_status": "running",
+            "templates": [],
+            "current_template": None,
+            "completed": 0,
+            "total": 0,
+        }
+
+    @workflow.query
+    def get_progress(self) -> Dict[str, Any]:
+        return self._progress
+
     @workflow.run
     async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
         templates_dir = parameters.get("templates_dir", "/templates")
         requested = parameters.get("templates")
+        self._progress["phase"] = "discovering"
 
-        template_keys = await workflow.execute_activity(
-            discover_template_keys,
+        resolved = await workflow.execute_activity(
+            discover_template_operations,
             args=[templates_dir, requested],
             start_to_close_timeout=timedelta(seconds=30),
         )
+        template_keys = [item["dir_name"] for item in resolved]
         if not template_keys:
             return WorkflowResult(
                 status="failed",
@@ -834,8 +981,18 @@ class RolloutWorkspacesWorkflow(BaseWorkflow):
                 metadata={"workflow_type": "rollout_workspaces"},
             )
 
+        self._progress.update({
+            "phase": "rolling_out",
+            "templates": _progress_templates(resolved),
+            "total": len(template_keys),
+        })
+
         results = []
         for key in template_keys:
+            self._progress.update({"phase": "rolling_out", "current_template": key})
+            _update_template_progress(
+                self._progress, key, status="running", phase="rolling_out"
+            )
             result = await workflow.execute_activity(
                 rollout_template_workspaces,
                 args=[key, templates_dir],
@@ -847,8 +1004,19 @@ class RolloutWorkspacesWorkflow(BaseWorkflow):
                 ),
             )
             results.append(result)
+            ok = bool(result.get("success"))
+            _update_template_progress(
+                self._progress,
+                key,
+                status="succeeded" if ok else "failed",
+                phase="complete",
+                error=result.get("error") or ("; ".join(result.get("errors", [])) or None),
+                result=result,
+            )
+            self._progress["completed"] += 1
 
         failed = [r for r in results if not r.get("success")]
+        _finish_progress(self._progress, len(failed))
         return WorkflowResult(
             status="completed_with_errors" if failed else "completed",
             result={"rollouts": results},
@@ -872,10 +1040,27 @@ async def discover_template_keys(
     return [t["dir_name"] for t in templates]
 
 
+@activity.defn(name="discover_template_operations")
+async def discover_template_operations(
+    templates_dir: str,
+    requested: Optional[List[str]],
+) -> List[Dict[str, Any]]:
+    """Discover serializable template identity/label data for progress UIs."""
+    return [
+        {
+            "dir_name": item["dir_name"],
+            "coder_template_name": item.get("coder_template_name", item["dir_name"]),
+            "display_name": item.get("display_name"),
+        }
+        for item in _resolve_templates(requested, templates_dir)
+    ]
+
+
 ACTIVITIES = [
     build_workspace_image,
     cleanup_stale_workspace_images,
     discover_template_keys,
+    discover_template_operations,
     push_coder_template,
     rollout_template_workspaces,
 ]

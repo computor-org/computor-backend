@@ -4,10 +4,11 @@ FastAPI router for Coder workspace management.
 This router provides endpoints for on-demand workspace provisioning.
 """
 
+import asyncio
 import logging
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -34,7 +35,10 @@ from computor_backend.exceptions import (
 )
 from computor_backend.coder.schemas import (
     CoderAdminTaskResponse,
+    CoderAdminTaskListResponse,
+    CoderFleetStatusResponse,
     CoderHealthResponse,
+    CoderTemplateFleetStatus,
     ImageBuildRequest,
     ProvisionResult,
     TemplatePushRequest,
@@ -527,6 +531,144 @@ async def get_coder_session(
 # Admin endpoints — image building + template pushing (workspace:manage)
 # -----------------------------------------------------------------------------
 
+CODER_ADMIN_TASKS = {
+    "build_workspace_images",
+    "push_coder_templates",
+    "rollout_workspaces",
+}
+
+
+async def _recent_coder_tasks(limit: int = 20) -> list[TaskInfo]:
+    """Return recent Coder administration workflows with queryable progress."""
+    executor = get_task_executor()
+    listed = await executor.list_tasks(limit=max(limit * 5, 100))
+    candidates = [
+        row for row in listed.get("tasks", [])
+        if row.get("task_name") in CODER_ADMIN_TASKS
+    ][:limit]
+    tasks: list[TaskInfo] = []
+    for row in candidates:
+        workflow_id = row.get("workflow_id") or row.get("task_id")
+        if not workflow_id:
+            continue
+        try:
+            tasks.append(await executor.get_task_status(workflow_id))
+        except Exception:
+            logger.warning("Could not load Coder workflow %s", workflow_id, exc_info=True)
+    return tasks
+
+
+async def _reject_conflicting_coder_task() -> None:
+    """Keep image GC/template activation/rollout operations from racing."""
+    executor = get_task_executor()
+    listed = await executor.list_tasks(limit=1000, status="STARTED")
+    active = next(
+        (
+            row
+            for row in listed.get("tasks", [])
+            if row.get("task_name") in CODER_ADMIN_TASKS
+        ),
+        None,
+    )
+    if active:
+        workflow_id = active.get("workflow_id") or active.get("task_id")
+        raise ConflictException(
+            detail=(
+                f"Coder update operation '{active.get('task_name')}' is already running "
+                f"({workflow_id})"
+            )
+        )
+
+
+@router.get(
+    "/admin/fleet",
+    response_model=CoderFleetStatusResponse,
+    summary="Get template-centric workspace fleet status",
+)
+async def get_workspace_fleet_status(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    client: Annotated[CoderClient, Depends(get_coder_client)],
+) -> CoderFleetStatusResponse:
+    """Return rollout readiness and technical health for workspace maintainers."""
+    _check_workspace_access(permissions, "manage")
+    try:
+        (healthy, version), templates, workspaces = await asyncio.gather(
+            client.health_check(),
+            client.list_templates(),
+            client.list_all_workspaces(),
+        )
+    except Exception as e:
+        raise _handle_coder_error(e) from e
+
+    by_template: dict[str, list] = {}
+    for workspace in workspaces:
+        by_template.setdefault(workspace.template_id, []).append(workspace)
+
+    rows: list[CoderTemplateFleetStatus] = []
+    for template in templates:
+        template_workspaces = by_template.get(template.id, [])
+        current = 0
+        outdated = 0
+        running_outdated = 0
+        scheduled = 0
+        actionable = 0
+        for workspace in template_workspaces:
+            is_current = bool(
+                template.active_version_id
+                and workspace.template_version_id == template.active_version_id
+            )
+            if is_current:
+                current += 1
+                continue
+            outdated += 1
+            status = (
+                workspace.latest_build_status.value
+                if workspace.latest_build_status
+                else ""
+            )
+            is_running = (
+                workspace.latest_build_transition == "start"
+                and status in ("succeeded", "running")
+            )
+            if is_running:
+                running_outdated += 1
+                actionable += 1
+            elif workspace.automatic_updates == "always":
+                scheduled += 1
+            else:
+                actionable += 1
+
+        if not template.active_version_id:
+            rollout_state = "unavailable"
+        elif actionable:
+            rollout_state = "ready"
+        elif outdated and scheduled == outdated:
+            rollout_state = "scheduled_on_start"
+        else:
+            rollout_state = "up_to_date"
+
+        rows.append(CoderTemplateFleetStatus(
+            id=template.id,
+            name=template.name,
+            display_name=template.display_name,
+            active_version_id=template.active_version_id,
+            workspace_count=len(template_workspaces),
+            current_count=current,
+            outdated_count=outdated,
+            running_outdated_count=running_outdated,
+            scheduled_on_start_count=scheduled,
+            actionable_count=actionable,
+            rollout_state=rollout_state,
+        ))
+
+    return CoderFleetStatusResponse(
+        healthy=healthy,
+        version=version,
+        templates=rows,
+        workspace_count=len(workspaces),
+    )
+
 
 def _build_template_parameters(settings: CoderSettings) -> dict:
     """Build common parameters for coder template workflows from settings and env."""
@@ -579,6 +721,7 @@ async def build_workspace_images(
     Requires workspace:manage permission.
     """
     _check_workspace_access(permissions, "manage")
+    await _reject_conflicting_coder_task()
 
     executor = get_task_executor()
     params = {
@@ -616,6 +759,7 @@ async def push_coder_templates(
     Optionally builds images first. Requires workspace:manage permission.
     """
     _check_workspace_access(permissions, "manage")
+    await _reject_conflicting_coder_task()
 
     executor = get_task_executor()
     params = _build_template_parameters(settings)
@@ -654,6 +798,7 @@ async def rollout_workspaces_endpoint(
     whole fleet. Requires workspace:manage permission.
     """
     _check_workspace_access(permissions, "manage")
+    await _reject_conflicting_coder_task()
 
     executor = get_task_executor()
     submission = TaskSubmission(
@@ -671,6 +816,21 @@ async def rollout_workspaces_endpoint(
         task_name="rollout_workspaces",
         status="submitted",
     )
+
+
+@router.get(
+    "/admin/tasks",
+    response_model=CoderAdminTaskListResponse,
+    summary="List recent Coder administration tasks",
+)
+async def list_admin_tasks(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    limit: int = Query(10, ge=1, le=50),
+) -> CoderAdminTaskListResponse:
+    """List recent image/template workflows, including their progress queries."""
+    _check_workspace_access(permissions, "manage")
+    return CoderAdminTaskListResponse(tasks=await _recent_coder_tasks(limit))
 
 
 @router.get(

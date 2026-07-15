@@ -59,6 +59,7 @@ export interface CoderWorkspace {
   template_version_name?: string | null;
   latest_build_transition?: string | null;
   latest_build_status?: WorkspaceBuildStatus | null;
+  automatic_updates?: 'always' | 'never' | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -163,6 +164,60 @@ export interface CoderAdminTaskResponse {
   status: string;
 }
 
+export type TemplateRolloutState =
+  | 'unavailable'
+  | 'building'
+  | 'ready'
+  | 'rolling_out'
+  | 'scheduled_on_start'
+  | 'up_to_date';
+
+export interface CoderTemplateFleetStatus {
+  id: string;
+  name: string;
+  display_name?: string | null;
+  active_version_id?: string | null;
+  workspace_count: number;
+  current_count: number;
+  outdated_count: number;
+  running_outdated_count: number;
+  scheduled_on_start_count: number;
+  actionable_count: number;
+  rollout_state: TemplateRolloutState;
+}
+
+export interface CoderFleetStatusResponse {
+  healthy: boolean;
+  version?: string | null;
+  templates: CoderTemplateFleetStatus[];
+  workspace_count: number;
+}
+
+export interface CoderTemplateTaskProgress {
+  key: string;
+  name: string;
+  display_name?: string | null;
+  status: 'pending' | 'running' | 'succeeded' | 'failed';
+  phase: string;
+  error?: string | null;
+  result?: Record<string, unknown> | null;
+}
+
+export interface CoderTaskProgress {
+  phase?: string;
+  operation_status?: string;
+  image_tag?: string;
+  current_template?: string | null;
+  completed?: number;
+  total?: number;
+  templates?: CoderTemplateTaskProgress[];
+  result?: Record<string, unknown> | null;
+}
+
+export interface CoderAdminTaskListResponse {
+  tasks: TaskInfo[];
+}
+
 export enum TaskStatus {
   QUEUED = 'queued',
   STARTED = 'started',
@@ -177,5 +232,10 @@ export interface TaskInfo {
   task_name: string;
   status: TaskStatus;
   error?: string | null;
-  progress?: Record<string, unknown> | null;
+  progress?: CoderTaskProgress | null;
+  created_at?: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  workflow_id?: string | null;
+  duration?: string | null;
 }

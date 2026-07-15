@@ -16,6 +16,8 @@ import type {
   WorkspaceRolloutRequest,
   CoderAdminTaskResponse,
   TaskInfo,
+  CoderAdminTaskListResponse,
+  CoderFleetStatusResponse,
 } from '@/src/types/workspaces';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from '@/src/generated/clients/baseClient';
@@ -99,6 +101,11 @@ export class CoderClient extends BaseEndpointClient {
     return this.client.get<WorkspaceListResponse>(this.buildPath('workspaces', 'all'));
   }
 
+  /** Template-centric readiness, workspace counts, and privileged Coder health. */
+  async getFleetStatus(): Promise<CoderFleetStatusResponse> {
+    return this.client.get<CoderFleetStatusResponse>(this.buildPath('admin', 'fleet'));
+  }
+
   /**
    * Build workspace Docker images (optionally a specific image tag).
    */
@@ -125,5 +132,13 @@ export class CoderClient extends BaseEndpointClient {
    */
   async getAdminTask(workflowId: string): Promise<TaskInfo> {
     return this.client.get<TaskInfo>(this.buildPath('admin', 'tasks', workflowId));
+  }
+
+
+  /** Recent build/push/rollout workflows, including active progress after reload. */
+  async listAdminTasks(limit = 10): Promise<CoderAdminTaskListResponse> {
+    return this.client.get<CoderAdminTaskListResponse>(this.buildPath('admin', 'tasks'), {
+      params: { limit },
+    });
   }
 }
