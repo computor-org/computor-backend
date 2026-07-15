@@ -18,6 +18,7 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from computor_backend.coder.keepalive import bump_workspace_activity
 from computor_backend.database import get_db
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.exceptions import (
@@ -593,6 +594,7 @@ async def verify_coder_access(
     # owner check below. Consistent with the system-wide is_admin bypass.
     if principal.is_admin:
         logger.info(f"Admin {principal.user_id} authorized for workspace {url_owner}/{workspace_name}")
+        bump_workspace_activity(url_owner, workspace_name)
         return JSONResponse(
             status_code=200,
             content={"status": "authorized", "user_id": principal.user_id, "workspace": workspace_name}
@@ -616,6 +618,11 @@ async def verify_coder_access(
 
     # User is authorized
     logger.info(f"User {principal.user_id} authorized for workspace {workspace_name}")
+
+    # This ForwardAuth hit is the only activity signal Coder gets (browser
+    # traffic bypasses Coder's proxy), so push the workspace's auto-stop
+    # deadline forward. Throttled + fire-and-forget; never blocks the response.
+    bump_workspace_activity(url_owner, workspace_name)
 
     # Return 200 OK - Traefik will forward the request
     return JSONResponse(

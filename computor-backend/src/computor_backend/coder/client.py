@@ -660,6 +660,40 @@ class CoderClient:
     # Workspace operations
     # -------------------------------------------------------------------------
 
+    async def extend_workspace_deadline(
+        self,
+        workspace_id: str,
+        *,
+        extend_ms: int,
+    ) -> bool:
+        """Push a running workspace's auto-stop deadline to ``now + extend_ms``.
+
+        Uses Coder's ``PUT /workspaces/{id}/extend``, which sets an absolute
+        deadline. This is best-effort keepalive (see ``coder/keepalive.py``):
+        it returns ``False`` — never raises — when the workspace is stopped,
+        has no deadline, or Coder otherwise rejects the request, so callers on
+        the request hot path are never disturbed.
+
+        Args:
+            workspace_id: Coder workspace UUID.
+            extend_ms: Milliseconds from now for the new deadline.
+
+        Returns:
+            True if Coder accepted the new deadline.
+        """
+        from datetime import datetime, timedelta, timezone
+
+        # isoformat() on a timezone-aware datetime yields the RFC3339 timestamp
+        # Coder's extend endpoint expects.
+        deadline = datetime.now(timezone.utc) + timedelta(milliseconds=extend_ms)
+        resp = await self._request(
+            "PUT",
+            f"/api/v2/workspaces/{workspace_id}/extend",
+            json={"deadline": deadline.isoformat()},
+            ok=None,
+        )
+        return resp.status_code == 200
+
     @staticmethod
     def _parse_workspace_summary(ws: dict) -> CoderWorkspace:
         """Build a CoderWorkspace from a Coder /workspaces list entry."""

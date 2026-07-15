@@ -701,8 +701,8 @@ def _build_template_parameters(settings: CoderSettings) -> dict:
         "template_variables": {
             "matlab_license_file": os.environ.get("MATLAB_MLM_LICENSE_FILE", ""),
         },
-        "ttl_ms": 3600000,
-        "activity_bump_ms": 3600000,
+        "ttl_ms": settings.workspace_ttl_ms,
+        "activity_bump_ms": settings.workspace_activity_bump_ms,
     }
 
 
