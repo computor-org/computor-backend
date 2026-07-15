@@ -280,7 +280,7 @@ export default function WorkspaceFleetPanel() {
       {loading ? (
         <ListLoading>Loading template fleet…</ListLoading>
       ) : (
-        <ScrollPanel className="shrink-0 max-h-[28rem]">
+        <ScrollPanel className="h-[32rem] min-h-[32rem] max-h-[32rem]">
           <Table>
             <Thead>
               <tr>
@@ -396,7 +396,7 @@ export default function WorkspaceFleetPanel() {
       </div>
 
       {!loading && (
-        <ScrollPanel>
+        <ScrollPanel className="h-[32rem] min-h-[32rem] max-h-[32rem]">
           <Table>
             <Thead>
               <tr>

@@ -3,7 +3,7 @@
 import { Suspense } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import ListPageLayout from '@/src/components/ListPageLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import Forbidden from '@/src/components/Forbidden';
 import Tabs from '@/src/components/ui/Tabs';
@@ -38,7 +38,13 @@ function WorkspaceAdminContent() {
         onSelect={(id) => router.replace(id === 'users' ? pathname : `${pathname}?tab=${id}`)}
       />
 
-      {tab === 'users' ? <WorkspaceUsersPanel /> : <WorkspaceFleetPanel />}
+      {tab === 'users' ? (
+        <WorkspaceUsersPanel />
+      ) : (
+        <ScrollArea className="space-y-6 pr-1">
+          <WorkspaceFleetPanel />
+        </ScrollArea>
+      )}
     </ListPageLayout>
   );
 }
