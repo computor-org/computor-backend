@@ -34,6 +34,10 @@ from computor_backend.permissions.course_access import (
 )
 from computor_backend.permissions.principal import Principal
 
+# Needs a live Postgres (the ``db`` fixture builds a real engine below).
+# Deselected from the hermetic default run; exercise with `-m integration`.
+pytestmark = pytest.mark.integration
+
 
 def _database_url() -> str:
     host = os.environ.get("POSTGRES_HOST", "localhost")

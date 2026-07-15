@@ -26,7 +26,10 @@ def _pg_reachable() -> bool:
         return False
 
 
-pytestmark = pytest.mark.skipif(not _pg_reachable(), reason="Postgres not reachable")
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(not _pg_reachable(), reason="Postgres not reachable"),
+]
 
 
 def _new_org() -> Organization:

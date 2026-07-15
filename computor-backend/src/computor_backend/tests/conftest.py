@@ -47,7 +47,7 @@ def database_url():
         'POSTGRES_PORT': os.environ.get('POSTGRES_PORT', '5432'),
         'POSTGRES_USER': os.environ.get('POSTGRES_USER', 'postgres'),
         'POSTGRES_PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'postgres_secret'),
-        'POSTGRES_DB': os.environ.get('POSTGRES_DB', 'codeability')
+        'POSTGRES_DB': os.environ.get('POSTGRES_DB', 'computor')
     }
     
     return f"postgresql://{env_vars['POSTGRES_USER']}:{env_vars['POSTGRES_PASSWORD']}@{env_vars['POSTGRES_HOST']}:{env_vars['POSTGRES_PORT']}/{env_vars['POSTGRES_DB']}"

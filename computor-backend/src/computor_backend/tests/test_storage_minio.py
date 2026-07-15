@@ -47,6 +47,7 @@ def storage_service(mock_minio_client):
 class TestMinIOClient:
     """Test MinIO client initialization and configuration"""
     
+    @pytest.mark.docker
     def test_minio_client_singleton(self):
         """Test that MinIO client is a singleton"""
         client1 = get_minio_client()

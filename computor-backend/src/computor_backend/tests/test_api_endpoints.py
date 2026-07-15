@@ -14,6 +14,11 @@ from typing import List, Dict, Any
 BASE_URL = "http://localhost:8000"
 AUTH = ("admin", "admin")
 
+# Black-box tests against a live API server (needs Postgres + Redis). Deselected
+# from the hermetic default run; exercise with `-m "integration or docker"`.
+pytestmark = [pytest.mark.integration, pytest.mark.docker]
+
+
 class TestAPIEndpoints:
     """Test suite for API endpoints"""
     
