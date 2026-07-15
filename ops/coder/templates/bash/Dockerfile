@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     less \
     procps \
     openssh-client \
+    sudo \
     && rm -rf /var/lib/apt/lists/*
 
 # ttyd is not packaged in bookworm — install the official static binary
@@ -28,8 +29,16 @@ RUN sed -i 's/^# *en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen
 ENV LANG=en_US.UTF-8
 
 # uid 1000 'coder' with home at /home/coder — must match the other workspace
-# images so the shared per-user home volume has consistent ownership
-RUN useradd --create-home --uid 1000 --shell /bin/bash coder
+# images so the shared per-user home volume has consistent ownership.
+# Passwordless sudo so students can apt-install their own toolchains; the
+# workspace is untrusted-by-design and network-isolated (see the bash template
+# variables + docker-compose.coder.yaml), so this matches the ubuntu-desktop and
+# MATLAB images. Note: apt-installed packages live in the ephemeral container
+# layer and are lost on rebuild — persistent setup belongs in ~/personalize.
+RUN useradd --create-home --uid 1000 --shell /bin/bash coder \
+    && usermod -aG sudo coder \
+    && echo "coder ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/coder \
+    && chmod 0440 /etc/sudoers.d/coder
 
 USER coder
 WORKDIR /home/coder
