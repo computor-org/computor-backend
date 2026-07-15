@@ -17,6 +17,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import subprocess
 from datetime import timedelta
 from typing import Any, Dict, List, Optional
@@ -29,6 +30,27 @@ from .temporal_base import BaseWorkflow, WorkflowResult
 from .worker_settings import get_worker_settings
 
 logger = logging.getLogger(__name__)
+
+# Versioned workspace image tags kept per repo by the cleanup activity: the
+# tag just pinned by the template push plus rollback targets. Older versions
+# are untagged on the build host and deleted from the registry.
+IMAGE_VERSIONS_TO_KEEP = 2
+
+# Auto-generated tag shape ("v" + workflow.now timestamp). Only tags matching
+# this are ever cleanup candidates — :latest, admin-chosen custom tags and
+# foreign repos are never touched.
+_VERSION_TAG_RE = re.compile(r"^v\d{8}-\d{6}$")
+
+_REGISTRY_REPO_ROOT = "/var/lib/registry/docker/registry/v2/repositories"
+
+
+def _stale_version_tags(tags: List[str]) -> List[str]:
+    """Versioned tags beyond the newest IMAGE_VERSIONS_TO_KEEP.
+
+    Fixed-width timestamps make lexical order chronological.
+    """
+    versioned = sorted((t for t in tags if _VERSION_TAG_RE.match(t)), reverse=True)
+    return versioned[IMAGE_VERSIONS_TO_KEEP:]
 
 
 def _discover_templates(templates_dir: str) -> Dict[str, Dict[str, Any]]:
@@ -181,6 +203,129 @@ def build_workspace_image(
     except Exception as e:
         logger.exception(f"Failed to build/push image for {template_key}")
         return {"success": False, "template": template_key, "error": str(e)}
+
+
+@activity.defn(name="cleanup_stale_workspace_images")
+def cleanup_stale_workspace_images(
+    template_keys: List[str],
+    templates_dir: str,
+    registry_host: str,
+) -> Dict[str, Any]:
+    """
+    Prune superseded versioned workspace images after a successful build+push.
+
+    Every build run mints a fresh ``vYYYYMMDD-HHMMSS`` tag, so without pruning
+    the build host's docker daemon and the local registry each grow by one
+    image generation (multi-GB for MATLAB) per rebuild. For each processed
+    template's repo this keeps ``:latest`` plus the IMAGE_VERSIONS_TO_KEEP
+    newest versioned tags and removes the rest:
+
+    * on the host daemon by untagging — an image whose last tag is held by a
+      container docker refuses to delete, so in-use images survive;
+    * in the registry by removing stale tag directories via exec in the
+      registry container (its HTTP API is unreachable from the worker — the
+      registry is deliberately network-isolated), then one
+      ``registry garbage-collect --delete-untagged`` pass to reclaim blobs.
+
+    Only safe once template pushes have re-pinned every processed template to
+    this run's tag, and while no other build is pushing (GC racing a push can
+    drop fresh blobs) — both hold as the final activity of the push workflow,
+    whose task queue processes activities sequentially.
+
+    BLOCKING activity (docker SDK), plain ``def`` for the worker thread pool.
+    Best-effort by design: always returns a result dict, never raises.
+    """
+    import docker as docker_sdk
+
+    settings = get_worker_settings()
+    if settings.coder_registry_host is not None:
+        registry_host = settings.coder_registry_host
+
+    discovered = _discover_templates(templates_dir)
+    image_names = [
+        discovered[k]["image_name"] for k in template_keys if k in discovered
+    ]
+
+    removed_local: Dict[str, List[str]] = {}
+    removed_registry: Dict[str, List[str]] = {}
+    skipped: List[str] = []
+    errors: List[str] = []
+
+    try:
+        client = docker_sdk.DockerClient(base_url="unix://" + settings.docker_socket_path)
+    except Exception as e:
+        return {"success": False, "error": f"docker connect failed: {e}"}
+
+    # Host daemon: untag stale versions. The image itself disappears with its
+    # last tag unless a container still references it (docker then 409s).
+    for name in image_names:
+        repo = f"{registry_host}/{name}"
+        try:
+            tags = [
+                t.rsplit(":", 1)[1]
+                for img in client.images.list(name=repo)
+                for t in img.tags
+                if t.startswith(repo + ":")
+            ]
+        except Exception as e:
+            errors.append(f"{repo}: list failed: {e}")
+            continue
+        for tag in _stale_version_tags(tags):
+            try:
+                client.images.remove(image=f"{repo}:{tag}")
+                removed_local.setdefault(name, []).append(tag)
+            except Exception as e:
+                skipped.append(f"{repo}:{tag}: {e}")
+
+    # Registry: drop stale tag references, then garbage-collect blobs.
+    gc_summary = None
+    try:
+        registry = client.containers.get(settings.coder_registry_container)
+    except Exception as e:
+        registry = None
+        errors.append(
+            f"registry container {settings.coder_registry_container!r} unavailable: {e}"
+        )
+
+    if registry is not None:
+        stale_dirs = []
+        for name in image_names:
+            tags_dir = f"{_REGISTRY_REPO_ROOT}/{name}/_manifests/tags"
+            code, out = registry.exec_run(["ls", "-1", tags_dir])
+            if code != 0:
+                continue  # repo not (yet) in the registry
+            for tag in _stale_version_tags(out.decode(errors="replace").split()):
+                stale_dirs.append(f"{tags_dir}/{tag}")
+                removed_registry.setdefault(name, []).append(tag)
+        if stale_dirs:
+            code, out = registry.exec_run(["rm", "-rf", *stale_dirs])
+            if code != 0:
+                errors.append(
+                    f"registry tag removal failed: {out.decode(errors='replace')[:300]}"
+                )
+            else:
+                # Removing a tag dir only unlinks the reference; GC deletes the
+                # now-untagged manifests and any blobs no manifest uses.
+                code, out = registry.exec_run(
+                    ["registry", "garbage-collect", "--delete-untagged",
+                     "/etc/docker/registry/config.yml"]
+                )
+                tail = out.decode(errors="replace").strip().splitlines()[-3:]
+                gc_summary = f"exit={code}: " + " | ".join(tail)
+                if code != 0:
+                    errors.append(f"registry GC failed: {gc_summary}")
+
+    result = {
+        "success": not errors,
+        "removed_local": removed_local,
+        "removed_registry": removed_registry,
+        "skipped_in_use": skipped,
+        "gc": gc_summary,
+    }
+    if errors:
+        result["errors"] = errors
+    logger.info(f"Workspace image cleanup: {result}")
+    return result
 
 
 def _template_declares_variable(template_dir: str, name: str) -> bool:
@@ -547,18 +692,39 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
             )
             results.append(result)
 
+        # Step 3: prune superseded image versions, but only for templates this
+        # run just re-pinned to its fresh tag. Never on build_images=False
+        # (e.g. a rollback push pinning an older tag that pruning would treat
+        # as stale). Best-effort — a cleanup failure must not fail the push.
+        cleanup = None
+        if build_images:
+            pushed_ok = [
+                key for key, r in zip(template_keys, results)
+                if r.get("success") and not r.get("skipped")
+            ]
+            if pushed_ok:
+                try:
+                    cleanup = await workflow.execute_activity(
+                        cleanup_stale_workspace_images,
+                        args=[pushed_ok, templates_dir, registry_host],
+                        start_to_close_timeout=timedelta(minutes=10),
+                        retry_policy=RetryPolicy(maximum_attempts=1),
+                    )
+                except Exception as e:
+                    workflow.logger.warning(f"Image cleanup failed (non-fatal): {e}")
+
         failed = [r for r in results if not r.get("success")]
         if failed:
             return WorkflowResult(
                 status="completed_with_errors",
-                result={"pushes": results, "image_tag": image_tag},
+                result={"pushes": results, "image_tag": image_tag, "cleanup": cleanup},
                 error=f"{len(failed)} push(es) failed",
                 metadata={"workflow_type": "push_coder_templates"},
             )
 
         return WorkflowResult(
             status="completed",
-            result={"pushes": results, "image_tag": image_tag},
+            result={"pushes": results, "image_tag": image_tag, "cleanup": cleanup},
             metadata={"workflow_type": "push_coder_templates"},
         )
 
@@ -708,6 +874,7 @@ async def discover_template_keys(
 
 ACTIVITIES = [
     build_workspace_image,
+    cleanup_stale_workspace_images,
     discover_template_keys,
     push_coder_template,
     rollout_template_workspaces,

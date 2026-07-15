@@ -106,6 +106,14 @@ class WorkerSettings(BaseSettings):
     )
     # Old: os.environ.get("CODER_URL", coder_url)  -- same override-a-param shape.
     coder_url: Optional[str] = Field(default=None, validation_alias="CODER_URL")
+    # Registry container name, used by the image-cleanup activity to exec tag
+    # removal + garbage collection (the registry's HTTP API is unreachable from
+    # the worker network by design; see docker-compose.coder.yaml). Matches the
+    # container_name pinned there.
+    coder_registry_container: str = Field(
+        default="computor-coder-registry",
+        validation_alias="CODER_REGISTRY_CONTAINER",
+    )
     docker_socket_path: str = Field(
         default="/var/run/docker.sock", validation_alias="DOCKER_SOCKET_PATH"
     )
