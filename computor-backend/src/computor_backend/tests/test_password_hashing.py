@@ -130,69 +130,6 @@ class TestPasswordComplexity:
 
         assert "PASSWORD_TOO_LONG" in str(exc_info.value.code)
 
-    @pytest.mark.xfail(
-        reason="SUSPECTED POLICY REGRESSION (review): PasswordComplexityRequirements "
-        "sets REQUIRE_UPPERCASE/LOWERCASE/DIGIT/SPECIAL=False (docstring cites NIST "
-        "SP 800-63B, which discourages composition rules). If that relaxation is "
-        "intentional these 4 composition tests are stale and should be deleted; if "
-        "not, re-enable the requirements.",
-        strict=False,
-    )
-    def test_password_no_uppercase(self):
-        """Test that password without uppercase is rejected."""
-        no_uppercase = "mysecure123!"
-
-        with pytest.raises(PasswordValidationError) as exc_info:
-            validate_password_strength(no_uppercase)
-
-        assert "COMPLEXITY_FAILED" in str(exc_info.value.code)
-        assert "uppercase" in str(exc_info.value.message).lower()
-
-    @pytest.mark.xfail(
-        reason="SUSPECTED POLICY REGRESSION (review): REQUIRE_LOWERCASE=False — see "
-        "test_password_no_uppercase. Composition rules are currently disabled.",
-        strict=False,
-    )
-    def test_password_no_lowercase(self):
-        """Test that password without lowercase is rejected."""
-        no_lowercase = "MYSECURE123!"
-
-        with pytest.raises(PasswordValidationError) as exc_info:
-            validate_password_strength(no_lowercase)
-
-        assert "COMPLEXITY_FAILED" in str(exc_info.value.code)
-        assert "lowercase" in str(exc_info.value.message).lower()
-
-    @pytest.mark.xfail(
-        reason="SUSPECTED POLICY REGRESSION (review): REQUIRE_DIGIT=False — see "
-        "test_password_no_uppercase. Composition rules are currently disabled.",
-        strict=False,
-    )
-    def test_password_no_digit(self):
-        """Test that password without digit is rejected."""
-        no_digit = "MySecurePassword!"
-
-        with pytest.raises(PasswordValidationError) as exc_info:
-            validate_password_strength(no_digit)
-
-        assert "COMPLEXITY_FAILED" in str(exc_info.value.code)
-        assert "digit" in str(exc_info.value.message).lower()
-
-    @pytest.mark.xfail(
-        reason="SUSPECTED POLICY REGRESSION (review): REQUIRE_SPECIAL=False — see "
-        "test_password_no_uppercase. Composition rules are currently disabled.",
-        strict=False,
-    )
-    def test_password_no_special_char(self):
-        """Test that password without special character is rejected."""
-        no_special = "MySecurePassword123"
-
-        with pytest.raises(PasswordValidationError) as exc_info:
-            validate_password_strength(no_special)
-
-        assert "COMPLEXITY_FAILED" in str(exc_info.value.code)
-        assert "special" in str(exc_info.value.message).lower()
-
     def test_password_common_rejected(self):
         """Test that common passwords are rejected."""
         common_passwords = [
