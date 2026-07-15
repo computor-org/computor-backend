@@ -24,6 +24,19 @@ git config --global user.name "${full_name}"
 git config --global user.email "${email}"
 mkdir -p "$HOME/workspace"
 
+# Configure and activate the Computor extension for this workspace.
+mkdir -p "$HOME/.computor"
+cat > "$HOME/.computor/config.json" <<COMPUTOR_EOF
+{
+  "version": "1.0.0",
+  "authentication": {
+    "baseUrl": "${computor_backend_url}",
+    "autoLogin": true
+  }
+}
+COMPUTOR_EOF
+touch "$HOME/workspace/.computor"
+
 if [ -x "$HOME/personalize" ]; then
   "$HOME/personalize" >/tmp/personalize.log 2>&1 || true
 fi

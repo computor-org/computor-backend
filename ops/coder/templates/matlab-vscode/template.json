@@ -3,6 +3,6 @@
     "image_name": "computor-workspace-matlab-vscode",
     "build_args_env": [],
     "display_name": "MATLAB VS Code",
-    "description": "MATLAB R2024b in browser-based VS Code with the official MathWorks extension.",
+    "description": "MATLAB R2024b in browser-based VS Code with the Computor and official MathWorks extensions.",
     "icon": "https://raw.githubusercontent.com/mathworks/MATLAB-extension-for-vscode/main/public/L-Membrane_RGB_128x128.png"
 }

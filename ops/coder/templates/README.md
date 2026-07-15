@@ -98,8 +98,9 @@ docker run --rm \
 
 `matlab-vscode` and `matlab-ui` are based on `mathworks/matlab:r2024b` and are
 therefore substantially larger and slower to start than the general-purpose
-templates. The VS Code variant installs the official MathWorks MATLAB extension;
-the UI variant serves MathWorks' native browser interface through MATLAB Proxy.
+templates. The VS Code variant installs both the Computor extension and the
+official MathWorks MATLAB extension; the UI variant serves MathWorks' native
+browser interface through MATLAB Proxy.
 
 Both templates offer an optional, masked `matlab_license_file` workspace
 parameter. Set it to a network license manager such as `27000@licenses.example`

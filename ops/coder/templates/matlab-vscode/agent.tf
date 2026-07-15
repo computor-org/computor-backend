@@ -6,6 +6,7 @@ resource "coder_agent" "main" {
     dev_forward_ports    = var.dev_forward_ports
     full_name            = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
     email                = data.coder_workspace_owner.me.email
+    computor_backend_url = var.computor_backend_url
     code_server_password = var.code_server_password
     code_server_port     = var.code_server_port
     coder_base_path      = var.coder_base_path

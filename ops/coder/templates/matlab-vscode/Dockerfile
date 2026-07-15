@@ -1,4 +1,25 @@
-# MATLAB R2024b with browser-based VS Code and the official MathWorks extension.
+# MATLAB R2024b with browser-based VS Code, Computor and MathWorks extensions.
+FROM node:20-bookworm AS vsix-builder
+
+ARG EXTENSION_REPO_URL=https://github.com/computor-org/computor-vscode.git
+ARG EXTENSION_REPO_REF="release/2026.10"
+
+WORKDIR /build
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth 1 --branch "${EXTENSION_REPO_REF}" "${EXTENSION_REPO_URL}" extension
+
+WORKDIR /build/extension
+
+RUN npm ci \
+    && npm run compile --if-present \
+    && npm run build --if-present \
+    && npm install --global @vscode/vsce \
+    && vsce package --out /tmp/computor-extension.vsix
+
 FROM ghcr.io/coder/code-server:latest AS code-server
 
 FROM mathworks/matlab:r2024b
@@ -43,12 +64,22 @@ RUN curl -fsSL \
       -o /tmp/language-matlab.vsix \
     && chown coder:coder /tmp/language-matlab.vsix
 
+COPY --from=vsix-builder --chown=coder:coder \
+    /tmp/computor-extension.vsix /tmp/computor-extension.vsix
+
 USER coder
 RUN code-server \
       --user-data-dir /tmp/code-server-data \
       --extensions-dir /opt/code-server/extensions \
       --install-extension /tmp/language-matlab.vsix --force \
-    && rm -rf /tmp/language-matlab.vsix /tmp/code-server-data
+    && code-server \
+      --user-data-dir /tmp/code-server-data \
+      --extensions-dir /opt/code-server/extensions \
+      --install-extension /tmp/computor-extension.vsix --force \
+    && rm -rf \
+      /tmp/language-matlab.vsix \
+      /tmp/computor-extension.vsix \
+      /tmp/code-server-data
 
 USER root
 RUN chown -R coder:coder /home/coder
