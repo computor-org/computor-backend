@@ -12,6 +12,7 @@ Coder workspace integration.
 | **[development.md](development.md)** | Setup, the daily cycle, adding an entity end-to-end, migrations, code generation, and tests. |
 | **[backend-patterns.md](backend-patterns.md)** | The three patterns the backend is built on: EntityInterface/DTOs, RBAC permissions, and Temporal workflows. |
 | **[git-integration.md](git-integration.md)** | How a course connects to git — in-system Forgejo vs. external GitLab, delivery modes, and configuring it from a deployment file. |
+| **[../ops/docs/SELF_UPDATE.md](../ops/docs/SELF_UPDATE.md)** | One-click system updates from the admin UI (System → Updates) or `./computor.sh update` — config, update flow, rollback, and the rules that keep changes update-friendly. |
 
 New here? Read them in that order. For a specific task, jump straight to the relevant doc.
 
@@ -26,7 +27,7 @@ pip install -e computor-types/ -e computor-client/ -e computor-cli/ -e computor-
 cp ops/environments/.env.common.template .env
 
 # 3. Docker services (postgres, redis, temporal, minio, traefik, workers)
-bash startup.sh dev -d
+./computor.sh up dev -d
 
 # 4. Backend on :8000 (runs migrations + seeds admin automatically)
 bash api.sh
@@ -36,8 +37,9 @@ bash web.sh
 ```
 
 In **dev**, only the supporting services run in Docker — the API and frontend run locally
-via `api.sh` / `web.sh`. In **prod** (`bash startup.sh prod -d`) everything runs in Docker.
-Always drive the stack through the shell scripts, never `docker compose` directly.
+via `api.sh` / `web.sh`. In **prod** (`./computor.sh up prod -d`) everything runs in Docker.
+Always drive the stack through `./computor.sh` (`up`/`down`/`status`/`maintenance`/`update`;
+`startup.sh`/`stop.sh`/`maintenance.sh` remain as wrappers), never `docker compose` directly.
 See [development.md](development.md) for the full walkthrough.
 
 ## Service URLs

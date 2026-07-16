@@ -32,16 +32,24 @@ ops/
 
 ### Starting Services
 
-From the project root directory:
+From the project root directory (`startup.sh`/`stop.sh`/`maintenance.sh` remain as
+wrappers around `computor.sh`):
 
 ```bash
 # Development
-./startup.sh dev -d
+./computor.sh up dev -d
 
 # Production
-./startup.sh prod -d
+./computor.sh up prod -d
 
-# Coder workspace support is controlled via CODER_ENABLED=true in .env
+# Stop / status / maintenance / self-update
+./computor.sh down
+./computor.sh status
+./computor.sh maintenance enter prod     # static maintenance page, services stopped
+./computor.sh update check               # see docs/SELF_UPDATE.md
+
+# Optional services are .env flags: CODER_ENABLED, KEYCLOAK_ENABLED,
+# GIT_SERVER=forgejo, MATLAB_ENABLED, UPDATE_ENABLED
 ```
 
 ### Environment Setup
@@ -61,24 +69,16 @@ From the project root directory:
 
 ### Direct Docker Compose Usage
 
-If you need to run docker-compose directly:
+Avoid raw `docker compose` for lifecycle operations: the overlay list depends on the
+`.env` feature flags, and in prod the public URLs are derived from `PUBLIC_DOMAIN` at
+launch — a bare compose command fails interpolation. `./computor.sh` (via
+`ops/lib/common.sh`) handles both. For ad-hoc read-only commands (logs, ps), reuse the
+assembled file list:
 
 ```bash
-# Development
-docker-compose -f ops/docker/docker-compose.base.yaml \
-               -f ops/docker/docker-compose.dev.yaml \
-               up -d
-
-# Development with Coder
-docker-compose -f ops/docker/docker-compose.base.yaml \
-               -f ops/docker/docker-compose.dev.yaml \
-               -f ops/docker/docker-compose.coder.yaml \
-               up -d
-
-# View logs
-docker-compose -f ops/docker/docker-compose.base.yaml \
-               -f ops/docker/docker-compose.dev.yaml \
-               logs -f [service-name]
+source ops/lib/common.sh
+load_env && derive_public_urls dev && pin_project_name && assemble_compose_files dev
+docker compose $COMPOSE_FILES logs -f [service-name]
 ```
 
 ## Environment Files

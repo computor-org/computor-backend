@@ -7,7 +7,7 @@ The Computor platform supports Coder in two different ways:
 ### 1. Integrated Coder (Recommended)
 **Location**: `ops/docker/docker-compose.coder.yaml`
 **Config**: `.env` (in project root)
-**Usage**: Set `CODER_ENABLED=true` in `.env`, then `./startup.sh dev -d`
+**Usage**: Set `CODER_ENABLED=true` in `.env`, then `./computor.sh up dev -d`
 
 - Runs as part of Computor stack
 - Has its **own** dedicated PostgreSQL (`computor-coder-postgres`, port 5439)
@@ -84,12 +84,12 @@ gets its own dedicated postgres container (`coder-postgres`).
 1. Backup Coder data from standalone PostgreSQL
 2. Stop standalone Coder: `cd ops/coder && ./stop.sh`
 3. Setup integrated: `./setup-env.sh` and configure `.env.coder`
-4. Set `CODER_ENABLED=true` in `.env` and start: `./startup.sh dev -d`
+4. Set `CODER_ENABLED=true` in `.env` and start: `./computor.sh up dev -d`
 5. Restore data to shared PostgreSQL `coder` database
 
 ### From Integrated to Standalone:
 1. Backup Coder data from shared PostgreSQL `coder` database
-2. Stop integrated: `./stop.sh dev`
+2. Stop integrated: `./computor.sh down dev`
 3. Setup standalone: `cd ops/coder && ./install.sh`
 4. Restore data to standalone PostgreSQL
 
@@ -115,7 +115,7 @@ gets its own dedicated postgres container (`coder-postgres`).
 ./setup-env.sh
 
 # Start Computor with Coder
-./startup.sh dev -d
+./computor.sh up dev -d
 
 # Access Coder
 # https://your-coder-domain:8446

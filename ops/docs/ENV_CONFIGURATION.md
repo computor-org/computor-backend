@@ -129,17 +129,18 @@ compose` to exit at parse time:
 ## How It Works
 
 ### Loading Order
-1. `startup.sh` loads `.env.common` (or `.env` if .env.common doesn't exist)
-2. Then loads `.env.dev` or `.env.prod` to override specific values
-3. Docker Compose uses the combined environment
+1. `./computor.sh` (via `ops/lib/common.sh`) loads the single `.env` in the repo root
+2. In prod, public URLs are derived from `PUBLIC_DOMAIN` unless set explicitly in `.env`
+3. Docker Compose uses that environment; overlays are picked from the `dev|prod`
+   argument and the `.env` feature flags
 
 ### Environment Overrides
-Development (`./startup.sh dev`):
+Development (`./computor.sh up dev`):
 - Uses localhost for database connections
 - Single worker replicas
 - Debug mode enabled
 
-Production (`./startup.sh prod`):
+Production (`./computor.sh up prod`):
 - Uses Docker service names for connections
 - Multiple worker replicas
 - Debug mode disabled
@@ -163,7 +164,7 @@ CODER_ADMIN_EMAIL=admin@yourdomain.com
 
 Then start with:
 ```bash
-./startup.sh dev -d
+./computor.sh up dev -d
 ```
 
 ## Migration from Old Structure

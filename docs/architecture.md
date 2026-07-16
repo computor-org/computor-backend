@@ -79,6 +79,7 @@ See [backend-patterns.md](backend-patterns.md#temporal-workflows).
 | **Forgejo** _(optional)_ | In-system git server | Managed per-course git hosting; auto-registers into the GitServer registry at startup. See [git-integration.md](git-integration.md). |
 | **Keycloak** _(optional)_ | SSO / IdP brokering | External institute logins brokered via Keycloak. |
 | **Coder** _(optional, `CODER_ENABLED=true`)_ | Browser IDE workspaces | Separate Postgres + registry + a dedicated Temporal worker. |
+| **Updater** _(optional, `UPDATE_ENABLED=true`, prod)_ | Self-update sidecar | Executes admin-triggered updates (maintenance page → rebuild → restart, auto-rollback). See [ops/docs/SELF_UPDATE.md](../ops/docs/SELF_UPDATE.md). |
 
 ## Key design patterns
 

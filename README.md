@@ -43,7 +43,7 @@ pip install -e computor-backend/
 cp ops/environments/.env.common.template .env  # Then edit .env with your configuration
 
 # Start Docker services (PostgreSQL, Redis, Temporal, MinIO)
-bash startup.sh dev -d
+./computor.sh up dev -d
 
 # Start the API server (runs migrations + creates admin user automatically)
 bash api.sh
@@ -53,7 +53,7 @@ bash web.sh
 
 # Tip: Run without -d to see Docker service logs (useful for debugging).
 # This requires additional terminals for api.sh and web.sh:
-#   Terminal 1: bash startup.sh dev
+#   Terminal 1: ./computor.sh up dev
 #   Terminal 2: bash api.sh
 #   Terminal 3: bash web.sh
 ```
@@ -72,28 +72,42 @@ cd <dir-name>
 cp ops/environments/.env.common.template .env  # Then edit .env with your production configuration
 
 # Start all services (builds Docker images, runs migrations, starts API)
-bash startup.sh prod --build -d
+./computor.sh up prod --build -d
 
 # To enable Coder workspace support, set CODER_ENABLED=true in .env
 ```
 
-### startup.sh
+### computor.sh
+
+The single CLI for operating the stack. `startup.sh`, `stop.sh`, and
+`maintenance.sh` still work as thin wrappers around it.
 
 ```
-Usage: ./startup.sh [dev|prod] [docker-compose-options]
+Usage: ./computor.sh <command> [dev|prod] [docker-compose-options]
 
-  dev              Development services only (default)
-  prod             Production services (includes API server)
-  -d               Run in detached mode
-  --build          Rebuild Docker images before starting
+  up          Start the stack (dev is the default environment)
+  down        Stop the stack (auto-detects dev/prod when omitted)
+  status      Show services + maintenance state
+  maintenance enter|exit|status — full maintenance mode (static page, services stopped)
+  update      check|status|run — self-update (see ops/docs/SELF_UPDATE.md)
 
-Coder workspace support is controlled via CODER_ENABLED=true in .env.
+Optional services are controlled via .env flags: CODER_ENABLED, KEYCLOAK_ENABLED,
+GIT_SERVER=forgejo, MATLAB_ENABLED, UPDATE_ENABLED.
 
 Examples:
-  ./startup.sh dev -d              # Dev services, detached
-  ./startup.sh prod                # Production (foreground)
-  ./startup.sh prod --build -d     # Rebuild images and start detached
+  ./computor.sh up dev -d             # Dev services, detached
+  ./computor.sh up prod --build -d    # Rebuild images and start detached
+  ./computor.sh down                  # Stop whatever is running
+  ./computor.sh maintenance enter prod
 ```
+
+### System updates
+
+With `UPDATE_ENABLED=true` (plus `SYSTEM_REPO_URL`/`SYSTEM_REPO_BRANCH` in `.env`),
+admins can check for new commits on the tracked branch and run a one-click update
+from the web UI (**System → Updates**) — maintenance page, rebuild, restart, and
+automatic rollback if the new version fails its health check. Details:
+[ops/docs/SELF_UPDATE.md](ops/docs/SELF_UPDATE.md).
 
 ### api.sh (development)
 
@@ -127,6 +141,7 @@ Start at **[docs/README.md](docs/README.md)** — the index and quick start. Fro
 - [Development](docs/development.md) — setup, daily cycle, entities, migrations, codegen, tests
 - [Backend Patterns](docs/backend-patterns.md) — EntityInterface/DTOs, permissions, Temporal
 - [Git Integration](docs/git-integration.md) — course git: Forgejo vs. GitLab, deploy-from-file
+- [Self-Update](ops/docs/SELF_UPDATE.md) — one-click system updates from the admin UI / CLI
 
 ## License
 
