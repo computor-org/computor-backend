@@ -158,6 +158,8 @@ DEPLOY_PATH="/opt/computor"  # host directory for all persistent data
 ENABLE_CODER=false
 ENABLE_FORGEJO=false
 ENABLE_TESTING_WORKER=true  # --auto sets up a testing worker by default
+ENABLE_UPDATE=false
+SYSTEM_REPO_BRANCH_DEFAULT="main"
 
 # Interactive mode
 if [ "$AUTO_MODE" != true ]; then
@@ -208,6 +210,15 @@ if [ "$AUTO_MODE" != true ]; then
     read -p "Enable Coder workspace management? (y/N): " enable_coder
     if [ "$enable_coder" = "y" ] || [ "$enable_coder" = "Y" ]; then
         ENABLE_CODER=true
+    fi
+    echo
+
+    # Self-update. The availability check works in dev too, but the executor
+    # (updater sidecar) is prod-only — see ops/docs/SELF_UPDATE.md.
+    echo -e "${GREEN}6. Self-Update:${NC}"
+    read -p "Enable self-update (admin UI checks the tracked branch for new commits)? (y/N): " enable_update
+    if [ "$enable_update" = "y" ] || [ "$enable_update" = "Y" ]; then
+        ENABLE_UPDATE=true
     fi
     echo
 fi
@@ -430,6 +441,42 @@ if [ "$SKIP_COMMON" != true ]; then
         set_env_var CODER_ADMIN_EMAIL "$CODER_ADMIN_EMAIL"
 
         echo -e "  ${GREEN}✓${NC} Coder configuration complete"
+    fi
+
+    # Configure self-update if requested. The updater fetches SYSTEM_REPO_BRANCH
+    # from SYSTEM_REPO_URL; the token is only needed for a private repo and is
+    # passed to git via a credential helper (never embedded in the URL).
+    if [ "$ENABLE_UPDATE" = true ]; then
+        echo -e "  Configuring self-update..."
+
+        # Default to this checkout's origin, normalized to the https form the
+        # updater expects (git@host:path -> https://host/path).
+        REPO_URL_DEFAULT=$(git -C "$SCRIPT_DIR" remote get-url origin 2>/dev/null || echo "")
+        case "$REPO_URL_DEFAULT" in
+            git@*)
+                REPO_URL_DEFAULT="${REPO_URL_DEFAULT#git@}"
+                REPO_URL_DEFAULT="https://${REPO_URL_DEFAULT/://}"
+                ;;
+        esac
+        # Track whatever this checkout is on, so a deployment cut from a release
+        # branch doesn't silently follow main.
+        REPO_BRANCH_DEFAULT=$(git -C "$SCRIPT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+        [ -n "$REPO_BRANCH_DEFAULT" ] && [ "$REPO_BRANCH_DEFAULT" != "HEAD" ] \
+            || REPO_BRANCH_DEFAULT="$SYSTEM_REPO_BRANCH_DEFAULT"
+
+        SYSTEM_REPO_URL=$(prompt_value "Git URL of this deployment repository (https form)" "$REPO_URL_DEFAULT" false)
+        SYSTEM_REPO_BRANCH=$(prompt_value "Branch to track for updates" "$REPO_BRANCH_DEFAULT" false)
+        SYSTEM_REPO_TOKEN=$(prompt_value "Access token (leave empty for a public repository)" "" true)
+
+        set_env_var UPDATE_ENABLED true
+        set_env_var SYSTEM_REPO_URL "$SYSTEM_REPO_URL"
+        set_env_var SYSTEM_REPO_BRANCH "$SYSTEM_REPO_BRANCH"
+        set_env_var SYSTEM_REPO_TOKEN "$SYSTEM_REPO_TOKEN"
+
+        echo -e "  ${GREEN}✓${NC} Self-update configured (tracking ${YELLOW}${SYSTEM_REPO_BRANCH}${NC})"
+        if [ "$ENVIRONMENT" != "prod" ]; then
+            echo -e "    ${YELLOW}Note:${NC} the update check works in dev, but running an update needs prod."
+        fi
     fi
 
     echo -e "  ${GREEN}✓${NC} Created .env.common"
