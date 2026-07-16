@@ -1,10 +1,6 @@
 #!/bin/bash
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ops/lib/common.sh"
 
 # Parse flags
 WIPE_TEMPLATES=false
@@ -27,27 +23,18 @@ if [ "$confirmation" != "yes" ]; then
     exit 0
 fi
 
-# Source environment for credentials and paths
-source .env
-
-# Detect which environment is running (dev or prod) for compose file selection
-ENVIRONMENT=""
-if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "temporal-ui"; then
-    ENVIRONMENT="dev"
-elif docker ps --format '{{.Names}}' 2>/dev/null | grep -q "uvicorn"; then
-    ENVIRONMENT="prod"
-else
-    # Default to dev if we can't detect
-    ENVIRONMENT="dev"
-fi
-
-COMPOSE_FILES="-f ops/docker/docker-compose.base.yaml -f ops/docker/docker-compose.$ENVIRONMENT.yaml -f ops/docker/docker-compose.coder.yaml"
+load_env
+detect_environment || ENVIRONMENT="dev"
+derive_public_urls "$ENVIRONMENT"
+pin_project_name
+CODER_DETECTED=true   # always include the coder overlay — that's what we wipe
+assemble_compose_files "$ENVIRONMENT"
 
 echo -e "\n${YELLOW}1. Stopping all Coder services via docker compose...${NC}"
 # Use docker compose to properly stop and remove all coder-related containers
 # This handles all services including temporal-worker-coder (which has no explicit container_name)
-docker compose $COMPOSE_FILES stop coder-postgres coder coder-registry temporal-worker-coder 2>/dev/null
-docker compose $COMPOSE_FILES rm -f coder-postgres coder coder-registry temporal-worker-coder 2>/dev/null
+compose stop coder-postgres coder coder-registry temporal-worker-coder 2>/dev/null
+compose rm -f coder-postgres coder coder-registry temporal-worker-coder 2>/dev/null
 echo "  Coder containers stopped and removed"
 
 echo -e "\n${YELLOW}2. Removing Coder workspace containers and volumes...${NC}"

@@ -18,8 +18,9 @@ ops/
 │   ├── .env.prod.template     # Production settings
 │   └── .env.coder.template    # Coder addon settings
 │
-├── scripts/                   # Operational scripts (legacy/utilities)
-│   └── startup.sh.old         # Old startup script for reference
+├── lib/                       # Shared bash library for ./computor.sh
+│   ├── common.sh              # env loading, COMPOSE_FILES assembly, maintenance
+│   └── update.sh              # self-update executor (see docs/SELF_UPDATE.md)
 │
 └── docs/                      # Operational documentation
     ├── DOCKER_SETUP.md        # Complete Docker setup guide

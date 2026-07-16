@@ -8,6 +8,12 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useCourseViews } from '@/src/hooks/useCourseViews';
 import { icons } from './icons';
+
+// Baked at build time by computor.sh (docker/web/Dockerfile GIT_COMMIT arg);
+// unset in `next dev`, where the generic fallback is shown instead.
+const APP_VERSION = process.env.NEXT_PUBLIC_GIT_COMMIT
+  ? process.env.NEXT_PUBLIC_GIT_COMMIT.slice(0, 7)
+  : 'dev';
 import {
   NavItem,
   coursesNavigation,
@@ -216,7 +222,7 @@ export default function Sidebar() {
                 <Image src="/computor_logo.png" alt="Computor" width={24} height={24} className="h-6 w-6" />
                 <span className="text-sm font-semibold text-gray-700">Computor</span>
               </div>
-              <p className="text-xs text-gray-500 text-center">v1.0.0</p>
+              <p className="text-xs text-gray-500 text-center" title="Running version (git commit)">{APP_VERSION}</p>
             </div>
           ) : (
             <div className="flex justify-center">
@@ -293,7 +299,7 @@ export default function Sidebar() {
               <Image src="/computor_logo.png" alt="Computor" width={24} height={24} className="h-6 w-6" />
               <span className="text-sm font-semibold text-gray-700">Computor</span>
             </div>
-            <p className="text-xs text-gray-500 text-center">v1.0.0</p>
+            <p className="text-xs text-gray-500 text-center" title="Running version (git commit)">{APP_VERSION}</p>
           </div>
         ) : (
           <div className="flex justify-center">

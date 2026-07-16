@@ -317,13 +317,16 @@ cmd_up() {
         chmod +x "${REPO_ROOT}/docker/postgres-init/01-create-multiple-databases.sh" 2>/dev/null || true
     fi
 
+    # Build provenance for image builds: baked into computor-base (ARG) and the
+    # web image's NEXT_PUBLIC_GIT_COMMIT; also interpolated by compose builds.
+    git_build_meta
+
     # The Python service images (api + temporal workers) inherit from a shared base
     # image (docker/base/Dockerfile); the matlab worker COPYs from it. Build it first
     # so their `FROM computor-base:latest` resolves. Rebuild when --build is requested
     # or when the image is missing (cached/fast otherwise).
     if [[ "$DOCKER_ARGS" == *"--build"* ]] || ! docker image inspect computor-base:latest >/dev/null 2>&1; then
         log "\n${GREEN}Building shared base image (computor-base)...${NC}"
-        git_build_meta
         echo "  Baking build provenance: commit=${GIT_COMMIT} branch=${GIT_BRANCH}"
         (cd "$REPO_ROOT" && docker build -f docker/base/Dockerfile -t computor-base:latest \
             --build-arg GIT_COMMIT="$GIT_COMMIT" --build-arg GIT_BRANCH="$GIT_BRANCH" .)

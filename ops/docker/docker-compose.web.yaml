@@ -9,6 +9,7 @@ services:
       dockerfile: ./docker/web/Dockerfile
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        - GIT_COMMIT=${GIT_COMMIT:-}
     networks:
       - computor-network
     restart: unless-stopped
