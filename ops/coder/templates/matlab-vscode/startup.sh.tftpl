@@ -7,17 +7,20 @@ for port in $(echo "${dev_forward_ports}" | tr ',' ' '); do
 done
 %{ endif }
 
+# Shared per-user home volume can retain foreign-owned state from other
+# workspace types or older image builds — heal ownership on every start, not
+# just first run.
+sudo chown -R coder:coder "$HOME" 2>/dev/null || true
+
 # Restore only missing files from MathWorks' original home. matlab-proxy's
 # generated scripts retain /home/matlab paths, which resolve through the image's
-# compatibility symlink to this shared home.
-if [ ! -f "$HOME/.matlab_workspace_init_done" ]; then
-  # Shared per-user home volume can retain foreign-owned/partial state from
-  # other workspace types or older image builds — heal it, and treat the seed
-  # as best-effort: it must never block code-server from starting.
-  sudo chown -R coder:coder "$HOME" 2>/dev/null || true
+# compatibility symlink to this shared home. Seed once per template (marker is
+# template-specific so matlab-ui's seed doesn't suppress this one) and
+# best-effort: it must never block code-server from starting.
+if [ ! -f "$HOME/.matlab_vscode_init_done" ]; then
   cp -a --update=none /opt/matlab-home-seed/. "$HOME"/ \
     || echo "WARN: matlab home seed incomplete; continuing" >&2
-  touch "$HOME/.matlab_workspace_init_done"
+  touch "$HOME/.matlab_vscode_init_done"
 fi
 
 git config --global user.name "${full_name}"

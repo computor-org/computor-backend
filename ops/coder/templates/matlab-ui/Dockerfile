@@ -1,5 +1,10 @@
 # MATLAB R2024b native browser UI, served by the image's MATLAB Proxy.
-FROM mathworks/matlab:r2024b
+# Digest-pinned to R2024b Update 6: Update 8 breaks the browser desktop when
+# served under a non-empty MWI_BASE_URL (file open fails with "Invalid function
+# name", icon/label bundles 404 on a doubled path prefix) — see
+# https://github.com/mathworks/matlab-proxy/issues/88. Unpin only after the
+# upstream fix or after validating a newer release line in dev.
+FROM mathworks/matlab:r2024b@sha256:5603328923de4fd5ba5d5b610fbb925e1bcb8aec253df5d17e47bf95f351ca46
 
 USER root
 
