@@ -74,3 +74,16 @@ vncserver :1 \
   -select-de xfce \
   -disableBasicAuth \
   >/tmp/kasmvnc.log 2>&1
+
+# vncserver self-daemonizes, so it returns before KasmVNC's web server is
+# necessarily accepting connections. The agent only reports lifecycle_state=ready
+# once this script exits, and the web launch page sends the user to the workspace
+# on that signal — without this gate the user would land on a 502.
+# kasmvnc_port is the built-in web server's port (it serves the client and the
+# websocket on the same port). Any HTTP answer proves it is listening, hence no
+# curl -f. Capped well under the agent's 300s startup_script_timeout; falling
+# through is not fatal.
+for _ in $(seq 1 120); do
+  curl -s -o /dev/null --max-time 1 "http://127.0.0.1:${kasmvnc_port}/" && break
+  sleep 1
+done

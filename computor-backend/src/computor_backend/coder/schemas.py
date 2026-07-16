@@ -140,6 +140,22 @@ class WorkspaceDetails(BaseModel):
     code_server_url: Optional[str] = Field(None, description="Code-server URL")
     health: Optional[Union[str, bool]] = Field(None, description="Workspace health status")
     resources: Optional[dict[str, Any]] = Field(None, description="Workspace resources")
+    agent_lifecycle: Optional[str] = Field(
+        None,
+        description=(
+            "Coder agent lifecycle_state: created|starting|ready|start_timeout|"
+            "start_error|off|shutting_down|shutdown_*. Reports how far the agent's "
+            "startup script got, unlike the connection status in `resources`."
+        ),
+    )
+    ready: bool = Field(
+        False,
+        description=(
+            "Workspace is RUNNING and its agent finished its startup script. "
+            "RUNNING alone only means the Terraform apply succeeded, so the service "
+            "inside may still be booting; prefer this before sending a user to the URL."
+        ),
+    )
 
 
 class ProvisionResult(BaseModel):

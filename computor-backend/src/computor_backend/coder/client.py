@@ -1018,6 +1018,7 @@ class CoderClient:
         code_server_url = None
         resources = {}
         agent_status = None
+        agent_lifecycle = None
 
         # Build access URL for running workspaces via Traefik
         if status == WorkspaceStatus.RUNNING and self.settings.workspace_base_url:
@@ -1027,21 +1028,30 @@ class CoderClient:
             access_url = f"{base_url}/{owner_name}/{workspace_name}/"
 
         # Extract code-server URL from agent apps
-        logger.info(f"Parsing workspace resources: {len(latest_build.get('resources', []))} resources")
+        # Logged at debug: the workspace-launch page polls this endpoint every 2s.
+        logger.debug(f"Parsing workspace resources: {len(latest_build.get('resources', []))} resources")
         for resource in latest_build.get("resources", []):
             resource_name = resource.get("name", "unknown")
             agents = resource.get("agents", [])
-            logger.info(f"Resource '{resource_name}' has {len(agents)} agents")
+            logger.debug(f"Resource '{resource_name}' has {len(agents)} agents")
 
             for agent in agents:
                 agent_name = agent.get("name", "unknown")
                 agent_status = agent.get("status")
+                # `status` is the agent's *connection* state (connecting/connected/...);
+                # `lifecycle_state` is how far its startup script got, which is what
+                # tells us the service inside is actually up.
+                agent_lifecycle = agent.get("lifecycle_state")
                 apps = agent.get("apps", [])
-                logger.info(f"Agent '{agent_name}' status={agent_status}, apps count={len(apps)}")
+                logger.debug(
+                    f"Agent '{agent_name}' status={agent_status} "
+                    f"lifecycle={agent_lifecycle}, apps count={len(apps)}"
+                )
 
                 # Store agent info in resources
                 resources[agent_name] = {
                     "status": agent_status,
+                    "lifecycle_state": agent_lifecycle,
                     "apps": [app.get("slug") for app in apps],
                 }
 
@@ -1049,15 +1059,15 @@ class CoderClient:
                 for app in apps:
                     app_slug = app.get("slug", "").lower()
                     app_url = app.get("url")
-                    logger.info(f"App: slug='{app_slug}', url={app_url}")
+                    logger.debug(f"App: slug='{app_slug}', url={app_url}")
 
                     if any(term in app_slug for term in ["code", "vscode", "vs-code"]):
                         # Skip localhost URLs - they're internal container URLs not accessible from outside
                         if app_url and "localhost" not in app_url and "127.0.0.1" not in app_url:
                             code_server_url = app_url
-                            logger.info(f"Found code-server URL: {code_server_url}")
+                            logger.debug(f"Found code-server URL: {code_server_url}")
                         else:
-                            logger.info(f"Skipping internal URL: {app_url}")
+                            logger.debug(f"Skipping internal URL: {app_url}")
                         break
 
         # Generate code-server URL for running workspaces via Traefik
@@ -1066,9 +1076,9 @@ class CoderClient:
             workspace_name = data["name"]
             base_url = self.settings.workspace_base_url.rstrip("/")
             code_server_url = f"{base_url}/{owner_name}/{workspace_name}/"
-            logger.info(f"Using Traefik code-server URL: {code_server_url}")
+            logger.debug(f"Using Traefik code-server URL: {code_server_url}")
 
-        logger.info(f"Workspace details: status={status}, access_url={access_url}, code_server_url={code_server_url}")
+        logger.debug(f"Workspace details: status={status}, access_url={access_url}, code_server_url={code_server_url}")
 
         return WorkspaceDetails(
             workspace=workspace,
@@ -1077,6 +1087,8 @@ class CoderClient:
             code_server_url=code_server_url,
             health=data.get("health", {}).get("healthy"),
             resources=resources,
+            agent_lifecycle=agent_lifecycle,
+            ready=status == WorkspaceStatus.RUNNING and agent_lifecycle == "ready",
         )
 
     @staticmethod

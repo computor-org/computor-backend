@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollPanel, ListLoading } from '@/src/components/ListPageLayout';
 import { useResource } from '@/src/hooks/useResource';
@@ -14,11 +15,13 @@ import ConfirmDialog from '@/src/components/ConfirmDialog';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Button, { ButtonLink } from '@/src/components/ui/Button';
+import { openLaunchTab, workspaceLaunchUrl } from '@/src/utils/workspaceLaunch';
 import type { CoderHealthResponse, WorkspaceDetails } from '@/src/types/workspaces';
 
 const coderClient = new CoderClient();
 
 export default function WorkspacesPage() {
+  const router = useRouter();
   const { canProvisionWorkspace } = usePermissions();
 
   // Workspace list with silent background polling (pauses on hidden tabs).
@@ -53,6 +56,13 @@ export default function WorkspacesPage() {
     // Opens a running workspace in a new tab; otherwise shows its details.
     const details = await actions.openOrDetails(owner, name);
     if (details) setDetailsData(details);
+  };
+
+  // Start the workspace and open it once it is ready. The launch page issues the
+  // start itself, so this only has to get the user there — synchronously, since
+  // a tab opened after an await would be popup-blocked.
+  const handleLaunch = (owner: string, name: string) => {
+    if (!openLaunchTab(owner, name)) router.push(workspaceLaunchUrl(owner, name));
   };
 
   return (
@@ -123,6 +133,7 @@ export default function WorkspacesPage() {
               onStop={actions.stop}
               onDelete={(owner, name) => setDeleteTarget({ owner, name })}
               onViewDetails={handleViewDetails}
+              onLaunch={handleLaunch}
             />
           </ScrollPanel>
         ) : null}

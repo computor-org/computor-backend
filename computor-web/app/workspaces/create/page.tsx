@@ -12,6 +12,7 @@ import { useCoderTemplates } from '@/src/hooks/useCoderTemplates';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { CoderClient } from '@/src/clients/CoderClient';
+import { workspaceLaunchUrl } from '@/src/utils/workspaceLaunch';
 import { inputCls } from '@/src/components/ui/tokens';
 
 const coderClient = new CoderClient();
@@ -47,13 +48,37 @@ function CreateWorkspaceForm({ allowCustomName }: { allowCustomName: boolean }) 
     }
     setSubmitting(true);
     setError(null);
+
+    // Open the tab NOW, while we are still inside the click. Provisioning is a
+    // round-trip, and a window.open() after an await is no longer tied to the
+    // user gesture — popup blockers eat it. The tab parks on about:blank for the
+    // moment it takes to get the workspace's name back.
+    const tab = window.open('about:blank', '_blank');
+
     try {
-      await coderClient.provisionWorkspace({
+      const result = await coderClient.provisionWorkspace({
         body: { template, workspace_name: allowCustomName ? name.trim() || null : null },
       });
-      notify('Workspace created', 'success');
-      router.push('/workspaces');
+
+      // Always the server's name, never the derivedName() mirror: self-provisioners
+      // have workspace_name nulled and re-derived server-side.
+      const workspaceName = result.workspace?.name;
+      if (!workspaceName) {
+        throw new Error('The workspace was not created.');
+      }
+
+      const launchUrl = workspaceLaunchUrl(result.user.username, workspaceName);
+
+      if (tab) {
+        tab.location.replace(launchUrl);
+        notify('Workspace created — opening in a new tab', 'success');
+        router.push('/workspaces');
+      } else {
+        // Popup blocked: fall back to launching in this tab.
+        router.push(launchUrl);
+      }
     } catch (err) {
+      tab?.close();
       // e.g. 409: name already taken by a workspace of a different template
       setError(err instanceof Error ? err.message : 'Failed to create workspace');
       setSubmitting(false);
