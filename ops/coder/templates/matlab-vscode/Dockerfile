@@ -22,7 +22,11 @@ RUN npm ci \
 
 FROM ghcr.io/coder/code-server:latest AS code-server
 
-FROM mathworks/matlab:r2024b
+# Digest-pinned to R2024b Update 6, same digest as matlab-ui: Update 8 breaks
+# the browser desktop under a non-empty MWI_BASE_URL (matlab-proxy#88), and the
+# two matlab templates must stay on identical MATLAB builds because they seed
+# the same shared per-user home volume.
+FROM mathworks/matlab:r2024b@sha256:5603328923de4fd5ba5d5b610fbb925e1bcb8aec253df5d17e47bf95f351ca46
 
 USER root
 
