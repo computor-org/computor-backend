@@ -139,7 +139,7 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
       IDENTITY_PROVIDERS_FILE: /idp/identity-providers.json
     volumes:
-      - ../../scripts/setup_identity_providers.py:/setup_identity_providers.py:ro
+      - ../keycloak/setup_identity_providers.py:/setup_identity_providers.py:ro
       - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/idp:/idp:ro
     entrypoint: ["python3", "/setup_identity_providers.py"]
     depends_on:

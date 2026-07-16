@@ -17,6 +17,9 @@ ops/
 ├── environments/              # Environment configuration template
 │   └── .env.common.template   # All variables; setup-env.sh generates .env from it
 │
+├── keycloak/                  # IdP registration one-shot (stdlib-only python),
+│                              # mounted by docker-compose.keycloak.yaml
+│
 ├── lib/                       # Shared bash library for ./computor.sh
 │   ├── common.sh              # env loading, COMPOSE_FILES assembly, maintenance
 │   └── update.sh              # self-update executor (see docs/SELF_UPDATE.md)

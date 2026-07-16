@@ -31,6 +31,13 @@ The hook also warns about:
 - Database connection strings
 - Hardcoded passwords in common patterns
 
+## 📐 Architecture Check
+
+After the secret scan, the hook runs `scripts/check_forbidden_imports.py`, which blocks
+the commit if `computor-types`, `computor-cli`, or `computor-client` import backend-only
+packages (fastapi, sqlalchemy, `computor_backend`, …). Run it manually with
+`python3 scripts/check_forbidden_imports.py`.
+
 ## 🛠️ Manual Installation
 
 If the install script doesn't work, you can manually install:
