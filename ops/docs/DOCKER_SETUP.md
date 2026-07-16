@@ -17,11 +17,8 @@ computor-fullstack/
 │   ├── docker-compose.coder.yaml  # Optional Coder addon
 │   └── docker-compose.web.yaml    # Frontend (auto-loaded in prod)
 ├── .env                            # Active environment file
-├── setup-env.sh                    # Environment setup script
-├── computor.sh                     # Lifecycle CLI (up/down/status/maintenance/update)
-├── startup.sh                      # Wrapper for ./computor.sh up
-├── stop.sh                         # Wrapper for ./computor.sh down
-└── maintenance.sh                  # Wrapper for ./computor.sh maintenance
+├── setup-env.sh                    # Creates .env (generates .env.common with fresh secrets)
+└── computor.sh                     # Lifecycle CLI (up/down/status/maintenance/update/test)
 ```
 
 ### Service Organization
@@ -59,7 +56,7 @@ computor-fullstack/
 git clone <repository>
 cd computor-fullstack
 
-# Run the setup script to create environment files
+# Run the setup script to create the .env file
 ./setup-env.sh
 
 # Or for non-interactive setup:

@@ -1,6 +1,6 @@
 # Forgejo-Keycloak OIDC bridge
 # Include when BOTH GIT_SERVER=forgejo AND KEYCLOAK_ENABLED=true.
-# startup.sh adds this file automatically — do not include manually.
+# computor.sh adds this file automatically — do not include manually.
 #
 # The Keycloak 'forgejo' client is declared in the realm import
 # (data/keycloak/computor-realm.json) with a fixed secret shared via

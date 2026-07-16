@@ -63,7 +63,7 @@ echo "  Images removed"
 
 if [ "$WIPE_TEMPLATES" = true ]; then
     echo -e "\n${YELLOW}5. Removing Coder templates...${NC}"
-    # Templates are re-seeded from the repo on next startup.sh
+    # Templates are re-seeded from the repo on next computor.sh up
     if [ -n "$SYSTEM_DEPLOYMENT_PATH" ] && [ -d "$SYSTEM_DEPLOYMENT_PATH/coder" ]; then
         sudo rm -rf "$SYSTEM_DEPLOYMENT_PATH/coder"
         echo "  Coder directory removed from $SYSTEM_DEPLOYMENT_PATH/coder"
@@ -83,7 +83,7 @@ echo "  Registry data cleared"
 echo -e "\n${GREEN}=== COMPLETE Coder wipe finished! ===${NC}"
 echo ""
 echo "Next steps:"
-echo "1. Ensure CODER_ENABLED=true in .env, then: bash startup.sh dev -d"
+echo "1. Ensure CODER_ENABLED=true in .env, then: ./computor.sh up dev -d"
 echo "2. Coder will be completely fresh - new database, new admin user"
 echo "3. Build images and push templates via admin API:"
 echo "   POST /coder/admin/images/build"

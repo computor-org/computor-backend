@@ -9,7 +9,7 @@
 #
 # On first start the computor realm is imported from
 #   ${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports/computor-realm.json
-# (startup.sh copies it there from data/keycloak/computor-realm.json,
+# (computor.sh up copies it there from data/keycloak/computor-realm.json,
 #  substituting KEYCLOAK_CLIENT_SECRET before the copy)
 
 # computor-network is created by docker-compose.base.yaml; this overlay is
@@ -117,7 +117,7 @@ services:
 
   # One-shot: registers any brokered external OIDC identity providers in Keycloak,
   # idempotently, after Keycloak is healthy. Providers come from the operator-managed
-  # (gitignored) data/keycloak/identity-providers.json, staged by startup.sh to
+  # (gitignored) data/keycloak/identity-providers.json, staged by computor.sh up to
   # ${SYSTEM_DEPLOYMENT_PATH}/keycloak/idp. No file / no enabled providers -> no-op.
   # Runs on a plain python image (stdlib-only script) so it works in BOTH dev (backend
   # on host) and prod (backend containerized) without needing the backend image.

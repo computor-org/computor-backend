@@ -39,8 +39,8 @@ pip install -e computor-cli/
 pip install -e computor-utils/
 pip install -e computor-backend/
 
-# Configure environment
-cp ops/environments/.env.common.template .env  # Then edit .env with your configuration
+# Configure environment (generates .env with fresh secrets; never overwrites an existing .env)
+./setup-env.sh
 
 # Start Docker services (PostgreSQL, Redis, Temporal, MinIO)
 ./computor.sh up dev -d
@@ -69,7 +69,7 @@ No local Python installation required — everything runs in Docker containers.
 # Clone and configure
 git clone <repository-url> <dir-name>
 cd <dir-name>
-cp ops/environments/.env.common.template .env  # Then edit .env with your production configuration
+./setup-env.sh   # interactive setup — generates .env with fresh secrets for production
 
 # Start all services (builds Docker images, runs migrations, starts API)
 ./computor.sh up prod --build -d
@@ -79,8 +79,7 @@ cp ops/environments/.env.common.template .env  # Then edit .env with your produc
 
 ### computor.sh
 
-The single CLI for operating the stack. `startup.sh`, `stop.sh`, and
-`maintenance.sh` still work as thin wrappers around it.
+The single CLI for operating the stack.
 
 ```
 Usage: ./computor.sh <command> [dev|prod] [docker-compose-options]
@@ -90,6 +89,7 @@ Usage: ./computor.sh <command> [dev|prod] [docker-compose-options]
   status      Show services + maintenance state
   maintenance enter|exit|status — full maintenance mode (static page, services stopped)
   update      check|status|run — self-update (see ops/docs/SELF_UPDATE.md)
+  test        Run the backend test suite (pytest)
 
 Optional services are controlled via .env flags: CODER_ENABLED, KEYCLOAK_ENABLED,
 GIT_SERVER=forgejo, MATLAB_ENABLED, UPDATE_ENABLED.
@@ -99,6 +99,7 @@ Examples:
   ./computor.sh up prod --build -d    # Rebuild images and start detached
   ./computor.sh down                  # Stop whatever is running
   ./computor.sh maintenance enter prod
+  ./computor.sh test --unit           # Backend unit tests (no database needed)
 ```
 
 ### System updates
@@ -108,6 +109,21 @@ admins can check for new commits on the tracked branch and run a one-click updat
 from the web UI (**System → Updates**) — maintenance page, rebuild, restart, and
 automatic rollback if the new version fails its health check. Details:
 [ops/docs/SELF_UPDATE.md](ops/docs/SELF_UPDATE.md).
+
+### setup-env.sh
+
+Creates the environment configuration: generates `.env.common` (every variable,
+with freshly generated secrets and admin credentials) and copies it to `.env`.
+An existing `.env` is NEVER overwritten — regenerated values land in
+`.env.common` for you to diff and merge.
+
+```
+Usage: ./setup-env.sh [OPTIONS]
+
+  --auto          Non-interactive mode with defaults
+  --force         Overwrite an existing .env.common without asking
+  --preserve      Only (re)generate .env.common; don't create/copy .env
+```
 
 ### api.sh (development)
 
@@ -132,6 +148,18 @@ Environment Variables:
   NEXT_PUBLIC_API_URL    Backend API URL (default: http://localhost:8000)
   COMPUTOR_WEB_PORT      Dev server port (default: 3000)
 ```
+
+## Running Tests
+
+```bash
+./computor.sh test                    # all backend tests (unit + integration)
+./computor.sh test --unit             # unit tests only (no database needed)
+./computor.sh test --integration      # integration tests (needs the dev stack up)
+./computor.sh test --file test_models # a single test file
+./computor.sh test -k "some_test"     # extra args pass straight through to pytest
+```
+
+Integration tests expect the dev services to be running (`./computor.sh up dev -d`).
 
 ## Documentation
 

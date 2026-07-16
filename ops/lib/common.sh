@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# Shared library for the computor lifecycle CLI (computor.sh) and the
-# legacy wrapper scripts. Functions only — sourcing this file has no side
-# effects. Every consumer of the compose stack (up/down/status/maintenance/
-# update, wipe/align helpers) must get its .env loading, public-URL
-# derivation and COMPOSE_FILES assembly from here so the feature-flag →
-# overlay mapping exists in exactly one place.
+# Shared library for the computor lifecycle CLI (computor.sh) and the wipe
+# helpers. Functions only — sourcing this file has no side effects. Every
+# consumer of the compose stack (up/down/status/maintenance/update, wipe/align
+# helpers) must get its .env loading, public-URL derivation and COMPOSE_FILES
+# assembly from here so the feature-flag → overlay mapping exists in exactly
+# one place.
 
 # Guard against double-sourcing (computor.sh sources common.sh and update.sh,
 # which may itself need common.sh).
@@ -175,7 +175,7 @@ git_build_meta() {
 
 # ---------------------------------------------------------------------------
 # Full-maintenance primitives (Redis flag + Traefik static-page catch-all +
-# selective service stop). Moved verbatim from maintenance.sh.
+# selective service stop). Used by cmd_maintenance and the update executor.
 # ---------------------------------------------------------------------------
 
 # Services that keep running during full maintenance. The update executor

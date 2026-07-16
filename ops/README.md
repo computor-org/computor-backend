@@ -10,13 +10,12 @@ ops/
 │   ├── docker-compose.base.yaml      # Core shared services
 │   ├── docker-compose.dev.yaml       # Development-specific
 │   ├── docker-compose.prod.yaml      # Production-specific
-│   └── docker-compose.coder.yaml     # Optional Coder addon
+│   └── docker-compose.*.yaml         # Optional overlays (web, coder, keycloak,
+│                                     # forgejo, matlab, updater) — added
+│                                     # automatically by computor.sh from .env flags
 │
-├── environments/              # Environment configuration templates
-│   ├── .env.common.template   # Shared configuration
-│   ├── .env.dev.template      # Development settings
-│   ├── .env.prod.template     # Production settings
-│   └── .env.coder.template    # Coder addon settings
+├── environments/              # Environment configuration template
+│   └── .env.common.template   # All variables; setup-env.sh generates .env from it
 │
 ├── lib/                       # Shared bash library for ./computor.sh
 │   ├── common.sh              # env loading, COMPOSE_FILES assembly, maintenance
@@ -24,6 +23,8 @@ ops/
 │
 └── docs/                      # Operational documentation
     ├── DOCKER_SETUP.md        # Complete Docker setup guide
+    ├── ENV_CONFIGURATION.md   # Environment variables reference
+    ├── CODER_INTEGRATION.md   # Coder workspace integration
     ├── REVERSE_PROXY.md       # nginx (TLS) → Traefik production setup
     └── SELF_UPDATE.md         # One-click updates from the admin UI / CLI
 ```
@@ -32,8 +33,7 @@ ops/
 
 ### Starting Services
 
-From the project root directory (`startup.sh`/`stop.sh`/`maintenance.sh` remain as
-wrappers around `computor.sh`):
+From the project root directory:
 
 ```bash
 # Development
@@ -83,13 +83,14 @@ docker compose $COMPOSE_FILES logs -f [service-name]
 
 ## Environment Files
 
-The actual environment files (`.env.*`) are created in the project root directory from the templates in `ops/environments/`:
+The runtime scripts read a single `.env` in the project root. `./setup-env.sh` creates it:
 
-- `.env.common` - Created from `ops/environments/.env.common.template`
-- `.env.dev` - Created from `ops/environments/.env.dev.template`
-- `.env.prod` - Created from `ops/environments/.env.prod.template`
-- `.env.coder` - Created from `ops/environments/.env.coder.template`
-- `.env` - Auto-generated consolidated file
+- `.env.common` - Generated template with ALL variables and freshly generated secrets
+- `.env` - Copied from `.env.common` (an existing `.env` is never overwritten)
+
+`ops/environments/.env.common.template` is the static reference template behind
+`setup-env.sh`; dev vs. prod is a runtime argument (`./computor.sh up dev|prod`), not a
+separate env file.
 
 ## Key Services
 
@@ -118,7 +119,8 @@ The actual environment files (`.env.*`) are created in the project root director
 
 ## Notes
 
-- The startup scripts (`startup.sh` and `setup-env.sh`) remain in the project root for convenience
-- Environment files are created in the project root, not in ops/
+- The lifecycle CLI (`computor.sh`) and the `.env` scaffolding script (`setup-env.sh`)
+  live in the project root
+- The `.env` file is created in the project root, not in ops/
 - All Docker Compose files use relative paths from the project root
 - The `docker/postgres-init/` directory in the project root contains database initialization scripts

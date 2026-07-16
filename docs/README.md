@@ -23,8 +23,8 @@ New here? Read them in that order. For a specific task, jump straight to the rel
 python3.10 -m venv .venv && source .venv/bin/activate
 pip install -e computor-types/ -e computor-client/ -e computor-cli/ -e computor-backend/
 
-# 2. Environment: copy the template to the repo root and edit secrets
-cp ops/environments/.env.common.template .env
+# 2. Environment: generate .env with fresh secrets (never overwrites an existing .env)
+./setup-env.sh
 
 # 3. Docker services (postgres, redis, temporal, minio, traefik, workers)
 ./computor.sh up dev -d
@@ -38,8 +38,8 @@ bash web.sh
 
 In **dev**, only the supporting services run in Docker — the API and frontend run locally
 via `api.sh` / `web.sh`. In **prod** (`./computor.sh up prod -d`) everything runs in Docker.
-Always drive the stack through `./computor.sh` (`up`/`down`/`status`/`maintenance`/`update`;
-`startup.sh`/`stop.sh`/`maintenance.sh` remain as wrappers), never `docker compose` directly.
+Always drive the stack through `./computor.sh`
+(`up`/`down`/`status`/`maintenance`/`update`/`test`), never `docker compose` directly.
 See [development.md](development.md) for the full walkthrough.
 
 ## Service URLs

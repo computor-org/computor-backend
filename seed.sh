@@ -4,7 +4,7 @@
 # Runs the backend's own import logic in-process as an admin, so every real
 # mechanic applies (user find-or-create, student profiles, submission groups).
 # Seeded users (dev.userNNN@seed.local) are not loginable. Needs Postgres up
-# (startup.sh); does NOT need the API (api.sh) or Keycloak.
+# (computor.sh up); does NOT need the API (api.sh) or Keycloak.
 #
 # Usage:
 #   bash seed.sh                          # 20 users into every course

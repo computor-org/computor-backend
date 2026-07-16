@@ -34,7 +34,7 @@ A template directory must contain:
 
 ## Lifecycle
 
-1. `startup.sh` seeds/syncs `ops/coder/templates/*` into `${SYSTEM_DEPLOYMENT_PATH}/coder/templates/`.
+1. `computor.sh up` seeds/syncs `ops/coder/templates/*` into `${SYSTEM_DEPLOYMENT_PATH}/coder/templates/`.
    Deployed dirs containing a `.computor-managed` marker are re-synced from the repo on every
    startup; dirs without the marker are left alone (operator-customized) — delete such a dir once
    to adopt syncing.
@@ -91,7 +91,7 @@ docker run --rm \
    serve under a base path (e.g. JupyterLab's `--ServerApp.base_url`) can own the full
    `/coder/{owner}/{workspace}` prefix — for that template, drop the stripprefix
    middleware so the prefix reaches the container intact (see `jupyter`).
-5. Run `startup.sh` (or copy the dir into the deployed templates dir) and push via
+5. Run `computor.sh up` (or copy the dir into the deployed templates dir) and push via
    `POST /coder/admin/templates/push {"templates": ["<dir-name>"], "build_images": true}`.
 
 ## MATLAB workspaces

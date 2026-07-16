@@ -8,14 +8,15 @@
 #   ./computor.sh status [dev|prod]                          # services + maintenance state
 #   ./computor.sh maintenance enter|exit|status [dev|prod]   # full maintenance mode
 #   ./computor.sh update check|status|run|exec [prod]        # self-update (see ops/lib/update.sh)
+#   ./computor.sh test [--unit|--integration|--slow|--file <name>] [pytest-args]
+#                                                            # backend test suite (pytest)
 #
 # Examples:
 #   ./computor.sh up dev -d
 #   ./computor.sh up prod --build -d
 #   ./computor.sh down
 #   ./computor.sh maintenance enter prod
-#
-# startup.sh / stop.sh / maintenance.sh are thin wrappers around this script.
+#   ./computor.sh test --unit
 
 set -e
 
@@ -602,6 +603,56 @@ cmd_update() {
     fi
 }
 
+cmd_test() {
+    # Backend pytest runner. Convenience flags map to pytest markers; anything
+    # unrecognized passes through to pytest verbatim.
+    local pytest_args=()
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --unit)         pytest_args+=(-m unit) ;;
+            --integration)  pytest_args+=(-m integration) ;;
+            --slow)         pytest_args+=(-m slow) ;;
+            --file)
+                [ -n "${2:-}" ] || die "--file requires a test file name"
+                if [[ "$2" == *"test_"* ]]; then
+                    pytest_args+=("computor_backend/tests/$2.py")
+                else
+                    pytest_args+=("$2")
+                fi
+                shift
+                ;;
+            -v|--verbose)   pytest_args+=(-vv) ;;
+            -h|--help)      usage 0 ;;
+            *)              pytest_args+=("$1") ;;
+        esac
+        shift
+    done
+
+    log "${GREEN}=== Computor Backend Tests ===${NC}"
+
+    # Unit tests need no stack, so a missing .env is tolerated; with one, the
+    # integration tests talk to the configured database instead of fallbacks.
+    if [ -f "${REPO_ROOT}/.env" ]; then
+        load_env && echo "  ✓ .env loaded"
+    else
+        warn "  No .env found — using default database settings."
+    fi
+    export POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
+    export POSTGRES_PORT="${POSTGRES_PORT:-5432}"
+    export POSTGRES_USER="${POSTGRES_USER:-postgres}"
+    export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-postgres_secret}"
+    export POSTGRES_DB="${POSTGRES_DB:-computor}"
+    log "  Database: ${YELLOW}${POSTGRES_USER}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}${NC}"
+
+    [ -n "${VIRTUAL_ENV:-}" ] || warn "  No virtual environment active — using system Python."
+    command -v pytest >/dev/null 2>&1 || die "pytest not found. Install the backend first:
+  pip install -e ${REPO_ROOT}/computor-backend"
+
+    cd "${REPO_ROOT}/computor-backend/src"
+    log "\n${GREEN}Running pytest...${NC}"
+    pytest "${pytest_args[@]}"
+}
+
 COMMAND="${1:-}"
 shift || true
 
@@ -611,6 +662,7 @@ case "$COMMAND" in
     status)       cmd_status "$@" ;;
     maintenance)  cmd_maintenance "$@" ;;
     update)       cmd_update "$@" ;;
+    test)         cmd_test "$@" ;;
     -h|--help|help|"") usage 0 ;;
     *)
         log "${RED}Unknown command: $COMMAND${NC}"

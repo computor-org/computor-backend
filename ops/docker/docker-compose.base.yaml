@@ -6,7 +6,7 @@
 # container_name, e.g. the replica-scaled workers) as `computor-<service>-<n>`.
 # Without it, Compose falls back to the basename of the compose-file directory
 # (`ops/docker`) and you get `docker-<service>-<n>`. Base is always the first
-# `-f` file in startup.sh/stop.sh, so declaring it here covers the whole stack.
+# `-f` file assembled by computor.sh, so declaring it here covers the whole stack.
 name: computor
 
 networks:

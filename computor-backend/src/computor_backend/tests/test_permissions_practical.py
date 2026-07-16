@@ -487,7 +487,7 @@ class TestCorePermissions:
 To run these tests:
 
 1. Start the services (database, redis, etc.):
-   bash startup.sh
+   ./computor.sh up dev -d
 
 2. Run all permission tests:
    pytest src/computor_backend/tests/test_permissions_practical.py -v

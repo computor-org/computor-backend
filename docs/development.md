@@ -15,8 +15,8 @@ generation, and tests.
 python3.10 -m venv .venv && source .venv/bin/activate
 pip install -e computor-types/ -e computor-client/ -e computor-cli/ -e computor-backend/
 
-# 2. Environment — copy the template to the repo root, then fill in secrets
-cp ops/environments/.env.common.template .env
+# 2. Environment — generate .env with fresh secrets (never overwrites an existing .env)
+./setup-env.sh
 
 # 3. Docker services (postgres, redis, temporal + UI, minio, traefik, workers)
 ./computor.sh up dev -d
@@ -31,8 +31,7 @@ bash web.sh
 **Editable installs** mean code changes take effect without reinstalling. **Never** use
 `docker compose` directly — `./computor.sh` (via `ops/lib/common.sh`) picks the right
 compose overlays from the `dev|prod` argument and the `.env` flags (`CODER_ENABLED`,
-`KEYCLOAK_ENABLED`, `GIT_SERVER`, `MATLAB_ENABLED`, `UPDATE_ENABLED`); the old
-`startup.sh`/`stop.sh`/`maintenance.sh` still work as wrappers. `api.sh` applies
+`KEYCLOAK_ENABLED`, `GIT_SERVER`, `MATLAB_ENABLED`, `UPDATE_ENABLED`). `api.sh` applies
 migrations automatically, so `migrations.sh` is only for the rare standalone case.
 
 Verify:
@@ -52,7 +51,7 @@ git pull                       # on the active release branch
 bash api.sh                    # terminal 1
 bash web.sh                    # terminal 2
 git checkout -b feat/your-thing
-# …work…  →  bash test.sh  →  git commit  →  push  →  PR into the release branch
+# …work…  →  ./computor.sh test  →  git commit  →  push  →  PR into the release branch
 ./computor.sh down             # stop docker services (auto-detects dev/prod)
 ```
 
@@ -77,7 +76,7 @@ The full loop for a new entity (e.g. `Assignment`). Each step lives in the packa
 6. **Permissions** — register a handler for the model in `permissions/` if it needs
    entity-specific rules.
 7. **Regenerate** — `bash generate.sh all` (TS types, clients, python-client, schemas).
-8. **Test** — add `tests/test_assignments.py`; run `bash test.sh`.
+8. **Test** — add `tests/test_assignments.py`; run `./computor.sh test`.
 
 ## Migrations
 
@@ -122,9 +121,11 @@ with `npx tsc --noEmit`. `computor-web` uses **yarn** (never `npm install`).
 ## Tests
 
 ```bash
-bash test.sh                              # all tests
-pytest path/to/test_x.py::test_fn         # a single test
-pytest -m unit  /  -m integration         # by marker
+./computor.sh test                        # all tests (loads .env for the database)
+./computor.sh test --unit                 # unit tests only (no database needed)
+./computor.sh test --integration          # integration tests (stack must be up)
+./computor.sh test --file test_models     # a single test file
+pytest path/to/test_x.py::test_fn         # a single test (from computor-backend/src)
 pytest --cov=computor_backend             # coverage
 ```
 
