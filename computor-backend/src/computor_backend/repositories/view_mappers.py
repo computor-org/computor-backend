@@ -347,10 +347,13 @@ async def course_member_course_content_result_mapper(
     if not detailed:
         return list_obj
 
-    # Get DTO is List + a few extra fields, with richer ``course_content_type``
-    # and ``submission_group`` variants. ``model_dump(exclude=...)`` lets us
-    # share the common fields without restating every assignment.
-    list_data = list_obj.model_dump(exclude={'course_content_type', 'submission_group'})
+    # Get DTO is List + a few extra fields, with richer ``course_content_type``,
+    # ``submission_group`` and ``result`` variants. ``model_dump(exclude=...)``
+    # lets us share the common fields without restating every assignment.
+    # ``result`` must bypass the dump: model_dump serializes nested models per
+    # the List field's declared schema (``ResultStudentList``), silently
+    # dropping ``result_json``/``result_artifacts`` from the detailed payload.
+    list_data = list_obj.model_dump(exclude={'course_content_type', 'submission_group', 'result'})
     return CourseContentStudentGet(
         **list_data,
         created_at=course_content.created_at,
@@ -359,4 +362,5 @@ async def course_member_course_content_result_mapper(
         description=course_content.description,
         course_content_type=CourseContentTypeGet.model_validate(course_content.course_content_type),
         submission_group=submission_group_detail,
+        result=result_payload,
     )
