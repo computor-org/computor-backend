@@ -8,20 +8,33 @@ the updater sidecar (see ops/lib/update.sh), never by this process.
 """
 
 import asyncio
+import json
 import logging
 import re
 from datetime import datetime, timezone
 from typing import Annotated, Optional, Tuple
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
 from computor_backend.config import get_settings
-from computor_backend.exceptions import ForbiddenException
+from computor_backend.database import get_db
+from computor_backend.exceptions import (
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+)
+from computor_backend.model.auth import User
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.core import check_admin
 from computor_backend.permissions.principal import Principal
 from computor_backend.redis_cache import get_redis_client
-from computor_types.update import SystemUpdateState, SystemUpdateStatusGet
+from computor_types.update import (
+    SystemUpdateState,
+    SystemUpdateStatusGet,
+    SystemUpdateTriggerResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +43,12 @@ update_router = APIRouter()
 REDIS_KEY_REMOTE = "update:remote"
 REDIS_KEY_STATE = "update:state"
 REDIS_KEY_AGENT = "update:agent"
+REDIS_KEY_LOCK = "update:lock"
+REDIS_KEY_QUEUE = "update:queue"
 
 REMOTE_CACHE_TTL = 300  # seconds
 LS_REMOTE_TIMEOUT = 10  # seconds
+UPDATE_LOCK_TTL = 7200  # seconds — matches ops/lib/update.sh
 
 # Resolved once per process: the running commit/branch never change while the
 # process lives (env is baked at image build; dev reads the working tree).
@@ -212,3 +228,100 @@ async def check_for_update(
 
     redis = await get_redis_client()
     return await _build_status(redis, force_refresh=True)
+
+
+@update_router.post("", response_model=SystemUpdateTriggerResponse)
+async def trigger_update(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    """
+    Queue a self-update run.
+
+    Admin only. The API only queues — the updater sidecar picks the request up
+    from Redis and executes it (maintenance page -> git update -> rebuild ->
+    restart -> health check, with automatic rollback on failure). Expect the
+    whole system, including this API, to go down for several minutes.
+    """
+    if not check_admin(permissions):
+        raise ForbiddenException(detail="Admin privileges required")
+
+    settings = get_settings().update
+    if not settings.enabled:
+        raise BadRequestException(
+            detail="Self-update is disabled. Set UPDATE_ENABLED=true in .env and restart."
+        )
+
+    redis = await get_redis_client()
+    if not await redis.exists(REDIS_KEY_AGENT):
+        raise ConflictException(
+            detail="The updater sidecar is not running (development environment, "
+            "or the sidecar is down). Updates can only be triggered in production."
+        )
+
+    # Single-flight: the lock is released by the updater when the run finishes
+    # (or expires after UPDATE_LOCK_TTL as a stuck-run backstop).
+    acquired = await redis.set(REDIS_KEY_LOCK, str(uuid4()), nx=True, ex=UPDATE_LOCK_TTL)
+    if not acquired:
+        raise ConflictException(detail="An update is already in progress.")
+
+    now = datetime.now(timezone.utc).isoformat()
+    user = db.query(User).filter(User.id == permissions.user_id).first()
+    display_name = (
+        f"{user.given_name} {user.family_name}"
+        if user and user.given_name
+        else permissions.user_id
+    )
+
+    # Fresh state for this run (clears any previous run's leftover fields).
+    await redis.delete(REDIS_KEY_STATE)
+    await redis.hset(REDIS_KEY_STATE, mapping={
+        "status": "requested",
+        "phase": "",
+        "message": "Waiting for the updater to pick up the request",
+        "requested_by": permissions.user_id,
+        "requested_by_name": display_name,
+        "requested_at": now,
+        "error": "",
+    })
+    await redis.lpush(REDIS_KEY_QUEUE, json.dumps({
+        "requested_by": permissions.user_id,
+        "requested_at": now,
+        "branch": settings.repo_branch,
+    }))
+
+    logger.warning(f"Self-update REQUESTED by {permissions.user_id} (branch {settings.repo_branch})")
+
+    return SystemUpdateTriggerResponse(status="requested", requested_at=now)
+
+
+@update_router.post("/reset")
+async def reset_update_state(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+):
+    """
+    Clear a stuck update lock/state (admin recovery).
+
+    Marks a non-terminal run as failed and releases the lock so a new update
+    can be requested. Does NOT stop a runner that is actually still executing —
+    use this only when a run died without cleaning up (the lock also expires
+    on its own after 2 hours).
+    """
+    if not check_admin(permissions):
+        raise ForbiddenException(detail="Admin privileges required")
+
+    redis = await get_redis_client()
+    state = await redis.hgetall(REDIS_KEY_STATE)
+    now = datetime.now(timezone.utc).isoformat()
+
+    await redis.delete(REDIS_KEY_LOCK, REDIS_KEY_QUEUE)
+    if state and state.get("status") in ("requested", "running"):
+        await redis.hset(REDIS_KEY_STATE, mapping={
+            "status": "failed",
+            "error": "Manually reset by an administrator.",
+            "finished_at": now,
+        })
+
+    logger.warning(f"Self-update state RESET by {permissions.user_id}")
+
+    return {"status": "reset"}

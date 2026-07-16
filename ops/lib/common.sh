@@ -106,6 +106,11 @@ assemble_compose_files() {
     if [ "$environment" = "prod" ] && [ "${UPDATE_ENABLED:-}" = "true" ] \
         && [ -f "${d}/docker-compose.updater.yaml" ]; then
         COMPOSE_FILES="$COMPOSE_FILES -f ${d}/docker-compose.updater.yaml"
+        # The overlay interpolates these; every consumer (up/down/maintenance/
+        # update, host or runner container) must agree on the same values.
+        export COMPUTOR_REPO_DIR="${COMPUTOR_REPO_DIR:-$REPO_ROOT}"
+        export HOST_UID="${HOST_UID:-$(id -u)}"
+        export HOST_GID="${HOST_GID:-$(id -g)}"
     fi
 
     export COMPOSE_FILES

@@ -23,7 +23,8 @@ ops/
 │
 └── docs/                      # Operational documentation
     ├── DOCKER_SETUP.md        # Complete Docker setup guide
-    └── REVERSE_PROXY.md       # nginx (TLS) → Traefik production setup
+    ├── REVERSE_PROXY.md       # nginx (TLS) → Traefik production setup
+    └── SELF_UPDATE.md         # One-click updates from the admin UI / CLI
 ```
 
 ## Quick Reference
