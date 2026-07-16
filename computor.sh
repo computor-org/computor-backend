@@ -323,7 +323,10 @@ cmd_up() {
     # or when the image is missing (cached/fast otherwise).
     if [[ "$DOCKER_ARGS" == *"--build"* ]] || ! docker image inspect computor-base:latest >/dev/null 2>&1; then
         log "\n${GREEN}Building shared base image (computor-base)...${NC}"
-        (cd "$REPO_ROOT" && docker build -f docker/base/Dockerfile -t computor-base:latest .)
+        git_build_meta
+        echo "  Baking build provenance: commit=${GIT_COMMIT} branch=${GIT_BRANCH}"
+        (cd "$REPO_ROOT" && docker build -f docker/base/Dockerfile -t computor-base:latest \
+            --build-arg GIT_COMMIT="$GIT_COMMIT" --build-arg GIT_BRANCH="$GIT_BRANCH" .)
     fi
     # The testing worker also layers on a heavy, slow-changing language-runtimes
     # image (Octave/R/Python 3.13/Julia) built independently of the project source.

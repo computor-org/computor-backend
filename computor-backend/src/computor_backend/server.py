@@ -78,6 +78,7 @@ from computor_backend.api.course_member_import import course_member_import_route
 from computor_backend.api.course_member_gradings import course_member_gradings_router
 from computor_backend.api.workspace_roles import workspace_roles_router
 from computor_backend.api.maintenance import maintenance_router
+from computor_backend.api.update import update_router
 from computor_backend.api.invites import invites_router
 from computor_backend.api.consent import consent_router
 from computor_backend.api.instance import instance_router
@@ -454,6 +455,13 @@ app.include_router(
     maintenance_router,
     prefix="/system/maintenance",
     tags=["system", "maintenance"],
+    dependencies=[Depends(get_current_principal), Depends(get_redis_client)]
+)
+
+app.include_router(
+    update_router,
+    prefix="/system/update",
+    tags=["system", "update"],
     dependencies=[Depends(get_current_principal), Depends(get_redis_client)]
 )
 

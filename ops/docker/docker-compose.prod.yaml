@@ -122,6 +122,12 @@ services:
       # Public Forgejo URL — the backend reconciles the 'forgejo' Keycloak client's
       # OIDC redirect URI to this on startup, so it never goes stale on a URL change.
       FORGEJO_ROOT_URL: ${FORGEJO_ROOT_URL:-}
+      # Self-update (System -> Updates admin page). :- defaults keep pre-existing
+      # .env files working — new compose vars must never use :? here.
+      UPDATE_ENABLED: ${UPDATE_ENABLED:-false}
+      SYSTEM_REPO_URL: ${SYSTEM_REPO_URL:-}
+      SYSTEM_REPO_BRANCH: ${SYSTEM_REPO_BRANCH:-main}
+      SYSTEM_REPO_TOKEN: ${SYSTEM_REPO_TOKEN:-}
     depends_on:
       postgres:
         condition: service_started
