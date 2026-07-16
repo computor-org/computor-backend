@@ -17,9 +17,8 @@ computor-fullstack/
 │   ├── docker-compose.coder.yaml  # Optional Coder addon
 │   └── docker-compose.web.yaml    # Frontend (auto-loaded in prod)
 ├── .env                            # Active environment file
-├── setup-env.sh                    # Environment setup script
-├── startup.sh                      # Service startup script
-└── stop.sh                         # Service stop script
+├── setup-env.sh                    # Creates .env (generates .env.common with fresh secrets)
+└── computor.sh                     # Lifecycle CLI (up/down/status/maintenance/update/test)
 ```
 
 ### Service Organization
@@ -57,7 +56,7 @@ computor-fullstack/
 git clone <repository>
 cd computor-fullstack
 
-# Run the setup script to create environment files
+# Run the setup script to create the .env file
 ./setup-env.sh
 
 # Or for non-interactive setup:
@@ -69,13 +68,13 @@ cd computor-fullstack
 #### Development Mode
 
 ```bash
-./startup.sh dev -d
+./computor.sh up dev -d
 ```
 
 #### Production Mode
 
 ```bash
-./startup.sh prod -d
+./computor.sh up prod -d
 ```
 
 Coder workspace support is controlled via `CODER_ENABLED=true` in `.env`.
@@ -83,13 +82,13 @@ Coder workspace support is controlled via `CODER_ENABLED=true` in `.env`.
 ### 3. Stop Services
 
 ```bash
-./stop.sh dev    # development stack
-./stop.sh prod   # production stack
+./computor.sh down dev    # development stack
+./computor.sh down prod   # production stack
 ```
 
-The startup/stop scripts compose the correct overlay set based on `CODER_ENABLED`
-in `.env`. Avoid running `docker compose` directly with hand-listed `-f` flags —
-it bypasses the script's overlay logic.
+`./computor.sh` composes the correct overlay set from the `.env` feature flags.
+Avoid running `docker compose` directly with hand-listed `-f` flags — it bypasses
+the script's overlay logic.
 
 ## Environment Configuration
 
@@ -125,8 +124,8 @@ The system uses a layered environment configuration:
 
 ### Manual Docker Compose Commands
 
-The startup/stop scripts are the supported entry points. If you really need to
-invoke compose directly:
+`./computor.sh` is the supported entry point. If you really need to invoke
+compose directly:
 
 ```bash
 # Development
@@ -210,7 +209,7 @@ If you're migrating from the old docker-compose structure:
 4. Stop old services and start with new structure:
    ```bash
    docker-compose -f docker-compose-dev.yaml down
-   ./startup.sh dev -d
+   ./computor.sh up dev -d
    ```
 
 ## Troubleshooting

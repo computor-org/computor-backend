@@ -59,3 +59,11 @@ RUN pip install --user --no-deps --no-warn-script-location \
 
 # Source on PYTHONPATH so imports resolve from the working tree (alembic, etc.).
 ENV PYTHONPATH=/home/worker/computor-backend/src
+
+# Build provenance, injected by computor.sh at build time. Declared last so a
+# changed commit hash never busts the dependency/source layers above. The repo's
+# .git is not in the image, so this ENV is the only way a container can know
+# which commit it runs (read by /system/update/status).
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+ENV GIT_COMMIT=${GIT_COMMIT} GIT_BRANCH=${GIT_BRANCH}

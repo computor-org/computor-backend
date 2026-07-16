@@ -2,18 +2,18 @@
 
 ## Overview
 
-The Computor platform uses a **single unified configuration file** (`.env.common`) that contains ALL settings for the platform, including optional Coder integration.
+The Computor platform uses a **single configuration file** (`.env` in the repo root) that
+contains ALL settings for the platform, including optional Coder integration. Dev vs.
+prod is a runtime argument (`./computor.sh up dev|prod`), not a separate env file.
 
 ## File Structure
 
 ```
 computor-fullstack/
-├── .env.common         # Main configuration (ALL variables)
-├── .env                # Working copy (duplicate of .env.common)
-├── .env.dev            # Development overrides (small, only host changes)
-├── .env.prod           # Production overrides (small, only host changes)
+├── .env.common         # Generated template (ALL variables, fresh secrets)
+├── .env                # The configuration the runtime scripts read
 └── ops/environments/
-    └── .env.common.template  # Template with all variables
+    └── .env.common.template  # Static reference template behind setup-env.sh
 ```
 
 ## Quick Setup
@@ -31,8 +31,7 @@ This will:
 1. Create `.env.common` with all configuration
 2. Generate secure passwords and tokens
 3. Configure Coder if requested
-4. Create `.env` as a working copy
-5. Create `.env.dev` and `.env.prod` with minimal overrides
+4. Create `.env` from `.env.common` (an existing `.env` is NEVER overwritten)
 
 ### Using Existing Configuration
 ```bash
@@ -51,20 +50,10 @@ This will:
 - **Generated from**: `ops/environments/.env.common.template`
 - **When to edit**: To change any configuration value
 
-### `.env` - Working Copy
-- **Contains**: Copy of `.env.common` for backward compatibility
-- **Purpose**: Some tools expect `.env` in the root
-- **Auto-created**: By setup-env.sh
-
-### `.env.dev` - Development Overrides
-- **Contains**: Only host/port overrides for local development
-- **Example**: `POSTGRES_HOST=localhost` instead of `postgres`
-- **Size**: ~6 lines
-
-### `.env.prod` - Production Overrides
-- **Contains**: Only host/port overrides for production
-- **Example**: `POSTGRES_HOST=postgres`, restricted MinIO ports
-- **Size**: ~6 lines
+### `.env` - The Active Configuration
+- **Contains**: Everything the runtime scripts (`computor.sh`, `api.sh`, `seed.sh`) read
+- **Created**: Copied from `.env.common` by setup-env.sh (never overwritten once it exists)
+- **When to edit**: Always — this is the live config; `.env.common` is just the generated template
 
 ## Key Variables
 
@@ -129,17 +118,18 @@ compose` to exit at parse time:
 ## How It Works
 
 ### Loading Order
-1. `startup.sh` loads `.env.common` (or `.env` if .env.common doesn't exist)
-2. Then loads `.env.dev` or `.env.prod` to override specific values
-3. Docker Compose uses the combined environment
+1. `./computor.sh` (via `ops/lib/common.sh`) loads the single `.env` in the repo root
+2. In prod, public URLs are derived from `PUBLIC_DOMAIN` unless set explicitly in `.env`
+3. Docker Compose uses that environment; overlays are picked from the `dev|prod`
+   argument and the `.env` feature flags
 
-### Environment Overrides
-Development (`./startup.sh dev`):
+### Environment Differences (compose overlays, not env files)
+Development (`./computor.sh up dev`):
 - Uses localhost for database connections
 - Single worker replicas
 - Debug mode enabled
 
-Production (`./startup.sh prod`):
+Production (`./computor.sh up prod`):
 - Uses Docker service names for connections
 - Multiple worker replicas
 - Debug mode disabled
@@ -163,7 +153,7 @@ CODER_ADMIN_EMAIL=admin@yourdomain.com
 
 Then start with:
 ```bash
-./startup.sh dev -d
+./computor.sh up dev -d
 ```
 
 ## Migration from Old Structure
@@ -198,9 +188,9 @@ If you have old separate `.env` files:
 
 ### Missing Variables
 If a service complains about missing variables:
-1. Check if the variable is in `.env.common`
-2. Check if it's being overridden in `.env.dev` or `.env.prod`
-3. Re-run `./setup-env.sh` to ensure all variables are present
+1. Check if the variable is set in `.env`
+2. Re-run `./setup-env.sh` and diff: new variables land in `.env.common`
+   (`diff .env .env.common`), then merge them into `.env`
 
 ### Coder Not Working
 1. Check `CODER_ENABLED=true` in `.env.common`
@@ -208,16 +198,15 @@ If a service complains about missing variables:
 3. Check Coder database exists: The startup script automatically creates it when `CODER_ENABLED=true`
 
 ### Environment Confusion
-To see which environment variables are loaded:
+To see the fully-interpolated compose configuration:
 ```bash
-# Check what's in the environment
-docker-compose -f ops/docker/docker-compose.base.yaml config
+source ops/lib/common.sh
+load_env && derive_public_urls dev && pin_project_name && assemble_compose_files dev
+docker compose $COMPOSE_FILES config
 ```
 
 ## Best Practices
 
-1. **Use `.env.common` for everything** - It's the single source of truth
-2. **Keep overrides minimal** - Only put host/port changes in `.env.dev` and `.env.prod`
-3. **Don't duplicate variables** - If it's the same in dev and prod, put it in `.env.common`
-4. **Use setup script** - It handles token generation and proper configuration
-5. **Backup before changes** - The script auto-backs up, but manual backups are good too
+1. **Edit `.env` for everything** - It's the single source of truth the runtime reads
+2. **Use the setup script** - It handles token generation and proper configuration
+3. **Backup before changes** - The script never overwrites `.env`, but manual backups are good too

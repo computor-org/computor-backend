@@ -146,7 +146,7 @@ async def schedule_maintenance(
 
     Admin only. Sets a scheduled time and optionally notifies connected users.
     Does NOT activate maintenance mode -- that requires a separate activate call
-    or can be triggered by the maintenance.sh script.
+    or can be triggered by ``computor.sh maintenance enter``.
     """
     if not check_admin(permissions):
         raise ForbiddenException(detail="Admin privileges required")

@@ -1,0 +1,53 @@
+# Self-update sidecar (prod-only, UPDATE_ENABLED=true). Included by
+# ops/lib/common.sh::assemble_compose_files, which also exports
+# COMPUTOR_REPO_DIR / HOST_UID / HOST_GID.
+#
+# The watcher stays up through the update's maintenance stop (it is part of
+# MAINTENANCE_KEEP_SERVICES in ops/lib/update.sh) and launches the actual
+# update run as a detached sibling container OUTSIDE this compose project, so
+# recreating this service can never kill a run in progress.
+#
+# SECURITY: mounts the raw docker socket (root-equivalent on the host) — the
+# prod socket-proxy cannot serve image builds/compose orchestration. Contained
+# by: no published ports, not routed by traefik, non-root user (socket access
+# via group_add), and the only actionable input is the Redis queue behind the
+# admin-only POST /system/update. The queue payload itself is informational —
+# the branch that gets deployed comes from .env, never from the queue.
+services:
+  updater:
+    build:
+      context: ../../
+      dockerfile: ./docker/updater/Dockerfile
+    image: computor-updater:latest
+    container_name: computor-updater
+    restart: unless-stopped
+    # Run as the host user so files the runner's `git checkout` touches keep
+    # host ownership; DOCKER_GID grants socket access (probed by computor.sh).
+    # :- defaults keep read-only compose commands (config/ps/logs/down) working
+    # without the exports; `computor.sh up` always exports the real values.
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    group_add:
+      - "${DOCKER_GID:-0}"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      COMPUTOR_REPO_DIR: ${COMPUTOR_REPO_DIR:-.}
+      DOCKER_GID: ${DOCKER_GID:-0}
+      HOME: /tmp
+    volumes:
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
+      # Same absolute path as on the host: compose-relative bind mounts in the
+      # other overlays (../../docker/...) must resolve when the runner invokes
+      # docker compose from inside the container.
+      - ${COMPUTOR_REPO_DIR:-.}:${COMPUTOR_REPO_DIR:-/repo}
+    working_dir: ${COMPUTOR_REPO_DIR:-/repo}
+    networks:
+      - computor-network
+    depends_on:
+      - redis
+    labels:
+      - "traefik.enable=false"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

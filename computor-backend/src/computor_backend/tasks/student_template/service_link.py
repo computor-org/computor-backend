@@ -70,7 +70,7 @@ def link_testing_service(db: Session, content, files: Optional[Dict[str, bytes]]
             ServiceType.path == Ltree('testing.temporal')
         ).first()
         if not service_type:
-            logger.warning("ServiceType 'testing.temporal' not found - run seed_testing_temporal_service_type.py")
+            logger.warning("ServiceType 'testing.temporal' not found - run 'alembic upgrade head' (seeded by migration)")
             return
 
         # Prefer an enabled service whose language matches

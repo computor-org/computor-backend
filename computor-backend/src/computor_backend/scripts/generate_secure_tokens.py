@@ -90,10 +90,11 @@ def main():
 
     if args.output_env:
         print("💡 Usage:")
-        print("   1. Add these to your .env file")
-        print("   2. Run: cd computor-backend/src && \\")
-        print("      python -m computor_backend.scripts.create_service_users \\")
-        print("      --predefined-tokens --output-env")
+        print("   1. Add the token to .env (e.g. TESTING_WORKER_TOKEN=...)")
+        print("   2. Reference it from a bootstrap deployment under data/deployments/")
+        print("      (see testing-worker.example.yaml: api_token.token: ${TESTING_WORKER_TOKEN})")
+        print("   3. Restart the API — service users and tokens are created at startup")
+        print("      by ensure_bootstrap_services().")
         print()
 
     return 0

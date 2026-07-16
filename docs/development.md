@@ -15,11 +15,11 @@ generation, and tests.
 python3.10 -m venv .venv && source .venv/bin/activate
 pip install -e computor-types/ -e computor-client/ -e computor-cli/ -e computor-backend/
 
-# 2. Environment — copy the template to the repo root, then fill in secrets
-cp ops/environments/.env.common.template .env
+# 2. Environment — generate .env with fresh secrets (never overwrites an existing .env)
+./setup-env.sh
 
 # 3. Docker services (postgres, redis, temporal + UI, minio, traefik, workers)
-bash startup.sh dev -d
+./computor.sh up dev -d
 
 # 4. Backend on :8000 — runs Alembic migrations and seeds the admin user on start
 bash api.sh
@@ -29,9 +29,10 @@ bash web.sh
 ```
 
 **Editable installs** mean code changes take effect without reinstalling. **Never** use
-`docker compose` directly — `startup.sh`/`stop.sh` pick the right compose overlay from the
-`dev|prod` argument and `CODER_ENABLED`. `api.sh` applies migrations automatically, so
-`migrations.sh` is only for the rare standalone case.
+`docker compose` directly — `./computor.sh` (via `ops/lib/common.sh`) picks the right
+compose overlays from the `dev|prod` argument and the `.env` flags (`CODER_ENABLED`,
+`KEYCLOAK_ENABLED`, `GIT_SERVER`, `MATLAB_ENABLED`, `UPDATE_ENABLED`). `api.sh` applies
+migrations automatically, so `migrations.sh` is only for the rare standalone case.
 
 Verify:
 
@@ -46,16 +47,16 @@ curl localhost:8000/docs # Swagger UI is up
 ```bash
 source .venv/bin/activate
 git pull                       # on the active release branch
-bash startup.sh dev -d         # add --build to rebuild worker/images after code changes
+./computor.sh up dev -d        # add --build to rebuild worker/images after code changes
 bash api.sh                    # terminal 1
 bash web.sh                    # terminal 2
 git checkout -b feat/your-thing
-# …work…  →  bash test.sh  →  git commit  →  push  →  PR into the release branch
-bash stop.sh                   # stop docker services (auto-detects dev/prod)
+# …work…  →  ./computor.sh test  →  git commit  →  push  →  PR into the release branch
+./computor.sh down             # stop docker services (auto-detects dev/prod)
 ```
 
 > Worker code is **baked into the worker images**. After editing anything under `tasks/`,
-> rebuild with `bash startup.sh dev --build -d` or the workers keep running stale code.
+> rebuild with `./computor.sh up dev --build -d` or the workers keep running stale code.
 
 ## Adding an entity, end-to-end
 
@@ -75,7 +76,7 @@ The full loop for a new entity (e.g. `Assignment`). Each step lives in the packa
 6. **Permissions** — register a handler for the model in `permissions/` if it needs
    entity-specific rules.
 7. **Regenerate** — `bash generate.sh all` (TS types, clients, python-client, schemas).
-8. **Test** — add `tests/test_assignments.py`; run `bash test.sh`.
+8. **Test** — add `tests/test_assignments.py`; run `./computor.sh test`.
 
 ## Migrations
 
@@ -97,8 +98,9 @@ Guidelines:
   breaking a live schema.
 - Migration headers vary between `revision = "..."` and `revision: str = "..."`; use
   `alembic heads` (not grep) to find the correct parent when hand-authoring one.
-- To reset a dev DB: `stop.sh` intentionally disables `-v`; remove the postgres data dir
-  under `${SYSTEM_DEPLOYMENT_PATH}/postgres` manually, then `startup.sh` + `api.sh`.
+- To reset a dev DB: `./computor.sh down` intentionally disables `-v`; remove the postgres
+  data dir under `${SYSTEM_DEPLOYMENT_PATH}/postgres` manually, then `./computor.sh up dev -d`
+  + `api.sh`.
 
 ## Code generation
 
@@ -119,9 +121,11 @@ with `npx tsc --noEmit`. `computor-web` uses **yarn** (never `npm install`).
 ## Tests
 
 ```bash
-bash test.sh                              # all tests
-pytest path/to/test_x.py::test_fn         # a single test
-pytest -m unit  /  -m integration         # by marker
+./computor.sh test                        # all tests (loads .env for the database)
+./computor.sh test --unit                 # unit tests only (no database needed)
+./computor.sh test --integration          # integration tests (stack must be up)
+./computor.sh test --file test_models     # a single test file
+pytest path/to/test_x.py::test_fn         # a single test (from computor-backend/src)
 pytest --cov=computor_backend             # coverage
 ```
 
@@ -135,7 +139,7 @@ via `TestClient`. Common fixtures (`client`, `db`, `admin_token`, `test_course`)
 |---------|-----|
 | Port already in use | `lsof -i :8000` → `kill -9 <PID>` |
 | Import errors for `computor_*` | Re-run the editable installs (order: types → client → cli → backend) |
-| Worker runs old code | Rebuild: `bash startup.sh dev --build -d` (source is baked into worker images) |
+| Worker runs old code | Rebuild: `./computor.sh up dev --build -d` (source is baked into worker images) |
 | DB connection fails | `docker ps | grep postgres`; check `.env` datastore hosts (dev = `localhost`) |
 | Migration "table already exists" / out of sync | `alembic current`; `alembic stamp head`; or reset the dev DB (above) |
 

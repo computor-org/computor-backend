@@ -3,7 +3,7 @@
 # Environment setup script for Computor
 # Creates .env.common - a template configuration file with all variables
 # User should copy .env.common to .env and customize as needed
-# startup.sh uses .env as the main configuration file
+# computor.sh uses .env as the main configuration file
 
 set -e
 
@@ -252,7 +252,7 @@ if [ "$SKIP_COMMON" != true ]; then
     MINIO_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-20)
     TEMPORAL_PG_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-20)
 
-    # Keycloak internal secrets. KEYCLOAK_CLIENT_SECRET must be hex: startup.sh
+    # Keycloak internal secrets. KEYCLOAK_CLIENT_SECRET must be hex: computor.sh up
     # substitutes it into the realm config with a /-delimited sed, so it must
     # not contain '/'.
     KEYCLOAK_DB_PASSWORD=$(generate_token | tr -d '/+=' | cut -c1-20)
@@ -352,7 +352,7 @@ if [ "$SKIP_COMMON" != true ]; then
             done
         fi
         PUBLIC_DOMAIN="${PUBLIC_DOMAIN%/}"  # strip trailing slash so we don't get //api
-        # Single source of truth for the public URLs. startup.sh derives
+        # Single source of truth for the public URLs. computor.sh up derives
         # NEXT_PUBLIC_API_URL / KEYCLOAK_PUBLIC_URL / FORGEJO_ROOT_URL / FORGEJO_DOMAIN
         # from this at launch, so leave those empty here (a domain change is then a
         # one-line edit). Set any of them explicitly later to override its derivation.
@@ -393,8 +393,8 @@ if [ "$SKIP_COMMON" != true ]; then
 
         # Public exposure. Dev: direct port (localhost:3030), no Traefik. Prod: served
         # behind Traefik under the /forgejo subpath. FORGEJO_ROOT_URL and FORGEJO_DOMAIN
-        # are derived from PUBLIC_DOMAIN by startup.sh, so leave them empty here (set
-        # explicitly to override). startup.sh strips the scheme for FORGEJO_DOMAIN and
+        # are derived from PUBLIC_DOMAIN by computor.sh up, so leave them empty here (set
+        # explicitly to override). computor.sh strips the scheme for FORGEJO_DOMAIN and
         # appends /forgejo for FORGEJO_ROOT_URL.
         if [ "$ENVIRONMENT" = "prod" ]; then
             set_env_var FORGEJO_TRAEFIK_ENABLED true
@@ -435,8 +435,8 @@ if [ "$SKIP_COMMON" != true ]; then
     echo -e "  ${GREEN}✓${NC} Created .env.common"
 fi
 
-# Make .env usable by startup.sh — but NEVER overwrite an existing .env.
-# startup.sh reads .env only; .env.common is just the generated template.
+# Make .env usable by computor.sh — but NEVER overwrite an existing .env.
+# computor.sh reads .env only; .env.common is just the generated template.
 ENV_READY=false
 if [ -f .env ]; then
     # An existing .env is the source of truth — leave it untouched.
@@ -465,7 +465,7 @@ fi
 echo -e "\n${GREEN}=== Setup Complete ===${NC}"
 echo -e "Created:"
 [ -f .env.common ] && echo -e "  ${GREEN}✓${NC} .env.common - configuration template with ALL variables"
-[ "$ENV_READY" = true ] && echo -e "  ${GREEN}✓${NC} .env - ready for ./startup.sh"
+[ "$ENV_READY" = true ] && echo -e "  ${GREEN}✓${NC} .env - ready for ./computor.sh up"
 
 # Report the admin credentials (generated or entered) so the user can log in.
 # Only populated when .env.common was (re)generated this run.
@@ -499,13 +499,13 @@ echo "  To let users sign in via an institute IdP (config stays local, not commi
 echo "    1. cp data/keycloak/identity-providers.example.json data/keycloak/identity-providers.json"
 echo "       then set alias / discoveryUrl / clientId and \"enabled\": true"
 echo "    2. add its secret to .env:  IDP_<ALIAS>_CLIENT_SECRET=..."
-echo "    3. ./startup.sh — the keycloak-idp-setup step registers it (idempotent)"
+echo "    3. ./computor.sh up — the keycloak-idp-setup step registers it (idempotent)"
 
 echo -e "\n${GREEN}To start Computor:${NC}"
-echo "  ./startup.sh $ENVIRONMENT -d"
+echo "  ./computor.sh up $ENVIRONMENT -d"
 if [ "$ENABLE_CODER" = true ]; then
     echo "  (Coder is enabled via CODER_ENABLED=true in .env)"
 fi
 
 echo -e "\n${GREEN}To stop Computor:${NC}"
-echo "  ./stop.sh $ENVIRONMENT"
+echo "  ./computor.sh down $ENVIRONMENT"

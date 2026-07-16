@@ -66,7 +66,7 @@ services:
       # path read-only). Same path inside the container as outside so
       # ``settings.DOCUMENTS_ROOT`` resolves consistently in both processes.
       - ${DOCUMENTS_ROOT:-${SYSTEM_DEPLOYMENT_PATH}/shared/documents}:${DOCUMENTS_ROOT:-/opt/computor/shared/documents}
-      # Bootstrap deployments staged by startup.sh; applied idempotently at boot.
+      # Bootstrap deployments staged by computor.sh up; applied idempotently at boot.
       - ${SYSTEM_DEPLOYMENT_PATH}/deployments:/deployments:ro
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
@@ -122,6 +122,12 @@ services:
       # Public Forgejo URL — the backend reconciles the 'forgejo' Keycloak client's
       # OIDC redirect URI to this on startup, so it never goes stale on a URL change.
       FORGEJO_ROOT_URL: ${FORGEJO_ROOT_URL:-}
+      # Self-update (System -> Updates admin page). :- defaults keep pre-existing
+      # .env files working — new compose vars must never use :? here.
+      UPDATE_ENABLED: ${UPDATE_ENABLED:-false}
+      SYSTEM_REPO_URL: ${SYSTEM_REPO_URL:-}
+      SYSTEM_REPO_BRANCH: ${SYSTEM_REPO_BRANCH:-main}
+      SYSTEM_REPO_TOKEN: ${SYSTEM_REPO_TOKEN:-}
     depends_on:
       postgres:
         condition: service_started

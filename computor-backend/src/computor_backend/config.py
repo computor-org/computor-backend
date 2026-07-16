@@ -51,6 +51,52 @@ class StorageSettings(BaseSettings):
     )
 
 
+class UpdateSettings(BaseSettings):
+    """Self-update subsystem configuration (System -> Updates admin page).
+
+    ``git_commit``/``git_branch`` are baked into the images at build time by
+    computor.sh (see docker/base/Dockerfile); in dev they are unset and the
+    update API falls back to reading the working tree's git metadata.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    enabled: bool = Field(
+        default=False,
+        validation_alias="UPDATE_ENABLED",
+        description="Whether the self-update subsystem (updater sidecar + trigger endpoint) is enabled.",
+    )
+    repo_url: str = Field(
+        default="",
+        validation_alias="SYSTEM_REPO_URL",
+        description="Git URL of the deployment repository the update check compares against.",
+    )
+    repo_branch: str = Field(
+        default="main",
+        validation_alias="SYSTEM_REPO_BRANCH",
+        description="Branch the deployment tracks for updates.",
+    )
+    repo_token: str = Field(
+        default="",
+        validation_alias="SYSTEM_REPO_TOKEN",
+        description="Access token for private repositories (never logged or returned).",
+    )
+    git_commit: str = Field(
+        default="",
+        validation_alias="GIT_COMMIT",
+        description="Commit hash baked into the running image at build time.",
+    )
+    git_branch: str = Field(
+        default="",
+        validation_alias="GIT_BRANCH",
+        description="Branch name baked into the running image at build time.",
+    )
+
+
 class Settings:
     """Aggregate accessor for the backend's configuration domains.
 
@@ -62,6 +108,7 @@ class Settings:
 
     def __init__(self) -> None:
         self.storage = StorageSettings()
+        self.update = UpdateSettings()
 
 
 @lru_cache

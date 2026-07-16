@@ -29,6 +29,9 @@ COPY computor-web/ .
 # These can be overridden at build time with --build-arg
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# Build provenance (set by computor.sh) — shown in the sidebar footer.
+ARG GIT_COMMIT=
+ENV NEXT_PUBLIC_GIT_COMMIT=$GIT_COMMIT
 
 # Disable Next.js telemetry
 ENV NEXT_TELEMETRY_DISABLED=1

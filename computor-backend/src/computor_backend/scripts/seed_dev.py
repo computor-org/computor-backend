@@ -8,7 +8,7 @@ ensured, submission groups are provisioned, and (for legacy-git courses) the
 repository workflow is triggered. A raw INSERT skips all of that, which is why
 directly-inserted members misbehave.
 
-In-process, so it needs Postgres up (`startup.sh`) but NOT the API (`api.sh`) or
+In-process, so it needs Postgres up (`computor.sh up`) but NOT the API (`api.sh`) or
 Keycloak. Fake users (email ``dev.userNNN@seed.local``) are not loginable.
 Idempotent: users are found-or-created by email and the import updates an
 existing member instead of duplicating.

@@ -76,10 +76,17 @@ check_file() {
         file_errors=1
     fi
     
-    # Database connection strings with passwords
-    if grep -qE '(mongodb|postgres|postgresql|mysql|redis)://[^:]+:[^@]+@' "$file"; then
-        echo -e "${YELLOW}⚠️  Database connection string with credentials found in: $file${NC}"
-        echo "   Consider using environment variables instead"
+    # Database connection strings with hardcoded passwords (skip env vars)
+    local db_matches=$(grep -nE '(mongodb|postgres|postgresql|mysql|redis)://[^:]+:[^@]+@' "$file" 2>/dev/null || true)
+    if [ -n "$db_matches" ]; then
+        while IFS= read -r match; do
+            # Skip if password part contains env var syntax ($, ${, %)
+            if ! echo "$match" | grep -qE ':\$[A-Z_{]|:\%[A-Z]'; then
+                echo -e "${YELLOW}⚠️  Database connection string with credentials found in: $file${NC}"
+                echo "   $match"
+                echo "   Consider using environment variables instead"
+            fi
+        done <<< "$db_matches"
     fi
     
     # Slack tokens
@@ -100,8 +107,12 @@ check_file() {
     return $file_errors
 }
 
-# Check each staged file
+# Check each staged file (skip this hook's own source — it contains the
+# detection patterns and would always self-match)
 for FILE in $STAGED_FILES; do
+    if [ "$FILE" = "scripts/git-hooks/pre-commit" ]; then
+        continue
+    fi
     if [ -f "$FILE" ]; then
         if ! check_file "$FILE"; then
             ERRORS_FOUND=1
@@ -122,7 +133,7 @@ for FILE in $STAGED_FILES; do
     fi
 done
 
-# Final result
+# Final result for secrets check
 if [ $ERRORS_FOUND -eq 1 ]; then
     echo
     echo -e "${RED}❌ Secrets detected! Commit blocked.${NC}"
@@ -137,7 +148,36 @@ if [ $ERRORS_FOUND -eq 1 ]; then
     echo "- Use git commit --no-verify to skip this check (NOT RECOMMENDED)"
     exit 1
 else
-    echo -e "${GREEN}✅ No secrets detected. Proceeding with commit.${NC}"
+    echo -e "${GREEN}✅ No secrets detected.${NC}"
 fi
 
+# Check for forbidden imports (architectural boundaries)
+echo
+echo "🔍 Checking for forbidden imports..."
+if command -v python3 &> /dev/null; then
+    if [ -f "scripts/check_forbidden_imports.py" ]; then
+        if python3 scripts/check_forbidden_imports.py; then
+            echo -e "${GREEN}✅ No forbidden imports detected.${NC}"
+        else
+            echo
+            echo -e "${RED}❌ Forbidden imports detected! Commit blocked.${NC}"
+            echo
+            echo "To fix this:"
+            echo "1. Remove the forbidden import from your files"
+            echo "2. Use the appropriate package (e.g., computor-client instead of computor_backend)"
+            echo "3. See scripts/check_forbidden_imports.py for details"
+            echo
+            echo "If you must skip this check (NOT RECOMMENDED):"
+            echo "  git commit --no-verify"
+            exit 1
+        fi
+    else
+        echo -e "${YELLOW}⚠️  Import checker script not found, skipping...${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠️  Python3 not found, skipping import check...${NC}"
+fi
+
+echo
+echo -e "${GREEN}✅ All pre-commit checks passed!${NC}"
 exit 0

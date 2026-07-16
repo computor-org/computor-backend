@@ -1,6 +1,6 @@
 # Keycloak production overlay — patches the keycloak and uvicorn services.
 # Only included when KEYCLOAK_ENABLED=true AND environment=prod.
-# startup.sh handles this automatically — do not include manually.
+# computor.sh handles this automatically — do not include manually.
 
 services:
   keycloak:

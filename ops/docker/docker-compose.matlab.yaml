@@ -1,5 +1,5 @@
 # MATLAB Testing Worker — optional add-on stack
-# Include when MATLAB_ENABLED=true. startup.sh adds this file automatically.
+# Include when MATLAB_ENABLED=true. computor.sh adds this file automatically.
 #
 # Required .env additions when enabling MATLAB:
 #   MATLAB_ENABLED=true

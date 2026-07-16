@@ -1,6 +1,6 @@
 # Web frontend (computor-web) Docker Compose overlay
 # Adds the Next.js frontend service behind Traefik
-# Included automatically in production mode by startup.sh
+# Included automatically in production mode by computor.sh
 
 services:
   frontend:
@@ -9,6 +9,7 @@ services:
       dockerfile: ./docker/web/Dockerfile
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        - GIT_COMMIT=${GIT_COMMIT:-}
     networks:
       - computor-network
     restart: unless-stopped

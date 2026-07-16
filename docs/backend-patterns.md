@@ -137,7 +137,7 @@ Patterns you'll see: **sequential** (activity output → next input), **parallel
 
 **Workers run in Docker** as part of the stack (`temporal-worker`, `-testing`, `-matlab`,
 and `-coder` when enabled); replica counts are env-tunable. Because source is baked into the
-image, rebuild after editing `tasks/`: `bash startup.sh dev --build -d`.
+image, rebuild after editing `tasks/`: `./computor.sh up dev --build -d`.
 
 The course-git workflows (`temporal_hierarchy_management`, `temporal_student_template_v2`)
 are the backbone of [git-integration.md](git-integration.md).
