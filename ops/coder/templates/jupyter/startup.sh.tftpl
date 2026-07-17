@@ -46,3 +46,15 @@ jupyter lab \
   --ServerApp.allow_remote_access=True \
   --ServerApp.trust_xheaders=True \
   >/tmp/jupyterlab.log 2>&1 &
+
+# Block until JupyterLab actually accepts connections. The agent only reports
+# lifecycle_state=ready once this script exits, and the web launch page sends the
+# user to the workspace on that signal — without this gate the script would exit
+# the instant jupyter was *launched* and the user would land on a 502.
+# Any HTTP answer proves it is listening, hence no curl -f (jupyter serves under
+# base_url, so / returns 404). Capped well under the agent's 300s
+# startup_script_timeout; falling through is not fatal.
+for _ in $(seq 1 120); do
+  curl -s -o /dev/null --max-time 1 "http://127.0.0.1:${jupyter_port}/" && break
+  sleep 1
+done

@@ -12,6 +12,13 @@ interface WorkspaceTableProps {
   onStop: (owner: string, name: string) => Promise<void>;
   onDelete: (owner: string, name: string) => void;
   onViewDetails: (owner: string, name: string) => void;
+  /**
+   * Start the workspace and open it when it is ready. Pass this for a user's own
+   * workspaces; leave it out where starting one is administration rather than a
+   * request to use it (the admin per-user page), and Start falls back to onStart.
+   * Must be synchronous — it opens a tab from the click.
+   */
+  onLaunch?: (owner: string, name: string) => void;
 }
 
 function WorkspaceRow({
@@ -20,12 +27,14 @@ function WorkspaceRow({
   onStop,
   onDelete,
   onViewDetails,
+  onLaunch,
 }: {
   workspace: CoderWorkspace;
   onStart: (owner: string, name: string) => Promise<void>;
   onStop: (owner: string, name: string) => Promise<void>;
   onDelete: (owner: string, name: string) => void;
   onViewDetails: (owner: string, name: string) => void;
+  onLaunch?: (owner: string, name: string) => void;
 }) {
   const [actionLoading, setActionLoading] = useState<'start' | 'stop' | null>(null);
   const owner = workspace.owner_name || '';
@@ -73,16 +82,23 @@ function WorkspaceRow({
               </Button>
             </>
           )}
-          {(category === 'stopped' || category === 'failed') && (
-            <Button
-              size="xs"
-              onClick={() => runAction('start', onStart)}
-              loading={actionLoading === 'start'}
-              loadingLabel="Starting…"
-            >
-              Start
-            </Button>
-          )}
+          {(category === 'stopped' || category === 'failed') &&
+            (onLaunch ? (
+              // Calls straight out of the click: the handler opens a tab, and a
+              // window.open() after an await gets eaten by popup blockers.
+              <Button size="xs" onClick={() => onLaunch(owner, workspace.name)}>
+                Start
+              </Button>
+            ) : (
+              <Button
+                size="xs"
+                onClick={() => runAction('start', onStart)}
+                loading={actionLoading === 'start'}
+                loadingLabel="Starting…"
+              >
+                Start
+              </Button>
+            ))}
           {category === 'pending' && (
             <span className="px-2.5 py-1 text-xs font-medium text-yellow-700">
               {workspace.latest_build_status}…
@@ -107,6 +123,7 @@ export default function WorkspaceTable({
   onStop,
   onDelete,
   onViewDetails,
+  onLaunch,
 }: WorkspaceTableProps) {
   return (
     <Table>
@@ -128,6 +145,7 @@ export default function WorkspaceTable({
             onStop={onStop}
             onDelete={onDelete}
             onViewDetails={onViewDetails}
+            onLaunch={onLaunch}
           />
         ))}
       </Tbody>

@@ -64,6 +64,21 @@ export interface CoderWorkspace {
   updated_at?: string | null;
 }
 
+/** Coder agent lifecycle_state — how far the agent's startup script got. */
+export type AgentLifecycle =
+  | 'created'
+  | 'starting'
+  | 'ready'
+  | 'start_timeout'
+  | 'start_error'
+  | 'off'
+  | 'shutting_down'
+  | 'shutdown_timeout'
+  | 'shutdown_error';
+
+/** Lifecycle states that mean the startup script will never report ready. */
+export const AGENT_LIFECYCLE_GAVE_UP: readonly string[] = ['start_timeout', 'start_error'];
+
 export interface WorkspaceDetails {
   workspace: CoderWorkspace;
   status: WorkspaceStatus;
@@ -71,6 +86,14 @@ export interface WorkspaceDetails {
   code_server_url?: string | null;
   health?: string | boolean | null;
   resources?: Record<string, unknown> | null;
+  /** How far the agent's startup script got; absent on older backends. */
+  agent_lifecycle?: AgentLifecycle | string | null;
+  /**
+   * Running AND the agent finished its startup script. `status === 'running'`
+   * alone only means the Terraform apply succeeded — the service inside may
+   * still be booting — so prefer this before sending a user to the URL.
+   */
+  ready?: boolean;
 }
 
 export interface ProvisionResult {
