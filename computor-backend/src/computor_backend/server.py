@@ -381,7 +381,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Total-Count"],
+    # Content-Disposition is not CORS-safelisted: without it the browser can
+    # read a download's bytes but not the filename the backend chose.
+    expose_headers=["X-Total-Count", "Content-Disposition"],
 )
 
 def _guard_no_archive_admin(entity, permissions, db):
