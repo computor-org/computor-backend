@@ -112,6 +112,9 @@ test('waits while the agent is still starting, then opens when it reports ready'
   await expect(page.getByText('Almost there — waiting for the editor…')).toBeVisible();
   expect(page.url()).not.toContain('8080');
 
+  // A transient launch tab, not an app page: no sidebar/topbar chrome.
+  await expect(page.getByRole('navigation')).toHaveCount(0);
+
   // ...and then open the workspace once the agent reports ready.
   await page.waitForURL(WORKSPACE_URL, { timeout: 20_000 });
   await expect(page.getByRole('heading', { name: 'editor' })).toBeVisible();
@@ -211,16 +214,18 @@ test('creating a workspace opens a launch tab for the name the server chose', as
       count: 1,
     }),
   );
-  await page.route(`${API_ORIGIN}/coder/workspaces/provision`, (route) =>
-    json(route, {
+  await page.route(`${API_ORIGIN}/coder/workspaces/provision`, async (route) => {
+    // Hold the response so the test can see the tab parked on the creating state.
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    return json(route, {
       user: { id: 'u-me', username: 'u-me', email: USER.email },
       // A self-provisioner's requested name is discarded and re-derived server
       // side, so the launch tab must follow this, not any client-side guess.
       workspace: { id: 'w1', name: 'vscode', owner_id: 'u-me', template_id: 't-vscode' },
       created_user: false,
       created_workspace: true,
-    }),
-  );
+    });
+  });
 
   await page.goto('/workspaces/create');
 
@@ -228,10 +233,22 @@ test('creating a workspace opens a launch tab for the name the server chose', as
   await page.getByRole('button', { name: 'Create' }).click();
   const launchTab = await popup;
 
-  await launchTab.waitForURL(/\/workspaces\/launch\?/);
-  expect(launchTab.url()).toContain('owner=u-me');
+  // While provisioning round-trips, the tab is already the launch spinner —
+  // never a blank about:blank page.
+  await expect(launchTab.getByText('Creating your workspace…')).toBeVisible();
+
+  await launchTab.waitForURL(/owner=u-me/);
   expect(launchTab.url()).toContain('name=vscode');
 
   // The tab the user was on goes back to the list rather than following along.
   await page.waitForURL(/\/workspaces$/);
+});
+
+test('a tab parked on the creating state spins instead of erroring', async ({ page }) => {
+  await setup(page, [details({ status: 'starting' })]);
+
+  await page.goto('/workspaces/launch?creating=1');
+
+  await expect(page.getByText('Creating your workspace…')).toBeVisible();
+  await expect(page.getByText('Could not open the workspace')).not.toBeVisible();
 });
