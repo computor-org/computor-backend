@@ -23,6 +23,12 @@ const SECTIONS = [
     desc: 'Student progress, grading & activity',
     icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
   },
+  {
+    slug: 'templates',
+    title: 'Templates',
+    desc: 'Download the student template, flat or by course structure',
+    icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4',
+  },
 ];
 
 export default function LecturerViewPage() {
