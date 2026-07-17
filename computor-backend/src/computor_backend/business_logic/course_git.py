@@ -1274,32 +1274,19 @@ def register_gitlab_managed_access(
 # ---------------------------------------------------------------------------
 
 
-def get_template_archive_source(
+def resolve_template_archive_source(
     course_id: UUID | str,
-    permissions: Principal,
     db: Session,
 ) -> tuple[str, dict, str]:
     """Resolve ``(url, headers, filename)`` for the course template archive on its
     managed git server.
 
-    The backend fetches it with the registry **service token** and streams it to
-    the student — used by download mode and to seed an external repo — so the
-    student never sees the token. Membership-gated; the template content is
-    something every course member is entitled to.
+    Carries NO permission check — callers gate access themselves (course-member
+    gate in :func:`get_template_archive_source`, lecturer gate in
+    ``GET /courses/{id}/template``). The backend fetches the URL with the
+    registry **service token**, so the requester never sees the credential.
     """
     from urllib.parse import quote
-
-    user_id = permissions.get_user_id()
-    if not user_id:
-        raise NotFoundException()
-
-    member = (
-        check_course_permissions(permissions, CourseMember, "_student", db)
-        .filter(CourseMember.course_id == course_id, CourseMember.user_id == user_id)
-        .first()
-    )
-    if member is None:
-        raise NotFoundException(error_code="GIT_002", detail="You are not a member of this course")
 
     binding = (
         db.query(CourseGitBinding)
@@ -1337,3 +1324,29 @@ def get_template_archive_source(
         raise BadRequestException(detail=f"Unsupported git server type '{server.type}'")
 
     return url, headers, f"{slug}.zip"
+
+
+def get_template_archive_source(
+    course_id: UUID | str,
+    permissions: Principal,
+    db: Session,
+) -> tuple[str, dict, str]:
+    """Resolve the template archive source for the current course member.
+
+    Membership-gated wrapper around :func:`resolve_template_archive_source` —
+    used by download mode and to seed an external repo; the template content is
+    something every course member is entitled to.
+    """
+    user_id = permissions.get_user_id()
+    if not user_id:
+        raise NotFoundException()
+
+    member = (
+        check_course_permissions(permissions, CourseMember, "_student", db)
+        .filter(CourseMember.course_id == course_id, CourseMember.user_id == user_id)
+        .first()
+    )
+    if member is None:
+        raise NotFoundException(error_code="GIT_002", detail="You are not a member of this course")
+
+    return resolve_template_archive_source(course_id, db)
