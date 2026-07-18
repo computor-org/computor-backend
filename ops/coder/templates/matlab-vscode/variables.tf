@@ -75,3 +75,9 @@ variable "cpu_shares" {
   description = "Relative CPU weight; 0 uses the Docker default"
   type        = number
 }
+
+variable "shm_size" {
+  default     = 512
+  description = "Size of /dev/shm in MiB (MATLAB needs a larger-than-default shared memory segment)"
+  type        = number
+}

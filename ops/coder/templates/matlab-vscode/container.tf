@@ -11,7 +11,7 @@ resource "docker_container" "workspace" {
 
   memory     = var.memory_mb
   cpu_shares = var.cpu_shares
-  shm_size   = 512
+  shm_size   = var.shm_size
 
   entrypoint = [
     "sh", "-c",

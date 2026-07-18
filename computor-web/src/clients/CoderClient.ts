@@ -18,6 +18,12 @@ import type {
   TaskInfo,
   CoderAdminTaskListResponse,
   CoderFleetStatusResponse,
+  TemplateSettingsListResponse,
+  TemplateFileActionResponse,
+  TemplateFilesResponse,
+  TemplateVariablesResponse,
+  WorkspaceTemplateSettings,
+  WorkspaceTemplateSettingsUpdate,
 } from '@/src/types/workspaces';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from '@/src/generated/clients/baseClient';
@@ -140,5 +146,69 @@ export class CoderClient extends BaseEndpointClient {
     return this.client.get<CoderAdminTaskListResponse>(this.buildPath('admin', 'tasks'), {
       params: { limit },
     });
+  }
+
+  // --- Admin: per-template settings + template editing (workspace:manage) ---
+
+  /** All stored per-template settings (resource limits, seat quota, overrides). */
+  async listTemplateSettings(): Promise<TemplateSettingsListResponse> {
+    return this.client.get<TemplateSettingsListResponse>(
+      this.buildPath('admin', 'templates', 'settings'),
+    );
+  }
+
+  /** Upsert one template's settings. Limits/overrides apply at the next push. */
+  async updateTemplateSettings({ templateName, body }: {
+    templateName: string;
+    body: WorkspaceTemplateSettingsUpdate;
+  }): Promise<WorkspaceTemplateSettings> {
+    return this.client.put<WorkspaceTemplateSettings>(
+      this.buildPath('admin', 'templates', templateName, 'settings'),
+      body,
+    );
+  }
+
+  /** Contents of the deployed template directory's editable files. */
+  async getTemplateFiles({ templateName }: { templateName: string }): Promise<TemplateFilesResponse> {
+    return this.client.get<TemplateFilesResponse>(
+      this.buildPath('admin', 'templates', templateName, 'files'),
+    );
+  }
+
+  /** Overwrite one template file (raw editing); marks the template customized. */
+  async updateTemplateFile({ templateName, fileName, content }: {
+    templateName: string;
+    fileName: string;
+    content: string;
+  }): Promise<TemplateFileActionResponse> {
+    return this.client.put<TemplateFileActionResponse>(
+      this.buildPath('admin', 'templates', templateName, 'files', fileName),
+      { content },
+    );
+  }
+
+  /** Hand a customized template back to automatic repo syncing (next startup). */
+  async restoreTemplateManaged({ templateName }: { templateName: string }): Promise<TemplateFileActionResponse> {
+    return this.client.post<TemplateFileActionResponse>(
+      this.buildPath('admin', 'templates', templateName, 'restore-managed'),
+    );
+  }
+
+  /** Declared Terraform variables of a template (guided editing surface). */
+  async getTemplateVariables({ templateName }: { templateName: string }): Promise<TemplateVariablesResponse> {
+    return this.client.get<TemplateVariablesResponse>(
+      this.buildPath('admin', 'templates', templateName, 'variables'),
+    );
+  }
+
+  /** Guided edit: rewrite defaults of declared, non-managed variables. */
+  async updateTemplateVariables({ templateName, defaults }: {
+    templateName: string;
+    defaults: Record<string, unknown>;
+  }): Promise<TemplateVariablesResponse> {
+    return this.client.put<TemplateVariablesResponse>(
+      this.buildPath('admin', 'templates', templateName, 'variables'),
+      { defaults },
+    );
   }
 }

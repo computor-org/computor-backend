@@ -241,6 +241,77 @@ export interface CoderAdminTaskListResponse {
   tasks: TaskInfo[];
 }
 
+// --- Admin: per-template settings (resource limits, seat quota) + editing ---
+
+export interface WorkspaceTemplateSettings {
+  /** Coder template name (e.g. 'vscode-workspace'). */
+  template_name: string;
+  /** Container memory cap in MiB applied at push time; null/0 = unlimited. */
+  memory_mb?: number | null;
+  /** Relative CPU weight applied at push time; null/0 = Docker default. */
+  cpu_shares?: number | null;
+  /** Max concurrently running workspaces across all users; null = unlimited. */
+  max_running_workspaces?: number | null;
+  /** Extra Terraform variable overrides pushed as --variable. */
+  template_variables: Record<string, string>;
+  updated_at?: string | null;
+}
+
+export interface WorkspaceTemplateSettingsUpdate {
+  memory_mb?: number | null;
+  cpu_shares?: number | null;
+  max_running_workspaces?: number | null;
+  template_variables?: Record<string, string>;
+}
+
+export interface TemplateSettingsListResponse {
+  settings: WorkspaceTemplateSettings[];
+}
+
+export interface TemplateFile {
+  name: string;
+  content: string;
+}
+
+export interface TemplateFilesResponse {
+  template_name: string;
+  dir_name: string;
+  /**
+   * True when the deployed template is operator-customized (the
+   * .computor-managed marker is gone) and no longer auto-synced from the repo.
+   */
+  customized: boolean;
+  files: TemplateFile[];
+}
+
+export interface TemplateFileActionResponse {
+  success: boolean;
+  message: string;
+  customized: boolean;
+}
+
+export interface TemplateVariable {
+  name: string;
+  type?: string | null;
+  /** Declared default; masked (null) for sensitive variables. */
+  default?: unknown;
+  has_default: boolean;
+  description?: string | null;
+  sensitive: boolean;
+  /** Supplied by the push pipeline / settings UI — guided editing is locked. */
+  managed: boolean;
+  managed_reason?: string | null;
+  /** The .tf file declaring this variable. */
+  file: string;
+}
+
+export interface TemplateVariablesResponse {
+  template_name: string;
+  dir_name: string;
+  customized: boolean;
+  variables: TemplateVariable[];
+}
+
 export enum TaskStatus {
   QUEUED = 'queued',
   STARTED = 'started',
