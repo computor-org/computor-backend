@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -83,6 +84,10 @@ export default function DashboardPage() {
                           )}
                         </div>
                         {c.title && c.path && <p className="text-xs text-gray-500">{c.path}</p>}
+                        {/* Template icon launchers; hides itself when the
+                            course offers no workspaces. Members only — the
+                            fetch would 403 for courses visible without a role. */}
+                        {role && <CourseWorkspaceLaunchButtons courseId={c.id} compact />}
                       </div>
                     );
                   })}

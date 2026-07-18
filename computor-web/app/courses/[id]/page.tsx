@@ -14,6 +14,7 @@ import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
+import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import type {
   CourseMemberRepositoryGet,
   StudentRepositoryProvisioned,
@@ -35,7 +36,7 @@ interface ViewCard {
 const userClient = new UserClient();
 export default function CoursePage() {
   const courseId = useParams().id as string;
-  const { canManageHierarchy: canManage, isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
+  const { canManageHierarchy: canManage, isAdmin, isOrganizationManager, courseHasAtLeast, courseRole } = usePermissions();
   const canManageMembers = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
 
   const { data, loading, error, reload } = useResource(
@@ -230,6 +231,16 @@ export default function CoursePage() {
                 </div>
               </Link>
             ))}
+          </div>
+        )}
+
+        {/* Workspaces — launch buttons for the course's allowed templates.
+            The component hides itself when the course offers none; the role
+            gate only avoids a guaranteed-403 fetch for non-members. */}
+        {(isAdmin || courseRole(courseId) != null) && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Workspaces</h2>
+            <CourseWorkspaceLaunchButtons courseId={courseId} />
           </div>
         )}
 

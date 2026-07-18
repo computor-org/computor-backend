@@ -138,6 +138,7 @@ export const getViewNavigation = (courseId: string): NavItem[] => [
       { id: 'lecturer-assignments', label: 'Assignments', path: `/courses/${courseId}/lecturer/assignments` },
       { id: 'lecturer-students', label: 'Students', path: `/courses/${courseId}/lecturer/students` },
       { id: 'lecturer-templates', label: 'Templates', path: `/courses/${courseId}/lecturer/templates` },
+      { id: 'lecturer-workspaces', label: 'Workspaces', path: `/courses/${courseId}/lecturer/workspaces` },
       // Grading Overview isn't implemented yet — re-add the link once
       // /courses/[id]/lecturer/grading has a real page.
     ],
