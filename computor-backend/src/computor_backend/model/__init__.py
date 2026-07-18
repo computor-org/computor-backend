@@ -30,7 +30,7 @@ from .service import Service, ServiceType, ApiToken
 from .invite import InviteLink
 from .git_server import GitServer, CourseGitBinding, CourseMemberGitRepository
 from .consent import PolicyVersion, UserConsent
-from .workspace import WorkspaceTemplateSettings
+from .workspace import WorkspaceTemplateSettings, CourseWorkspaceTemplate, CourseWorkspaceSettings
 
 # Import all models to ensure relationships are properly set up
 from . import (
@@ -129,4 +129,7 @@ __all__ = [
     'UserConsent',
     # Coder workspace template settings
     'WorkspaceTemplateSettings',
+    # Course-scoped workspace configuration
+    'CourseWorkspaceTemplate',
+    'CourseWorkspaceSettings',
 ]

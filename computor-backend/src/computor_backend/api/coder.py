@@ -72,6 +72,15 @@ from computor_backend.coder.service import (
     get_user_fullname,
     mint_workspace_token,
 )
+from computor_backend.business_logic.course_workspaces import (
+    enforce_template_quota as _enforce_template_quota,
+    get_disabled_template_names,
+    get_member_course_template_names,
+    is_template_enabled,
+    list_admin_course_workspaces,
+    template_settings_row as _template_settings_row,
+)
+from computor_types.course_workspaces import CourseWorkspaceAdminListResponse
 from computor_backend.database import get_db
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
@@ -90,6 +99,36 @@ def _check_workspace_access(permissions: Principal, action: str = "access") -> N
         raise ForbiddenException(
             detail=f"Workspace '{action}' permission required. Contact your administrator.",
         )
+
+
+# Actions a course member gets without a global workspace role, through being
+# in a course with >= 1 allowed (and globally enabled) workspace template.
+# manage/delete/session/provision deliberately never fall back.
+_COURSE_FALLBACK_ACTIONS = {"access", "list", "start", "stop", "templates"}
+
+
+def _check_workspace_access_or_course_member(
+    permissions: Principal,
+    action: str,
+    db: Session,
+    *,
+    username: Optional[str] = None,
+) -> None:
+    """Global workspace claim, or course-derived access.
+
+    Course-derived callers may only touch their OWN workspaces: ``username``
+    (Coder usernames are Computor user UUIDs) must match the principal.
+    Global claim holders keep today's behavior.
+    """
+    if permissions.is_admin or permissions.permitted("workspace", action):
+        return
+    if action in _COURSE_FALLBACK_ACTIONS and get_member_course_template_names(db, permissions):
+        if username is not None and username != str(permissions.user_id):
+            raise ForbiddenException(detail="You may only access your own workspaces.")
+        return
+    raise ForbiddenException(
+        detail=f"Workspace '{action}' permission required. Contact your administrator.",
+    )
 
 
 def _handle_coder_error(e: Exception) -> ComputorException:
@@ -130,61 +169,9 @@ async def require_coder_enabled(
     return settings
 
 
-# Builds counted against a template's max_running_workspaces quota: the
-# latest build is a start whose job is queued, applying, or applied.
-_ACTIVE_BUILD_STATUSES = {"pending", "starting", "running", "succeeded"}
-
-
-def _template_settings_row(
-    db: Session, template_name: str
-) -> Optional[WorkspaceTemplateSettings]:
-    return (
-        db.query(WorkspaceTemplateSettings)
-        .filter(WorkspaceTemplateSettings.template_name == template_name)
-        .first()
-    )
-
-
-async def _enforce_template_quota(
-    db: Session,
-    client: CoderClient,
-    template_name: str,
-    exclude_workspace_id: Optional[str] = None,
-) -> None:
-    """Reject provision/start when the template is at its running-seat cap.
-
-    The cap counts running/starting workspaces of the template across ALL
-    users and applies to everyone, admins included — it models hard capacity
-    (e.g. MATLAB license seats), which exceeding would break anyway. A soft
-    check (two racing starts can both pass), which is acceptable for a cap
-    whose violation just means one container too many until the next stop.
-    """
-    row = _template_settings_row(db, template_name)
-    if row is None or row.max_running_workspaces is None:
-        return
-    limit = int(row.max_running_workspaces)
-    workspaces = await client.list_all_workspaces()
-    active = 0
-    for workspace in workspaces:
-        if workspace.template_name != template_name:
-            continue
-        if exclude_workspace_id and workspace.id == exclude_workspace_id:
-            continue
-        if workspace.latest_build_transition != "start":
-            continue
-        status = (
-            workspace.latest_build_status.value if workspace.latest_build_status else ""
-        )
-        if status in _ACTIVE_BUILD_STATUSES:
-            active += 1
-    if active >= limit:
-        raise ConflictException(
-            detail=(
-                f"Template '{template_name}' is at its capacity of {limit} running "
-                f"workspace(s) ({active} currently active). Stop an existing "
-                "workspace or try again later."
-            ),
-        )
+# Template quota + settings-row helpers live in business_logic.course_workspaces
+# (shared with the course-scoped workspace endpoints); imported above as
+# _enforce_template_quota / _template_settings_row.
 
 
 # Terraform variables the push pipeline always supplies as --variable values.
@@ -271,11 +258,30 @@ async def list_templates(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> TemplateListResponse:
-    """List all available workspace templates. Requires workspace:templates."""
-    _check_workspace_access(permissions, "templates")
+    """List available workspace templates.
+
+    Managers (workspace:manage) see everything; workspace:templates holders
+    see globally enabled templates; course members without a workspace role
+    see the enabled templates their courses allow.
+    """
+    is_manager = permissions.is_admin or permissions.permitted("workspace", "manage")
+    has_templates_claim = permissions.permitted("workspace", "templates")
+    course_names: set[str] = set()
+    if not (is_manager or has_templates_claim):
+        course_names = get_member_course_template_names(db, permissions)
+        if not course_names:
+            raise ForbiddenException(
+                detail="Workspace 'templates' permission required. Contact your administrator.",
+            )
     try:
         templates = await client.list_templates()
+        if not is_manager:
+            disabled = get_disabled_template_names(db, among={t.name for t in templates})
+            templates = [t for t in templates if t.name not in disabled]
+            if course_names:
+                templates = [t for t in templates if t.name in course_names]
         return TemplateListResponse(
             templates=templates,
             count=len(templates),
@@ -312,13 +318,18 @@ async def provision_workspace(
     only for themselves, one workspace per template — the request is forced to
     their own account and the derived per-template name, so Coder's per-user name
     uniqueness caps them at one (re-provisioning idempotently refreshes its token).
+    Course members without any workspace role get the same self-service
+    semantics, restricted to the templates their courses allow.
     """
     is_full_provisioner = permissions.is_admin or permissions.permitted("workspace", "provision")
+    course_scoped_names: Optional[set[str]] = None
     if not is_full_provisioner:
         if not permissions.permitted("workspace", "provision_self"):
-            raise ForbiddenException(
-                detail="Workspace 'provision' permission required. Contact your administrator.",
-            )
+            course_scoped_names = get_member_course_template_names(db, permissions)
+            if not course_scoped_names:
+                raise ForbiddenException(
+                    detail="Workspace 'provision' permission required. Contact your administrator.",
+                )
         # Self-service: never allow targeting another user, and always use the
         # derived per-template name so the user gets at most one per template.
         if request.email:
@@ -330,9 +341,23 @@ async def provision_workspace(
                 )
             request.email = None
         request.workspace_name = None
+        # Self-provisioned workspaces always use the template's default
+        # (shared) home; scratch homes are a lecturer/maintainer feature.
+        request.home_mode = None
     try:
         # Verify template exists in Coder before minting a token
         template = request.template or settings.default_template
+        if course_scoped_names is not None and template not in course_scoped_names:
+            raise ForbiddenException(
+                detail=f"Template '{template}' is not available for your courses.",
+            )
+        if not (permissions.is_admin or permissions.permitted("workspace", "manage")):
+            # course_scoped_names is already enabled-filtered; this covers
+            # global provision/provision_self holders.
+            if not is_template_enabled(db, template):
+                raise ForbiddenException(
+                    detail=f"Template '{template}' is currently disabled.",
+                )
         try:
             await client.get_template_id(template)
         except CoderTemplateNotFoundError as e:
@@ -396,6 +421,7 @@ async def provision_workspace(
             template=template,
             workspace_name=workspace_name,
             computor_auth_token=workspace_token,
+            home_mode=request.home_mode,
         )
         return result
     except ComputorException:
@@ -434,7 +460,7 @@ async def get_workspaces(
         _check_workspace_access(permissions, "manage")
         target_email = email
     else:
-        _check_workspace_access(permissions, "list")
+        _check_workspace_access_or_course_member(permissions, "list", db)
         user = get_user_by_id(db, cache, str(permissions.user_id))
         target_email = get_user_email(user)
 
@@ -494,7 +520,7 @@ async def workspace_exists(
         _check_workspace_access(permissions, "manage")
         target_email = email
     else:
-        _check_workspace_access(permissions, "list")
+        _check_workspace_access_or_course_member(permissions, "list", db)
         user = get_user_by_id(db, cache, str(permissions.user_id))
         target_email = get_user_email(user)
 
@@ -523,9 +549,10 @@ async def get_workspace_details(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> WorkspaceDetails:
     """Get detailed information about a specific workspace."""
-    _check_workspace_access(permissions)
+    _check_workspace_access_or_course_member(permissions, "access", db, username=username)
     try:
         return await client.get_workspace(username, workspace_name)
     except Exception as e:
@@ -546,7 +573,7 @@ async def start_workspace(
     db: Annotated[Session, Depends(get_db)],
 ) -> WorkspaceActionResponse:
     """Start a stopped workspace."""
-    _check_workspace_access(permissions, "start")
+    _check_workspace_access_or_course_member(permissions, "start", db, username=username)
     try:
         # Per-template seat quota — the workspace being started never counts
         # itself (it is stopped, but its latest build may still read "start").
@@ -580,9 +607,10 @@ async def stop_workspace(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> WorkspaceActionResponse:
     """Stop a running workspace."""
-    _check_workspace_access(permissions, "stop")
+    _check_workspace_access_or_course_member(permissions, "stop", db, username=username)
     try:
         success = await client.stop_workspace(username, workspace_name)
         return WorkspaceActionResponse(
@@ -986,12 +1014,30 @@ async def rollout_workspaces_endpoint(
 def _settings_row_to_schema(row: WorkspaceTemplateSettings) -> WorkspaceTemplateSettingsSchema:
     return WorkspaceTemplateSettingsSchema(
         template_name=row.template_name,
+        enabled=bool(row.enabled),
         memory_mb=row.memory_mb,
         cpu_shares=row.cpu_shares,
         max_running_workspaces=row.max_running_workspaces,
         template_variables=dict(row.template_variables or {}),
         updated_at=row.updated_at,
     )
+
+
+@router.get(
+    "/admin/courses",
+    response_model=CourseWorkspaceAdminListResponse,
+    summary="List all courses with their workspace configuration",
+)
+async def list_admin_courses(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Annotated[Session, Depends(get_db)],
+) -> CourseWorkspaceAdminListResponse:
+    """Every course with its allowed templates and lecturer-provisioning flag.
+
+    Claim-gated (workspace:manage), not membership-gated: workspace
+    maintainers configure courses they are not members of. Pure DB read, so
+    it works while Coder itself is disabled."""
+    return list_admin_course_workspaces(permissions, db)
 
 
 @router.get(
@@ -1057,6 +1103,7 @@ async def update_template_settings(
             created_by=permissions.user_id,
         )
         db.add(row)
+    row.enabled = request.enabled
     row.memory_mb = request.memory_mb
     row.cpu_shares = request.cpu_shares
     row.max_running_workspaces = request.max_running_workspaces
