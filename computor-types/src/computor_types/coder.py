@@ -76,6 +76,11 @@ class CoderWorkspaceCreate(BaseModel):
         None,
         description="Pre-minted API token for automatic extension authentication"
     )
+    home_mode: Optional[str] = Field(
+        None,
+        description="Home volume mode: 'shared' (per-user home volume) or "
+                    "'scratch' (throwaway per-workspace volume). None = template default (shared).",
+    )
 
 
 # Response schemas
@@ -125,6 +130,14 @@ class CoderWorkspace(BaseModel):
     latest_build_status: Optional[WorkspaceBuildStatus] = Field(
         None,
         description="Latest build status"
+    )
+    latest_build_id: Optional[str] = Field(
+        None, description="ID of the latest build (for reading its rich parameters)"
+    )
+    home_mode: Optional[str] = Field(
+        None,
+        description="Home volume mode ('shared' | 'scratch') read from the latest build's "
+                    "rich parameters; only populated by views that need it",
     )
     automatic_updates: Optional[str] = Field(
         None,
@@ -318,6 +331,12 @@ class WorkspaceTemplateSettingsSchema(BaseModel):
     """Per-template settings row (see model.workspace.WorkspaceTemplateSettings)."""
 
     template_name: str = Field(..., description="Coder template name (e.g. 'vscode-workspace')")
+    enabled: bool = Field(
+        True,
+        description="Whether non-managers may see and provision this template; "
+                    "disabling hides it from listings and blocks new workspaces, "
+                    "existing ones keep running",
+    )
     memory_mb: Optional[int] = Field(
         None, description="Container memory cap in MiB applied at push time; null/0 = unlimited"
     )
@@ -340,6 +359,7 @@ class WorkspaceTemplateSettingsSchema(BaseModel):
 class WorkspaceTemplateSettingsUpdate(BaseModel):
     """Upsert payload for a template's settings."""
 
+    enabled: bool = Field(True)
     memory_mb: Optional[int] = Field(None, ge=0)
     cpu_shares: Optional[int] = Field(
         None, ge=0, description="0 = Docker default; Docker requires values >= 2 otherwise"

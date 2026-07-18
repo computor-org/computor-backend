@@ -8,12 +8,23 @@ resource "docker_image" "workspace_image" {
   keep_locally = true
 }
 
+# Throwaway home volume for scratch-mode workspaces. Unlike the shared home
+# (never a Terraform resource, so a workspace delete can't touch it), the
+# scratch volume IS Terraform-owned: it survives stop/start (not gated on
+# start_count) and is destroyed together with the workspace. Created before
+# the container mounts it by name, so docker's auto-create can't race it.
+resource "docker_volume" "scratch_home" {
+  count = data.coder_parameter.home_mode.value == "scratch" ? 1 : 0
+  name  = "coder-scratch-${data.coder_workspace.me.id}"
+}
+
 # Workspace container
 resource "docker_container" "workspace" {
-  count    = data.coder_workspace.me.start_count
-  image    = docker_image.workspace_image.name
-  name     = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
-  hostname = data.coder_workspace.me.name
+  count      = data.coder_workspace.me.start_count
+  depends_on = [docker_volume.scratch_home]
+  image      = docker_image.workspace_image.name
+  name       = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
+  hostname   = data.coder_workspace.me.name
 
   # Resource limits so one workspace (whose user has sudo) cannot exhaust the
   # host. Opt-in caps (0 = unlimited/default) — set per host capacity. NOTE: the

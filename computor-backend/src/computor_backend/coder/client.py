@@ -710,6 +710,7 @@ class CoderClient:
             template_version_name=latest.get("template_version_name"),
             latest_build_transition=latest.get("transition"),
             latest_build_status=latest.get("status"),
+            latest_build_id=latest.get("id"),
             automatic_updates=ws.get("automatic_updates"),
             created_at=ws.get("created_at"),
             updated_at=ws.get("updated_at"),
@@ -842,6 +843,11 @@ class CoderClient:
             logger.info(f"Adding computor_auth_token to workspace (prefix: {workspace_data.computor_auth_token[:15]}...)")
         else:
             logger.warning("No computor_auth_token provided for workspace creation!")
+        if workspace_data.home_mode:
+            rich_params.append({
+                "name": "home_mode",
+                "value": workspace_data.home_mode,
+            })
         if rich_params:
             payload["rich_parameter_values"] = rich_params
             logger.info(f"Sending rich_parameter_values: {[p['name'] for p in rich_params]}")
@@ -870,6 +876,7 @@ class CoderClient:
             template_name=data.get("template_name"),
             template_display_name=data.get("template_display_name"),
             latest_build_status=data.get("latest_build", {}).get("status"),
+            latest_build_id=data.get("latest_build", {}).get("id"),
             created_at=data.get("created_at"),
         )
 
@@ -1004,6 +1011,7 @@ class CoderClient:
             template_name=data.get("template_name"),
             template_display_name=data.get("template_display_name"),
             latest_build_status=data.get("latest_build", {}).get("status"),
+            latest_build_id=data.get("latest_build", {}).get("id"),
             created_at=data.get("created_at"),
             updated_at=data.get("updated_at"),
         )
@@ -1152,13 +1160,21 @@ class CoderClient:
             return False
 
         workspace = resp.json()
-        template_version_id = workspace["latest_build"]["template_version_id"]
+        latest_build = workspace.get("latest_build") or {}
+        template_version_id = latest_build["template_version_id"]
 
-        # Create a new build with the updated token parameter
+        # Create a new build with the updated token parameter. home_mode is
+        # immutable per workspace; re-send its current value so the rebuild
+        # cannot reset a scratch-home workspace to the shared-home default.
         rich_params = [{
             "name": "computor_auth_token",
             "value": computor_auth_token,
         }]
+        build_id = latest_build.get("id")
+        if build_id:
+            home_mode = await self._get_build_param(build_id, "home_mode")
+            if home_mode is not None:
+                rich_params.append({"name": "home_mode", "value": home_mode})
 
         resp = await self._request(
             "POST",
@@ -1239,13 +1255,17 @@ class CoderClient:
         latest = (resp.json() or {}).get("latest_build") or {}
 
         # Preserve the current auth token; omitting it resets the param to its
-        # "" default and de-authenticates the extension.
+        # "" default and de-authenticates the extension. Same for home_mode:
+        # a scratch-home workspace must not silently rebuild onto the shared home.
         rich_params: list[dict] = []
         build_id = latest.get("id")
         if build_id:
             current_token = await self._get_build_param(build_id, "computor_auth_token")
             if current_token is not None:
                 rich_params.append({"name": "computor_auth_token", "value": current_token})
+            home_mode = await self._get_build_param(build_id, "home_mode")
+            if home_mode is not None:
+                rich_params.append({"name": "home_mode", "value": home_mode})
 
         resp = await self._request(
             "POST",
@@ -1282,6 +1302,7 @@ class CoderClient:
         template: Optional[str] = None,
         workspace_name: Optional[str] = None,
         computor_auth_token: Optional[str] = None,
+        home_mode: Optional[str] = None,
     ) -> ProvisionResult:
         """
         Full provisioning: get or create user and workspace.
@@ -1357,11 +1378,14 @@ class CoderClient:
                     computor_auth_token,
                 )
         except CoderWorkspaceNotFoundError:
-            # Create workspace
+            # Create workspace. home_mode only applies at creation — for an
+            # existing workspace it is immutable and the token-update rebuild
+            # preserves the original value.
             ws_data = CoderWorkspaceCreate(
                 name=workspace_name,
                 template=template,
                 computor_auth_token=computor_auth_token,
+                home_mode=home_mode,
             )
             workspace = await self.create_workspace(user.username, ws_data)
             workspace_created = True

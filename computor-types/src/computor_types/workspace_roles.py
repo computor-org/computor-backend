@@ -26,3 +26,9 @@ class WorkspaceProvisionRequest(BaseModel):
     email: Optional[str] = Field(None, description="Target user email. If omitted, provisions for the current user.")
     template: Optional[str] = Field(None, description="Workspace template name. Validated against the templates available in Coder; omit for the server default.")
     workspace_name: Optional[str] = Field(None, description="Custom workspace name. Defaults to a name derived from the template.")
+    home_mode: Optional[str] = Field(
+        None,
+        description="Home volume mode: 'shared' (per-user home volume) or 'scratch' "
+                    "(throwaway per-workspace volume). Full provisioners only; "
+                    "self-provisioning always uses the template default (shared).",
+    )
