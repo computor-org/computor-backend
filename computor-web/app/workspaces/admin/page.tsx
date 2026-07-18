@@ -10,18 +10,23 @@ import Tabs from '@/src/components/ui/Tabs';
 import WorkspaceUsersPanel from '@/src/components/workspaces/WorkspaceUsersPanel';
 import WorkspaceFleetPanel from '@/src/components/workspaces/WorkspaceFleetPanel';
 import WorkspaceTemplatesPanel from '@/src/components/workspaces/WorkspaceTemplatesPanel';
+import WorkspaceCoursesPanel from '@/src/components/workspaces/WorkspaceCoursesPanel';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
 
-type AdminTab = 'users' | 'fleet' | 'templates';
+type AdminTab = 'users' | 'fleet' | 'templates' | 'courses';
 
 function WorkspaceAdminContent() {
   const router = useRouter();
   const pathname = usePathname();
   // URL-backed tabs (?tab=fleet) so all are deep-linkable.
   const rawTab = useSearchParam('tab');
-  const tab: AdminTab = rawTab === 'fleet' ? 'fleet' : rawTab === 'templates' ? 'templates' : 'users';
+  const tab: AdminTab =
+    rawTab === 'fleet' ? 'fleet'
+    : rawTab === 'templates' ? 'templates'
+    : rawTab === 'courses' ? 'courses'
+    : 'users';
 
   return (
     <ListPageLayout>
@@ -36,6 +41,7 @@ function WorkspaceAdminContent() {
           { id: 'users', label: 'Users & roles' },
           { id: 'fleet', label: 'Fleet' },
           { id: 'templates', label: 'Templates' },
+          { id: 'courses', label: 'Courses' },
         ]}
         active={tab}
         onSelect={(id) => router.replace(id === 'users' ? pathname : `${pathname}?tab=${id}`)}
@@ -47,9 +53,13 @@ function WorkspaceAdminContent() {
         <ScrollArea className="space-y-6 pr-1">
           <WorkspaceFleetPanel />
         </ScrollArea>
-      ) : (
+      ) : tab === 'templates' ? (
         <ScrollArea className="space-y-6 pr-1">
           <WorkspaceTemplatesPanel />
+        </ScrollArea>
+      ) : (
+        <ScrollArea className="space-y-6 pr-1">
+          <WorkspaceCoursesPanel />
         </ScrollArea>
       )}
     </ListPageLayout>

@@ -1,13 +1,14 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollPanel, ListLoading } from '@/src/components/ListPageLayout';
 import { useResource } from '@/src/hooks/useResource';
 import ErrorBanner from '@/src/components/ErrorBanner';
-import { ButtonLink } from '@/src/components/ui/Button';
+import Button, { ButtonLink } from '@/src/components/ui/Button';
+import { useNotify } from '@/src/contexts/NotificationContext';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { WorkspaceBuildStatus } from '@/src/types/workspaces';
-import type { CoderWorkspace } from '@/src/types/workspaces';
+import type { CoderWorkspace, WorkspaceTemplateSettings } from '@/src/types/workspaces';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/src/components/ui/Table';
 
 const coderClient = new CoderClient();
@@ -30,7 +31,9 @@ function isActive(workspace: CoderWorkspace): boolean {
 
 /** Per-template resource limits + seat quota overview, linking to the editor. */
 export default function WorkspaceTemplatesPanel() {
-  const { data, loading, error } = useResource(
+  const notify = useNotify();
+  const [toggling, setToggling] = useState<string | null>(null);
+  const { data, loading, error, reload } = useResource(
     async () => {
       const [templates, settings, workspaces] = await Promise.all([
         coderClient.listTemplates(),
@@ -62,6 +65,29 @@ export default function WorkspaceTemplatesPanel() {
 
   const templates = data?.templates ?? [];
 
+  // The settings PUT is a full replace, so the toggle re-sends the row's
+  // current values (or the defaults when no row exists) with enabled flipped.
+  async function toggleEnabled(templateName: string, settings?: WorkspaceTemplateSettings) {
+    setToggling(templateName);
+    try {
+      await coderClient.updateTemplateSettings({
+        templateName,
+        body: {
+          enabled: !(settings?.enabled ?? true),
+          memory_mb: settings?.memory_mb ?? null,
+          cpu_shares: settings?.cpu_shares ?? null,
+          max_running_workspaces: settings?.max_running_workspaces ?? null,
+          template_variables: settings?.template_variables ?? {},
+        },
+      });
+      reload();
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Failed to update template', 'error');
+    } finally {
+      setToggling(null);
+    }
+  }
+
   return (
     <>
       <ErrorBanner>{error}</ErrorBanner>
@@ -70,7 +96,8 @@ export default function WorkspaceTemplatesPanel() {
         Per-template container resource limits, running-workspace seat quotas, and Terraform
         configuration. Limits and variable changes apply at the next{' '}
         <span className="font-medium">Build &amp; push</span> (Fleet tab); seat quotas apply
-        immediately.
+        immediately. Disabled templates are hidden from users and courses and cannot be
+        provisioned; running workspaces keep working.
       </p>
 
       {loading ? (
@@ -81,6 +108,7 @@ export default function WorkspaceTemplatesPanel() {
             <Thead>
               <tr>
                 <Th>Template</Th>
+                <Th>Enabled</Th>
                 <Th>Memory cap</Th>
                 <Th>CPU shares</Th>
                 <Th>Seats (running / max)</Th>
@@ -91,15 +119,26 @@ export default function WorkspaceTemplatesPanel() {
             <Tbody>
               {templates.map((template) => {
                 const settings = settingsByName.get(template.name);
+                const enabled = settings?.enabled ?? true;
                 const running = runningByTemplate.get(template.name) ?? 0;
                 const extraCount = Object.keys(settings?.template_variables ?? {}).length;
                 return (
-                  <Tr key={template.id} className="hover:bg-gray-50">
+                  <Tr key={template.id} className={`hover:bg-gray-50 ${enabled ? '' : 'opacity-60'}`}>
                     <Td>
                       <div className="text-sm font-medium text-gray-900">
                         {template.display_name || template.name}
                       </div>
                       <div className="text-xs text-gray-500">{template.name}</div>
+                    </Td>
+                    <Td>
+                      <Button
+                        size="xs"
+                        variant={enabled ? 'secondary' : 'primary'}
+                        disabled={toggling === template.name}
+                        onClick={() => toggleEnabled(template.name, settings)}
+                      >
+                        {enabled ? 'Disable' : 'Enable'}
+                      </Button>
                     </Td>
                     <Td className="text-sm text-gray-700">
                       {settings?.memory_mb ? `${settings.memory_mb} MiB` : 'Unlimited'}
@@ -129,7 +168,7 @@ export default function WorkspaceTemplatesPanel() {
               })}
               {templates.length === 0 && (
                 <Tr>
-                  <Td colSpan={6} className="py-8 text-center text-sm text-gray-500">
+                  <Td colSpan={7} className="py-8 text-center text-sm text-gray-500">
                     No templates.
                   </Td>
                 </Tr>

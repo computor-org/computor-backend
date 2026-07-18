@@ -59,6 +59,12 @@ export interface CoderWorkspace {
   template_version_name?: string | null;
   latest_build_transition?: string | null;
   latest_build_status?: WorkspaceBuildStatus | null;
+  latest_build_id?: string | null;
+  /**
+   * Home volume mode ('shared' | 'scratch') from the latest build's rich
+   * parameters; only populated by views that need it (lecturer console).
+   */
+  home_mode?: string | null;
   automatic_updates?: 'always' | 'never' | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -162,6 +168,11 @@ export interface WorkspaceProvisionRequest {
   template?: string | null;
   /** Custom workspace name; omit for a name derived from the template. */
   workspace_name?: string | null;
+  /**
+   * Home volume mode; full provisioners only. Self-provisioning always uses
+   * the template default (shared).
+   */
+  home_mode?: 'shared' | 'scratch' | null;
 }
 
 // --- Admin: image build / template push / fleet rollout ---
@@ -246,6 +257,11 @@ export interface CoderAdminTaskListResponse {
 export interface WorkspaceTemplateSettings {
   /** Coder template name (e.g. 'vscode-workspace'). */
   template_name: string;
+  /**
+   * Disabled templates are hidden from non-manager listings and cannot be
+   * provisioned by non-managers; existing workspaces keep running.
+   */
+  enabled: boolean;
   /** Container memory cap in MiB applied at push time; null/0 = unlimited. */
   memory_mb?: number | null;
   /** Relative CPU weight applied at push time; null/0 = Docker default. */
@@ -258,6 +274,7 @@ export interface WorkspaceTemplateSettings {
 }
 
 export interface WorkspaceTemplateSettingsUpdate {
+  enabled?: boolean;
   memory_mb?: number | null;
   cpu_shares?: number | null;
   max_running_workspaces?: number | null;
@@ -310,6 +327,84 @@ export interface TemplateVariablesResponse {
   dir_name: string;
   customized: boolean;
   variables: TemplateVariable[];
+}
+
+// --- Course-scoped workspaces (computor_types/course_workspaces.py) ---
+
+export interface CourseWorkspaceTemplateItem {
+  template_name: string;
+  /** Global enable state (a template without a settings row is enabled). */
+  enabled: boolean;
+  display_name?: string | null;
+  description?: string | null;
+  icon?: string | null;
+  /** Whether Coder currently has this template; null when Coder was unreachable. */
+  exists_in_coder?: boolean | null;
+}
+
+export interface CourseWorkspaceSettingsGet {
+  course_id: string;
+  templates: CourseWorkspaceTemplateItem[];
+  /** Whether course lecturers may bulk-provision workspaces for students. */
+  lecturer_provision_enabled: boolean;
+  /** Managers only: globally enabled Coder templates to pick from. */
+  available?: CoderTemplate[] | null;
+  can_manage: boolean;
+}
+
+export interface CourseWorkspaceSettingsUpdate {
+  /** Allowed Coder template names (full replacement). */
+  template_names: string[];
+  lecturer_provision_enabled?: boolean;
+}
+
+export interface CourseWorkspaceAdminItem {
+  course_id: string;
+  title?: string | null;
+  path?: string | null;
+  template_names: string[];
+  lecturer_provision_enabled: boolean;
+}
+
+export interface CourseWorkspaceAdminListResponse {
+  courses: CourseWorkspaceAdminItem[];
+}
+
+export interface StudentWorkspaceProvisionRequest {
+  /** Course-allowed Coder template name. */
+  template_name: string;
+  course_member_ids: string[];
+  /** 'scratch' = throwaway per-workspace home (deleted with the workspace). */
+  home_mode?: 'shared' | 'scratch';
+  /** Optional name suffix (e.g. 'exam1'); defaults to 'tmp'. */
+  label?: string | null;
+}
+
+export interface StudentWorkspaceProvisionOutcome {
+  course_member_id: string;
+  user_id?: string | null;
+  full_name?: string | null;
+  workspace_name?: string | null;
+  success: boolean;
+  error?: string | null;
+}
+
+export interface StudentWorkspaceProvisionResponse {
+  outcomes: StudentWorkspaceProvisionOutcome[];
+  succeeded: number;
+  failed: number;
+}
+
+export interface CourseStudentWorkspaceEntry {
+  course_member_id: string;
+  user_id: string;
+  full_name?: string | null;
+  workspaces: CoderWorkspace[];
+}
+
+export interface CourseStudentWorkspacesResponse {
+  students: CourseStudentWorkspaceEntry[];
+  count: number;
 }
 
 export enum TaskStatus {

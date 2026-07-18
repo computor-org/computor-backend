@@ -17,6 +17,7 @@ interface VariableRow {
 }
 
 interface FormState {
+  enabled: boolean;
   memoryMb: string;
   cpuShares: string;
   maxRunning: string;
@@ -48,6 +49,7 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
   const stored = useMemo<FormState>(() => {
     const row = data?.settings.find((item) => item.template_name === templateName);
     return {
+      enabled: row?.enabled ?? true,
       memoryMb: row?.memory_mb ? String(row.memory_mb) : '',
       cpuShares: row?.cpu_shares ? String(row.cpu_shares) : '',
       maxRunning: row?.max_running_workspaces != null ? String(row.max_running_workspaces) : '',
@@ -76,6 +78,7 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
       await coderClient.updateTemplateSettings({
         templateName,
         body: {
+          enabled: form.enabled,
           memory_mb: parseLimit('Memory cap', form.memoryMb),
           cpu_shares: parseLimit('CPU shares', form.cpuShares),
           max_running_workspaces: parseLimit('Max running workspaces', form.maxRunning),
@@ -108,6 +111,22 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
             provision/start — for everyone, admins included.
           </p>
         </div>
+
+        <label className="flex items-start gap-2">
+          <input
+            type="checkbox"
+            checked={form.enabled}
+            onChange={(event) => update({ enabled: event.target.checked })}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="block text-sm font-medium text-gray-900">Enabled</span>
+            <span className="block text-xs text-gray-500">
+              Disabled templates are hidden from users and courses and cannot be provisioned;
+              existing workspaces keep running and starting.
+            </span>
+          </span>
+        </label>
 
         <div className="grid gap-4 sm:grid-cols-3">
           <div>

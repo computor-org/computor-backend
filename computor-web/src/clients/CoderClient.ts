@@ -5,6 +5,7 @@
 
 import type {
   CoderHealthResponse,
+  CourseWorkspaceAdminListResponse,
   TemplateListResponse,
   WorkspaceListResponse,
   WorkspaceDetails,
@@ -146,6 +147,13 @@ export class CoderClient extends BaseEndpointClient {
     return this.client.get<CoderAdminTaskListResponse>(this.buildPath('admin', 'tasks'), {
       params: { limit },
     });
+  }
+
+  /** All courses with their workspace configuration (admin Courses tab). */
+  async listAdminCourses(): Promise<CourseWorkspaceAdminListResponse> {
+    return this.client.get<CourseWorkspaceAdminListResponse>(
+      this.buildPath('admin', 'courses'),
+    );
   }
 
   // --- Admin: per-template settings + template editing (workspace:manage) ---
