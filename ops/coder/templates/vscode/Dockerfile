@@ -72,6 +72,13 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/local/bin/python
 RUN mkdir -p /opt/code-server/extensions \
     && chown -R coder:coder /opt/code-server
 
+# Make webview rendering survive a failed/stuck service-worker handshake
+# (Safari private windows, Lockdown Mode — computor-org/issues#274).
+COPY patch-webview-host.js /tmp/patch-webview-host.js
+RUN /usr/lib/code-server/lib/node /tmp/patch-webview-host.js \
+        /usr/lib/code-server/lib/vscode/out/vs/workbench/contrib/webview/browser/pre/index.html \
+    && rm /tmp/patch-webview-host.js
+
 # Allow pip to install packages system-wide
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 

@@ -22,6 +22,15 @@ RUN npm ci \
 
 FROM ghcr.io/coder/code-server:latest AS code-server
 
+# Make webview rendering survive a failed/stuck service-worker handshake
+# (Safari private windows, Lockdown Mode — computor-org/issues#274). Applied
+# here so the COPY --from=code-server below ships the patched webview host.
+USER root
+COPY patch-webview-host.js /tmp/patch-webview-host.js
+RUN /usr/lib/code-server/lib/node /tmp/patch-webview-host.js \
+        /usr/lib/code-server/lib/vscode/out/vs/workbench/contrib/webview/browser/pre/index.html \
+    && rm /tmp/patch-webview-host.js
+
 # Digest-pinned to R2024b Update 6, same digest as matlab-ui: Update 8 breaks
 # the browser desktop under a non-empty MWI_BASE_URL (matlab-proxy#88), and the
 # two matlab templates must stay on identical MATLAB builds because they seed
