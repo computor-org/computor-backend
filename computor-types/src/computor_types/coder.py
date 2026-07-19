@@ -411,7 +411,7 @@ class TemplateFileActionResponse(BaseModel):
 
 
 class TemplateVariable(BaseModel):
-    """One Terraform variable declared by a template (guided editing surface)."""
+    """One Terraform variable declared by a template (settings-override pick-list)."""
 
     name: str
     type: Optional[str] = Field(None, description="Declared type (string | number | bool | …)")
@@ -423,8 +423,8 @@ class TemplateVariable(BaseModel):
     sensitive: bool = False
     managed: bool = Field(
         False,
-        description="Supplied by the push pipeline or the settings UI — its file "
-                    "default is ignored, so guided editing is locked for it",
+        description="Owned by the deployment (push pipeline, environment, or "
+                    "infrastructure wiring) — cannot be overridden by managers",
     )
     managed_reason: Optional[str] = None
     file: str = Field(..., description="The .tf file declaring this variable")
@@ -437,11 +437,3 @@ class TemplateVariablesResponse(BaseModel):
     dir_name: str
     customized: bool
     variables: list[TemplateVariable] = Field(default_factory=list)
-
-
-class TemplateVariableUpdateRequest(BaseModel):
-    """Guided edit: new defaults for declared, non-managed variables."""
-
-    defaults: dict[str, Any] = Field(
-        ..., description="Variable name → new default value"
-    )

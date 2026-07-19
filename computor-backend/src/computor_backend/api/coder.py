@@ -52,7 +52,6 @@ from computor_types.coder import (
     TemplateSettingsListResponse,
     TemplateVariable,
     TemplateVariablesResponse,
-    TemplateVariableUpdateRequest,
     WorkspaceActionResponse,
     WorkspaceDetails,
     WorkspaceListResponse,
@@ -175,8 +174,8 @@ async def require_coder_enabled(
 
 
 # Terraform variables the push pipeline always supplies as --variable values.
-# Their file defaults are dead (a push always overrides them), so the guided
-# variable editor locks them and the settings overrides reject them.
+# Their file defaults are dead (a push always overrides them), so the settings
+# overrides reject them and they never appear as manager-editable.
 _PUSH_MANAGED_VARIABLES = {
     "computor_backend_internal": "set by the deployment at push time",
     "computor_backend_url": "set by the deployment at push time",
@@ -186,17 +185,24 @@ _PUSH_MANAGED_VARIABLES = {
     "cpu_shares": "managed via the template's resource limit settings",
 }
 
+# Infrastructure wiring: these must match the compose stack (networks, proxy
+# paths, internal hosts), so managers cannot override them. The raw file
+# editor remains the operator escape hatch.
+_INFRA_VARIABLES = {
+    "coder_internal_url": "deployment wiring (internal Coder URL)",
+    "coder_base_path": "deployment wiring (reverse-proxy base path)",
+    "docker_network": "deployment wiring (workspace Docker network)",
+    "docker_socket": "deployment wiring (Docker socket URI)",
+}
+
 _TF_VARIABLE_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_-]*$")
 
 
-def _managed_variable_reasons(db: Session, template_name: str) -> dict:
-    """Variable name → why guided editing is locked for it."""
-    reasons = dict(_PUSH_MANAGED_VARIABLES)
+def _locked_variable_reasons() -> dict:
+    """Variable name → why managers cannot override it in the settings."""
+    reasons = {**_PUSH_MANAGED_VARIABLES, **_INFRA_VARIABLES}
     for name in _deployment_template_variables():
         reasons.setdefault(name, "set from the deployment environment at push time")
-    row = _template_settings_row(db, template_name)
-    for name in (row.template_variables or {}) if row else ():
-        reasons.setdefault(name, "overridden in this template's settings")
     return reasons
 
 
@@ -1079,16 +1085,17 @@ async def update_template_settings(
     workspace:manage permission."""
     _check_workspace_access(permissions, "manage")
 
+    locked = _locked_variable_reasons()
     for name in request.template_variables:
         if not _TF_VARIABLE_NAME_RE.match(name):
             raise BadRequestException(
                 detail=f"'{name}' is not a valid Terraform variable name.",
             )
-        if name in _PUSH_MANAGED_VARIABLES or name in _deployment_template_variables():
+        if name in locked:
             raise BadRequestException(
                 detail=(
                     f"Variable '{name}' cannot be overridden here — it is "
-                    f"{_PUSH_MANAGED_VARIABLES.get(name, 'set from the deployment environment at push time')}."
+                    f"{locked[name]}."
                 ),
             )
     if request.cpu_shares is not None and request.cpu_shares == 1:
@@ -1201,82 +1208,20 @@ async def restore_template_managed(
 @router.get(
     "/admin/templates/{template_name}/variables",
     response_model=TemplateVariablesResponse,
-    summary="List a template's declared Terraform variables (guided editing)",
+    summary="List a template's declared Terraform variables",
 )
 async def get_template_variables(
     template_name: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
-    db: Annotated[Session, Depends(get_db)],
 ) -> TemplateVariablesResponse:
-    """Variables parsed from the template's .tf files. Variables the push
-    pipeline supplies (or the settings UI owns) are flagged managed — their
-    file defaults are dead. Requires workspace:manage."""
+    """Variables parsed from the template's .tf files — the pick-list behind
+    the settings tab's variable overrides. Variables the deployment owns
+    (push pipeline, environment, infrastructure wiring) are flagged managed:
+    they cannot be overridden. Requires workspace:manage."""
     _check_workspace_access(permissions, "manage")
     dir_name, path = _resolve_template_fs(settings, template_name)
-    reasons = _managed_variable_reasons(db, template_name)
-    variables = []
-    for parsed in templates_fs.parse_template_variables(path):
-        reason = reasons.get(parsed["name"])
-        variables.append(TemplateVariable(
-            **parsed,
-            managed=reason is not None,
-            managed_reason=reason,
-        ))
-    return TemplateVariablesResponse(
-        template_name=template_name,
-        dir_name=dir_name,
-        customized=templates_fs.is_customized(path),
-        variables=variables,
-    )
-
-
-@router.put(
-    "/admin/templates/{template_name}/variables",
-    response_model=TemplateVariablesResponse,
-    summary="Update variable defaults (guided editing)",
-)
-async def update_template_variables(
-    template_name: str,
-    request: TemplateVariableUpdateRequest,
-    permissions: Annotated[Principal, Depends(get_current_principal)],
-    settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
-    db: Annotated[Session, Depends(get_db)],
-) -> TemplateVariablesResponse:
-    """Rewrite the ``default`` of declared, non-managed, non-sensitive
-    variables in the template's .tf files (each touched file must re-parse
-    before anything is written). Marks the template as operator-customized.
-    Takes effect at the next template push. Requires workspace:manage."""
-    _check_workspace_access(permissions, "manage")
-    dir_name, path = _resolve_template_fs(settings, template_name)
-    if not request.defaults:
-        raise BadRequestException(detail="No variable defaults provided.")
-
-    reasons = _managed_variable_reasons(db, template_name)
-    declared = {v["name"]: v for v in templates_fs.parse_template_variables(path)}
-    for name in request.defaults:
-        info = declared.get(name)
-        if info is None:
-            raise BadRequestException(
-                detail=f"Variable '{name}' is not declared in this template.",
-            )
-        if name in reasons:
-            raise BadRequestException(
-                detail=f"Variable '{name}' is locked — {reasons[name]}.",
-            )
-        if info["sensitive"]:
-            raise BadRequestException(
-                detail=f"Variable '{name}' is sensitive — edit it in the raw "
-                       "file editor.",
-            )
-
-    try:
-        templates_fs.update_variable_defaults(path, request.defaults)
-    except templates_fs.TemplateFileError as e:
-        raise BadRequestException(detail=str(e)) from e
-    except OSError as e:
-        raise InternalServerException(detail=f"Could not write template files: {e}") from e
-
+    reasons = _locked_variable_reasons()
     variables = []
     for parsed in templates_fs.parse_template_variables(path):
         reason = reasons.get(parsed["name"])

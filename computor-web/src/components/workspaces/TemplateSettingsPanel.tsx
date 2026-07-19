@@ -8,6 +8,7 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import Button from '@/src/components/ui/Button';
 import { inputCls } from '@/src/components/ui/tokens';
 import { CoderClient } from '@/src/clients/CoderClient';
+import type { TemplateVariable } from '@/src/types/workspaces';
 
 const coderClient = new CoderClient();
 
@@ -22,6 +23,13 @@ interface FormState {
   cpuShares: string;
   maxRunning: string;
   variables: VariableRow[];
+}
+
+function defaultToString(variable: TemplateVariable): string {
+  const value = variable.default;
+  if (value == null) return '';
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  return String(value);
 }
 
 /** '' → null, otherwise a non-negative integer (throws a user message). */
@@ -46,6 +54,15 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
     [templateName],
   );
 
+  // Declared template variables feed the override pick-list; the backend
+  // already flags deployment-owned ones (push pipeline, env, infra wiring)
+  // as managed, so only genuine capability knobs are offered.
+  const {
+    data: declaredData,
+    loading: declaredLoading,
+    error: declaredError,
+  } = useResource(() => coderClient.getTemplateVariables({ templateName }), [templateName]);
+
   const stored = useMemo<FormState>(() => {
     const row = data?.settings.find((item) => item.template_name === templateName);
     return {
@@ -60,6 +77,11 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
   // Overlay pattern: `stored` is derived from the fetch, `draft` holds local
   // edits (avoids syncing server state into local state via effects).
   const form = draft ?? stored;
+
+  const takenNames = new Set(form.variables.map((row) => row.name.trim()));
+  const addable = (declaredData?.variables ?? []).filter(
+    (variable) => !variable.managed && !variable.sensitive && !takenNames.has(variable.name),
+  );
 
   function update(changes: Partial<FormState>) {
     setDraft({ ...form, ...changes });
@@ -183,35 +205,41 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
           <h2 className="text-lg font-semibold text-gray-900">Terraform variable overrides</h2>
           <p className="text-sm text-gray-500 mt-1">
             Pushed as <code className="font-mono text-xs">--variable name=value</code> — they
-            override the file defaults without customizing the template files. Only variables
-            the template declares are applied.
+            override the template&apos;s defaults without customizing its files. Empty values
+            are ignored at push.
           </p>
         </div>
 
         {form.variables.map((row, index) => (
           <div key={index} className="flex items-center gap-2">
-            <input
-              value={row.name}
-              onChange={(event) => {
-                const variables = form.variables.slice();
-                variables[index] = { ...row, name: event.target.value };
-                update({ variables });
-              }}
-              placeholder="variable name (e.g. shm_size)"
-              className={`${inputCls} w-64 font-mono`}
-              aria-label={`Variable ${index + 1} name`}
-            />
-            <input
-              value={row.value}
-              onChange={(event) => {
-                const variables = form.variables.slice();
-                variables[index] = { ...row, value: event.target.value };
-                update({ variables });
-              }}
-              placeholder="value"
-              className={`${inputCls} flex-1 font-mono`}
-              aria-label={`Variable ${index + 1} value`}
-            />
+            {/* Wrappers own the widths: inputCls carries w-full, which would
+                otherwise fight the sizing classes and crush the value input. */}
+            <div className="w-64 shrink-0">
+              <input
+                value={row.name}
+                onChange={(event) => {
+                  const variables = form.variables.slice();
+                  variables[index] = { ...row, name: event.target.value };
+                  update({ variables });
+                }}
+                placeholder="variable name (e.g. shm_size)"
+                className={`${inputCls} font-mono`}
+                aria-label={`Variable ${index + 1} name`}
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <input
+                value={row.value}
+                onChange={(event) => {
+                  const variables = form.variables.slice();
+                  variables[index] = { ...row, value: event.target.value };
+                  update({ variables });
+                }}
+                placeholder="value"
+                className={`${inputCls} font-mono`}
+                aria-label={`Variable ${index + 1} value`}
+              />
+            </div>
             <Button
               size="xs"
               variant="dangerGhost"
@@ -222,13 +250,64 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
           </div>
         ))}
 
-        <Button
-          size="xs"
-          variant="ghost"
-          onClick={() => update({ variables: [...form.variables, { name: '', value: '' }] })}
-        >
-          + Add variable
-        </Button>
+        {form.variables.length === 0 && addable.length === 0 && !declaredLoading && !declaredError && (
+          <p className="text-sm text-gray-500">
+            This template declares no overridable variables.
+          </p>
+        )}
+
+        {addable.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-gray-700">
+              Declared by the template — pick one to override its default:
+            </p>
+            {addable.map((variable) => (
+              <button
+                key={variable.name}
+                type="button"
+                onClick={() =>
+                  update({
+                    variables: [
+                      ...form.variables,
+                      { name: variable.name, value: defaultToString(variable) },
+                    ],
+                  })
+                }
+                className="w-full text-left rounded border border-gray-200 px-3 py-2 hover:border-blue-400 hover:bg-blue-50"
+              >
+                <span className="text-sm font-mono text-gray-900">+ {variable.name}</span>
+                <span className="text-xs text-gray-500 ml-2">
+                  {variable.type || 'untyped'}
+                  {variable.has_default && ` · default: ${defaultToString(variable) || '""'}`}
+                </span>
+                {variable.description && (
+                  <span className="block text-xs text-gray-500 mt-0.5">{variable.description}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {declaredLoading && (
+          <p className="text-xs text-gray-500">Loading declared variables…</p>
+        )}
+
+        {declaredError && (
+          // Pick-list unavailable (e.g. templates dir not mounted) — fall back
+          // to free-form entry so overrides stay manageable.
+          <div className="space-y-2">
+            <p className="text-xs text-gray-500">
+              Could not load the template&apos;s declared variables — enter names manually.
+            </p>
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={() => update({ variables: [...form.variables, { name: '', value: '' }] })}
+            >
+              + Add variable
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="shrink-0 flex items-center gap-3">

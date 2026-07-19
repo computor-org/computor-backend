@@ -8,13 +8,12 @@ import PageHeader from '@/src/components/PageHeader';
 import Forbidden from '@/src/components/Forbidden';
 import Tabs from '@/src/components/ui/Tabs';
 import TemplateSettingsPanel from '@/src/components/workspaces/TemplateSettingsPanel';
-import TemplateVariablesPanel from '@/src/components/workspaces/TemplateVariablesPanel';
 import TemplateFilesPanel from '@/src/components/workspaces/TemplateFilesPanel';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
 
-type TemplateTab = 'settings' | 'variables' | 'files';
+type TemplateTab = 'settings' | 'files';
 
 function TemplateAdminContent() {
   const router = useRouter();
@@ -22,8 +21,7 @@ function TemplateAdminContent() {
   const params = useParams<{ name: string }>();
   const templateName = decodeURIComponent(params.name);
   const rawTab = useSearchParam('tab');
-  const tab: TemplateTab =
-    rawTab === 'variables' ? 'variables' : rawTab === 'files' ? 'files' : 'settings';
+  const tab: TemplateTab = rawTab === 'files' ? 'files' : 'settings';
 
   return (
     <ListPageLayout>
@@ -40,7 +38,6 @@ function TemplateAdminContent() {
       <Tabs<TemplateTab>
         tabs={[
           { id: 'settings', label: 'Limits & settings' },
-          { id: 'variables', label: 'Variables (guided)' },
           { id: 'files', label: 'Files (raw)' },
         ]}
         active={tab}
@@ -50,8 +47,6 @@ function TemplateAdminContent() {
       <ScrollArea className="space-y-6 pr-1">
         {tab === 'settings' ? (
           <TemplateSettingsPanel templateName={templateName} />
-        ) : tab === 'variables' ? (
-          <TemplateVariablesPanel templateName={templateName} />
         ) : (
           <TemplateFilesPanel templateName={templateName} />
         )}

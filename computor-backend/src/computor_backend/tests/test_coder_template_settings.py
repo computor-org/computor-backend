@@ -1,7 +1,6 @@
-"""Per-template settings: push variable overrides, seat quota, guided editing."""
+"""Per-template settings: push variable overrides, seat quota, template files."""
 
 import json
-import os
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -106,13 +105,17 @@ async def test_quota_excludes_the_target_workspace_and_ignores_unlimited():
 
 
 @pytest.mark.asyncio
-async def test_settings_update_rejects_push_managed_variable_overrides():
-    with pytest.raises(BadRequestException):
-        await update_template_settings(
-            "vscode-workspace",
-            WorkspaceTemplateSettingsUpdate(template_variables={"workspace_image": "x"}),
-            _admin(), MagicMock(), _db_returning([]),
-        )
+async def test_settings_update_rejects_locked_variable_overrides():
+    for variables in (
+        {"workspace_image": "x"},   # push-managed
+        {"docker_network": "x"},    # infrastructure wiring
+    ):
+        with pytest.raises(BadRequestException):
+            await update_template_settings(
+                "vscode-workspace",
+                WorkspaceTemplateSettingsUpdate(template_variables=variables),
+                _admin(), MagicMock(), _db_returning([]),
+            )
     with pytest.raises(BadRequestException):
         await update_template_settings(
             "vscode-workspace",
@@ -139,7 +142,7 @@ async def test_settings_update_upserts_a_new_row():
     assert result.template_variables == {"code_server_port": "13337"}
 
 
-# --- guided editing (templates_fs) -------------------------------------------
+# --- template files (templates_fs) -------------------------------------------
 
 
 VARIABLES_TF = '''variable "app_port" {
@@ -186,27 +189,6 @@ def test_resolve_and_parse_variables(template_dir):
     assert parsed["secret"]["default"] is None  # masked
 
 
-def test_update_defaults_rewrites_in_place_and_drops_marker(template_dir):
-    _root, tpl = template_dir
-    assert not templates_fs.is_customized(tpl)
-    templates_fs.update_variable_defaults(tpl, {"app_port": "9999", "greeting": "hi"})
-    text = open(os.path.join(tpl, "variables.tf")).read()
-    assert "default     = 9999" in text
-    assert 'default     = "hi"' in text
-    assert templates_fs.is_customized(tpl)
-
-    templates_fs.restore_managed(tpl)
-    assert not templates_fs.is_customized(tpl)
-
-
-def test_update_defaults_validates_names_and_types(template_dir):
-    _root, tpl = template_dir
-    with pytest.raises(templates_fs.TemplateFileError):
-        templates_fs.update_variable_defaults(tpl, {"unknown": "1"})
-    with pytest.raises(templates_fs.TemplateFileError):
-        templates_fs.update_variable_defaults(tpl, {"app_port": "not-a-number"})
-
-
 def test_write_template_file_gates_syntax_and_names(template_dir):
     _root, tpl = template_dir
     with pytest.raises(templates_fs.TemplateFileError):
@@ -216,5 +198,9 @@ def test_write_template_file_gates_syntax_and_names(template_dir):
     with pytest.raises(templates_fs.TemplateFileError):
         templates_fs.write_template_file(tpl, "new.tf", "")  # must already exist
 
+    assert not templates_fs.is_customized(tpl)
     templates_fs.write_template_file(tpl, "main.tf", 'locals { a = 1 }\n')
     assert templates_fs.is_customized(tpl)
+
+    templates_fs.restore_managed(tpl)
+    assert not templates_fs.is_customized(tpl)
