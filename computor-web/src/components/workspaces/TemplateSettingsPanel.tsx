@@ -212,28 +212,34 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
 
         {form.variables.map((row, index) => (
           <div key={index} className="flex items-center gap-2">
-            <input
-              value={row.name}
-              onChange={(event) => {
-                const variables = form.variables.slice();
-                variables[index] = { ...row, name: event.target.value };
-                update({ variables });
-              }}
-              placeholder="variable name (e.g. shm_size)"
-              className={`${inputCls} w-64 font-mono`}
-              aria-label={`Variable ${index + 1} name`}
-            />
-            <input
-              value={row.value}
-              onChange={(event) => {
-                const variables = form.variables.slice();
-                variables[index] = { ...row, value: event.target.value };
-                update({ variables });
-              }}
-              placeholder="value"
-              className={`${inputCls} flex-1 font-mono`}
-              aria-label={`Variable ${index + 1} value`}
-            />
+            {/* Wrappers own the widths: inputCls carries w-full, which would
+                otherwise fight the sizing classes and crush the value input. */}
+            <div className="w-64 shrink-0">
+              <input
+                value={row.name}
+                onChange={(event) => {
+                  const variables = form.variables.slice();
+                  variables[index] = { ...row, name: event.target.value };
+                  update({ variables });
+                }}
+                placeholder="variable name (e.g. shm_size)"
+                className={`${inputCls} font-mono`}
+                aria-label={`Variable ${index + 1} name`}
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <input
+                value={row.value}
+                onChange={(event) => {
+                  const variables = form.variables.slice();
+                  variables[index] = { ...row, value: event.target.value };
+                  update({ variables });
+                }}
+                placeholder="value"
+                className={`${inputCls} font-mono`}
+                aria-label={`Variable ${index + 1} value`}
+              />
+            </div>
             <Button
               size="xs"
               variant="dangerGhost"
