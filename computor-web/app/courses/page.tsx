@@ -122,7 +122,7 @@ function CourseCard({ course, role }: { course: CourseList; role: string | null 
 
       {/* Template icon launchers; hides itself when the course offers no
           workspaces. Members only — the fetch would 403 without a role. */}
-      {role && <CourseWorkspaceLaunchButtons courseId={course.id} compact />}
+      {role && <CourseWorkspaceLaunchButtons courseId={course.id} compact className="mb-4" />}
 
       <div className="flex items-center justify-end pt-4 border-t border-gray-200 mt-auto">
         <Link
