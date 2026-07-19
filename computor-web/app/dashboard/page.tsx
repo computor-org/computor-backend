@@ -11,20 +11,9 @@ import type { CourseList } from '@/src/generated/types/courses';
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { showManagement, isWorkspaceUser, isUserManager, isAdmin, courseRole } = usePermissions();
+  const { courseRole } = usePermissions();
   const { data, loading } = useResource(() => fetchLocalCourses(), []);
   const courses = data ?? [];
-
-  const actions = [
-    { label: 'Browse Courses', href: '/courses', show: true },
-    { label: 'Browse Examples', href: '/examples', show: true },
-    { label: 'Organizations', href: '/organizations', show: showManagement },
-    { label: 'Course Families', href: '/course-families', show: showManagement },
-    { label: 'Workspaces', href: '/workspaces', show: isWorkspaceUser },
-    { label: 'User Management', href: '/admin/users', show: isUserManager },
-    { label: 'System', href: '/admin/maintenance', show: isAdmin },
-    { label: 'Settings', href: '/settings', show: true },
-  ].filter((a) => a.show);
 
   return (
     <AuthenticatedLayout>
@@ -43,77 +32,55 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Your Courses */}
-          <div className="bg-white rounded-lg shadow border border-gray-200">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">Your Courses</h2>
-              <Link href="/courses" className="text-sm text-blue-600 hover:underline">
-                View all →
-              </Link>
-            </div>
-            <div className="p-6">
-              {loading ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />
-                  ))}
-                </div>
-              ) : courses.length === 0 ? (
-                <p className="text-sm text-gray-500">No courses yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {courses.slice(0, 6).map((c) => {
-                    const role = courseRole(c.id);
-                    return (
-                      <div
-                        key={c.id}
-                        className="rounded-lg border border-gray-200 p-3 transition-colors hover:border-blue-400 hover:bg-blue-50"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <Link
-                            href={`/courses/${c.id}`}
-                            className="min-w-0 text-sm font-medium text-gray-900 hover:underline"
-                          >
-                            <span className="block truncate">{c.title || c.path}</span>
-                          </Link>
-                          {role && (
-                            <span className="shrink-0 px-2 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-700">
-                              {role}
-                            </span>
-                          )}
-                        </div>
-                        {c.title && c.path && <p className="text-xs text-gray-500">{c.path}</p>}
-                        {/* Template icon launchers; hides itself when the
-                            course offers no workspaces. Members only — the
-                            fetch would 403 for courses visible without a role. */}
-                        {role && <CourseWorkspaceLaunchButtons courseId={c.id} compact />}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+        {/* Your Courses */}
+        <div className="bg-white rounded-lg shadow border border-gray-200">
+          <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-900">Your Courses</h2>
+            <Link href="/courses" className="text-sm text-blue-600 hover:underline">
+              View all →
+            </Link>
           </div>
-
-          {/* Quick Actions — role-aware, real links */}
-          <div className="bg-white rounded-lg shadow border border-gray-200">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Quick Actions</h2>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-2 gap-3">
-                {actions.map((a) => (
-                  <Link
-                    key={a.href}
-                    href={a.href}
-                    className="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-center"
-                  >
-                    <p className="text-sm font-medium text-gray-700">{a.label}</p>
-                  </Link>
+          <div className="p-6">
+            {loading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />
                 ))}
               </div>
-            </div>
+            ) : courses.length === 0 ? (
+              <p className="text-sm text-gray-500">No courses yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {courses.slice(0, 6).map((c) => {
+                  const role = courseRole(c.id);
+                  return (
+                    <div
+                      key={c.id}
+                      className="rounded-lg border border-gray-200 p-3 transition-colors hover:border-blue-400 hover:bg-blue-50"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <Link
+                          href={`/courses/${c.id}`}
+                          className="min-w-0 text-sm font-medium text-gray-900 hover:underline"
+                        >
+                          <span className="block truncate">{c.title || c.path}</span>
+                        </Link>
+                        {role && (
+                          <span className="shrink-0 px-2 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-700">
+                            {role}
+                          </span>
+                        )}
+                      </div>
+                      {c.title && c.path && <p className="text-xs text-gray-500">{c.path}</p>}
+                      {/* Template icon launchers; hides itself when the
+                          course offers no workspaces. Members only — the
+                          fetch would 403 for courses visible without a role. */}
+                      {role && <CourseWorkspaceLaunchButtons courseId={c.id} compact />}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>

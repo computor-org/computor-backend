@@ -133,25 +133,15 @@ export const getViewNavigation = (courseId: string): NavItem[] => [
     label: 'Lecturer',
     path: `/courses/${courseId}/lecturer`,
     icon: 'lecturer',
-    ownPage: true,
+    // No ownPage: /courses/[id]/lecturer only redirects to the first sub-item,
+    // so the sidebar link hops there directly.
     subItems: [
+      { id: 'lecturer-grading', label: 'Grading', path: `/courses/${courseId}/lecturer/grading` },
+      { id: 'lecturer-members', label: 'Course Members', path: `/courses/${courseId}/lecturer/members` },
+      { id: 'lecturer-groups', label: 'Course Groups', path: `/courses/${courseId}/lecturer/groups` },
       { id: 'lecturer-assignments', label: 'Assignments', path: `/courses/${courseId}/lecturer/assignments` },
-      { id: 'lecturer-students', label: 'Students', path: `/courses/${courseId}/lecturer/students` },
       { id: 'lecturer-templates', label: 'Templates', path: `/courses/${courseId}/lecturer/templates` },
       { id: 'lecturer-workspaces', label: 'Workspaces', path: `/courses/${courseId}/lecturer/workspaces` },
-      // Grading Overview isn't implemented yet — re-add the link once
-      // /courses/[id]/lecturer/grading has a real page.
-    ],
-  },
-  {
-    id: 'management-view',
-    view: 'management',
-    label: 'Management',
-    path: `/courses/${courseId}/management`,
-    icon: 'admin',
-    subItems: [
-      { id: 'management-members', label: 'Course Members', path: `/courses/${courseId}/management/members` },
-      { id: 'management-groups', label: 'Course Groups', path: `/courses/${courseId}/management/groups` },
     ],
   },
 ];

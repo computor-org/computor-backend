@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
+import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
@@ -85,9 +86,11 @@ export default function CoursesPage() {
 }
 
 function CourseCard({ course, role }: { course: CourseList; role: string | null }) {
+  // The launch buttons live OUTSIDE the Link: nesting them in the anchor would
+  // both be invalid HTML and still navigate the card on an icon click.
   return (
-    <Link href={`/courses/${course.id}`}>
-      <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-all cursor-pointer h-full flex flex-col">
+    <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-all h-full flex flex-col">
+      <Link href={`/courses/${course.id}`} className="flex flex-col flex-grow cursor-pointer">
         <div className="flex items-start justify-between mb-4 gap-2">
           <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
             {course.title || 'Untitled Course'}
@@ -115,16 +118,23 @@ function CourseCard({ course, role }: { course: CourseList; role: string | null 
             </div>
           )}
         </div>
+      </Link>
 
-        <div className="flex items-center justify-end pt-4 border-t border-gray-200 mt-auto">
-          <span className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center">
-            View Course
-            <svg className="ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </span>
-        </div>
+      {/* Template icon launchers; hides itself when the course offers no
+          workspaces. Members only — the fetch would 403 without a role. */}
+      {role && <CourseWorkspaceLaunchButtons courseId={course.id} compact />}
+
+      <div className="flex items-center justify-end pt-4 border-t border-gray-200 mt-auto">
+        <Link
+          href={`/courses/${course.id}`}
+          className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center"
+        >
+          View Course
+          <svg className="ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
       </div>
-    </Link>
+    </div>
   );
 }

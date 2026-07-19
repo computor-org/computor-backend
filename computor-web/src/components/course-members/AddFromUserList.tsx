@@ -129,7 +129,7 @@ export default function AddFromUserList({
         <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
           This course has no groups yet, so students cannot be added.{' '}
           <Link
-            href={`/courses/${courseId}/management/groups/create`}
+            href={`/courses/${courseId}/lecturer/groups/create`}
             className="font-medium text-amber-800 underline hover:no-underline"
           >
             Create a group

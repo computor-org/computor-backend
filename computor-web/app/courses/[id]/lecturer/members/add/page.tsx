@@ -78,7 +78,7 @@ export default function AddCourseMembersPage() {
           breadcrumbs={[
             { label: 'Courses', href: '/courses' },
             { label: courseLabel, href: `/courses/${courseId}` },
-            { label: 'Course Members', href: `/courses/${courseId}/management/members` },
+            { label: 'Course Members', href: `/courses/${courseId}/lecturer/members` },
             { label: 'Add' },
           ]}
           title="Add members"

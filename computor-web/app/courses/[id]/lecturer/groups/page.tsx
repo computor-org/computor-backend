@@ -93,7 +93,7 @@ export default function CourseGroupsPage() {
           subtitle="Groups (lab sections, tutorial cohorts) students are assigned to. Every student must belong to a group."
           actions={
             <Link
-              href={`/courses/${courseId}/management/groups/create`}
+              href={`/courses/${courseId}/lecturer/groups/create`}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
             >
               New group
@@ -122,7 +122,7 @@ export default function CourseGroupsPage() {
                     <tr key={g.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3">
                         <Link
-                          href={`/courses/${courseId}/management/groups/${g.id}/edit`}
+                          href={`/courses/${courseId}/lecturer/groups/${g.id}/edit`}
                           className="font-medium text-gray-900 text-sm hover:text-blue-600"
                         >
                           {g.title || g.id}
@@ -131,7 +131,7 @@ export default function CourseGroupsPage() {
                       <td className="px-4 py-3 text-sm text-gray-600">{count}</td>
                       <td className="px-4 py-3 text-right space-x-4">
                         <Link
-                          href={`/courses/${courseId}/management/groups/${g.id}/edit`}
+                          href={`/courses/${courseId}/lecturer/groups/${g.id}/edit`}
                           className="text-sm text-blue-600 hover:underline"
                         >
                           Edit

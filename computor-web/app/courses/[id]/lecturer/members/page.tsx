@@ -154,7 +154,7 @@ export default function CourseMembersPage() {
           subtitle="Manage who belongs to this course and their roles."
           actions={
             <Link
-              href={`/courses/${courseId}/management/members/add`}
+              href={`/courses/${courseId}/lecturer/members/add`}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
             >
               Add members
