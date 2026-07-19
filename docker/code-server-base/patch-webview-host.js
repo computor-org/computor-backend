@@ -20,7 +20,9 @@
  * step is verified; any mismatch (e.g. a code-server upgrade changed the
  * file) fails the image build loudly instead of shipping a broken patch.
  *
- * Run with code-server's bundled node:
+ * Applied once in docker/code-server-base/Dockerfile (computor-code-server),
+ * the shared base every code-server workspace template builds FROM. Run with
+ * code-server's bundled node:
  *   /usr/lib/code-server/lib/node patch-webview-host.js <path-to-pre/index.html>
  */
 'use strict';
