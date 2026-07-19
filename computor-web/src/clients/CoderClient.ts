@@ -202,21 +202,10 @@ export class CoderClient extends BaseEndpointClient {
     );
   }
 
-  /** Declared Terraform variables of a template (guided editing surface). */
+  /** Declared Terraform variables of a template (settings-override pick-list). */
   async getTemplateVariables({ templateName }: { templateName: string }): Promise<TemplateVariablesResponse> {
     return this.client.get<TemplateVariablesResponse>(
       this.buildPath('admin', 'templates', templateName, 'variables'),
-    );
-  }
-
-  /** Guided edit: rewrite defaults of declared, non-managed variables. */
-  async updateTemplateVariables({ templateName, defaults }: {
-    templateName: string;
-    defaults: Record<string, unknown>;
-  }): Promise<TemplateVariablesResponse> {
-    return this.client.put<TemplateVariablesResponse>(
-      this.buildPath('admin', 'templates', templateName, 'variables'),
-      { defaults },
     );
   }
 }

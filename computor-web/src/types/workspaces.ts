@@ -315,7 +315,7 @@ export interface TemplateVariable {
   has_default: boolean;
   description?: string | null;
   sensitive: boolean;
-  /** Supplied by the push pipeline / settings UI — guided editing is locked. */
+  /** Owned by the deployment (push pipeline / env / infra wiring) — not overridable. */
   managed: boolean;
   managed_reason?: string | null;
   /** The .tf file declaring this variable. */
