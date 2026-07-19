@@ -26,7 +26,6 @@ from computor_types.coder import (  # noqa: F401
     TemplateSettingsListResponse,
     TemplateVariable,
     TemplateVariablesResponse,
-    TemplateVariableUpdateRequest,
     WorkspaceActionResponse,
     WorkspaceBuildStatus,
     WorkspaceDetails,

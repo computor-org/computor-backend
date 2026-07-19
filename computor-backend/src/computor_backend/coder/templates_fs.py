@@ -1,10 +1,10 @@
 """Filesystem access to the deployed Coder template directories.
 
-Backs the raw + guided template editing endpoints in ``api/coder.py``. All
-reads/writes target the DEPLOYED templates dir (``${SYSTEM_DEPLOYMENT_PATH}/
-coder/templates``, mounted at ``CODER_TEMPLATES_DIR`` in containers) — the
-same files ``coder templates push`` consumes — never the repo copy under
-``ops/coder/templates``.
+Backs the raw template editing + variable listing endpoints in
+``api/coder.py``. All reads/writes target the DEPLOYED templates dir
+(``${SYSTEM_DEPLOYMENT_PATH}/coder/templates``, mounted at
+``CODER_TEMPLATES_DIR`` in containers) — the same files ``coder templates
+push`` consumes — never the repo copy under ``ops/coder/templates``.
 
 Customization contract (see computor.sh): a deployed template dir carrying a
 ``.computor-managed`` marker is re-synced from the repo on every startup.
@@ -12,12 +12,6 @@ Any edit through this module therefore REMOVES the marker, flipping the
 template to operator-customized so startup stops clobbering it;
 ``restore_managed`` re-creates the marker, and the repo defaults return on
 the next system restart.
-
-Guided editing is deliberately NOT a general HCL rewriter: it only replaces
-(or inserts) the single-line ``default = …`` inside a ``variable "name"``
-block, then re-parses the whole file with hcl2 and refuses to write anything
-that no longer parses. Multi-line defaults are rejected — that's what the
-raw editor is for.
 """
 
 import json
@@ -177,7 +171,7 @@ def write_template_file(template_dir: str, file_name: str, content: str) -> None
 
 
 # ---------------------------------------------------------------------------
-# Guided variable editing
+# Declared variables (settings-override pick-list)
 # ---------------------------------------------------------------------------
 
 
@@ -222,91 +216,3 @@ def parse_template_variables(template_dir: str) -> List[Dict[str, Any]]:
                     "file": entry,
                 })
     return variables
-
-
-def _serialize_default(name: str, var_type: Optional[str], value: Any) -> str:
-    """Render a new default as HCL source, coerced to the declared type."""
-    if var_type == "bool" or isinstance(value, bool):
-        if isinstance(value, str):
-            if value.lower() in ("true", "false"):
-                return value.lower()
-            raise TemplateFileError(f"Variable '{name}' expects true or false.")
-        return "true" if value else "false"
-    if var_type == "number":
-        if isinstance(value, (int, float)) and not isinstance(value, bool):
-            return json.dumps(value)
-        try:
-            text = str(value).strip()
-            return json.dumps(float(text) if "." in text else int(text))
-        except (TypeError, ValueError) as e:
-            raise TemplateFileError(f"Variable '{name}' expects a number.") from e
-    # Strings (and untyped): JSON escaping is valid HCL string syntax.
-    return json.dumps(str(value))
-
-
-def _variable_block_span(text: str, name: str) -> Tuple[int, int]:
-    """(start, end) offsets of the ``variable "name" { … }`` block body."""
-    match = re.search(r'variable\s+"' + re.escape(name) + r'"\s*\{', text)
-    if not match:
-        raise TemplateFileError(f"Variable '{name}' not found.")
-    depth = 0
-    for i in range(match.end() - 1, len(text)):
-        if text[i] == "{":
-            depth += 1
-        elif text[i] == "}":
-            depth -= 1
-            if depth == 0:
-                return match.end(), i
-    raise TemplateFileError(f"Unbalanced braces in variable '{name}' block.")
-
-
-def _rewrite_default(text: str, name: str, serialized: str) -> str:
-    """Replace (or insert) the single-line default inside one variable block."""
-    body_start, body_end = _variable_block_span(text, name)
-    body = text[body_start:body_end]
-    match = re.search(r"^([ \t]*default\s*=\s*)(.*)$", body, flags=re.MULTILINE)
-    if match:
-        old_value = match.group(2).strip()
-        if old_value.startswith(("[", "{")) or old_value.endswith(("[", "{", "(")):
-            raise TemplateFileError(
-                f"Variable '{name}' has a multi-line default — "
-                "edit it in the raw file editor."
-            )
-        new_body = body[:match.start()] + match.group(1) + serialized + body[match.end():]
-    else:
-        new_body = f"\n  default     = {serialized}" + body
-    return text[:body_start] + new_body + text[body_end:]
-
-
-def update_variable_defaults(template_dir: str, updates: Dict[str, Any]) -> None:
-    """Apply new defaults for the given variables, validating each touched
-    file re-parses before anything is written. Flips the dir to customized."""
-    declared = {v["name"]: v for v in parse_template_variables(template_dir)}
-    by_file: Dict[str, Dict[str, Any]] = {}
-    for name, value in updates.items():
-        info = declared.get(name)
-        if info is None:
-            raise TemplateFileError(f"Variable '{name}' is not declared in this template.")
-        by_file.setdefault(info["file"], {})[name] = value
-
-    # Rewrite + validate everything in memory first, then write all files.
-    pending: List[Tuple[str, str]] = []
-    for file_name, file_updates in by_file.items():
-        path = os.path.join(template_dir, file_name)
-        with open(path, encoding="utf-8") as f:
-            text = f.read()
-        for name, value in file_updates.items():
-            serialized = _serialize_default(name, declared[name].get("type"), value)
-            text = _rewrite_default(text, name, serialized)
-        try:
-            hcl2.loads(text)
-        except Exception as e:
-            raise TemplateFileError(
-                f"Edit to {file_name} would produce invalid Terraform: {e}"
-            ) from e
-        pending.append((path, text))
-
-    for path, text in pending:
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(text)
-    mark_customized(template_dir)
