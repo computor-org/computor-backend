@@ -15,23 +15,11 @@ import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPa
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
-import type {
-  CourseMemberRepositoryGet,
-  StudentRepositoryProvisioned,
-} from 'types/generated';
+import type { StudentRepositoryProvisioned } from 'types/generated';
 
 const coursesClient = new CoursesClient();
 const courseFamiliesClient = new CourseFamiliesClient();
 const organizationsClient = new OrganizationsClient();
-
-interface ViewCard {
-  view: string;
-  href: string;
-  title: string;
-  desc: string;
-  icon: ReactNode;
-}
-
 
 const userClient = new UserClient();
 export default function CoursePage() {
@@ -42,8 +30,7 @@ export default function CoursePage() {
   const { data, loading, error, reload } = useResource(
     async () => {
       const course = await coursesClient.getCoursesCoursesIdGet({ id: courseId });
-      const [courseViews, organization, courseFamily, gitBinding, myRepo, gitDescriptor] = await Promise.all([
-        userClient.getCourseViewsForCurrentUserByCourseUserViewsCourseIdGet({ courseId }).catch(() => [] as string[]),
+      const [organization, courseFamily, gitBinding, myRepo, gitDescriptor] = await Promise.all([
         organizationsClient.getOrganizationsOrganizationsIdGet({ id: course.organization_id }).catch(() => null),
         courseFamiliesClient.getCourseFamiliesCourseFamiliesIdGet({ id: course.course_family_id }).catch(() => null),
         // Git binding is lecturer-cohort only; fetch it only for managers.
@@ -56,12 +43,11 @@ export default function CoursePage() {
         // (everyone), so a non-git course never shows the provision button.
         userClient.getCourseGitDescriptorEndpointUserCoursesCourseIdGitGet({ courseId }).catch(() => null),
       ]);
-      return { course, courseViews, organization, courseFamily, gitBinding, myRepo, gitDescriptor };
+      return { course, organization, courseFamily, gitBinding, myRepo, gitDescriptor };
     },
     [courseId, canManageMembers],
   );
   const course = data?.course ?? null;
-  const courseViews = data?.courseViews ?? [];
   const organization = data?.organization ?? null;
   const courseFamily = data?.courseFamily ?? null;
   const gitBinding = data?.gitBinding ?? null;
@@ -111,62 +97,6 @@ export default function CoursePage() {
     );
   }
 
-  const viewCards: ViewCard[] = [
-    {
-      view: 'student',
-      href: `/courses/${courseId}/student`,
-      title: 'Student view',
-      desc: 'Course contents & assignments',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-        </svg>
-      ),
-    },
-    {
-      view: 'tutor',
-      href: `/courses/${courseId}/tutor`,
-      title: 'Tutor view',
-      desc: 'Students & grading',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-        </svg>
-      ),
-    },
-    {
-      view: 'lecturer',
-      href: `/courses/${courseId}/lecturer`,
-      title: 'Lecturer view',
-      desc: 'Contents & grading',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-        </svg>
-      ),
-    },
-    {
-      view: 'management',
-      href: `/courses/${courseId}/management/members`,
-      title: 'Management',
-      desc: 'Members & course administration',
-      icon: (
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
-    },
-    // Management is a permission (not a course role): show it to the manager
-    // cohort directly, so it appears even before the backend's `management`
-    // view is loaded. Student/tutor/lecturer stay driven by the course views.
-  ].filter((c) => courseViews.includes(c.view) || (c.view === 'management' && canManageMembers));
-
-  // Literal class strings so Tailwind's JIT actually emits them.
-  const quickCols =
-    viewCards.length >= 3 ? 'md:grid-cols-3' : viewCards.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-1';
-
   // Hierarchy breadcrumb: Organization › Course family › Course, falling back to
   // the flat Courses list when those aren't readable (e.g. for students).
   const crumbs: { label: string; href?: string }[] = [];
@@ -213,37 +143,6 @@ export default function CoursePage() {
         />
 
         <ScrollArea className="space-y-8">
-        {/* Quick Access — the primary way into the course, so it leads. */}
-        {viewCards.length > 0 && (
-          <div className={`grid grid-cols-1 gap-4 ${quickCols}`}>
-            {viewCards.map((c) => (
-              <Link
-                key={c.view}
-                href={c.href}
-                className="group flex items-center gap-4 p-5 bg-white border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all"
-              >
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-100">
-                  {c.icon}
-                </span>
-                <div className="min-w-0">
-                  <h3 className="font-semibold text-gray-900">{c.title}</h3>
-                  <p className="text-xs text-gray-500">{c.desc}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-
-        {/* Workspaces — launch buttons for the course's allowed templates.
-            The component hides itself when the course offers none; the role
-            gate only avoids a guaranteed-403 fetch for non-members. */}
-        {(isAdmin || courseRole(courseId) != null) && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Workspaces</h2>
-            <CourseWorkspaceLaunchButtons courseId={courseId} />
-          </div>
-        )}
-
         {/* About — description + the few facts worth showing (no identifiers). */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">About</h2>
@@ -281,6 +180,16 @@ export default function CoursePage() {
             )}
           </dl>
         </div>
+
+        {/* Workspaces — launch buttons for the course's allowed templates.
+            The component hides itself when the course offers none; the role
+            gate only avoids a guaranteed-403 fetch for non-members. */}
+        {(isAdmin || courseRole(courseId) != null) && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Workspaces</h2>
+            <CourseWorkspaceLaunchButtons courseId={courseId} />
+          </div>
+        )}
 
         {/* Git — the caller's own repository (+ ensure access) when the course
             uses git, then the course binding for managers. Hidden entirely for a

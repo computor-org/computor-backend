@@ -55,8 +55,8 @@ type SortDir = 'asc' | 'desc';
 
 /**
  * Student progress & grading overview — the sortable roster with stat cards and
- * charts, shown as the Lecturer → Students sub-tab. Rows open the per-student
- * detail at `/courses/[id]/lecturer/students/[memberId]`.
+ * charts, shown as the Lecturer → Grading sub-tab. Rows open the per-student
+ * detail at `/courses/[id]/lecturer/grading/[memberId]`.
  */
 export default function CourseProgressView({ courseId }: { courseId: string }) {
   const router = useRouter();
@@ -148,9 +148,9 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
           { label: 'Courses', href: '/courses' },
           { label: courseTitle, href: `/courses/${courseId}` },
           { label: 'Lecturer View', href: `/courses/${courseId}/lecturer` },
-          { label: 'Students' },
+          { label: 'Grading' },
         ]}
-        title="Students"
+        title="Grading"
         subtitle="Overview of student progress and grading"
         actions={
           <button
@@ -259,7 +259,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
                           <tr
                             key={s.course_member_id}
                             className="hover:bg-blue-50/50 cursor-pointer transition-colors"
-                            onClick={() => router.push(`/courses/${courseId}/lecturer/students/${s.course_member_id}`)}
+                            onClick={() => router.push(`/courses/${courseId}/lecturer/grading/${s.course_member_id}`)}
                           >
                             {/* Name */}
                             <td className="px-4 py-2.5">

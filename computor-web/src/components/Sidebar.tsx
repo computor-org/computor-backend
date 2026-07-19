@@ -144,8 +144,13 @@ export default function Sidebar() {
     // Only the course's actual views — never fall back to global views, which
     // would surface role views the user doesn't hold for this course.
     const activeViews = courseViews;
-    const availableViews = viewNavigation.filter((item) =>
-      activeViews.includes(item.view!)
+    // Admins/org managers without a course role only get the `management`
+    // view from the backend; member administration now lives under Lecturer,
+    // so that view keeps the Lecturer section visible for them.
+    const availableViews = viewNavigation.filter(
+      (item) =>
+        activeViews.includes(item.view!) ||
+        (item.view === 'lecturer' && activeViews.includes('management'))
     );
 
     return (

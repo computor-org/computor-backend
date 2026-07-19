@@ -34,9 +34,14 @@ const courseWorkspacesClient = new CourseWorkspacesClient();
 export default function CourseWorkspaceLaunchButtons({
   courseId,
   compact = false,
+  className,
 }: {
   courseId: string;
   compact?: boolean;
+  /** Extra classes on the root, e.g. outer spacing — only rendered when the
+      component itself renders, so callers don't get stray margins when it
+      self-hides. */
+  className?: string;
 }) {
   const router = useRouter();
   const notify = useNotify();
@@ -102,7 +107,7 @@ export default function CourseWorkspaceLaunchButtons({
 
   if (compact) {
     return (
-      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <div className={`mt-2 flex flex-wrap items-center gap-1.5 ${className ?? ''}`}>
         {templates.map((t) => (
           <button
             key={t.template_name}
@@ -127,7 +132,7 @@ export default function CourseWorkspaceLaunchButtons({
   }
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${className ?? ''}`}>
       <div className="flex flex-wrap gap-3">
         {templates.map((t) => (
           <button

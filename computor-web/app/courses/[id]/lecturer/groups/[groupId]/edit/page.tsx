@@ -49,7 +49,7 @@ export default function CourseGroupEditPage() {
         id: groupId,
         body: { title: title.trim(), description: description.trim() || null },
       });
-      router.push(`/courses/${courseId}/management/groups`);
+      router.push(`/courses/${courseId}/lecturer/groups`);
     } catch (e) {
       setSaving(false);
       setSaveError(e instanceof Error ? e.message : 'Save failed');
@@ -68,14 +68,14 @@ export default function CourseGroupEditPage() {
         <FormPanel
           breadcrumbs={[
             { label: 'Courses', href: '/courses' },
-            { label: 'Course Groups', href: `/courses/${courseId}/management/groups` },
+            { label: 'Course Groups', href: `/courses/${courseId}/lecturer/groups` },
             { label: title || 'Group' },
           ]}
           title={`Edit ${title || 'group'}`}
           error={loadError ?? saveError}
           submitting={saving}
           disabled={!title.trim()}
-          onCancel={() => router.push(`/courses/${courseId}/management/groups`)}
+          onCancel={() => router.push(`/courses/${courseId}/lecturer/groups`)}
           onSubmit={save}
         >
           <Field label="Title" required>

@@ -46,7 +46,7 @@ export default function CourseGroupCreatePage() {
           description: description.trim() || null,
         },
       });
-      router.push(`/courses/${courseId}/management/groups`);
+      router.push(`/courses/${courseId}/lecturer/groups`);
     } catch (e) {
       setSaving(false);
       setError(e instanceof Error ? e.message : 'Create failed');
@@ -63,7 +63,7 @@ export default function CourseGroupCreatePage() {
         breadcrumbs={[
           { label: 'Courses', href: '/courses' },
           { label: courseLabel, href: `/courses/${courseId}` },
-          { label: 'Course Groups', href: `/courses/${courseId}/management/groups` },
+          { label: 'Course Groups', href: `/courses/${courseId}/lecturer/groups` },
           { label: 'New' },
         ]}
         title="New group"
@@ -72,7 +72,7 @@ export default function CourseGroupCreatePage() {
         submitting={saving}
         disabled={!title.trim()}
         submitLabel="Create"
-        onCancel={() => router.push(`/courses/${courseId}/management/groups`)}
+        onCancel={() => router.push(`/courses/${courseId}/lecturer/groups`)}
         onSubmit={save}
       >
         <Field label="Title" required>
