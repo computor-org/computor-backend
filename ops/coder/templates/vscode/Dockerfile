@@ -27,7 +27,9 @@ RUN npm ci \
 # =========================
 # Stage 2: Runtime image with code-server
 # =========================
-FROM ghcr.io/coder/code-server:latest
+# computor-code-server = upstream code-server + the webview service-worker
+# patch (issue #274); built by computor.sh from docker/code-server-base/.
+FROM computor-code-server:latest
 
 USER root
 

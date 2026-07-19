@@ -12,7 +12,7 @@ A template directory must contain:
 | `template.json` | Manifest (see below). Its presence makes the directory a template. |
 | `*.tf` | Coder Terraform template. Terraform loads every `.tf` in the dir, so it is split by concern: `versions.tf` (providers), `variables.tf`, `main.tf` (data sources/locals/parameter), `agent.tf` (coder_agent + IDE modules), `container.tf` (workspace container + Traefik routing). |
 | `startup.sh.tftpl` | Agent startup script, loaded from `agent.tf` via `templatefile()`. Bash/awk vars use the single-`$` form; Terraform interpolation uses `${...}` and the passed vars map. |
-| `Dockerfile` | Optional. When present, the image build workflow builds & pushes it to the local registry. |
+| `Dockerfile` | Optional. When present, the image build workflow builds & pushes it to the local registry. Templates that ship code-server MUST build `FROM computor-code-server:latest` (upstream code-server + the webview service-worker patch, built by `computor.sh` from `docker/code-server-base/` — issue #274), never from `ghcr.io/coder/code-server` directly. |
 
 `template.json` fields:
 

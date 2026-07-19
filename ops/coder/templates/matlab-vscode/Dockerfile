@@ -20,7 +20,9 @@ RUN npm ci \
     && npm install --global @vscode/vsce \
     && vsce package --out /tmp/computor-extension.vsix
 
-FROM ghcr.io/coder/code-server:latest AS code-server
+# computor-code-server = upstream code-server + the webview service-worker
+# patch (issue #274); built by computor.sh from docker/code-server-base/.
+FROM computor-code-server:latest AS code-server
 
 # Digest-pinned to R2024b Update 6, same digest as matlab-ui: Update 8 breaks
 # the browser desktop under a non-empty MWI_BASE_URL (matlab-proxy#88), and the

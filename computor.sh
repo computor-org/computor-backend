@@ -346,6 +346,14 @@ cmd_up() {
         log "\n${GREEN}Building coder runtime image (computor-coder-runtime)...${NC}"
         (cd "$REPO_ROOT" && docker build -f docker/coder-runtime/Dockerfile -t computor-coder-runtime:latest .)
     fi
+    # Code-server workspace templates build FROM computor-code-server:latest — the
+    # upstream code-server image plus the webview service-worker patch (issue #274).
+    # The temporal worker builds template images on this same docker daemon, so the
+    # local tag resolves without a registry; build it before any template build.
+    if [ "${CODER_ENABLED:-}" = "true" ] && { [[ "$DOCKER_ARGS" == *"--build"* ]] || ! docker image inspect computor-code-server:latest >/dev/null 2>&1; }; then
+        log "\n${GREEN}Building patched code-server base (computor-code-server)...${NC}"
+        (cd "$REPO_ROOT" && docker build -f docker/code-server-base/Dockerfile -t computor-code-server:latest docker/code-server-base)
+    fi
 
     # Start services
     log "\n${GREEN}Starting Computor services...${NC}"
