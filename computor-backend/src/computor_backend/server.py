@@ -73,6 +73,7 @@ from computor_backend.api.services import services_router
 from computor_backend.api.api_tokens import api_tokens_router
 from computor_backend.api.git_servers import git_servers_router
 from computor_backend.api.course_git import course_git_router
+from computor_backend.api.course_workspaces import course_workspaces_router
 from computor_backend.api.course_deployment import course_deployment_router
 from computor_backend.api.course_member_import import course_member_import_router
 from computor_backend.api.course_member_gradings import course_member_gradings_router
@@ -553,6 +554,10 @@ app.include_router(
 # lecturer-facing per-course binding. Auth is enforced per-endpoint.
 app.include_router(git_servers_router, tags=["git-servers"])
 app.include_router(course_git_router, tags=["course-git"])
+# Unconditional (not inside the CODER_ENABLED block): the course-template
+# association is meaningful config even while the Coder integration is off;
+# the student-workspace routes fail via the client when Coder is down.
+app.include_router(course_workspaces_router, tags=["course-workspaces"])
 # Single-course deploy from an uploaded course_deployment.yaml (web create page).
 app.include_router(course_deployment_router, tags=["course-deployment"])
 

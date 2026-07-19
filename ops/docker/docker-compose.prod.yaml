@@ -68,6 +68,10 @@ services:
       - ${DOCUMENTS_ROOT:-${SYSTEM_DEPLOYMENT_PATH}/shared/documents}:${DOCUMENTS_ROOT:-/opt/computor/shared/documents}
       # Bootstrap deployments staged by computor.sh up; applied idempotently at boot.
       - ${SYSTEM_DEPLOYMENT_PATH}/deployments:/deployments:ro
+      # Deployed Coder templates, read-write: backs the template editing
+      # endpoints (raw + guided) under /coder/admin/templates. Harmless empty
+      # dir when Coder is disabled.
+      - ${SYSTEM_DEPLOYMENT_PATH}/coder/templates:/templates
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     environment:
@@ -105,6 +109,9 @@ services:
       CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
       CODER_ADMIN_API_SECRET: ${CODER_ADMIN_API_SECRET}
+      # Deployed template files for the template editing endpoints (matches
+      # the /templates volume above).
+      CODER_TEMPLATES_DIR: /templates
       # Read by the API when pushing Coder templates (matlab_license_file
       # template variable) — must reach this container, not just the host env.
       MATLAB_MLM_LICENSE_FILE: ${MATLAB_MLM_LICENSE_FILE:-}

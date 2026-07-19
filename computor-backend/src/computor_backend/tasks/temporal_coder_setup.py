@@ -695,6 +695,10 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
         backend_external_url = parameters.get("backend_external_url", "http://host.docker.internal:8000")
         dev_forward_ports = parameters.get("dev_forward_ports", "")
         template_variables = parameters.get("template_variables", {})
+        # Per-template --variable overrides (resource caps + extra variables
+        # from the workspace_template_settings rows), keyed by Coder template
+        # name; resolved by the API at submit time so the worker needs no DB.
+        per_template_variables = parameters.get("per_template_variables", {}) or {}
         ttl_ms = parameters.get("ttl_ms", 14400000)  # 4 hour default
         activity_bump_ms = parameters.get("activity_bump_ms", 14400000)
         # One immutable image tag for this run, shared by the build and the
@@ -770,6 +774,9 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
         # Step 2: push templates
         workflow.logger.info(f"Pushing templates: {template_keys}")
 
+        coder_names = {
+            item["dir_name"]: item.get("coder_template_name", "") for item in resolved
+        }
         results = []
         for key in template_keys:
             build_result = build_results.get(key)
@@ -783,6 +790,13 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
                 continue
             self._progress.update({"phase": "pushing", "current_template": key})
             _update_template_progress(self._progress, key, status="running", phase="pushing")
+            # Settings rows are keyed by Coder template name; accept the dir
+            # name too. Per-template overrides win over deployment-wide ones.
+            overrides = (
+                per_template_variables.get(coder_names.get(key, ""))
+                or per_template_variables.get(key)
+                or {}
+            )
             result = await workflow.execute_activity(
                 push_coder_template,
                 args=[
@@ -798,7 +812,7 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
                     activity_bump_ms,
                     registry_host,
                     image_tag,
-                    template_variables,
+                    {**template_variables, **overrides},
                 ],
                 start_to_close_timeout=timedelta(minutes=10),
                 retry_policy=RetryPolicy(
