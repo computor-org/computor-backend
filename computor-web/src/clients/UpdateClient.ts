@@ -5,7 +5,11 @@
 
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from '@/src/generated/clients/baseClient';
-import type { SystemUpdateStatusGet, SystemUpdateTriggerResponse } from '@/src/types/update';
+import type {
+  SystemUpdateScheduleResponse,
+  SystemUpdateStatusGet,
+  SystemUpdateTriggerResponse,
+} from '@/src/types/update';
 
 export class UpdateClient extends BaseEndpointClient {
   constructor(client: APIClient = apiClient) {
@@ -24,6 +28,18 @@ export class UpdateClient extends BaseEndpointClient {
   /** Queue a self-update run (executed by the updater sidecar; prod only). */
   async triggerUpdate(): Promise<SystemUpdateTriggerResponse> {
     return this.client.post<SystemUpdateTriggerResponse>(this.buildPath());
+  }
+
+  /** Schedule a one-shot update (fired by the updater sidecar at the given time). */
+  async scheduleUpdate(scheduledAt: string): Promise<SystemUpdateScheduleResponse> {
+    return this.client.post<SystemUpdateScheduleResponse>(this.buildPath('schedule'), {
+      scheduled_at: scheduledAt,
+    });
+  }
+
+  /** Cancel a pending scheduled update. */
+  async cancelSchedule(): Promise<void> {
+    return this.client.delete<void>(this.buildPath('schedule'));
   }
 
   /** Clear a stuck update lock/state (admin recovery). */

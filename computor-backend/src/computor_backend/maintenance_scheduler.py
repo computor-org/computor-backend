@@ -1,8 +1,9 @@
 """
 Background scheduler that broadcasts maintenance countdown reminders.
 
-Polls Redis for scheduled maintenance and broadcasts `maintenance:reminder`
-events at predefined thresholds (30, 20, 10, 5, 4, 3, 2, 1 minutes before).
+Polls Redis for scheduled maintenance AND scheduled self-updates (which imply
+a maintenance window) and broadcasts `maintenance:reminder` events at
+predefined thresholds (30, 20, 10, 5, 4, 3, 2, 1 minutes before).
 """
 
 import asyncio
@@ -14,7 +15,11 @@ from computor_backend.redis_cache import get_redis_client
 
 logger = logging.getLogger(__name__)
 
-REDIS_KEY_SCHEDULE = "maintenance:schedule"
+# (redis key, default reminder message) — one countdown is tracked per key.
+WATCHED_SCHEDULES = [
+    ("maintenance:schedule", "Scheduled maintenance is approaching."),
+    ("update:schedule", "The system will restart for a scheduled update."),
+]
 POLL_INTERVAL_SECONDS = 30
 REMINDER_THRESHOLDS = [30, 20, 10, 5, 4, 3, 2, 1]
 
@@ -25,8 +30,8 @@ class MaintenanceReminderScheduler:
     def __init__(self):
         self._task: Optional[asyncio.Task] = None
         self._running = False
-        self._sent_thresholds: set[int] = set()
-        self._current_scheduled_at: Optional[str] = None
+        self._sent_thresholds: dict[str, set[int]] = {}
+        self._current_scheduled_at: dict[str, Optional[str]] = {}
 
     async def start(self):
         """Start the background reminder loop."""
@@ -66,25 +71,30 @@ class MaintenanceReminderScheduler:
             logger.info("Maintenance reminder loop cancelled")
 
     async def _check_and_broadcast(self):
-        """Check schedule in Redis and broadcast reminders at thresholds."""
+        """Check each watched schedule in Redis and broadcast reminders at thresholds."""
         redis = await get_redis_client()
-        schedule = await redis.hgetall(REDIS_KEY_SCHEDULE)
+        for redis_key, default_message in WATCHED_SCHEDULES:
+            schedule = await redis.hgetall(redis_key)
+            await self._check_schedule(redis_key, default_message, schedule)
+
+    async def _check_schedule(self, redis_key: str, default_message: str, schedule: dict):
+        sent = self._sent_thresholds.setdefault(redis_key, set())
 
         if not schedule or not schedule.get("scheduled_at"):
             # No schedule — reset tracking
-            if self._current_scheduled_at is not None:
-                self._current_scheduled_at = None
-                self._sent_thresholds.clear()
+            if self._current_scheduled_at.get(redis_key) is not None:
+                self._current_scheduled_at[redis_key] = None
+                sent.clear()
             return
 
         scheduled_at_str = schedule["scheduled_at"]
-        message = schedule.get("message", "Scheduled maintenance is approaching.")
+        message = schedule.get("message") or default_message
 
         # Detect schedule change — reset thresholds
-        if scheduled_at_str != self._current_scheduled_at:
-            logger.info(f"Maintenance schedule detected/changed: {scheduled_at_str}")
-            self._current_scheduled_at = scheduled_at_str
-            self._sent_thresholds.clear()
+        if scheduled_at_str != self._current_scheduled_at.get(redis_key):
+            logger.info(f"Schedule on {redis_key} detected/changed: {scheduled_at_str}")
+            self._current_scheduled_at[redis_key] = scheduled_at_str
+            sent.clear()
 
         # Parse scheduled time
         try:
@@ -104,18 +114,18 @@ class MaintenanceReminderScheduler:
             return
 
         for threshold in REMINDER_THRESHOLDS:
-            if threshold in self._sent_thresholds:
+            if threshold in sent:
                 continue
 
             if minutes_remaining <= threshold:
                 if minutes_remaining < threshold - 1.5:
                     # This threshold is well past — mark sent without broadcasting
                     # (avoids sending "30 min reminder" when only 3 min remain)
-                    self._sent_thresholds.add(threshold)
+                    sent.add(threshold)
                 else:
                     # Within the threshold window — broadcast
                     await self._broadcast_reminder(threshold, scheduled_at_str, message)
-                    self._sent_thresholds.add(threshold)
+                    sent.add(threshold)
 
     async def _broadcast_reminder(self, minutes_remaining: int, scheduled_at: str, message: str):
         """Broadcast a maintenance:reminder event via Redis pub/sub."""

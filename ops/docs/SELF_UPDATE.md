@@ -52,6 +52,46 @@ Progress is written to Redis (`update:state`, `update:log`), so the admin page
 can narrate the run even while the API itself is down (the page keeps polling
 and resumes automatically).
 
+## Scheduled updates
+
+`POST /system/update/schedule` (admin-only, also on the admin page) stores a
+one-shot schedule in Redis; `DELETE /system/update/schedule` cancels it. The
+**sidecar** fires it: each 30 s loop iteration it compares `date -u +%s`
+against the stored epoch and, when due, performs exactly the manual trigger's
+enqueue (lock → `update:state` → `update:queue`). The API pre-computes
+`scheduled_at_epoch` so the sidecar never parses ISO datetimes.
+
+Redis keys:
+
+- `update:schedule` — hash: `scheduled_at` (ISO8601), `scheduled_at_epoch`,
+  `scheduled_by`, `scheduled_by_name`, `created_at`. No TTL; persists until
+  fired or cancelled. Re-posting replaces it.
+- `update:schedule:claimed` — transient: the sidecar claims a due schedule via
+  atomic `RENAME`, so a concurrent cancel and a firing sidecar can never both
+  win.
+- `update:schedule:result` — hash (TTL 7 days): `outcome`
+  (`fired` | `missed` | `skipped_lock`), `scheduled_at`, `resolved_at`,
+  `detail` — shown on the admin page so an absent admin sees what happened.
+
+Semantics:
+
+- **Already up to date at fire time** — fires anyway; the run short-circuits
+  with "Already up to date" before entering maintenance (zero downtime).
+- **Missed window** — if the system was down at the scheduled time, the update
+  still fires up to 60 min late (`SCHEDULE_GRACE_SECONDS` in
+  `docker/updater/watch.sh`); beyond that the schedule resolves as `missed` —
+  never a surprise update long after the window the admin picked.
+- **Lock held at fire time** — resolves as `skipped_lock`, no retry loop.
+- **Countdown reminders** — the API's reminder loop watches `update:schedule`
+  alongside `maintenance:schedule` and broadcasts the same
+  `maintenance:reminder` WebSocket events (30/20/10/5/4/3/2/1 min before).
+- `POST /system/update/reset` clears runs, **not** schedules.
+- Scheduling requires a live sidecar heartbeat (like the manual trigger), so a
+  schedule that could never fire is rejected upfront.
+- Clock assumption: the epoch is computed by the API and compared against the
+  sidecar host's clock — same kernel clock in the single-host compose
+  deployment. Multi-host would need NTP (out of scope).
+
 ## Rules for update-friendly changes
 
 - **Migrations must be backward-compatible for one version.** Alembic upgrades
