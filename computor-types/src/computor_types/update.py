@@ -34,6 +34,25 @@ class SystemUpdateState(BaseModel):
     error: Optional[str] = None
 
 
+class SystemUpdateSchedule(BaseModel):
+    """A pending one-shot scheduled update (fired by the updater sidecar)."""
+    scheduled_at: str
+    scheduled_by: Optional[str] = None
+    scheduled_by_name: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class SystemUpdateScheduleResult(BaseModel):
+    """How the most recent schedule was resolved."""
+    outcome: str = Field(
+        default="",
+        description="fired | missed | skipped_lock",
+    )
+    scheduled_at: Optional[str] = None
+    resolved_at: Optional[str] = None
+    detail: Optional[str] = None
+
+
 class SystemUpdateStatusGet(BaseModel):
     """Running vs. remote version, updater availability, and last run state."""
     update_enabled: bool = False
@@ -53,9 +72,23 @@ class SystemUpdateStatusGet(BaseModel):
         description="Whether the updater sidecar heartbeat is live (always false in dev).",
     )
     state: SystemUpdateState = Field(default_factory=SystemUpdateState)
+    schedule: Optional[SystemUpdateSchedule] = None
+    last_schedule_result: Optional[SystemUpdateScheduleResult] = None
 
 
 class SystemUpdateTriggerResponse(BaseModel):
     """Response to a successfully queued update request."""
     status: str = "requested"
     requested_at: str
+
+
+class SystemUpdateScheduleRequest(BaseModel):
+    """Request to schedule a one-shot update at a future time."""
+    scheduled_at: str = Field(description="ISO8601 datetime (UTC assumed if naive).")
+
+
+class SystemUpdateScheduleResponse(BaseModel):
+    """Response to a successfully stored update schedule."""
+    status: str = "scheduled"
+    scheduled_at: str
+    scheduled_by_name: Optional[str] = None

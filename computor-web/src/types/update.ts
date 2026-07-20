@@ -30,6 +30,21 @@ export interface SystemUpdateState {
   error: string | null;
 }
 
+export interface SystemUpdateSchedule {
+  scheduled_at: string;
+  scheduled_by: string | null;
+  scheduled_by_name: string | null;
+  created_at: string | null;
+}
+
+export interface SystemUpdateScheduleResult {
+  /** fired | missed | skipped_lock */
+  outcome: string;
+  scheduled_at: string | null;
+  resolved_at: string | null;
+  detail: string | null;
+}
+
 export interface SystemUpdateStatusGet {
   update_enabled: boolean;
   running_commit: string;
@@ -44,9 +59,17 @@ export interface SystemUpdateStatusGet {
   /** Whether the updater sidecar heartbeat is live (always false in dev). */
   updater_online: boolean;
   state: SystemUpdateState;
+  schedule: SystemUpdateSchedule | null;
+  last_schedule_result: SystemUpdateScheduleResult | null;
 }
 
 export interface SystemUpdateTriggerResponse {
   status: string;
   requested_at: string;
+}
+
+export interface SystemUpdateScheduleResponse {
+  status: string;
+  scheduled_at: string;
+  scheduled_by_name: string | null;
 }

@@ -31,6 +31,10 @@ from computor_backend.permissions.core import check_admin
 from computor_backend.permissions.principal import Principal
 from computor_backend.redis_cache import get_redis_client
 from computor_types.update import (
+    SystemUpdateSchedule,
+    SystemUpdateScheduleRequest,
+    SystemUpdateScheduleResponse,
+    SystemUpdateScheduleResult,
     SystemUpdateState,
     SystemUpdateStatusGet,
     SystemUpdateTriggerResponse,
@@ -45,6 +49,8 @@ REDIS_KEY_STATE = "update:state"
 REDIS_KEY_AGENT = "update:agent"
 REDIS_KEY_LOCK = "update:lock"
 REDIS_KEY_QUEUE = "update:queue"
+REDIS_KEY_SCHEDULE = "update:schedule"
+REDIS_KEY_SCHEDULE_RESULT = "update:schedule:result"
 
 REMOTE_CACHE_TTL = 300  # seconds
 LS_REMOTE_TIMEOUT = 10  # seconds
@@ -175,6 +181,9 @@ async def _build_status(redis, force_refresh: bool = False) -> SystemUpdateStatu
     raw_state = await redis.hgetall(REDIS_KEY_STATE)
     updater_online = bool(await redis.exists(REDIS_KEY_AGENT))
 
+    raw_schedule = await redis.hgetall(REDIS_KEY_SCHEDULE)
+    raw_schedule_result = await redis.hgetall(REDIS_KEY_SCHEDULE_RESULT)
+
     remote_commit = remote.get("commit") or None
     return SystemUpdateStatusGet(
         update_enabled=settings.enabled,
@@ -192,6 +201,26 @@ async def _build_status(redis, force_refresh: bool = False) -> SystemUpdateStatu
         ),
         updater_online=updater_online,
         state=SystemUpdateState(**raw_state) if raw_state else SystemUpdateState(),
+        schedule=(
+            SystemUpdateSchedule(
+                scheduled_at=raw_schedule["scheduled_at"],
+                scheduled_by=raw_schedule.get("scheduled_by"),
+                scheduled_by_name=raw_schedule.get("scheduled_by_name"),
+                created_at=raw_schedule.get("created_at"),
+            )
+            if raw_schedule.get("scheduled_at")
+            else None
+        ),
+        last_schedule_result=(
+            SystemUpdateScheduleResult(
+                outcome=raw_schedule_result.get("outcome", ""),
+                scheduled_at=raw_schedule_result.get("scheduled_at"),
+                resolved_at=raw_schedule_result.get("resolved_at"),
+                detail=raw_schedule_result.get("detail"),
+            )
+            if raw_schedule_result
+            else None
+        ),
     )
 
 
@@ -293,6 +322,98 @@ async def trigger_update(
     logger.warning(f"Self-update REQUESTED by {permissions.user_id} (branch {settings.repo_branch})")
 
     return SystemUpdateTriggerResponse(status="requested", requested_at=now)
+
+
+@update_router.post("/schedule", response_model=SystemUpdateScheduleResponse)
+async def schedule_update(
+    request: SystemUpdateScheduleRequest,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    """
+    Schedule a one-shot self-update at a future time.
+
+    Admin only. The updater sidecar fires the update at the scheduled time with
+    the same guards as a manual trigger; if the system was down past the time,
+    it fires only within a 60-minute grace window, otherwise the schedule is
+    recorded as missed. Re-posting replaces an existing schedule.
+    """
+    if not check_admin(permissions):
+        raise ForbiddenException(detail="Admin privileges required")
+
+    settings = get_settings().update
+    if not settings.enabled:
+        raise BadRequestException(
+            detail="Self-update is disabled. Set UPDATE_ENABLED=true in .env and restart."
+        )
+
+    # Validate datetime — replace trailing 'Z' with '+00:00' for Python < 3.11 compat
+    try:
+        raw = request.scheduled_at.replace("Z", "+00:00")
+        scheduled_dt = datetime.fromisoformat(raw)
+    except ValueError:
+        raise BadRequestException(detail="Invalid datetime format. Use ISO8601.")
+
+    if scheduled_dt.tzinfo is None:
+        scheduled_dt = scheduled_dt.replace(tzinfo=timezone.utc)
+
+    if scheduled_dt <= datetime.now(timezone.utc):
+        raise BadRequestException(detail="Scheduled time must be in the future")
+
+    redis = await get_redis_client()
+    # A schedule can only ever fire through the sidecar, so refusing to store
+    # one without a live sidecar surfaces the misconfiguration immediately.
+    if not await redis.exists(REDIS_KEY_AGENT):
+        raise ConflictException(
+            detail="The updater sidecar is not running (development environment, "
+            "or the sidecar is down). Updates can only be scheduled in production."
+        )
+
+    now = datetime.now(timezone.utc).isoformat()
+    user = db.query(User).filter(User.id == permissions.user_id).first()
+    display_name = (
+        f"{user.given_name} {user.family_name}"
+        if user and user.given_name
+        else permissions.user_id
+    )
+
+    await redis.delete(REDIS_KEY_SCHEDULE)
+    await redis.hset(REDIS_KEY_SCHEDULE, mapping={
+        "scheduled_at": scheduled_dt.isoformat(),
+        # Precomputed so the sidecar's bash only compares integers against
+        # `date -u +%s` and never parses ISO datetimes.
+        "scheduled_at_epoch": str(int(scheduled_dt.timestamp())),
+        "scheduled_by": permissions.user_id,
+        "scheduled_by_name": display_name,
+        "created_at": now,
+    })
+
+    logger.warning(
+        f"Self-update SCHEDULED for {scheduled_dt.isoformat()} by {permissions.user_id} "
+        f"(branch {settings.repo_branch})"
+    )
+
+    return SystemUpdateScheduleResponse(
+        status="scheduled",
+        scheduled_at=scheduled_dt.isoformat(),
+        scheduled_by_name=display_name,
+    )
+
+
+@update_router.delete("/schedule")
+async def cancel_scheduled_update(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+):
+    """Cancel a pending scheduled update. Admin only. Idempotent."""
+    if not check_admin(permissions):
+        raise ForbiddenException(detail="Admin privileges required")
+
+    redis = await get_redis_client()
+    await redis.delete(REDIS_KEY_SCHEDULE)
+
+    logger.warning(f"Scheduled self-update CANCELLED by {permissions.user_id}")
+
+    return {"status": "cancelled"}
 
 
 @update_router.post("/reset")

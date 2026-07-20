@@ -54,6 +54,11 @@ export default function UpdatesPage() {
   const [checking, setChecking] = useState(false);
   const [showUpdateConfirm, setShowUpdateConfirm] = useState(false);
   const [triggering, setTriggering] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduling, setScheduling] = useState(false);
+  const [showCancelScheduleConfirm, setShowCancelScheduleConfirm] = useState(false);
+  const [cancellingSchedule, setCancellingSchedule] = useState(false);
+  const [dismissedResult, setDismissedResult] = useState<string | null>(null);
 
   const lastStatus = lastStatusRef.current;
   const state: SystemUpdateState | undefined = (status ?? lastStatus)?.state;
@@ -112,6 +117,36 @@ export default function UpdatesPage() {
       notify(err instanceof Error ? err.message : 'Failed to request update', 'error');
     } finally {
       setTriggering(false);
+    }
+  };
+
+  const handleSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scheduleDate) return;
+    setScheduling(true);
+    try {
+      await updateClient.scheduleUpdate(new Date(scheduleDate).toISOString());
+      notify('Update scheduled', 'success');
+      setScheduleDate('');
+      await reload();
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Failed to schedule update', 'error');
+    } finally {
+      setScheduling(false);
+    }
+  };
+
+  const handleCancelSchedule = async () => {
+    setShowCancelScheduleConfirm(false);
+    setCancellingSchedule(true);
+    try {
+      await updateClient.cancelSchedule();
+      notify('Scheduled update cancelled', 'success');
+      await reload();
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Failed to cancel scheduled update', 'error');
+    } finally {
+      setCancellingSchedule(false);
     }
   };
 
@@ -265,6 +300,79 @@ export default function UpdatesPage() {
                 </div>
               </div>
 
+              {/* Scheduled update */}
+              <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Scheduled Update</h2>
+                {view.last_schedule_result &&
+                  ['missed', 'skipped_lock'].includes(view.last_schedule_result.outcome) &&
+                  dismissedResult !== view.last_schedule_result.resolved_at && (
+                    <div className="p-3 mb-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start justify-between gap-3">
+                      <p className="text-sm text-yellow-800">
+                        <strong>
+                          The update scheduled for{' '}
+                          {view.last_schedule_result.scheduled_at
+                            ? new Date(view.last_schedule_result.scheduled_at).toLocaleString()
+                            : 'an earlier time'}{' '}
+                          did not run:
+                        </strong>{' '}
+                        {view.last_schedule_result.detail}
+                      </p>
+                      <button
+                        onClick={() => setDismissedResult(view.last_schedule_result?.resolved_at ?? '')}
+                        className="text-xs text-yellow-700 hover:text-yellow-900 shrink-0"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  )}
+                {view.schedule ? (
+                  <div className="flex items-center gap-4">
+                    <p className="text-sm text-gray-600">
+                      An update is scheduled for{' '}
+                      <strong>{new Date(view.schedule.scheduled_at).toLocaleString()}</strong>
+                      {view.schedule.scheduled_by_name && <> by {view.schedule.scheduled_by_name}</>}.
+                      The system will go into maintenance and update itself automatically.
+                    </p>
+                    <button
+                      onClick={() => setShowCancelScheduleConfirm(true)}
+                      disabled={cancellingSchedule}
+                      className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors shrink-0"
+                    >
+                      {cancellingSchedule ? 'Cancelling…' : 'Cancel Schedule'}
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSchedule} className="space-y-3">
+                    <div className="flex flex-wrap items-end gap-4">
+                      <div className="flex-1 min-w-[200px] max-w-xs">
+                        <label htmlFor="update-schedule-date" className="block text-sm font-medium text-gray-700 mb-1">
+                          Date & Time
+                        </label>
+                        <input
+                          id="update-schedule-date"
+                          type="datetime-local"
+                          value={scheduleDate}
+                          onChange={(e) => setScheduleDate(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          required
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={!!updateDisabledReason || scheduling || !scheduleDate}
+                        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                      >
+                        {scheduling ? 'Scheduling…' : 'Schedule Update'}
+                      </button>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      {updateDisabledReason ??
+                        'At the scheduled time the system enters maintenance, updates to the latest commit on the tracked branch, and rolls back automatically if the update fails. Users get countdown notifications beforehand.'}
+                    </p>
+                  </form>
+                )}
+              </div>
+
               {/* Last update run */}
               {state && state.status !== 'idle' && (
                 <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
@@ -378,6 +486,16 @@ export default function UpdatesPage() {
             </>
           )}
         </ScrollArea>
+
+        <ConfirmDialog
+          open={showCancelScheduleConfirm}
+          title="Cancel Scheduled Update"
+          message="The pending scheduled update will be removed and the system will not update automatically. Cancel the schedule?"
+          confirmLabel="Cancel schedule"
+          variant="danger"
+          onConfirm={handleCancelSchedule}
+          onCancel={() => setShowCancelScheduleConfirm(false)}
+        />
 
         <ConfirmDialog
           open={showUpdateConfirm}
