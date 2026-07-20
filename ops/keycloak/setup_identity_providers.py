@@ -14,9 +14,10 @@ for the schema. Secrets are NOT in that file: each entry names an env var via
 secret only ever lives in .env -> container env -> Keycloak, never on disk in a
 config file.
 
-Safe to run on every boot: each provider and its attribute mappers is created if
-absent and updated in place if present. A missing or empty providers file is a
-no-op (exit 0) — brokered IdPs are optional.
+Safe to run on every boot: realm settings are reconciled (see
+ensure_realm_settings), and each provider and its mappers is created if absent
+and updated in place if present. A missing or empty providers file skips the
+provider step (exit 0) — brokered IdPs are optional.
 
 Stdlib only (urllib + json) so it runs unchanged in a slim python image (the
 one-shot compose service) and on a host (manual run), with no pip install.
@@ -179,33 +180,52 @@ def upsert_provider(base, realm, token, entry):
 
 
 def _reconcile_mappers(base, realm, token, entry):
-    """Create/update the claim->user-attribute mappers (email, names)."""
+    """Create/update the claim->user mappers (username, email, names)."""
     alias = entry["alias"]
     claim_map = entry.get(
         "mappers", {"email": "email", "givenName": "given_name", "familyName": "family_name"}
     )
-    # (mapper name suffix, target Keycloak user attribute, source claim key)
+    # (mapper name suffix, mapper type, config)
     wanted = [
-        ("email", "email", claim_map.get("email", "email")),
-        ("firstName", "firstName", claim_map.get("givenName", "given_name")),
-        ("lastName", "lastName", claim_map.get("familyName", "family_name")),
+        # Brokered users are created by Keycloak itself, not by our admin-API
+        # provisioning, so the username must be imported from the IdP — without
+        # it the realm's required-profile check sends every first broker login
+        # into VERIFY_PROFILE ("Update Account Information"). IMPORT sets it
+        # once and never overwrites: the username doubles as the Forgejo
+        # account name and must not drift.
+        ("username", "oidc-username-idp-mapper", {
+            "syncMode": "IMPORT",
+            "template": "${CLAIM.%s}" % claim_map.get("username", "preferred_username"),
+            "target": "LOCAL",
+        }),
+        ("email", "oidc-user-attribute-idp-mapper", {
+            "syncMode": "INHERIT",
+            "claim": claim_map.get("email", "email"),
+            "user.attribute": "email",
+        }),
+        ("firstName", "oidc-user-attribute-idp-mapper", {
+            "syncMode": "INHERIT",
+            "claim": claim_map.get("givenName", "given_name"),
+            "user.attribute": "firstName",
+        }),
+        ("lastName", "oidc-user-attribute-idp-mapper", {
+            "syncMode": "INHERIT",
+            "claim": claim_map.get("familyName", "family_name"),
+            "user.attribute": "lastName",
+        }),
     ]
 
     mappers_url = f"{base}/admin/realms/{realm}/identity-provider/instances/{alias}/mappers"
     status, existing = _request("GET", mappers_url, token=token)
     by_name = {m["name"]: m for m in existing} if (status == 200 and isinstance(existing, list)) else {}
 
-    for suffix, user_attr, claim in wanted:
+    for suffix, mapper_type, config in wanted:
         name = f"{alias}-{suffix}"
         representation = {
             "name": name,
             "identityProviderAlias": alias,
-            "identityProviderMapper": "oidc-user-attribute-idp-mapper",
-            "config": {
-                "syncMode": "INHERIT",
-                "claim": claim,
-                "user.attribute": user_attr,
-            },
+            "identityProviderMapper": mapper_type,
+            "config": config,
         }
         if name in by_name:
             mid = by_name[name]["id"]
@@ -217,6 +237,26 @@ def _reconcile_mappers(base, realm, token, entry):
             st, body = _request("POST", mappers_url, token=token, json_body=representation)
             if st not in (200, 201):
                 raise RuntimeError(f"create mapper '{name}' failed: {st} {body}")
+
+
+def ensure_realm_settings(base, realm, token):
+    """Reconcile realm settings that --import-realm cannot fix on existing
+    deployments (the realm JSON is only imported into a fresh Keycloak DB).
+
+    Usernames are generated Forgejo-safe handles and must not drift (Forgejo
+    maps accounts by preferred_username), so username editing is disabled.
+    """
+    url = f"{base}/admin/realms/{realm}"
+    status, body = _request("GET", url, token=token)
+    if status != 200 or not isinstance(body, dict):
+        raise RuntimeError(f"reading realm '{realm}' failed: {status}")
+    if body.get("editUsernameAllowed") is False:
+        return
+    body["editUsernameAllowed"] = False
+    st, resp = _request("PUT", url, token=token, json_body=body)
+    if st not in (200, 204):
+        raise RuntimeError(f"updating realm '{realm}' failed: {st} {resp}")
+    _log(f"realm '{realm}': disabled username editing")
 
 
 def main():
@@ -232,25 +272,32 @@ def main():
 
     path = Path(providers_file)
     if not path.exists():
-        _log(f"no providers file at {providers_file} — nothing to configure")
-        return
-    try:
-        providers = json.loads(path.read_text())
-    except ValueError as e:
-        raise SystemExit(f"{providers_file} is not valid JSON: {e}")
-    if not isinstance(providers, list):
-        raise SystemExit(f"{providers_file} must be a JSON array of providers")
+        _log(f"no providers file at {providers_file}")
+        providers = []
+    else:
+        try:
+            providers = json.loads(path.read_text())
+        except ValueError as e:
+            raise SystemExit(f"{providers_file} is not valid JSON: {e}")
+        if not isinstance(providers, list):
+            raise SystemExit(f"{providers_file} must be a JSON array of providers")
 
     active = [p for p in providers if p.get("enabled", True)]
-    if not active:
-        _log("providers file has no enabled providers — nothing to configure")
-        return
 
     if not admin or not admin_pass:
-        raise SystemExit("KEYCLOAK_ADMIN / KEYCLOAK_ADMIN_PASSWORD must be set")
+        if active:
+            raise SystemExit("KEYCLOAK_ADMIN / KEYCLOAK_ADMIN_PASSWORD must be set")
+        _log("no admin credentials — skipping realm settings reconcile")
+        return
+
+    token = get_admin_token(base, admin, admin_pass)
+    ensure_realm_settings(base, realm, token)
+
+    if not active:
+        _log("no enabled providers — nothing else to configure")
+        return
 
     _log(f"configuring {len(active)} identity provider(s) on realm '{realm}' at {base}")
-    token = get_admin_token(base, admin, admin_pass)
 
     failures = []
     for entry in active:

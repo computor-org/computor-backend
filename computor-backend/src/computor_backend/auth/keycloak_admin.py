@@ -177,8 +177,8 @@ class KeycloakAdminClient:
         """Check if a user exists in Keycloak (by email)."""
         return await self._get_user_id_by_email(email) is not None
 
-    async def get_username(self, user_id: str) -> Optional[str]:
-        """Return the current Keycloak username for a user id (authoritative live read)."""
+    async def get_user(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Return the full Keycloak user representation, or None if absent."""
         token = await self._get_admin_token()
         user_url = f"{self.server_url}/admin/realms/{self.realm}/users/{user_id}"
 
@@ -190,7 +190,12 @@ class KeycloakAdminClient:
                 return None
             if response.status_code != 200:
                 response.raise_for_status()
-            return response.json().get("username")
+            return response.json()
+
+    async def get_username(self, user_id: str) -> Optional[str]:
+        """Return the current Keycloak username for a user id (authoritative live read)."""
+        user = await self.get_user(user_id)
+        return user.get("username") if user else None
 
     async def generate_unique_username(
         self,
