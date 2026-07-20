@@ -265,7 +265,9 @@ class ApiTokenRepository(BaseRepository[ApiToken]):
         Returns:
             Revoked token or None if not found
         """
-        token = self.get_by_id_optional(token_id)
+        # Session-attached fetch, NOT get_by_id_optional: a cache hit there
+        # returns a detached instance whose mutation would never be flushed.
+        token = self._get_attached(token_id)
         if not token:
             return None
 
@@ -277,7 +279,11 @@ class ApiTokenRepository(BaseRepository[ApiToken]):
         if revoked_by:
             token.updated_by = revoked_by
 
-        self.db.commit()
+        try:
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
         self.db.refresh(token)
 
         # Invalidate caches
@@ -286,6 +292,61 @@ class ApiTokenRepository(BaseRepository[ApiToken]):
             self.cache.invalidate_tags(*tags)
 
         return token
+
+    def unrevoke(
+        self,
+        token_id: str,
+        unrevoked_by: Optional[str] = None
+    ) -> Optional[ApiToken]:
+        """
+        Restore a revoked token (compensation for a failed rotation).
+
+        Used to roll back a just-revoked workspace token when the provisioning
+        that was meant to replace it failed: the old token's plaintext is still
+        deployed inside the running workspace, so clearing ``revoked_at`` makes
+        that deployment functional again.
+
+        Note: with the partial unique index on active workspace token names,
+        this raises if another token with the same name is currently active —
+        callers must revoke the replacement first.
+
+        Args:
+            token_id: Token ID to restore
+            unrevoked_by: User ID who restored the token
+
+        Returns:
+            Restored token or None if not found
+        """
+        token = self._get_attached(token_id)
+        if not token:
+            return None
+
+        if token.revoked_at is None:
+            return token  # Already active
+
+        token.revoked_at = None
+        token.revocation_reason = None
+        if unrevoked_by:
+            token.updated_by = unrevoked_by
+
+        try:
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+        self.db.refresh(token)
+
+        if self._use_cache():
+            tags = self.get_entity_tags(token)
+            self.cache.invalidate_tags(*tags)
+
+        return token
+
+    def _get_attached(self, token_id: str) -> Optional[ApiToken]:
+        """Fetch a token as a session-attached row, bypassing the cache."""
+        return self.db.query(ApiToken).filter(
+            ApiToken.id == token_id
+        ).first()
 
     def revoke_all_by_name(
         self,
