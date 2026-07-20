@@ -157,6 +157,26 @@ async def invalidate_token_cache(token_hash_hex: str) -> None:
         logger.warning(f"Failed to invalidate API token cache: {e}")
 
 
+def invalidate_token_cache_sync(token_hash_hex: str) -> None:
+    """
+    Synchronous variant of invalidate_token_cache() for sync call sites.
+
+    Uses the sync Redis client, so it works both from threadpool contexts and
+    from sync code running inside an async endpoint (where the async helper
+    cannot be awaited). Best-effort: failures are logged, never raised — a
+    missed delete only extends the revocation window by the cache TTL.
+    """
+    from computor_backend.redis_cache import get_sync_redis_client
+
+    cache_key = f"api_token:auth:{token_hash_hex}"
+
+    try:
+        get_sync_redis_client().delete(cache_key)
+        logger.info(f"Invalidated API token cache: {token_hash_hex[:16]}...")
+    except Exception as e:
+        logger.warning(f"Failed to invalidate API token cache: {e}")
+
+
 async def invalidate_user_token_caches(user_id: str) -> None:
     """
     Invalidate all cached tokens for a user.

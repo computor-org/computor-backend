@@ -422,20 +422,9 @@ def revoke_api_token(
 
 def _invalidate_token_cache_sync(token_hash: bytes) -> None:
     """Helper to invalidate token cache from sync context."""
-    import asyncio
-    try:
-        from computor_backend.permissions.api_token_cache import invalidate_token_cache
-        token_hash_hex = token_hash.hex()
+    from computor_backend.permissions.api_token_cache import invalidate_token_cache_sync
 
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        loop.run_until_complete(invalidate_token_cache(token_hash_hex))
-    except Exception as e:
-        logger.warning(f"Failed to invalidate token cache: {e}")
+    invalidate_token_cache_sync(token_hash.hex())
 
 
 def create_api_token_admin(
