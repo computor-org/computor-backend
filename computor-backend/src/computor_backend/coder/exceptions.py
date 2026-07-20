@@ -123,7 +123,7 @@ class CoderTimeoutError(CoderError):
 
 
 class CoderWorkspaceActionError(CoderError):
-    """Raised when a workspace action (start/stop/delete) fails."""
+    """Raised when a workspace action (start/stop/delete/token update) fails."""
 
     def __init__(self, action: str, workspace: str, reason: Optional[str] = None, **kwargs):
         message = f"Failed to {action} workspace '{workspace}'"

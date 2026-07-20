@@ -19,6 +19,7 @@ from .exceptions import (
     CoderTimeoutError,
     CoderUserExistsError,
     CoderUserNotFoundError,
+    CoderWorkspaceActionError,
     CoderWorkspaceExistsError,
     CoderWorkspaceNotFoundError,
 )
@@ -1161,7 +1162,13 @@ class CoderClient:
 
         workspace = resp.json()
         latest_build = workspace.get("latest_build") or {}
-        template_version_id = latest_build["template_version_id"]
+        template_version_id = latest_build.get("template_version_id")
+        if not template_version_id:
+            logger.error(
+                f"Workspace {workspace_id}: latest build has no "
+                f"template_version_id; cannot update token"
+            )
+            return False
 
         # Create a new build with the updated token parameter. home_mode is
         # immutable per workspace; re-send its current value so the rebuild
@@ -1373,10 +1380,19 @@ class CoderClient:
                 )
             if computor_auth_token:
                 logger.info(f"Workspace exists, updating with new token (prefix: {computor_auth_token[:15]}...)")
-                await self._update_workspace_token(
+                updated = await self._update_workspace_token(
                     workspace.id,
                     computor_auth_token,
                 )
+                if not updated:
+                    # The old token was already rotated out — a workspace left
+                    # on it cannot authenticate. Fail the provision so callers
+                    # can roll the rotation back instead of reporting success.
+                    raise CoderWorkspaceActionError(
+                        "update the auth token of",
+                        workspace_name,
+                        reason="token-update build could not be started",
+                    )
         except CoderWorkspaceNotFoundError:
             # Create workspace. home_mode only applies at creation — for an
             # existing workspace it is immutable and the token-update rebuild
