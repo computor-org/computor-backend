@@ -30,6 +30,7 @@ from computor_backend.coder.service import (
     get_user_email,
     get_user_fullname,
     mint_workspace_token,
+    rollback_workspace_token_rotation,
 )
 from computor_backend.exceptions import (
     BadRequestException,
@@ -518,20 +519,34 @@ async def provision_student_workspaces(
                 await enforce_template_quota(
                     db, client, template, exclude_workspace_id=exclude_id
                 )
-            token = mint_workspace_token(
+            mint_result = mint_workspace_token(
                 db, cache, str(member.user_id), str(permissions.user_id),
                 workspace_name=workspace_name,
                 ttl_days=coder_settings.workspace_token_ttl_days,
             )
-            result = await client.provision_workspace(
-                user_email=email,
-                username=str(member.user_id),
-                full_name=get_user_fullname(user),
-                template=template,
-                workspace_name=workspace_name,
-                computor_auth_token=token,
-                home_mode=data.home_mode,
-            )
+            if mint_result is None:
+                # A tokenless workspace cannot authenticate its extension —
+                # record the failure instead of provisioning a broken one.
+                outcome.error = "Failed to mint workspace auth token"
+                outcomes.append(outcome)
+                continue
+            try:
+                result = await client.provision_workspace(
+                    user_email=email,
+                    username=str(member.user_id),
+                    full_name=get_user_fullname(user),
+                    template=template,
+                    workspace_name=workspace_name,
+                    computor_auth_token=mint_result.token,
+                    home_mode=data.home_mode,
+                )
+            except Exception:
+                # The workspace never received the new token — undo the
+                # rotation so it keeps its still-deployed old token.
+                rollback_workspace_token_rotation(
+                    db, cache, mint_result, revoked_by=str(permissions.user_id)
+                )
+                raise
             outcome.workspace_name = result.workspace.name if result.workspace else workspace_name
             outcome.success = True
         except ComputorException as e:

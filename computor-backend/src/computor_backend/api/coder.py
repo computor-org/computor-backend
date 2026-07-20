@@ -22,6 +22,7 @@ from computor_backend.coder.exceptions import (
     CoderDisabledError,
     CoderNotFoundError,
     CoderTemplateNotFoundError,
+    CoderWorkspaceActionError,
 )
 from computor_backend.coder.naming import derive_workspace_name, sanitize_workspace_name
 from computor_backend.exceptions import (
@@ -70,6 +71,7 @@ from computor_backend.coder.service import (
     get_user_email,
     get_user_fullname,
     mint_workspace_token,
+    rollback_workspace_token_rotation,
 )
 from computor_backend.business_logic.course_workspaces import (
     enforce_template_quota as _enforce_template_quota,
@@ -149,6 +151,9 @@ def _handle_coder_error(e: Exception) -> ComputorException:
     if isinstance(e, CoderConflictError):
         # e.g. workspace name already taken by a different template
         return ConflictException(detail=e.detail or str(e))
+    if isinstance(e, CoderWorkspaceActionError):
+        # e.g. the token-update build could not be started
+        return InternalServerException(detail=str(e))
     if isinstance(e, CoderAPIError):
         # CoderAPIError carries its own status_code; surface 4xx as bad request,
         # 5xx as internal — handlers will pick the right log severity.
@@ -410,25 +415,36 @@ async def provision_workspace(
 
         # Mint workspace token (bounded lifetime; rotated on each provision of
         # this workspace — tokens of the user's other workspaces stay valid)
-        workspace_token = mint_workspace_token(
+        mint_result = mint_workspace_token(
             db, cache, str(target_user.id), str(permissions.user_id),
             workspace_name=workspace_name,
             ttl_days=settings.workspace_token_ttl_days,
         )
-        if workspace_token:
-            logger.info(f"Token minted (prefix: {workspace_token[:15]}..., length: {len(workspace_token)})")
-        else:
-            logger.error("Token minting returned None!")
+        if mint_result is None:
+            # Without a token the workspace's extension can never authenticate
+            # — a tokenless provision is a broken workspace, not a degraded one.
+            raise ServiceUnavailableException(
+                detail="Failed to mint workspace auth token; workspace not provisioned.",
+            )
+        logger.info(f"Token minted (prefix: {mint_result.token[:15]}..., length: {len(mint_result.token)})")
 
-        result = await client.provision_workspace(
-            user_email=get_user_email(target_user),
-            username=str(target_user.id),
-            full_name=get_user_fullname(target_user),
-            template=template,
-            workspace_name=workspace_name,
-            computor_auth_token=workspace_token,
-            home_mode=request.home_mode,
-        )
+        try:
+            result = await client.provision_workspace(
+                user_email=get_user_email(target_user),
+                username=str(target_user.id),
+                full_name=get_user_fullname(target_user),
+                template=template,
+                workspace_name=workspace_name,
+                computor_auth_token=mint_result.token,
+                home_mode=request.home_mode,
+            )
+        except Exception:
+            # The workspace never received the new token — undo the rotation so
+            # a running workspace keeps its still-deployed old token.
+            rollback_workspace_token_rotation(
+                db, cache, mint_result, revoked_by=str(permissions.user_id)
+            )
+            raise
         return result
     except ComputorException:
         # Typed exceptions (ServiceUnavailableException, NotFoundException, …) already

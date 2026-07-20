@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 import computor_backend.business_logic.course_workspaces as cw
+from computor_backend.coder.service import MintResult
 from computor_backend.api.coder import (
     _check_workspace_access_or_course_member,
     list_templates,
@@ -519,7 +520,12 @@ async def test_bulk_provision_continues_past_failures_and_derives_name(monkeypat
     db = _bulk_db(member_first=member)
     monkeypatch.setattr(cw, "get_user_email", lambda u: "s@example.org")
     monkeypatch.setattr(cw, "get_user_fullname", lambda u: "Student One")
-    monkeypatch.setattr(cw, "mint_workspace_token", lambda *a, **k: "tok")
+    monkeypatch.setattr(
+        cw, "mint_workspace_token",
+        lambda *a, **k: MintResult(token="tok", new_token_id="nt1", superseded_ids=[]),
+    )
+    rollback = MagicMock()
+    monkeypatch.setattr(cw, "rollback_workspace_token_rotation", rollback)
 
     client = MagicMock()
     provision_result = MagicMock()
@@ -541,6 +547,9 @@ async def test_bulk_provision_continues_past_failures_and_derives_name(monkeypat
     assert result.failed == 1 and result.succeeded == 1
     assert result.outcomes[0].error == "boom"
     assert result.outcomes[1].workspace_name == "vscode-exam1"
+    # The failed member's token rotation is rolled back (their workspace never
+    # received the new token); the succeeded member's is kept.
+    assert rollback.call_count == 1
     # Label is sanitized into the derived name; scratch home is passed through.
     _, call_kwargs = client.provision_workspace.call_args
     assert call_kwargs["workspace_name"] == "vscode-exam1"
