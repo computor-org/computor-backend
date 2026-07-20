@@ -13,7 +13,8 @@
     "mappers": {
       "email": "email",
       "givenName": "given_name",
-      "familyName": "family_name"
+      "familyName": "family_name",
+      "username": "preferred_username"
     }
   }
 ]

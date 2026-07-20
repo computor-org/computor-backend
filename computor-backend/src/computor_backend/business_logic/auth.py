@@ -771,8 +771,11 @@ async def provision_keycloak_login(
             kc_user_id = await kc.create_user(KeycloakUser(
                 username=handle,
                 email=email,
-                firstName=given_name or "",
-                lastName=family_name or "",
+                # Keycloak's default user profile requires non-empty first/last
+                # name — a blank value forces VERIFY_PROFILE ("Update Account
+                # Information") on the user's first login.
+                firstName=given_name or email.split("@")[0],
+                lastName=family_name or "User",
                 enabled=True,
                 emailVerified=True,
                 credentials=[{"type": "password", "value": password, "temporary": False}],
@@ -799,12 +802,24 @@ async def ensure_keycloak_admin(email: str, password: str) -> None:
     if existing_id:
         kc_user_id = existing_id
         logger.info("Keycloak admin %s already exists — leaving password unchanged.", email)
-        await kc.update_user(kc_user_id, {"requiredActions": [], "emailVerified": True})
+        # Keycloak's default user profile requires first/last name; an account
+        # missing them is pushed into VERIFY_PROFILE ("Update Account
+        # Information") at login — clearing requiredActions cannot suppress
+        # that, so backfill blank names (never clobber ones set by a human).
+        existing = await kc.get_user(kc_user_id) or {}
+        updates: Dict[str, Any] = {"requiredActions": [], "emailVerified": True}
+        if not existing.get("firstName"):
+            updates["firstName"] = "System"
+        if not existing.get("lastName"):
+            updates["lastName"] = "Administrator"
+        await kc.update_user(kc_user_id, updates)
     else:
         handle = await kc.generate_unique_username(None, None, email)
         kc_user_id = await kc.create_user(KeycloakUser(
             username=handle,
             email=email,
+            firstName="System",
+            lastName="Administrator",
             enabled=True,
             emailVerified=True,
             credentials=[{"type": "password", "value": password, "temporary": False}],
