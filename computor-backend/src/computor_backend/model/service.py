@@ -194,6 +194,16 @@ class ApiToken(UUIDPkMixin, AuditMixin, Base):
         Index('idx_api_token_user_active', 'user_id', postgresql_where=text("revoked_at IS NULL")),
         Index('idx_api_token_prefix', 'token_prefix'),
         Index('idx_api_token_hash_active', 'token_hash', postgresql_where=text("revoked_at IS NULL")),
+        # Workspace auto-login tokens are per-workspace singletons: at most one
+        # active token per (user, name). Scoped to workspace tokens only —
+        # user-created tokens may legitimately share a name.
+        Index(
+            'uq_api_token_active_workspace_name', 'user_id', 'name',
+            unique=True,
+            postgresql_where=text(
+                "revoked_at IS NULL AND name LIKE 'workspace-auto-login%'"
+            ),
+        ),
     )
 
     # Primary key and versioning
