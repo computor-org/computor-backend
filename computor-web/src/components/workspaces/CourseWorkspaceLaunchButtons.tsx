@@ -35,6 +35,7 @@ export default function CourseWorkspaceLaunchButtons({
   courseId,
   compact = false,
   className,
+  title,
 }: {
   courseId: string;
   compact?: boolean;
@@ -42,6 +43,10 @@ export default function CourseWorkspaceLaunchButtons({
       component itself renders, so callers don't get stray margins when it
       self-hides. */
   className?: string;
+  /** Section heading rendered inside the root (non-compact only) — lives here
+      rather than in the caller so it disappears with the component when the
+      course has no templates, instead of leaving an empty titled card. */
+  title?: string;
 }) {
   const router = useRouter();
   const notify = useNotify();
@@ -133,6 +138,7 @@ export default function CourseWorkspaceLaunchButtons({
 
   return (
     <div className={`space-y-4 ${className ?? ''}`}>
+      {title && <h2 className="text-lg font-semibold text-gray-900">{title}</h2>}
       <div className="flex flex-wrap gap-3">
         {templates.map((t) => (
           <button

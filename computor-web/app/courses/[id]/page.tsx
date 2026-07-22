@@ -182,13 +182,15 @@ export default function CoursePage() {
         </div>
 
         {/* Workspaces — launch buttons for the course's allowed templates.
-            The component hides itself when the course offers none; the role
-            gate only avoids a guaranteed-403 fetch for non-members. */}
+            The component hides itself (card and heading included) when the
+            course offers none; the role gate only avoids a guaranteed-403
+            fetch for non-members. */}
         {(isAdmin || courseRole(courseId) != null) && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Workspaces</h2>
-            <CourseWorkspaceLaunchButtons courseId={courseId} />
-          </div>
+          <CourseWorkspaceLaunchButtons
+            courseId={courseId}
+            title="Workspaces"
+            className="bg-white rounded-lg border border-gray-200 p-6"
+          />
         )}
 
         {/* Git — the caller's own repository (+ ensure access) when the course
