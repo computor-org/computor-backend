@@ -13,6 +13,7 @@ services:
   # dev mounts the socket directly; prod proxies it via tecnativa/docker-socket-proxy.
   traefik:
     image: traefik:v3.6.6
+    restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
     logging:
@@ -32,6 +33,7 @@ services:
   # PostgreSQL with multiple databases support
   postgres:
     image: postgres:16
+    restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
     logging:
