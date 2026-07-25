@@ -224,7 +224,7 @@ export default function RolesPage() {
 
         {/* Left panel — role list */}
         <div className="w-72 shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col">
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto scroll-slim">
             {rolesLoading ? (
               <div className="p-4 text-sm text-gray-400">Loading…</div>
             ) : rolesError ? (
@@ -256,7 +256,7 @@ export default function RolesPage() {
         </div>
 
         {/* Right panel — role detail */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto scroll-slim">
           {!selectedRoleId ? (
             <div className="flex items-center justify-center h-full text-gray-400 text-sm">
               Select a role to view its claims and members

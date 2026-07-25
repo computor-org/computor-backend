@@ -104,7 +104,12 @@ export default function TopBar() {
   };
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-40 print:hidden">
+    // No `sticky` — the header is a flex sibling of the scroll container, not
+    // inside it, so it never scrolled in the first place and had nothing to
+    // stick to. `z-40` stays: it applies to a flex item even when statically
+    // positioned, and the profile dropdown below relies on it to paint over the
+    // sticky <thead> in list tables.
+    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-40 print:hidden">
       {/* Logo / Title */}
       <Link href="/dashboard" className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer">
         <Image src="/computor_logo.png" alt="Computor" width={32} height={32} className="h-8 w-8" />

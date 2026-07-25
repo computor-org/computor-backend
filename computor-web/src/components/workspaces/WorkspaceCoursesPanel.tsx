@@ -28,7 +28,7 @@ export default function WorkspaceCoursesPanel() {
       {loading ? (
         <ListLoading>Loading courses…</ListLoading>
       ) : (
-        <ScrollPanel className="h-[36rem] min-h-[36rem] max-h-[36rem]">
+        <ScrollPanel>
           <Table>
             <Thead>
               <tr>

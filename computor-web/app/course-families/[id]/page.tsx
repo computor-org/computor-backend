@@ -41,7 +41,7 @@ export default function CourseFamilyDetailPage() {
 
   return (
     <AuthenticatedLayout>
-      <ListPageLayout>
+      <ListPageLayout width="narrow">
         <PageHeader
           breadcrumbs={[{ label: 'Course Families', href: '/course-families' }, { label: family?.title || family?.path || 'Course Family' }]}
           title={family?.title || family?.path || 'Course Family'}

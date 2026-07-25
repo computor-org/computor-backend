@@ -154,92 +154,86 @@ export default function Sidebar() {
     );
 
     return (
-      <aside
-        className={`${
-          collapsed ? 'w-16' : 'w-64'
-        } bg-white border-r border-gray-200 transition-all duration-300 flex flex-col print:hidden`}
-      >
-        {/* Header */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200">
-          {!collapsed && (
-            <Link href="/dashboard" className="flex-1 min-w-0 hover:bg-gray-50 rounded px-2 py-1 -mx-2 -my-1 transition-colors cursor-pointer">
-              <p className="text-sm font-semibold text-gray-900 truncate">
-                {user?.givenName} {user?.familyName}
-              </p>
-            </Link>
-          )}
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            <svg
-              className={`h-5 w-5 text-gray-600 transition-transform ${collapsed ? 'rotate-180' : ''}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-        </div>
+      <SidebarShell collapsed={collapsed} setCollapsed={setCollapsed} user={user}>
+        {/* Back to Courses Link */}
+        <Link
+          href="/courses"
+          className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors mb-4"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          {!collapsed && <span className="text-sm">Back to Courses</span>}
+        </Link>
 
-        {/* Navigation - View-based */}
-        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-          {/* Back to Courses Link */}
-          <Link
-            href="/courses"
-            className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors mb-4"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            {!collapsed && <span className="text-sm">Back to Courses</span>}
-          </Link>
+        {/* Course overview (this course's landing page) — always reachable,
+            even after switching into a role view. Active only on the exact
+            path so it doesn't stay highlighted inside the role sub-routes. */}
+        <Link
+          href={`/courses/${currentCourseId}`}
+          className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors mb-1 ${
+            pathname === `/courses/${currentCourseId}`
+              ? 'bg-blue-50 text-blue-600'
+              : 'text-gray-700 hover:bg-gray-100'
+          }`}
+          title={collapsed ? 'Overview' : undefined}
+        >
+          <span className={pathname === `/courses/${currentCourseId}` ? 'text-blue-600' : 'text-gray-500'}>
+            {icons.overview}
+          </span>
+          {!collapsed && <span className="text-sm font-medium">Overview</span>}
+        </Link>
 
-          {/* Course overview (this course's landing page) — always reachable,
-              even after switching into a role view. Active only on the exact
-              path so it doesn't stay highlighted inside the role sub-routes. */}
-          <Link
-            href={`/courses/${currentCourseId}`}
-            className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors mb-1 ${
-              pathname === `/courses/${currentCourseId}`
-                ? 'bg-blue-50 text-blue-600'
-                : 'text-gray-700 hover:bg-gray-100'
-            }`}
-            title={collapsed ? 'Overview' : undefined}
-          >
-            <span className={pathname === `/courses/${currentCourseId}` ? 'text-blue-600' : 'text-gray-500'}>
-              {icons.overview}
-            </span>
-            {!collapsed && <span className="text-sm font-medium">Overview</span>}
-          </Link>
-
-          {renderNavItems(availableViews)}
-        </nav>
-
-        {/* Footer - Logo & Version */}
-        <div className="p-4 border-t border-gray-200">
-          {!collapsed ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-center space-x-2">
-                <Image src="/computor_logo.png" alt="Computor" width={24} height={24} className="h-6 w-6" />
-                <span className="text-sm font-semibold text-gray-700">Computor</span>
-              </div>
-              <p className="text-xs text-gray-500 text-center" title="Running version (git commit)">{APP_VERSION}</p>
-            </div>
-          ) : (
-            <div className="flex justify-center">
-              <Image src="/computor_logo.png" alt="Computor" width={32} height={32} className="h-8 w-8" />
-            </div>
-          )}
-        </div>
-      </aside>
+        {renderNavItems(availableViews)}
+      </SidebarShell>
     );
   }
 
   // Default navigation
+  return (
+    <SidebarShell collapsed={collapsed} setCollapsed={setCollapsed} user={user}>
+      {renderNavItems(coursesNavigation)}
+      {(showManagement || isExampleManager) &&
+        renderNavItems(
+          isAdmin || isOrganizationManager
+            ? managementNavigation
+            : managementNavigation.map((n) => ({
+                ...n,
+                subItems: n.subItems?.filter((s) => {
+                  // Git Servers is admin / org-manager only.
+                  if (s.id === 'mgmt-gitservers') return false;
+                  // A user who reaches this section only via _example_manager
+                  // (no org/family/lecturer access) sees just the example links.
+                  if (!showManagement) return s.id === 'mgmt-examples' || s.id === 'mgmt-example-repos';
+                  return true;
+                }),
+              })),
+        )}
+      {isUserManager && renderNavItems(userMgmtNavigation)}
+      {isWorkspaceUser && renderNavItems(getWorkspacesNavigation(isWorkspaceMaintainer))}
+      {isAdmin && renderNavItems(adminNavigation)}
+    </SidebarShell>
+  );
+}
+
+/**
+ * The sidebar's fixed chrome — collapse header, scrolling nav, logo footer.
+ *
+ * Both navigation modes (course context and the default app nav) render the
+ * exact same frame and differ only in what goes inside <nav>, so the frame
+ * lives here once and each mode passes its items as children.
+ */
+function SidebarShell({
+  collapsed,
+  setCollapsed,
+  user,
+  children,
+}: {
+  collapsed: boolean;
+  setCollapsed: (collapsed: boolean) => void;
+  user: { givenName?: string; familyName?: string } | null | undefined;
+  children: React.ReactNode;
+}) {
   return (
     <aside
       className={`${
@@ -272,29 +266,7 @@ export default function Sidebar() {
         </button>
       </div>
 
-      {/* Navigation - Main Items */}
-      <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-        {renderNavItems(coursesNavigation)}
-        {(showManagement || isExampleManager) &&
-          renderNavItems(
-            isAdmin || isOrganizationManager
-              ? managementNavigation
-              : managementNavigation.map((n) => ({
-                  ...n,
-                  subItems: n.subItems?.filter((s) => {
-                    // Git Servers is admin / org-manager only.
-                    if (s.id === 'mgmt-gitservers') return false;
-                    // A user who reaches this section only via _example_manager
-                    // (no org/family/lecturer access) sees just the example links.
-                    if (!showManagement) return s.id === 'mgmt-examples' || s.id === 'mgmt-example-repos';
-                    return true;
-                  }),
-                })),
-          )}
-        {isUserManager && renderNavItems(userMgmtNavigation)}
-        {isWorkspaceUser && renderNavItems(getWorkspacesNavigation(isWorkspaceMaintainer))}
-        {isAdmin && renderNavItems(adminNavigation)}
-      </nav>
+      <nav className="flex-1 p-2 space-y-1 overflow-y-auto scroll-slim">{children}</nav>
 
       {/* Footer - Logo & Version */}
       <div className="p-4 border-t border-gray-200">

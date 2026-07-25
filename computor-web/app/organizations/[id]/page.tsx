@@ -41,7 +41,7 @@ export default function OrganizationDetailPage() {
 
   return (
     <AuthenticatedLayout>
-      <ListPageLayout>
+      <ListPageLayout width="narrow">
         <PageHeader
           breadcrumbs={[{ label: 'Organizations', href: '/organizations' }, { label: org?.title || org?.path || 'Organization' }]}
           title={org?.title || org?.path || 'Organization'}

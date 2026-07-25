@@ -196,7 +196,7 @@ export default function ConsentPage() {
             )}
           </div>
           {policy ? (
-            <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
+            <div className="max-h-96 overflow-y-auto scroll-slim border border-gray-200 rounded-lg p-4">
               <div className="prose prose-slate max-w-none">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{policy.content}</ReactMarkdown>
               </div>

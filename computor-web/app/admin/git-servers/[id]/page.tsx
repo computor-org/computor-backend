@@ -40,7 +40,7 @@ export default function GitServerDetailPage() {
 
   return (
     <AuthenticatedLayout>
-      <ListPageLayout>
+      <ListPageLayout width="narrow">
         <PageHeader
           breadcrumbs={[{ label: 'Git Servers', href: '/admin/git-servers' }, { label: server?.name || server?.base_url || 'Git Server' }]}
           title={server?.name || server?.base_url || 'Git Server'}

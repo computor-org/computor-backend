@@ -5,6 +5,11 @@
   --background: #ffffff;
   --foreground: #171717;
   color-scheme: light;
+  /* Recolors every native checkbox, radio and range to the brand blue that
+     Button's primary variant uses, while keeping the platform's own focus ring,
+     indeterminate state and keyboard behaviour. Inherited, so it reaches the
+     controls the app renders directly rather than through a component. */
+  accent-color: #2563eb;
 }
 
 @theme inline {
@@ -18,6 +23,136 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/*
+ * Scrollbar styling for the app's internal scroll areas.
+ *
+ * Opt-in (a utility, not a `*` rule) on purpose: nearly every route funnels
+ * through ScrollArea/ScrollPanel in ListPageLayout, so opting in costs the same
+ * single edit — but `::-webkit-scrollbar { width }` set on `*` cannot be undone
+ * per element, which would trap <textarea>, <pre> and third-party scrollers, and
+ * a global `scrollbar-gutter` would leak into #printable-report, which the print
+ * block below does not neutralize.
+ *
+ * The 12px box minus the 2x3px transparent border leaves a 6px visible thumb
+ * sitting 3px clear of the content edge. That inset — not the width — is what
+ * stops the bar from looking welded to the table border next to it.
+ *
+ * `scrollbar-width` is deliberately behind an @supports gate. Chromium honours
+ * the standard property over the ::-webkit-scrollbar rules, so declaring it
+ * unconditionally throws the thumb styling away and leaves the plain native
+ * thin bar (verified by rendering both). Gating on "this engine has no
+ * ::-webkit-scrollbar" hands Chromium/Safari the inset pill and Firefox — where
+ * these two properties are the entire available surface — its thin bar in the
+ * same colour. Do NOT emulate the inset with padding; that shifts the content.
+ */
+@utility scroll-slim {
+  @supports not selector(::-webkit-scrollbar) {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-gray-300) transparent;
+  }
+
+  &::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--color-gray-300);
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+  }
+
+  &:hover::-webkit-scrollbar-thumb {
+    background-color: var(--color-gray-400);
+  }
+
+  &::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+/*
+ * Reserve the scrollbar's width whether or not it is showing, so content does
+ * not jump sideways when a list grows past the fold. Borderless scroll bodies
+ * only: on a bordered panel `stable` also reserves a gutter on the horizontal
+ * axis, which carves a permanent empty strip along the bottom of the card.
+ */
+@utility scroll-gutter {
+  scrollbar-gutter: stable;
+}
+
+/*
+ * Soft edges on a scroll body, so a list that continues past the fold looks cut
+ * off on purpose rather than sliced mid-row.
+ *
+ * Driven by a scroll timeline rather than a scroll listener: no JS, no
+ * rerenders, and it stays correct during momentum scrolling. A sticky
+ * ::before/::after was the alternative and is disqualified here — a pseudo
+ * element inside the scroller becomes a flex/grid item (several ScrollAreas are
+ * `grid grid-cols-*`) and would need a hardcoded background, which differs
+ * between ScrollArea (page gray) and ScrollPanel (white).
+ *
+ * The timeline is inactive when the element cannot scroll, so the custom
+ * properties stay at their 0px initial values and the mask is fully opaque —
+ * i.e. no fade on a short list, none at the top when scrolled to 0, and none at
+ * the bottom once you reach the end, all without a single branch.
+ */
+@property --scroll-fade-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --scroll-fade-bottom {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes scroll-fade-in-top {
+  from {
+    --scroll-fade-top: 0px;
+  }
+  to {
+    --scroll-fade-top: 1.5rem;
+  }
+}
+
+@keyframes scroll-fade-out-bottom {
+  from {
+    --scroll-fade-bottom: 1.5rem;
+  }
+  to {
+    --scroll-fade-bottom: 0px;
+  }
+}
+
+@utility scroll-fade {
+  @supports (animation-timeline: scroll()) {
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 var(--scroll-fade-top),
+      #000 calc(100% - var(--scroll-fade-bottom)),
+      transparent 100%
+    );
+    animation:
+      scroll-fade-in-top linear both,
+      scroll-fade-out-bottom linear both;
+    animation-timeline:
+      scroll(self block),
+      scroll(self block);
+    animation-range:
+      0 1.5rem,
+      calc(100% - 1.5rem) 100%;
+  }
 }
 
 /*
@@ -51,7 +186,17 @@ body {
     width: 100%;
   }
 
-  /* Neutralize the on-screen scroll shells so the whole report prints. */
+  /*
+   * Neutralize the on-screen scroll shells so the whole report prints. The mask
+   * and scroll timeline from `scroll-fade` must go too: with the scroller
+   * unclipped the timeline never advances, which would otherwise leave the
+   * report's top edge permanently faded on paper.
+   */
+  * {
+    mask-image: none !important;
+    animation: none !important;
+  }
+
   #printable-report * {
     overflow: visible !important;
     max-height: none !important;

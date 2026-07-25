@@ -12,6 +12,7 @@ import WorkspaceTable from '@/src/components/workspaces/WorkspaceTable';
 import WorkspaceDetailsModal from '@/src/components/workspaces/WorkspaceDetailsModal';
 import { categorizeStatus } from '@/src/components/workspaces/WorkspaceStatusBadge';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
+import EmptyState from '@/src/components/EmptyState';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Button, { ButtonLink } from '@/src/components/ui/Button';
@@ -107,24 +108,24 @@ export default function WorkspacesPage() {
         {loading ? (
           <ListLoading>Loading workspaces…</ListLoading>
         ) : !error && workspaces.length === 0 ? (
-          <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-            <h3 className="mt-4 text-lg font-medium text-gray-900">No workspaces</h3>
-            {canProvisionWorkspace ? (
-              <>
-                <p className="mt-2 text-sm text-gray-500">Get started by creating your first workspace.</p>
-                <ButtonLink href="/workspaces/create" className="mt-4">
-                  New Workspace
-                </ButtonLink>
-              </>
-            ) : (
-              <p className="mt-2 text-sm text-gray-500">
-                No workspaces have been provisioned for you yet. Please contact your administrator.
-              </p>
-            )}
-          </div>
+          <EmptyState
+            icon={
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            }
+            title="No workspaces"
+            description={
+              canProvisionWorkspace
+                ? 'Get started by creating your first workspace.'
+                : 'No workspaces have been provisioned for you yet. Please contact your administrator.'
+            }
+            action={
+              canProvisionWorkspace ? (
+                <ButtonLink href="/workspaces/create">New Workspace</ButtonLink>
+              ) : undefined
+            }
+          />
         ) : !error ? (
           <ScrollPanel>
             <WorkspaceTable

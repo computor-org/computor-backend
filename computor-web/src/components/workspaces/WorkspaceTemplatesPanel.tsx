@@ -103,7 +103,7 @@ export default function WorkspaceTemplatesPanel() {
       {loading ? (
         <ListLoading>Loading templates…</ListLoading>
       ) : (
-        <ScrollPanel className="h-[36rem] min-h-[36rem] max-h-[36rem]">
+        <ScrollPanel>
           <Table>
             <Thead>
               <tr>

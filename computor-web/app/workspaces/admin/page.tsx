@@ -47,20 +47,27 @@ function WorkspaceAdminContent() {
         onSelect={(id) => router.replace(id === 'users' ? pathname : `${pathname}?tab=${id}`)}
       />
 
+      {/*
+        Single-table panels are flex-column children, like the users panel
+        above: their chrome is `shrink-0` and the table claims the rest of the
+        height. The fleet panel is the exception — it stacks TWO tables, which
+        in a flex column would halve each into a couple of visible rows, so it
+        keeps a scrolling page with its own bounded tables instead.
+      */}
       {tab === 'users' ? (
         <WorkspaceUsersPanel />
       ) : tab === 'fleet' ? (
-        <ScrollArea className="space-y-6 pr-1">
+        <ScrollArea className="space-y-6">
           <WorkspaceFleetPanel />
         </ScrollArea>
       ) : tab === 'templates' ? (
-        <ScrollArea className="space-y-6 pr-1">
+        <div className="flex-1 min-h-0 flex flex-col gap-6">
           <WorkspaceTemplatesPanel />
-        </ScrollArea>
+        </div>
       ) : (
-        <ScrollArea className="space-y-6 pr-1">
+        <div className="flex-1 min-h-0 flex flex-col gap-6">
           <WorkspaceCoursesPanel />
-        </ScrollArea>
+        </div>
       )}
     </ListPageLayout>
   );
