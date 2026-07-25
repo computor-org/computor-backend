@@ -15,7 +15,7 @@ export default function WorkspaceDetailsModal({
   const ws = details.workspace;
   return (
     <Modal title="Workspace Details" onClose={onClose} maxWidth="max-w-lg">
-      <div className="p-6 pt-4 max-h-[80vh] overflow-y-auto">
+      <div className="p-6 pt-4 max-h-[80vh] overflow-y-auto scroll-slim">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <tbody className="divide-y divide-gray-100">

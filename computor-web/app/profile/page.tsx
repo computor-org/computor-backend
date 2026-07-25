@@ -121,7 +121,7 @@ export default function ProfilePage() {
 
   return (
     <AuthenticatedLayout>
-      <ListPageLayout>
+      <ListPageLayout width="narrow">
         <PageHeader
           breadcrumbs={[{ label: 'My Profile' }]}
           title="My Profile"
@@ -146,7 +146,7 @@ export default function ProfilePage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         <ScrollArea>
-          <div className="max-w-3xl space-y-6">
+          <div className="space-y-6">
         {loading ? (
           <div className="text-gray-500">Loading…</div>
         ) : !user ? null : (

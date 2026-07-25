@@ -175,7 +175,7 @@ export default function UserDetailPage() {
 
   return (
     <AuthenticatedLayout>
-      <ListPageLayout>
+      <ListPageLayout width="narrow">
         <PageHeader
           breadcrumbs={[{ label: 'Users', href: '/admin/users' }, { label: user?.email || 'User' }]}
           title={user?.email || 'User'}
@@ -197,7 +197,7 @@ export default function UserDetailPage() {
         {loading ? (
           <ListLoading>Loading…</ListLoading>
         ) : user ? (
-          <ScrollArea className="space-y-6 max-w-3xl">
+          <ScrollArea className="space-y-6">
             <section className="bg-white border border-gray-200 rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <div>
                 <dt className="text-gray-500">Status</dt>

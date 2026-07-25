@@ -1,6 +1,15 @@
 'use client';
 
-import { ReactNode, useEffect, useId, useRef } from 'react';
+import { ReactNode, useEffect, useId, useRef, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
+
+// "Has this hydrated yet?" without a setState-in-effect: the store never
+// changes, so the answer is simply which snapshot React asks for. The server —
+// and the first client render, which must match it — gets false; every render
+// after hydration gets true, at which point `document` exists to portal into.
+const subscribeToNothing = () => () => {};
+const onClient = () => true;
+const onServer = () => false;
 
 /**
  * Accessible modal base: backdrop, dialog semantics, focus trap, Escape.
@@ -9,6 +18,12 @@ import { ReactNode, useEffect, useId, useRef } from 'react';
  * announce it (`role="dialog"`, `aria-modal`, `aria-labelledby`) and Tab
  * cannot escape to the page behind it (WCAG 2.1 SC 2.1.2). Focus returns
  * to the previously focused element on close.
+ *
+ * Rendered into <body> via a portal so `position: fixed` always resolves
+ * against the viewport. Several ancestors would otherwise capture it: any
+ * `transform`, `filter` or — since the scroll-fade utility — `mask-image` on an
+ * enclosing element makes that element the containing block for fixed
+ * descendants, which would trap a dialog opened from inside a scroll area.
  */
 export default function Modal({
   title,
@@ -26,6 +41,7 @@ export default function Modal({
 }) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
+  const mounted = useSyncExternalStore(subscribeToNothing, onClient, onServer);
 
   useEffect(() => {
     const panel = panelRef.current;
@@ -73,9 +89,13 @@ export default function Modal({
       document.removeEventListener('keydown', onKeyDown);
       previouslyFocused?.focus?.();
     };
-  }, [onClose]);
+    // `mounted` gates the portal, so the panel this effect needs only exists
+    // once it flips true.
+  }, [onClose, mounted]);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/50" onClick={onClose} aria-hidden="true" />
       <div
@@ -91,6 +111,7 @@ export default function Modal({
         </h2>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

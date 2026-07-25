@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
+import PageHeader from '@/src/components/PageHeader';
 import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -17,73 +19,76 @@ export default function DashboardPage() {
 
   return (
     <AuthenticatedLayout>
-      <div className="space-y-6">
-        {/* Welcome */}
-        <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Welcome back, {user?.givenName || user?.username}!
-          </h1>
-          <p className="mt-2 text-gray-600">
-            {loading
+      <ListPageLayout>
+        {/* The welcome card used to carry the page title. Using PageHeader
+            instead puts the dashboard on the same header rhythm — breadcrumb,
+            h1, subtitle — as every other page in the app. */}
+        <PageHeader
+          breadcrumbs={[{ label: 'Dashboard' }]}
+          title={`Welcome back, ${user?.givenName || user?.username}!`}
+          subtitle={
+            loading
               ? 'Loading your courses…'
               : courses.length === 0
               ? "You're not enrolled in any courses yet."
-              : `You have ${courses.length} ${courses.length === 1 ? 'course' : 'courses'}.`}
-          </p>
-        </div>
+              : `You have ${courses.length} ${courses.length === 1 ? 'course' : 'courses'}.`
+          }
+        />
 
-        {/* Your Courses */}
-        <div className="bg-white rounded-lg shadow border border-gray-200">
-          <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900">Your Courses</h2>
-            <Link href="/courses" className="text-sm text-blue-600 hover:underline">
-              View all →
-            </Link>
-          </div>
-          <div className="p-6">
-            {loading ? (
-              <div className="space-y-2">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />
-                ))}
-              </div>
-            ) : courses.length === 0 ? (
-              <p className="text-sm text-gray-500">No courses yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {courses.slice(0, 6).map((c) => {
-                  const role = courseRole(c.id);
-                  return (
-                    <div
-                      key={c.id}
-                      className="rounded-lg border border-gray-200 p-3 transition-colors hover:border-blue-400 hover:bg-blue-50"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <Link
-                          href={`/courses/${c.id}`}
-                          className="min-w-0 text-sm font-medium text-gray-900 hover:underline"
-                        >
-                          <span className="block truncate">{c.title || c.path}</span>
-                        </Link>
-                        {role && (
-                          <span className="shrink-0 px-2 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-700">
-                            {role}
-                          </span>
-                        )}
+        <ScrollArea>
+          {/* Your Courses */}
+          <div className="bg-white rounded-lg shadow border border-gray-200">
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">Your Courses</h2>
+              <Link href="/courses" className="text-sm text-blue-600 hover:underline">
+                View all →
+              </Link>
+            </div>
+            <div className="p-6">
+              {loading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />
+                  ))}
+                </div>
+              ) : courses.length === 0 ? (
+                <p className="text-sm text-gray-500">No courses yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {courses.slice(0, 6).map((c) => {
+                    const role = courseRole(c.id);
+                    return (
+                      <div
+                        key={c.id}
+                        className="rounded-lg border border-gray-200 p-3 transition-colors hover:border-blue-400 hover:bg-blue-50"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <Link
+                            href={`/courses/${c.id}`}
+                            className="min-w-0 text-sm font-medium text-gray-900 hover:underline"
+                          >
+                            <span className="block truncate">{c.title || c.path}</span>
+                          </Link>
+                          {role && (
+                            <span className="shrink-0 px-2 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-700">
+                              {role}
+                            </span>
+                          )}
+                        </div>
+                        {c.title && c.path && <p className="text-xs text-gray-500">{c.path}</p>}
+                        {/* Template icon launchers; hides itself when the
+                            course offers no workspaces. Members only — the
+                            fetch would 403 for courses visible without a role. */}
+                        {role && <CourseWorkspaceLaunchButtons courseId={c.id} compact />}
                       </div>
-                      {c.title && c.path && <p className="text-xs text-gray-500">{c.path}</p>}
-                      {/* Template icon launchers; hides itself when the
-                          course offers no workspaces. Members only — the
-                          fetch would 403 for courses visible without a role. */}
-                      {role && <CourseWorkspaceLaunchButtons courseId={c.id} compact />}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </div>
+        </ScrollArea>
+      </ListPageLayout>
     </AuthenticatedLayout>
   );
 }

@@ -73,7 +73,10 @@ export default function FormPanel({
 }) {
   const formId = useId();
   return (
-    <ListPageLayout>
+    // Narrow: the form used to be capped at max-w-2xl on its own, which left
+    // the header's Cancel/Save floating far to its right on a wide monitor.
+    // Capping the whole scaffold instead keeps them over the form.
+    <ListPageLayout width="narrow">
       <PageHeader
         breadcrumbs={breadcrumbs}
         title={title}
@@ -105,7 +108,6 @@ export default function FormPanel({
             e.preventDefault();
             onSubmit();
           }}
-          className="max-w-2xl"
         >
           <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">{children}</div>
         </form>

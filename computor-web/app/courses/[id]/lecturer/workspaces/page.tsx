@@ -150,7 +150,7 @@ function LecturerWorkspacesContent() {
       {loading ? (
         <ListLoading>Loading…</ListLoading>
       ) : (
-        <ScrollArea className="space-y-6 pr-1">
+        <ScrollArea className="space-y-6">
           {!provisionAllowed ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
               Lecturer provisioning is not enabled for this course. A workspace maintainer can
@@ -233,7 +233,7 @@ function LecturerWorkspacesContent() {
                 </div>
               </div>
 
-              <div className="max-h-80 overflow-y-auto rounded-lg border border-gray-200">
+              <div className="max-h-80 overflow-y-auto scroll-slim rounded-lg border border-gray-200">
                 <Table>
                   <Thead>
                     <tr>

@@ -50,7 +50,7 @@ export default function ExampleRepositoryDetailPage() {
 
   return (
     <AuthenticatedLayout>
-      <ListPageLayout>
+      <ListPageLayout width="narrow">
         <PageHeader
           breadcrumbs={[{ label: 'Example Repositories', href: '/example-repositories' }, { label: repo?.name || 'Repository' }]}
           title={repo?.name || 'Repository'}

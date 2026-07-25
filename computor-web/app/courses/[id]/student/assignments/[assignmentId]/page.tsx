@@ -54,7 +54,9 @@ export default function AssignmentDetailPage() {
   if (loading) {
     return (
       <AuthenticatedLayout>
-        <ListLoading />
+        <ListPageLayout>
+          <ListLoading />
+        </ListPageLayout>
       </AuthenticatedLayout>
     );
   }

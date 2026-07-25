@@ -82,7 +82,9 @@ export default function CoursePage() {
   if (loading) {
     return (
       <AuthenticatedLayout>
-        <ListLoading />
+        <ListPageLayout>
+          <ListLoading />
+        </ListPageLayout>
       </AuthenticatedLayout>
     );
   }

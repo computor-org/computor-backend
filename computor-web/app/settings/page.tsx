@@ -155,13 +155,13 @@ export default function SettingsPage() {
 
   return (
     <AuthenticatedLayout>
-      <ListPageLayout>
+      <ListPageLayout width="narrow">
         <PageHeader breadcrumbs={[{ label: 'Settings' }]} title="Settings" subtitle="Manage your account, security, and API access." />
 
         <ErrorBanner>{error}</ErrorBanner>
 
         <ScrollArea>
-          <div className="max-w-3xl space-y-6">
+          <div className="space-y-6">
             {/* Account & Security — only shown when the account console is configured */}
             {accountConsoleUrl && (
               <Section title="Account & Security" description="Password, email, two-factor authentication and active sessions are managed by your login provider.">

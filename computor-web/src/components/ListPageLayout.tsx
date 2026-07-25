@@ -21,30 +21,73 @@ import type { ReactNode } from 'react';
  *     )}
  *     <div className="shrink-0 …">…pager…</div>
  *   </ListPageLayout>
+ *
+ * `width` caps how far the page spreads on a large monitor. Default `wide`
+ * suits tables and card grids, where column density is the point; `narrow`
+ * suits forms, detail pages and anything that is really a column of prose —
+ * without it a 2560px monitor stretches a six-field form across the room. The
+ * cap wraps the header too, so PageHeader's actions stay aligned with the body
+ * beneath them instead of drifting to the far edge.
+ *
+ * Capped but left-aligned, not centred: the shell already anchors everything to
+ * the sidebar, so centring would slide the title sideways each time you moved
+ * between a wide list and its narrow create form.
  */
-export default function ListPageLayout({ children }: { children: ReactNode }) {
-  return <div className="p-6 flex flex-col h-full min-h-0 gap-6">{children}</div>;
+export default function ListPageLayout({
+  width = 'wide',
+  children,
+}: {
+  width?: 'wide' | 'narrow';
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={`p-6 flex flex-col h-full min-h-0 gap-6 w-full ${
+        width === 'narrow' ? 'max-w-4xl' : 'max-w-[110rem]'
+      }`}
+    >
+      {children}
+    </div>
+  );
 }
 
 /**
  * Borderless region that grows to fill the layout and scrolls internally — the
  * body for pages whose content isn't a single table (e.g. a stack of cards).
  * Pass `space-y-*` via className for inter-child spacing.
+ *
+ * `scroll-slim` gives the thumb its inset so it never touches the content, and
+ * `scroll-gutter` reserves its width so the content doesn't shift sideways when
+ * the list crosses the fold. Bordered bodies opt out of the gutter — see
+ * <ScrollPanel>.
  */
 export function ScrollArea({
   className = '',
+  gutter = true,
   children,
 }: {
   className?: string;
+  gutter?: boolean;
   children: ReactNode;
 }) {
-  return <div className={`flex-1 min-h-0 overflow-y-auto ${className}`}>{children}</div>;
+  return (
+    <div
+      className={`flex-1 min-h-0 overflow-y-auto scroll-slim scroll-fade ${gutter ? 'scroll-gutter' : ''} ${className}`}
+    >
+      {children}
+    </div>
+  );
 }
 
 /**
  * Bordered card that grows to fill the layout and scrolls both axes — the body
  * for table pages. Pair it with a `sticky top-0 z-10` <thead> so table headers
  * stay pinned while the body scrolls.
+ *
+ * No scrollbar gutter here: `scrollbar-gutter: stable` reserves space on every
+ * axis whose overflow is `auto`, and this panel is `overflow-x-auto` too, so it
+ * would leave a permanent empty strip along the bottom edge inside the border.
+ * The table's own cell padding already keeps rows off the thumb.
  */
 export function ScrollPanel({
   className = '',
@@ -54,7 +97,10 @@ export function ScrollPanel({
   children: ReactNode;
 }) {
   return (
-    <ScrollArea className={`overflow-x-auto rounded-lg border border-gray-200 bg-white ${className}`}>
+    <ScrollArea
+      className={`overflow-x-auto rounded-lg border border-gray-200 bg-white ${className}`}
+      gutter={false}
+    >
       {children}
     </ScrollArea>
   );
