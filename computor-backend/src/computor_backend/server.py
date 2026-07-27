@@ -373,6 +373,33 @@ origins = [
 #    responses carry CORS headers.
 # 4. Upload size limiter (innermost) - enforces body size limits
 from computor_backend.middleware import UploadSizeLimiterMiddleware, MaintenanceMiddleware, ConsentGateMiddleware
+
+
+@app.middleware("http")
+async def _tag_git_url_audience(request, call_next):
+    """Record whether this request is answered for a Coder workspace.
+
+    Workspaces reach the API through workspace-ingress, which injects
+    X-Computor-Client on that route — and an injected header replaces whatever
+    the client sent, so a workspace cannot suppress it. Git URLs are then
+    rendered with the host that workspace can actually reach instead of the
+    public domain, which it deliberately cannot resolve. Forging the header
+    from outside gains nothing: the internal hostname is unreachable there.
+    """
+    from computor_backend.git_server.config import (
+        WORKSPACE_CLIENT_HEADER,
+        WORKSPACE_CLIENT_VALUE,
+        set_git_audience,
+    )
+
+    set_git_audience(
+        WORKSPACE_CLIENT_VALUE
+        if request.headers.get(WORKSPACE_CLIENT_HEADER, "").lower() == WORKSPACE_CLIENT_VALUE
+        else "public"
+    )
+    return await call_next(request)
+
+
 app.add_middleware(UploadSizeLimiterMiddleware)
 app.add_middleware(ConsentGateMiddleware)
 app.add_middleware(MaintenanceMiddleware)

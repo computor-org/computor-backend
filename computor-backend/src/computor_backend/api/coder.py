@@ -904,12 +904,20 @@ def _build_template_parameters(settings: CoderSettings) -> dict:
     debug_mode = os.environ.get("DEBUG_MODE", "development")
     if debug_mode == "production":
         backend_internal = "http://uvicorn:8000"
-        backend_external = os.environ.get("BACKEND_EXTERNAL_URL", "")
         forward_ports = ""
     else:
         backend_internal = "http://host.docker.internal:8000"
-        backend_external = os.environ.get("BACKEND_EXTERNAL_URL", "http://host.docker.internal:8000")
         forward_ports = os.environ.get("DEV_FORWARD_PORTS", "")
+
+    # What the extension INSIDE a workspace calls. Not the public URL: a
+    # workspace reaches the API through workspace-ingress, which answers to this
+    # name on the workspace networks and forwards to the backend. Same value in
+    # dev and prod — the ingress absorbs the difference (in dev it forwards to
+    # the host, where the backend runs) — and it is plain HTTP on an internal
+    # name, so no certificate has to exist for a workspace to talk to us.
+    backend_external = os.environ.get(
+        "WORKSPACE_BACKEND_URL", "http://computor-api"
+    )
 
     return {
         "templates_dir": settings.templates_dir,

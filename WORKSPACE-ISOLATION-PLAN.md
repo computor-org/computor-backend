@@ -3,7 +3,8 @@
 **Branch:** `feat/workspace-isolation-modes` off `release/2026.10`
 
 > Approved 2026-07-27. Phase order is deliberate: Phase 1 is shippable on its own, Phase 3 is
-> blocked on the prod TLS cert path, and Phase 4 opens with a spike that can change its approach.
+> shippable on its own. Phase 3 was later reworked from a public-domain alias onto internal names
+> (see Design) to remove the production-certificate handling it would otherwise have required.
 
 ---
 
@@ -65,10 +66,17 @@ Both parameters default to `true` ("no course-level restriction") and are `mutab
 `home_mode`. Template values arrive as `--variable` at push time; course values as rich parameters
 per workspace.
 
-**Split-horizon ingress.** A `workspace-ingress` proxy is aliased to `PUBLIC_DOMAIN` on the
-workspace networks and carries an allowlist route table. Public URLs keep working verbatim inside
-workspaces — no backend URL split, no clone-URL rewriting, no extension change, existing clones
-keep working.
+**Internal-name ingress.** A `workspace-ingress` proxy answers to `computor-api` and
+`computor-git` on the workspace networks and carries an allowlist route table. Nothing else the
+platform serves has a name a workspace can resolve.
+
+This replaces an earlier split-horizon design that aliased the proxy as `PUBLIC_DOMAIN` so public
+URLs would keep working verbatim. That needed no code changes, but it moved the workspace's TLS
+handshake onto the proxy instead of nginx — so it required a copy of the production certificate
+inside the container plus a restart hook on every renewal. Permanent operational handwork to avoid
+a one-time code change was the wrong trade. Internal names are plain HTTP, so no certificate has to
+exist anywhere. The cost is that clone URLs are rendered per audience, and clones made before the
+switch keep a remote the workspace can no longer resolve.
 
 **Per-user app secret.** Each *user* (not workspace — `/home/coder` is one shared volume and
 KasmVNC's `~/.kasmpasswd` would collide between two of their running desktops) gets a secret that
@@ -262,10 +270,10 @@ the browser path still opens each of the four templates without a credential pro
 
 ## Risks / open items
 
-1. **Prod TLS cert path** — which host path holds `fullchain.pem`/`privkey.pem` for `PUBLIC_DOMAIN`,
-   and how the proxy reloads on renewal (Traefik's file provider does not reliably reload on
-   content-only changes; likely needs a reload hook). Blocks Phase 3 only.
-2. **code-server cookie injection** — the Phase 4 spike; has a defined fallback.
+1. ~~Prod TLS cert path~~ — resolved by dropping TLS: workspaces use internal names over plain
+   HTTP, so no certificate has to be placed or renewed anywhere.
+2. ~~code-server cookie injection~~ — spike done: code-server compares its session cookie against
+   HASHED_PASSWORD, so the ingress injects the argon2 hash and no login page appears.
 3. **Rollout timing** — template changes need a push + rollout; course changes only affect newly
    provisioned workspaces until a rebuild. Say so in the UI copy.
 4. **`allow_root=false` is a behaviour change** for bash / ubuntu-desktop / vscode / MATLAB at the

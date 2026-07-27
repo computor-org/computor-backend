@@ -1,0 +1,40 @@
+{
+  "realm": "fake-idp",
+  "enabled": true,
+  "displayName": "Fake Institute IdP (LOCAL TEST ONLY)",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "sslRequired": "none",
+  "clients": [
+    {
+      "clientId": "computor-broker",
+      "name": "Computor (broker test client)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "fakeidptestsecret0123456789abcdef",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:8180/auth/realms/computor/broker/fakeidp/endpoint",
+        "http://localhost:8180/realms/computor/broker/fakeidp/endpoint"
+      ],
+      "webOrigins": ["+"]
+    }
+  ],
+  "users": [
+    {
+      "username": "tester",
+      "enabled": true,
+      "email": "tester@example.edu",
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "User",
+      "credentials": [
+        { "type": "password", "value": "test1234", "temporary": false }
+      ]
+    }
+  ]
+}

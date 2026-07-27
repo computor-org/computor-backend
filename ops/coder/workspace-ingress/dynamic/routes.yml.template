@@ -5,51 +5,61 @@
 #
 # This file IS the isolation boundary. Workspaces sit on a network whose only
 # other members are the Coder server and this proxy, and they reach the outside
-# world only through the routes below. Everything the platform serves that is
-# not listed here — the web UI, Keycloak, /docs, MinIO — is unreachable from a
-# workspace, whether or not it has internet.
+# world only through the two names below. Everything else the platform serves —
+# the web UI, Keycloak, /docs, MinIO, the datastores — has no name a workspace
+# can resolve and no route a workspace can take.
+#
+# The names are deliberately NOT the real service names. This container also
+# sits on computor-network, so aliasing it as `uvicorn` or `computor-forgejo`
+# would let its own upstream lookups resolve back to itself.
 #
 # The workspace routes themselves are NOT here: they come from the Docker
 # provider, which reads the labels the workspace containers already carry
-# (ForwardAuth + stripprefix), filtered to `computor.ingress=workspace`.
+# (ForwardAuth, credential injection, stripprefix), filtered to
+# `computor.ingress=workspace`.
 
 http:
   routers:
-    # The Computor API. Same path the public URL uses, so a workspace resolving
-    # PUBLIC_DOMAIN to this proxy reaches the backend with its URLs unchanged.
+    # The Computor API, as http://computor-api/ inside a workspace. Plain HTTP
+    # on an internal name: no certificate to mount, copy or renew, which is the
+    # whole reason workspaces stopped using the public URL.
     workspace-api:
-      rule: "PathPrefix(`/api`)"
-      entryPoints: [web, websecure]
+      rule: "Host(`computor-api`)"
+      entryPoints: [web]
       service: workspace-api
-      middlewares: [workspace-api-strip]
-      priority: 100
+      middlewares: [workspace-client-tag]
+      # Above the workspace PathPrefix routers, which share this entrypoint.
+      priority: 1000
 
-    # Git. Student repositories are cloned with credentials embedded in the URL,
-    # so this has to be reachable for an offline workspace to be usable at all.
+    # Git, as http://computor-git/ inside a workspace. Student repositories are
+    # cloned with credentials embedded in the URL, so this has to be reachable
+    # for an offline workspace to be usable at all.
     workspace-git:
-      rule: "PathPrefix(`/forgejo`)"
-      entryPoints: [web, websecure]
+      rule: "Host(`computor-git`)"
+      entryPoints: [web]
       service: workspace-git
-      middlewares: [workspace-git-strip]
-      priority: 100
+      priority: 1000
 
-    # Anything else a workspace asks this proxy for. Without it a request for
-    # `/` would fall through to whatever router matched most loosely; with it
-    # the answer is an explicit, greppable 403.
+    # Anything else asked of this proxy. Without it a stray request would fall
+    # through to whatever router matched most loosely; with it the answer is an
+    # explicit, greppable 403.
     workspace-denied:
       rule: "PathPrefix(`/`)"
-      entryPoints: [web, websecure]
+      entryPoints: [web]
       service: noop@internal
       middlewares: [workspace-deny]
       priority: 1
 
   middlewares:
-    workspace-api-strip:
-      stripPrefix:
-        prefixes: ["/api"]
-    workspace-git-strip:
-      stripPrefix:
-        prefixes: ["/forgejo"]
+    # Tells the backend to render git URLs with the host this workspace can
+    # reach, rather than the public domain it deliberately cannot resolve.
+    # customRequestHeaders REPLACES the client's value, so a workspace can
+    # neither suppress nor forge this.
+    workspace-client-tag:
+      headers:
+        customRequestHeaders:
+          X-Computor-Client: "workspace"
+
     workspace-deny:
       ipAllowList:
         # No source can ever match, so every request through this middleware is
@@ -66,14 +76,3 @@ http:
       loadBalancer:
         servers:
           - url: "${WORKSPACE_INGRESS_GIT_URL}"
-
-# Certificate for PUBLIC_DOMAIN, so a workspace hitting the public HTTPS URL
-# gets a certificate it already trusts. Mounted from WORKSPACE_INGRESS_TLS_DIR;
-# when that is unset Traefik falls back to its self-signed default, which is
-# fine in dev (plain HTTP) and NOT fine in production.
-tls:
-  stores:
-    default:
-      defaultCertificate:
-        certFile: /etc/traefik/certs/fullchain.pem
-        keyFile: /etc/traefik/certs/privkey.pem

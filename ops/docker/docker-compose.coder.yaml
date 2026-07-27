@@ -38,11 +38,12 @@ services:
   # weaker statement than it looked. The main Traefik is therefore no longer
   # attached to the workspace networks — it forwards /coder here instead.
   #
-  # On the workspace side this container answers to PUBLIC_DOMAIN (network
-  # alias), so a workspace resolving the public URL lands on the allowlist in
-  # ops/coder/workspace-ingress/ instead of the internet. Public URLs keep
-  # working verbatim inside workspaces: no backend URL split, no clone-URL
-  # rewriting, and existing clones keep their remotes.
+  # On the workspace side it answers to the internal names computor-api and
+  # computor-git (network aliases), which is what workspaces use for the API
+  # and for git. Those are plain HTTP on internal names, so there is no
+  # certificate to mount, copy or renew anywhere — the workspace never speaks
+  # to the public domain, and the public domain never has to resolve inside
+  # a workspace.
   workspace-ingress:
     image: traefik:v3.6.6
     container_name: computor-workspace-ingress
@@ -65,28 +66,17 @@ services:
       - '--providers.docker.constraints=Label(`computor.ingress`,`workspace`)'
       - "--providers.docker.network=${CODER_WORKSPACE_NETWORK:-computor-coder-workspaces}"
       - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      # TLS belongs to the entrypoint, not the routers: a router with its
-      # own `tls` only serves TLS connections, so the same router could not
-      # also answer the plain-HTTP entrypoint (it 404s instead).
-      - "--entrypoints.websecure.http.tls=true"
       - "--entrypoints.web.forwardedHeaders.trustedIPs=127.0.0.1/32,172.16.0.0/12,192.168.0.0/16"
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
     networks:
       computor-network: {}
       computor-coder-workspaces:
-        aliases:
-          - ${PUBLIC_HOST:-computor.dev.test}
+        aliases: [computor-api, computor-git]
       computor-coder-workspaces-offline:
-        aliases:
-          - ${PUBLIC_HOST:-computor.dev.test}
+        aliases: [computor-api, computor-git]
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/workspace-ingress/dynamic:/etc/traefik/dynamic:ro
-      # Certificate for PUBLIC_DOMAIN. Without it Traefik serves its self-signed
-      # default, which workspaces will reject over HTTPS — dev talks plain HTTP,
-      # production must set this.
-      - ${WORKSPACE_INGRESS_TLS_DIR:-../coder/workspace-ingress/certs-empty}:/etc/traefik/certs:ro
     extra_hosts:
       # Dev only in practice: the backend runs on the host there, and the
       # rendered allowlist points at host.docker.internal.

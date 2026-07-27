@@ -51,10 +51,6 @@ derive_public_urls() {
         export KEYCLOAK_PUBLIC_URL="${KEYCLOAK_PUBLIC_URL:-${PUBLIC_DOMAIN}/auth}"
         export FORGEJO_ROOT_URL="${FORGEJO_ROOT_URL:-${PUBLIC_DOMAIN}/forgejo}"
         export FORGEJO_DOMAIN="${FORGEJO_DOMAIN:-${_pd_host}}"
-        # Bare host, for things that need a hostname rather than a URL — notably
-        # the workspace-ingress network alias, which makes the public URL
-        # resolve to the allowlist proxy from inside a workspace.
-        export PUBLIC_HOST="${PUBLIC_HOST:-${_pd_host}}"
     fi
 }
 

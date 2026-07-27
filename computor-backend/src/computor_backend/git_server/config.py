@@ -1,4 +1,5 @@
 import os
+from contextvars import ContextVar
 from functools import lru_cache
 from typing import List, Optional
 
@@ -73,6 +74,53 @@ def get_git_server_settings() -> GitServerSettings:
     return GitServerSettings()
 
 
+# Name the workspace-ingress answers to on the workspace networks. Workspaces
+# cannot resolve the public domain (deliberately — that is what keeps them off
+# everything else the platform serves) and would need a certificate for it if
+# they could, so clone URLs handed to a workspace point here instead.
+WORKSPACE_GIT_URL = os.environ.get("WORKSPACE_GIT_URL", "http://computor-git")
+
+# Which flavour of git URL the CURRENT request should be answered with.
+#
+# Set per request from the X-Computor-Client header, which workspace-ingress
+# injects on the route workspaces use to reach the API. Injected headers replace
+# whatever the client sent, so a workspace cannot suppress it — and forging it
+# from outside buys nothing, since the internal hostname is unreachable there.
+#
+# A ContextVar rather than a parameter because the alternative is threading a
+# flag through every DTO-building call site in business_logic/course_git.py,
+# where it would say nothing about the domain — this is a rendering decision
+# about the audience, not an input to the logic.
+_git_audience: ContextVar[str] = ContextVar("git_audience", default="public")
+
+WORKSPACE_CLIENT_HEADER = "x-computor-client"
+WORKSPACE_CLIENT_VALUE = "workspace"
+
+
+def set_git_audience(audience: str) -> None:
+    """Record whether this request is answered for a workspace or a browser."""
+    _git_audience.set(audience)
+
+
+def to_workspace_git_url(url: Optional[str]) -> Optional[str]:
+    """Rewrite a stored git URL to the host a Coder workspace can reach.
+
+    The counterpart of :func:`to_public_git_url`: same swap, different
+    destination. Called instead of it when the request authenticated with a
+    workspace token, so the extension clones through workspace-ingress rather
+    than the public domain — which also means an internet-disabled workspace can
+    still reach git.
+    """
+    if not url:
+        return url
+    cfg = get_git_server_settings()
+    public = (cfg.public_url or "").rstrip("/")
+    for prefix in [*cfg.internal_hosts, public]:
+        if prefix and url.startswith(prefix):
+            return WORKSPACE_GIT_URL + url[len(prefix):]
+    return url
+
+
 def to_public_git_url(url: Optional[str]) -> Optional[str]:
     """Rewrite a stored git URL that uses a backend-internal git host to the
     user-reachable public host.
@@ -85,6 +133,11 @@ def to_public_git_url(url: Optional[str]) -> Optional[str]:
     """
     if not url:
         return url
+    if _git_audience.get() == WORKSPACE_CLIENT_VALUE:
+        # Same URL, different audience: a workspace gets the host it can
+        # actually reach. Every caller that renders a git URL for a client goes
+        # through here, so this is the one place the choice has to be made.
+        return to_workspace_git_url(url)
     cfg = get_git_server_settings()
     public = (cfg.public_url or "").rstrip("/")
     if not public:
