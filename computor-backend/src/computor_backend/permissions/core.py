@@ -27,6 +27,8 @@ from computor_backend.permissions.handlers_impl import (
     MessagePermissionHandler,
     ExamplePermissionHandler,
     UserRolePermissionHandler,
+    ServicePermissionHandler,
+    ApiTokenPermissionHandler,
 )
 
 # Import refactored Principal and related classes
@@ -119,10 +121,14 @@ def initialize_permission_handlers():
     permission_registry.register(Result, ResultPermissionHandler(Result))
     permission_registry.register(Message, MessagePermissionHandler(Message))
 
-    # Service accounts, service types, and API tokens - admin only
-    permission_registry.register(Service, UserPermissionHandler(Service))
+    # Service accounts and API tokens: admin, or the `_service_manager` claims.
+    # These used to be registered with UserPermissionHandler, which is written
+    # against the User model — see handlers_service for what that broke.
+    # ServiceType stays read-for-all / write-on-claim: a service manager picks
+    # a type, they don't invent one.
+    permission_registry.register(Service, ServicePermissionHandler(Service))
     permission_registry.register(ServiceType, ReadOnlyPermissionHandler(ServiceType))
-    permission_registry.register(ApiToken, UserPermissionHandler(ApiToken))
+    permission_registry.register(ApiToken, ApiTokenPermissionHandler(ApiToken))
 
     # Artifact models - use CourseMemberPermissionHandler for course-scoped access
     permission_registry.register(SubmissionArtifact, CourseMemberPermissionHandler(SubmissionArtifact))

@@ -134,6 +134,42 @@ def get_default_scopes_for_service(
     return DEFAULT_SERVICE_SCOPES.get(service_type.category, [])
 
 
+def assert_may_mint_token_for(user, permissions: Principal) -> None:
+    """Gate minting a token on behalf of another user.
+
+    ``check_permissions`` cannot express this rule: it returns a query over
+    ``api_token``, but the constraint here is on the *target user*.
+
+    Token scopes are additive (see ``permissions/handlers_service``), so a
+    token minted on a human account carries that account's entire role set no
+    matter which scopes are requested. Minting one for someone else is
+    therefore an escalation, and is reserved to admins. Service accounts hold
+    no roles, so a `_service_manager` minting for them grants exactly the
+    scopes and nothing more.
+    """
+    if str(user.id) == str(permissions.user_id):
+        return  # your own token — always allowed
+
+    if permissions.is_admin:
+        return
+
+    if not user.is_service:
+        raise ForbiddenException(
+            detail=(
+                "Only administrators can create API tokens for another user. "
+                "Token scopes only add permissions, so such a token would "
+                "carry that user's full authority."
+            ),
+            context={"target_user_id": str(user.id)},
+        )
+
+    if not permissions.permitted(ApiToken.__tablename__, "create"):
+        raise ForbiddenException(
+            detail="Insufficient permissions to create an API token for this service account",
+            context={"target_user_id": str(user.id)},
+        )
+
+
 def create_api_token(
     token_data: ApiTokenCreate,
     permissions: Principal,
@@ -154,16 +190,9 @@ def create_api_token(
 
     Raises:
         BadRequestException: If user not found or token generation fails
-        ForbiddenException: If user lacks permissions
+        ForbiddenException: If minting for another user without the authority
     """
-    # Determine target user ID
-    if token_data.user_id:
-        # Admin creating token for another user
-        check_permissions(permissions, ApiToken, "create", db)
-        target_user_id = token_data.user_id
-    else:
-        # User creating token for themselves
-        target_user_id = permissions.user_id
+    target_user_id = token_data.user_id or permissions.user_id
 
     # Verify user exists
     user_repo = UserRepository(db, cache)
@@ -171,9 +200,7 @@ def create_api_token(
     if not user:
         raise BadRequestException(detail="User not found")
 
-    # If not admin, verify creating token for self
-    if token_data.user_id and token_data.user_id != permissions.user_id:
-        check_permissions(permissions, ApiToken, "create", db)
+    assert_may_mint_token_for(user, permissions)
 
     # Determine scopes: use provided scopes, or get defaults for service accounts
     scopes = token_data.scopes
@@ -248,17 +275,23 @@ def get_api_token(
     """
     Get API token details by ID.
 
-    Users can only view their own tokens unless they have admin permissions.
-    The actual token value is never returned.
+    Users can only view their own tokens; a `_service_manager` additionally
+    sees tokens owned by service accounts; admins see everything. The actual
+    token value is never returned.
+
+    The row MUST be fetched through the query ``check_permissions`` returns.
+    ``ApiTokenPermissionHandler`` narrows rather than raises (everyone owns
+    some tokens), so a bare repository lookup after a successful
+    ``check_permissions`` would read any user's token.
     """
-    token_repo = ApiTokenRepository(db, cache)
-    token = token_repo.get_by_id_optional(str(token_id))
+    query = check_permissions(permissions, ApiToken, "get", db)
+
+    # str(): the UUID column type rejects uuid.UUID objects in a filter
+    # (StatementError). The endpoint declares token_id as UUID, so this cast
+    # is required at every one of these call sites.
+    token = query.filter(ApiToken.id == str(token_id)).first()
     if not token:
         raise NotFoundException(detail="API token not found")
-
-    # Check permissions: owner or admin
-    if str(token.user_id) != str(permissions.user_id):
-        check_permissions(permissions, ApiToken, "read", db)
 
     return ApiTokenGet.model_validate(token, from_attributes=True)
 
@@ -273,37 +306,22 @@ def list_api_tokens(
     """
     List API tokens.
 
-    Regular users can only list their own tokens.
-    Admins can list all tokens or filter by user_id.
+    Visibility comes entirely from ``ApiTokenPermissionHandler``: a regular
+    user sees their own, a `_service_manager` sees service-owned tokens plus
+    their own, an admin sees everything. ``user_id`` narrows within that set —
+    asking for a user you cannot see yields an empty list, not a 403.
     """
-    token_repo = ApiTokenRepository(db, cache)
+    query = check_permissions(permissions, ApiToken, "list", db)
 
-    # Determine which user's tokens to list
     if user_id:
-        # Admin filtering by specific user
-        check_permissions(permissions, ApiToken, "read", db)
-        target_user_id = str(user_id)
-    else:
-        # Check if user can list all tokens or only their own
-        try:
-            check_permissions(permissions, ApiToken, "read", db)
-            # Admin - can list all tokens
-            target_user_id = None
-        except ForbiddenException:
-            # Regular user - only their own tokens
-            target_user_id = str(permissions.user_id)
+        query = query.filter(ApiToken.user_id == str(user_id))
 
-    # Get tokens based on filtering
-    if target_user_id:
-        tokens = token_repo.find_by_user(target_user_id, include_revoked=include_revoked)
-    else:
-        # Admin listing all tokens
-        if include_revoked:
-            tokens = token_repo.list()
-        else:
-            tokens = token_repo.find_by(revoked_at=None)
+    if not include_revoked:
+        query = query.filter(ApiToken.revoked_at.is_(None))
 
-    return [ApiTokenGet.model_validate(t, from_attributes=True) for t in tokens]
+    return [
+        ApiTokenGet.model_validate(t, from_attributes=True) for t in query.all()
+    ]
 
 
 def update_api_token_admin(
@@ -330,15 +348,17 @@ def update_api_token_admin(
         Updated token details
 
     Raises:
-        ForbiddenException: If user is not admin
+        ForbiddenException: If the caller may not act on this token
         NotFoundException: If token not found
     """
-    # Require admin permissions
-    check_permissions(permissions, ApiToken, "update", db)
-
-    # Get token
     token_repo = ApiTokenRepository(db, cache)
-    token = token_repo.get_by_id_optional(str(token_id))
+
+    # Fetch through the permitted query: rewriting a token's scopes is the
+    # most direct escalation there is, so it must be scoped exactly like a
+    # read. ApiTokenPermissionHandler narrows instead of raising, so a bare
+    # get_by_id_optional here would let any caller re-scope any token.
+    query = check_permissions(permissions, ApiToken, "update", db)
+    token = query.filter(ApiToken.id == str(token_id)).first()
     if not token:
         raise NotFoundException(detail="API token not found")
 
@@ -380,23 +400,25 @@ def revoke_api_token(
     """
     Revoke an API token.
 
-    Users can revoke their own tokens.
-    Admins can revoke any token.
+    Users can revoke their own tokens; a `_service_manager` can also revoke a
+    service account's; admins can revoke any.
+
+    Fetched through the permitted query, not by id — revoking someone else's
+    token is a denial of service, so the same narrowing that applies to reads
+    must apply here. See ``get_api_token`` for why a bare lookup is unsafe.
 
     Also invalidates the token's Redis cache for immediate effect.
     """
     token_repo = ApiTokenRepository(db, cache)
-    token = token_repo.get_by_id_optional(str(token_id))
+
+    query = check_permissions(permissions, ApiToken, "delete", db)
+    token = query.filter(ApiToken.id == str(token_id)).first()
     if not token:
         raise NotFoundException(detail="API token not found")
 
     # Check if already revoked
     if token.revoked_at:
         raise BadRequestException(detail="Token is already revoked")
-
-    # Check permissions: owner or admin
-    if str(token.user_id) != str(permissions.user_id):
-        check_permissions(permissions, ApiToken, "delete", db)
 
     try:
         revoked_token = token_repo.revoke(
@@ -460,17 +482,18 @@ def create_api_token_admin(
         Created token with the predefined token value
 
     Raises:
-        ForbiddenException: If user is not admin
+        ForbiddenException: If minting for another user without the authority
         BadRequestException: If user not found or token format invalid
     """
-    # Require admin permissions
-    check_permissions(permissions, ApiToken, "create", db)
-
     # Verify user exists
     user_repo = UserRepository(db, cache)
     user = user_repo.get_by_id_optional(token_data.user_id)
     if not user:
         raise BadRequestException(detail="User not found")
+
+    # Same rule as create_api_token: a predefined value doesn't make minting
+    # for a human account any less of an escalation.
+    assert_may_mint_token_for(user, permissions)
 
     # Validate token format
     predefined_token = token_data.predefined_token
