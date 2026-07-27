@@ -150,6 +150,102 @@ def is_template_enabled(db: Session, template_name: str) -> bool:
 
 
 # -----------------------------------------------------------------------------
+# Root / internet policy
+#
+# Two levels, ANDed inside the Terraform template (see ops/coder/templates):
+# the template settings row is the ceiling and travels as a --variable at push
+# time; the course association row narrows it and travels as a rich parameter
+# per workspace. Resolving the AND in the template rather than here means a
+# rich parameter — the weaker, per-workspace input — can never widen access.
+# -----------------------------------------------------------------------------
+
+# Mirrors the templates' own variable defaults, so a template with no settings
+# row behaves exactly like one with a freshly created row.
+DEFAULT_ALLOW_ROOT = False
+DEFAULT_ALLOW_INTERNET = True
+
+
+def settings_row_policy(row: Optional[WorkspaceTemplateSettings]) -> tuple[bool, bool]:
+    """(allow_root, allow_internet) of a settings row, or the defaults.
+
+    Tolerates NULL attributes: the columns are NOT NULL in the database, but a
+    row constructed in Python and not yet flushed has them unset, and
+    ``bool(None)`` would silently read as "internet denied".
+    """
+    if row is None:
+        return DEFAULT_ALLOW_ROOT, DEFAULT_ALLOW_INTERNET
+    return (
+        DEFAULT_ALLOW_ROOT if row.allow_root is None else bool(row.allow_root),
+        DEFAULT_ALLOW_INTERNET if row.allow_internet is None else bool(row.allow_internet),
+    )
+
+
+def template_policy_ceiling(db: Session, template_name: str) -> tuple[bool, bool]:
+    """(allow_root, allow_internet) a template permits at most."""
+    return settings_row_policy(template_settings_row(db, template_name))
+
+
+def course_template_policy(
+    db: Session, course_id: UUID | str, template_name: str
+) -> tuple[Optional[bool], Optional[bool]]:
+    """One course's narrowing for a template; (None, None) = inherit."""
+    row = (
+        db.query(CourseWorkspaceTemplate)
+        .filter(
+            CourseWorkspaceTemplate.course_id == str(course_id),
+            CourseWorkspaceTemplate.template_name == template_name,
+        )
+        .first()
+    )
+    if row is None:
+        return None, None
+    return row.allow_root, row.allow_internet
+
+
+def member_template_policy(
+    db: Session, principal: Principal, template_name: str
+) -> tuple[Optional[bool], Optional[bool]]:
+    """Narrowing for a self-provisioned workspace, across ALL the principal's
+    courses that allow the template.
+
+    The most restrictive course wins: a student enrolled in an exam course that
+    denies internet does not get internet by launching the same template from
+    another course. (None, None) when no course of theirs allows it — then only
+    the template ceiling applies.
+    """
+    course_ids = principal.get_courses_with_role("_student")
+    if not course_ids:
+        return None, None
+    rows = (
+        db.query(CourseWorkspaceTemplate)
+        .filter(
+            CourseWorkspaceTemplate.course_id.in_([str(c) for c in course_ids]),
+            CourseWorkspaceTemplate.template_name == template_name,
+        )
+        .all()
+    )
+    if not rows:
+        return None, None
+    # NULL means "this course adds no restriction", so only an explicit False counts.
+    return (
+        all(row.allow_root is not False for row in rows),
+        all(row.allow_internet is not False for row in rows),
+    )
+
+
+def effective_policy(
+    ceiling: bool, course_value: Optional[bool]
+) -> bool:
+    """What a workspace actually gets: the ceiling minus any course denial."""
+    return ceiling and course_value is not False
+
+
+def _narrowing(value: Optional[bool]) -> Optional[bool]:
+    """Normalise a course policy value: only False is a statement."""
+    return False if value is False else None
+
+
+# -----------------------------------------------------------------------------
 # Course-derived access
 # -----------------------------------------------------------------------------
 
@@ -259,6 +355,7 @@ async def get_course_workspace_settings(
         if not enabled and not is_manager:
             continue
         coder_template = (by_name or {}).get(row.template_name)
+        ceiling_root, ceiling_internet = template_policy_ceiling(db, row.template_name)
         items.append(CourseWorkspaceTemplateItem(
             template_name=row.template_name,
             enabled=enabled,
@@ -266,6 +363,12 @@ async def get_course_workspace_settings(
             description=coder_template.description if coder_template else None,
             icon=coder_template.icon if coder_template else None,
             exists_in_coder=None if by_name is None else coder_template is not None,
+            allow_root=row.allow_root,
+            allow_internet=row.allow_internet,
+            template_allow_root=ceiling_root,
+            template_allow_internet=ceiling_internet,
+            effective_allow_root=effective_policy(ceiling_root, row.allow_root),
+            effective_allow_internet=effective_policy(ceiling_internet, row.allow_internet),
         ))
 
     available = None
@@ -346,6 +449,22 @@ async def update_course_workspace_settings(
             template_name=name,
             created_by=permissions.user_id,
         ))
+    db.flush()
+
+    # Per-template narrowing. Applied to the whole retained list, not just the
+    # additions: a policy row is a property of the association, so a template
+    # missing from template_policies is reset to "inherit" rather than keeping
+    # a stale denial the manager just cleared in the UI.
+    for row in _course_template_rows(db, course_id):
+        if row.template_name not in requested:
+            continue
+        policy = data.template_policies.get(row.template_name)
+        # True is normalised to NULL: a course can only restrict, so "allow"
+        # and "no opinion" are the same statement — storing True would read as
+        # a grant the template may not honour.
+        row.allow_root = _narrowing(policy.allow_root if policy else None)
+        row.allow_internet = _narrowing(policy.allow_internet if policy else None)
+        row.updated_by = permissions.user_id
 
     settings_row = _course_settings_row(db, course_id)
     if settings_row is None:
@@ -478,6 +597,10 @@ async def provision_student_workspaces(
     quota_row = template_settings_row(db, template)
     has_quota = quota_row is not None and quota_row.max_running_workspaces is not None
 
+    # Same for every workspace in the batch: this course's narrowing of the
+    # template's root/internet ceiling.
+    policy_root, policy_internet = course_template_policy(db, course_id, template)
+
     outcomes: list[StudentWorkspaceProvisionOutcome] = []
     for member_id in data.course_member_ids:
         outcome = StudentWorkspaceProvisionOutcome(course_member_id=str(member_id))
@@ -531,6 +654,8 @@ async def provision_student_workspaces(
                 workspace_name=workspace_name,
                 computor_auth_token=token,
                 home_mode=data.home_mode,
+                allow_root=policy_root,
+                allow_internet=policy_internet,
             )
             outcome.workspace_name = result.workspace.name if result.workspace else workspace_name
             outcome.success = True

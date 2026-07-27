@@ -848,6 +848,16 @@ class CoderClient:
                 "name": "home_mode",
                 "value": workspace_data.home_mode,
             })
+        # Course-level policy narrowing. Only sent when a course actually has an
+        # opinion — omitting them leaves the template's parameter default
+        # ("true" = no narrowing), which the template ANDs with its own
+        # variable, so the ceiling still applies either way.
+        for name, value in (
+            ("allow_root", workspace_data.allow_root),
+            ("allow_internet", workspace_data.allow_internet),
+        ):
+            if value is not None:
+                rich_params.append({"name": name, "value": "true" if value else "false"})
         if rich_params:
             payload["rich_parameter_values"] = rich_params
             logger.info(f"Sending rich_parameter_values: {[p['name'] for p in rich_params]}")
@@ -1163,18 +1173,13 @@ class CoderClient:
         latest_build = workspace.get("latest_build") or {}
         template_version_id = latest_build["template_version_id"]
 
-        # Create a new build with the updated token parameter. home_mode is
-        # immutable per workspace; re-send its current value so the rebuild
-        # cannot reset a scratch-home workspace to the shared-home default.
+        # Create a new build with the updated token parameter, carrying the
+        # immutable per-workspace parameters over (see _carry_build_params).
         rich_params = [{
             "name": "computor_auth_token",
             "value": computor_auth_token,
         }]
-        build_id = latest_build.get("id")
-        if build_id:
-            home_mode = await self._get_build_param(build_id, "home_mode")
-            if home_mode is not None:
-                rich_params.append({"name": "home_mode", "value": home_mode})
+        rich_params += await self._carry_build_params(latest_build.get("id"))
 
         resp = await self._request(
             "POST",
@@ -1195,6 +1200,39 @@ class CoderClient:
         else:
             logger.error(f"Failed to update workspace token: {resp.status_code} - {resp.text}")
         return success
+
+    # Immutable per-workspace parameters. A new build that omits any of these
+    # silently resets it to the template default, which would move a scratch
+    # home onto the shared volume or hand a locked-down workspace root and
+    # internet back. Every code path that starts a build must carry them over.
+    CARRIED_BUILD_PARAMS = ("home_mode", "allow_root", "allow_internet")
+
+    async def _carry_build_params(self, build_id: Optional[str]) -> list[dict]:
+        """Rich-parameter values to re-send so a rebuild preserves policy.
+
+        One request for all of them rather than one per name — a rebuild is
+        already several round-trips deep by the time it gets here.
+        """
+        if not build_id:
+            return []
+        resp = await self._request(
+            "GET",
+            f"/api/v2/workspacebuilds/{build_id}/parameters",
+            admin_headers=True,
+            ok=None,
+        )
+        if resp.status_code != 200:
+            logger.warning(
+                f"Build {build_id}: could not read parameters ({resp.status_code}); "
+                "rebuild will fall back to template defaults for policy parameters"
+            )
+            return []
+        by_name = {p.get("name"): p.get("value") for p in resp.json()}
+        return [
+            {"name": name, "value": by_name[name]}
+            for name in self.CARRIED_BUILD_PARAMS
+            if by_name.get(name) is not None
+        ]
 
     async def _get_build_param(
         self, build_id: str, name: str
@@ -1255,17 +1293,15 @@ class CoderClient:
         latest = (resp.json() or {}).get("latest_build") or {}
 
         # Preserve the current auth token; omitting it resets the param to its
-        # "" default and de-authenticates the extension. Same for home_mode:
-        # a scratch-home workspace must not silently rebuild onto the shared home.
+        # "" default and de-authenticates the extension. Same for the immutable
+        # per-workspace parameters (see _carry_build_params).
         rich_params: list[dict] = []
         build_id = latest.get("id")
         if build_id:
             current_token = await self._get_build_param(build_id, "computor_auth_token")
             if current_token is not None:
                 rich_params.append({"name": "computor_auth_token", "value": current_token})
-            home_mode = await self._get_build_param(build_id, "home_mode")
-            if home_mode is not None:
-                rich_params.append({"name": "home_mode", "value": home_mode})
+            rich_params += await self._carry_build_params(build_id)
 
         resp = await self._request(
             "POST",
@@ -1303,6 +1339,8 @@ class CoderClient:
         workspace_name: Optional[str] = None,
         computor_auth_token: Optional[str] = None,
         home_mode: Optional[str] = None,
+        allow_root: Optional[bool] = None,
+        allow_internet: Optional[bool] = None,
     ) -> ProvisionResult:
         """
         Full provisioning: get or create user and workspace.
@@ -1320,6 +1358,9 @@ class CoderClient:
             workspace_name: Custom workspace name (defaults to a name derived
                 from the template, e.g. 'python-workspace' -> 'python')
             computor_auth_token: Pre-minted API token for extension auto-login
+            allow_root: Course-level root narrowing; None = no course opinion.
+                Cannot widen past the template's own allow_root variable.
+            allow_internet: Course-level internet narrowing, same semantics.
 
         Returns:
             ProvisionResult with user and workspace info
@@ -1378,14 +1419,16 @@ class CoderClient:
                     computor_auth_token,
                 )
         except CoderWorkspaceNotFoundError:
-            # Create workspace. home_mode only applies at creation — for an
-            # existing workspace it is immutable and the token-update rebuild
-            # preserves the original value.
+            # Create workspace. home_mode and the policy parameters only apply
+            # at creation — for an existing workspace they are immutable and
+            # the token-update rebuild preserves the original values.
             ws_data = CoderWorkspaceCreate(
                 name=workspace_name,
                 template=template,
                 computor_auth_token=computor_auth_token,
                 home_mode=home_mode,
+                allow_root=allow_root,
+                allow_internet=allow_internet,
             )
             workspace = await self.create_workspace(user.username, ws_data)
             workspace_created = True

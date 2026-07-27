@@ -64,6 +64,7 @@ function LecturerWorkspacesContent() {
   const templates = (settings?.templates ?? []).filter((t) => t.enabled);
   const provisionAllowed = (settings?.lecturer_provision_enabled ?? false) || (settings?.can_manage ?? false);
   const effectiveTemplate = template || templates[0]?.template_name || '';
+  const selectedTemplate = templates.find((t) => t.template_name === effectiveTemplate);
 
   function toggleMember(id: string) {
     setSelected((prev) => {
@@ -190,6 +191,22 @@ function LecturerWorkspacesContent() {
                       </option>
                     ))}
                   </select>
+                  {selectedTemplate && (
+                    // Read-only: the policy is set by a workspace maintainer,
+                    // per template and per course. Shown here so a lecturer
+                    // knows what the students they provision for will get.
+                    <p className="mt-1 text-xs text-gray-500">
+                      Students get{' '}
+                      <span className="font-medium">
+                        {selectedTemplate.effective_allow_root ? 'root' : 'no root'}
+                      </span>{' '}
+                      and{' '}
+                      <span className="font-medium">
+                        {selectedTemplate.effective_allow_internet ? 'internet' : 'no internet'}
+                      </span>
+                      .
+                    </p>
+                  )}
                 </div>
                 <div>
                   <span className="block text-xs font-medium text-gray-700 mb-1">Home directory</span>

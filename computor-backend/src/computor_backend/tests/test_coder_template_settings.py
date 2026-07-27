@@ -50,16 +50,35 @@ def test_per_template_variables_stringifies_and_skips_unset_limits():
         WorkspaceTemplateSettings(
             template_name="matlab-ui-workspace", memory_mb=8192, cpu_shares=None,
             max_running_workspaces=5, template_variables={"shm_size": "1024"},
+            allow_root=True, allow_internet=True,
         ),
-        WorkspaceTemplateSettings(  # quota only — nothing to push
+        WorkspaceTemplateSettings(  # quota only — no caps to push
             template_name="bash-workspace", memory_mb=None, cpu_shares=0,
             max_running_workspaces=3, template_variables={},
+            allow_root=False, allow_internet=False,
         ),
     ]
     overrides = _per_template_variables(_db_returning(rows))
+    # The caps are opt-in and skipped when unset; the policy booleans always
+    # travel, because "off" is a value and the push filter drops empty strings.
     assert overrides == {
-        "matlab-ui-workspace": {"memory_mb": "8192", "shm_size": "1024"},
+        "matlab-ui-workspace": {
+            "memory_mb": "8192", "shm_size": "1024",
+            "allow_root": "true", "allow_internet": "true",
+        },
+        "bash-workspace": {"allow_root": "false", "allow_internet": "false"},
     }
+
+
+def test_per_template_variables_uses_defaults_for_an_unflushed_row():
+    """A row built in Python has NULL policy columns until it is flushed.
+
+    bool(None) is False, so reading them naively would push allow_internet=false
+    and silently cut internet from every workspace of that template.
+    """
+    row = WorkspaceTemplateSettings(template_name="bash-workspace", template_variables={})
+    overrides = _per_template_variables(_db_returning([row]))
+    assert overrides["bash-workspace"] == {"allow_root": "false", "allow_internet": "true"}
 
 
 # --- seat quota --------------------------------------------------------------

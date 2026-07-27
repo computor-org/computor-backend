@@ -77,6 +77,8 @@ from computor_backend.business_logic.course_workspaces import (
     get_member_course_template_names,
     is_template_enabled,
     list_admin_course_workspaces,
+    member_template_policy,
+    settings_row_policy,
     template_settings_row as _template_settings_row,
 )
 from computor_types.course_workspaces import CourseWorkspaceAdminListResponse
@@ -183,6 +185,8 @@ _PUSH_MANAGED_VARIABLES = {
     "workspace_image": "pinned to the built image at push time",
     "memory_mb": "managed via the template's resource limit settings",
     "cpu_shares": "managed via the template's resource limit settings",
+    "allow_root": "managed via the template's root/internet policy settings",
+    "allow_internet": "managed via the template's root/internet policy settings",
 }
 
 # Infrastructure wiring: these must match the compose stack (networks, proxy
@@ -192,6 +196,7 @@ _INFRA_VARIABLES = {
     "coder_internal_url": "deployment wiring (internal Coder URL)",
     "coder_base_path": "deployment wiring (reverse-proxy base path)",
     "docker_network": "deployment wiring (workspace Docker network)",
+    "docker_network_offline": "deployment wiring (no-egress workspace Docker network)",
     "docker_socket": "deployment wiring (Docker socket URI)",
 }
 
@@ -420,6 +425,18 @@ async def provision_workspace(
         else:
             logger.error("Token minting returned None!")
 
+        # Course-level policy narrowing. Only applies when the caller is
+        # provisioning for THEMSELVES, where the courses in their claims are
+        # the relevant context — a manager provisioning for someone else is an
+        # explicit act, and gets the template's own policy. Either way the
+        # template ceiling still applies, so this can only restrict further.
+        if request.email:
+            policy_root, policy_internet = None, None
+        else:
+            policy_root, policy_internet = member_template_policy(
+                db, permissions, template
+            )
+
         result = await client.provision_workspace(
             user_email=get_user_email(target_user),
             username=str(target_user.id),
@@ -428,6 +445,8 @@ async def provision_workspace(
             workspace_name=workspace_name,
             computor_auth_token=workspace_token,
             home_mode=request.home_mode,
+            allow_root=policy_root,
+            allow_internet=policy_internet,
         )
         return result
     except ComputorException:
@@ -860,6 +879,12 @@ def _per_template_variables(db: Session) -> dict:
             variables["memory_mb"] = str(row.memory_mb)
         if row.cpu_shares:
             variables["cpu_shares"] = str(row.cpu_shares)
+        # Always sent, unlike the caps above: these are booleans whose "off"
+        # value is meaningful, and the push filter drops falsy values, so
+        # "false" has to travel as the non-empty string it already is.
+        allow_root, allow_internet = settings_row_policy(row)
+        variables["allow_root"] = "true" if allow_root else "false"
+        variables["allow_internet"] = "true" if allow_internet else "false"
         for name, value in (row.template_variables or {}).items():
             variables[name] = str(value)
         if variables:
@@ -1018,12 +1043,15 @@ async def rollout_workspaces_endpoint(
 
 
 def _settings_row_to_schema(row: WorkspaceTemplateSettings) -> WorkspaceTemplateSettingsSchema:
+    allow_root, allow_internet = settings_row_policy(row)
     return WorkspaceTemplateSettingsSchema(
         template_name=row.template_name,
         enabled=bool(row.enabled),
         memory_mb=row.memory_mb,
         cpu_shares=row.cpu_shares,
         max_running_workspaces=row.max_running_workspaces,
+        allow_root=allow_root,
+        allow_internet=allow_internet,
         template_variables=dict(row.template_variables or {}),
         updated_at=row.updated_at,
     )
@@ -1114,6 +1142,8 @@ async def update_template_settings(
     row.memory_mb = request.memory_mb
     row.cpu_shares = request.cpu_shares
     row.max_running_workspaces = request.max_running_workspaces
+    row.allow_root = request.allow_root
+    row.allow_internet = request.allow_internet
     row.template_variables = dict(request.template_variables)
     row.updated_by = permissions.user_id
     db.commit()

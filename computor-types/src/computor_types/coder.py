@@ -81,6 +81,17 @@ class CoderWorkspaceCreate(BaseModel):
         description="Home volume mode: 'shared' (per-user home volume) or "
                     "'scratch' (throwaway per-workspace volume). None = template default (shared).",
     )
+    allow_root: Optional[bool] = Field(
+        None,
+        description="Course-level root policy for this workspace. The template ANDs it with "
+                    "its own allow_root, so False always denies but True only permits what "
+                    "the template already allows. None = no course-level restriction.",
+    )
+    allow_internet: Optional[bool] = Field(
+        None,
+        description="Course-level internet policy for this workspace, ANDed with the "
+                    "template's allow_internet the same way. None = no course-level restriction.",
+    )
 
 
 # Response schemas
@@ -348,6 +359,17 @@ class WorkspaceTemplateSettingsSchema(BaseModel):
         description="Max concurrently running workspaces of this template across all "
                     "users; null = unlimited, 0 freezes the template",
     )
+    allow_root: bool = Field(
+        False,
+        description="Whether workspaces of this template may use sudo/su. The CEILING: "
+                    "a course can narrow it further but never grant root the template "
+                    "denies. Applied at the next template push.",
+    )
+    allow_internet: bool = Field(
+        True,
+        description="Whether workspaces of this template reach the internet. The CEILING, "
+                    "same narrowing rule as allow_root. Applied at the next template push.",
+    )
     template_variables: dict[str, str] = Field(
         default_factory=dict,
         description="Extra Terraform variable overrides pushed as --variable "
@@ -365,6 +387,12 @@ class WorkspaceTemplateSettingsUpdate(BaseModel):
         None, ge=0, description="0 = Docker default; Docker requires values >= 2 otherwise"
     )
     max_running_workspaces: Optional[int] = Field(None, ge=0)
+    allow_root: bool = Field(
+        False, description="Grant sudo/su in this template's workspaces (ceiling)"
+    )
+    allow_internet: bool = Field(
+        True, description="Allow internet egress from this template's workspaces (ceiling)"
+    )
     template_variables: dict[str, str] = Field(default_factory=dict)
 
 

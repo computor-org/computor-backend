@@ -62,6 +62,13 @@ class WorkspaceTemplateSettings(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     # users (e.g. MATLAB license seats). NULL = unlimited; 0 freezes the
     # template. Enforced for everyone, admins included.
     max_running_workspaces = Column(BigInteger)
+    # Root / internet policy CEILING for this template, pushed as the Terraform
+    # variables of the same name. A course can narrow these further (see
+    # CourseWorkspaceTemplate) but never widen them: the template ANDs the two.
+    # Defaults mirror the templates' own variable defaults, so a template
+    # without a settings row behaves identically to one with a default row.
+    allow_root = Column(Boolean, nullable=False, server_default=text('false'), default=False)
+    allow_internet = Column(Boolean, nullable=False, server_default=text('true'), default=True)
     # Extra Terraform variable overrides ({name: value}) pushed with the same
     # declared-variable guard as the deployment-wide template_variables.
     template_variables = Column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
@@ -89,6 +96,12 @@ class CourseWorkspaceTemplate(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     )
     # Coder template name, same identity as WorkspaceTemplateSettings.template_name.
     template_name = Column(String(255), nullable=False)
+    # Course-level narrowing of the template's root/internet ceiling, delivered
+    # as rich parameters at provision time. NULL = inherit the template; False
+    # denies. True cannot grant what the template denies — the template ANDs
+    # the two — so these are only ever restrictions.
+    allow_root = Column(Boolean)
+    allow_internet = Column(Boolean)
 
 
 class CourseWorkspaceSettings(UUIDPkMixin, VersionedMixin, AuditMixin, Base):

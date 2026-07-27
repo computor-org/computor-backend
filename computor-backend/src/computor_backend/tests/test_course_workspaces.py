@@ -114,6 +114,11 @@ def make_db(
             q.filter.return_value.order_by.return_value.all.return_value = sorted(
                 course_templates, key=lambda r: r.template_name
             )
+            # Policy lookups filter without ordering.
+            q.filter.return_value.all.return_value = list(course_templates)
+            q.filter.return_value.first.return_value = (
+                course_templates[0] if course_templates else None
+            )
         elif target is CourseWorkspaceSettings:
             q.filter.return_value.first = lambda: state["course_settings"]
         elif target is Course:
@@ -131,8 +136,8 @@ def make_db(
     return db
 
 
-def _tpl_row(course_id: str, name: str) -> CourseWorkspaceTemplate:
-    return CourseWorkspaceTemplate(course_id=course_id, template_name=name)
+def _tpl_row(course_id: str, name: str, **policy) -> CourseWorkspaceTemplate:
+    return CourseWorkspaceTemplate(course_id=course_id, template_name=name, **policy)
 
 
 def _coder_template(name: str) -> CoderTemplate:
@@ -601,3 +606,86 @@ async def test_lecturer_delete_rejects_non_members_and_foreign_templates():
             "c1", "u1111-2222", "other", lecturer, db,
             _delete_client(template="other-workspace"),
         )
+
+
+# --- root / internet policy ---------------------------------------------------
+
+
+def test_template_ceiling_falls_back_to_the_template_variable_defaults():
+    """A template with no settings row must behave like the .tf defaults."""
+    assert cw.template_policy_ceiling(make_db(settings_row=None), "bash-workspace") == (
+        cw.DEFAULT_ALLOW_ROOT, cw.DEFAULT_ALLOW_INTERNET
+    )
+    assert (cw.DEFAULT_ALLOW_ROOT, cw.DEFAULT_ALLOW_INTERNET) == (False, True)
+
+
+def test_settings_row_policy_tolerates_an_unflushed_row():
+    row = WorkspaceTemplateSettings(template_name="bash-workspace")
+    # Columns are NULL until flushed; bool(None) would read as "internet off".
+    assert cw.settings_row_policy(row) == (False, True)
+
+
+def test_a_course_can_narrow_but_never_widen():
+    # Template denies root: no course setting can hand it back.
+    assert cw.effective_policy(False, True) is False
+    assert cw.effective_policy(False, None) is False
+    # Template allows it: the course decides.
+    assert cw.effective_policy(True, None) is True
+    assert cw.effective_policy(True, True) is True
+    assert cw.effective_policy(True, False) is False
+
+
+def test_self_provision_takes_the_most_restrictive_course():
+    """Sharing a template across courses must not launder an exam course's
+    restrictions — the strictest course the student is in wins."""
+    principal = Principal(user_id="s1", claims=Claims(dependent={"course": {
+        "open-course": {"_student"}, "exam-course": {"_student"},
+    }}))
+    db = make_db(course_templates=[
+        _tpl_row("open-course", "bash-workspace"),                      # no opinion
+        _tpl_row("exam-course", "bash-workspace", allow_internet=False),
+    ])
+    allow_root, allow_internet = cw.member_template_policy(db, principal, "bash-workspace")
+    assert allow_internet is False
+    assert allow_root is True  # no course denies it; the ceiling still applies
+
+
+def test_no_course_context_means_no_narrowing():
+    db = make_db(course_templates=[])
+    assert cw.member_template_policy(db, _workspace_user(), "bash-workspace") == (None, None)
+
+
+@pytest.mark.asyncio
+async def test_course_policy_stores_only_denials():
+    """A course can restrict but never grant, so True and "no opinion" are the
+    same statement — storing True would read as a grant the template may not
+    honour, and would silently start granting if the ceiling later opened."""
+    row = _tpl_row("c1", "bash-workspace")
+    db = make_db(course_templates=[row], course_settings=None)
+    client = MagicMock()
+    client.list_templates = AsyncMock(side_effect=AssertionError("Coder must not be called"))
+
+    await cw.update_course_workspace_settings(
+        "c1",
+        CourseWorkspaceSettingsUpdate(
+            template_names=["bash-workspace"],
+            template_policies={"bash-workspace": {"allow_root": True, "allow_internet": False}},
+        ),
+        _maintainer(), db, client, _coder_settings(),
+    )
+    assert row.allow_root is None      # the grant is normalised away
+    assert row.allow_internet is False  # the denial is kept
+
+
+@pytest.mark.asyncio
+async def test_omitting_a_template_policy_clears_a_stale_denial():
+    row = _tpl_row("c1", "bash-workspace", allow_internet=False)
+    db = make_db(course_templates=[row], course_settings=None)
+    client = MagicMock()
+    client.list_templates = AsyncMock(side_effect=AssertionError("Coder must not be called"))
+
+    await cw.update_course_workspace_settings(
+        "c1", CourseWorkspaceSettingsUpdate(template_names=["bash-workspace"]),
+        _maintainer(), db, client, _coder_settings(),
+    )
+    assert row.allow_internet is None

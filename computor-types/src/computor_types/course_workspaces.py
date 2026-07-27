@@ -17,6 +17,21 @@ from pydantic import BaseModel, Field
 from computor_types.coder import CoderTemplate, CoderWorkspace
 
 
+class CourseWorkspaceTemplatePolicy(BaseModel):
+    """Course-level narrowing of a template's root/internet policy.
+
+    ``None`` means "inherit the template" — a course can only ever take access
+    away, so setting True on something the template denies changes nothing.
+    """
+
+    allow_root: Optional[bool] = Field(
+        None, description="False denies sudo/su for this course; None inherits the template"
+    )
+    allow_internet: Optional[bool] = Field(
+        None, description="False denies internet for this course; None inherits the template"
+    )
+
+
 class CourseWorkspaceTemplateItem(BaseModel):
     """One template allowed in a course, enriched from Coder best-effort."""
 
@@ -29,6 +44,24 @@ class CourseWorkspaceTemplateItem(BaseModel):
     icon: Optional[str] = Field(None, description="Coder template icon URL/path")
     exists_in_coder: Optional[bool] = Field(
         None, description="Whether Coder currently has this template; None when Coder was unreachable"
+    )
+    allow_root: Optional[bool] = Field(
+        None, description="This course's root policy; None = inherit the template"
+    )
+    allow_internet: Optional[bool] = Field(
+        None, description="This course's internet policy; None = inherit the template"
+    )
+    template_allow_root: bool = Field(
+        False, description="The template's ceiling — a course cannot grant beyond it"
+    )
+    template_allow_internet: bool = Field(
+        True, description="The template's internet ceiling"
+    )
+    effective_allow_root: bool = Field(
+        False, description="What a workspace provisioned for this course actually gets"
+    )
+    effective_allow_internet: bool = Field(
+        True, description="What a workspace provisioned for this course actually gets"
     )
 
 
@@ -57,6 +90,12 @@ class CourseWorkspaceSettingsUpdate(BaseModel):
         default_factory=list, description="Allowed Coder template names (full replacement)"
     )
     lecturer_provision_enabled: bool = Field(False)
+    template_policies: dict[str, CourseWorkspaceTemplatePolicy] = Field(
+        default_factory=dict,
+        description="Per-template root/internet narrowing, keyed by template name. "
+                    "Templates absent from this map inherit their template's policy; "
+                    "keys not present in template_names are ignored.",
+    )
 
 
 class CourseWorkspaceAdminItem(BaseModel):
