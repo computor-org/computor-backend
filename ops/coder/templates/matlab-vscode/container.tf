@@ -61,6 +61,13 @@ resource "docker_container" "workspace" {
     read_only      = false
   }
 
+  # Routed by workspace-ingress, not the main Traefik: this label is what each
+  # proxy's docker-provider constraint selects on (see docker-compose.coder.yaml).
+  labels {
+    label = "computor.ingress"
+    value = "workspace"
+  }
+
   labels {
     label = "coder.owner"
     value = data.coder_workspace_owner.me.name

@@ -1,0 +1,82 @@
+# Allowlist for the workspace-ingress proxy — rendered by computor.sh into
+# ${SYSTEM_DEPLOYMENT_PATH}/workspace-ingress/dynamic/routes.yml (the upstreams
+# differ between dev and prod, and Traefik's file provider does no env
+# substitution).
+#
+# This file IS the isolation boundary. Workspaces sit on a network whose only
+# other members are the Coder server and this proxy, and they reach the outside
+# world only through the routes below. Everything the platform serves that is
+# not listed here — the web UI, Keycloak, /docs, MinIO — is unreachable from a
+# workspace, whether or not it has internet.
+#
+# The workspace routes themselves are NOT here: they come from the Docker
+# provider, which reads the labels the workspace containers already carry
+# (ForwardAuth + stripprefix), filtered to `computor.ingress=workspace`.
+
+http:
+  routers:
+    # The Computor API. Same path the public URL uses, so a workspace resolving
+    # PUBLIC_DOMAIN to this proxy reaches the backend with its URLs unchanged.
+    workspace-api:
+      rule: "PathPrefix(`/api`)"
+      entryPoints: [web, websecure]
+      service: workspace-api
+      middlewares: [workspace-api-strip]
+      tls: {}
+      priority: 100
+
+    # Git. Student repositories are cloned with credentials embedded in the URL,
+    # so this has to be reachable for an offline workspace to be usable at all.
+    workspace-git:
+      rule: "PathPrefix(`/forgejo`)"
+      entryPoints: [web, websecure]
+      service: workspace-git
+      middlewares: [workspace-git-strip]
+      tls: {}
+      priority: 100
+
+    # Anything else a workspace asks this proxy for. Without it a request for
+    # `/` would fall through to whatever router matched most loosely; with it
+    # the answer is an explicit, greppable 403.
+    workspace-denied:
+      rule: "PathPrefix(`/`)"
+      entryPoints: [web, websecure]
+      service: noop@internal
+      middlewares: [workspace-deny]
+      tls: {}
+      priority: 1
+
+  middlewares:
+    workspace-api-strip:
+      stripPrefix:
+        prefixes: ["/api"]
+    workspace-git-strip:
+      stripPrefix:
+        prefixes: ["/forgejo"]
+    workspace-deny:
+      ipAllowList:
+        # No source can ever match, so every request through this middleware is
+        # rejected. Traefik has no "always deny" middleware; this is the
+        # idiomatic stand-in.
+        sourceRange: ["255.255.255.255/32"]
+
+  services:
+    workspace-api:
+      loadBalancer:
+        servers:
+          - url: "${WORKSPACE_INGRESS_BACKEND_URL}"
+    workspace-git:
+      loadBalancer:
+        servers:
+          - url: "${WORKSPACE_INGRESS_GIT_URL}"
+
+# Certificate for PUBLIC_DOMAIN, so a workspace hitting the public HTTPS URL
+# gets a certificate it already trusts. Mounted from WORKSPACE_INGRESS_TLS_DIR;
+# when that is unset Traefik falls back to its self-signed default, which is
+# fine in dev (plain HTTP) and NOT fine in production.
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /etc/traefik/certs/fullchain.pem
+        keyFile: /etc/traefik/certs/privkey.pem
