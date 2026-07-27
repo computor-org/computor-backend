@@ -20,9 +20,17 @@ logger = logging.getLogger(__name__)
 class TestingBackend(ABC):
     """Abstract base class for testing backends."""
 
-    def __init__(self, service_slug: str = None):
-        """Initialize backend with optional service slug."""
+    def __init__(self, service_slug: str = None, language: str = None):
+        """Initialize backend with its service slug and language.
+
+        ``language`` comes from ``Service.config.language`` and is what
+        actually selects behaviour. ``service_slug`` is carried for logging
+        and error messages only — it is the ``meta.yaml``
+        ``executionBackend.slug`` contract, an identifier, never a runner
+        selector.
+        """
         self.service_slug = service_slug
+        self.language = language
 
     @abstractmethod
     async def execute_tests(
@@ -39,82 +47,6 @@ class TestingBackend(ABC):
     def get_backend_type(self) -> str:
         """Return the type identifier for this backend."""
         pass
-
-
-class PythonTestingBackend(TestingBackend):
-    """Python testing backend using subprocess execution."""
-    
-    def get_backend_type(self) -> str:
-        return "temporal:python"
-    
-    async def execute_tests(
-        self,
-        test_file_path: str,
-        spec_file_path: str,
-        test_job_config: Dict[str, Any],
-        backend_properties: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Execute Python tests using subprocess."""
-        logging.basicConfig(level=logging.INFO)
-        # Get configuration from backend properties (env-var fallbacks live in
-        # worker_settings; TESTING_EXECUTABLE has no static default so this
-        # site keeps its own "/tmp/engine/catester/testing.py run" fallback).
-        settings = get_worker_settings()
-        testing_executable = backend_properties.get(
-            "testing_executable",
-            settings.testing_executable
-            if settings.testing_executable is not None
-            else "/tmp/engine/catester/testing.py run",
-        )
-        runtime_environment = backend_properties.get(
-            "runtime_environment",
-            settings.runtime_environment,
-        )
-        
-        # Build command
-        test_env_exec = f"{runtime_environment} {testing_executable} --test {test_file_path} --spec {spec_file_path}"
-        logger.info(f"Executing Python test command: {test_env_exec}")
-        
-        try:
-            # Execute test command
-            result = subprocess.run(
-                test_env_exec,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=backend_properties.get("timeout", 300)  # 5 minutes default
-            )
-            
-            # Log output for debugging
-            logger.info(f"Test command executed with return code: {result.returncode}")
-            if result.stdout:
-                logger.info(f"Test stdout: {result.stdout[:500]}...")
-            if result.stderr:
-                logger.warning(f"Test stderr: {result.stderr[:500]}...")
-
-            # Python test backend writes results to file (testSummary.json)
-            # The return value here is ignored - results are read from file
-            # Just return None to indicate execution completed
-            return None
-            
-        except subprocess.TimeoutExpired as e:
-            logger.error(f"Test execution timed out: {e}")
-            return {
-                "passed": 0,
-                "failed": 1,
-                "total": 1,
-                "error": "Test execution timed out",
-                "details": {"timeout": True}
-            }
-        except Exception as e:
-            logger.error(f"Error executing Python tests: {e}")
-            return {
-                "passed": 0,
-                "failed": 1,
-                "total": 1,
-                "error": str(e),
-                "details": {"exception": str(e)}
-            }
 
 
 class MatlabTestingBackend(TestingBackend):
@@ -239,16 +171,9 @@ class ComputorTestingBackend(TestingBackend):
     Uses the computor-test CLI which wraps pytest-based testing.
     """
 
-    # Language slug to computor-test subcommand mapping
-    LANGUAGE_MAP = {
-        "itpcp.exec.py": "python",
-        "itpcp.exec.oct": "octave",
-        "itpcp.exec.r": "r",
-        "itpcp.exec.julia": "julia",
-        "itpcp.exec.c": "c",
-        "itpcp.exec.fortran": "fortran",
-        "itpcp.exec.doc": "document",
-    }
+    # ``doc`` is accepted as an alias because the historical slug suffix was
+    # ``.doc`` while the computor-test subcommand is ``document``.
+    _SUBCOMMAND_ALIASES = {"doc": "document"}
 
     def get_backend_type(self) -> str:
         return "computor-testing"
@@ -277,16 +202,18 @@ class ComputorTestingBackend(TestingBackend):
         """
         logging.basicConfig(level=logging.INFO)
 
-        # Determine language from service slug
-        language = self._get_language_from_slug(
-            test_job_config.get("testing_service_slug") or self.service_slug
-        )
-
+        # The language comes from Service.config.language, resolved by the
+        # factory. There is deliberately no slug-based fallback: the slug is
+        # the meta.yaml contract, not a runner selector, and guessing from it
+        # is what made every non-itpcp.* slug unusable.
+        language = self.language
         if not language:
             raise ValueError(
-                f"Could not determine language for service slug: "
-                f"{test_job_config.get('testing_service_slug')}"
+                "No testing language configured for service "
+                f"'{test_job_config.get('testing_service_slug') or self.service_slug}'. "
+                "Set config.language on the service."
             )
+        language = self._SUBCOMMAND_ALIASES.get(language, language)
 
         # Get configuration with fallbacks. TESTING_EXECUTABLE has no static
         # default in worker_settings, so this site keeps its own "computor-test".
@@ -356,90 +283,71 @@ class ComputorTestingBackend(TestingBackend):
                 "details": {"exception": str(e)}
             }
 
-    def _get_language_from_slug(self, service_slug: str) -> Optional[str]:
-        """Map service slug to computor-test language name."""
-        if not service_slug:
-            return None
-        return self.LANGUAGE_MAP.get(service_slug.lower())
-
-
-class JavaTestingBackend(TestingBackend):
-    """Java testing backend using JUnit or similar frameworks."""
-
-    def get_backend_type(self) -> str:
-        return "temporal:java"
-
-    async def execute_tests(
-        self,
-        test_file_path: str,
-        spec_file_path: str,
-        test_job_config: Dict[str, Any],
-        backend_properties: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Execute Java tests."""
-
-        # Example implementation for Java testing
-        java_command = backend_properties.get("java_command", "java")
-        test_runner = backend_properties.get("test_runner", "junit")
-
-        # Build command based on test runner
-        if test_runner == "junit":
-            cmd = f"{java_command} -cp .:junit.jar org.junit.runner.JUnitCore {test_file_path}"
-        else:
-            cmd = f"{java_command} {test_file_path}"
-
-        logger.info(f"Executing Java test command: {cmd}")
-
-        # Similar subprocess execution as Python
-        # ... (implementation details)
-
-        return {
-            "passed": 0,
-            "failed": 0,
-            "total": 0,
-            "details": {"message": "Java testing backend not fully implemented"}
-        }
-
 
 class TestingBackendFactory:
-    """Factory for creating testing backend instances based on service slug."""
+    """Factory for creating testing backend instances, keyed by language.
 
-    _backends: Dict[str, type[TestingBackend]] = {
-        # ComputorTestingBackend for computor-testing framework (multi-language)
-        "itpcp.exec.py": ComputorTestingBackend,
-        "itpcp.exec.oct": ComputorTestingBackend,      # Octave (not MATLAB!)
-        "itpcp.exec.r": ComputorTestingBackend,
-        "itpcp.exec.julia": ComputorTestingBackend,
-        "itpcp.exec.c": ComputorTestingBackend,
-        "itpcp.exec.fortran": ComputorTestingBackend,
-        "itpcp.exec.doc": ComputorTestingBackend,
+    Dispatch is on ``Service.config.language``, never on the service slug.
+    The slug is the contract between an example's ``meta.yaml``
+    (``properties.executionBackend.slug``) and a ``Service`` row — an
+    identifier chosen by whoever registers the service. It used to double as
+    a lookup key into a hardcoded table here, which meant only the eight
+    ``itpcp.exec.*`` names known to this file could ever run: registering a
+    testing system under any other name produced a service that bound to
+    examples correctly and then died at execution.
 
-        # MATLAB - separate system with Pyro5 RPC (unchanged)
-        "itpcp.exec.mat": MatlabTestingBackend,
+    Adding a testing system is now a data change, not a code change.
+    """
 
-        # Legacy backends (deprecated but kept for backward compatibility)
-        "temporal:python": PythonTestingBackend,
-        "temporal:matlab": MatlabTestingBackend,
-        "temporal:java": JavaTestingBackend,
+    _language_backends: Dict[str, type[TestingBackend]] = {
+        # computor-test CLI, one subcommand per language
+        "python": ComputorTestingBackend,
+        "octave": ComputorTestingBackend,      # GNU Octave, not MATLAB
+        "r": ComputorTestingBackend,
+        "julia": ComputorTestingBackend,
+        "c": ComputorTestingBackend,
+        "cpp": ComputorTestingBackend,
+        "fortran": ComputorTestingBackend,
+        "document": ComputorTestingBackend,
+        "doc": ComputorTestingBackend,         # alias for 'document'
+        # MATLAB is a separate system: Pyro5 RPC to the MATLAB engine
+        "matlab": MatlabTestingBackend,
     }
 
     @classmethod
-    def register_backend(cls, service_slug: str, backend_class: type[TestingBackend]):
-        """Register a new testing backend for a service slug."""
-        cls._backends[service_slug] = backend_class
+    def register_language_backend(cls, language: str, backend_class: type[TestingBackend]):
+        """Register a testing backend implementation for a language."""
+        cls._language_backends[language.lower()] = backend_class
 
     @classmethod
-    def create_backend(cls, service_slug: str) -> TestingBackend:
-        """Create a testing backend instance based on service slug."""
-        backend_class = cls._backends.get(service_slug.lower())
+    def create_backend(cls, service_slug: str, language: Optional[str] = None) -> TestingBackend:
+        """Create a testing backend for ``language``.
+
+        Raises with an actionable message when the service carries no
+        language, which is the one configuration mistake that can produce an
+        otherwise-valid testing service.
+        """
+        if not language:
+            raise ValueError(
+                f"Service '{service_slug}' has no testing language configured. "
+                f"Set config.language on the service to one of: "
+                f"{sorted(cls._language_backends)}"
+            )
+
+        key = language.strip().lower()
+        backend_class = cls._language_backends.get(key)
         if not backend_class:
-            raise ValueError(f"Unknown testing backend for service: {service_slug}. Available: {list(cls._backends.keys())}")
-        return backend_class(service_slug=service_slug)
+            raise ValueError(
+                f"Unsupported testing language '{language}' on service "
+                f"'{service_slug}'. Supported languages: "
+                f"{sorted(cls._language_backends)}"
+            )
+        return backend_class(service_slug=service_slug, language=key)
 
     @classmethod
-    def get_available_backends(cls) -> list[str]:
-        """Get list of available backend types."""
-        return list(cls._backends.keys())
+    def get_available_languages(cls) -> list[str]:
+        """Languages a service may set in ``config.language``."""
+        return sorted(cls._language_backends)
 
 
 async def execute_tests_with_backend(
@@ -495,8 +403,12 @@ async def execute_tests_with_backend(
 
         logger.info(f"Merged backend properties for {service_slug}: {merged_properties}")
 
-        # Create and execute backend
-        backend = TestingBackendFactory.create_backend(service_slug)
+        # `language` rides in on the merged config: Service.config wins over
+        # ServiceType.properties, so a type can supply a default and a service
+        # can override it.
+        backend = TestingBackendFactory.create_backend(
+            service_slug, language=merged_properties.get("language")
+        )
         return await backend.execute_tests(
             test_file_path,
             spec_file_path,
