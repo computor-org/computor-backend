@@ -1081,11 +1081,216 @@ async def discover_template_operations(
     ]
 
 
+
+# ---------------------------------------------------------------------------
+# Workspace volumes
+#
+# Home volumes (coder-home-{coder-user-id}, shared by all of a user's
+# workspaces) and scratch volumes (coder-scratch-{workspace-id}) are
+# deliberately not Terraform-managed, so deleting a workspace can never destroy
+# a home. The flip side is that nothing in the platform could see them: a
+# departed user's home was unreclaimable, sizes invisible, and files a
+# root-enabled workspace left behind unfixable once root was switched off.
+#
+# These run here rather than in the backend because only this worker has the
+# docker socket. Same shape as the image-cleanup activity: blocking, plain def,
+# best-effort, always returns a dict.
+# ---------------------------------------------------------------------------
+
+HOME_VOLUME_PREFIX = "coder-home-"
+SCRATCH_VOLUME_PREFIX = "coder-scratch-"
+
+# Small image used to fix ownership from outside the workspace. Pulled on first
+# use if the daemon does not have it.
+REPAIR_IMAGE = "alpine:3"
+
+
+def _is_workspace_volume(name: str) -> bool:
+    return name.startswith(HOME_VOLUME_PREFIX) or name.startswith(SCRATCH_VOLUME_PREFIX)
+
+
+@activity.defn(name="list_workspace_volumes")
+def list_workspace_volumes() -> Dict[str, Any]:
+    """Every coder-home-* / coder-scratch-* volume with its size and use count.
+
+    Sizes come from one `docker system df` call rather than a du per volume.
+    Docker reports -1 when it has not computed a size; that is surfaced as None
+    rather than faked, so the UI can say "unknown" instead of "0 B".
+    """
+    import docker as docker_sdk
+
+    settings = get_worker_settings()
+    try:
+        client = docker_sdk.DockerClient(base_url="unix://" + settings.docker_socket_path)
+    except Exception as e:
+        return {"success": False, "error": f"docker connect failed: {e}", "volumes": []}
+
+    # Ask for volume usage only. The unfiltered df also walks every image and
+    # container layer, which on a host carrying the MATLAB images is the bulk of
+    # the work and none of the answer. The type filter needs docker API >= 1.42,
+    # so fall back to the plain call on an older daemon.
+    try:
+        try:
+            df = client.api._result(
+                client.api._get(
+                    client.api._url("/system/df"), params={"type": ["volume"]}
+                ),
+                True,
+            )
+        except Exception:
+            df = client.df()
+    except Exception as e:
+        return {"success": False, "error": f"docker df failed: {e}", "volumes": []}
+
+    volumes = []
+    for entry in df.get("Volumes") or []:
+        name = entry.get("Name") or ""
+        if not _is_workspace_volume(name):
+            continue
+        usage = entry.get("UsageData") or {}
+        size = usage.get("Size")
+        ref_count = usage.get("RefCount")
+        volumes.append({
+            "name": name,
+            "kind": "home" if name.startswith(HOME_VOLUME_PREFIX) else "scratch",
+            # The uuid half of the name: a Coder USER id for a home, a WORKSPACE
+            # id for a scratch volume. Resolved to a person by the caller, which
+            # is the side that can talk to Coder and the database.
+            "owner_ref": name.split("-", 2)[2] if name.count("-") >= 2 else "",
+            "size_bytes": None if size is None or size < 0 else int(size),
+            "in_use": bool(ref_count) if ref_count is not None else None,
+            "created_at": entry.get("CreatedAt"),
+        })
+    volumes.sort(key=lambda v: v["name"])
+    return {"success": True, "volumes": volumes}
+
+
+@activity.defn(name="delete_workspace_volume")
+def delete_workspace_volume(name: str) -> Dict[str, Any]:
+    """Remove one workspace volume; never forced.
+
+    A volume a container still references is refused by docker, and that is the
+    behaviour we want reported rather than overridden — forcing it would pull
+    the home out from under a running workspace.
+    """
+    import docker as docker_sdk
+
+    if not _is_workspace_volume(name):
+        return {"success": False, "error": f"'{name}' is not a workspace volume"}
+
+    settings = get_worker_settings()
+    try:
+        client = docker_sdk.DockerClient(base_url="unix://" + settings.docker_socket_path)
+        client.volumes.get(name).remove()
+    except Exception as e:
+        message = str(e)
+        if "in use" in message or "409" in message:
+            return {
+                "success": False,
+                "error": f"'{name}' is in use by a container — stop the workspace first.",
+            }
+        return {"success": False, "error": message}
+    return {"success": True, "message": f"Volume '{name}' deleted"}
+
+
+@activity.defn(name="repair_volume_ownership")
+def repair_volume_ownership(name: str) -> Dict[str, Any]:
+    """Give a volume's contents back to uid 1000 from outside the workspace.
+
+    Files a workspace created while it had root stay root-owned in the shared
+    home. Once the template's root is switched off nothing inside the workspace
+    can chown them, so the user is left with directories they cannot write and,
+    in the MATLAB templates, a startup that aborts on them.
+    """
+    import docker as docker_sdk
+
+    if not _is_workspace_volume(name):
+        return {"success": False, "error": f"'{name}' is not a workspace volume"}
+
+    settings = get_worker_settings()
+    try:
+        client = docker_sdk.DockerClient(base_url="unix://" + settings.docker_socket_path)
+        client.containers.run(
+            REPAIR_IMAGE,
+            command=["chown", "-R", "1000:1000", "/vol"],
+            volumes={name: {"bind": "/vol", "mode": "rw"}},
+            remove=True,
+            network_disabled=True,
+        )
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    return {"success": True, "message": f"Ownership of '{name}' reset to uid 1000"}
+
+
+@register_task
+@workflow.defn(name="workspace_volumes", sandboxed=False)
+class WorkspaceVolumesWorkflow(BaseWorkflow):
+    """List, delete or repair workspace volumes.
+
+    One workflow with an action rather than three, because each is a single
+    activity call — the docker socket lives on this worker, so even reading a
+    list has to come through Temporal. Short timeouts: `docker system df` walks
+    the filesystem and the caller is a web request waiting on the result.
+    """
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "workspace_volumes"
+
+    @classmethod
+    def get_task_queue(cls) -> str:
+        return "coder-tasks"
+
+    @classmethod
+    def get_execution_timeout(cls) -> timedelta:
+        return timedelta(minutes=10)
+
+    @workflow.run
+    async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
+        action = parameters.get("action", "list")
+        volume = parameters.get("volume")
+
+        if action == "list":
+            result = await workflow.execute_activity(
+                list_workspace_volumes,
+                start_to_close_timeout=timedelta(minutes=5),
+            )
+        elif action in ("delete", "repair"):
+            if not volume:
+                return WorkflowResult(
+                    status="failed", result=None,
+                    error="A volume name is required",
+                    metadata={"workflow_type": "workspace_volumes"},
+                )
+            result = await workflow.execute_activity(
+                delete_workspace_volume if action == "delete" else repair_volume_ownership,
+                args=[volume],
+                # A chown over a large home is slow; deleting is not.
+                start_to_close_timeout=timedelta(minutes=5 if action == "repair" else 1),
+            )
+        else:
+            return WorkflowResult(
+                status="failed", result=None,
+                error=f"Unknown action '{action}'",
+                metadata={"workflow_type": "workspace_volumes"},
+            )
+
+        return WorkflowResult(
+            status="completed" if result.get("success") else "failed",
+            result=result,
+            error=result.get("error"),
+            metadata={"workflow_type": "workspace_volumes", "action": action},
+        )
+
+
 ACTIVITIES = [
     build_workspace_image,
     cleanup_stale_workspace_images,
+    delete_workspace_volume,
     discover_template_keys,
     discover_template_operations,
+    list_workspace_volumes,
     push_coder_template,
+    repair_volume_ownership,
     rollout_template_workspaces,
 ]

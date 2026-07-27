@@ -728,6 +728,18 @@ class CoderClient:
 
         return [self._parse_workspace_summary(ws) for ws in resp.json().get("workspaces", [])]
 
+    async def list_all_users(self, limit: int = 1000) -> list[CoderUser]:
+        """Every Coder user (admin view).
+
+        Used to resolve a `coder-home-{coder-user-id}` volume back to a person:
+        the volume name carries Coder's user id, while everything else in
+        Computor keys off the username (which is the Computor user id).
+        """
+        resp = await self._request(
+            "GET", "/api/v2/users", params={"limit": limit}, admin_headers=True, ok=(200,)
+        )
+        return [CoderUser.from_api(u) for u in resp.json().get("users", [])]
+
     async def get_workspace(
         self,
         username: str,

@@ -346,6 +346,44 @@ class CoderAdminTaskListResponse(BaseModel):
     tasks: list[TaskInfo] = Field(default_factory=list)
 
 
+# Workspace volumes (home + scratch), managed through the coder worker
+
+class WorkspaceVolume(BaseModel):
+    """One coder-home-* / coder-scratch-* docker volume."""
+
+    name: str = Field(..., description="Docker volume name")
+    kind: str = Field(..., description="'home' (shared per user) or 'scratch' (per workspace)")
+    size_bytes: Optional[int] = Field(
+        None, description="Size on disk; null when docker has not computed it"
+    )
+    in_use: Optional[bool] = Field(
+        None, description="A container currently mounts it — deletion will be refused"
+    )
+    created_at: Optional[str] = Field(None, description="Docker's creation timestamp")
+    user_id: Optional[str] = Field(None, description="Computor user this home belongs to")
+    user_name: Optional[str] = Field(None, description="Display name / email of that user")
+    workspace_name: Optional[str] = Field(
+        None, description="For a scratch volume, the workspace it belongs to"
+    )
+    orphaned: bool = Field(
+        False,
+        description="Nothing references it any more: the Coder user or workspace the "
+                    "name points at no longer exists. Safe to reclaim.",
+    )
+
+
+class WorkspaceVolumeListResponse(BaseModel):
+    """All workspace volumes with their sizes and owners."""
+
+    volumes: list[WorkspaceVolume] = Field(default_factory=list)
+    total_bytes: int = Field(0, description="Sum of the known sizes")
+    unresolved: bool = Field(
+        False,
+        description="Coder was unreachable, so owners could not be resolved and nothing "
+                    "is reported as orphaned (absence of an owner would be misleading)",
+    )
+
+
 # Template settings (DB-backed resource limits, quota, variable overrides)
 
 class WorkspaceTemplateSettingsSchema(BaseModel):

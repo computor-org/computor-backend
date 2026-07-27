@@ -337,6 +337,32 @@ export interface TemplateVariablesResponse {
   variables: TemplateVariable[];
 }
 
+
+// --- Admin: workspace volumes (home + scratch) ---
+
+export interface WorkspaceVolume {
+  name: string;
+  /** 'home' = shared per user, 'scratch' = per workspace. */
+  kind: string;
+  /** Size on disk; null when docker has not computed it. */
+  size_bytes?: number | null;
+  /** A container mounts it — deletion will be refused. */
+  in_use?: boolean | null;
+  created_at?: string | null;
+  user_id?: string | null;
+  user_name?: string | null;
+  workspace_name?: string | null;
+  /** The Coder user or workspace the name points at is gone. Safe to reclaim. */
+  orphaned: boolean;
+}
+
+export interface WorkspaceVolumeListResponse {
+  volumes: WorkspaceVolume[];
+  total_bytes: number;
+  /** Coder was unreachable, so owners are unresolved and nothing is called orphaned. */
+  unresolved: boolean;
+}
+
 // --- Course-scoped workspaces (computor_types/course_workspaces.py) ---
 
 export interface CourseWorkspaceTemplateItem {
