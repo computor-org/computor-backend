@@ -173,13 +173,25 @@ services:
         condition: service_healthy
 
 networks:
-  # Isolated bridge for Coder workspace containers. Workspaces are untrusted —
-  # the user has passwordless sudo — so they must NOT share computor-network
-  # with the platform's databases, IdP (Keycloak), object store (MinIO), Redis,
-  # Temporal, etc. Only Traefik (ingress) and the Coder server (agent
-  # connections) are also attached here. computor-network itself is defined in
-  # docker-compose.base.yaml and merged in at deploy time.
+  # Isolated bridge for Coder workspace containers. Workspaces are untrusted, so
+  # they must NOT share computor-network with the platform's databases, IdP
+  # (Keycloak), object store (MinIO), Redis, Temporal, etc. Only Traefik
+  # (ingress) and the Coder server (agent connections) are also attached here.
+  # computor-network itself is defined in docker-compose.base.yaml and merged in
+  # at deploy time.
   computor-coder-workspaces:
     name: computor-coder-workspaces
     driver: bridge
+
+  # Same bridge, minus egress: `internal` means docker installs no NAT and no
+  # default route, so a workspace attached here reaches the containers on this
+  # network and nothing else — external DNS and connects fail immediately
+  # (ENETUNREACH) rather than hanging, which keeps apt/pip/git from stalling.
+  # A workspace picks exactly ONE of the two networks (see the templates'
+  # allow_internet variable): attaching both would restore egress via the
+  # non-internal one.
+  computor-coder-workspaces-offline:
+    name: computor-coder-workspaces-offline
+    driver: bridge
+    internal: true
 

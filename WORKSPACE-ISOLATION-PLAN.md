@@ -2,8 +2,8 @@
 
 **Branch:** `feat/workspace-isolation-modes` off `release/2026.10`
 
-> A first draft of this lives at `WORKSPACE-ISOLATION-PLAN.md` in the repo root (written before
-> the app-auth investigation). Replace it with this content as the first commit on the branch.
+> Approved 2026-07-27. Phase order is deliberate: Phase 1 is shippable on its own, Phase 3 is
+> blocked on the prod TLS cert path, and Phase 4 opens with a spike that can change its approach.
 
 ---
 

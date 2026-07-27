@@ -24,6 +24,12 @@ resource "docker_container" "workspace" {
   cpu_shares = var.cpu_shares
   shm_size   = var.shm_size
 
+  # Root policy (see allow_root). no-new-privileges makes the kernel refuse the
+  # setuid transition in sudo/su, so the same image serves both modes and there
+  # is no root-less image variant to maintain. Fixed for the container's life —
+  # changing the policy replaces the container.
+  security_opts = local.root_enabled ? [] : ["no-new-privileges:true"]
+
   entrypoint = [
     "sh", "-c",
     replace(
@@ -46,7 +52,7 @@ resource "docker_container" "workspace" {
   }
 
   networks_advanced {
-    name = var.docker_network
+    name = local.ws_net
   }
 
   volumes {
@@ -69,7 +75,7 @@ resource "docker_container" "workspace" {
   }
   labels {
     label = "traefik.docker.network"
-    value = var.docker_network
+    value = local.ws_net
   }
   labels {
     label = "traefik.http.routers.coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.rule"
