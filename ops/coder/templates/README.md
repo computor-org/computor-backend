@@ -106,6 +106,27 @@ volume, and nothing can repair them once that user's workspaces lose root (the M
 `sudo chown -R coder:coder "$HOME"` self-heal silently no-ops). Sweep `coder-home-*` volumes
 before turning root off for users who had it.
 
+## What a workspace can reach
+
+Workspaces sit on their own bridge, whose only other members are the Coder
+server and `workspace-ingress`. Everything outbound goes through that proxy's
+allowlist (`ops/coder/workspace-ingress/`): the Computor API and git, nothing
+else. The platform's web UI, Keycloak, `/docs` and the datastores are
+unreachable from a workspace whether or not internet is enabled.
+
+Each workspace app also requires a per-user credential that the ingress
+injects (`workspace_app_secret`, plus an argon2 hash for the code-server
+templates). Without it, one workspace could drive another directly by
+container name — the apps bind `0.0.0.0` on a shared bridge and the names are
+predictable. This raises the bar but does not make the bridge a boundary:
+workspaces can still see each other's ports.
+
+**Dev only:** a workspace can reach the dev machine through the bridge gateway,
+so anything you have listening on `0.0.0.0` there is reachable from inside a
+workspace. That is how the dev backend is reached (it runs on the host, not in
+a container). Compose binds the platform's own ports to `127.0.0.1`, which is
+what keeps the datastores out of reach.
+
 ## Adding a new workspace type
 
 1. Copy an existing template dir (`vscode` for editor-based, `bash` for terminal-based,

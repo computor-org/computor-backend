@@ -198,6 +198,13 @@ services:
 
   # Static file server — read-only view of the documents tree maintained by
   # the /documents API. Both must point at the same host directory.
+  #
+  # NOTE: /docs carries no ForwardAuth, so the whole documents tree is readable
+  # (and listable — SHOW_LISTING) by anyone who can reach Traefik, with no
+  # login. That is fine if the tree is meant to be public course material, and
+  # is not if anything private ever lands there. Workspaces can no longer reach
+  # it — they are behind workspace-ingress, whose allowlist covers only the API
+  # and git — but every browser on the public domain still can.
   static-server:
     image: halverneus/static-file-server:latest
     security_opt:
