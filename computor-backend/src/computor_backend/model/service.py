@@ -4,10 +4,14 @@ Service and API Token models for service account management.
 Service accounts are specialized users (is_service=true) that represent
 automated workers, integrations, and other non-human systems.
 
-Service users typically authenticate via API tokens, but can optionally
-have passwords for administrative access or debugging purposes.
+Service users authenticate ONLY via API tokens — the ``user.password``
+column was dropped when Keycloak SSO became the sole identity provider, so
+there is no password path for them (or anyone else).
 
-API tokens provide scoped authentication for both service and regular users.
+API tokens carry scopes for both service and regular users. Note that scopes
+are ADDITIVE: they grant permissions and never remove any, so a token is
+never weaker than the account it belongs to. A service user holds no roles,
+which is what makes its scopes meaningful in the first place.
 
 ServiceType defines the types of services available in the system using
 UUID + Ltree hybrid approach for stable references and hierarchical organization.

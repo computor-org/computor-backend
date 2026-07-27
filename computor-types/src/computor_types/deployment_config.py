@@ -21,12 +21,8 @@ class UserDeployment(BaseDeployment):
     family_name: Optional[str] = Field(None, description="User's family name")
     email: Optional[str] = Field(None, description="User's email address")
     number: Optional[str] = Field(None, description="User number/identifier (student ID)")
-    user_type: str = Field("user", description="Type of user account (user or token)")
     properties: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional user properties")
-    
-    # Password for local authentication (optional)
-    password: Optional[str] = Field(None, description="Initial password for the user")
-    
+
     # System roles (optional) - e.g., "_admin", "_user_manager", "_organization_manager"
     roles: Optional[List[str]] = Field(None, description="System roles to assign to the user")
     
@@ -752,8 +748,6 @@ EXAMPLE_USERS_DEPLOYMENT = UsersDeploymentConfig(
                 given_name="Course",
                 family_name="Manager",
                 email="course.manager@university.edu",
-                user_type="user",
-                password="<password>"
             ),
             accounts=[
                 AccountDeployment(

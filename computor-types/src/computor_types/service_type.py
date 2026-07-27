@@ -12,6 +12,19 @@ from datetime import datetime
 from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
 
 
+# One list, used by both Create and Update. They had drifted: Update omitted
+# 'agent', so PATCHing the seeded `agent` service type was a guaranteed 422.
+ALLOWED_CATEGORIES = [
+    'worker',
+    'testing',
+    'review',
+    'metrics',
+    'integration',
+    'custom',
+    'agent',
+]
+
+
 class ServiceTypeBase(BaseModel):
     """Base fields shared across all service type DTOs."""
     path: str = Field(..., description="Hierarchical path (e.g., 'testing.python', 'review.llm.gpt4')")
@@ -61,11 +74,10 @@ class ServiceTypeBase(BaseModel):
     @classmethod
     def validate_category(cls, v: str) -> str:
         """Validate category is one of the allowed values."""
-        allowed = ['worker', 'testing', 'review', 'metrics', 'integration', 'custom', 'agent']
-        if v not in allowed:
+        if v not in ALLOWED_CATEGORIES:
             raise ValueError(
                 f"Invalid category: '{v}'. "
-                f"Must be one of: {', '.join(allowed)}"
+                f"Must be one of: {', '.join(ALLOWED_CATEGORIES)}"
             )
         return v
 
@@ -108,11 +120,10 @@ class ServiceTypeUpdate(BaseModel):
         """Validate category is one of the allowed values."""
         if v is None:
             return v
-        allowed = ['worker', 'testing', 'review', 'metrics', 'integration', 'custom']
-        if v not in allowed:
+        if v not in ALLOWED_CATEGORIES:
             raise ValueError(
                 f"Invalid category: '{v}'. "
-                f"Must be one of: {', '.join(allowed)}"
+                f"Must be one of: {', '.join(ALLOWED_CATEGORIES)}"
             )
         return v
 

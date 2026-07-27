@@ -3,7 +3,6 @@
 import click
 
 from computor_cli.auth import get_computor_client
-from computor_client import SyncComputorClient
 from computor_cli.config import CLIAuthConfig
 from computor_cli.utils import run_async
 
@@ -51,12 +50,13 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                 click.echo(f"  ℹ️  User already exists: {user.display_name}")
             else:
                 # Create new user
+                # UserCreate has no `number` or `user_type` field — pydantic's
+                # extra='ignore' has been silently dropping both. `user_type`
+                # is gone entirely (the column was removed with local auth).
                 user_create = UserCreate(
                     given_name=user_dep.given_name,
                     family_name=user_dep.family_name,
                     email=user_dep.email,
-                    number=user_dep.number,
-                    user_type=user_dep.user_type,
                     properties=user_dep.properties
                 )
                 
@@ -96,17 +96,10 @@ def _deploy_users(config: ComputorDeploymentConfig, auth: CLIAuthConfig):
                     except Exception as e:
                         click.echo(f"  ⚠️  Failed to assign role {role_id}: {e}")
                 
-            # Set password if provided
-            if user_dep.password:
-                try:
-                    # Endpoint has no generated client method; use the sync facade.
-                    SyncComputorClient.from_client(client).create(
-                        "user/password", {"password": user_dep.password}
-                    )
-                    click.echo(f"  ✅ Set password for user: {user.display_name}")
-                except Exception as e:
-                    click.echo(f"  ⚠️  Failed to set password: {e}")
-            
+            # No password step: local password auth was removed when Keycloak
+            # SSO became the only identity provider, and the `user.password`
+            # column no longer exists.
+
             # Create accounts
             for account_dep in user_deployment.accounts:
                 # Check if account already exists for this user
