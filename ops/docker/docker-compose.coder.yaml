@@ -66,6 +66,10 @@ services:
       - "--providers.docker.network=${CODER_WORKSPACE_NETWORK:-computor-coder-workspaces}"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+      # TLS belongs to the entrypoint, not the routers: a router with its
+      # own `tls` only serves TLS connections, so the same router could not
+      # also answer the plain-HTTP entrypoint (it 404s instead).
+      - "--entrypoints.websecure.http.tls=true"
       - "--entrypoints.web.forwardedHeaders.trustedIPs=127.0.0.1/32,172.16.0.0/12,192.168.0.0/16"
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"

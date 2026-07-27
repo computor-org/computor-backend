@@ -22,7 +22,6 @@ http:
       entryPoints: [web, websecure]
       service: workspace-api
       middlewares: [workspace-api-strip]
-      tls: {}
       priority: 100
 
     # Git. Student repositories are cloned with credentials embedded in the URL,
@@ -32,7 +31,6 @@ http:
       entryPoints: [web, websecure]
       service: workspace-git
       middlewares: [workspace-git-strip]
-      tls: {}
       priority: 100
 
     # Anything else a workspace asks this proxy for. Without it a request for
@@ -43,7 +41,6 @@ http:
       entryPoints: [web, websecure]
       service: noop@internal
       middlewares: [workspace-deny]
-      tls: {}
       priority: 1
 
   middlewares:
