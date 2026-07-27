@@ -65,11 +65,13 @@ from computor_backend.tasks import get_task_executor, TaskSubmission
 from computor_types.tasks import TaskInfo
 from computor_types.workspace_roles import WorkspaceProvisionRequest
 from computor_backend.coder.service import (
+    derive_workspace_app_secret,
     get_user_by_email,
     get_user_by_id,
     get_user_email,
     get_user_fullname,
     mint_workspace_token,
+    workspace_app_password_hash,
 )
 from computor_backend.business_logic.course_workspaces import (
     enforce_template_quota as _enforce_template_quota,
@@ -437,6 +439,7 @@ async def provision_workspace(
                 db, permissions, template
             )
 
+        app_secret = derive_workspace_app_secret(str(target_user.id))
         result = await client.provision_workspace(
             user_email=get_user_email(target_user),
             username=str(target_user.id),
@@ -447,6 +450,8 @@ async def provision_workspace(
             home_mode=request.home_mode,
             allow_root=policy_root,
             allow_internet=policy_internet,
+            app_secret=app_secret,
+            app_password_hash=workspace_app_password_hash(app_secret),
         )
         return result
     except ComputorException:

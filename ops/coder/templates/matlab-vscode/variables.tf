@@ -57,12 +57,6 @@ variable "dev_forward_ports" {
   type        = string
 }
 
-variable "code_server_password" {
-  default     = ""
-  description = "Password for code-server access (empty disables code-server auth)"
-  sensitive   = true
-  type        = string
-}
 
 variable "memory_mb" {
   default     = 0

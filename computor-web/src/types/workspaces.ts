@@ -107,7 +107,6 @@ export interface ProvisionResult {
   workspace?: CoderWorkspace | null;
   created_user: boolean;
   created_workspace: boolean;
-  code_server_password?: string | null;
 }
 
 export interface CoderTemplate {

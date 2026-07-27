@@ -68,9 +68,16 @@ class CoderWorkspaceCreate(BaseModel):
         ...,
         description="Workspace template name (must exist in Coder)"
     )
-    code_server_password: Optional[str] = Field(
+    app_secret: Optional[str] = Field(
         None,
-        description="Password for direct code-server access"
+        description="Per-user credential the workspace app requires and the workspace "
+                    "ingress injects, so one workspace cannot drive another directly. "
+                    "None leaves the app unauthenticated.",
+    )
+    app_password_hash: Optional[str] = Field(
+        None,
+        description="Argon2id hash of app_secret, used by the code-server templates as "
+                    "HASHED_PASSWORD and as the injected session cookie.",
     )
     computor_auth_token: Optional[str] = Field(
         None,
@@ -192,10 +199,6 @@ class ProvisionResult(BaseModel):
     workspace: Optional[CoderWorkspace] = Field(None, description="Created workspace")
     created_user: bool = Field(False, description="Whether user was newly created")
     created_workspace: bool = Field(False, description="Whether workspace was newly created")
-    code_server_password: Optional[str] = Field(
-        None,
-        description="Code-server password (only returned on creation)"
-    )
 
 
 class CoderTemplate(BaseModel):

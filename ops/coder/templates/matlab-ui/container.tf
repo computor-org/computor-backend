@@ -96,6 +96,15 @@ resource "docker_container" "workspace" {
     label = "traefik.http.services.coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.loadbalancer.server.port"
     value = var.matlab_proxy_port
   }
+  # Injects the per-user app credential (matlab-proxy takes its token in the mwi-auth-token header), so a request reaching the app
+  # WITHOUT passing through this proxy — another workspace dialling the
+  # container directly — carries no credential and is refused. An empty value
+  # removes the header: the unauthenticated fallback when no secret was issued.
+  labels {
+    label = "traefik.http.middlewares.appauth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.headers.customrequestheaders.mwi-auth-token"
+    value = local.app_secret
+  }
+
   labels {
     label = "traefik.http.middlewares.auth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.forwardauth.address"
     value = "${var.computor_backend_internal}/auth/verify-coder-access"
@@ -106,6 +115,6 @@ resource "docker_container" "workspace" {
   }
   labels {
     label = "traefik.http.routers.coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.middlewares"
-    value = "auth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
+    value = "auth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)},appauth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
   }
 }

@@ -126,6 +126,15 @@ resource "docker_container" "workspace" {
   # prefix must reach the container intact (unlike ttyd/KasmVNC/code-server).
 
   # ForwardAuth middleware - verify user authentication before allowing access
+  # Injects the per-user app credential (Jupyter accepts its token in an Authorization header), so a request reaching the app
+  # WITHOUT passing through this proxy — another workspace dialling the
+  # container directly — carries no credential and is refused. An empty value
+  # removes the header: the unauthenticated fallback when no secret was issued.
+  labels {
+    label = "traefik.http.middlewares.appauth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.headers.customrequestheaders.Authorization"
+    value = local.app_secret != "" ? "token ${local.app_secret}" : ""
+  }
+
   labels {
     label = "traefik.http.middlewares.auth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.forwardauth.address"
     value = "${var.computor_backend_internal}/auth/verify-coder-access"
@@ -139,6 +148,6 @@ resource "docker_container" "workspace" {
   # Authentication middleware only (no strip-prefix — see note above)
   labels {
     label = "traefik.http.routers.coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.middlewares"
-    value = "auth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
+    value = "auth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)},appauth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
   }
 }

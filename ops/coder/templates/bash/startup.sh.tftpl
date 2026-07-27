@@ -32,12 +32,28 @@ fi
 # Traefik strips the /coder/{user}/{workspace} prefix, so ttyd serves at
 # root; its asset and websocket URLs are relative, which resolves correctly
 # as long as the workspace URL ends with a trailing slash.
+# --credential makes ttyd demand HTTP basic auth. The workspace ingress injects
+# it for browser traffic, so the user never sees a prompt; a request that did
+# not come through the ingress — another workspace dialling this container
+# directly on the shared bridge — has no header and is refused.
+%{ if app_secret != "" }
+ttyd \
+  --port ${ttyd_port} \
+  --interface 0.0.0.0 \
+  --writable \
+  --credential "coder:${app_secret}" \
+  bash --login \
+  >/tmp/ttyd.log 2>&1 &
+%{ else }
+echo "WARNING: no workspace app secret was issued — the terminal is reachable" \
+     "by any other workspace on this network." >&2
 ttyd \
   --port ${ttyd_port} \
   --interface 0.0.0.0 \
   --writable \
   bash --login \
   >/tmp/ttyd.log 2>&1 &
+%{ endif }
 
 # Block until ttyd actually accepts connections. The agent only reports
 # lifecycle_state=ready once this script exits, and the web launch page sends the

@@ -82,3 +82,37 @@ locals {
   # non-internal one (see docker-compose.coder.yaml).
   ws_net = local.internet_enabled ? var.docker_network : var.docker_network_offline
 }
+
+# Per-USER credential the workspace app requires and the ingress injects, so a
+# workspace cannot be driven directly by another workspace on the shared bridge
+# (the apps bind 0.0.0.0 and container names are predictable). Per user rather
+# than per workspace because /home/coder is shared across a user's workspaces —
+# a per-workspace value would make two running desktops fight over
+# ~/.kasmpasswd. Empty leaves the app unauthenticated.
+data "coder_parameter" "workspace_app_secret" {
+  name         = "workspace_app_secret"
+  type         = "string"
+  description  = "Per-user credential required by this workspace's app"
+  mutable      = true
+  default      = ""
+  display_name = "Workspace App Secret"
+  order        = 104
+}
+
+# Argon2id hash of the same secret, for the code-server templates: code-server
+# compares its session cookie against HASHED_PASSWORD, so handing it the hash
+# lets the ingress inject a ready-made session and skip the login page.
+data "coder_parameter" "workspace_app_hash" {
+  name         = "workspace_app_hash"
+  type         = "string"
+  description  = "Argon2id hash of the app secret (code-server session cookie)"
+  mutable      = true
+  default      = ""
+  display_name = "Workspace App Secret Hash"
+  order        = 105
+}
+
+locals {
+  app_secret = data.coder_parameter.workspace_app_secret.value
+  app_hash   = data.coder_parameter.workspace_app_hash.value
+}

@@ -5,6 +5,9 @@ This module provides service functions for workspace operations that
 require access to backend repositories and utilities.
 """
 
+import base64
+import hashlib
+import hmac
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -14,8 +17,53 @@ from sqlalchemy.orm import Session
 from computor_backend.model.service import ApiToken
 from computor_backend.repositories import ApiTokenRepository, UserRepository
 from computor_backend.utils.api_token import generate_api_token
+from computor_backend.utils.encryption import _token_secret
 
 logger = logging.getLogger(__name__)
+
+
+# Domain separator, so this secret can never collide with another HMAC derived
+# from the same TOKEN_SECRET.
+_APP_SECRET_CONTEXT = b"computor:workspace-app-auth:v1"
+
+
+def derive_workspace_app_secret(user_id: str) -> str:
+    """Credential the workspace apps require and the ingress injects.
+
+    Workspace apps (ttyd, KasmVNC, Jupyter, code-server) bind on 0.0.0.0 and
+    all workspaces share a Docker bridge, so without a credential any workspace
+    can drive any other one directly by container name, never touching the
+    proxy that does the authentication. Requiring this secret closes that.
+
+    Per USER rather than per workspace: /home/coder is one volume shared across
+    all of a user's workspaces, so a per-workspace secret would make two of
+    their running desktops fight over ~/.kasmpasswd. Sharing it between a
+    single user's own workspaces is not a weakening — they are the same trust
+    domain — while a different user still cannot authenticate.
+
+    Derived rather than stored: deterministic from TOKEN_SECRET, so there is no
+    migration, nothing at rest, and a rebuild reproduces the same value.
+    """
+    digest = hmac.new(
+        _token_secret().encode("utf-8"),
+        _APP_SECRET_CONTEXT + str(user_id).encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
+    # URL-safe and free of ':' so it survives basic-auth and token headers.
+    return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+
+
+def workspace_app_password_hash(secret: str) -> str:
+    """Argon2id hash of the app secret, for the code-server templates.
+
+    code-server keeps its session in a `code-server-session` cookie holding an
+    argon2 hash; with HASHED_PASSWORD set it compares the cookie against that
+    hash directly. Handing the template both values lets the ingress inject a
+    ready-made session cookie, so a user never sees a login page.
+    """
+    from argon2 import PasswordHasher
+
+    return PasswordHasher().hash(secret)
 
 
 def mint_workspace_token(

@@ -689,3 +689,41 @@ async def test_omitting_a_template_policy_clears_a_stale_denial():
         _maintainer(), db, client, _coder_settings(),
     )
     assert row.allow_internet is None
+
+
+# --- per-user app credential -------------------------------------------------
+
+
+def test_app_secret_is_per_user_and_deterministic(monkeypatch):
+    """Per USER, not per workspace: /home/coder is shared across a user's
+    workspaces, so a per-workspace secret would make two running desktops fight
+    over ~/.kasmpasswd. Deterministic so a rebuild reproduces it with nothing
+    stored anywhere."""
+    monkeypatch.setenv("TOKEN_SECRET", "x" * 32)
+    from computor_backend.coder.service import derive_workspace_app_secret
+
+    a = derive_workspace_app_secret("user-1")
+    assert a == derive_workspace_app_secret("user-1")
+    assert a != derive_workspace_app_secret("user-2")
+    # Has to survive a basic-auth "user:pass" pair and a token header.
+    assert ":" not in a and a.strip() == a
+
+
+def test_app_secret_changes_with_the_token_secret(monkeypatch):
+    from computor_backend.coder.service import derive_workspace_app_secret
+
+    monkeypatch.setenv("TOKEN_SECRET", "a" * 32)
+    first = derive_workspace_app_secret("user-1")
+    monkeypatch.setenv("TOKEN_SECRET", "b" * 32)
+    assert derive_workspace_app_secret("user-1") != first
+
+
+def test_immutable_parameters_are_carried_across_a_rebuild():
+    """A build that omits a rich parameter silently resets it to the template
+    default — which would hand a locked-down workspace root and internet back,
+    and drop the app credential while the ingress keeps injecting one."""
+    from computor_backend.coder.client import CoderClient
+
+    for name in ("home_mode", "allow_root", "allow_internet",
+                 "workspace_app_secret", "workspace_app_hash"):
+        assert name in CoderClient.CARRIED_BUILD_PARAMS

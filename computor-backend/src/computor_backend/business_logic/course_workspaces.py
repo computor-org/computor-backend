@@ -27,9 +27,11 @@ from computor_backend.coder.config import CoderSettings
 from computor_backend.coder.exceptions import CoderWorkspaceNotFoundError
 from computor_backend.coder.naming import derive_workspace_name, sanitize_workspace_name
 from computor_backend.coder.service import (
+    derive_workspace_app_secret,
     get_user_email,
     get_user_fullname,
     mint_workspace_token,
+    workspace_app_password_hash,
 )
 from computor_backend.exceptions import (
     BadRequestException,
@@ -646,6 +648,7 @@ async def provision_student_workspaces(
                 workspace_name=workspace_name,
                 ttl_days=coder_settings.workspace_token_ttl_days,
             )
+            app_secret = derive_workspace_app_secret(str(member.user_id))
             result = await client.provision_workspace(
                 user_email=email,
                 username=str(member.user_id),
@@ -656,6 +659,8 @@ async def provision_student_workspaces(
                 home_mode=data.home_mode,
                 allow_root=policy_root,
                 allow_internet=policy_internet,
+                app_secret=app_secret,
+                app_password_hash=workspace_app_password_hash(app_secret),
             )
             outcome.workspace_name = result.workspace.name if result.workspace else workspace_name
             outcome.success = True

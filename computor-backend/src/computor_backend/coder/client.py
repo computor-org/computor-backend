@@ -830,11 +830,12 @@ class CoderClient:
 
         # Add rich parameter values (per-workspace Terraform variables)
         rich_params = []
-        if workspace_data.code_server_password:
-            rich_params.append({
-                "name": "code_server_password",
-                "value": workspace_data.code_server_password,
-            })
+        for name, value in (
+            ("workspace_app_secret", workspace_data.app_secret),
+            ("workspace_app_hash", workspace_data.app_password_hash),
+        ):
+            if value:
+                rich_params.append({"name": name, "value": value})
         if workspace_data.computor_auth_token:
             rich_params.append({
                 "name": "computor_auth_token",
@@ -1205,7 +1206,16 @@ class CoderClient:
     # silently resets it to the template default, which would move a scratch
     # home onto the shared volume or hand a locked-down workspace root and
     # internet back. Every code path that starts a build must carry them over.
-    CARRIED_BUILD_PARAMS = ("home_mode", "allow_root", "allow_internet")
+    CARRIED_BUILD_PARAMS = (
+        "home_mode",
+        "allow_root",
+        "allow_internet",
+        # Losing these on a rebuild would leave the app with no credential while
+        # the ingress keeps injecting one — the workspace would answer nobody,
+        # or worse, answer everybody.
+        "workspace_app_secret",
+        "workspace_app_hash",
+    )
 
     async def _carry_build_params(self, build_id: Optional[str]) -> list[dict]:
         """Rich-parameter values to re-send so a rebuild preserves policy.
@@ -1341,6 +1351,8 @@ class CoderClient:
         home_mode: Optional[str] = None,
         allow_root: Optional[bool] = None,
         allow_internet: Optional[bool] = None,
+        app_secret: Optional[str] = None,
+        app_password_hash: Optional[str] = None,
     ) -> ProvisionResult:
         """
         Full provisioning: get or create user and workspace.
@@ -1429,6 +1441,8 @@ class CoderClient:
                 home_mode=home_mode,
                 allow_root=allow_root,
                 allow_internet=allow_internet,
+                app_secret=app_secret,
+                app_password_hash=app_password_hash,
             )
             workspace = await self.create_workspace(user.username, ws_data)
             workspace_created = True

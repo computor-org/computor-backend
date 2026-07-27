@@ -48,22 +48,31 @@ command_line:
   prompt: false
 KASM_EOF
 
-# KasmVNC requires at least one user with write permission even when
-# BasicAuth is disabled. The shared home volume may not contain the
-# password file yet, so create a runtime-only random-password user or
-# upgrade the existing coder user in place.
+# KasmVNC needs a user with write permission whether or not BasicAuth is on.
+# With a workspace app secret we set that as the password and REQUIRE auth, so
+# the desktop is not driveable by another workspace dialling this container
+# directly on the shared bridge; the ingress injects the credential for browser
+# traffic. The secret is per user, not per workspace, precisely because this
+# file lives in the home volume shared across all of a user's workspaces.
 KASM_PASSFILE="$HOME/.kasmpasswd"
+umask 077
+%{ if app_secret != "" }
+printf '%s\n%s\n' '${app_secret}' '${app_secret}' |
+  kasmvncpasswd -u coder -w "$KASM_PASSFILE"
+%{ else }
+echo "WARNING: no workspace app secret was issued — the desktop is reachable" \
+     "by any other workspace on this network." >&2
 if ! awk -F: '$1 == "coder" && $3 ~ /w/ { found = 1 } END { exit found ? 0 : 1 }' "$KASM_PASSFILE" 2>/dev/null; then
   if grep -q '^coder:' "$KASM_PASSFILE" 2>/dev/null; then
     kasmvncpasswd -u coder -w -n "$KASM_PASSFILE"
   else
-    umask 077
     KASM_PASSWORD="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
     printf '%s\n%s\n' "$KASM_PASSWORD" "$KASM_PASSWORD" |
       kasmvncpasswd -u coder -w "$KASM_PASSFILE"
     unset KASM_PASSWORD
   fi
 fi
+%{ endif }
 
 # Start the XFCE desktop served by KasmVNC's built-in web server.
 # Traefik strips the /coder/{user}/{workspace} prefix; the KasmVNC web
@@ -72,8 +81,8 @@ fi
 vncserver -kill :1 >/dev/null 2>&1 || true
 vncserver :1 \
   -select-de xfce \
-  -disableBasicAuth \
-  >/tmp/kasmvnc.log 2>&1
+%{ if app_secret == "" }  -disableBasicAuth \
+%{ endif }  >/tmp/kasmvnc.log 2>&1
 
 # vncserver self-daemonizes, so it returns before KasmVNC's web server is
 # necessarily accepting connections. The agent only reports lifecycle_state=ready

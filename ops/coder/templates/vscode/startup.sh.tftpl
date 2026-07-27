@@ -49,8 +49,13 @@ fi
 # Use password auth if password is provided, otherwise no auth
 # The home is shared across the user's workspaces, so code-server state
 # (open editors, machine settings) is scoped per workspace via user-data-dir
-%{ if code_server_password != "" }
-export PASSWORD="${code_server_password}"
+%{ if app_hash != "" }
+# code-server compares its session cookie against HASHED_PASSWORD, so handing it
+# the argon2 hash lets the ingress inject a ready-made session — the user never
+# sees a login page, while a request that did not come through the ingress
+# (another workspace dialling this container directly) has no cookie and is
+# bounced to the login page.
+export HASHED_PASSWORD="${app_hash}"
 code-server \
   --auth password \
   --bind-addr 0.0.0.0:${code_server_port} \
@@ -60,6 +65,8 @@ code-server \
   /home/coder/workspace \
   >/tmp/code-server.log 2>&1 &
 %{ else }
+echo "WARNING: no workspace app secret was issued — the editor is reachable" \
+     "by any other workspace on this network." >&2
 code-server \
   --auth none \
   --bind-addr 0.0.0.0:${code_server_port} \

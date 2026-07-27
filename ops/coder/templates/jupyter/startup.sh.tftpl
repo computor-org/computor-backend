@@ -34,13 +34,17 @@ fi
 # because Traefik ForwardAuth already gates access (same model as the other
 # workspace types); allow_origin='*' + trust_xheaders let kernel websockets work
 # through the proxy.
+# The token is the per-user workspace app secret: the ingress injects it as an
+# Authorization header for browser traffic, so a request that did not come
+# through the ingress — another workspace dialling this container directly on
+# the shared bridge — is refused. An empty secret leaves Jupyter open, as before.
 jupyter lab \
   --no-browser \
   --ServerApp.ip=0.0.0.0 \
   --ServerApp.port=${jupyter_port} \
   --ServerApp.base_url="${coder_base_path}/${owner_name}/${workspace_name}/" \
   --ServerApp.root_dir=/home/coder/workspace \
-  --IdentityProvider.token='' \
+  --IdentityProvider.token='${app_secret}' \
   --ServerApp.password='' \
   --ServerApp.allow_origin='*' \
   --ServerApp.allow_remote_access=True \

@@ -44,12 +44,6 @@ variable "computor_backend_internal" {
   type        = string
 }
 
-variable "code_server_password" {
-  default     = ""
-  description = "Password for code-server access (empty = no password required)"
-  type        = string
-  sensitive   = true
-}
 
 variable "dev_forward_ports" {
   default     = ""
