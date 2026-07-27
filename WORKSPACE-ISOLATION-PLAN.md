@@ -2,9 +2,9 @@
 
 **Branch:** `feat/workspace-isolation-modes` off `release/2026.10`
 
-> Approved 2026-07-27. Phase order is deliberate: Phase 1 is shippable on its own, Phase 3 is
-> shippable on its own. Phase 3 was later reworked from a public-domain alias onto internal names
-> (see Design) to remove the production-certificate handling it would otherwise have required.
+> Approved 2026-07-27. Phase order is deliberate — Phase 1 is shippable on its own. Phase 3 was
+> later reworked from a public-domain alias onto internal names (see Design) to remove the
+> production-certificate handling it would otherwise have required.
 
 ---
 

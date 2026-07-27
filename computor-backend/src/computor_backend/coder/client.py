@@ -1300,18 +1300,48 @@ class CoderClient:
                 f"Failed to load workspace {workspace_id} for version update: {resp.status_code}"
             )
             return False
-        latest = (resp.json() or {}).get("latest_build") or {}
+        workspace = resp.json() or {}
+        latest = workspace.get("latest_build") or {}
 
         # Preserve the current auth token; omitting it resets the param to its
         # "" default and de-authenticates the extension. Same for the immutable
         # per-workspace parameters (see _carry_build_params).
-        rich_params: list[dict] = []
+        by_name: dict[str, str] = {}
         build_id = latest.get("id")
         if build_id:
             current_token = await self._get_build_param(build_id, "computor_auth_token")
             if current_token is not None:
-                rich_params.append({"name": "computor_auth_token", "value": current_token})
-            rich_params += await self._carry_build_params(build_id)
+                by_name["computor_auth_token"] = current_token
+            for param in await self._carry_build_params(build_id):
+                by_name[param["name"]] = param["value"]
+
+        # A workspace built before app auth existed has no credential to carry,
+        # so a rollout would bring it back with its app still open to every
+        # other workspace. Derive it here instead — the Coder username IS the
+        # Computor user id, which is what the secret is derived from.
+        owner = workspace.get("owner_name")
+        if owner and not by_name.get("workspace_app_secret"):
+            from computor_backend.coder.service import (
+                derive_workspace_app_secret,
+                workspace_app_password_hash,
+            )
+
+            try:
+                secret = derive_workspace_app_secret(owner)
+                by_name["workspace_app_secret"] = secret
+                by_name["workspace_app_hash"] = workspace_app_password_hash(secret)
+            except Exception as e:
+                # TOKEN_SECRET missing: roll out without app auth rather than
+                # blocking the update, but say so — the app stays reachable by
+                # other workspaces until the next provision.
+                logger.warning(
+                    f"Workspace {workspace_id}: could not derive the app credential "
+                    f"({e}); rolling out with the app unauthenticated"
+                )
+
+        rich_params: list[dict] = [
+            {"name": name, "value": value} for name, value in by_name.items()
+        ]
 
         resp = await self._request(
             "POST",
