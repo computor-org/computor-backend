@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 import asyncio
 import os
 from computor_backend.exceptions.exceptions import NotFoundException
-from computor_backend.permissions.role_setup import claims_organization_manager, claims_user_manager, claims_workspace_user, claims_workspace_maintainer, claims_git_manager, claims_example_manager
+from computor_backend.permissions.role_setup import claims_organization_manager, claims_user_manager, claims_workspace_user, claims_workspace_maintainer, claims_git_manager, claims_example_manager, claims_service_manager
 from computor_backend.permissions.core import db_apply_roles
 from computor_backend.model.auth import User
 from computor_backend.model.role import UserRole
@@ -154,6 +154,7 @@ async def startup_logic():
         db_apply_roles("_workspace_user",claims_workspace_user(),db)
         db_apply_roles("_workspace_maintainer",claims_workspace_maintainer(),db)
         db_apply_roles("_git_manager",claims_git_manager(),db)
+        db_apply_roles("_service_manager",claims_service_manager(),db)
 
     # Initialize plugin registry with configuration (loads Keycloak provider, etc.)
     await initialize_plugin_registry_with_config()

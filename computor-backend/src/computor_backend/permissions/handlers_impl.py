@@ -18,10 +18,12 @@ from computor_backend.permissions.handlers_user import *  # noqa: F401,F403
 from computor_backend.permissions.handlers_course import *  # noqa: F401,F403
 from computor_backend.permissions.handlers_scoped import *  # noqa: F401,F403
 from computor_backend.permissions.handlers_misc import *  # noqa: F401,F403
+from computor_backend.permissions.handlers_service import *  # noqa: F401,F403
 
 from computor_backend.permissions.handlers_user import __all__ as _user_all
 from computor_backend.permissions.handlers_course import __all__ as _course_all
 from computor_backend.permissions.handlers_scoped import __all__ as _scoped_all
 from computor_backend.permissions.handlers_misc import __all__ as _misc_all
+from computor_backend.permissions.handlers_service import __all__ as _service_all
 
-__all__ = [*_user_all, *_course_all, *_scoped_all, *_misc_all]
+__all__ = [*_user_all, *_course_all, *_scoped_all, *_misc_all, *_service_all]

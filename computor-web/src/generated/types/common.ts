@@ -2006,13 +2006,13 @@ export interface StudentRepoResult {
  * DTO for creating a new service account.
  */
 export interface ServiceCreate {
-  /** URL-safe slug identifier (lowercase, alphanumeric, dots, hyphens) */
+  /** URL-safe slug identifier (lowercase, alphanumeric, dots, hyphens). For testing services this MUST match the properties.executionBackend.slug your examples declare in meta.yaml */
   slug: string;
   /** Human-readable service name */
   name: string;
   /** Service description */
   description?: string | null;
-  /** Service type (e.g., 'temporal_worker', 'grading', 'notification') */
+  /** ServiceType path, e.g. 'testing.temporal' or 'agent' */
   service_type: string;
   /** Email for service user */
   email?: string | null;
@@ -2020,10 +2020,10 @@ export interface ServiceCreate {
   given_name?: string | null;
   /** Family name for service user (defaults to rest of name) */
   family_name?: string | null;
-  /** Password for service user (optional - use API tokens instead) */
-  password?: string | null;
   /** Service-specific configuration */
   config?: Record<string, unknown> | null;
+  /** Test runner language for testing services. Stored into config.language, which is what selects the runner — the slug never does. Required when the service type's category is 'testing'. */
+  language?: string | null;
   /** Whether the service is enabled */
   enabled?: boolean | null;
 }
@@ -2035,6 +2035,8 @@ export interface ServiceUpdate {
   name?: string | null;
   description?: string | null;
   config?: Record<string, unknown> | null;
+  /** Test runner language; merged into config.language. */
+  language?: string | null;
   enabled?: boolean | null;
   /** Last heartbeat timestamp */
   last_seen_at?: string | null;

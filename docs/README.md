@@ -12,6 +12,7 @@ Coder workspace integration.
 | **[development.md](development.md)** | Setup, the daily cycle, adding an entity end-to-end, migrations, code generation, and tests. |
 | **[backend-patterns.md](backend-patterns.md)** | The three patterns the backend is built on: EntityInterface/DTOs, RBAC permissions, and Temporal workflows. |
 | **[git-integration.md](git-integration.md)** | How a course connects to git — in-system Forgejo vs. external GitLab, delivery modes, and configuring it from a deployment file. |
+| **[service-accounts.md](service-accounts.md)** | Machine identities — testing systems, integrations and AI agents: how to add one, the `meta.yaml`↔slug binding, API tokens and what their scopes do (and don't) restrict. |
 | **[../ops/docs/SELF_UPDATE.md](../ops/docs/SELF_UPDATE.md)** | One-click system updates from the admin UI (System → Updates) or `./computor.sh update` — config, update flow, rollback, and the rules that keep changes update-friendly. |
 
 New here? Read them in that order. For a specific task, jump straight to the relevant doc.

@@ -1,10 +1,11 @@
 """Business logic for service account management."""
 import logging
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy import cast, Text
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError
 
 from computor_backend.exceptions import (
@@ -15,7 +16,7 @@ from computor_backend.exceptions import (
 )
 from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.principal import Principal
-from computor_backend.model.service import Service
+from computor_backend.model.service import Service, ServiceType
 from computor_backend.model.auth import User
 from computor_backend.model.course import CourseContent
 from computor_backend.model.example import ExampleVersion
@@ -28,6 +29,97 @@ from computor_types.services import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def service_to_get(service: Service) -> ServiceGet:
+    """Build a ``ServiceGet`` including ``service_type_path``.
+
+    ``ServiceGet.service_type_path`` is a projection of
+    ``service.service_type.path``, not a column, so a plain
+    ``model_validate(..., from_attributes=True)`` always leaves it ``None`` —
+    which is why every list/get response used to hide what kind of service a
+    row was. Fill it here so there is exactly one place that knows.
+    """
+    dto = ServiceGet.model_validate(service, from_attributes=True)
+    dto.service_type_path = (
+        str(service.service_type.path) if service.service_type else None
+    )
+    return dto
+
+
+def build_service_config(
+    config: Optional[dict],
+    language: Optional[str],
+    service_type: ServiceType,
+) -> dict:
+    """Fold ``language`` into ``Service.config`` and validate it.
+
+    ``config.language`` is what ``TestingBackendFactory`` dispatches on. It
+    lives inside ``config`` (rather than as its own column) because that dict
+    is already shipped verbatim to the worker via ``service_config_payload``
+    and ``GET /service-accounts/me``. Callers may set it either way — as the
+    ``language`` field or directly inside ``config`` — and the explicit field
+    wins.
+
+    A testing service without a language is unrunnable, so reject it here
+    rather than at submission time.
+    """
+    from computor_backend.testing import TestingBackendFactory
+
+    merged = dict(config or {})
+    if language:
+        merged["language"] = language
+
+    value = merged.get("language")
+    if value is not None:
+        known = TestingBackendFactory.get_available_languages()
+        if value not in known:
+            raise BadRequestException(
+                detail=(
+                    f"Unsupported testing language '{value}'. "
+                    f"Supported languages: {', '.join(known)}"
+                ),
+                context={"language": value, "supported": known},
+            )
+    elif service_type.category == "testing":
+        raise BadRequestException(
+            detail=(
+                f"Service type '{service_type.path}' is a testing service, so a "
+                f"language is required. Supported languages: "
+                f"{', '.join(TestingBackendFactory.get_available_languages())}"
+            ),
+            context={"service_type": str(service_type.path)},
+        )
+
+    return merged
+
+
+def resolve_service_type(db: Session, path: str) -> ServiceType:
+    """Look up a ServiceType by its Ltree path, or raise 400.
+
+    The path is cast to text for comparison to avoid Ltree type processing
+    issues. Resolution is strict on purpose: a service whose
+    ``service_type_id`` is NULL looks fine until someone submits an
+    assignment, which then fails deep in the test pipeline with
+    ``SUBMIT_005 "Service type not found for service"``. Failing at creation
+    puts the error where the typo is.
+    """
+    service_type = (
+        db.query(ServiceType).filter(cast(ServiceType.path, Text) == path).first()
+    )
+    if service_type is None:
+        known = [
+            str(row.path)
+            for row in db.query(ServiceType.path).order_by(ServiceType.path).all()
+        ]
+        raise BadRequestException(
+            detail=(
+                f"Unknown service type '{path}'. "
+                f"Known service types: {', '.join(known) or '(none registered)'}"
+            ),
+            context={"service_type": path, "known_service_types": known},
+        )
+    return service_type
 
 
 def create_service_account(
@@ -57,6 +149,14 @@ def create_service_account(
     existing_service = db.query(Service).filter(Service.slug == service_data.slug).first()
     if existing_service:
         raise BadRequestException(detail=f"Service with slug '{service_data.slug}' already exists")
+
+    # Resolve the ServiceType and validate the config BEFORE touching the user
+    # table — a bad path or a testing service with no language must not leave a
+    # stray service user behind.
+    service_type = resolve_service_type(db, service_data.service_type)
+    config = build_service_config(
+        service_data.config, service_data.language, service_type
+    )
 
     # Look up existing service user by email (if provided)
     user = None
@@ -101,29 +201,15 @@ def create_service_account(
         except Exception as e:
             raise BadRequestException(detail=f"Failed to create user: {str(e)}") from e
 
-    # Look up ServiceType by path to get UUID
-    service_type_id = None
-    if service_data.service_type:
-        from computor_backend.model.service import ServiceType
-        from sqlalchemy import cast, Text
-        # Cast Ltree to text for comparison to avoid Ltree type processing issues
-        service_type = db.query(ServiceType).filter(
-            cast(ServiceType.path, Text) == service_data.service_type
-        ).first()
-        if service_type:
-            service_type_id = service_type.id
-        else:
-            logger.warning(f"ServiceType not found for path: {service_data.service_type}")
-
     # Create service record
     try:
         service = Service(
             slug=service_data.slug,
             name=service_data.name,
             description=service_data.description,
-            service_type_id=service_type_id,
+            service_type_id=service_type.id,
             user_id=user.id,
-            config=service_data.config or {},
+            config=config,
             enabled=service_data.enabled if service_data.enabled is not None else True,
             created_by=permissions.user_id,
         )
@@ -134,7 +220,7 @@ def create_service_account(
 
         logger.info(f"Created service account: {service.slug} (user_id: {user.id})")
 
-        return ServiceGet.model_validate(service, from_attributes=True)
+        return service_to_get(service)
 
     except IntegrityError as e:
         db.rollback()
@@ -152,13 +238,13 @@ def get_service_account(
     db: Session,
 ) -> ServiceGet:
     """Get service account by ID."""
-    query = check_permissions(permissions, Service, "read", db)
+    query = check_permissions(permissions, Service, "get", db)
 
     service = query.filter(Service.id == service_id).first()
     if not service:
         raise NotFoundException(detail="Service not found")
 
-    return ServiceGet.model_validate(service, from_attributes=True)
+    return service_to_get(service)
 
 
 def list_service_accounts(
@@ -169,16 +255,18 @@ def list_service_accounts(
     """List all service accounts with optional filtering."""
     from computor_backend.interfaces.service import ServiceInterface
 
-    query = check_permissions(permissions, Service, "read", db)
+    query = check_permissions(permissions, Service, "list", db)
     query = query.filter(Service.archived_at.is_(None))
 
     # Apply filters if provided
     if query_params:
         query = ServiceInterface.search(db, query, query_params)
 
-    services = query.all()
+    # service_to_get reads service.service_type.path — eager-load it so a list
+    # of N services stays one query instead of N+1.
+    services = query.options(joinedload(Service.service_type)).all()
 
-    return [ServiceGet.model_validate(s, from_attributes=True) for s in services]
+    return [service_to_get(s) for s in services]
 
 
 def _get_service_dependents(db: Session, service_id) -> dict:
@@ -281,6 +369,20 @@ def update_service_account(
                     },
                 )
 
+        # `language` is not a column — it folds into config.language, and the
+        # merge has to start from the CURRENT config when only `language` was
+        # sent, otherwise setting a language would wipe temporal.task_queue.
+        if "language" in update_data or "config" in update_data:
+            base = (
+                update_data.get("config")
+                if "config" in update_data
+                else (service.config or {})
+            )
+            update_data["config"] = build_service_config(
+                base, update_data.pop("language", None), service.service_type
+            )
+        update_data.pop("language", None)
+
         for field, value in update_data.items():
             if hasattr(service, field):
                 setattr(service, field, value)
@@ -292,7 +394,7 @@ def update_service_account(
 
         logger.info(f"Updated service account: {service.slug}")
 
-        return ServiceGet.model_validate(service, from_attributes=True)
+        return service_to_get(service)
 
     except ConflictException:
         # ConflictException is intentional — don't swallow it as a 500.

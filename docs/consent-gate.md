@@ -80,14 +80,13 @@ normally (they are never swallowed by the fail-open handler).
 
 **Identity resolution** (`middleware/principal_lookup.py`, shared logic that
 `MaintenanceMiddleware` can migrate to later): credential precedence mirrors
-`parse_authorization_header` exactly — `X-API-Token`, then `GLP-CREDS`, then
-`Authorization`, then the `ct_access_token` cookie only when no Authorization
-header is present — so the gate always judges the same identity the route
-authenticates. Sources: SSO tokens → principal cache, falling back to the
+`parse_authorization_header` exactly — `X-API-Token`, then `Authorization`,
+then the `ct_access_token` cookie only when no Authorization header is present
+— so the gate always judges the same identity the route authenticates.
+Sources: SSO tokens → principal cache, falling back to the
 `sso_session:{hash}` store; API tokens → principal cache, falling back to one
 indexed DB lookup (`api_token.token_hash` is a deterministic sha256), so
-infrequent API-token clients are still gated; GLP-CREDS → principal cache
-only.
+infrequent API-token clients are still gated.
 
 Flow: whitelisted path or OPTIONS → pass; unresolvable credentials → pass (the
 route's auth dependency 401s); service principals (`is_service`) → pass; no
@@ -124,10 +123,9 @@ gate is also inactive as long as no `policy_versions` row is effective — a
 fresh deployment is not gated until the first policy is published.
 
 **Known limitation:** HTTP Basic credentials (dev `admin/admin`, some test
-suites) cannot be resolved without password verification and pass the gate;
-GLP-CREDS users are only gated while their principal cache entry (15 min TTL)
-is warm. All real clients (web, VS Code extension) use SSO tokens/cookies or
-API tokens and are fully gated.
+suites) cannot be resolved without password verification and pass the gate.
+All real clients (web, VS Code extension) use SSO tokens/cookies or API tokens
+and are fully gated.
 
 ## Frontend (computor-web)
 

@@ -17,6 +17,7 @@ const ROLE_ORDER = [
   '_workspace_user',
   '_workspace_maintainer',
   '_git_manager',
+  '_service_manager',
 ];
 
 function orderOf(id: string): number {

@@ -112,6 +112,11 @@ compose` to exit at parse time:
 - `SYSTEM_DEPLOYMENT_PATH`, `DEBUG_MODE`
 - `TESTING_WORKER_TOKEN`, `MATLAB_WORKER_TOKEN`, `MATLAB_TEST_ENGINE_*`,
   `MATLAB_MLM_LICENSE_FILE`
+  — each worker token must be a `ctp_…` value that is BOTH the worker container's
+  `API_TOKEN` and the `api_token.token` in `data/deployments/*.yaml`, so the two
+  cannot drift. Changing the variable does **not** rotate the token; rotate
+  deliberately (mint → update the container → restart → revoke the old one).
+  See [service-accounts.md](../../docs/service-accounts.md).
 - When coder is enabled: `CODER_POSTGRES_USER`, `CODER_POSTGRES_PASSWORD`,
   `CODER_ADMIN_EMAIL`, `CODER_ADMIN_PASSWORD`
 

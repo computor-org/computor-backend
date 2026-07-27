@@ -21,6 +21,7 @@ from computor_backend.business_logic.service_accounts import (
     create_service_account,
     get_service_account,
     list_service_accounts,
+    service_to_get,
     update_service_account,
     update_service_heartbeat,
     delete_service_account,
@@ -91,28 +92,9 @@ async def get_service_me(
             context={"user_id": str(user_id)}
         )
 
-    # Get service type path if available (lazy load relationship)
-    service_type_path = None
-    if service.service_type_id:
-        from computor_backend.repositories import ServiceTypeRepository
-        service_type_repo = ServiceTypeRepository(db, cache)
-        service_type = service_type_repo.get_by_id_optional(str(service.service_type_id))
-        if service_type:
-            service_type_path = str(service_type.path)
-
-    return ServiceGet(
-        id=str(service.id),
-        slug=service.slug,
-        name=service.name,
-        description=service.description,
-        service_type_id=str(service.service_type_id) if service.service_type_id else None,
-        service_type_path=service_type_path,
-        user_id=str(service.user_id),
-        config=service.config or {},
-        enabled=service.enabled,
-        last_seen_at=service.last_seen_at,
-        properties=service.properties
-    )
+    # service_to_get resolves service_type_path from the relationship, so this
+    # endpoint and the CRUD responses can no longer drift apart.
+    return service_to_get(service)
 
 
 # =============================================================================

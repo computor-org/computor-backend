@@ -89,35 +89,31 @@ async def fetch_service_config(
 
 def get_service_language(service_config: Optional[ServiceGet], config: Dict[str, Any]) -> str:
     """
-    Determine the primary language for this service.
+    Determine which language runtime to provision in this container.
 
-    Priority:
-    1. Explicit 'language' field in config
-    2. Inferred from service slug (e.g., itpcp.exec.py -> python)
-    3. Default to 'python'
+    The single source of truth is ``Service.config.language``, fetched from
+    ``GET /service-accounts/me``. This deliberately does NOT guess from the
+    service slug: the slug is the ``meta.yaml`` ``executionBackend.slug``
+    contract, an identifier chosen by whoever registered the service, and
+    inferring behaviour from it is exactly what limited testing systems to a
+    handful of blessed ``itpcp.exec.*`` names.
+
+    Falls back to python only when there is no service config at all — i.e.
+    the worker is running on bare environment variables with no API token,
+    which is a valid standalone mode.
     """
-    # Check explicit language in config
-    if "language" in config:
-        return config["language"]
+    language = config.get("language")
+    if language:
+        return language
 
-    # Infer from service slug
-    if service_config and service_config.slug:
-        slug = service_config.slug.lower()
-        if slug.endswith(".py"):
-            return "python"
-        elif slug.endswith(".oct"):
-            return "octave"
-        elif slug.endswith(".r"):
-            return "r"
-        elif slug.endswith(".julia"):
-            return "julia"
-        elif slug.endswith(".mat"):
-            return "matlab"
-        elif slug.endswith(".c"):
-            return "c"
-        elif slug.endswith(".fortran"):
-            return "fortran"
+    if service_config is not None:
+        raise SystemExit(
+            f"Service '{service_config.slug}' has no config.language. "
+            "Set it on the service (one of python, octave, r, julia, c, cpp, "
+            "fortran, document, matlab) — the worker cannot infer it from the slug."
+        )
 
+    print("  ⚠ No service config available; defaulting language to 'python'")
     return "python"
 
 

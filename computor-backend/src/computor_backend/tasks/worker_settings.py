@@ -119,10 +119,8 @@ class WorkerSettings(BaseSettings):
     )
 
     # --- testing backends (testing/backends.py) ---------------------------
-    # TESTING_EXECUTABLE has DIFFERENT literal fallbacks at its two call sites
-    # (PythonTestingBackend -> "/tmp/engine/catester/testing.py run",
-    #  ComputorTestingBackend -> "computor-test"), so it is Optional and each
-    #  site keeps its own default; None == unset.
+    # ComputorTestingBackend falls back to the literal "computor-test" when
+    # this is unset, so it is Optional; None == unset.
     testing_executable: Optional[str] = Field(
         default=None, validation_alias="TESTING_EXECUTABLE"
     )

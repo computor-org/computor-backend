@@ -83,6 +83,10 @@ See [backend-patterns.md](backend-patterns.md#temporal-workflows).
 
 ## Key design patterns
 
+- **Service accounts** — every non-human caller (testing workers, integrations, AI agents)
+  is a `User` with `is_service=true`, paired 1:1 with a `Service` row and authenticating
+  via an `ApiToken` (`X-API-Token`). The testing worker is the main example. See
+  [service-accounts.md](service-accounts.md).
 - **EntityInterface** — one class per entity in `computor-types` defines its Create/Get/
   List/Update/Query DTOs; drives client + TypeScript + OpenAPI generation.
 - **Business-logic separation** — thin API, fat `business_logic/` (see above).
