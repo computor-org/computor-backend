@@ -80,8 +80,17 @@ Recurring shapes:
   their own (admins/org-managers are uncapped).
 
 Entity-specific rules live in **permission handlers** registered at startup
-(`permission_registry.register(Model, Handler(Model))`). System roles like `_admin`,
-`_user_manager`, and `_workspace_user` are seeded into the `role` table.
+(`permission_registry.register(Model, Handler(Model))`). The builtin system roles —
+`_admin`, `_user_manager`, `_organization_manager`, `_example_manager`, `_git_manager`,
+`_service_manager`, `_workspace_user`, `_workspace_maintainer` — are seeded into the
+`role` table by migrations, and their claims are applied idempotently on every start
+from `permissions/role_setup.py`.
+
+One trap when writing a handler: `check_permissions` calls **only** `build_query`, so a
+handler that *narrows* instead of raising makes a successful call mean "here is what you
+may see", not "you are authorized". Callers must then fetch through the returned query
+rather than re-fetching by id from a repository — see `permissions/handlers_service.py`
+and its call sites in `business_logic/api_tokens.py`.
 
 **Rules of thumb**: check permissions in `business_logic/` (not the endpoint), check them
 **early** (before expensive work), always allow the admin bypass, and raise descriptive
