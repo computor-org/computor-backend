@@ -115,6 +115,21 @@ def ensure_bootstrap_services() -> None:
                     )
 
 
+def _merged_config(svc: ServiceConfig) -> dict:
+    """Fold the YAML's top-level ``language:`` into ``Service.config``.
+
+    ``language`` is a sibling of ``config`` in the deployment file because
+    that reads better, but it belongs *inside* ``Service.config`` — that dict
+    is what reaches the dispatcher (``service_config_payload``) and the worker
+    container (``GET /service-accounts/me``). Before this it was simply
+    dropped, so every bootstrapped service was created with no language.
+    """
+    config = dict(svc.config or {})
+    if svc.language and not config.get("language"):
+        config["language"] = svc.language
+    return config
+
+
 def _ensure_service(svc: ServiceConfig, system: Principal, db) -> str:
     """Ensure one service + its token exist. Returns a short human status."""
     existing = db.query(Service).filter(Service.slug == svc.slug).first()
@@ -128,7 +143,7 @@ def _ensure_service(svc: ServiceConfig, system: Principal, db) -> str:
                 email=svc.user.email,
                 given_name=svc.user.given_name,
                 family_name=svc.user.family_name,
-                config=svc.config or {},
+                config=_merged_config(svc),
                 enabled=True,
             ),
             system,
@@ -139,6 +154,15 @@ def _ensure_service(svc: ServiceConfig, system: Principal, db) -> str:
     else:
         user_id = str(existing.user_id)
         created_now = False
+
+        # Heal a service seeded before `language` was threaded through. The
+        # inequality guard keeps this a no-op on every subsequent boot rather
+        # than churning updated_at.
+        merged = _merged_config(svc)
+        if merged != (existing.config or {}):
+            existing.config = merged
+            db.commit()
+            logger.info("Bootstrap: refreshed config for service %s", svc.slug)
 
     # Token is idempotent: leave any existing active token untouched (a changed
     # ${TESTING_WORKER_TOKEN} is intentionally NOT auto-rotated here — that would

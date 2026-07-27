@@ -16,11 +16,16 @@
 # Only the `services:` section is applied at boot (no organizations/users/contents).
 
 services:
-  - slug: testing.default               # adjust to match the executionBackend slug
-                                         # your examples/courses reference (e.g.
-                                         # itpcp.exec.py) so contents link to it.
+  - slug: testing.default               # MUST match properties.executionBackend.slug
+                                         # in your examples' meta.yaml — that string is
+                                         # what binds an assignment to this service.
+                                         # Any name works; it is an identifier, not a
+                                         # runner selector.
     service_type_path: testing.temporal  # resolves to the ServiceType seeded by migration
-    language: python                     # the testing worker also handles octave/R/julia/...
+    language: python                     # REQUIRED for testing.* services. This — not the
+                                         # slug — selects the test runner. One of: python,
+                                         # octave, r, julia, c, cpp, fortran, document,
+                                         # matlab. Folded into config.language at apply time.
     description: Default testing worker
     user:
       email: testing-worker@computor.local
