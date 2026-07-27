@@ -137,3 +137,19 @@ locals {
   app_secret = data.coder_parameter.workspace_app_secret.value
   app_hash   = data.coder_parameter.workspace_app_hash.value
 }
+
+# Which course this workspace was provisioned FOR, empty when a user
+# provisioned it for themselves. Nothing in Terraform reads it — it is a label
+# the backend queries back, because otherwise "is this workspace part of course
+# X" can only be inferred from (owner is a member) x (template is allowed),
+# which also matches a member's personal workspace on a course template. The
+# course views scope listing and deletion on this.
+data "coder_parameter" "course_id" {
+  name         = "course_id"
+  type         = "string"
+  description  = "Course this workspace was provisioned for (empty = personal)"
+  mutable      = false
+  default      = ""
+  display_name = "Course"
+  order        = 106
+}

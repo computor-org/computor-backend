@@ -833,6 +833,7 @@ class CoderClient:
         for name, value in (
             ("workspace_app_secret", workspace_data.app_secret),
             ("workspace_app_hash", workspace_data.app_password_hash),
+            ("course_id", workspace_data.course_id),
         ):
             if value:
                 rich_params.append({"name": name, "value": value})
@@ -1210,6 +1211,9 @@ class CoderClient:
         "home_mode",
         "allow_root",
         "allow_internet",
+        # Losing this would orphan the workspace from its course, making it
+        # invisible to — and undeletable by — the lecturers who provisioned it.
+        "course_id",
         # Losing these on a rebuild would leave the app with no credential while
         # the ingress keeps injecting one — the workspace would answer nobody,
         # or worse, answer everybody.
@@ -1225,6 +1229,24 @@ class CoderClient:
         """
         if not build_id:
             return []
+        by_name = await self.get_build_params(build_id)
+        if not by_name:
+            logger.warning(
+                f"Build {build_id}: could not read parameters; the rebuild will "
+                "fall back to template defaults for the carried parameters"
+            )
+        return [
+            {"name": name, "value": by_name[name]}
+            for name in self.CARRIED_BUILD_PARAMS
+            if by_name.get(name) is not None
+        ]
+
+    async def get_build_params(self, build_id: str) -> dict[str, str]:
+        """All rich-parameter values of a build, or {} when unreadable.
+
+        Callers that need more than one value should use this rather than
+        several _get_build_param calls — the API returns the whole set anyway.
+        """
         resp = await self._request(
             "GET",
             f"/api/v2/workspacebuilds/{build_id}/parameters",
@@ -1232,17 +1254,12 @@ class CoderClient:
             ok=None,
         )
         if resp.status_code != 200:
-            logger.warning(
-                f"Build {build_id}: could not read parameters ({resp.status_code}); "
-                "rebuild will fall back to template defaults for policy parameters"
-            )
-            return []
-        by_name = {p.get("name"): p.get("value") for p in resp.json()}
-        return [
-            {"name": name, "value": by_name[name]}
-            for name in self.CARRIED_BUILD_PARAMS
-            if by_name.get(name) is not None
-        ]
+            return {}
+        return {
+            p["name"]: p.get("value")
+            for p in resp.json()
+            if p.get("name") and p.get("value") is not None
+        }
 
     async def _get_build_param(
         self, build_id: str, name: str
@@ -1383,6 +1400,7 @@ class CoderClient:
         allow_internet: Optional[bool] = None,
         app_secret: Optional[str] = None,
         app_password_hash: Optional[str] = None,
+        course_id: Optional[str] = None,
     ) -> ProvisionResult:
         """
         Full provisioning: get or create user and workspace.
@@ -1473,6 +1491,7 @@ class CoderClient:
                 allow_internet=allow_internet,
                 app_secret=app_secret,
                 app_password_hash=app_password_hash,
+                course_id=course_id,
             )
             workspace = await self.create_workspace(user.username, ws_data)
             workspace_created = True

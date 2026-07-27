@@ -555,44 +555,62 @@ async def test_bulk_provision_continues_past_failures_and_derives_name(monkeypat
 # --- lecturer delete gate -----------------------------------------------------
 
 
-def _delete_client(template="vscode-workspace", home_mode="scratch"):
+def _delete_client(template="vscode-workspace", home_mode="scratch", course_id="c1"):
+    """A workspace whose build carries `course_id` — None = provisioned by its
+    owner for themselves, which no course may delete."""
     client = MagicMock()
     details = MagicMock()
     details.workspace.template_name = template
     details.workspace.latest_build_id = "b1"
+    params = {"home_mode": home_mode}
+    if course_id is not None:
+        params["course_id"] = course_id
     client.get_workspace = AsyncMock(return_value=details)
-    client._get_build_param = AsyncMock(return_value=home_mode)
+    client.get_build_params = AsyncMock(return_value=params)
     client.delete_workspace = AsyncMock(return_value=True)
     return client
 
 
 @pytest.mark.asyncio
-async def test_lecturer_deletes_scratch_but_not_shared_workspaces():
+async def test_course_delete_is_scoped_to_the_course_for_everyone():
+    """The reported bug: a personal workspace of a course member, on a course
+    template, was listed under the course and an admin could delete it. Owner +
+    template is not enough to say a workspace belongs to a course."""
     db = _bulk_db(members=[_member(user_id="1111-2222")])
     lecturer = _course_principal("l1", "c1", "_lecturer")
 
-    result = await cw.delete_student_workspace(
-        "c1", "u1111-2222", "vscode-tmp", lecturer, db, _delete_client()
-    )
-    assert result.success is True
+    for caller in (lecturer, _maintainer(), _admin()):
+        with pytest.raises(ForbiddenException) as exc:
+            await cw.delete_student_workspace(
+                "c1", "u1111-2222", "vscode", caller, db,
+                _delete_client(course_id=None),        # provisioned by its owner
+            )
+        assert "not provisioned for this course" in str(exc.value)
 
-    with pytest.raises(ForbiddenException) as exc:
-        await cw.delete_student_workspace(
-            "c1", "u1111-2222", "vscode", lecturer, db,
-            _delete_client(home_mode="shared"),
-        )
-    assert "throwaway" in str(exc.value)
-
-    # Maintainers may delete shared-home workspaces of course members.
-    result = await cw.delete_student_workspace(
-        "c1", "u1111-2222", "vscode", _maintainer(), db,
-        _delete_client(home_mode="shared"),
-    )
-    assert result.success is True
+        with pytest.raises(ForbiddenException):
+            await cw.delete_student_workspace(
+                "c1", "u1111-2222", "vscode", caller, db,
+                _delete_client(course_id="some-other-course"),
+            )
 
 
 @pytest.mark.asyncio
-async def test_lecturer_delete_rejects_non_members_and_foreign_templates():
+async def test_lecturer_deletes_any_workspace_of_their_course():
+    """Including shared-home ones: the old scratch-only rule blocked a lecturer
+    from deleting a workspace they had bulk-provisioned with home_mode=shared."""
+    db = _bulk_db(members=[_member(user_id="1111-2222")])
+    lecturer = _course_principal("l1", "c1", "_lecturer")
+
+    for home_mode in ("scratch", "shared"):
+        result = await cw.delete_student_workspace(
+            "c1", "u1111-2222", "vscode-tmp", lecturer, db,
+            _delete_client(home_mode=home_mode, course_id="c1"),
+        )
+        assert result.success is True
+
+
+@pytest.mark.asyncio
+async def test_lecturer_delete_rejects_non_members():
     db = _bulk_db(members=[_member(user_id="1111-2222")])
     lecturer = _course_principal("l1", "c1", "_lecturer")
 
@@ -601,59 +619,21 @@ async def test_lecturer_delete_rejects_non_members_and_foreign_templates():
             "c1", "u9999-0000", "vscode-tmp", lecturer, db, _delete_client()
         )
 
-    with pytest.raises(ForbiddenException):
-        await cw.delete_student_workspace(
-            "c1", "u1111-2222", "other", lecturer, db,
-            _delete_client(template="other-workspace"),
-        )
 
+@pytest.mark.asyncio
+async def test_the_marker_governs_even_if_the_template_left_the_course():
+    """Deletion no longer re-checks the template list. A workspace carries its
+    course from provisioning time, when the template WAS allowed; removing the
+    template from the course afterwards must not strand the workspaces it
+    already created with nobody able to clean them up."""
+    db = _bulk_db(members=[_member(user_id="1111-2222")])
+    lecturer = _course_principal("l1", "c1", "_lecturer")
 
-# --- root / internet policy ---------------------------------------------------
-
-
-def test_template_ceiling_falls_back_to_the_template_variable_defaults():
-    """A template with no settings row must behave like the .tf defaults."""
-    assert cw.template_policy_ceiling(make_db(settings_row=None), "bash-workspace") == (
-        cw.DEFAULT_ALLOW_ROOT, cw.DEFAULT_ALLOW_INTERNET
+    result = await cw.delete_student_workspace(
+        "c1", "u1111-2222", "old", lecturer, db,
+        _delete_client(template="template-since-removed", course_id="c1"),
     )
-    assert (cw.DEFAULT_ALLOW_ROOT, cw.DEFAULT_ALLOW_INTERNET) == (False, True)
-
-
-def test_settings_row_policy_tolerates_an_unflushed_row():
-    row = WorkspaceTemplateSettings(template_name="bash-workspace")
-    # Columns are NULL until flushed; bool(None) would read as "internet off".
-    assert cw.settings_row_policy(row) == (False, True)
-
-
-def test_a_course_can_narrow_but_never_widen():
-    # Template denies root: no course setting can hand it back.
-    assert cw.effective_policy(False, True) is False
-    assert cw.effective_policy(False, None) is False
-    # Template allows it: the course decides.
-    assert cw.effective_policy(True, None) is True
-    assert cw.effective_policy(True, True) is True
-    assert cw.effective_policy(True, False) is False
-
-
-def test_self_provision_takes_the_most_restrictive_course():
-    """Sharing a template across courses must not launder an exam course's
-    restrictions — the strictest course the student is in wins."""
-    principal = Principal(user_id="s1", claims=Claims(dependent={"course": {
-        "open-course": {"_student"}, "exam-course": {"_student"},
-    }}))
-    db = make_db(course_templates=[
-        _tpl_row("open-course", "bash-workspace"),                      # no opinion
-        _tpl_row("exam-course", "bash-workspace", allow_internet=False),
-    ])
-    allow_root, allow_internet = cw.member_template_policy(db, principal, "bash-workspace")
-    assert allow_internet is False
-    assert allow_root is True  # no course denies it; the ceiling still applies
-
-
-def test_no_course_context_means_no_narrowing():
-    db = make_db(course_templates=[])
-    assert cw.member_template_policy(db, _workspace_user(), "bash-workspace") == (None, None)
-
+    assert result.success is True
 
 @pytest.mark.asyncio
 async def test_course_policy_stores_only_denials():

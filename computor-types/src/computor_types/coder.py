@@ -99,6 +99,13 @@ class CoderWorkspaceCreate(BaseModel):
         description="Course-level internet policy for this workspace, ANDed with the "
                     "template's allow_internet the same way. None = no course-level restriction.",
     )
+    course_id: Optional[str] = Field(
+        None,
+        description="Course this workspace is provisioned FOR. None/empty means the user "
+                    "provisioned it for themselves, which is what course views scope on: "
+                    "without it, a member's personal workspace on a course template is "
+                    "indistinguishable from one the course created.",
+    )
 
 
 # Response schemas
