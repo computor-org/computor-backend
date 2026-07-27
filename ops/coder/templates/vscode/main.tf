@@ -71,12 +71,17 @@ data "coder_parameter" "home_mode" {
 # rich parameters at provision time. The default "true" means "no course-level
 # restriction" — the effective value is ANDed with the template variable in the
 # locals below, so a parameter can only ever take access away, never grant it.
-# Immutable: a running workspace's policy cannot be flipped by a rebuild.
+#
+# MUTABLE, unlike home_mode: a course's policy has to be able to change under
+# workspaces that already exist (an exam lockdown is worth nothing if it only
+# applies to workspaces provisioned after it). Coder rejects a build that
+# changes an immutable parameter, so the backend could not push a new value.
+# Only the backend ever sets these — no user can reach Coder to set their own.
 data "coder_parameter" "allow_root" {
   name         = "allow_root"
   type         = "bool"
   description  = "Course-level root policy; ANDed with the template's allow_root variable"
-  mutable      = false
+  mutable      = true
   default      = "true"
   display_name = "Root Access"
   order        = 102
@@ -86,7 +91,7 @@ data "coder_parameter" "allow_internet" {
   name         = "allow_internet"
   type         = "bool"
   description  = "Course-level internet policy; ANDed with the template's allow_internet variable"
-  mutable      = false
+  mutable      = true
   default      = "true"
   display_name = "Internet Access"
   order        = 103

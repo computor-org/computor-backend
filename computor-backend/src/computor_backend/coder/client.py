@@ -952,6 +952,7 @@ class CoderClient:
         self,
         username: str,
         workspace_name: str,
+        policy: Optional[dict] = None,
     ) -> bool:
         """
         Start a stopped workspace.
@@ -959,6 +960,10 @@ class CoderClient:
         Args:
             username: User's username
             workspace_name: Workspace name
+            policy: {"allow_root": bool, "allow_internet": bool} to apply as it
+                starts. Callers that know the workspace belongs to a course pass
+                the course's CURRENT policy, so one that was stopped when the
+                policy changed does not come back under the old one.
 
         Returns:
             True if start initiated successfully
@@ -967,7 +972,17 @@ class CoderClient:
         return await self._workspace_transition(
             details.workspace.id,
             "start",
+            policy=policy,
         )
+
+    async def rebuild_with_policy(self, workspace_id: str, policy: dict) -> bool:
+        """Restart a running workspace under a new root/internet policy.
+
+        The parameters are mutable precisely so this is possible; a running
+        workspace cannot pick up a policy change any other way, because its
+        container was created with the old one.
+        """
+        return await self._workspace_transition(workspace_id, "start", policy=policy)
 
     async def stop_workspace(
         self,
@@ -994,8 +1009,18 @@ class CoderClient:
         self,
         workspace_id: str,
         transition: str,
+        policy: Optional[dict] = None,
     ) -> bool:
-        """Execute workspace state transition (start/stop)."""
+        """Execute workspace state transition (start/stop).
+
+        ``policy`` overrides rich parameters on this build — used to apply a
+        course's current root/internet policy as the workspace starts, so a
+        workspace that was stopped when the policy changed comes back under the
+        new one rather than the one it was created with. Omitting the field
+        entirely (the default) makes Coder carry the previous build's values
+        forward, which is what keeps the auth token and home mode across an
+        ordinary stop/start.
+        """
         # Get workspace to find template version
         resp = await self._request(
             "GET", f"/api/v2/workspaces/{workspace_id}", ok=None
@@ -1007,14 +1032,27 @@ class CoderClient:
         workspace = resp.json()
         template_version_id = workspace["latest_build"]["template_version_id"]
 
+        body: dict[str, Any] = {
+            "template_version_id": template_version_id,
+            "transition": transition,
+        }
+        if policy:
+            # A partial list resets everything omitted, so send the carried
+            # parameters too and let the policy win where they overlap.
+            carried = {
+                p["name"]: p["value"]
+                for p in await self._carry_build_params(workspace["latest_build"].get("id"))
+            }
+            carried.update({k: ("true" if v else "false") for k, v in policy.items()})
+            body["rich_parameter_values"] = [
+                {"name": name, "value": value} for name, value in carried.items()
+            ]
+
         # Create transition build
         resp = await self._request(
             "POST",
             f"/api/v2/workspaces/{workspace_id}/builds",
-            json={
-                "template_version_id": template_version_id,
-                "transition": transition,
-            },
+            json=body,
             ok=None,
             timeout=self.settings.workspace_timeout,
         )

@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from computor_backend.business_logic.course_workspaces import (
+    apply_course_workspace_policy,
     delete_student_workspace,
     get_course_workspace_settings,
     list_student_workspaces,
@@ -71,6 +72,25 @@ async def update_course_workspace_settings_endpoint(
         str(course_id), data, permissions, db, client, coder_settings
     )
 
+
+@course_workspaces_router.post(
+    "/courses/{course_id}/workspace-settings/apply-policy",
+    response_model=StudentWorkspaceProvisionResponse,
+)
+async def apply_course_workspace_policy_endpoint(
+    course_id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Annotated[Session, Depends(get_db)],
+    client: Annotated[CoderClient, Depends(get_coder_client)],
+) -> StudentWorkspaceProvisionResponse:
+    """Push the course's current root/internet policy onto its RUNNING
+    workspaces, restarting them (workspace:manage).
+
+    Stopped workspaces are left alone and reported: they pick the policy up on
+    their next start, which is cheaper and less surprising than starting a
+    student's workspace in order to lock it down.
+    """
+    return await apply_course_workspace_policy(str(course_id), permissions, db, client)
 
 @course_workspaces_router.post(
     "/courses/{course_id}/student-workspaces/provision",

@@ -777,6 +777,105 @@ async def list_student_workspaces(
     return CourseStudentWorkspacesResponse(students=students, count=len(relevant))
 
 
+async def workspace_start_policy(
+    db: Session, client: CoderClient, template_name: str, build_id: Optional[str]
+) -> Optional[dict]:
+    """The policy a workspace should start under, or None to leave it alone.
+
+    A workspace carries its course marker, so the CURRENT course policy can be
+    applied every time it starts. Without this a workspace that was stopped when
+    a lecturer cut internet for an exam would come back with internet — the
+    parameters it was created with are what a bare start carries forward.
+
+    Returns None for a personal workspace (nothing to enforce) or when the
+    marker cannot be read, so an unreachable Coder degrades to today's
+    behaviour rather than to a policy guess.
+    """
+    if not build_id:
+        return None
+    try:
+        params = await client.get_build_params(build_id)
+    except Exception:
+        return None
+    course_id = params.get("course_id")
+    if not course_id:
+        return None
+    course_root, course_internet = course_template_policy(db, course_id, template_name)
+    # The template ceiling is applied inside Terraform; only the course's
+    # narrowing travels as a parameter.
+    return {
+        "allow_root": course_root is not False,
+        "allow_internet": course_internet is not False,
+    }
+
+
+async def apply_course_workspace_policy(
+    course_id: UUID | str,
+    permissions: Principal,
+    db: Session,
+    client: CoderClient,
+) -> StudentWorkspaceProvisionResponse:
+    """Push the course's current policy onto the workspaces it provisioned.
+
+    Only RUNNING workspaces are rebuilt: their container was created with the
+    old policy and nothing else can change it. Stopped ones are left alone and
+    reported — they pick the policy up when they next start (see
+    workspace_start_policy), which is both cheaper and less surprising than
+    starting a student's workspace to lock it down.
+
+    Governed by workspace:manage like the rest of the course workspace
+    configuration.
+    """
+    _load_course_or_404(db, course_id)
+    if not can_manage_course_workspaces(permissions):
+        raise ForbiddenException(
+            detail="Changing course workspace policy requires the workspace maintainer role.",
+        )
+
+    workspaces = await client.list_all_workspaces()
+    outcomes: list[StudentWorkspaceProvisionOutcome] = []
+    for workspace in workspaces:
+        if not workspace.latest_build_id:
+            continue
+        try:
+            params = await client.get_build_params(workspace.latest_build_id)
+        except Exception:
+            continue
+        if params.get("course_id") != str(course_id):
+            continue
+
+        outcome = StudentWorkspaceProvisionOutcome(
+            course_member_id="", workspace_name=workspace.name
+        )
+        running = (
+            workspace.latest_build_transition == "start"
+            and (workspace.latest_build_status.value if workspace.latest_build_status else "")
+            in ACTIVE_BUILD_STATUSES
+        )
+        if not running:
+            outcome.error = "Stopped — it will start under the new policy."
+            outcomes.append(outcome)
+            continue
+
+        course_root, course_internet = course_template_policy(
+            db, course_id, workspace.template_name or ""
+        )
+        ok = await client.rebuild_with_policy(workspace.id, {
+            "allow_root": course_root is not False,
+            "allow_internet": course_internet is not False,
+        })
+        outcome.success = ok
+        if not ok:
+            outcome.error = "Rebuild failed"
+        outcomes.append(outcome)
+
+    return StudentWorkspaceProvisionResponse(
+        outcomes=outcomes,
+        succeeded=sum(1 for o in outcomes if o.success),
+        failed=sum(1 for o in outcomes if not o.success),
+    )
+
+
 async def delete_student_workspace(
     course_id: UUID | str,
     username: str,

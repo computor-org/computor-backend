@@ -85,6 +85,8 @@ from computor_backend.business_logic.course_workspaces import (
     member_template_policy,
     settings_row_policy,
     template_settings_row as _template_settings_row,
+    apply_course_workspace_policy,
+    workspace_start_policy,
 )
 from computor_types.course_workspaces import CourseWorkspaceAdminListResponse
 from computor_backend.database import get_db
@@ -642,7 +644,14 @@ async def start_workspace(
                 details.workspace.template_name,
                 exclude_workspace_id=details.workspace.id,
             )
-        success = await client.start_workspace(username, workspace_name)
+        # A course workspace starts under the course's CURRENT policy, not the
+        # one it was created with — otherwise a workspace that happened to be
+        # stopped when a lecturer locked the course down comes back unlocked.
+        policy = await workspace_start_policy(
+            db, client, details.workspace.template_name or "",
+            details.workspace.latest_build_id,
+        )
+        success = await client.start_workspace(username, workspace_name, policy=policy)
         return WorkspaceActionResponse(
             success=success,
             message="Workspace starting" if success else "Failed to start workspace",
