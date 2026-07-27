@@ -703,7 +703,18 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
         activity_bump_ms = parameters.get("activity_bump_ms", 14400000)
         # One immutable image tag for this run, shared by the build and the
         # template's pinned workspace_image. workflow.now() is replay-safe.
-        image_tag = parameters.get("image_tag") or ("v" + workflow.now().strftime("%Y%m%d-%H%M%S"))
+        #
+        # Without a build there is nothing to give a fresh tag to, and pinning
+        # the template to one would produce a version whose every workspace
+        # fails with "unable to pull image ...:vYYYYMMDD-HHMMSS". Fall back to
+        # the tag the last build published instead.
+        image_tag = parameters.get("image_tag")
+        if not image_tag:
+            image_tag = (
+                "v" + workflow.now().strftime("%Y%m%d-%H%M%S")
+                if build_images
+                else "latest"
+            )
         self._progress.update({"phase": "discovering", "image_tag": image_tag})
 
         if not coder_admin_email or not coder_admin_password:
