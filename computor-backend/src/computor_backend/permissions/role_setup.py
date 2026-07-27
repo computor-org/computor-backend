@@ -20,8 +20,11 @@ from computor_backend.interfaces import (
     StudentProfileInterface,
     ProfileInterface,
     ExtensionInterface,
+    ServiceInterface,
+    ApiTokenInterface,
 )
 from computor_backend.model.example import Example, ExampleRepository
+from computor_backend.model.service import ApiToken, Service
 
 
 def get_all_claim_values() -> Generator[Tuple[str, str], None, None]:
@@ -173,6 +176,43 @@ def claims_workspace_maintainer() -> List[Tuple[str, str]]:
         ("permissions", "workspace:manage"),        # Query/manage any user's workspaces + manage templates (build/push/rollout)
         ("permissions", "workspace:session"),       # Create coder sessions
     ]
+
+
+def claims_service_manager() -> List[Tuple[str, str]]:
+    """
+    Generate claims for the service manager role.
+
+    ``_service_manager`` owns machine identities: testing workers,
+    integrations and AI agents, plus the API tokens they authenticate with.
+    The point of the role is to delegate that without handing out ``_admin``.
+
+    Per-row safety lives in ``ApiTokenPermissionHandler`` — an
+    ``api_token:*`` claim only reaches tokens owned by SERVICE users (plus the
+    holder's own), never another human's. Token scopes are additive, so a
+    human's token carries that human's whole role set; minting or re-scoping
+    one would be an escalation and stays admin-only.
+
+    Deliberately NOT granted: ``course_member`` claims. Enrolling an agent
+    into a course remains gated on admin or a per-course lecturer role, so a
+    service manager cannot seat an account into a course they don't run.
+    Also not granted: ``service_type`` writes — a service manager picks a
+    type, they don't invent one (reading types is open to everyone via
+    ``ReadOnlyPermissionHandler``).
+    """
+    claims: List[Tuple[str, str]] = []
+
+    claims.extend(ServiceInterface().claim_values())
+    claims.extend(ApiTokenInterface().claim_values())
+
+    # ``ACTIONS`` (computor_types/base.py) is {create, get, list, update} —
+    # there is no "delete", so ``claim_values()`` never emits one. Without
+    # these two, a service manager cannot archive a service or revoke a token
+    # and gets a confusing 403. Same explicit-append pattern as
+    # ``claims_example_manager``.
+    claims.append(("permissions", f"{Service.__tablename__}:delete"))
+    claims.append(("permissions", f"{ApiToken.__tablename__}:delete"))
+
+    return claims
 
 
 def claims_git_manager() -> List[Tuple[str, str]]:
