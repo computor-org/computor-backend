@@ -21,6 +21,7 @@ import {
   managementNavigation,
   adminNavigation,
   userMgmtNavigation,
+  servicesNavigation,
   getViewNavigation,
   pathMatches,
 } from '@/src/config/navigation';
@@ -28,7 +29,7 @@ import {
 export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
-  const { isAdmin, isOrganizationManager, isUserManager, isWorkspaceUser, isWorkspaceMaintainer, isExampleManager, showManagement } = usePermissions();
+  const { isAdmin, isOrganizationManager, isUserManager, isWorkspaceUser, isWorkspaceMaintainer, isExampleManager, isServiceManager, showManagement } = usePermissions();
   const [collapsed, setCollapsed] = useState(false);
 
   // Sub-sections the user has explicitly toggled open. The section containing
@@ -211,6 +212,7 @@ export default function Sidebar() {
         )}
       {isUserManager && renderNavItems(userMgmtNavigation)}
       {isWorkspaceUser && renderNavItems(getWorkspacesNavigation(isWorkspaceMaintainer))}
+      {isServiceManager && renderNavItems(servicesNavigation)}
       {isAdmin && renderNavItems(adminNavigation)}
     </SidebarShell>
   );

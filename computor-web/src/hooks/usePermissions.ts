@@ -71,6 +71,12 @@ export function usePermissions() {
   // provision for anyone with custom names. Mirrors the backend claims
   // workspace:provision_self / workspace:provision.
   const canProvisionWorkspace = isWorkspaceUser || isWorkspaceMaintainer;
+  // Service accounts (testing systems, integrations, AI agents) and their API
+  // tokens are managed by _service_manager (admins bypass). Mirrors the
+  // backend claims service:* / api_token:*. Note the backend additionally
+  // confines a service manager to tokens on SERVICE users — it can never mint
+  // or revoke a human's token, since token scopes are additive.
+  const isServiceManager = isAdmin || systemRoles.includes('_service_manager');
 
   const hasView = (view: string) => views.includes(view);
 
@@ -147,6 +153,7 @@ export function usePermissions() {
     isWorkspaceUser,
     isWorkspaceMaintainer,
     canProvisionWorkspace,
+    isServiceManager,
     hasView,
     views,
     scopes,

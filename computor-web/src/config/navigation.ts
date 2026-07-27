@@ -73,6 +73,18 @@ export const managementNavigation: NavItem[] = [
   },
 ];
 
+// Service accounts — admin or _service_manager. Its own group rather than a
+// System sub-item, because the System group is gated on isAdmin alone and
+// _service_manager exists precisely so this can be delegated without admin.
+export const servicesNavigation: NavItem[] = [
+  {
+    id: 'services',
+    label: 'Services',
+    path: '/admin/services',
+    icon: 'services',
+  },
+];
+
 // Admin-only navigation items
 export const adminNavigation: NavItem[] = [
   {

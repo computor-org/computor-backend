@@ -184,6 +184,17 @@ export default function SettingsPage() {
               title="API Tokens"
               description="Personal access tokens for the CLI, VS Code extension and scripts. Treat them like passwords."
             >
+              {/*
+                Scopes are additive claims (PrincipalBuilder.build), so a
+                personal token is never weaker than the account. Users assume
+                the opposite; say it where the token is minted.
+              */}
+              <div className="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                <strong className="font-medium">A token acts with your full permissions.</strong>{' '}
+                Scopes only add permissions — they never remove any. Anyone holding one of these tokens
+                can do anything you can.
+              </div>
+
               {createdToken && (
                 <div className="mb-5 rounded-lg border border-green-300 bg-green-50 p-4">
                   <p className="text-sm font-medium text-green-800">Token created — copy it now. You won’t be able to see it again.</p>
