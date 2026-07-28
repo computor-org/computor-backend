@@ -483,3 +483,22 @@ export interface TaskInfo {
   workflow_id?: string | null;
   duration?: string | null;
 }
+
+/** What happened to one workspace when a rotated app credential was pushed. */
+export interface WorkspaceCredentialOutcome {
+  workspace_name: string;
+  success: boolean;
+  error?: string | null;
+}
+
+/** Result of rotating a user's workspace app credential. */
+export interface WorkspaceCredentialRotationResponse {
+  user_id: string;
+  key_version: number;
+  rotated_at?: string | null;
+  /** False when nothing was pushed to — Coder disabled, or no workspaces. */
+  pushed: boolean;
+  outcomes: WorkspaceCredentialOutcome[];
+  succeeded: number;
+  failed: number;
+}
