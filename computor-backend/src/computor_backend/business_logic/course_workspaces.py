@@ -31,11 +31,10 @@ from computor_backend.coder.naming import (
     sanitize_workspace_name,
 )
 from computor_backend.coder.service import (
-    derive_workspace_app_secret,
+    current_workspace_app_credentials,
     get_user_email,
     get_user_fullname,
     mint_workspace_token,
-    workspace_app_password_hash,
 )
 from computor_backend.exceptions import (
     BadRequestException,
@@ -656,7 +655,9 @@ async def provision_student_workspaces(
                 workspace_name=workspace_name,
                 ttl_days=coder_settings.workspace_token_ttl_days,
             )
-            app_secret = derive_workspace_app_secret(str(member.user_id))
+            app_secret, app_hash = current_workspace_app_credentials(
+                db, str(member.user_id)
+            )
             result = await client.provision_workspace(
                 user_email=email,
                 username=str(member.user_id),
@@ -668,7 +669,7 @@ async def provision_student_workspaces(
                 allow_root=policy_root,
                 allow_internet=policy_internet,
                 app_secret=app_secret,
-                app_password_hash=workspace_app_password_hash(app_secret),
+                app_password_hash=app_hash,
                 course_id=str(course_id),
             )
             outcome.workspace_name = result.workspace.name if result.workspace else workspace_name

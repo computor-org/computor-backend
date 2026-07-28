@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 _APP_SECRET_CONTEXT = b"computor:workspace-app-auth:v1"
 
 
-def derive_workspace_app_secret(user_id: str) -> str:
+def derive_workspace_app_secret(user_id: str, key_version: int = 1) -> str:
     """Credential the workspace apps require and the ingress injects.
 
     Workspace apps (ttyd, KasmVNC, Jupyter, code-server) bind on 0.0.0.0 and
@@ -41,12 +41,27 @@ def derive_workspace_app_secret(user_id: str) -> str:
     single user's own workspaces is not a weakening — they are the same trust
     domain — while a different user still cannot authenticate.
 
-    Derived rather than stored: deterministic from TOKEN_SECRET, so there is no
-    migration, nothing at rest, and a rebuild reproduces the same value.
+    ``key_version`` (``user.workspace_app_key_version``) makes the credential
+    revocable for ONE user: bumping it yields a different secret, and pushing
+    that onto their workspaces invalidates the old one. Version 1 is the
+    original derivation, so nothing already provisioned changes value.
+
+    Derived rather than stored *by Computor*: deterministic from TOKEN_SECRET,
+    so we hold no secret and a rebuild reproduces the value. It is NOT absent
+    at rest generally — Coder persists both this and its argon2 hash as rich
+    build parameters, and the hash also sits in a Traefik label, where it is a
+    bearer equivalent (see ``workspace_app_password_hash``). Anyone who can
+    read those can authenticate; the key version is what makes that
+    recoverable.
     """
+    message = _APP_SECRET_CONTEXT + str(user_id).encode("utf-8")
+    if key_version and int(key_version) > 1:
+        # Appended only from v2 so v1 stays byte-identical to the original
+        # derivation. A UUID cannot contain ':', so the suffix is unambiguous.
+        message += b":" + str(int(key_version)).encode("ascii")
     digest = hmac.new(
         _token_secret().encode("utf-8"),
-        _APP_SECRET_CONTEXT + str(user_id).encode("utf-8"),
+        message,
         hashlib.sha256,
     ).digest()
     # URL-safe and free of ':' so it survives basic-auth and token headers.
@@ -60,10 +75,70 @@ def workspace_app_password_hash(secret: str) -> str:
     argon2 hash; with HASHED_PASSWORD set it compares the cookie against that
     hash directly. Handing the template both values lets the ingress inject a
     ready-made session cookie, so a user never sees a login page.
+
+    Note what that comparison implies: code-server checks the cookie for
+    EQUALITY with the hash, it does not verify the secret against it. So this
+    hash is a bearer credential, not a one-way digest — whoever reads it (the
+    Traefik label, Coder's build parameters) can mint a session without ever
+    knowing the secret. Argon2's cost parameters buy nothing here; treat the
+    hash exactly as carefully as the secret.
+
+    Salted, so each call returns a different string: the value that reaches the
+    container and the value the ingress injects must come from the same build.
     """
     from argon2 import PasswordHasher
 
     return PasswordHasher().hash(secret)
+
+
+def workspace_app_key_version(db: Session, user_id: str) -> int:
+    """The user's current app-credential key version.
+
+    Read straight from the database rather than through UserRepository: user
+    rows are Redis-cached for an hour, and a stale version here would keep
+    re-issuing a credential that was just revoked.
+    """
+    from computor_backend.model.auth import User
+
+    version = (
+        db.query(User.workspace_app_key_version)
+        .filter(User.id == str(user_id))
+        .scalar()
+    )
+    return int(version or 1)
+
+
+def current_workspace_app_credentials(db: Session, user_id: str) -> tuple[str, str]:
+    """``(secret, argon2 hash)`` at the user's current key version."""
+    secret = derive_workspace_app_secret(user_id, workspace_app_key_version(db, user_id))
+    return secret, workspace_app_password_hash(secret)
+
+
+def workspace_app_credentials_for_owner(
+    db: Session, owner_name: Optional[str]
+) -> Optional[tuple[str, str]]:
+    """Current credentials for a Coder workspace owner, or None.
+
+    None when the owner has no Computor user behind it — Coder's own ``admin``
+    account, or a workspace whose user was deleted — and when TOKEN_SECRET is
+    unavailable. Callers carry the previous build's values forward in that
+    case rather than issuing something nobody can reproduce.
+    """
+    from computor_backend.coder.naming import decode_coder_username
+    from computor_backend.model.auth import User
+
+    user_id = decode_coder_username(owner_name)
+    if user_id is None:
+        return None
+    exists = db.query(User.id).filter(User.id == user_id).scalar()
+    if exists is None:
+        logger.info(f"Coder owner '{owner_name}' has no Computor user; carrying credentials")
+        return None
+    try:
+        return current_workspace_app_credentials(db, user_id)
+    except Exception as e:
+        logger.warning(f"Could not derive app credentials for '{owner_name}': {e}")
+        return None
 
 
 def mint_workspace_token(

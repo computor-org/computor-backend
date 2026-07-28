@@ -734,6 +734,44 @@ def test_app_secret_changes_with_the_token_secret(monkeypatch):
     assert derive_workspace_app_secret("user-1") != first
 
 
+def test_key_version_1_reproduces_the_original_derivation(monkeypatch):
+    """Known-answer vectors captured from the code BEFORE key versions existed.
+
+    Every workspace provisioned so far holds a v1 secret in its build
+    parameters, its container env and its ingress label. If v1 ever stopped
+    reproducing these bytes, all of them would keep answering to a credential
+    the platform no longer computes — silently, until someone tried to use one.
+    """
+    monkeypatch.setenv("TOKEN_SECRET", "x" * 32)
+    from computor_backend.coder.service import derive_workspace_app_secret
+
+    assert (
+        derive_workspace_app_secret("user-1")
+        == "gwUgzj0rygz1PjHbtBv6yvFP-_4hy15xXzB-szfRPwM"
+    )
+    assert (
+        derive_workspace_app_secret("0232de59-e05d-4bc2-898f-b879c06abcde")
+        == "wPUo5OhO4Y9r-a0P5nEqSKAM-JO9NQKZtvYYjrkMlak"
+    )
+    # The default and an explicit v1 are the same statement.
+    assert derive_workspace_app_secret("user-1", 1) == derive_workspace_app_secret("user-1")
+
+
+def test_bumping_the_key_version_changes_only_that_users_secret(monkeypatch):
+    monkeypatch.setenv("TOKEN_SECRET", "x" * 32)
+    from computor_backend.coder.service import derive_workspace_app_secret
+
+    v1 = derive_workspace_app_secret("user-1")
+    v2 = derive_workspace_app_secret("user-1", 2)
+    v3 = derive_workspace_app_secret("user-1", 3)
+    assert len({v1, v2, v3}) == 3
+    # Another user at the same version is unaffected by the bump.
+    assert derive_workspace_app_secret("user-2") == derive_workspace_app_secret("user-2", 1)
+    # Format invariants hold at every version.
+    for secret in (v2, v3):
+        assert ":" not in secret and secret.strip() == secret
+
+
 def test_immutable_parameters_are_carried_across_a_rebuild():
     """A build that omits a rich parameter silently resets it to the template
     default — which would hand a locked-down workspace root and internet back,
