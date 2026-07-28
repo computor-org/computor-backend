@@ -154,3 +154,59 @@ async def test_token_update_merges_extra_params_without_duplicates():
     assert sent["computor_auth_token"] == "ctp_new_token"
     assert sent["workspace_app_secret"] == "new-secret"
     assert sent["home_mode"] == "scratch"
+
+
+# --- fleet rollout ------------------------------------------------------------
+
+
+def _rollout_client():
+    client = _client()
+    client._carry_build_params = AsyncMock(
+        return_value=[{"name": n, "value": v} for n, v in PREVIOUS_BUILD.items()
+                      if n != "computor_auth_token"]
+    )
+    client._get_build_param = AsyncMock(return_value="ctp_previous_token")
+    return client
+
+
+@pytest.mark.asyncio
+async def test_rollout_replaces_the_credential_when_the_caller_supplies_one():
+    client = _rollout_client()
+    await client.update_workspace_to_version(
+        "ws-1", "tv-2", credentials=("fresh-secret", "$argon2id$fresh")
+    )
+    sent = _sent(client)
+    assert sent["workspace_app_secret"] == "fresh-secret"
+    assert sent["workspace_app_hash"] == "$argon2id$fresh"
+    assert sent["computor_auth_token"] == "ctp_previous_token"
+    assert sent["home_mode"] == "scratch"
+
+
+@pytest.mark.asyncio
+async def test_rollout_carries_the_previous_credential_without_one():
+    # Coder's own admin account or a deleted user: nothing to resolve, so the
+    # workspace keeps the credential it has rather than getting one derived
+    # from a string that is not the user id.
+    client = _rollout_client()
+    await client.update_workspace_to_version("ws-1", "tv-2")
+    sent = _sent(client)
+    assert sent["workspace_app_secret"] == "old-secret"
+
+
+@pytest.mark.asyncio
+async def test_rollout_never_derives_a_credential_itself(monkeypatch):
+    """The client has no database session, so it cannot know the key version.
+
+    It used to derive from the Coder owner_name, which is not the user id — a
+    truncated one under the old naming scheme — producing a secret nothing else
+    could reproduce.
+    """
+    monkeypatch.setenv("TOKEN_SECRET", "x" * 32)
+    client = _rollout_client()
+    client.get_build_params = AsyncMock(return_value={})
+    client._carry_build_params = AsyncMock(return_value=[])
+    client._get_build_param = AsyncMock(return_value=None)
+
+    await client.update_workspace_to_version("ws-1", "tv-2")
+
+    assert "workspace_app_secret" not in _sent(client)

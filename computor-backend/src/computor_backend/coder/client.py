@@ -1371,9 +1371,17 @@ class CoderClient:
         self,
         workspace_id: str,
         template_version_id: str,
+        credentials: Optional[tuple[str, str]] = None,
     ) -> bool:
         """Rebuild a workspace onto a specific template version (fleet update),
         preserving its computor_auth_token so the extension stays authenticated.
+
+        ``credentials`` is the owner's ``(app_secret, app_hash)`` at their
+        current key version, resolved by the caller — this class has no database
+        session, and the key version lives in the database. When given it
+        REPLACES whatever the previous build held, which both heals a workspace
+        built before app auth existed and delivers a rotated credential. When
+        omitted the previous build's values are carried forward.
 
         Issues a ``start`` build on the new version — for workspaces to update
         immediately. For stopped workspaces prefer ``set_workspace_auto_update``
@@ -1406,29 +1414,12 @@ class CoderClient:
             for param in await self._carry_build_params(build_id):
                 by_name[param["name"]] = param["value"]
 
-        # A workspace built before app auth existed has no credential to carry,
-        # so a rollout would bring it back with its app still open to every
-        # other workspace. Derive it here instead — the Coder username IS the
-        # Computor user id, which is what the secret is derived from.
-        owner = workspace.get("owner_name")
-        if owner and not by_name.get("workspace_app_secret"):
-            from computor_backend.coder.service import (
-                derive_workspace_app_secret,
-                workspace_app_password_hash,
-            )
-
-            try:
-                secret = derive_workspace_app_secret(owner)
-                by_name["workspace_app_secret"] = secret
-                by_name["workspace_app_hash"] = workspace_app_password_hash(secret)
-            except Exception as e:
-                # TOKEN_SECRET missing: roll out without app auth rather than
-                # blocking the update, but say so — the app stays reachable by
-                # other workspaces until the next provision.
-                logger.warning(
-                    f"Workspace {workspace_id}: could not derive the app credential "
-                    f"({e}); rolling out with the app unauthenticated"
-                )
+        # The caller resolved the owner's current credential (it needs the key
+        # version from the database). Replace rather than carry: this heals a
+        # workspace built before app auth existed, and delivers a rotated
+        # credential to one that missed the push.
+        if credentials:
+            by_name["workspace_app_secret"], by_name["workspace_app_hash"] = credentials
 
         rich_params: list[dict] = [
             {"name": name, "value": value} for name, value in by_name.items()

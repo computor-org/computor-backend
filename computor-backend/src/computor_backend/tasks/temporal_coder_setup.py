@@ -916,6 +916,25 @@ async def rollout_template_workspaces(
                 if w.template_name == coder_template_name
             ]
 
+            # The owner's CURRENT app credential, resolved once per owner before
+            # the Coder loop so the database session stays short. The client
+            # cannot do this itself: the key version lives in the database.
+            # Owners with no Computor user behind them (Coder's own admin, a
+            # deleted user) map to None and keep their existing credential.
+            credentials_by_owner: dict[str, Optional[tuple[str, str]]] = {}
+            owner_names = {w.owner_name for w in targets if w.owner_name}
+            if owner_names:
+                from computor_backend.coder.service import (
+                    workspace_app_credentials_for_owner,
+                )
+                from computor_backend.database import get_db_session
+
+                with get_db_session() as db:
+                    for owner_name in owner_names:
+                        credentials_by_owner[owner_name] = (
+                            workspace_app_credentials_for_owner(db, owner_name)
+                        )
+
             for w in targets:
                 try:
                     # Always enable auto-update so a stopped/failed workspace
@@ -931,7 +950,11 @@ async def rollout_template_workspaces(
                     status = w.latest_build_status.value if w.latest_build_status else ""
                     is_up = w.latest_build_transition == "start" and status in ("succeeded", "running")
                     if is_up:
-                        if await client.update_workspace_to_version(w.id, version_id):
+                        if await client.update_workspace_to_version(
+                            w.id,
+                            version_id,
+                            credentials=credentials_by_owner.get(w.owner_name),
+                        ):
                             updated_now += 1
                         else:
                             errors.append(w.name)
