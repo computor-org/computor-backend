@@ -41,7 +41,7 @@ ttyd \
   --port ${ttyd_port} \
   --interface 0.0.0.0 \
   --writable \
-  --credential "coder:${app_secret}" \
+  --credential 'coder:${app_secret}' \
   bash --login \
   >/tmp/ttyd.log 2>&1 &
 %{ else }
