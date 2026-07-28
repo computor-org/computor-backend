@@ -525,6 +525,10 @@ async def test_bulk_provision_continues_past_failures_and_derives_name(monkeypat
     monkeypatch.setattr(cw, "get_user_email", lambda u: "s@example.org")
     monkeypatch.setattr(cw, "get_user_fullname", lambda u: "Student One")
     monkeypatch.setattr(cw, "mint_workspace_token", lambda *a, **k: "tok")
+    # Provisioning derives the per-user app secret from TOKEN_SECRET; without it
+    # every member fails on encryption and the partial-failure case under test
+    # never arises. Set it here rather than relying on the ambient environment.
+    monkeypatch.setenv("TOKEN_SECRET", "x" * 32)
 
     client = MagicMock()
     provision_result = MagicMock()
