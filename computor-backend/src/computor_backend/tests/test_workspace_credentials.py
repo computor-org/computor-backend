@@ -6,7 +6,7 @@ running workspace stop accepting the old secret.
 """
 
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -180,3 +180,43 @@ async def test_rotate_without_coder_still_revokes(monkeypatch):
     db.commit.assert_called_once()
     assert result.key_version == 2
     assert result.pushed is False
+
+
+# --- the start path -----------------------------------------------------------
+
+
+def test_start_sends_the_owners_current_credential(monkeypatch):
+    """A workspace stopped at rotation time must not come back holding the
+    revoked secret — so every start carries the current one."""
+    monkeypatch.setenv("TOKEN_SECRET", "x" * 32)
+    from computor_backend.api.coder import _current_app_credential_params
+    from computor_backend.coder.service import derive_workspace_app_secret
+
+    owner = MagicMock()
+    owner.id = USER_ID
+    db = _db(version=3)
+
+    with patch("computor_backend.api.coder._computor_user_for_coder_name", return_value=owner):
+        params = _current_app_credential_params(db, encode_coder_username(USER_ID))
+
+    assert params["workspace_app_secret"] == derive_workspace_app_secret(USER_ID, 3)
+    assert params["workspace_app_hash"].startswith("$argon2")
+
+
+def test_start_carries_previous_values_for_an_unresolvable_owner():
+    # Coder's own admin account, or a deleted user: no override, so the build
+    # carries whatever the previous one had rather than stranding the workspace.
+    from computor_backend.api.coder import _current_app_credential_params
+
+    with patch("computor_backend.api.coder._computor_user_for_coder_name", return_value=None):
+        assert _current_app_credential_params(MagicMock(), "admin") is None
+
+
+def test_start_carries_previous_values_when_the_secret_cannot_be_derived(monkeypatch):
+    monkeypatch.delenv("TOKEN_SECRET", raising=False)
+    from computor_backend.api.coder import _current_app_credential_params
+
+    owner = MagicMock()
+    owner.id = USER_ID
+    with patch("computor_backend.api.coder._computor_user_for_coder_name", return_value=owner):
+        assert _current_app_credential_params(_db(), encode_coder_username(USER_ID)) is None

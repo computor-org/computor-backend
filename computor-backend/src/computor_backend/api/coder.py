@@ -151,6 +151,25 @@ def _check_workspace_access_or_course_member(
     )
 
 
+def _current_app_credential_params(db: Session, username: str) -> Optional[dict]:
+    """Rich-parameter overrides carrying the owner's current app credential.
+
+    None when the owner has no Computor user behind the Coder name (Coder's own
+    ``admin`` account, a deleted user) or when the credential cannot be derived
+    — the build then carries the previous values forward, which is the old
+    behaviour rather than a workspace nobody can reach.
+    """
+    owner = _computor_user_for_coder_name(db, username)
+    if owner is None:
+        return None
+    try:
+        secret, app_hash = current_workspace_app_credentials(db, str(owner.id))
+    except Exception as e:
+        logger.warning(f"Could not derive the app credential for '{username}': {e}")
+        return None
+    return {"workspace_app_secret": secret, "workspace_app_hash": app_hash}
+
+
 def _handle_coder_error(e: Exception) -> ComputorException:
     """Convert Coder exceptions to typed ComputorException instances.
 
@@ -657,7 +676,15 @@ async def start_workspace(
             db, client, details.workspace.template_name or "",
             details.workspace.latest_build_id,
         )
-        success = await client.start_workspace(username, workspace_name, policy=policy)
+        # Every start carries the owner's CURRENT app credential, for course and
+        # personal workspaces alike. A workspace that was stopped when the
+        # credential was rotated would otherwise come back holding the revoked
+        # one — the build parameters are what the container and the ingress are
+        # rendered from, and Coder carries them forward untouched.
+        overrides = _current_app_credential_params(db, username)
+        success = await client.start_workspace(
+            username, workspace_name, policy=policy, param_overrides=overrides
+        )
         return WorkspaceActionResponse(
             success=success,
             message="Workspace starting" if success else "Failed to start workspace",
