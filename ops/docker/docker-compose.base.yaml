@@ -199,12 +199,13 @@ services:
   # Static file server — read-only view of the documents tree maintained by
   # the /documents API. Both must point at the same host directory.
   #
-  # NOTE: /docs carries no ForwardAuth, so the whole documents tree is readable
-  # (and listable — SHOW_LISTING) by anyone who can reach Traefik, with no
-  # login. That is fine if the tree is meant to be public course material, and
-  # is not if anything private ever lands there. Workspaces can no longer reach
-  # it — they are behind workspace-ingress, whose allowlist covers only the API
-  # and git — but every browser on the public domain still can.
+  # This container has no authentication of its own, so /docs is gated by a
+  # ForwardAuth to the backend. Without it the whole tree was readable — and
+  # listable, SHOW_LISTING is on — by anyone who could reach Traefik, with no
+  # login. The gate requires an authenticated user and nothing more, matching
+  # the read policy GET /documents/{list,files} already enforce; writes stay
+  # scope-checked in the API. Workspaces cannot reach this at all: they are
+  # behind workspace-ingress, whose allowlist covers only the API and git.
   static-server:
     image: halverneus/static-file-server:latest
     security_opt:
@@ -227,8 +228,13 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.static.rule=PathPrefix(`/docs`)"
       - "traefik.http.routers.static.entrypoints=web"
+      # API_URL is the backend as a container reaches it (dev: the host-run
+      # backend, prod: the uvicorn container) — set per environment by
+      # setup-env.sh, which is exactly what Traefik needs here.
+      - "traefik.http.middlewares.static-auth.forwardauth.address=${API_URL:-http://uvicorn:8000}/auth/verify-documents-access"
       - "traefik.http.middlewares.static-stripprefix.stripprefix.prefixes=/docs"
-      - "traefik.http.routers.static.middlewares=static-stripprefix"
+      # Auth first, then strip — same chain order as the workspace routers.
+      - "traefik.http.routers.static.middlewares=static-auth,static-stripprefix"
       - "traefik.http.services.static.loadbalancer.server.port=8080"
     depends_on:
       - traefik

@@ -67,9 +67,10 @@ export class DocumentsClient extends BaseEndpointClient {
   /**
    * Get Document File
    * Fetch a documents file. Available to any authenticated user.
-   * The same content is reachable unauthenticated via the static-server
-   * at ``/docs/<...>``; this endpoint serves authenticated callers
-   * through the same auth chain they use for everything else.
+   * The same content is reachable via the static-server at
+   * ``/docs/<...>``, which is gated by the same requirement through a
+   * ForwardAuth (``/auth/verify-documents-access``); this endpoint serves
+   * callers that address the file by scope rather than by tree path.
    * Supports ``If-None-Match`` for cheap revalidation: when the
    * supplied ETag matches the current file, returns ``304 Not
    * Modified`` with the same ``ETag`` and ``Last-Modified`` headers

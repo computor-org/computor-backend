@@ -230,9 +230,11 @@ other.
   the platform itself uses for student repos) fetches arbitrary external URLs on the user's behalf.
   Set `[migrations] ALLOW_LOCALNETWORK=false` + an `ALLOWED_DOMAINS` allowlist, or "offline" is
   bypassable.
-- **`/docs` is unauthenticated** to anyone who can reach Traefik — every workspace and every browser
-  on the public domain (`docker-compose.base.yaml:219-225`, no ForwardAuth). Confirm intent; add
-  the auth middleware if not.
+- ~~**`/docs` is unauthenticated**~~ — closed. The static-server router now carries a ForwardAuth to
+  `/auth/verify-documents-access`, so reading (and listing — `SHOW_LISTING` is on) the documents
+  tree needs a logged-in user. The bar is "any authenticated user", deliberately identical to the
+  `GET /documents/{list,files}` read policy: the same bytes are reachable through the API by the
+  same caller, so a stricter static path would protect nothing. Writes stay scope-checked.
 - **Dev host exposure:** a dev workspace reaches the bridge gateway, so anything on the dev machine
   bound to `0.0.0.0` is reachable (verified: backend `:8000`, web `:3000`; forgejo and postgres are
   safe only because compose binds them to `127.0.0.1`). Document it.

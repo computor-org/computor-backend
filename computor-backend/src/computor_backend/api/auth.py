@@ -629,3 +629,33 @@ async def verify_coder_access(
         status_code=200,
         content={"status": "authorized", "user_id": principal.user_id, "workspace": workspace_name}
     )
+
+
+@auth_router.get("/verify-documents-access")
+async def verify_documents_access(
+    principal: Principal = Depends(get_current_principal)
+) -> Response:
+    """
+    Traefik ForwardAuth endpoint for the ``/docs`` static file server.
+
+    The documents tree is served read-only by the ``static-server`` container,
+    which has no authentication of its own. Without this gate anyone who could
+    reach Traefik could read *and list* (``SHOW_LISTING``) the entire tree with
+    no login at all.
+
+    Read access is "any authenticated user" — deliberately the same policy
+    ``GET /documents/list`` and ``GET /documents/files`` already enforce.
+    Making the static path stricter than the API would protect nothing: the
+    same bytes are reachable through the API by the same caller. Writes stay
+    scope-checked in ``check_documents_write_permission``.
+
+    Authentication is the platform-wide chain (``X-API-Token``, Bearer, or the
+    ``ct_access_token`` cookie), so a browser already logged into the web UI on
+    the same host passes without a prompt.
+
+    Returns:
+    - 204 No Content: authenticated — Traefik forwards the request
+    - 401 Unauthorized: raised by ``get_current_principal``, returned to the client
+    """
+    logger.debug(f"Documents access authorized for user {principal.user_id}")
+    return Response(status_code=204)
