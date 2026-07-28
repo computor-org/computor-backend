@@ -10,6 +10,7 @@ import re
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import String as sa_String, cast as sa_cast
 from sqlalchemy.orm import Session
 
 from computor_backend.coder.client import CoderClient, get_coder_client
@@ -56,6 +57,8 @@ from computor_types.coder import (
     WorkspaceDetails,
     WorkspaceListResponse,
     WorkspaceRolloutRequest,
+    WorkspaceVolume,
+    WorkspaceVolumeListResponse,
     WorkspaceTemplateSettingsSchema,
     WorkspaceTemplateSettingsUpdate,
 )
@@ -65,11 +68,13 @@ from computor_backend.tasks import get_task_executor, TaskSubmission
 from computor_types.tasks import TaskInfo
 from computor_types.workspace_roles import WorkspaceProvisionRequest
 from computor_backend.coder.service import (
+    derive_workspace_app_secret,
     get_user_by_email,
     get_user_by_id,
     get_user_email,
     get_user_fullname,
     mint_workspace_token,
+    workspace_app_password_hash,
 )
 from computor_backend.business_logic.course_workspaces import (
     enforce_template_quota as _enforce_template_quota,
@@ -77,7 +82,11 @@ from computor_backend.business_logic.course_workspaces import (
     get_member_course_template_names,
     is_template_enabled,
     list_admin_course_workspaces,
+    member_template_policy,
+    settings_row_policy,
     template_settings_row as _template_settings_row,
+    apply_course_workspace_policy,
+    workspace_start_policy,
 )
 from computor_types.course_workspaces import CourseWorkspaceAdminListResponse
 from computor_backend.database import get_db
@@ -183,6 +192,8 @@ _PUSH_MANAGED_VARIABLES = {
     "workspace_image": "pinned to the built image at push time",
     "memory_mb": "managed via the template's resource limit settings",
     "cpu_shares": "managed via the template's resource limit settings",
+    "allow_root": "managed via the template's root/internet policy settings",
+    "allow_internet": "managed via the template's root/internet policy settings",
 }
 
 # Infrastructure wiring: these must match the compose stack (networks, proxy
@@ -192,10 +203,35 @@ _INFRA_VARIABLES = {
     "coder_internal_url": "deployment wiring (internal Coder URL)",
     "coder_base_path": "deployment wiring (reverse-proxy base path)",
     "docker_network": "deployment wiring (workspace Docker network)",
+    "docker_network_offline": "deployment wiring (no-egress workspace Docker network)",
     "docker_socket": "deployment wiring (Docker socket URI)",
 }
 
 _TF_VARIABLE_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_-]*$")
+
+def _computor_user_for_coder_name(db: Session, username: str):
+    """The Computor user behind a Coder username, or None.
+
+    Coder usernames are the Computor user id with a "u" prefix, TRUNCATED to
+    Coder's 32-character limit — so `ud4abffea-1ec4-403c-898d-3d83f28` is a
+    prefix of a uuid, not a uuid. Matching has to be by prefix, the same rule
+    `_member_for_owner_name` uses for course members. Coder's own `admin`
+    account has no Computor user at all and simply misses.
+    """
+    if not username.startswith("u") or len(username) < 9:
+        return None
+    prefix = username[1:]
+    try:
+        from computor_backend.model.auth import User
+
+        return (
+            db.query(User)
+            .filter(sa_cast(User.id, sa_String).like(f"{prefix}%"))
+            .first()
+        )
+    except Exception:
+        logger.warning(f"Could not resolve Coder username '{username}' to a user")
+        return None
 
 
 def _locked_variable_reasons() -> dict:
@@ -420,6 +456,19 @@ async def provision_workspace(
         else:
             logger.error("Token minting returned None!")
 
+        # Course-level policy narrowing. Only applies when the caller is
+        # provisioning for THEMSELVES, where the courses in their claims are
+        # the relevant context — a manager provisioning for someone else is an
+        # explicit act, and gets the template's own policy. Either way the
+        # template ceiling still applies, so this can only restrict further.
+        if request.email:
+            policy_root, policy_internet = None, None
+        else:
+            policy_root, policy_internet = member_template_policy(
+                db, permissions, template
+            )
+
+        app_secret = derive_workspace_app_secret(str(target_user.id))
         result = await client.provision_workspace(
             user_email=get_user_email(target_user),
             username=str(target_user.id),
@@ -428,6 +477,10 @@ async def provision_workspace(
             workspace_name=workspace_name,
             computor_auth_token=workspace_token,
             home_mode=request.home_mode,
+            allow_root=policy_root,
+            allow_internet=policy_internet,
+            app_secret=app_secret,
+            app_password_hash=workspace_app_password_hash(app_secret),
         )
         return result
     except ComputorException:
@@ -591,7 +644,14 @@ async def start_workspace(
                 details.workspace.template_name,
                 exclude_workspace_id=details.workspace.id,
             )
-        success = await client.start_workspace(username, workspace_name)
+        # A course workspace starts under the course's CURRENT policy, not the
+        # one it was created with — otherwise a workspace that happened to be
+        # stopped when a lecturer locked the course down comes back unlocked.
+        policy = await workspace_start_policy(
+            db, client, details.workspace.template_name or "",
+            details.workspace.latest_build_id,
+        )
+        success = await client.start_workspace(username, workspace_name, policy=policy)
         return WorkspaceActionResponse(
             success=success,
             message="Workspace starting" if success else "Failed to start workspace",
@@ -860,6 +920,12 @@ def _per_template_variables(db: Session) -> dict:
             variables["memory_mb"] = str(row.memory_mb)
         if row.cpu_shares:
             variables["cpu_shares"] = str(row.cpu_shares)
+        # Always sent, unlike the caps above: these are booleans whose "off"
+        # value is meaningful, and the push filter drops falsy values, so
+        # "false" has to travel as the non-empty string it already is.
+        allow_root, allow_internet = settings_row_policy(row)
+        variables["allow_root"] = "true" if allow_root else "false"
+        variables["allow_internet"] = "true" if allow_internet else "false"
         for name, value in (row.template_variables or {}).items():
             variables[name] = str(value)
         if variables:
@@ -874,12 +940,20 @@ def _build_template_parameters(settings: CoderSettings) -> dict:
     debug_mode = os.environ.get("DEBUG_MODE", "development")
     if debug_mode == "production":
         backend_internal = "http://uvicorn:8000"
-        backend_external = os.environ.get("BACKEND_EXTERNAL_URL", "")
         forward_ports = ""
     else:
         backend_internal = "http://host.docker.internal:8000"
-        backend_external = os.environ.get("BACKEND_EXTERNAL_URL", "http://host.docker.internal:8000")
         forward_ports = os.environ.get("DEV_FORWARD_PORTS", "")
+
+    # What the extension INSIDE a workspace calls. Not the public URL: a
+    # workspace reaches the API through workspace-ingress, which answers to this
+    # name on the workspace networks and forwards to the backend. Same value in
+    # dev and prod — the ingress absorbs the difference (in dev it forwards to
+    # the host, where the backend runs) — and it is plain HTTP on an internal
+    # name, so no certificate has to exist for a workspace to talk to us.
+    backend_external = os.environ.get(
+        "WORKSPACE_BACKEND_URL", "http://computor-api"
+    )
 
     return {
         "templates_dir": settings.templates_dir,
@@ -1018,12 +1092,15 @@ async def rollout_workspaces_endpoint(
 
 
 def _settings_row_to_schema(row: WorkspaceTemplateSettings) -> WorkspaceTemplateSettingsSchema:
+    allow_root, allow_internet = settings_row_policy(row)
     return WorkspaceTemplateSettingsSchema(
         template_name=row.template_name,
         enabled=bool(row.enabled),
         memory_mb=row.memory_mb,
         cpu_shares=row.cpu_shares,
         max_running_workspaces=row.max_running_workspaces,
+        allow_root=allow_root,
+        allow_internet=allow_internet,
         template_variables=dict(row.template_variables or {}),
         updated_at=row.updated_at,
     )
@@ -1114,6 +1191,8 @@ async def update_template_settings(
     row.memory_mb = request.memory_mb
     row.cpu_shares = request.cpu_shares
     row.max_running_workspaces = request.max_running_workspaces
+    row.allow_root = request.allow_root
+    row.allow_internet = request.allow_internet
     row.template_variables = dict(request.template_variables)
     row.updated_by = permissions.user_id
     db.commit()
@@ -1236,6 +1315,156 @@ async def get_template_variables(
         customized=templates_fs.is_customized(path),
         variables=variables,
     )
+
+
+async def _run_volume_task(action: str, volume: Optional[str] = None) -> dict:
+    """Run one workspace-volume action on the coder worker and wait for it.
+
+    The backend has no docker socket — only the coder worker does — so even
+    reading the volume list is a Temporal round trip. Unlike the build/push
+    workflows these are short and the caller is a web request, so this awaits
+    the result instead of handing back a workflow id to poll.
+    """
+    executor = get_task_executor()
+    submission = TaskSubmission(
+        task_name="workspace_volumes",
+        parameters={"action": action, "volume": volume},
+        queue="coder-tasks",
+    )
+    workflow_id = await executor.submit_task(submission)
+    try:
+        result = await asyncio.wait_for(executor.get_task_result(workflow_id), timeout=300)
+    except asyncio.TimeoutError:
+        raise ServiceUnavailableException(
+            detail="The volume operation timed out. Is the coder worker running?",
+        )
+    payload = result.result if isinstance(result.result, dict) else {}
+    # Depending on how Temporal deserialized it, this is either the activity's
+    # own dict or the whole WorkflowResult wrapping it. Unwrap one level rather
+    # than depend on which.
+    if "success" not in payload and isinstance(payload.get("result"), dict):
+        payload = payload["result"]
+    if not payload.get("success"):
+        raise BadRequestException(
+            detail=payload.get("error") or result.error or "Volume operation failed",
+        )
+    return payload
+
+
+@router.get(
+    "/admin/volumes",
+    response_model=WorkspaceVolumeListResponse,
+    summary="List workspace home and scratch volumes with sizes and owners",
+)
+async def list_workspace_volumes(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    client: Annotated[CoderClient, Depends(get_coder_client)],
+    db: Annotated[Session, Depends(get_db)],
+    cache=Depends(get_cache),
+) -> WorkspaceVolumeListResponse:
+    """Home volumes (shared per user) and scratch volumes (per workspace).
+
+    These are deliberately not Terraform-managed so a workspace delete can
+    never destroy a home — which also means nothing else in the platform can
+    see them. Requires workspace:manage.
+    """
+    _check_workspace_access(permissions, "manage")
+    payload = await _run_volume_task("list")
+
+    # Resolve owners. The worker only sees names; matching a `coder-home-{id}`
+    # to a person needs Coder (id -> username) and the database (username is
+    # the Computor user id). If Coder is unreachable we still return the
+    # volumes, but nothing is called orphaned — "no owner found" would then
+    # mean "could not look up", which is the opposite of safe to delete.
+    users_by_id: dict[str, str] = {}
+    workspaces_by_id: dict[str, str] = {}
+    unresolved = False
+    try:
+        users_by_id = {u.id: u.username for u in await client.list_all_users()}
+        workspaces_by_id = {w.id: w.name for w in await client.list_all_workspaces()}
+    except Exception as e:
+        logger.warning(f"Could not resolve volume owners from Coder: {e}")
+        unresolved = True
+
+    volumes = []
+    total = 0
+    for entry in payload.get("volumes", []):
+        ref = entry.get("owner_ref") or ""
+        user_id = user_name = workspace_name = None
+        orphaned = False
+        if entry["kind"] == "home":
+            username = users_by_id.get(ref)
+            if username:
+                user = _computor_user_for_coder_name(db, username)
+                user_id = str(user.id) if user else username
+                if user:
+                    user_name = get_user_fullname(user) or get_user_email(user)
+            elif not unresolved:
+                orphaned = True
+        else:
+            workspace_name = workspaces_by_id.get(ref)
+            if workspace_name is None and not unresolved:
+                orphaned = True
+        size = entry.get("size_bytes")
+        if size:
+            total += size
+        volumes.append(WorkspaceVolume(
+            name=entry["name"],
+            kind=entry["kind"],
+            size_bytes=size,
+            in_use=entry.get("in_use"),
+            created_at=entry.get("created_at"),
+            user_id=user_id,
+            user_name=user_name,
+            workspace_name=workspace_name,
+            orphaned=orphaned,
+        ))
+    return WorkspaceVolumeListResponse(
+        volumes=volumes, total_bytes=total, unresolved=unresolved
+    )
+
+
+@router.delete(
+    "/admin/volumes/{volume_name}",
+    response_model=WorkspaceActionResponse,
+    summary="Delete a workspace volume",
+)
+async def delete_workspace_volume(
+    volume_name: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+) -> WorkspaceActionResponse:
+    """Reclaim a home or scratch volume. Irreversible.
+
+    Deleting a home takes every file of that user with it, across all of their
+    workspaces. Refused while a container still mounts it — stop the workspace
+    first. Requires workspace:manage.
+    """
+    _check_workspace_access(permissions, "manage")
+    payload = await _run_volume_task("delete", volume_name)
+    return WorkspaceActionResponse(success=True, message=payload.get("message", "Deleted"))
+
+
+@router.post(
+    "/admin/volumes/{volume_name}/repair",
+    response_model=WorkspaceActionResponse,
+    summary="Reset a volume's file ownership to the workspace user",
+)
+async def repair_workspace_volume(
+    volume_name: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+) -> WorkspaceActionResponse:
+    """Give the volume's contents back to uid 1000.
+
+    Files a workspace wrote while it had root stay root-owned in the shared
+    home; once the template's root access is switched off nothing inside the
+    workspace can fix them. Requires workspace:manage.
+    """
+    _check_workspace_access(permissions, "manage")
+    payload = await _run_volume_task("repair", volume_name)
+    return WorkspaceActionResponse(success=True, message=payload.get("message", "Repaired"))
 
 
 @router.get(

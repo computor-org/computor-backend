@@ -10,12 +10,13 @@ import Tabs from '@/src/components/ui/Tabs';
 import WorkspaceUsersPanel from '@/src/components/workspaces/WorkspaceUsersPanel';
 import WorkspaceFleetPanel from '@/src/components/workspaces/WorkspaceFleetPanel';
 import WorkspaceTemplatesPanel from '@/src/components/workspaces/WorkspaceTemplatesPanel';
+import WorkspaceVolumesPanel from '@/src/components/workspaces/WorkspaceVolumesPanel';
 import WorkspaceCoursesPanel from '@/src/components/workspaces/WorkspaceCoursesPanel';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
 
-type AdminTab = 'users' | 'fleet' | 'templates' | 'courses';
+type AdminTab = 'users' | 'fleet' | 'templates' | 'courses' | 'volumes';
 
 function WorkspaceAdminContent() {
   const router = useRouter();
@@ -26,6 +27,7 @@ function WorkspaceAdminContent() {
     rawTab === 'fleet' ? 'fleet'
     : rawTab === 'templates' ? 'templates'
     : rawTab === 'courses' ? 'courses'
+    : rawTab === 'volumes' ? 'volumes'
     : 'users';
 
   return (
@@ -42,6 +44,7 @@ function WorkspaceAdminContent() {
           { id: 'fleet', label: 'Fleet' },
           { id: 'templates', label: 'Templates' },
           { id: 'courses', label: 'Courses' },
+          { id: 'volumes', label: 'Volumes' },
         ]}
         active={tab}
         onSelect={(id) => router.replace(id === 'users' ? pathname : `${pathname}?tab=${id}`)}
@@ -63,6 +66,10 @@ function WorkspaceAdminContent() {
       ) : tab === 'templates' ? (
         <div className="flex-1 min-h-0 flex flex-col gap-6">
           <WorkspaceTemplatesPanel />
+        </div>
+      ) : tab === 'volumes' ? (
+        <div className="flex-1 min-h-0 flex flex-col gap-6">
+          <WorkspaceVolumesPanel />
         </div>
       ) : (
         <div className="flex-1 min-h-0 flex flex-col gap-6">

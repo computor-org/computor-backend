@@ -1,0 +1,471 @@
+
+git:
+  delivery: git
+  provider: forgejo
+  student_repo_modes: [managed, download]
+
+name: Programmieren in der Physik MATLAB 2027
+path: matlab.2027
+
+services:
+- slug: itpcp.exec.mat
+content_types:
+- color: green
+  kind: unit
+  slug: weekly
+  title: Weekly
+- color: blue
+  kind: unit
+  slug: training_unit
+  title: Training
+- color: cyan
+  kind: assignment
+  slug: standard
+  title: Standard
+- color: yellow
+  kind: assignment
+  slug: mandatory
+  title: Mandatory
+- color: fuchsia
+  kind: assignment
+  slug: advanced
+  title: Advanced
+- color: blue
+  kind: assignment
+  slug: training
+  title: Training
+- color: orange
+  kind: unit
+  slug: advanced
+  title: Advanced
+- color: lime
+  kind: unit
+  slug: exam
+  title: Exam
+- color: lime
+  kind: assignment
+  slug: exam
+  title: Exam
+contents:
+- content_type: weekly
+  contents:
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.math_constants
+    max_group_size: 1
+    path: math_constants
+    position: 1.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.simple_computations
+    max_group_size: 1
+    path: simple_computations
+    position: 2.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.simple_plot
+    max_group_size: 1
+    path: simple_plot
+    position: 3.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.character_introduction
+    max_group_size: 1
+    path: character_introduction
+    position: 4.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.plot_hyperbolic_functions
+    max_group_size: 1
+    path: plot_hyperbolic_functions
+    position: 5.0
+  path: unit_1
+  position: 1.0
+- content_type: weekly
+  contents:
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.vector_create
+    max_group_size: 1
+    path: vector_create
+    position: 1.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.indexing
+    max_group_size: 1
+    path: indexing
+    position: 2.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.compare_variables
+    max_group_size: 1
+    path: compare_variables
+    position: 3.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.plot_own_functions
+    max_group_size: 1
+    path: plot_own_functions
+    position: 4.0
+  path: unit_2
+  position: 2.0
+- content_type: weekly
+  contents:
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.fit_current_versus_voltage
+    max_group_size: 1
+    path: fit_current_versus_voltage
+    position: 1.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.fit_kerr_efect
+    max_group_size: 1
+    path: fit_kerr_efect
+    position: 2.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.fit_several_polynomials
+    max_group_size: 1
+    path: fit_several_polynomials
+    position: 3.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.random_numbers
+    max_group_size: 1
+    path: random_numbers
+    position: 4.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.short_test_vector
+    max_group_size: 1
+    path: short_test_vector
+    position: 10.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.short_test_random
+    max_group_size: 1
+    path: short_test_random
+    position: 11.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.short_test_taylor
+    max_group_size: 1
+    path: short_test_taylor
+    position: 12.0
+  path: unit_3
+  position: 3.0
+- content_type: weekly
+  contents:
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.numeric_data_types
+    max_group_size: 1
+    path: numeric_data_types
+    position: 1.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.characters_and_strings
+    max_group_size: 1
+    path: characters_and_strings
+    position: 2.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.type_of_letter
+    max_group_size: 1
+    path: type_of_letter
+    position: 3.0
+  - content_type: standard
+    example_identifier: itpcp.pgph.mat.regular_polyhedra
+    max_group_size: 1
+    path: regular_polyhedra
+    position: 4.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.decision_with_if
+    max_group_size: 1
+    path: decision_with_if
+    position: 5.0
+  - content_type: exam
+    example_identifier: itpcp.pgph.mat.inter_exam_01
+    max_group_size: 1
+    path: inter_exam_01
+    position: 10.0
+  path: unit_4
+  position: 4.0
+- content_type: weekly
+  contents:
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.quadratic_with_for
+    max_group_size: 1
+    path: quadratic_with_for
+    position: 1.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.while_test
+    max_group_size: 1
+    path: while_test
+    position: 2.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.taylor_with_for
+    max_group_size: 1
+    path: taylor_with_for
+    position: 3.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.train_sum
+    max_group_size: 1
+    path: train_sum
+    position: 4.0
+  - content_type: standard
+    example_identifier: itpcp.pgph.mat.lucas_sequence_for
+    max_group_size: 1
+    path: lucas_sequence_for
+    position: 5.0
+  - content_type: standard
+    example_identifier: itpcp.pgph.mat.lucas_sequence_direct
+    max_group_size: 1
+    path: lucas_sequence_direct
+    position: 6.0
+  path: unit_5
+  position: 5.0
+- content_type: weekly
+  contents:
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.logical_indexing
+    max_group_size: 1
+    path: logical_indexing
+    position: 1.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.compare_for_to_logics
+    max_group_size: 1
+    path: compare_for_to_logics
+    position: 2.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.quadratic_with_logical_indexing
+    max_group_size: 1
+    path: quadratic_with_logical_indexing
+    position: 3.0
+  - content_type: standard
+    example_identifier: itpcp.pgph.mat.pivot_index
+    max_group_size: 1
+    path: pivot_index
+    position: 4.0
+  - content_type: advanced
+    example_identifier: itpcp.pgph.mat.binary_singleton_expansion
+    max_group_size: 1
+    path: binary_singleton_expansion
+    position: 5.0
+  - content_type: advanced
+    example_identifier: itpcp.pgph.mat.conic_section_quadratic
+    max_group_size: 1
+    path: conic_section_quadratic
+    position: 6.0
+  - content_type: standard
+    example_identifier: itpcp.pgph.mat.conic_section_draw
+    max_group_size: 1
+    path: conic_section_draw
+    position: 7.0
+  path: unit_6
+  position: 6.0
+- content_type: weekly
+  contents:
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.beat_with_defaults
+    max_group_size: 1
+    path: beat_with_defaults
+    position: 1.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.polar_ellipse
+    max_group_size: 1
+    path: polar_ellipse
+    position: 2.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.plot_sphere
+    max_group_size: 1
+    path: plot_sphere
+    position: 3.0
+  - content_type: standard
+    example_identifier: itpcp.pgph.mat.plot_torus
+    max_group_size: 1
+    path: plot_torus
+    position: 4.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.make_movie2_d
+    max_group_size: 1
+    path: make_movie2_d
+    position: 5.0
+  - content_type: advanced
+    example_identifier: itpcp.pgph.mat.make_movie3_d
+    max_group_size: 1
+    path: make_movie3_d
+    position: 6.0
+  - content_type: advanced
+    example_identifier: itpcp.pgph.mat.structure3_d
+    max_group_size: 1
+    path: structure3_d
+    position: 7.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.beat_with_defaults1
+    max_group_size: 1
+    path: beat_with_defaults1
+    position: 10.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.beat_with_defaults2
+    max_group_size: 1
+    path: beat_with_defaults2
+    position: 11.0
+  path: unit_7
+  position: 7.0
+- content_type: weekly
+  contents:
+  - content_type: advanced
+    example_identifier: itpcp.pgph.mat.from_roman_numbers
+    max_group_size: 1
+    path: from_roman_numbers
+    position: 1.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.anonymous_function
+    max_group_size: 1
+    path: anonymous_function
+    position: 2.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.fit_decaying_oscillation
+    max_group_size: 1
+    path: fit_decaying_oscillation
+    position: 3.0
+  - content_type: standard
+    example_identifier: itpcp.pgph.mat.fit_exp_function
+    max_group_size: 1
+    path: fit_exp_function
+    position: 4.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.interpolation
+    max_group_size: 1
+    path: interpolation
+    position: 5.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.short_test_fit
+    max_group_size: 1
+    path: short_test_fit
+    position: 6.0
+  - content_type: exam
+    example_identifier: itpcp.pgph.mat.inter_exam_02
+    max_group_size: 1
+    path: inter_exam_02
+    position: 10.0
+  path: unit_8
+  position: 8.0
+- content_type: weekly
+  contents:
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.kirchhoff
+    max_group_size: 1
+    path: kirchhoff
+    position: 1.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.diagonal_matrix
+    max_group_size: 1
+    path: diagonal_matrix
+    position: 2.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.band_pass_filter
+    max_group_size: 1
+    path: band_pass_filter
+    position: 3.0
+  - content_type: standard
+    example_identifier: itpcp.pgph.mat.conic_section
+    max_group_size: 1
+    path: conic_section
+    position: 4.0
+  - content_type: advanced
+    example_identifier: itpcp.pgph.mat.caesar_cipher
+    max_group_size: 1
+    path: caesar_cipher
+    position: 5.0
+  path: unit_9
+  position: 9.0
+- content_type: weekly
+  contents:
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.polynom_tangent
+    max_group_size: 1
+    path: polynom_tangent
+    position: 1.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.polynom_integral
+    max_group_size: 1
+    path: polynom_integral
+    position: 2.0
+  - content_type: standard
+    example_identifier: itpcp.pgph.mat.polynom_summation
+    max_group_size: 1
+    path: polynom_summation
+    position: 3.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.sort_in_vector
+    max_group_size: 1
+    path: sort_in_vector
+    position: 4.0
+  - content_type: standard
+    example_identifier: itpcp.pgph.mat.strictly_monotonic_increasing
+    max_group_size: 1
+    path: strictly_monotonic_increasing
+    position: 5.0
+  - content_type: advanced
+    example_identifier: itpcp.pgph.mat.chess_board
+    max_group_size: 1
+    path: chess_board
+    position: 6.0
+  - content_type: advanced
+    example_identifier: itpcp.pgph.mat.polynom_summation_advanced
+    max_group_size: 1
+    path: polynom_summation_advanced
+    position: 10.0
+  path: unit_10
+  position: 10.0
+- content_type: weekly
+  contents:
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.damped_harmonic_oscillator
+    max_group_size: 1
+    path: damped_harmonic_oscillator
+    position: 1.0
+  - content_type: standard
+    example_identifier: itpcp.pgph.mat.harmonic_oscilallator_resonance
+    max_group_size: 1
+    path: harmonic_oscilallator_resonance
+    position: 2.0
+  - content_type: standard
+    example_identifier: itpcp.pgph.mat.harmonic_oscilallator_comparision
+    max_group_size: 1
+    path: harmonic_oscilallator_comparision
+    position: 3.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.fourier_cosine_fit
+    max_group_size: 1
+    path: fourier_cosine_fit
+    position: 4.0
+  - content_type: advanced
+    example_identifier: itpcp.pgph.mat.intersection_ellipse_polynomial
+    max_group_size: 1
+    path: intersection_ellipse_polynomial
+    position: 5.0
+  - content_type: exam
+    example_identifier: itpcp.pgph.mat.final_exam
+    max_group_size: 1
+    path: final_exam
+    position: 10.0
+  path: unit_11
+  position: 11.0
+- content_type: weekly
+  contents:
+  - content_type: advanced
+    example_identifier: itpcp.pgph.mat.oop_polynomial
+    max_group_size: 1
+    path: oop_polynomial
+    position: 1.0
+  - content_type: advanced
+    example_identifier: itpcp.pgph.mat.practical_numbers
+    max_group_size: 1
+    path: practical_numbers
+    position: 2.0
+  - content_type: advanced
+    example_identifier: itpcp.pgph.mat.oop_practical_numbers_static
+    max_group_size: 1
+    path: oop_practical_numbers_static
+    position: 3.0
+  path: unit_12
+  position: 12.0
+- content_type: training_unit
+  contents:
+  - content_type: training
+    example_identifier: itpcp.pgph.mat.cell_training_1
+    max_group_size: 1
+    path: cell_training_1
+    position: 10.0
+  - content_type: mandatory
+    example_identifier: itpcp.pgph.mat.struct_training_1
+    max_group_size: 1
+    path: struct_training_1
+    position: 11.0
+  path: training_unit
+  position: 30.0

@@ -113,6 +113,13 @@ services:
       # migration targets must be allowed — but ONLY this host: the domain
       # allowlist keeps authenticated users from using /repos/migrate to reach
       # anything else on the internal network.
+      #
+      # This allowlist is also what stops /repos/migrate from being an egress
+      # bypass for internet-disabled workspaces: Forgejo stays reachable from
+      # one (git has to work), and Forgejo itself has internet, so without the
+      # allowlist a user could have it fetch an external URL on their behalf and
+      # read the result back by cloning the imported repo. Adding a public host
+      # here re-opens that path — do it only deliberately.
       FORGEJO__migrations__ALLOW_LOCALNETWORKS: "true"
       FORGEJO__migrations__ALLOWED_DOMAINS: "computor-forgejo,localhost,127.0.0.1"
     labels:

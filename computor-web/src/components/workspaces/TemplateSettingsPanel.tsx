@@ -22,6 +22,8 @@ interface FormState {
   memoryMb: string;
   cpuShares: string;
   maxRunning: string;
+  allowRoot: boolean;
+  allowInternet: boolean;
   variables: VariableRow[];
 }
 
@@ -70,6 +72,10 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
       memoryMb: row?.memory_mb ? String(row.memory_mb) : '',
       cpuShares: row?.cpu_shares ? String(row.cpu_shares) : '',
       maxRunning: row?.max_running_workspaces != null ? String(row.max_running_workspaces) : '',
+      // Defaults mirror the templates' own Terraform variable defaults, so a
+      // template without a settings row shows what it actually does.
+      allowRoot: row?.allow_root ?? false,
+      allowInternet: row?.allow_internet ?? true,
       variables: Object.entries(row?.template_variables ?? {}).map(([name, value]) => ({ name, value })),
     };
   }, [data, templateName]);
@@ -104,6 +110,8 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
           memory_mb: parseLimit('Memory cap', form.memoryMb),
           cpu_shares: parseLimit('CPU shares', form.cpuShares),
           max_running_workspaces: parseLimit('Max running workspaces', form.maxRunning),
+          allow_root: form.allowRoot,
+          allow_internet: form.allowInternet,
           template_variables: variables,
         },
       });
@@ -198,6 +206,53 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
             </p>
           </div>
         </div>
+      </div>
+
+      <div className="shrink-0 bg-white rounded-lg border border-gray-200 p-5 space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Root &amp; internet policy</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            The ceiling for every workspace of this template. A course can restrict these
+            further but can never grant what is switched off here. Applied with the next{' '}
+            <span className="font-medium">Build &amp; push</span>, and to each workspace when
+            it next restarts.
+          </p>
+        </div>
+
+        <label className="flex items-start gap-2">
+          <input
+            type="checkbox"
+            checked={form.allowRoot}
+            onChange={(event) => update({ allowRoot: event.target.checked })}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="block text-sm font-medium text-gray-900">Root access (sudo)</span>
+            <span className="block text-xs text-gray-500">
+              Off runs the container with <code className="font-mono">no-new-privileges</code>,
+              so <code className="font-mono">sudo</code> and <code className="font-mono">su</code>{' '}
+              are refused by the kernel even though the image ships them. Users can no longer
+              install system packages — including from a <code className="font-mono">~/personalize</code> script.
+            </span>
+          </span>
+        </label>
+
+        <label className="flex items-start gap-2">
+          <input
+            type="checkbox"
+            checked={form.allowInternet}
+            onChange={(event) => update({ allowInternet: event.target.checked })}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="block text-sm font-medium text-gray-900">Internet access</span>
+            <span className="block text-xs text-gray-500">
+              Off moves the workspace to an isolated network with no route out: the Computor
+              API and git stay reachable, everything external fails immediately. Package
+              installs from PyPI, npm or apt stop working.
+            </span>
+          </span>
+        </label>
       </div>
 
       <div className="shrink-0 bg-white rounded-lg border border-gray-200 p-5 space-y-3">

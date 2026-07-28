@@ -57,10 +57,17 @@ if [ ! -f "$USER_DATA_DIR/User/settings.json" ]; then
 SETTINGS_EOF
 fi
 
-%{ if code_server_password != "" }
-export PASSWORD="${code_server_password}"
+# code-server compares its session cookie against HASHED_PASSWORD, so handing it
+# the argon2 hash of the per-user app secret lets the ingress inject a
+# ready-made session — the user never sees a login page, while a request that
+# did not come through the ingress (another workspace dialling this container
+# directly on the shared bridge) has no cookie and is bounced to the login page.
+%{ if app_hash != "" }
+export HASHED_PASSWORD="${app_hash}"
 CODE_SERVER_AUTH=password
 %{ else }
+echo "WARNING: no workspace app secret was issued — the editor is reachable" \
+     "by any other workspace on this network." >&2
 CODE_SERVER_AUTH=none
 %{ endif }
 

@@ -114,6 +114,11 @@ def make_db(
             q.filter.return_value.order_by.return_value.all.return_value = sorted(
                 course_templates, key=lambda r: r.template_name
             )
+            # Policy lookups filter without ordering.
+            q.filter.return_value.all.return_value = list(course_templates)
+            q.filter.return_value.first.return_value = (
+                course_templates[0] if course_templates else None
+            )
         elif target is CourseWorkspaceSettings:
             q.filter.return_value.first = lambda: state["course_settings"]
         elif target is Course:
@@ -131,8 +136,8 @@ def make_db(
     return db
 
 
-def _tpl_row(course_id: str, name: str) -> CourseWorkspaceTemplate:
-    return CourseWorkspaceTemplate(course_id=course_id, template_name=name)
+def _tpl_row(course_id: str, name: str, **policy) -> CourseWorkspaceTemplate:
+    return CourseWorkspaceTemplate(course_id=course_id, template_name=name, **policy)
 
 
 def _coder_template(name: str) -> CoderTemplate:
@@ -520,6 +525,10 @@ async def test_bulk_provision_continues_past_failures_and_derives_name(monkeypat
     monkeypatch.setattr(cw, "get_user_email", lambda u: "s@example.org")
     monkeypatch.setattr(cw, "get_user_fullname", lambda u: "Student One")
     monkeypatch.setattr(cw, "mint_workspace_token", lambda *a, **k: "tok")
+    # Provisioning derives the per-user app secret from TOKEN_SECRET; without it
+    # every member fails on encryption and the partial-failure case under test
+    # never arises. Set it here rather than relying on the ambient environment.
+    monkeypatch.setenv("TOKEN_SECRET", "x" * 32)
 
     client = MagicMock()
     provision_result = MagicMock()
@@ -550,44 +559,62 @@ async def test_bulk_provision_continues_past_failures_and_derives_name(monkeypat
 # --- lecturer delete gate -----------------------------------------------------
 
 
-def _delete_client(template="vscode-workspace", home_mode="scratch"):
+def _delete_client(template="vscode-workspace", home_mode="scratch", course_id="c1"):
+    """A workspace whose build carries `course_id` — None = provisioned by its
+    owner for themselves, which no course may delete."""
     client = MagicMock()
     details = MagicMock()
     details.workspace.template_name = template
     details.workspace.latest_build_id = "b1"
+    params = {"home_mode": home_mode}
+    if course_id is not None:
+        params["course_id"] = course_id
     client.get_workspace = AsyncMock(return_value=details)
-    client._get_build_param = AsyncMock(return_value=home_mode)
+    client.get_build_params = AsyncMock(return_value=params)
     client.delete_workspace = AsyncMock(return_value=True)
     return client
 
 
 @pytest.mark.asyncio
-async def test_lecturer_deletes_scratch_but_not_shared_workspaces():
+async def test_course_delete_is_scoped_to_the_course_for_everyone():
+    """The reported bug: a personal workspace of a course member, on a course
+    template, was listed under the course and an admin could delete it. Owner +
+    template is not enough to say a workspace belongs to a course."""
     db = _bulk_db(members=[_member(user_id="1111-2222")])
     lecturer = _course_principal("l1", "c1", "_lecturer")
 
-    result = await cw.delete_student_workspace(
-        "c1", "u1111-2222", "vscode-tmp", lecturer, db, _delete_client()
-    )
-    assert result.success is True
+    for caller in (lecturer, _maintainer(), _admin()):
+        with pytest.raises(ForbiddenException) as exc:
+            await cw.delete_student_workspace(
+                "c1", "u1111-2222", "vscode", caller, db,
+                _delete_client(course_id=None),        # provisioned by its owner
+            )
+        assert "not provisioned for this course" in str(exc.value)
 
-    with pytest.raises(ForbiddenException) as exc:
-        await cw.delete_student_workspace(
-            "c1", "u1111-2222", "vscode", lecturer, db,
-            _delete_client(home_mode="shared"),
-        )
-    assert "throwaway" in str(exc.value)
-
-    # Maintainers may delete shared-home workspaces of course members.
-    result = await cw.delete_student_workspace(
-        "c1", "u1111-2222", "vscode", _maintainer(), db,
-        _delete_client(home_mode="shared"),
-    )
-    assert result.success is True
+        with pytest.raises(ForbiddenException):
+            await cw.delete_student_workspace(
+                "c1", "u1111-2222", "vscode", caller, db,
+                _delete_client(course_id="some-other-course"),
+            )
 
 
 @pytest.mark.asyncio
-async def test_lecturer_delete_rejects_non_members_and_foreign_templates():
+async def test_lecturer_deletes_any_workspace_of_their_course():
+    """Including shared-home ones: the old scratch-only rule blocked a lecturer
+    from deleting a workspace they had bulk-provisioned with home_mode=shared."""
+    db = _bulk_db(members=[_member(user_id="1111-2222")])
+    lecturer = _course_principal("l1", "c1", "_lecturer")
+
+    for home_mode in ("scratch", "shared"):
+        result = await cw.delete_student_workspace(
+            "c1", "u1111-2222", "vscode-tmp", lecturer, db,
+            _delete_client(home_mode=home_mode, course_id="c1"),
+        )
+        assert result.success is True
+
+
+@pytest.mark.asyncio
+async def test_lecturer_delete_rejects_non_members():
     db = _bulk_db(members=[_member(user_id="1111-2222")])
     lecturer = _course_principal("l1", "c1", "_lecturer")
 
@@ -596,8 +623,91 @@ async def test_lecturer_delete_rejects_non_members_and_foreign_templates():
             "c1", "u9999-0000", "vscode-tmp", lecturer, db, _delete_client()
         )
 
-    with pytest.raises(ForbiddenException):
-        await cw.delete_student_workspace(
-            "c1", "u1111-2222", "other", lecturer, db,
-            _delete_client(template="other-workspace"),
-        )
+
+@pytest.mark.asyncio
+async def test_the_marker_governs_even_if_the_template_left_the_course():
+    """Deletion no longer re-checks the template list. A workspace carries its
+    course from provisioning time, when the template WAS allowed; removing the
+    template from the course afterwards must not strand the workspaces it
+    already created with nobody able to clean them up."""
+    db = _bulk_db(members=[_member(user_id="1111-2222")])
+    lecturer = _course_principal("l1", "c1", "_lecturer")
+
+    result = await cw.delete_student_workspace(
+        "c1", "u1111-2222", "old", lecturer, db,
+        _delete_client(template="template-since-removed", course_id="c1"),
+    )
+    assert result.success is True
+
+@pytest.mark.asyncio
+async def test_course_policy_stores_only_denials():
+    """A course can restrict but never grant, so True and "no opinion" are the
+    same statement — storing True would read as a grant the template may not
+    honour, and would silently start granting if the ceiling later opened."""
+    row = _tpl_row("c1", "bash-workspace")
+    db = make_db(course_templates=[row], course_settings=None)
+    client = MagicMock()
+    client.list_templates = AsyncMock(side_effect=AssertionError("Coder must not be called"))
+
+    await cw.update_course_workspace_settings(
+        "c1",
+        CourseWorkspaceSettingsUpdate(
+            template_names=["bash-workspace"],
+            template_policies={"bash-workspace": {"allow_root": True, "allow_internet": False}},
+        ),
+        _maintainer(), db, client, _coder_settings(),
+    )
+    assert row.allow_root is None      # the grant is normalised away
+    assert row.allow_internet is False  # the denial is kept
+
+
+@pytest.mark.asyncio
+async def test_omitting_a_template_policy_clears_a_stale_denial():
+    row = _tpl_row("c1", "bash-workspace", allow_internet=False)
+    db = make_db(course_templates=[row], course_settings=None)
+    client = MagicMock()
+    client.list_templates = AsyncMock(side_effect=AssertionError("Coder must not be called"))
+
+    await cw.update_course_workspace_settings(
+        "c1", CourseWorkspaceSettingsUpdate(template_names=["bash-workspace"]),
+        _maintainer(), db, client, _coder_settings(),
+    )
+    assert row.allow_internet is None
+
+
+# --- per-user app credential -------------------------------------------------
+
+
+def test_app_secret_is_per_user_and_deterministic(monkeypatch):
+    """Per USER, not per workspace: /home/coder is shared across a user's
+    workspaces, so a per-workspace secret would make two running desktops fight
+    over ~/.kasmpasswd. Deterministic so a rebuild reproduces it with nothing
+    stored anywhere."""
+    monkeypatch.setenv("TOKEN_SECRET", "x" * 32)
+    from computor_backend.coder.service import derive_workspace_app_secret
+
+    a = derive_workspace_app_secret("user-1")
+    assert a == derive_workspace_app_secret("user-1")
+    assert a != derive_workspace_app_secret("user-2")
+    # Has to survive a basic-auth "user:pass" pair and a token header.
+    assert ":" not in a and a.strip() == a
+
+
+def test_app_secret_changes_with_the_token_secret(monkeypatch):
+    from computor_backend.coder.service import derive_workspace_app_secret
+
+    monkeypatch.setenv("TOKEN_SECRET", "a" * 32)
+    first = derive_workspace_app_secret("user-1")
+    monkeypatch.setenv("TOKEN_SECRET", "b" * 32)
+    assert derive_workspace_app_secret("user-1") != first
+
+
+def test_immutable_parameters_are_carried_across_a_rebuild():
+    """A build that omits a rich parameter silently resets it to the template
+    default — which would hand a locked-down workspace root and internet back,
+    and drop the app credential while the ingress keeps injecting one."""
+    from computor_backend.coder.client import CoderClient
+
+    for name in ("home_mode", "allow_root", "allow_internet",
+                 "workspace_app_secret", "workspace_app_hash"):
+        assert name in CoderClient.CARRIED_BUILD_PARAMS

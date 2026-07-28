@@ -33,6 +33,12 @@ resource "docker_container" "workspace" {
   memory     = var.memory_mb
   cpu_shares = var.cpu_shares
 
+  # Root policy (see allow_root). no-new-privileges makes the kernel refuse the
+  # setuid transition in sudo/su, so the same image serves both modes and there
+  # is no root-less image variant to maintain. Fixed for the container's life —
+  # changing the policy replaces the container.
+  security_opts = local.root_enabled ? [] : ["no-new-privileges:true"]
+
   # Fix for agent connection: replace localhost URLs with internal Coder URL
   entrypoint = [
     "sh", "-c",
@@ -60,13 +66,20 @@ resource "docker_container" "workspace" {
 
   # Connect to the isolated workspace network (see variables.tf docker_network)
   networks_advanced {
-    name = var.docker_network
+    name = local.ws_net
   }
 
   volumes {
     container_path = "/home/coder"
     volume_name    = local.home_volume_name
     read_only      = false
+  }
+
+  # Routed by workspace-ingress, not the main Traefik: this label is what each
+  # proxy's docker-provider constraint selects on (see docker-compose.coder.yaml).
+  labels {
+    label = "computor.ingress"
+    value = "workspace"
   }
 
   labels {
@@ -89,7 +102,7 @@ resource "docker_container" "workspace" {
   # Traefik's global --providers.docker.network pin (computor-network).
   labels {
     label = "traefik.docker.network"
-    value = var.docker_network
+    value = local.ws_net
   }
 
   labels {
@@ -113,6 +126,15 @@ resource "docker_container" "workspace" {
   # prefix must reach the container intact (unlike ttyd/KasmVNC/code-server).
 
   # ForwardAuth middleware - verify user authentication before allowing access
+  # Injects the per-user app credential (Jupyter accepts its token in an Authorization header), so a request reaching the app
+  # WITHOUT passing through this proxy — another workspace dialling the
+  # container directly — carries no credential and is refused. An empty value
+  # removes the header: the unauthenticated fallback when no secret was issued.
+  labels {
+    label = "traefik.http.middlewares.appauth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.headers.customrequestheaders.Authorization"
+    value = local.app_secret != "" ? "token ${local.app_secret}" : ""
+  }
+
   labels {
     label = "traefik.http.middlewares.auth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.forwardauth.address"
     value = "${var.computor_backend_internal}/auth/verify-coder-access"
@@ -126,6 +148,6 @@ resource "docker_container" "workspace" {
   # Authentication middleware only (no strip-prefix — see note above)
   labels {
     label = "traefik.http.routers.coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}.middlewares"
-    value = "auth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
+    value = "auth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)},appauth-coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
   }
 }

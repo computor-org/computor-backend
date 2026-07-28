@@ -12,6 +12,7 @@ resource "coder_agent" "main" {
   # through untouched. JupyterLab needs the full public base path, so owner and
   # workspace names are passed too.
   startup_script = templatefile("${path.module}/startup.sh.tftpl", {
+    app_secret        = local.app_secret
     dev_forward_ports = var.dev_forward_ports
     full_name         = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
     email             = data.coder_workspace_owner.me.email

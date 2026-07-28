@@ -1,0 +1,78 @@
+# Allowlist for the workspace-ingress proxy — rendered by computor.sh into
+# ${SYSTEM_DEPLOYMENT_PATH}/workspace-ingress/dynamic/routes.yml (the upstreams
+# differ between dev and prod, and Traefik's file provider does no env
+# substitution).
+#
+# This file IS the isolation boundary. Workspaces sit on a network whose only
+# other members are the Coder server and this proxy, and they reach the outside
+# world only through the two names below. Everything else the platform serves —
+# the web UI, Keycloak, /docs, MinIO, the datastores — has no name a workspace
+# can resolve and no route a workspace can take.
+#
+# The names are deliberately NOT the real service names. This container also
+# sits on computor-network, so aliasing it as `uvicorn` or `computor-forgejo`
+# would let its own upstream lookups resolve back to itself.
+#
+# The workspace routes themselves are NOT here: they come from the Docker
+# provider, which reads the labels the workspace containers already carry
+# (ForwardAuth, credential injection, stripprefix), filtered to
+# `computor.ingress=workspace`.
+
+http:
+  routers:
+    # The Computor API, as http://computor-api/ inside a workspace. Plain HTTP
+    # on an internal name: no certificate to mount, copy or renew, which is the
+    # whole reason workspaces stopped using the public URL.
+    workspace-api:
+      rule: "Host(`computor-api`)"
+      entryPoints: [web]
+      service: workspace-api
+      middlewares: [workspace-client-tag]
+      # Above the workspace PathPrefix routers, which share this entrypoint.
+      priority: 1000
+
+    # Git, as http://computor-git/ inside a workspace. Student repositories are
+    # cloned with credentials embedded in the URL, so this has to be reachable
+    # for an offline workspace to be usable at all.
+    workspace-git:
+      rule: "Host(`computor-git`)"
+      entryPoints: [web]
+      service: workspace-git
+      priority: 1000
+
+    # Anything else asked of this proxy. Without it a stray request would fall
+    # through to whatever router matched most loosely; with it the answer is an
+    # explicit, greppable 403.
+    workspace-denied:
+      rule: "PathPrefix(`/`)"
+      entryPoints: [web]
+      service: noop@internal
+      middlewares: [workspace-deny]
+      priority: 1
+
+  middlewares:
+    # Tells the backend to render git URLs with the host this workspace can
+    # reach, rather than the public domain it deliberately cannot resolve.
+    # customRequestHeaders REPLACES the client's value, so a workspace can
+    # neither suppress nor forge this.
+    workspace-client-tag:
+      headers:
+        customRequestHeaders:
+          X-Computor-Client: "workspace"
+
+    workspace-deny:
+      ipAllowList:
+        # No source can ever match, so every request through this middleware is
+        # rejected. Traefik has no "always deny" middleware; this is the
+        # idiomatic stand-in.
+        sourceRange: ["255.255.255.255/32"]
+
+  services:
+    workspace-api:
+      loadBalancer:
+        servers:
+          - url: "${WORKSPACE_INGRESS_BACKEND_URL}"
+    workspace-git:
+      loadBalancer:
+        servers:
+          - url: "${WORKSPACE_INGRESS_GIT_URL}"

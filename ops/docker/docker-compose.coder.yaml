@@ -6,14 +6,92 @@
 # (configured in workspace Terraform template via Docker labels)
 
 services:
-  # Attach Traefik (defined in base) to the isolated workspace network so it
-  # can route ingress to workspace containers, which no longer live on
-  # computor-network. Compose merges this additively into the base service.
-  # Workspaces set `traefik.docker.network=computor-coder-workspaces` so Traefik
-  # dials them on this network despite the global --providers.docker.network pin.
-  traefik:
+  # Read-only Docker API for workspace-ingress. Its own rather than the prod
+  # `socket-proxy`, so dev and prod are wired identically and the ingress never
+  # needs the raw socket.
+  coder-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    container_name: computor-coder-socket-proxy
     networks:
-      - computor-coder-workspaces
+      - computor-network
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    environment:
+      CONTAINERS: "1"
+      NETWORKS: "1"
+    volumes:
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
+    labels:
+      - "traefik.enable=false"
+
+  # Ingress for workspaces, and the ONLY route out of a workspace network.
+  #
+  # It exists because the main Traefik routes by bare PathPrefix: any container
+  # sharing a network with it can reach every service it fronts (the web UI,
+  # Keycloak, /docs, the API), which made "isolated workspace network" a much
+  # weaker statement than it looked. The main Traefik is therefore no longer
+  # attached to the workspace networks — it forwards /coder here instead.
+  #
+  # On the workspace side it answers to the internal names computor-api and
+  # computor-git (network aliases), which is what workspaces use for the API
+  # and for git. Those are plain HTTP on internal names, so there is no
+  # certificate to mount, copy or renew anywhere — the workspace never speaks
+  # to the public domain, and the public domain never has to resolve inside
+  # a workspace.
+  workspace-ingress:
+    image: traefik:v3.6.6
+    container_name: computor-workspace-ingress
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    command:
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.endpoint=tcp://coder-socket-proxy:2375"
+      - "--providers.docker.exposedbydefault=false"
+      # Only workspace containers. Their Traefik labels (ForwardAuth +
+      # stripprefix) are picked up unchanged — the routing model did not move,
+      # only which proxy performs it.
+      - '--providers.docker.constraints=Label(`computor.ingress`,`workspace`)'
+      - "--providers.docker.network=${CODER_WORKSPACE_NETWORK:-computor-coder-workspaces}"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.forwardedHeaders.trustedIPs=127.0.0.1/32,172.16.0.0/12,192.168.0.0/16"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+    networks:
+      computor-network: {}
+      computor-coder-workspaces:
+        aliases: [computor-api, computor-git]
+      computor-coder-workspaces-offline:
+        aliases: [computor-api, computor-git]
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/workspace-ingress/dynamic:/etc/traefik/dynamic:ro
+    extra_hosts:
+      # Dev only in practice: the backend runs on the host there, and the
+      # rendered allowlist points at host.docker.internal.
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - coder-socket-proxy
+    labels:
+      # Discovered by the MAIN Traefik (this container carries no
+      # computor.ingress=workspace label, so its constraint does not exclude it)
+      # to forward the workspace path prefix here. Everything below /coder is
+      # then routed, authenticated and stripped by this proxy.
+      - "traefik.enable=true"
+      - "traefik.http.routers.coder-ingress.rule=PathPrefix(`${CODER_BASE_PATH:-/coder}`)"
+      - "traefik.http.routers.coder-ingress.entrypoints=web"
+      - "traefik.http.services.coder-ingress.loadbalancer.server.port=80"
 
   # Dedicated PostgreSQL database for Coder (separate from main DB)
   coder-postgres:
@@ -50,11 +128,14 @@ services:
   # Coder server (internal only - not exposed via Traefik)
   coder:
     image: ghcr.io/coder/coder:latest
-    # Also on the isolated workspace network so the workspace agents can reach
-    # coder:7080 (CODER_ACCESS_URL) without workspaces touching computor-network.
+    # Also on BOTH isolated workspace networks so workspace agents can reach
+    # coder:7080 (CODER_ACCESS_URL) without workspaces touching
+    # computor-network. The offline one is not optional: an agent that cannot
+    # reach Coder never reports ready, so the workspace is simply broken.
     networks:
       - computor-network
       - computor-coder-workspaces
+      - computor-coder-workspaces-offline
     container_name: computor-coder
     restart: unless-stopped
     security_opt:
@@ -173,13 +254,25 @@ services:
         condition: service_healthy
 
 networks:
-  # Isolated bridge for Coder workspace containers. Workspaces are untrusted —
-  # the user has passwordless sudo — so they must NOT share computor-network
-  # with the platform's databases, IdP (Keycloak), object store (MinIO), Redis,
-  # Temporal, etc. Only Traefik (ingress) and the Coder server (agent
-  # connections) are also attached here. computor-network itself is defined in
-  # docker-compose.base.yaml and merged in at deploy time.
+  # Isolated bridge for Coder workspace containers. Workspaces are untrusted, so
+  # they must NOT share computor-network with the platform's databases, IdP
+  # (Keycloak), object store (MinIO), Redis, Temporal, etc. Only Traefik
+  # (ingress) and the Coder server (agent connections) are also attached here.
+  # computor-network itself is defined in docker-compose.base.yaml and merged in
+  # at deploy time.
   computor-coder-workspaces:
     name: computor-coder-workspaces
     driver: bridge
+
+  # Same bridge, minus egress: `internal` means docker installs no NAT and no
+  # default route, so a workspace attached here reaches the containers on this
+  # network and nothing else — external DNS and connects fail immediately
+  # (ENETUNREACH) rather than hanging, which keeps apt/pip/git from stalling.
+  # A workspace picks exactly ONE of the two networks (see the templates'
+  # allow_internet variable): attaching both would restore egress via the
+  # non-internal one.
+  computor-coder-workspaces-offline:
+    name: computor-coder-workspaces-offline
+    driver: bridge
+    internal: true
 

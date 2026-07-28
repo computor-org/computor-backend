@@ -37,6 +37,15 @@ export class CourseWorkspacesClient extends BaseEndpointClient {
     );
   }
 
+  /** Push the course's current policy onto its running workspaces, restarting
+   *  them (workspace:manage). Stopped ones pick it up on their next start. */
+  async applyPolicy({ courseId }: { courseId: string }): Promise<StudentWorkspaceProvisionResponse> {
+    return this.client.post<StudentWorkspaceProvisionResponse>(
+      this.buildPath(courseId, 'workspace-settings', 'apply-policy'),
+      {},
+    );
+  }
+
   /** Bulk-provision (throwaway) workspaces for selected course members. */
   async provisionStudents({ courseId, body }: {
     courseId: string;

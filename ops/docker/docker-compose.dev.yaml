@@ -10,6 +10,10 @@ services:
       - "--providers.docker.endpoint=unix:///var/run/docker.sock"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=computor-network"
+      # Workspace containers are routed by workspace-ingress, which is the only
+      # proxy on their networks. Without this constraint the main Traefik would
+      # also claim their routers and then fail to dial them.
+      - '--providers.docker.constraints=!Label(`computor.ingress`,`workspace`)'
       - "--entrypoints.web.address=:80"
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"

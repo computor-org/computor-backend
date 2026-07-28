@@ -33,7 +33,18 @@ fi
 export MWI_BASE_URL="${coder_base_path}/${owner_name}/${workspace_name}"
 export MWI_APP_PORT="${matlab_proxy_port}"
 export MWI_APP_HOST="0.0.0.0"
+# Token auth so the MATLAB desktop is not driveable by another workspace
+# dialling this container directly on the shared bridge; the ingress injects the
+# token as an mwi-auth-token header for browser traffic. An empty secret leaves
+# it open, as before.
+%{ if app_secret != "" }
+export MWI_ENABLE_TOKEN_AUTH="True"
+export MWI_AUTH_TOKEN="${app_secret}"
+%{ else }
+echo "WARNING: no workspace app secret was issued — MATLAB is reachable by any" \
+     "other workspace on this network." >&2
 export MWI_ENABLE_TOKEN_AUTH="False"
+%{ endif }
 export MWI_LOG_FILE="/tmp/matlab-proxy.log"
 
 matlab-proxy-app >/tmp/matlab-proxy-stdout.log 2>&1 &

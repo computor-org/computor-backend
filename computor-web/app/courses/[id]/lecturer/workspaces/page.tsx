@@ -40,6 +40,8 @@ function LecturerWorkspacesContent() {
   // Two-step delete: first click arms, second click deletes.
   const [armedDelete, setArmedDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [savingPolicy, setSavingPolicy] = useState(false);
+  const [applying, setApplying] = useState(false);
 
   const { data, loading, error, reload } = useResource(
     async () => {
@@ -64,6 +66,10 @@ function LecturerWorkspacesContent() {
   const templates = (settings?.templates ?? []).filter((t) => t.enabled);
   const provisionAllowed = (settings?.lecturer_provision_enabled ?? false) || (settings?.can_manage ?? false);
   const effectiveTemplate = template || templates[0]?.template_name || '';
+  const selectedTemplate = templates.find((t) => t.template_name === effectiveTemplate);
+  // Editing the policy stays a workspace-maintainer job; a lecturer sees the
+  // effective values read-only next to the template picker.
+  const canManage = settings?.can_manage ?? false;
 
   function toggleMember(id: string) {
     setSelected((prev) => {
@@ -78,6 +84,58 @@ function LecturerWorkspacesContent() {
     setSelected((prev) =>
       prev.size === members.length ? new Set() : new Set(members.map((m) => m.id)),
     );
+  }
+
+  /** The course can only narrow, so "allowed" is stored as null (inherit)
+   *  rather than true — see the backend's _narrowing. */
+  async function savePolicy(key: 'allow_root' | 'allow_internet', allowed: boolean) {
+    if (!settings || !selectedTemplate) return;
+    setSavingPolicy(true);
+    try {
+      await courseWorkspacesClient.updateSettings({
+        courseId,
+        body: {
+          template_names: settings.templates.map((t) => t.template_name),
+          lecturer_provision_enabled: settings.lecturer_provision_enabled,
+          template_policies: Object.fromEntries(
+            settings.templates.map((t) => [
+              t.template_name,
+              t.template_name === selectedTemplate.template_name
+                ? {
+                    allow_root: t.allow_root ?? null,
+                    allow_internet: t.allow_internet ?? null,
+                    [key]: allowed ? null : false,
+                  }
+                : { allow_root: t.allow_root ?? null, allow_internet: t.allow_internet ?? null },
+            ]),
+          ),
+        },
+      });
+      notify('Policy saved. New workspaces get it immediately.', 'success');
+      await reload();
+    } catch (e) {
+      notify(e instanceof Error ? e.message : 'Failed to save the policy', 'error');
+    } finally {
+      setSavingPolicy(false);
+    }
+  }
+
+  async function applyPolicy() {
+    setApplying(true);
+    try {
+      const result = await courseWorkspacesClient.applyPolicy({ courseId });
+      const skipped = result.outcomes.filter((o) => !o.success).length;
+      notify(
+        `${result.succeeded} workspace(s) restarted under the current policy` +
+          (skipped ? `; ${skipped} left alone (see the list)` : ''),
+        'success',
+      );
+      await reload();
+    } catch (e) {
+      notify(e instanceof Error ? e.message : 'Failed to apply the policy', 'error');
+    } finally {
+      setApplying(false);
+    }
   }
 
   async function provision() {
@@ -162,6 +220,56 @@ function LecturerWorkspacesContent() {
               templates in the workspace administration area.
             </div>
           ) : (
+            <>
+            {canManage && selectedTemplate && (
+              <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    Root &amp; internet for {selectedTemplate.display_name || selectedTemplate.template_name}
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    What this course&apos;s workspaces of this template get. A course can only take
+                    access away — a control is locked when the template itself already denies it.
+                    New workspaces get this immediately; existing ones keep what they were created
+                    with until you apply it or they next start.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-x-6 gap-y-2">
+                  {([
+                    ['allow_root', 'Root (sudo)', selectedTemplate.template_allow_root, selectedTemplate.allow_root],
+                    ['allow_internet', 'Internet', selectedTemplate.template_allow_internet, selectedTemplate.allow_internet],
+                  ] as const).map(([key, label, ceiling, courseValue]) => (
+                    <label
+                      key={key}
+                      className={`flex items-center gap-2 text-sm ${ceiling ? 'text-gray-700' : 'text-gray-400'}`}
+                      title={ceiling ? undefined : 'The template denies this; a course cannot grant it.'}
+                    >
+                      <input
+                        type="checkbox"
+                        disabled={!ceiling || savingPolicy}
+                        checked={ceiling && courseValue !== false}
+                        onChange={(event) => savePolicy(key, event.target.checked)}
+                      />
+                      {label}
+                      {!ceiling && <span className="text-xs">(off for this template)</span>}
+                    </label>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Button variant="secondary" onClick={applyPolicy} loading={applying}
+                          loadingLabel="Applying…">
+                    Apply to running workspaces
+                  </Button>
+                  <span className="text-xs text-gray-500">
+                    Restarts them so the change takes effect now — running processes end, files are
+                    untouched. Stopped workspaces pick it up when they next start.
+                  </span>
+                </div>
+              </div>
+            )}
+
             <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-4">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Provision for students</h2>
@@ -190,6 +298,22 @@ function LecturerWorkspacesContent() {
                       </option>
                     ))}
                   </select>
+                  {selectedTemplate && (
+                    // Read-only: the policy is set by a workspace maintainer,
+                    // per template and per course. Shown here so a lecturer
+                    // knows what the students they provision for will get.
+                    <p className="mt-1 text-xs text-gray-500">
+                      Students get{' '}
+                      <span className="font-medium">
+                        {selectedTemplate.effective_allow_root ? 'root' : 'no root'}
+                      </span>{' '}
+                      and{' '}
+                      <span className="font-medium">
+                        {selectedTemplate.effective_allow_internet ? 'internet' : 'no internet'}
+                      </span>
+                      .
+                    </p>
+                  )}
                 </div>
                 <div>
                   <span className="block text-xs font-medium text-gray-700 mb-1">Home directory</span>
@@ -306,15 +430,16 @@ function LecturerWorkspacesContent() {
                 </span>
               </div>
             </div>
+            </>
           )}
 
           <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-3">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Existing student workspaces</h2>
               <p className="text-sm text-gray-500 mt-1">
-                Workspaces of course members on this course&apos;s templates. Throwaway
-                (scratch-home) workspaces can be deleted here; shared-home workspaces are managed
-                by workspace maintainers.
+                Workspaces provisioned for this course. A member&apos;s own workspace is not
+                listed here even when it uses one of these templates — it belongs to them, not to
+                the course, and is managed under workspace administration.
               </p>
             </div>
             <Table>

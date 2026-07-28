@@ -68,9 +68,16 @@ class CoderWorkspaceCreate(BaseModel):
         ...,
         description="Workspace template name (must exist in Coder)"
     )
-    code_server_password: Optional[str] = Field(
+    app_secret: Optional[str] = Field(
         None,
-        description="Password for direct code-server access"
+        description="Per-user credential the workspace app requires and the workspace "
+                    "ingress injects, so one workspace cannot drive another directly. "
+                    "None leaves the app unauthenticated.",
+    )
+    app_password_hash: Optional[str] = Field(
+        None,
+        description="Argon2id hash of app_secret, used by the code-server templates as "
+                    "HASHED_PASSWORD and as the injected session cookie.",
     )
     computor_auth_token: Optional[str] = Field(
         None,
@@ -80,6 +87,24 @@ class CoderWorkspaceCreate(BaseModel):
         None,
         description="Home volume mode: 'shared' (per-user home volume) or "
                     "'scratch' (throwaway per-workspace volume). None = template default (shared).",
+    )
+    allow_root: Optional[bool] = Field(
+        None,
+        description="Course-level root policy for this workspace. The template ANDs it with "
+                    "its own allow_root, so False always denies but True only permits what "
+                    "the template already allows. None = no course-level restriction.",
+    )
+    allow_internet: Optional[bool] = Field(
+        None,
+        description="Course-level internet policy for this workspace, ANDed with the "
+                    "template's allow_internet the same way. None = no course-level restriction.",
+    )
+    course_id: Optional[str] = Field(
+        None,
+        description="Course this workspace is provisioned FOR. None/empty means the user "
+                    "provisioned it for themselves, which is what course views scope on: "
+                    "without it, a member's personal workspace on a course template is "
+                    "indistinguishable from one the course created.",
     )
 
 
@@ -181,10 +206,6 @@ class ProvisionResult(BaseModel):
     workspace: Optional[CoderWorkspace] = Field(None, description="Created workspace")
     created_user: bool = Field(False, description="Whether user was newly created")
     created_workspace: bool = Field(False, description="Whether workspace was newly created")
-    code_server_password: Optional[str] = Field(
-        None,
-        description="Code-server password (only returned on creation)"
-    )
 
 
 class CoderTemplate(BaseModel):
@@ -325,6 +346,44 @@ class CoderAdminTaskListResponse(BaseModel):
     tasks: list[TaskInfo] = Field(default_factory=list)
 
 
+# Workspace volumes (home + scratch), managed through the coder worker
+
+class WorkspaceVolume(BaseModel):
+    """One coder-home-* / coder-scratch-* docker volume."""
+
+    name: str = Field(..., description="Docker volume name")
+    kind: str = Field(..., description="'home' (shared per user) or 'scratch' (per workspace)")
+    size_bytes: Optional[int] = Field(
+        None, description="Size on disk; null when docker has not computed it"
+    )
+    in_use: Optional[bool] = Field(
+        None, description="A container currently mounts it — deletion will be refused"
+    )
+    created_at: Optional[str] = Field(None, description="Docker's creation timestamp")
+    user_id: Optional[str] = Field(None, description="Computor user this home belongs to")
+    user_name: Optional[str] = Field(None, description="Display name / email of that user")
+    workspace_name: Optional[str] = Field(
+        None, description="For a scratch volume, the workspace it belongs to"
+    )
+    orphaned: bool = Field(
+        False,
+        description="Nothing references it any more: the Coder user or workspace the "
+                    "name points at no longer exists. Safe to reclaim.",
+    )
+
+
+class WorkspaceVolumeListResponse(BaseModel):
+    """All workspace volumes with their sizes and owners."""
+
+    volumes: list[WorkspaceVolume] = Field(default_factory=list)
+    total_bytes: int = Field(0, description="Sum of the known sizes")
+    unresolved: bool = Field(
+        False,
+        description="Coder was unreachable, so owners could not be resolved and nothing "
+                    "is reported as orphaned (absence of an owner would be misleading)",
+    )
+
+
 # Template settings (DB-backed resource limits, quota, variable overrides)
 
 class WorkspaceTemplateSettingsSchema(BaseModel):
@@ -348,6 +407,17 @@ class WorkspaceTemplateSettingsSchema(BaseModel):
         description="Max concurrently running workspaces of this template across all "
                     "users; null = unlimited, 0 freezes the template",
     )
+    allow_root: bool = Field(
+        False,
+        description="Whether workspaces of this template may use sudo/su. The CEILING: "
+                    "a course can narrow it further but never grant root the template "
+                    "denies. Applied at the next template push.",
+    )
+    allow_internet: bool = Field(
+        True,
+        description="Whether workspaces of this template reach the internet. The CEILING, "
+                    "same narrowing rule as allow_root. Applied at the next template push.",
+    )
     template_variables: dict[str, str] = Field(
         default_factory=dict,
         description="Extra Terraform variable overrides pushed as --variable "
@@ -365,6 +435,12 @@ class WorkspaceTemplateSettingsUpdate(BaseModel):
         None, ge=0, description="0 = Docker default; Docker requires values >= 2 otherwise"
     )
     max_running_workspaces: Optional[int] = Field(None, ge=0)
+    allow_root: bool = Field(
+        False, description="Grant sudo/su in this template's workspaces (ceiling)"
+    )
+    allow_internet: bool = Field(
+        True, description="Allow internet egress from this template's workspaces (ceiling)"
+    )
     template_variables: dict[str, str] = Field(default_factory=dict)
 
 

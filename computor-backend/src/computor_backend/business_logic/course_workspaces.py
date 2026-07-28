@@ -27,9 +27,11 @@ from computor_backend.coder.config import CoderSettings
 from computor_backend.coder.exceptions import CoderWorkspaceNotFoundError
 from computor_backend.coder.naming import derive_workspace_name, sanitize_workspace_name
 from computor_backend.coder.service import (
+    derive_workspace_app_secret,
     get_user_email,
     get_user_fullname,
     mint_workspace_token,
+    workspace_app_password_hash,
 )
 from computor_backend.exceptions import (
     BadRequestException,
@@ -150,6 +152,102 @@ def is_template_enabled(db: Session, template_name: str) -> bool:
 
 
 # -----------------------------------------------------------------------------
+# Root / internet policy
+#
+# Two levels, ANDed inside the Terraform template (see ops/coder/templates):
+# the template settings row is the ceiling and travels as a --variable at push
+# time; the course association row narrows it and travels as a rich parameter
+# per workspace. Resolving the AND in the template rather than here means a
+# rich parameter — the weaker, per-workspace input — can never widen access.
+# -----------------------------------------------------------------------------
+
+# Mirrors the templates' own variable defaults, so a template with no settings
+# row behaves exactly like one with a freshly created row.
+DEFAULT_ALLOW_ROOT = False
+DEFAULT_ALLOW_INTERNET = True
+
+
+def settings_row_policy(row: Optional[WorkspaceTemplateSettings]) -> tuple[bool, bool]:
+    """(allow_root, allow_internet) of a settings row, or the defaults.
+
+    Tolerates NULL attributes: the columns are NOT NULL in the database, but a
+    row constructed in Python and not yet flushed has them unset, and
+    ``bool(None)`` would silently read as "internet denied".
+    """
+    if row is None:
+        return DEFAULT_ALLOW_ROOT, DEFAULT_ALLOW_INTERNET
+    return (
+        DEFAULT_ALLOW_ROOT if row.allow_root is None else bool(row.allow_root),
+        DEFAULT_ALLOW_INTERNET if row.allow_internet is None else bool(row.allow_internet),
+    )
+
+
+def template_policy_ceiling(db: Session, template_name: str) -> tuple[bool, bool]:
+    """(allow_root, allow_internet) a template permits at most."""
+    return settings_row_policy(template_settings_row(db, template_name))
+
+
+def course_template_policy(
+    db: Session, course_id: UUID | str, template_name: str
+) -> tuple[Optional[bool], Optional[bool]]:
+    """One course's narrowing for a template; (None, None) = inherit."""
+    row = (
+        db.query(CourseWorkspaceTemplate)
+        .filter(
+            CourseWorkspaceTemplate.course_id == str(course_id),
+            CourseWorkspaceTemplate.template_name == template_name,
+        )
+        .first()
+    )
+    if row is None:
+        return None, None
+    return row.allow_root, row.allow_internet
+
+
+def member_template_policy(
+    db: Session, principal: Principal, template_name: str
+) -> tuple[Optional[bool], Optional[bool]]:
+    """Narrowing for a self-provisioned workspace, across ALL the principal's
+    courses that allow the template.
+
+    The most restrictive course wins: a student enrolled in an exam course that
+    denies internet does not get internet by launching the same template from
+    another course. (None, None) when no course of theirs allows it — then only
+    the template ceiling applies.
+    """
+    course_ids = principal.get_courses_with_role("_student")
+    if not course_ids:
+        return None, None
+    rows = (
+        db.query(CourseWorkspaceTemplate)
+        .filter(
+            CourseWorkspaceTemplate.course_id.in_([str(c) for c in course_ids]),
+            CourseWorkspaceTemplate.template_name == template_name,
+        )
+        .all()
+    )
+    if not rows:
+        return None, None
+    # NULL means "this course adds no restriction", so only an explicit False counts.
+    return (
+        all(row.allow_root is not False for row in rows),
+        all(row.allow_internet is not False for row in rows),
+    )
+
+
+def effective_policy(
+    ceiling: bool, course_value: Optional[bool]
+) -> bool:
+    """What a workspace actually gets: the ceiling minus any course denial."""
+    return ceiling and course_value is not False
+
+
+def _narrowing(value: Optional[bool]) -> Optional[bool]:
+    """Normalise a course policy value: only False is a statement."""
+    return False if value is False else None
+
+
+# -----------------------------------------------------------------------------
 # Course-derived access
 # -----------------------------------------------------------------------------
 
@@ -259,6 +357,7 @@ async def get_course_workspace_settings(
         if not enabled and not is_manager:
             continue
         coder_template = (by_name or {}).get(row.template_name)
+        ceiling_root, ceiling_internet = template_policy_ceiling(db, row.template_name)
         items.append(CourseWorkspaceTemplateItem(
             template_name=row.template_name,
             enabled=enabled,
@@ -266,6 +365,12 @@ async def get_course_workspace_settings(
             description=coder_template.description if coder_template else None,
             icon=coder_template.icon if coder_template else None,
             exists_in_coder=None if by_name is None else coder_template is not None,
+            allow_root=row.allow_root,
+            allow_internet=row.allow_internet,
+            template_allow_root=ceiling_root,
+            template_allow_internet=ceiling_internet,
+            effective_allow_root=effective_policy(ceiling_root, row.allow_root),
+            effective_allow_internet=effective_policy(ceiling_internet, row.allow_internet),
         ))
 
     available = None
@@ -346,6 +451,22 @@ async def update_course_workspace_settings(
             template_name=name,
             created_by=permissions.user_id,
         ))
+    db.flush()
+
+    # Per-template narrowing. Applied to the whole retained list, not just the
+    # additions: a policy row is a property of the association, so a template
+    # missing from template_policies is reset to "inherit" rather than keeping
+    # a stale denial the manager just cleared in the UI.
+    for row in _course_template_rows(db, course_id):
+        if row.template_name not in requested:
+            continue
+        policy = data.template_policies.get(row.template_name)
+        # True is normalised to NULL: a course can only restrict, so "allow"
+        # and "no opinion" are the same statement — storing True would read as
+        # a grant the template may not honour.
+        row.allow_root = _narrowing(policy.allow_root if policy else None)
+        row.allow_internet = _narrowing(policy.allow_internet if policy else None)
+        row.updated_by = permissions.user_id
 
     settings_row = _course_settings_row(db, course_id)
     if settings_row is None:
@@ -478,6 +599,10 @@ async def provision_student_workspaces(
     quota_row = template_settings_row(db, template)
     has_quota = quota_row is not None and quota_row.max_running_workspaces is not None
 
+    # Same for every workspace in the batch: this course's narrowing of the
+    # template's root/internet ceiling.
+    policy_root, policy_internet = course_template_policy(db, course_id, template)
+
     outcomes: list[StudentWorkspaceProvisionOutcome] = []
     for member_id in data.course_member_ids:
         outcome = StudentWorkspaceProvisionOutcome(course_member_id=str(member_id))
@@ -523,6 +648,7 @@ async def provision_student_workspaces(
                 workspace_name=workspace_name,
                 ttl_days=coder_settings.workspace_token_ttl_days,
             )
+            app_secret = derive_workspace_app_secret(str(member.user_id))
             result = await client.provision_workspace(
                 user_email=email,
                 username=str(member.user_id),
@@ -531,6 +657,11 @@ async def provision_student_workspaces(
                 workspace_name=workspace_name,
                 computor_auth_token=token,
                 home_mode=data.home_mode,
+                allow_root=policy_root,
+                allow_internet=policy_internet,
+                app_secret=app_secret,
+                app_password_hash=workspace_app_password_hash(app_secret),
+                course_id=str(course_id),
             )
             outcome.workspace_name = result.workspace.name if result.workspace else workspace_name
             outcome.success = True
@@ -551,24 +682,32 @@ async def provision_student_workspaces(
     )
 
 
-async def _populate_home_modes(
+async def _populate_build_params(
     client: CoderClient, workspaces: list[CoderWorkspace]
-) -> None:
-    """Fill CoderWorkspace.home_mode from build parameters, bounded fan-out."""
+) -> dict[str, str]:
+    """Fill CoderWorkspace.home_mode and return each workspace's course marker.
+
+    One request per workspace for the whole parameter set rather than one per
+    value — the API returns them all anyway. Bounded fan-out.
+    """
     semaphore = asyncio.Semaphore(8)
+    course_by_workspace: dict[str, str] = {}
 
     async def fill(workspace: CoderWorkspace) -> None:
         if not workspace.latest_build_id:
             return
         async with semaphore:
             try:
-                workspace.home_mode = await client._get_build_param(
-                    workspace.latest_build_id, "home_mode"
-                )
+                params = await client.get_build_params(workspace.latest_build_id)
             except Exception:
-                workspace.home_mode = None
+                params = {}
+        workspace.home_mode = params.get("home_mode")
+        course = params.get("course_id")
+        if course:
+            course_by_workspace[workspace.id] = course
 
     await asyncio.gather(*(fill(w) for w in workspaces))
+    return course_by_workspace
 
 
 async def list_student_workspaces(
@@ -577,7 +716,12 @@ async def list_student_workspaces(
     db: Session,
     client: CoderClient,
 ) -> CourseStudentWorkspacesResponse:
-    """Workspaces of course members using course-allowed templates.
+    """Workspaces PROVISIONED FOR this course.
+
+    Scoped on the course marker, not on (owner is a member) x (template is
+    allowed): those two also match a member's personal workspace on a course
+    template, which is none of the course's business and must not be listed
+    here — the delete action next to each row acts on what this returns.
 
     Available to lecturers regardless of the provisioning flag so throwaway
     workspaces stay visible for cleanup after the flag is switched off.
@@ -596,19 +740,29 @@ async def list_student_workspaces(
     )
     workspaces = await client.list_all_workspaces()
 
-    by_member: dict[str, list[CoderWorkspace]] = {}
-    member_by_id = {str(m.id): m for m in members}
-    relevant: list[CoderWorkspace] = []
+    # The cheap filters first: the marker costs one API call per workspace, so
+    # only ask for candidates that could plausibly belong to this course.
+    candidates: list[CoderWorkspace] = []
+    member_of: dict[str, CourseMember] = {}
     for workspace in workspaces:
         if workspace.template_name not in allowed:
             continue
         member = _member_for_owner_name(members, workspace.owner_name)
         if member is None:
             continue
-        by_member.setdefault(str(member.id), []).append(workspace)
-        relevant.append(workspace)
+        candidates.append(workspace)
+        member_of[workspace.id] = member
 
-    await _populate_home_modes(client, relevant)
+    course_by_workspace = await _populate_build_params(client, candidates)
+
+    by_member: dict[str, list[CoderWorkspace]] = {}
+    member_by_id = {str(m.id): m for m in members}
+    relevant: list[CoderWorkspace] = []
+    for workspace in candidates:
+        if course_by_workspace.get(workspace.id) != str(course_id):
+            continue
+        by_member.setdefault(str(member_of[workspace.id].id), []).append(workspace)
+        relevant.append(workspace)
 
     students = []
     for member_id, member_workspaces in sorted(by_member.items()):
@@ -623,6 +777,105 @@ async def list_student_workspaces(
     return CourseStudentWorkspacesResponse(students=students, count=len(relevant))
 
 
+async def workspace_start_policy(
+    db: Session, client: CoderClient, template_name: str, build_id: Optional[str]
+) -> Optional[dict]:
+    """The policy a workspace should start under, or None to leave it alone.
+
+    A workspace carries its course marker, so the CURRENT course policy can be
+    applied every time it starts. Without this a workspace that was stopped when
+    a lecturer cut internet for an exam would come back with internet — the
+    parameters it was created with are what a bare start carries forward.
+
+    Returns None for a personal workspace (nothing to enforce) or when the
+    marker cannot be read, so an unreachable Coder degrades to today's
+    behaviour rather than to a policy guess.
+    """
+    if not build_id:
+        return None
+    try:
+        params = await client.get_build_params(build_id)
+    except Exception:
+        return None
+    course_id = params.get("course_id")
+    if not course_id:
+        return None
+    course_root, course_internet = course_template_policy(db, course_id, template_name)
+    # The template ceiling is applied inside Terraform; only the course's
+    # narrowing travels as a parameter.
+    return {
+        "allow_root": course_root is not False,
+        "allow_internet": course_internet is not False,
+    }
+
+
+async def apply_course_workspace_policy(
+    course_id: UUID | str,
+    permissions: Principal,
+    db: Session,
+    client: CoderClient,
+) -> StudentWorkspaceProvisionResponse:
+    """Push the course's current policy onto the workspaces it provisioned.
+
+    Only RUNNING workspaces are rebuilt: their container was created with the
+    old policy and nothing else can change it. Stopped ones are left alone and
+    reported — they pick the policy up when they next start (see
+    workspace_start_policy), which is both cheaper and less surprising than
+    starting a student's workspace to lock it down.
+
+    Governed by workspace:manage like the rest of the course workspace
+    configuration.
+    """
+    _load_course_or_404(db, course_id)
+    if not can_manage_course_workspaces(permissions):
+        raise ForbiddenException(
+            detail="Changing course workspace policy requires the workspace maintainer role.",
+        )
+
+    workspaces = await client.list_all_workspaces()
+    outcomes: list[StudentWorkspaceProvisionOutcome] = []
+    for workspace in workspaces:
+        if not workspace.latest_build_id:
+            continue
+        try:
+            params = await client.get_build_params(workspace.latest_build_id)
+        except Exception:
+            continue
+        if params.get("course_id") != str(course_id):
+            continue
+
+        outcome = StudentWorkspaceProvisionOutcome(
+            course_member_id="", workspace_name=workspace.name
+        )
+        running = (
+            workspace.latest_build_transition == "start"
+            and (workspace.latest_build_status.value if workspace.latest_build_status else "")
+            in ACTIVE_BUILD_STATUSES
+        )
+        if not running:
+            outcome.error = "Stopped — it will start under the new policy."
+            outcomes.append(outcome)
+            continue
+
+        course_root, course_internet = course_template_policy(
+            db, course_id, workspace.template_name or ""
+        )
+        ok = await client.rebuild_with_policy(workspace.id, {
+            "allow_root": course_root is not False,
+            "allow_internet": course_internet is not False,
+        })
+        outcome.success = ok
+        if not ok:
+            outcome.error = "Rebuild failed"
+        outcomes.append(outcome)
+
+    return StudentWorkspaceProvisionResponse(
+        outcomes=outcomes,
+        succeeded=sum(1 for o in outcomes if o.success),
+        failed=sum(1 for o in outcomes if not o.success),
+    )
+
+
 async def delete_student_workspace(
     course_id: UUID | str,
     username: str,
@@ -631,14 +884,27 @@ async def delete_student_workspace(
     db: Session,
     client: CoderClient,
 ) -> WorkspaceActionResponse:
-    """Delete a course member's workspace (lecturer feature).
+    """Delete a workspace that was provisioned for this course.
 
-    Lecturers may only delete scratch-home (throwaway) workspaces of
-    course-allowed templates; shared-home workspaces would not lose data on
-    delete but stay reserved for workspace maintainers.
+    Scoped on the course marker, for EVERY caller including admins. The
+    workspace:manage bypass exempts a caller from the course's provisioning
+    flag, never from the scope: a workspace that carries no marker (someone
+    provisioned it for themselves) or another course's marker is not this
+    course's to delete, and deleting one through a course-shaped UI was how
+    a personal workspace got destroyed.
+
+    Within the course, any of its workspaces may be deleted regardless of home
+    mode. The previous rule — lecturers may delete scratch homes only — stood in
+    for "the lecturer created it" and failed in both directions: it let this
+    endpoint reach personal workspaces, and it blocked a lecturer from deleting
+    a shared-home workspace they had bulk-provisioned themselves.
+
+    The template list is deliberately NOT re-checked: the marker was stamped at
+    provisioning time, when the template was allowed. Removing a template from
+    the course afterwards must not strand the workspaces it already created.
     """
     _load_course_or_404(db, course_id)
-    is_bypass = _require_course_lecturer(permissions, course_id)
+    _require_course_lecturer(permissions, course_id)
 
     members = (
         db.query(CourseMember)
@@ -656,23 +922,18 @@ async def delete_student_workspace(
     except CoderWorkspaceNotFoundError:
         raise NotFoundException(detail=f"Workspace '{workspace_name}' not found")
 
-    allowed = get_course_allowed_template_names(db, course_id, enabled_only=False)
-    template_name = details.workspace.template_name
-    if template_name not in allowed:
+    workspace_course = None
+    if details.workspace.latest_build_id:
+        params = await client.get_build_params(details.workspace.latest_build_id)
+        workspace_course = params.get("course_id")
+    if workspace_course != str(course_id):
         raise ForbiddenException(
-            detail="This workspace does not use one of the course's templates.",
+            detail=(
+                "This workspace was not provisioned for this course. Personal "
+                "workspaces can only be managed by their owner or under "
+                "workspace administration."
+            ),
         )
-
-    if not is_bypass:
-        home_mode = None
-        if details.workspace.latest_build_id:
-            home_mode = await client._get_build_param(
-                details.workspace.latest_build_id, "home_mode"
-            )
-        if home_mode != "scratch":
-            raise ForbiddenException(
-                detail="Only throwaway (scratch-home) workspaces can be deleted by lecturers.",
-            )
 
     success = await client.delete_workspace(username, workspace_name)
     return WorkspaceActionResponse(

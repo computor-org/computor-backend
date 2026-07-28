@@ -232,6 +232,29 @@ cmd_up() {
                 fi
             done
         fi
+
+        # Render the workspace-ingress allowlist. This is the file that decides
+        # what a workspace can reach besides its own ingress, so it is rendered
+        # from the repo on every startup rather than seeded once — an operator
+        # editing the deployed copy would be silently overwritten, which is the
+        # intended behaviour for a security boundary.
+        create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/workspace-ingress/dynamic"
+        ingress_template="${OPS_DIR}/coder/workspace-ingress/dynamic/routes.yml.template"
+        if [ -f "$ingress_template" ]; then
+            log "  ${GREEN}Rendering workspace-ingress allowlist...${NC}"
+            # In dev the backend runs on the host, not as a container.
+            if [ "$ENVIRONMENT" = "prod" ]; then
+                export WORKSPACE_INGRESS_BACKEND_URL="${WORKSPACE_INGRESS_BACKEND_URL:-http://uvicorn:8000}"
+            else
+                export WORKSPACE_INGRESS_BACKEND_URL="${WORKSPACE_INGRESS_BACKEND_URL:-http://host.docker.internal:8000}"
+            fi
+            export WORKSPACE_INGRESS_GIT_URL="${WORKSPACE_INGRESS_GIT_URL:-${GIT_SERVER_URL_INTERNAL:-http://computor-forgejo:3030}}"
+            envsubst '${WORKSPACE_INGRESS_BACKEND_URL} ${WORKSPACE_INGRESS_GIT_URL}' \
+                < "$ingress_template" \
+                > "${SYSTEM_DEPLOYMENT_PATH}/workspace-ingress/dynamic/routes.yml"
+            echo "    API  -> ${WORKSPACE_INGRESS_BACKEND_URL}"
+            echo "    git  -> ${WORKSPACE_INGRESS_GIT_URL}"
+        fi
     fi
 
     # Docker socket access is needed by Coder (workspace provisioning) and by

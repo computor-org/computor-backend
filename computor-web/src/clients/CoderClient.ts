@@ -20,6 +20,7 @@ import type {
   CoderAdminTaskListResponse,
   CoderFleetStatusResponse,
   TemplateSettingsListResponse,
+  WorkspaceVolumeListResponse,
   TemplateFileActionResponse,
   TemplateFilesResponse,
   TemplateVariablesResponse,
@@ -162,6 +163,26 @@ export class CoderClient extends BaseEndpointClient {
   async listTemplateSettings(): Promise<TemplateSettingsListResponse> {
     return this.client.get<TemplateSettingsListResponse>(
       this.buildPath('admin', 'templates', 'settings'),
+    );
+  }
+
+  /** Home and scratch volumes with sizes and owners (workspace:manage). */
+  async listVolumes(): Promise<WorkspaceVolumeListResponse> {
+    return this.client.get<WorkspaceVolumeListResponse>(this.buildPath('admin', 'volumes'));
+  }
+
+  /** Reclaim a volume. Irreversible; refused while a container mounts it. */
+  async deleteVolume({ name }: { name: string }): Promise<WorkspaceActionResponse> {
+    return this.client.delete<WorkspaceActionResponse>(
+      this.buildPath('admin', 'volumes', name),
+    );
+  }
+
+  /** Give a volume's files back to uid 1000 after a workspace lost root. */
+  async repairVolume({ name }: { name: string }): Promise<WorkspaceActionResponse> {
+    return this.client.post<WorkspaceActionResponse>(
+      this.buildPath('admin', 'volumes', name, 'repair'),
+      {},
     );
   }
 

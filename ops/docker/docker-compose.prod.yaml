@@ -34,6 +34,10 @@ services:
       - "--providers.docker.endpoint=tcp://socket-proxy:2375"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=computor-network"
+      # Workspace containers are routed by workspace-ingress, which is the only
+      # proxy on their networks. Without this constraint the main Traefik would
+      # also claim their routers and then fail to dial them.
+      - '--providers.docker.constraints=!Label(`computor.ingress`,`workspace`)'
       - "--entrypoints.web.address=:80"
       # Trust X-Forwarded-* headers from an upstream reverse proxy (e.g. nginx).
       # Without this Traefik overwrites X-Forwarded-Proto with "http" (nginx→Traefik

@@ -14,14 +14,27 @@ import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { CourseWorkspacesClient } from '@/src/clients/CourseWorkspacesClient';
+import { CoderClient } from '@/src/clients/CoderClient';
+import type { CourseWorkspaceTemplatePolicy } from '@/src/types/workspaces';
 
 const courseWorkspacesClient = new CourseWorkspacesClient();
+const coderClient = new CoderClient();
+
+/** A course can only restrict, so a policy checkbox is off when either the
+ *  template's ceiling denies it or this course does. */
+function policyChecked(ceiling: boolean, courseValue: boolean | null | undefined): boolean {
+  return ceiling && courseValue !== false;
+}
 
 function CourseWorkspaceConfigContent() {
   const params = useParams<{ courseId: string }>();
   const courseId = params.courseId;
   const notify = useNotify();
-  const [draft, setDraft] = useState<{ selected: string[]; lecturerProvision: boolean } | null>(null);
+  const [draft, setDraft] = useState<{
+    selected: string[];
+    lecturerProvision: boolean;
+    policies: Record<string, CourseWorkspaceTemplatePolicy>;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
 
   const { data, loading, error, reload } = useResource(
@@ -29,10 +42,34 @@ function CourseWorkspaceConfigContent() {
     [courseId],
   );
 
+  // The per-template ceilings. The course settings response only carries them
+  // for already-associated templates, so a template checked in this session
+  // would have no ceiling to render — the settings list covers every template.
+  const { data: templateSettings } = useResource(() => coderClient.listTemplateSettings(), []);
+
+  const ceilings = useMemo(() => {
+    const map = new Map<string, { root: boolean; internet: boolean }>();
+    for (const row of templateSettings?.settings ?? []) {
+      map.set(row.template_name, { root: row.allow_root, internet: row.allow_internet });
+    }
+    return map;
+  }, [templateSettings]);
+
+  /** Templates with no settings row fall back to the .tf variable defaults. */
+  function ceilingFor(name: string) {
+    return ceilings.get(name) ?? { root: false, internet: true };
+  }
+
   const stored = useMemo(
     () => ({
       selected: (data?.templates ?? []).map((t) => t.template_name),
       lecturerProvision: data?.lecturer_provision_enabled ?? false,
+      policies: Object.fromEntries(
+        (data?.templates ?? []).map((t) => [
+          t.template_name,
+          { allow_root: t.allow_root ?? null, allow_internet: t.allow_internet ?? null },
+        ]),
+      ) as Record<string, CourseWorkspaceTemplatePolicy>,
     }),
     [data],
   );
@@ -72,6 +109,19 @@ function CourseWorkspaceConfigContent() {
     setDraft({ ...form, selected });
   }
 
+  /** Unchecking means "deny for this course"; checking means "no restriction"
+   *  (null) rather than true — a course never grants, so storing true would
+   *  just be a lie that survives the template's ceiling changing later. */
+  function setPolicy(name: string, key: keyof CourseWorkspaceTemplatePolicy, allowed: boolean) {
+    setDraft({
+      ...form,
+      policies: {
+        ...form.policies,
+        [name]: { ...form.policies[name], [key]: allowed ? null : false },
+      },
+    });
+  }
+
   async function save() {
     setSaving(true);
     try {
@@ -80,6 +130,9 @@ function CourseWorkspaceConfigContent() {
         body: {
           template_names: form.selected,
           lecturer_provision_enabled: form.lecturerProvision,
+          template_policies: Object.fromEntries(
+            form.selected.map((name) => [name, form.policies[name] ?? {}]),
+          ),
         },
       });
       notify('Course workspace configuration saved', 'success');
@@ -162,6 +215,61 @@ function CourseWorkspaceConfigContent() {
               </div>
             )}
           </div>
+
+          {form.selected.length > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Root &amp; internet policy</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  What members of this course get when they launch each template. A course can
+                  only take access away — a control is locked when the template itself already
+                  denies it. Applies to newly provisioned workspaces; existing ones keep their
+                  policy until they are rebuilt.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {[...form.selected].sort((a, b) => a.localeCompare(b)).map((name) => {
+                  const ceiling = ceilingFor(name);
+                  const policy = form.policies[name] ?? {};
+                  return (
+                    <div key={name} className="rounded-lg border border-gray-200 p-3">
+                      <p className="text-sm font-medium text-gray-900">{name}</p>
+                      <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2">
+                        {([
+                          ['allow_root', 'Root (sudo)', ceiling.root, policy.allow_root],
+                          ['allow_internet', 'Internet', ceiling.internet, policy.allow_internet],
+                        ] as const).map(([key, label, allowedByTemplate, courseValue]) => (
+                          <label
+                            key={key}
+                            className={`flex items-center gap-2 text-sm ${
+                              allowedByTemplate ? 'text-gray-700' : 'text-gray-400'
+                            }`}
+                            title={
+                              allowedByTemplate
+                                ? undefined
+                                : 'The template denies this; a course cannot grant it.'
+                            }
+                          >
+                            <input
+                              type="checkbox"
+                              disabled={!allowedByTemplate}
+                              checked={policyChecked(allowedByTemplate, courseValue)}
+                              onChange={(event) => setPolicy(name, key, event.target.checked)}
+                            />
+                            {label}
+                            {!allowedByTemplate && (
+                              <span className="text-xs">(off for this template)</span>
+                            )}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-3">
             <label className="flex items-start gap-2">

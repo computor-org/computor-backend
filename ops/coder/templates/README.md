@@ -57,7 +57,7 @@ All templates mount the **same per-user volume** `coder-home-{owner-uuid}` at `/
   anything that must survive:
 - `~/personalize` — if this executable script exists, every workspace runs it at startup
   (output in `/tmp/personalize.log`). Put `sudo apt-get install -y …` or similar setup there
-  (only in images whose user has sudo; the desktop image does, the others do not).
+  (only works while the workspace has root — see "Root and internet policy" below).
 - The volume is created by the docker engine on first mount and is **not** managed by
   Terraform, so deleting a workspace never deletes the user's home.
 - code-server state is scoped per workspace via `--user-data-dir
@@ -76,6 +76,56 @@ docker run --rm \
   -v coder-home-<owner-uuid>:/to \
   alpine sh -c 'cp -a /from/. /to/'
 ```
+
+## Root and internet policy
+
+Both are **configuration, not image properties** — every template's image ships whatever it
+ships (four of the six happen to carry passwordless sudo: `bash`, `ubuntu-desktop`, `vscode`
+and both MATLAB images; `jupyter` has no `sudo` binary at all), and the container decides
+whether that sudo can actually be used.
+
+| Knob | Off means | Mechanism |
+|---|---|---|
+| `allow_root` (default **false**) | `sudo`/`su` refused | `security_opts = ["no-new-privileges:true"]` — the kernel refuses the setuid transition, so one image serves both modes |
+| `allow_internet` (default **true**) | no egress | the container is attached to `computor-coder-workspaces-offline` (`internal: true`) instead: no NAT, no default route, so external DNS and connects fail immediately rather than hanging |
+
+Policy comes from two places and is ANDed **inside the template** (`locals` in `main.tf`), so
+the weaker input always wins:
+
+- the **template** variables `allow_root` / `allow_internet` — the ceiling, set in the
+  workspace template settings and applied as `--variable` at push time;
+- the **course** parameters of the same name — narrowing only, delivered as rich parameters at
+  provision time and immutable for the life of the workspace.
+
+Both take effect on the next template push plus a workspace rebuild (`POST
+/coder/admin/templates/rollout`); a course-level change only affects newly provisioned
+workspaces until their next rebuild.
+
+Consequence worth knowing: files a workspace created as root stay root-owned in the shared home
+volume, and nothing can repair them once that user's workspaces lose root (the MATLAB templates'
+`sudo chown -R coder:coder "$HOME"` self-heal silently no-ops). Sweep `coder-home-*` volumes
+before turning root off for users who had it.
+
+## What a workspace can reach
+
+Workspaces sit on their own bridge, whose only other members are the Coder
+server and `workspace-ingress`. Everything outbound goes through that proxy's
+allowlist (`ops/coder/workspace-ingress/`): the Computor API and git, nothing
+else. The platform's web UI, Keycloak, `/docs` and the datastores are
+unreachable from a workspace whether or not internet is enabled.
+
+Each workspace app also requires a per-user credential that the ingress
+injects (`workspace_app_secret`, plus an argon2 hash for the code-server
+templates). Without it, one workspace could drive another directly by
+container name — the apps bind `0.0.0.0` on a shared bridge and the names are
+predictable. This raises the bar but does not make the bridge a boundary:
+workspaces can still see each other's ports.
+
+**Dev only:** a workspace can reach the dev machine through the bridge gateway,
+so anything you have listening on `0.0.0.0` there is reachable from inside a
+workspace. That is how the dev backend is reached (it runs on the host, not in
+a container). Compose binds the platform's own ports to `127.0.0.1`, which is
+what keeps the datastores out of reach.
 
 ## Adding a new workspace type
 

@@ -107,7 +107,6 @@ export interface ProvisionResult {
   workspace?: CoderWorkspace | null;
   created_user: boolean;
   created_workspace: boolean;
-  code_server_password?: string | null;
 }
 
 export interface CoderTemplate {
@@ -268,6 +267,13 @@ export interface WorkspaceTemplateSettings {
   cpu_shares?: number | null;
   /** Max concurrently running workspaces across all users; null = unlimited. */
   max_running_workspaces?: number | null;
+  /**
+   * Whether workspaces of this template may use sudo/su. The CEILING — a course
+   * can narrow it but never grant root the template denies. Next push applies.
+   */
+  allow_root: boolean;
+  /** Whether workspaces reach the internet. Same ceiling semantics. */
+  allow_internet: boolean;
   /** Extra Terraform variable overrides pushed as --variable. */
   template_variables: Record<string, string>;
   updated_at?: string | null;
@@ -278,6 +284,8 @@ export interface WorkspaceTemplateSettingsUpdate {
   memory_mb?: number | null;
   cpu_shares?: number | null;
   max_running_workspaces?: number | null;
+  allow_root?: boolean;
+  allow_internet?: boolean;
   template_variables?: Record<string, string>;
 }
 
@@ -329,6 +337,32 @@ export interface TemplateVariablesResponse {
   variables: TemplateVariable[];
 }
 
+
+// --- Admin: workspace volumes (home + scratch) ---
+
+export interface WorkspaceVolume {
+  name: string;
+  /** 'home' = shared per user, 'scratch' = per workspace. */
+  kind: string;
+  /** Size on disk; null when docker has not computed it. */
+  size_bytes?: number | null;
+  /** A container mounts it — deletion will be refused. */
+  in_use?: boolean | null;
+  created_at?: string | null;
+  user_id?: string | null;
+  user_name?: string | null;
+  workspace_name?: string | null;
+  /** The Coder user or workspace the name points at is gone. Safe to reclaim. */
+  orphaned: boolean;
+}
+
+export interface WorkspaceVolumeListResponse {
+  volumes: WorkspaceVolume[];
+  total_bytes: number;
+  /** Coder was unreachable, so owners are unresolved and nothing is called orphaned. */
+  unresolved: boolean;
+}
+
 // --- Course-scoped workspaces (computor_types/course_workspaces.py) ---
 
 export interface CourseWorkspaceTemplateItem {
@@ -340,6 +374,22 @@ export interface CourseWorkspaceTemplateItem {
   icon?: string | null;
   /** Whether Coder currently has this template; null when Coder was unreachable. */
   exists_in_coder?: boolean | null;
+  /** This course's root policy; null = inherit the template. */
+  allow_root?: boolean | null;
+  /** This course's internet policy; null = inherit the template. */
+  allow_internet?: boolean | null;
+  /** The template's ceiling — a course cannot grant beyond it. */
+  template_allow_root: boolean;
+  template_allow_internet: boolean;
+  /** What a workspace provisioned for this course actually gets. */
+  effective_allow_root: boolean;
+  effective_allow_internet: boolean;
+}
+
+/** Course-level narrowing; null on a field means "inherit the template". */
+export interface CourseWorkspaceTemplatePolicy {
+  allow_root?: boolean | null;
+  allow_internet?: boolean | null;
 }
 
 export interface CourseWorkspaceSettingsGet {
@@ -356,6 +406,11 @@ export interface CourseWorkspaceSettingsUpdate {
   /** Allowed Coder template names (full replacement). */
   template_names: string[];
   lecturer_provision_enabled?: boolean;
+  /**
+   * Per-template narrowing keyed by template name. Templates absent from the
+   * map inherit their template's policy; keys not in template_names are ignored.
+   */
+  template_policies?: Record<string, CourseWorkspaceTemplatePolicy>;
 }
 
 export interface CourseWorkspaceAdminItem {

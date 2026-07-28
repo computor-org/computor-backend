@@ -57,12 +57,6 @@ variable "dev_forward_ports" {
   type        = string
 }
 
-variable "code_server_password" {
-  default     = ""
-  description = "Password for code-server access (empty disables code-server auth)"
-  sensitive   = true
-  type        = string
-}
 
 variable "memory_mb" {
   default     = 0
@@ -80,4 +74,22 @@ variable "shm_size" {
   default     = 512
   description = "Size of /dev/shm in MiB (MATLAB needs a larger-than-default shared memory segment)"
   type        = number
+}
+
+variable "allow_root" {
+  default     = false
+  description = "Grant the workspace user root via sudo. When false the container runs with no-new-privileges, so the kernel refuses the setuid transition in sudo/su and ONE image serves both modes. Set per template in the workspace template settings; a course can narrow this further, never widen it."
+  type        = bool
+}
+
+variable "allow_internet" {
+  default     = true
+  description = "Allow egress to the internet. When false the workspace is attached to docker_network_offline instead: an internal network with no NAT and no default route, so platform ingress and the Coder agent keep working while external connects fail immediately. Set per template in the workspace template settings; a course can narrow this further, never widen it."
+  type        = bool
+}
+
+variable "docker_network_offline" {
+  default     = "computor-coder-workspaces-offline"
+  description = "Isolated Docker network WITHOUT egress, used when allow_internet is false. Declared `internal: true` in docker-compose.coder.yaml and carries the same ingress/agent services as docker_network."
+  type        = string
 }
