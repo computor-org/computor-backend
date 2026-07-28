@@ -55,7 +55,11 @@ fi
 # sees a login page, while a request that did not come through the ingress
 # (another workspace dialling this container directly) has no cookie and is
 # bounced to the login page.
-export HASHED_PASSWORD="${app_hash}"
+# SINGLE quotes: an argon2 hash is $argon2id$v=19$m=...$salt$digest, and in
+# double quotes the shell expands every $-segment as an undefined variable —
+# code-server then sees a mangled value, never matches the injected cookie, and
+# shows its login page.
+export HASHED_PASSWORD='${app_hash}'
 code-server \
   --auth password \
   --bind-addr 0.0.0.0:${code_server_port} \

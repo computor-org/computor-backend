@@ -39,7 +39,7 @@ export MWI_APP_HOST="0.0.0.0"
 # it open, as before.
 %{ if app_secret != "" }
 export MWI_ENABLE_TOKEN_AUTH="True"
-export MWI_AUTH_TOKEN="${app_secret}"
+export MWI_AUTH_TOKEN='${app_secret}'
 %{ else }
 echo "WARNING: no workspace app secret was issued — MATLAB is reachable by any" \
      "other workspace on this network." >&2
