@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from computor_backend.coder.keepalive import bump_workspace_activity
+from computor_backend.coder.naming import coder_username_matches_user
 from computor_backend.database import get_db
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.exceptions import (
@@ -600,10 +601,11 @@ async def verify_coder_access(
             content={"status": "authorized", "user_id": principal.user_id, "workspace": workspace_name}
         )
 
-    # Regular users: the owner segment must be the u{backend_uuid} form and resolve to
-    # the authenticated principal. Coder may truncate the username, so compare by prefix.
-    url_user_id = url_owner[1:] if url_owner.startswith("u") else url_owner
-    if not (url_owner.startswith("u") and principal.user_id.startswith(url_user_id)):
+    # Regular users: the owner segment must decode to the authenticated principal.
+    # Coder usernames are reversible (coder/naming.py), so this is an exact match —
+    # the previous prefix comparison would authorize any user whose id merely began
+    # with the truncated owner segment.
+    if not coder_username_matches_user(url_owner, principal.user_id):
         logger.warning(
             f"User {principal.user_id} attempted to access workspace belonging to {url_owner}"
         )

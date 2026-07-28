@@ -25,7 +25,11 @@ from sqlalchemy.orm import Session
 from computor_backend.coder.client import CoderClient
 from computor_backend.coder.config import CoderSettings
 from computor_backend.coder.exceptions import CoderWorkspaceNotFoundError
-from computor_backend.coder.naming import derive_workspace_name, sanitize_workspace_name
+from computor_backend.coder.naming import (
+    decode_coder_username,
+    derive_workspace_name,
+    sanitize_workspace_name,
+)
 from computor_backend.coder.service import (
     derive_workspace_app_secret,
     get_user_email,
@@ -541,14 +545,18 @@ def _require_course_lecturer(
 def _member_for_owner_name(
     members: list[CourseMember], owner_name: Optional[str]
 ) -> Optional[CourseMember]:
-    """Resolve a Coder owner username (u{uuid}, possibly truncated) to a member."""
-    if not owner_name or not owner_name.startswith("u"):
-        return None
-    uid_prefix = owner_name[1:]
-    if not uid_prefix:
+    """Resolve a Coder owner username to a course member, exactly.
+
+    Coder usernames decode back to the user id (``coder/naming.py``), so this
+    is an equality match — no prefix rule that could pair a workspace with the
+    wrong member. None for Coder's own ``admin`` account and anything else that
+    does not decode.
+    """
+    user_id = decode_coder_username(owner_name)
+    if user_id is None:
         return None
     for member in members:
-        if str(member.user_id).startswith(uid_prefix):
+        if str(member.user_id) == user_id:
             return member
     return None
 

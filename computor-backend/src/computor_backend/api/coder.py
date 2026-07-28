@@ -10,7 +10,6 @@ import re
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import String as sa_String, cast as sa_cast
 from sqlalchemy.orm import Session
 
 from computor_backend.coder.client import CoderClient, get_coder_client
@@ -24,7 +23,12 @@ from computor_backend.coder.exceptions import (
     CoderNotFoundError,
     CoderTemplateNotFoundError,
 )
-from computor_backend.coder.naming import derive_workspace_name, sanitize_workspace_name
+from computor_backend.coder.naming import (
+    coder_username_matches_user,
+    decode_coder_username,
+    derive_workspace_name,
+    sanitize_workspace_name,
+)
 from computor_backend.exceptions import (
     BadRequestException,
     ComputorException,
@@ -124,14 +128,19 @@ def _check_workspace_access_or_course_member(
 ) -> None:
     """Global workspace claim, or course-derived access.
 
-    Course-derived callers may only touch their OWN workspaces: ``username``
-    (Coder usernames are Computor user UUIDs) must match the principal.
-    Global claim holders keep today's behavior.
+    Course-derived callers may only touch their OWN workspaces, so ``username``
+    must resolve to the principal. It arrives in Coder form (the web sends the
+    workspace's ``owner_name``), which is why this goes through
+    ``coder_username_matches_user`` rather than comparing to the bare user id —
+    the two are different strings, so an equality check here rejected every
+    course-derived caller. Global claim holders keep today's behavior.
     """
     if permissions.is_admin or permissions.permitted("workspace", action):
         return
     if action in _COURSE_FALLBACK_ACTIONS and get_member_course_template_names(db, permissions):
-        if username is not None and username != str(permissions.user_id):
+        if username is not None and not coder_username_matches_user(
+            username, str(permissions.user_id)
+        ):
             raise ForbiddenException(detail="You may only access your own workspaces.")
         return
     raise ForbiddenException(
@@ -212,23 +221,17 @@ _TF_VARIABLE_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_-]*$")
 def _computor_user_for_coder_name(db: Session, username: str):
     """The Computor user behind a Coder username, or None.
 
-    Coder usernames are the Computor user id with a "u" prefix, TRUNCATED to
-    Coder's 32-character limit — so `ud4abffea-1ec4-403c-898d-3d83f28` is a
-    prefix of a uuid, not a uuid. Matching has to be by prefix, the same rule
-    `_member_for_owner_name` uses for course members. Coder's own `admin`
-    account has no Computor user at all and simply misses.
+    Coder usernames decode back to the exact user id (``coder/naming.py``), so
+    this is a primary-key lookup. Coder's own `admin` account does not decode
+    and simply misses, as does any owner we did not create.
     """
-    if not username.startswith("u") or len(username) < 9:
+    user_id = decode_coder_username(username)
+    if user_id is None:
         return None
-    prefix = username[1:]
     try:
         from computor_backend.model.auth import User
 
-        return (
-            db.query(User)
-            .filter(sa_cast(User.id, sa_String).like(f"{prefix}%"))
-            .first()
-        )
+        return db.query(User).filter(User.id == user_id).first()
     except Exception:
         logger.warning(f"Could not resolve Coder username '{username}' to a user")
         return None

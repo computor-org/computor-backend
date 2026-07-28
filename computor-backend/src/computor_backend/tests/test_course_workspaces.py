@@ -13,6 +13,7 @@ from computor_backend.api.coder import (
     update_template_settings,
 )
 from computor_backend.coder.exceptions import CoderTemplateNotFoundError
+from computor_backend.coder.naming import encode_coder_username
 from computor_backend.exceptions import (
     BadRequestException,
     ForbiddenException,
@@ -179,11 +180,37 @@ def test_fallback_grants_member_own_workspace_actions():
         _check_workspace_access_or_course_member(principal, action, db, username="s1")
 
 
+def test_fallback_grants_member_their_workspace_by_coder_owner_name():
+    """The web sends the workspace's Coder ``owner_name``, not the bare user id.
+
+    Those are different strings, so the equality check this replaced rejected
+    every course-derived caller on their own workspace — start/stop/details all
+    403'd for students whose access comes from course membership alone.
+    """
+    uid = "0232de59-e05d-4bc2-898f-b879c06abcde"
+    principal = _course_principal(uid, "c1", "_student")
+    db = make_db(course_templates=[_tpl_row("c1", "vscode-workspace")])
+    _check_workspace_access_or_course_member(
+        principal, "start", db, username=encode_coder_username(uid)
+    )
+
+
 def test_fallback_rejects_foreign_username():
     principal = _course_principal("s1", "c1", "_student")
     db = make_db(course_templates=[_tpl_row("c1", "vscode-workspace")])
     with pytest.raises(ForbiddenException):
         _check_workspace_access_or_course_member(principal, "start", db, username="other")
+
+
+def test_fallback_rejects_another_members_coder_name():
+    uid = "0232de59-e05d-4bc2-898f-b879c06abcde"
+    other = "0232de59-e05d-4bc2-898f-b879c06abcdf"  # differs in the last char only
+    principal = _course_principal(uid, "c1", "_student")
+    db = make_db(course_templates=[_tpl_row("c1", "vscode-workspace")])
+    with pytest.raises(ForbiddenException):
+        _check_workspace_access_or_course_member(
+            principal, "start", db, username=encode_coder_username(other)
+        )
 
 
 def test_fallback_never_covers_privileged_actions():
@@ -459,7 +486,12 @@ async def test_settings_get_survives_coder_down():
 # --- lecturer bulk provisioning -----------------------------------------------
 
 
-def _member(member_id="m1", user_id="1111-2222"):
+# A course member and the Coder owner name their workspaces carry.
+MEMBER_UUID = "1111aaaa-2222-4bbb-8ccc-333344445555"
+MEMBER_OWNER = encode_coder_username(MEMBER_UUID)
+
+
+def _member(member_id="m1", user_id=MEMBER_UUID):
     member = MagicMock(spec=CourseMember)
     member.id = member_id
     member.user_id = user_id
@@ -580,20 +612,20 @@ async def test_course_delete_is_scoped_to_the_course_for_everyone():
     """The reported bug: a personal workspace of a course member, on a course
     template, was listed under the course and an admin could delete it. Owner +
     template is not enough to say a workspace belongs to a course."""
-    db = _bulk_db(members=[_member(user_id="1111-2222")])
+    db = _bulk_db(members=[_member(user_id=MEMBER_UUID)])
     lecturer = _course_principal("l1", "c1", "_lecturer")
 
     for caller in (lecturer, _maintainer(), _admin()):
         with pytest.raises(ForbiddenException) as exc:
             await cw.delete_student_workspace(
-                "c1", "u1111-2222", "vscode", caller, db,
+                "c1", MEMBER_OWNER, "vscode", caller, db,
                 _delete_client(course_id=None),        # provisioned by its owner
             )
         assert "not provisioned for this course" in str(exc.value)
 
         with pytest.raises(ForbiddenException):
             await cw.delete_student_workspace(
-                "c1", "u1111-2222", "vscode", caller, db,
+                "c1", MEMBER_OWNER, "vscode", caller, db,
                 _delete_client(course_id="some-other-course"),
             )
 
@@ -602,12 +634,12 @@ async def test_course_delete_is_scoped_to_the_course_for_everyone():
 async def test_lecturer_deletes_any_workspace_of_their_course():
     """Including shared-home ones: the old scratch-only rule blocked a lecturer
     from deleting a workspace they had bulk-provisioned with home_mode=shared."""
-    db = _bulk_db(members=[_member(user_id="1111-2222")])
+    db = _bulk_db(members=[_member(user_id=MEMBER_UUID)])
     lecturer = _course_principal("l1", "c1", "_lecturer")
 
     for home_mode in ("scratch", "shared"):
         result = await cw.delete_student_workspace(
-            "c1", "u1111-2222", "vscode-tmp", lecturer, db,
+            "c1", MEMBER_OWNER, "vscode-tmp", lecturer, db,
             _delete_client(home_mode=home_mode, course_id="c1"),
         )
         assert result.success is True
@@ -615,7 +647,7 @@ async def test_lecturer_deletes_any_workspace_of_their_course():
 
 @pytest.mark.asyncio
 async def test_lecturer_delete_rejects_non_members():
-    db = _bulk_db(members=[_member(user_id="1111-2222")])
+    db = _bulk_db(members=[_member(user_id=MEMBER_UUID)])
     lecturer = _course_principal("l1", "c1", "_lecturer")
 
     with pytest.raises(ForbiddenException):
@@ -630,11 +662,11 @@ async def test_the_marker_governs_even_if_the_template_left_the_course():
     course from provisioning time, when the template WAS allowed; removing the
     template from the course afterwards must not strand the workspaces it
     already created with nobody able to clean them up."""
-    db = _bulk_db(members=[_member(user_id="1111-2222")])
+    db = _bulk_db(members=[_member(user_id=MEMBER_UUID)])
     lecturer = _course_principal("l1", "c1", "_lecturer")
 
     result = await cw.delete_student_workspace(
-        "c1", "u1111-2222", "old", lecturer, db,
+        "c1", MEMBER_OWNER, "old", lecturer, db,
         _delete_client(template="template-since-removed", course_id="c1"),
     )
     assert result.success is True
@@ -711,3 +743,23 @@ def test_immutable_parameters_are_carried_across_a_rebuild():
     for name in ("home_mode", "allow_root", "allow_internet",
                  "workspace_app_secret", "workspace_app_hash"):
         assert name in CoderClient.CARRIED_BUILD_PARAMS
+
+
+# --- Coder owner name -> course member ----------------------------------------
+
+
+def test_member_for_owner_name_resolves_the_encoded_name():
+    uid = "0232de59-e05d-4bc2-898f-b879c06abcde"
+    member = MagicMock(spec=CourseMember)
+    member.user_id = uid
+    assert cw._member_for_owner_name([member], encode_coder_username(uid)) is member
+
+
+def test_member_for_owner_name_ignores_admin_and_foreign_owners():
+    uid = "0232de59-e05d-4bc2-898f-b879c06abcde"
+    other = "0232de59-e05d-4bc2-898f-b879c06abcdf"
+    member = MagicMock(spec=CourseMember)
+    member.user_id = uid
+    assert cw._member_for_owner_name([member], "admin") is None
+    assert cw._member_for_owner_name([member], encode_coder_username(other)) is None
+    assert cw._member_for_owner_name([member], None) is None

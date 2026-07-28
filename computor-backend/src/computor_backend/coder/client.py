@@ -22,7 +22,11 @@ from .exceptions import (
     CoderWorkspaceExistsError,
     CoderWorkspaceNotFoundError,
 )
-from .naming import derive_workspace_name, sanitize_workspace_name
+from .naming import (
+    derive_workspace_name,
+    encode_coder_username,
+    sanitize_workspace_name,
+)
 from .schemas import (
     CoderTemplate,
     CoderUser,
@@ -272,39 +276,14 @@ class CoderClient:
 
     @staticmethod
     def _sanitize_username(username: str) -> str:
+        """The Coder username for a Computor user id.
+
+        ``u`` + base32 of the UUID's bytes: 27 characters, inside Coder's
+        32-character limit, and reversible — see ``coder/naming.py`` for why
+        that matters (the previous truncating scheme forced prefix matching
+        everywhere and derived the app secret from a lossy string).
         """
-        Sanitize username for Coder requirements.
-
-        Coder usernames must:
-        - Be lowercase
-        - Start with a letter (a-z)
-        - Only contain alphanumeric characters and hyphens
-        - Be max 32 characters
-
-        For UUIDs passed from the backend, we ALWAYS add a 'u' prefix
-        to create the u{uuid} format expected by ForwardAuth.
-
-        Args:
-            username: Raw username (e.g., UUID from backend user.id)
-
-        Returns:
-            Sanitized username in u{uuid} format valid for Coder
-        """
-        import re
-
-        # Lowercase and remove invalid characters (keep only alphanumeric and hyphens)
-        clean = re.sub(r"[^a-z0-9-]", "", username.lower())
-
-        # ALWAYS prepend 'u' - unconditionally (required by ForwardAuth)
-        clean = "u" + clean
-
-        # Truncate to 32 characters (Coder's limit)
-        clean = clean[:32]
-
-        # Remove trailing hyphens
-        clean = clean.rstrip("-")
-
-        return clean
+        return encode_coder_username(username)
 
     # -------------------------------------------------------------------------
     # User operations
