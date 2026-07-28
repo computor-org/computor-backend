@@ -62,6 +62,7 @@ from computor_types.coder import (
     WorkspaceListResponse,
     WorkspaceRolloutRequest,
     WorkspaceVolume,
+    WorkspaceCredentialRotationResponse,
     WorkspaceVolumeListResponse,
     WorkspaceTemplateSettingsSchema,
     WorkspaceTemplateSettingsUpdate,
@@ -78,6 +79,9 @@ from computor_backend.coder.service import (
     get_user_email,
     get_user_fullname,
     mint_workspace_token,
+)
+from computor_backend.business_logic.workspace_credentials import (
+    rotate_workspace_app_credential,
 )
 from computor_backend.business_logic.course_workspaces import (
     enforce_template_quota as _enforce_template_quota,
@@ -1467,6 +1471,42 @@ async def repair_workspace_volume(
     _check_workspace_access(permissions, "manage")
     payload = await _run_volume_task("repair", volume_name)
     return WorkspaceActionResponse(success=True, message=payload.get("message", "Repaired"))
+
+
+@router.post(
+    "/admin/users/{user_id}/app-credential/rotate",
+    response_model=WorkspaceCredentialRotationResponse,
+    summary="Rotate a user's workspace app credential",
+)
+async def rotate_user_app_credential(
+    user_id: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    client: Annotated[CoderClient, Depends(get_coder_client)],
+    db: Annotated[Session, Depends(get_db)],
+    cache=Depends(get_cache),
+) -> WorkspaceCredentialRotationResponse:
+    """Revoke the credential this user's workspace apps accept, and replace it.
+
+    The secret is derived from a per-user key version, so bumping that version
+    is the revocation. Their RUNNING workspaces are then rebuilt under the new
+    one — a running container holds the old secret in its environment and in
+    the Traefik label that injects it, and nothing short of a rebuild replaces
+    either. Stopped workspaces are reported instead of started: every start
+    sends the owner's current credential, so they cannot come back accepting
+    the revoked one.
+
+    Requires workspace:manage.
+    """
+    _check_workspace_access(permissions, "manage")
+    if get_user_by_id(db, cache, user_id) is None:
+        raise NotFoundException(detail=f"User {user_id} not found")
+    try:
+        return await rotate_workspace_app_credential(db, client, user_id, cache)
+    except ComputorException:
+        raise
+    except Exception as e:
+        raise _handle_coder_error(e) from e
 
 
 @router.get(
