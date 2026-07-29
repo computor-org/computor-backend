@@ -25,13 +25,16 @@ from sqlalchemy.orm import Session
 from computor_backend.coder.client import CoderClient
 from computor_backend.coder.config import CoderSettings
 from computor_backend.coder.exceptions import CoderWorkspaceNotFoundError
-from computor_backend.coder.naming import derive_workspace_name, sanitize_workspace_name
+from computor_backend.coder.naming import (
+    decode_coder_username,
+    derive_workspace_name,
+    sanitize_workspace_name,
+)
 from computor_backend.coder.service import (
-    derive_workspace_app_secret,
+    current_workspace_app_credentials,
     get_user_email,
     get_user_fullname,
     mint_workspace_token,
-    workspace_app_password_hash,
 )
 from computor_backend.exceptions import (
     BadRequestException,
@@ -541,14 +544,18 @@ def _require_course_lecturer(
 def _member_for_owner_name(
     members: list[CourseMember], owner_name: Optional[str]
 ) -> Optional[CourseMember]:
-    """Resolve a Coder owner username (u{uuid}, possibly truncated) to a member."""
-    if not owner_name or not owner_name.startswith("u"):
-        return None
-    uid_prefix = owner_name[1:]
-    if not uid_prefix:
+    """Resolve a Coder owner username to a course member, exactly.
+
+    Coder usernames decode back to the user id (``coder/naming.py``), so this
+    is an equality match — no prefix rule that could pair a workspace with the
+    wrong member. None for Coder's own ``admin`` account and anything else that
+    does not decode.
+    """
+    user_id = decode_coder_username(owner_name)
+    if user_id is None:
         return None
     for member in members:
-        if str(member.user_id).startswith(uid_prefix):
+        if str(member.user_id) == user_id:
             return member
     return None
 
@@ -648,7 +655,9 @@ async def provision_student_workspaces(
                 workspace_name=workspace_name,
                 ttl_days=coder_settings.workspace_token_ttl_days,
             )
-            app_secret = derive_workspace_app_secret(str(member.user_id))
+            app_secret, app_hash = current_workspace_app_credentials(
+                db, str(member.user_id)
+            )
             result = await client.provision_workspace(
                 user_email=email,
                 username=str(member.user_id),
@@ -660,7 +669,7 @@ async def provision_student_workspaces(
                 allow_root=policy_root,
                 allow_internet=policy_internet,
                 app_secret=app_secret,
-                app_password_hash=workspace_app_password_hash(app_secret),
+                app_password_hash=app_hash,
                 course_id=str(course_id),
             )
             outcome.workspace_name = result.workspace.name if result.workspace else workspace_name

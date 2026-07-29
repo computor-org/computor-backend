@@ -22,7 +22,11 @@ from .exceptions import (
     CoderWorkspaceExistsError,
     CoderWorkspaceNotFoundError,
 )
-from .naming import derive_workspace_name, sanitize_workspace_name
+from .naming import (
+    derive_workspace_name,
+    encode_coder_username,
+    sanitize_workspace_name,
+)
 from .schemas import (
     CoderTemplate,
     CoderUser,
@@ -272,39 +276,14 @@ class CoderClient:
 
     @staticmethod
     def _sanitize_username(username: str) -> str:
+        """The Coder username for a Computor user id.
+
+        ``u`` + base32 of the UUID's bytes: 27 characters, inside Coder's
+        32-character limit, and reversible — see ``coder/naming.py`` for why
+        that matters (the previous truncating scheme forced prefix matching
+        everywhere and derived the app secret from a lossy string).
         """
-        Sanitize username for Coder requirements.
-
-        Coder usernames must:
-        - Be lowercase
-        - Start with a letter (a-z)
-        - Only contain alphanumeric characters and hyphens
-        - Be max 32 characters
-
-        For UUIDs passed from the backend, we ALWAYS add a 'u' prefix
-        to create the u{uuid} format expected by ForwardAuth.
-
-        Args:
-            username: Raw username (e.g., UUID from backend user.id)
-
-        Returns:
-            Sanitized username in u{uuid} format valid for Coder
-        """
-        import re
-
-        # Lowercase and remove invalid characters (keep only alphanumeric and hyphens)
-        clean = re.sub(r"[^a-z0-9-]", "", username.lower())
-
-        # ALWAYS prepend 'u' - unconditionally (required by ForwardAuth)
-        clean = "u" + clean
-
-        # Truncate to 32 characters (Coder's limit)
-        clean = clean[:32]
-
-        # Remove trailing hyphens
-        clean = clean.rstrip("-")
-
-        return clean
+        return encode_coder_username(username)
 
     # -------------------------------------------------------------------------
     # User operations
@@ -953,6 +932,7 @@ class CoderClient:
         username: str,
         workspace_name: str,
         policy: Optional[dict] = None,
+        param_overrides: Optional[dict[str, str]] = None,
     ) -> bool:
         """
         Start a stopped workspace.
@@ -964,6 +944,10 @@ class CoderClient:
                 starts. Callers that know the workspace belongs to a course pass
                 the course's CURRENT policy, so one that was stopped when the
                 policy changed does not come back under the old one.
+            param_overrides: rich parameters to replace verbatim — the start
+                path passes the owner's CURRENT app credential, so a workspace
+                that was stopped when it was rotated cannot come back
+                answering to the revoked one.
 
         Returns:
             True if start initiated successfully
@@ -973,6 +957,7 @@ class CoderClient:
             details.workspace.id,
             "start",
             policy=policy,
+            param_overrides=param_overrides,
         )
 
     async def rebuild_with_policy(self, workspace_id: str, policy: dict) -> bool:
@@ -983,6 +968,19 @@ class CoderClient:
         container was created with the old one.
         """
         return await self._workspace_transition(workspace_id, "start", policy=policy)
+
+    async def rebuild_with_params(
+        self, workspace_id: str, param_overrides: dict[str, str]
+    ) -> bool:
+        """Restart a running workspace with specific rich parameters replaced.
+
+        Used to push a rotated app credential: the container bakes the secret
+        into its env and the ingress into a Traefik label, so a running
+        workspace can only pick up a new one by being rebuilt.
+        """
+        return await self._workspace_transition(
+            workspace_id, "start", param_overrides=param_overrides
+        )
 
     async def stop_workspace(
         self,
@@ -1010,16 +1008,23 @@ class CoderClient:
         workspace_id: str,
         transition: str,
         policy: Optional[dict] = None,
+        param_overrides: Optional[dict[str, str]] = None,
     ) -> bool:
         """Execute workspace state transition (start/stop).
 
-        ``policy`` overrides rich parameters on this build — used to apply a
-        course's current root/internet policy as the workspace starts, so a
-        workspace that was stopped when the policy changed comes back under the
-        new one rather than the one it was created with. Omitting the field
-        entirely (the default) makes Coder carry the previous build's values
-        forward, which is what keeps the auth token and home mode across an
-        ordinary stop/start.
+        ``policy`` (booleans) and ``param_overrides`` (verbatim strings)
+        override rich parameters on this build — the first applies a course's
+        current root/internet policy as the workspace starts, the second pushes
+        a rotated app credential. Either one makes the build send an EXPLICIT
+        parameter list, and a partial list resets everything it omits to the
+        template default, so the previous build's values have to be carried
+        over: the immutable set via CARRIED_BUILD_PARAMS, plus
+        ``computor_auth_token``, which is mutable and therefore not in that set
+        but would otherwise be reset to "" and de-authenticate the extension.
+
+        With neither (the default) the field is omitted entirely and Coder
+        carries every value forward itself, which is what keeps an ordinary
+        stop/start cheap and lossless.
         """
         # Get workspace to find template version
         resp = await self._request(
@@ -1036,14 +1041,23 @@ class CoderClient:
             "template_version_id": template_version_id,
             "transition": transition,
         }
-        if policy:
-            # A partial list resets everything omitted, so send the carried
-            # parameters too and let the policy win where they overlap.
+        if policy or param_overrides:
+            # One read for everything: the immutable set AND the auth token,
+            # which is mutable, absent from CARRIED_BUILD_PARAMS, and would be
+            # reset to the template's "" default by the partial list below.
+            build_id = workspace["latest_build"].get("id")
+            by_name = await self.get_build_params(build_id) if build_id else {}
             carried = {
-                p["name"]: p["value"]
-                for p in await self._carry_build_params(workspace["latest_build"].get("id"))
+                name: by_name[name]
+                for name in self.CARRIED_BUILD_PARAMS
+                if by_name.get(name) is not None
             }
-            carried.update({k: ("true" if v else "false") for k, v in policy.items()})
+            if by_name.get("computor_auth_token") is not None:
+                carried["computor_auth_token"] = by_name["computor_auth_token"]
+            if policy:
+                carried.update({k: ("true" if v else "false") for k, v in policy.items()})
+            if param_overrides:
+                carried.update(param_overrides)
             body["rich_parameter_values"] = [
                 {"name": name, "value": value} for name, value in carried.items()
             ]
@@ -1199,6 +1213,7 @@ class CoderClient:
         self,
         workspace_id: str,
         computor_auth_token: str,
+        extra_params: Optional[dict[str, str]] = None,
     ) -> bool:
         """
         Update an existing workspace with a new auth token.
@@ -1208,6 +1223,10 @@ class CoderClient:
         Args:
             workspace_id: Workspace ID to update
             computor_auth_token: New token value
+            extra_params: rich parameters to replace rather than carry over.
+                Re-provisioning an existing workspace passes the owner's
+                current app credential here; without it the carried (possibly
+                revoked) secret would be restored.
 
         Returns:
             True if update was initiated successfully
@@ -1225,13 +1244,18 @@ class CoderClient:
         latest_build = workspace.get("latest_build") or {}
         template_version_id = latest_build["template_version_id"]
 
-        # Create a new build with the updated token parameter, carrying the
-        # immutable per-workspace parameters over (see _carry_build_params).
-        rich_params = [{
-            "name": "computor_auth_token",
-            "value": computor_auth_token,
-        }]
-        rich_params += await self._carry_build_params(latest_build.get("id"))
+        # Create a new build with the updated token, carrying the immutable
+        # per-workspace parameters over (see _carry_build_params). Merged as a
+        # dict so a name can never appear twice: carried first, then the
+        # caller's replacements, then the new token.
+        merged = {
+            p["name"]: p["value"]
+            for p in await self._carry_build_params(latest_build.get("id"))
+        }
+        if extra_params:
+            merged.update(extra_params)
+        merged["computor_auth_token"] = computor_auth_token
+        rich_params = [{"name": n, "value": v} for n, v in merged.items()]
 
         resp = await self._request(
             "POST",
@@ -1347,9 +1371,17 @@ class CoderClient:
         self,
         workspace_id: str,
         template_version_id: str,
+        credentials: Optional[tuple[str, str]] = None,
     ) -> bool:
         """Rebuild a workspace onto a specific template version (fleet update),
         preserving its computor_auth_token so the extension stays authenticated.
+
+        ``credentials`` is the owner's ``(app_secret, app_hash)`` at their
+        current key version, resolved by the caller — this class has no database
+        session, and the key version lives in the database. When given it
+        REPLACES whatever the previous build held, which both heals a workspace
+        built before app auth existed and delivers a rotated credential. When
+        omitted the previous build's values are carried forward.
 
         Issues a ``start`` build on the new version — for workspaces to update
         immediately. For stopped workspaces prefer ``set_workspace_auto_update``
@@ -1382,29 +1414,12 @@ class CoderClient:
             for param in await self._carry_build_params(build_id):
                 by_name[param["name"]] = param["value"]
 
-        # A workspace built before app auth existed has no credential to carry,
-        # so a rollout would bring it back with its app still open to every
-        # other workspace. Derive it here instead — the Coder username IS the
-        # Computor user id, which is what the secret is derived from.
-        owner = workspace.get("owner_name")
-        if owner and not by_name.get("workspace_app_secret"):
-            from computor_backend.coder.service import (
-                derive_workspace_app_secret,
-                workspace_app_password_hash,
-            )
-
-            try:
-                secret = derive_workspace_app_secret(owner)
-                by_name["workspace_app_secret"] = secret
-                by_name["workspace_app_hash"] = workspace_app_password_hash(secret)
-            except Exception as e:
-                # TOKEN_SECRET missing: roll out without app auth rather than
-                # blocking the update, but say so — the app stays reachable by
-                # other workspaces until the next provision.
-                logger.warning(
-                    f"Workspace {workspace_id}: could not derive the app credential "
-                    f"({e}); rolling out with the app unauthenticated"
-                )
+        # The caller resolved the owner's current credential (it needs the key
+        # version from the database). Replace rather than carry: this heals a
+        # workspace built before app auth existed, and delivers a rotated
+        # credential to one that missed the push.
+        if credentials:
+            by_name["workspace_app_secret"], by_name["workspace_app_hash"] = credentials
 
         rich_params: list[dict] = [
             {"name": name, "value": value} for name, value in by_name.items()
@@ -1524,9 +1539,21 @@ class CoderClient:
                 )
             if computor_auth_token:
                 logger.info(f"Workspace exists, updating with new token (prefix: {computor_auth_token[:15]}...)")
+                # Replace the app credential rather than carrying the previous
+                # build's: after a rotation the carried value is the revoked
+                # one, and re-provisioning would quietly reinstate it.
+                app_creds = {
+                    name: value
+                    for name, value in (
+                        ("workspace_app_secret", app_secret),
+                        ("workspace_app_hash", app_password_hash),
+                    )
+                    if value
+                }
                 await self._update_workspace_token(
                     workspace.id,
                     computor_auth_token,
+                    extra_params=app_creds or None,
                 )
         except CoderWorkspaceNotFoundError:
             # Create workspace. home_mode and the policy parameters only apply

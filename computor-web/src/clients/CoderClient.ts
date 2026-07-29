@@ -20,6 +20,7 @@ import type {
   CoderAdminTaskListResponse,
   CoderFleetStatusResponse,
   TemplateSettingsListResponse,
+  WorkspaceCredentialRotationResponse,
   WorkspaceVolumeListResponse,
   TemplateFileActionResponse,
   TemplateFilesResponse,
@@ -182,6 +183,18 @@ export class CoderClient extends BaseEndpointClient {
   async repairVolume({ name }: { name: string }): Promise<WorkspaceActionResponse> {
     return this.client.post<WorkspaceActionResponse>(
       this.buildPath('admin', 'volumes', name, 'repair'),
+      {},
+    );
+  }
+
+  /**
+   * Revoke the credential this user's workspace apps accept and issue a new one.
+   * Their running workspaces are rebuilt under it; stopped ones adopt it on
+   * their next start. (workspace:manage)
+   */
+  async rotateUserAppCredential({ userId }: { userId: string }): Promise<WorkspaceCredentialRotationResponse> {
+    return this.client.post<WorkspaceCredentialRotationResponse>(
+      this.buildPath('admin', 'users', userId, 'app-credential', 'rotate'),
       {},
     );
   }

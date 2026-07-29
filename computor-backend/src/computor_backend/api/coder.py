@@ -10,7 +10,6 @@ import re
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import String as sa_String, cast as sa_cast
 from sqlalchemy.orm import Session
 
 from computor_backend.coder.client import CoderClient, get_coder_client
@@ -24,7 +23,12 @@ from computor_backend.coder.exceptions import (
     CoderNotFoundError,
     CoderTemplateNotFoundError,
 )
-from computor_backend.coder.naming import derive_workspace_name, sanitize_workspace_name
+from computor_backend.coder.naming import (
+    coder_username_matches_user,
+    decode_coder_username,
+    derive_workspace_name,
+    sanitize_workspace_name,
+)
 from computor_backend.exceptions import (
     BadRequestException,
     ComputorException,
@@ -58,6 +62,7 @@ from computor_types.coder import (
     WorkspaceListResponse,
     WorkspaceRolloutRequest,
     WorkspaceVolume,
+    WorkspaceCredentialRotationResponse,
     WorkspaceVolumeListResponse,
     WorkspaceTemplateSettingsSchema,
     WorkspaceTemplateSettingsUpdate,
@@ -68,13 +73,15 @@ from computor_backend.tasks import get_task_executor, TaskSubmission
 from computor_types.tasks import TaskInfo
 from computor_types.workspace_roles import WorkspaceProvisionRequest
 from computor_backend.coder.service import (
-    derive_workspace_app_secret,
+    current_workspace_app_credentials,
     get_user_by_email,
     get_user_by_id,
     get_user_email,
     get_user_fullname,
     mint_workspace_token,
-    workspace_app_password_hash,
+)
+from computor_backend.business_logic.workspace_credentials import (
+    rotate_workspace_app_credential,
 )
 from computor_backend.business_logic.course_workspaces import (
     enforce_template_quota as _enforce_template_quota,
@@ -124,19 +131,43 @@ def _check_workspace_access_or_course_member(
 ) -> None:
     """Global workspace claim, or course-derived access.
 
-    Course-derived callers may only touch their OWN workspaces: ``username``
-    (Coder usernames are Computor user UUIDs) must match the principal.
-    Global claim holders keep today's behavior.
+    Course-derived callers may only touch their OWN workspaces, so ``username``
+    must resolve to the principal. It arrives in Coder form (the web sends the
+    workspace's ``owner_name``), which is why this goes through
+    ``coder_username_matches_user`` rather than comparing to the bare user id —
+    the two are different strings, so an equality check here rejected every
+    course-derived caller. Global claim holders keep today's behavior.
     """
     if permissions.is_admin or permissions.permitted("workspace", action):
         return
     if action in _COURSE_FALLBACK_ACTIONS and get_member_course_template_names(db, permissions):
-        if username is not None and username != str(permissions.user_id):
+        if username is not None and not coder_username_matches_user(
+            username, str(permissions.user_id)
+        ):
             raise ForbiddenException(detail="You may only access your own workspaces.")
         return
     raise ForbiddenException(
         detail=f"Workspace '{action}' permission required. Contact your administrator.",
     )
+
+
+def _current_app_credential_params(db: Session, username: str) -> Optional[dict]:
+    """Rich-parameter overrides carrying the owner's current app credential.
+
+    None when the owner has no Computor user behind the Coder name (Coder's own
+    ``admin`` account, a deleted user) or when the credential cannot be derived
+    — the build then carries the previous values forward, which is the old
+    behaviour rather than a workspace nobody can reach.
+    """
+    owner = _computor_user_for_coder_name(db, username)
+    if owner is None:
+        return None
+    try:
+        secret, app_hash = current_workspace_app_credentials(db, str(owner.id))
+    except Exception as e:
+        logger.warning(f"Could not derive the app credential for '{username}': {e}")
+        return None
+    return {"workspace_app_secret": secret, "workspace_app_hash": app_hash}
 
 
 def _handle_coder_error(e: Exception) -> ComputorException:
@@ -212,23 +243,17 @@ _TF_VARIABLE_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_-]*$")
 def _computor_user_for_coder_name(db: Session, username: str):
     """The Computor user behind a Coder username, or None.
 
-    Coder usernames are the Computor user id with a "u" prefix, TRUNCATED to
-    Coder's 32-character limit — so `ud4abffea-1ec4-403c-898d-3d83f28` is a
-    prefix of a uuid, not a uuid. Matching has to be by prefix, the same rule
-    `_member_for_owner_name` uses for course members. Coder's own `admin`
-    account has no Computor user at all and simply misses.
+    Coder usernames decode back to the exact user id (``coder/naming.py``), so
+    this is a primary-key lookup. Coder's own `admin` account does not decode
+    and simply misses, as does any owner we did not create.
     """
-    if not username.startswith("u") or len(username) < 9:
+    user_id = decode_coder_username(username)
+    if user_id is None:
         return None
-    prefix = username[1:]
     try:
         from computor_backend.model.auth import User
 
-        return (
-            db.query(User)
-            .filter(sa_cast(User.id, sa_String).like(f"{prefix}%"))
-            .first()
-        )
+        return db.query(User).filter(User.id == user_id).first()
     except Exception:
         logger.warning(f"Could not resolve Coder username '{username}' to a user")
         return None
@@ -468,7 +493,7 @@ async def provision_workspace(
                 db, permissions, template
             )
 
-        app_secret = derive_workspace_app_secret(str(target_user.id))
+        app_secret, app_hash = current_workspace_app_credentials(db, str(target_user.id))
         result = await client.provision_workspace(
             user_email=get_user_email(target_user),
             username=str(target_user.id),
@@ -480,7 +505,7 @@ async def provision_workspace(
             allow_root=policy_root,
             allow_internet=policy_internet,
             app_secret=app_secret,
-            app_password_hash=workspace_app_password_hash(app_secret),
+            app_password_hash=app_hash,
         )
         return result
     except ComputorException:
@@ -651,7 +676,15 @@ async def start_workspace(
             db, client, details.workspace.template_name or "",
             details.workspace.latest_build_id,
         )
-        success = await client.start_workspace(username, workspace_name, policy=policy)
+        # Every start carries the owner's CURRENT app credential, for course and
+        # personal workspaces alike. A workspace that was stopped when the
+        # credential was rotated would otherwise come back holding the revoked
+        # one — the build parameters are what the container and the ingress are
+        # rendered from, and Coder carries them forward untouched.
+        overrides = _current_app_credential_params(db, username)
+        success = await client.start_workspace(
+            username, workspace_name, policy=policy, param_overrides=overrides
+        )
         return WorkspaceActionResponse(
             success=success,
             message="Workspace starting" if success else "Failed to start workspace",
@@ -1465,6 +1498,42 @@ async def repair_workspace_volume(
     _check_workspace_access(permissions, "manage")
     payload = await _run_volume_task("repair", volume_name)
     return WorkspaceActionResponse(success=True, message=payload.get("message", "Repaired"))
+
+
+@router.post(
+    "/admin/users/{user_id}/app-credential/rotate",
+    response_model=WorkspaceCredentialRotationResponse,
+    summary="Rotate a user's workspace app credential",
+)
+async def rotate_user_app_credential(
+    user_id: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    client: Annotated[CoderClient, Depends(get_coder_client)],
+    db: Annotated[Session, Depends(get_db)],
+    cache=Depends(get_cache),
+) -> WorkspaceCredentialRotationResponse:
+    """Revoke the credential this user's workspace apps accept, and replace it.
+
+    The secret is derived from a per-user key version, so bumping that version
+    is the revocation. Their RUNNING workspaces are then rebuilt under the new
+    one — a running container holds the old secret in its environment and in
+    the Traefik label that injects it, and nothing short of a rebuild replaces
+    either. Stopped workspaces are reported instead of started: every start
+    sends the owner's current credential, so they cannot come back accepting
+    the revoked one.
+
+    Requires workspace:manage.
+    """
+    _check_workspace_access(permissions, "manage")
+    if get_user_by_id(db, cache, user_id) is None:
+        raise NotFoundException(detail=f"User {user_id} not found")
+    try:
+        return await rotate_workspace_app_credential(db, client, user_id, cache)
+    except ComputorException:
+        raise
+    except Exception as e:
+        raise _handle_coder_error(e) from e
 
 
 @router.get(

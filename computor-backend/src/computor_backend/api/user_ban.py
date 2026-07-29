@@ -39,6 +39,41 @@ logger = logging.getLogger(__name__)
 user_ban_router = APIRouter()
 
 
+async def _revoke_workspace_app_credential(db: Session, user: User) -> None:
+    """Rotate the banned user's workspace app credential, best effort.
+
+    A ban blocks authentication, so their browser can no longer reach a
+    workspace through the proxy — but a running workspace keeps serving its
+    apps to anything that can dial the container on the workspace bridge, using
+    a credential the user may still hold a copy of. Rotating kills that: the
+    version bump revokes it durably in the database, and the push rebuilds
+    their running workspaces so the old secret stops being accepted.
+
+    Never fails the ban. The bump is the part that matters and is pure database
+    work; only the push needs Coder, and a Coder that is disabled, unreachable
+    or broken must not stop an administrator from banning someone.
+    """
+    try:
+        from computor_backend.business_logic.workspace_credentials import (
+            rotate_workspace_app_credential,
+        )
+        from computor_backend.coder.client import get_coder_client
+        from computor_backend.coder.config import get_coder_settings
+
+        client = get_coder_client() if get_coder_settings().enabled else None
+        result = await rotate_workspace_app_credential(db, client, str(user.id))
+        logger.info(
+            "Banned user %s: workspace credential rotated to v%s (%s rebuilt, %s pending)",
+            user.id, result.key_version, result.succeeded, result.failed,
+        )
+    except Exception:
+        logger.warning(
+            "Banned user %s: could not rotate the workspace app credential; their "
+            "running workspaces keep accepting the old one until it is rotated",
+            user.id, exc_info=True,
+        )
+
+
 def _require_user_manager(principal: Principal, db: Session) -> None:
     """Raise ForbiddenException unless caller is admin or has _user_manager role."""
     if principal.is_admin:
@@ -94,6 +129,8 @@ async def ban_user(
 
     await mark_user_banned(str(user.id))
     logger.info("User %s banned by %s", user.id, principal.user_id)
+
+    await _revoke_workspace_app_credential(db, user)
 
     return get_current_user(str(user.id), db)
 

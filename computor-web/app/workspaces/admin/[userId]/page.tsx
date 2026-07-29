@@ -8,10 +8,12 @@ import { useResource } from '@/src/hooks/useResource';
 import { useWorkspaceActions } from '@/src/hooks/useWorkspaceActions';
 import { useCoderTemplates } from '@/src/hooks/useCoderTemplates';
 import { CoderClient } from '@/src/clients/CoderClient';
+import { useNotify } from '@/src/contexts/NotificationContext';
 import { WorkspaceRolesClient } from '@/src/clients/WorkspaceRolesClient';
 import WorkspaceTable from '@/src/components/workspaces/WorkspaceTable';
 import WorkspaceDetailsModal from '@/src/components/workspaces/WorkspaceDetailsModal';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
+import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
@@ -29,8 +31,10 @@ export default function UserDetailPage() {
   const [detailsData, setDetailsData] = useState<WorkspaceDetails | null>(null);
   const [provisioning, setProvisioning] = useState(false);
   const [template, setTemplate] = useState('');
+  const [rotateOpen, setRotateOpen] = useState(false);
 
   const { templates } = useCoderTemplates();
+  const notify = useNotify();
 
   const {
     data,
@@ -78,6 +82,19 @@ export default function UserDetailPage() {
   const handleOpenWorkspace = async (owner: string, name: string) => {
     const details = await actions.openOrDetails(owner, name);
     if (details) setDetailsData(details);
+  };
+
+  const handleRotate = async () => {
+    const result = await coderClient.rotateUserAppCredential({ userId });
+    setRotateOpen(false);
+    // Stopped workspaces count as "not rebuilt" — say so rather than calling
+    // them failures, since they pick the new credential up on their next start.
+    const pending = result.failed > 0 ? `, ${result.failed} on next start` : '';
+    notify(
+      `Credential rotated to v${result.key_version} — ${result.succeeded} workspace(s) restarted${pending}`,
+      'success',
+    );
+    await refresh();
   };
 
   return (
@@ -177,6 +194,26 @@ export default function UserDetailPage() {
           </div>
         )}
 
+        {/* App credential */}
+        {user && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">App credential</h2>
+            <p className="text-sm text-gray-600 mb-4 max-w-3xl">
+              Every workspace app of this user — terminal, desktop, notebook, editor — requires
+              one shared secret, which the proxy injects on their behalf. Rotating it revokes the
+              old one. Their running workspaces restart immediately under the new secret; stopped
+              ones adopt it when they next start. Do this if the credential may have leaked.
+            </p>
+            <Button
+              variant="secondary"
+              className="text-red-700 border-red-300 hover:bg-red-50"
+              onClick={() => setRotateOpen(true)}
+            >
+              Rotate app credential
+            </Button>
+          </div>
+        )}
+
         {/* Workspace Management */}
         {user && (
           <div className="bg-white rounded-lg border border-gray-200">
@@ -211,6 +248,22 @@ export default function UserDetailPage() {
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}
         />
+
+        {/* Rotate confirmation — type-to-confirm, since running workspaces restart */}
+        {rotateOpen && user && (
+          <ConfirmDeleteDialog
+            title="Rotate app credential"
+            message={
+              `This revokes the credential ${user.email || user.user_id} uses for every workspace app. ` +
+              'Their running workspaces restart immediately under the new one, so unsaved terminal ' +
+              'state is lost and open editor sessions reconnect. Stopped workspaces adopt it on their ' +
+              'next start.'
+            }
+            confirmWord={user.email || user.user_id}
+            onConfirm={handleRotate}
+            onClose={() => setRotateOpen(false)}
+          />
+        )}
 
         {/* Details modal */}
         {detailsData && (

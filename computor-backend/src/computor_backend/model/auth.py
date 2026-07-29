@@ -32,6 +32,14 @@ class User(Base):
     banned_at = Column(DateTime(timezone=True))
     ban_reason = Column(String(1024))
 
+    # Key version of the workspace app credential (see coder/service.py). The
+    # secret is DERIVED from TOKEN_SECRET + user id, so without a per-user
+    # input there is no way to revoke one person's without re-keying everyone.
+    # Bumping this changes their secret and nobody else's; v1 reproduces the
+    # original derivation. ``rotated_at`` is audit only.
+    workspace_app_key_version = Column(Integer, nullable=False, server_default=text("1"))
+    workspace_app_key_rotated_at = Column(DateTime(timezone=True))
+
     # Relationships
     course_members = relationship("CourseMember", foreign_keys="CourseMember.user_id", back_populates="user", uselist=True, lazy="select")
     # user can have multiple student_profiles (one per organization)

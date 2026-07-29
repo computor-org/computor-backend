@@ -513,3 +513,30 @@ class TemplateVariablesResponse(BaseModel):
     dir_name: str
     customized: bool
     variables: list[TemplateVariable] = Field(default_factory=list)
+
+
+class WorkspaceCredentialOutcome(BaseModel):
+    """What happened to one workspace when a rotated credential was pushed."""
+
+    workspace_name: str
+    success: bool = False
+    error: Optional[str] = Field(
+        None, description="Why it failed, or why it was skipped"
+    )
+
+
+class WorkspaceCredentialRotationResponse(BaseModel):
+    """Result of rotating a user's workspace app credential."""
+
+    user_id: str
+    key_version: int = Field(..., description="Key version now in effect")
+    rotated_at: Optional[datetime] = None
+    pushed: bool = Field(
+        True,
+        description="False when no push was attempted — Coder disabled, or the "
+                    "user has no Coder account. The version bump still revoked "
+                    "the old credential.",
+    )
+    outcomes: list[WorkspaceCredentialOutcome] = Field(default_factory=list)
+    succeeded: int = 0
+    failed: int = 0

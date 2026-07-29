@@ -10,6 +10,7 @@ import json
 import pytest
 
 from computor_backend.api.auth import verify_coder_access
+from computor_backend.coder.naming import encode_coder_username
 from computor_backend.permissions.principal import Principal
 
 
@@ -26,9 +27,9 @@ class _FakeRequest:
         self.url = _FakeURL(path)
 
 
-# A backend user UUID and the Coder username derived from it (u + uuid).
+# A backend user UUID and the Coder username derived from it.
 USER_UUID = "0232de59-e05d-4bc2-898f-b879c06abcde"
-USER_OWNER = "u" + USER_UUID
+USER_OWNER = encode_coder_username(USER_UUID)
 
 
 def _admin():
@@ -65,19 +66,36 @@ async def test_user_can_access_own_workspace():
 
 
 @pytest.mark.asyncio
-async def test_user_can_access_own_workspace_when_coder_truncates_username():
-    # Coder truncates long usernames; the URL owner is a prefix of the real UUID.
-    truncated = "u" + USER_UUID[:20]
-    resp = await verify_coder_access(_FakeRequest("/coder/%s/workspace/" % truncated), _user())
+async def test_user_can_access_own_workspace_by_encoded_coder_name():
+    # The form Coder actually stores: "u" + base32 of the uuid's bytes.
+    resp = await verify_coder_access(
+        _FakeRequest("/coder/%s/workspace/" % encode_coder_username(USER_UUID)), _user()
+    )
     assert resp.status_code == 200
 
 
 @pytest.mark.asyncio
 async def test_user_cannot_access_other_users_workspace():
-    other = "u" + "ffffffff-ffff-ffff-ffff-ffffffffffff"
+    other = encode_coder_username("ffffffff-ffff-ffff-ffff-ffffffffffff")
     resp = await verify_coder_access(_FakeRequest("/coder/%s/workspace/" % other), _user())
     assert resp.status_code == 403
     assert "not authorized" in _body(resp)["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_a_shared_prefix_no_longer_authorizes():
+    # Under the old truncating scheme the owner segment was compared with
+    # startswith(), so any prefix of the caller's uuid opened their workspace.
+    resp = await verify_coder_access(
+        _FakeRequest("/coder/u%s/workspace/" % USER_UUID[:20]), _user()
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_undecodable_owner_is_rejected():
+    resp = await verify_coder_access(_FakeRequest("/coder/usomebody/workspace/"), _user())
+    assert resp.status_code == 403
 
 
 @pytest.mark.asyncio
