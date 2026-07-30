@@ -19,8 +19,7 @@ watchTimer = timer( ...
     'Period', 0.5, ...
     'BusyMode', 'drop', ...
     'TimerFcn', @(~, ~) poll(), ...
-    'ErrorFcn', @(~, event) warning('figurewatch:tick', ...
-        'Figure watching hit an error: %s', event.Data.message));
+    'ErrorFcn', @(timerObject, event) shutDownAfterError(timerObject, event));
 
 watchState(struct( ...
     'Directory', directory, ...
@@ -29,6 +28,20 @@ watchState(struct( ...
 dirtyFigures(gobjects(1, 0));
 
 start(watchTimer);
+end
+
+
+function shutDownAfterError(timerObject, event)
+%SHUTDOWNAFTERERROR Give up rather than fail twice a second forever.
+%   Whatever breaks a tick will break the next one too, and a warning every
+%   half second would bury the student's own output. Publishing is a
+%   convenience; MATLAB staying usable is not.
+warning('figurewatch:tick', ...
+    'Figure publishing stopped after an error: %s', event.Data.message);
+if isvalid(timerObject)
+    stop(timerObject);
+    delete(timerObject);
+end
 end
 
 

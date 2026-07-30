@@ -28,10 +28,14 @@ git config --global user.email "${email}"
 mkdir -p "$HOME/workspace"
 
 # MATLAB drives its figure rendering through a display even when it draws
-# nothing on screen, and this container has none — offscreen export is only
-# dependable with one attached. A virtual display is enough. Exported before
-# code-server starts so its terminals, its extension host and the background
-# MATLAB the MathWorks extension launches all inherit DISPLAY (issue #279).
+# nothing on screen, so exporting a figure wants one and this container has
+# none. A virtual display covers that — but only if it actually came up.
+#
+# DISPLAY is exported LAST and only after the display answers. MATLAB ran
+# headless here for years and worked; pointing it at an X server that never
+# started is far worse than leaving it headless, because MATLAB then blocks on
+# a display that will never reply and the workspace looks dead. Losing figures
+# is survivable, losing MATLAB is not.
 FIGURES_DIR="$${COMPUTOR_FIGURES_DIR:-/tmp/computor-figures}"
 mkdir -p "$FIGURES_DIR"
 
@@ -39,15 +43,33 @@ if command -v Xvfb >/dev/null 2>&1; then
   if [ ! -e /tmp/.X11-unix/X99 ]; then
     Xvfb :99 -screen 0 1280x1024x24 -nolisten tcp >/tmp/xvfb.log 2>&1 &
   fi
-  export DISPLAY=:99
-  # MATLAB starting against a half-open display falls back to a mode where
-  # figures never render. Xvfb needs a moment; not getting there is survivable.
+
   for _ in $(seq 1 50); do
     [ -e /tmp/.X11-unix/X99 ] && break
     sleep 0.1
   done
+
+  # The socket file appears before the server is ready to answer, so ask it a
+  # question when we have something to ask with.
+  display_ready=false
+  if [ -e /tmp/.X11-unix/X99 ]; then
+    if command -v xdpyinfo >/dev/null 2>&1; then
+      xdpyinfo -display :99 >/dev/null 2>&1 && display_ready=true
+    else
+      display_ready=true
+    fi
+  fi
+
+  if [ "$display_ready" = true ]; then
+    export DISPLAY=:99
+  else
+    echo "WARNING: Xvfb did not come up; MATLAB stays headless and figures are" \
+         "not published. Xvfb log follows." >&2
+    cat /tmp/xvfb.log >&2 2>/dev/null || true
+  fi
 else
-  echo "WARNING: Xvfb is missing — MATLAB figures will not be published." >&2
+  echo "WARNING: Xvfb is missing — MATLAB stays headless and figures are not" \
+       "published." >&2
 fi
 
 # Configure and activate the Computor extension for this workspace.

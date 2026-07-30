@@ -9,12 +9,20 @@
 % including the background MATLAB that the MathWorks extension starts to run
 % and debug code, which is the session a student's plots actually come from.
 
+% COMPUTOR_FIGUREWATCH=0 turns this off without rebuilding the image — set it
+% on the workspace agent and restart. Figure publishing is a convenience;
+% being able to take it out of the way when it misbehaves is not.
 try
-    computorMatlabPath = '/opt/computor/matlab';
-    if isfolder(computorMatlabPath)
-        addpath(computorMatlabPath);
+    computorFigurewatch = getenv('COMPUTOR_FIGUREWATCH');
+    if any(strcmp(computorFigurewatch, {'0', 'false', 'off', 'no'}))
+        fprintf('Computor: figure publishing disabled by COMPUTOR_FIGUREWATCH.\n');
+    else
+        computorMatlabPath = '/opt/computor/matlab';
+        if isfolder(computorMatlabPath)
+            addpath(computorMatlabPath);
+        end
+        figurewatch.start();
     end
-    figurewatch.start();
 catch computorStartupError
     % Never let this stop MATLAB from coming up: without figures a student can
     % still write, run and debug code.
@@ -22,4 +30,4 @@ catch computorStartupError
         'Figure publishing is off: %s', computorStartupError.message);
 end
 
-clear computorMatlabPath computorStartupError
+clear computorMatlabPath computorStartupError computorFigurewatch
