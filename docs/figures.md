@@ -97,7 +97,21 @@ config from the profile directory under `IPYTHONDIR` and from nowhere else —
 there is no `/etc/ipython` search path. The startup script only writes the file
 when it is absent, so a student who edits it keeps their version.
 
-### MATLAB — `+figurewatch`
+### MATLAB — `+figurewatch` (off by default)
+
+> **Publishing from MATLAB is disabled unless `COMPUTOR_FIGUREWATCH=1` is set on
+> the workspace agent.** It has taken matlab-vscode down twice — once by
+> exporting `DISPLAY` at a virtual display that never came up, once by starving
+> the container while MATLAB ran, to the point that bash stopped echoing — and
+> none of this code has ever run under test, because no MATLAB was available to
+> run it on. The same variable gates both the virtual display and the watcher,
+> so with it unset the template behaves exactly as it did before this feature.
+> Python publishing is a different image and is unaffected.
+>
+> Turning it on is a deliberate experiment on one workspace. Watch
+> `/tmp/xvfb.log` (unbounded) and the container's CPU and memory while a script
+> with figures runs.
+
 
 [`ops/coder/templates/matlab-vscode/figures/+figurewatch`](../ops/coder/templates/matlab-vscode/figures/+figurewatch)
 watches the session's figures on a timer and mirrors them into the folder.

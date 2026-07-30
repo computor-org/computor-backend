@@ -9,13 +9,16 @@
 % including the background MATLAB that the MathWorks extension starts to run
 % and debug code, which is the session a student's plots actually come from.
 
-% COMPUTOR_FIGUREWATCH=0 turns this off without rebuilding the image — set it
-% on the workspace agent and restart. Figure publishing is a convenience;
-% being able to take it out of the way when it misbehaves is not.
+% OFF unless COMPUTOR_FIGUREWATCH says otherwise. This has taken the workspace
+% down twice and has never run under test — there is no MATLAB to test it on —
+% so switching it on is a deliberate, reversible experiment on one workspace
+% rather than a surprise for everyone. The same variable gates the virtual
+% display in the workspace startup script.
 try
-    computorFigurewatch = getenv('COMPUTOR_FIGUREWATCH');
-    if any(strcmp(computorFigurewatch, {'0', 'false', 'off', 'no'}))
-        fprintf('Computor: figure publishing disabled by COMPUTOR_FIGUREWATCH.\n');
+    computorFigurewatch = lower(strtrim(getenv('COMPUTOR_FIGUREWATCH')));
+    if ~any(strcmp(computorFigurewatch, {'1', 'true', 'on', 'yes'}))
+        % Silent: this is the normal state, and startup.m runs for every
+        % session including the extension's background MATLAB.
     else
         computorMatlabPath = '/opt/computor/matlab';
         if isfolder(computorMatlabPath)
