@@ -3,9 +3,10 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Spinner from '@/src/components/ui/Spinner';
 import Button from '@/src/components/ui/Button';
+import ProgressTrack from '@/src/components/ui/ProgressTrack';
 import { categorizeStatus } from '@/src/components/workspaces/WorkspaceStatusBadge';
+import { workspaceStage } from '@/src/components/workspaces/workspaceStage';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
@@ -162,12 +163,15 @@ function LaunchWorkspace() {
       ? terminalError
       : 'This link is missing the workspace to open.';
 
-  // A poll error clears itself on the next successful tick, so the card is not sticky.
-  const waitingMessage = !hasTarget
-    ? 'Creating your workspace…'
-    : details && categorizeStatus(details.status) === 'running'
-      ? 'Almost there — waiting for the editor…'
-      : 'Starting your workspace…';
+  // Same stage vocabulary as the workspaces list, so the row you clicked and the
+  // tab it opened describe the wait with the same words.
+  //
+  // Before the first poll lands (and while `creating` has no workspace to poll
+  // at all) there is no status to map, so the bar starts at the provisioning
+  // stage rather than at zero: the request is already in flight.
+  const stage = details
+    ? workspaceStage(details.status, undefined, details.agent_lifecycle)
+    : { percent: 15, label: hasTarget ? 'Starting' : 'Creating your workspace', tone: 'blue' as const, active: true, settled: false };
 
   useEffect(() => {
     document.title = errorMessage
@@ -189,11 +193,28 @@ function LaunchWorkspace() {
       </div>
     </div>
   ) : (
-    <div className="text-center space-y-4">
-      <Spinner label="Starting workspace" />
-      <p className="text-gray-600">{waitingMessage}</p>
-      {name && <p className="text-sm text-gray-400">{name}</p>}
-      <p className="text-xs text-gray-400 pt-2">This tab opens automatically when it is ready.</p>
+    <div className="w-full max-w-sm space-y-5" aria-live="polite">
+      <div className="space-y-1 text-center">
+        <h1 className="text-lg font-semibold text-gray-900">
+          {hasTarget ? 'Starting your workspace' : 'Creating your workspace'}
+        </h1>
+        {name && <p className="text-sm text-gray-500">{name}</p>}
+      </div>
+
+      <div className="space-y-2">
+        <ProgressTrack
+          value={stage.percent}
+          tone={stage.tone}
+          active={stage.active}
+          size="md"
+          label={`${stage.label}${name ? ` ${name}` : ''}`}
+        />
+        <p className="text-sm text-gray-600 text-center">{stage.label}…</p>
+      </div>
+
+      <p className="text-xs text-gray-400 text-center">
+        This tab opens automatically when it is ready.
+      </p>
     </div>
   );
 }

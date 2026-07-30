@@ -6,6 +6,7 @@ This router provides endpoints for on-demand workspace provisioning.
 
 import asyncio
 import logging
+import os
 import re
 from typing import Annotated, Optional
 
@@ -48,6 +49,8 @@ from computor_types.coder import (
     CoderTemplateFleetStatus,
     ImageBuildRequest,
     ProvisionResult,
+    TemplateCatalogEntry,
+    TemplateCatalogResponse,
     TemplateFile,
     TemplateFileActionResponse,
     TemplateFileUpdateRequest,
@@ -84,6 +87,7 @@ from computor_backend.business_logic.workspace_credentials import (
     rotate_workspace_app_credential,
 )
 from computor_backend.business_logic.course_workspaces import (
+    ACTIVE_BUILD_STATUSES,
     enforce_template_quota as _enforce_template_quota,
     get_disabled_template_names,
     get_member_course_template_names,
@@ -1154,6 +1158,105 @@ async def list_admin_courses(
     maintainers configure courses they are not members of. Pure DB read, so
     it works while Coder itself is disabled."""
     return list_admin_course_workspaces(permissions, db)
+
+
+@router.get(
+    "/admin/templates/catalog",
+    response_model=TemplateCatalogResponse,
+    summary="List every workspace template the deployment ships, deployed or not",
+)
+async def list_template_catalog(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    client: Annotated[CoderClient, Depends(get_coder_client)],
+    db: Annotated[Session, Depends(get_db)],
+) -> TemplateCatalogResponse:
+    """The union of the templates on disk and the templates live in Coder.
+
+    ``GET /coder/templates`` only ever shows what Coder has, which makes a
+    template nobody pushed invisible — and nothing is pushed automatically:
+    a fresh deployment starts with none, and an operator picks. This is the
+    endpoint that shows them the choice.
+
+    Requires workspace:manage.
+    """
+    _check_workspace_access(permissions, "manage")
+    try:
+        coder_templates, workspaces = await asyncio.gather(
+            client.list_templates(),
+            client.list_all_workspaces(),
+        )
+    except Exception as e:
+        raise _handle_coder_error(e) from e
+
+    workspace_counts: dict[str, int] = {}
+    running_counts: dict[str, int] = {}
+    for workspace in workspaces:
+        workspace_counts[workspace.template_id] = (
+            workspace_counts.get(workspace.template_id, 0) + 1
+        )
+        # The same rule enforce_template_quota() counts by, so the seats column
+        # shows the number the quota actually acts on.
+        status = (
+            workspace.latest_build_status.value
+            if workspace.latest_build_status
+            else ""
+        )
+        if workspace.latest_build_transition == "start" and status in ACTIVE_BUILD_STATUSES:
+            running_counts[workspace.template_id] = (
+                running_counts.get(workspace.template_id, 0) + 1
+            )
+    live_by_name = {template.name: template for template in coder_templates}
+
+    enabled_by_name = {
+        row.template_name: row.enabled
+        for row in db.query(WorkspaceTemplateSettings).all()
+    }
+    root = templates_fs.resolve_templates_root(settings.templates_dir)
+    manifests = templates_fs.discover_templates(root) if root else {}
+
+    entries: list[TemplateCatalogEntry] = []
+    for dir_name, manifest in manifests.items():
+        name = manifest.get("coder_template_name") or dir_name
+        live = live_by_name.pop(name, None)
+        entries.append(TemplateCatalogEntry(
+            dir_name=dir_name,
+            name=name,
+            display_name=manifest.get("display_name") or (live.display_name if live else None),
+            description=manifest.get("description") or (live.description if live else None),
+            icon=manifest.get("icon") or (live.icon if live else None),
+            image_name=manifest.get("image_name"),
+            deployed=live is not None,
+            template_id=live.id if live else None,
+            active_version_id=live.active_version_id if live else None,
+            enabled=enabled_by_name.get(name, True),
+            customized=templates_fs.is_customized(os.path.join(root, dir_name)),
+            workspace_count=workspace_counts.get(live.id, 0) if live else 0,
+            running_workspace_count=running_counts.get(live.id, 0) if live else 0,
+        ))
+
+    # Whatever is left is live in Coder without a directory here — still listed,
+    # since it is a template users can be on, just not one we can rebuild.
+    for name, live in live_by_name.items():
+        entries.append(TemplateCatalogEntry(
+            dir_name=None,
+            name=name,
+            display_name=live.display_name,
+            description=live.description,
+            icon=live.icon,
+            deployed=True,
+            template_id=live.id,
+            active_version_id=live.active_version_id,
+            enabled=enabled_by_name.get(name, True),
+            workspace_count=workspace_counts.get(live.id, 0),
+            running_workspace_count=running_counts.get(live.id, 0),
+        ))
+
+    entries.sort(key=lambda entry: (entry.display_name or entry.name).lower())
+    return TemplateCatalogResponse(
+        templates=entries,
+        templates_dir_available=root is not None,
+    )
 
 
 @router.get(

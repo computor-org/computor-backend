@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import FormPanel, { Field } from '@/src/components/FormPanel';
@@ -22,7 +23,13 @@ function derivedName(template: string): string {
   return template.replace(/-workspace$/, '').replace(/[^a-z0-9-]/g, '') || 'workspace';
 }
 
-function CreateWorkspaceForm({ allowCustomName }: { allowCustomName: boolean }) {
+function CreateWorkspaceForm({
+  allowCustomName,
+  isMaintainer,
+}: {
+  allowCustomName: boolean;
+  isMaintainer: boolean;
+}) {
   const router = useRouter();
   const notify = useNotify();
   const preselected = useSearchParam('template');
@@ -105,7 +112,28 @@ function CreateWorkspaceForm({ allowCustomName }: { allowCustomName: boolean }) 
         {templatesLoading ? (
           <p className="text-sm text-gray-400">Loading templates…</p>
         ) : (
-          <TemplatePicker templates={templates} value={template} onChange={setTemplate} />
+          <TemplatePicker
+            templates={templates}
+            value={template}
+            onChange={setTemplate}
+            emptyHint={
+              isMaintainer ? (
+                <p>
+                  Templates are not deployed automatically — pick which ones this deployment
+                  offers under{' '}
+                  <Link
+                    href="/workspaces/admin?tab=templates"
+                    className="text-blue-600 hover:underline"
+                  >
+                    Administration → Templates
+                  </Link>
+                  .
+                </p>
+              ) : (
+                <p>If this does not resolve itself, contact your administrator.</p>
+              )
+            }
+          />
         )}
       </Field>
 
@@ -149,7 +177,10 @@ export default function CreateWorkspacePage() {
   return (
     <AuthenticatedLayout>
       <Suspense>
-        <CreateWorkspaceForm allowCustomName={isWorkspaceMaintainer} />
+        <CreateWorkspaceForm
+          allowCustomName={isWorkspaceMaintainer}
+          isMaintainer={isWorkspaceMaintainer}
+        />
       </Suspense>
     </AuthenticatedLayout>
   );

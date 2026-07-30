@@ -33,7 +33,10 @@ export default function WorkspacesPage() {
   );
   const workspaces = data ?? [];
   const runningCount = workspaces.filter(
-    (ws) => categorizeStatus(ws.latest_build_status) === 'running',
+    (ws) => categorizeStatus(ws.latest_build_status, ws.latest_build_transition) === 'running',
+  ).length;
+  const busyCount = workspaces.filter(
+    (ws) => categorizeStatus(ws.latest_build_status, ws.latest_build_transition) === 'pending',
   ).length;
 
   // Coder health for the status strip (no polling — cheap indicator only).
@@ -103,6 +106,14 @@ export default function WorkspacesPage() {
           </span>
           <span className="text-gray-300">·</span>
           <span>{loading ? '—' : `${runningCount} running / ${workspaces.length} total`}</span>
+          {busyCount > 0 && (
+            <>
+              <span className="text-gray-300">·</span>
+              <span className="text-blue-700">
+                {busyCount} {busyCount === 1 ? 'workspace is' : 'workspaces are'} still working
+              </span>
+            </>
+          )}
         </div>
 
         {loading ? (

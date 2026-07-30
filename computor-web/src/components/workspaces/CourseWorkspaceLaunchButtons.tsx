@@ -6,6 +6,9 @@ import { useResource } from '@/src/hooks/useResource';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import Button from '@/src/components/ui/Button';
 import TemplateIcon from '@/src/components/workspaces/TemplateIcon';
+import WorkspaceStatusBadge, {
+  categorizeStatus,
+} from '@/src/components/workspaces/WorkspaceStatusBadge';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { CourseWorkspacesClient } from '@/src/clients/CourseWorkspacesClient';
 import {
@@ -178,9 +181,21 @@ export default function CourseWorkspaceLaunchButtons({
                     {w.template_display_name || w.template_name}
                   </span>
                 </div>
-                <Button size="xs" variant="secondary" onClick={() => openExisting(w)}>
-                  Open
-                </Button>
+                <div className="flex shrink-0 items-center gap-2">
+                  {/*
+                    A badge, not a progress bar: this widget takes one snapshot
+                    and never polls, so a bar would animate without ever moving.
+                  */}
+                  <WorkspaceStatusBadge
+                    status={w.latest_build_status}
+                    transition={w.latest_build_transition}
+                  />
+                  <Button size="xs" variant="secondary" onClick={() => openExisting(w)}>
+                    {categorizeStatus(w.latest_build_status, w.latest_build_transition) === 'running'
+                      ? 'Open'
+                      : 'Start'}
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>

@@ -4,47 +4,65 @@ import { useMemo, useState } from 'react';
 import { ScrollPanel, ListLoading } from '@/src/components/ListPageLayout';
 import { useResource } from '@/src/hooks/useResource';
 import ErrorBanner from '@/src/components/ErrorBanner';
+import Badge from '@/src/components/Badge';
 import Button, { ButtonLink } from '@/src/components/ui/Button';
+import Toggle from '@/src/components/ui/Toggle';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { CoderClient } from '@/src/clients/CoderClient';
-import { WorkspaceBuildStatus } from '@/src/types/workspaces';
-import type { CoderWorkspace, WorkspaceTemplateSettings } from '@/src/types/workspaces';
+import { TaskStatus } from '@/src/types/workspaces';
+import type {
+  TemplateCatalogEntry,
+  WorkspaceTemplateSettings,
+} from '@/src/types/workspaces';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/src/components/ui/Table';
+import TemplateIcon from './TemplateIcon';
+import TemplateTaskProgress from './TemplateTaskProgress';
 
 const coderClient = new CoderClient();
 
-/** Builds counted against a template's seat quota (mirrors the backend). */
-const ACTIVE_BUILD_STATUSES = new Set<WorkspaceBuildStatus>([
-  WorkspaceBuildStatus.PENDING,
-  WorkspaceBuildStatus.STARTING,
-  WorkspaceBuildStatus.RUNNING,
-  WorkspaceBuildStatus.SUCCEEDED,
+const TERMINAL = new Set<TaskStatus>([
+  TaskStatus.FINISHED,
+  TaskStatus.FAILED,
+  TaskStatus.CANCELLED,
 ]);
 
-function isActive(workspace: CoderWorkspace): boolean {
-  return (
-    workspace.latest_build_transition === 'start' &&
-    workspace.latest_build_status != null &&
-    ACTIVE_BUILD_STATUSES.has(workspace.latest_build_status)
-  );
+/** What an admin has to do next to make this template usable, if anything. */
+function availability(template: TemplateCatalogEntry): { label: string; color: 'green' | 'gray' | 'yellow' } {
+  if (!template.deployed) return { label: 'Not deployed', color: 'gray' };
+  if (!template.enabled) return { label: 'Disabled', color: 'yellow' };
+  return { label: 'Available', color: 'green' };
 }
 
-/** Per-template resource limits + seat quota overview, linking to the editor. */
+/** A template can only be built if this deployment ships its directory. */
+function isDeployable(template: TemplateCatalogEntry): boolean {
+  return !template.deployed && Boolean(template.dir_name);
+}
+
+/**
+ * The template catalog: everything the deployment ships, deployed or not, with
+ * the two switches that decide whether a user can pick it — is its image built
+ * and pushed to Coder, and is it enabled.
+ *
+ * This is where which templates a deployment offers gets decided, including the
+ * first time. Nothing is deployed automatically: building every shipped image
+ * is tens of gigabytes, and a site that only teaches Python should not wait on
+ * MATLAB to find that out. So a fresh system arrives with an empty Coder and
+ * this list of candidates, and someone picks.
+ */
 export default function WorkspaceTemplatesPanel() {
   const notify = useNotify();
   const [toggling, setToggling] = useState<string | null>(null);
-  const { data, loading, error, reload } = useResource(
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [submitting, setSubmitting] = useState(false);
+
+  const { data, loading, error, reload, refresh } = useResource(
     async () => {
-      const [templates, settings, workspaces] = await Promise.all([
-        coderClient.listTemplates(),
+      const [catalog, settings, tasks] = await Promise.all([
+        coderClient.listTemplateCatalog(),
         coderClient.listTemplateSettings(),
-        coderClient.listAllWorkspaces(),
+        coderClient.listAdminTasks(5),
       ]);
-      return {
-        templates: templates.templates,
-        settings: settings.settings,
-        workspaces: workspaces.workspaces,
-      };
+      return { catalog, settings: settings.settings, tasks: tasks.tasks };
     },
     [],
     { refetchInterval: 5000 },
@@ -54,16 +72,32 @@ export default function WorkspaceTemplatesPanel() {
     () => new Map((data?.settings ?? []).map((row) => [row.template_name, row])),
     [data],
   );
-  const runningByTemplate = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const workspace of data?.workspaces ?? []) {
-      if (!workspace.template_name || !isActive(workspace)) continue;
-      counts.set(workspace.template_name, (counts.get(workspace.template_name) ?? 0) + 1);
-    }
-    return counts;
-  }, [data]);
 
-  const templates = data?.templates ?? [];
+  const templates = useMemo(() => data?.catalog.templates ?? [], [data]);
+  const deployable = useMemo(() => templates.filter(isDeployable), [templates]);
+  const nothingDeployed = templates.length > 0 && templates.every((t) => !t.deployed);
+
+  // A deploy is a build+push like any other, so the fleet's task feed already
+  // reports it — surfacing it here means whoever deploys a template from this
+  // tab watches it finish here instead of guessing or switching tabs.
+  const activeTask = (data?.tasks ?? []).find((task) => !TERMINAL.has(task.status)) ?? null;
+  const busy = Boolean(activeTask) || submitting;
+
+  // Only ever holds deployable names, so a refresh that flips one to deployed
+  // (or a stale tick) can never leave it selected for a second build.
+  const selectedNames = useMemo(
+    () => deployable.filter((t) => selected.has(t.name)),
+    [deployable, selected],
+  );
+
+  function toggleSelected(name: string) {
+    setSelected((previous) => {
+      const next = new Set(previous);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
 
   // The settings PUT is a full replace, so the toggle re-sends the row's
   // current values (or the defaults when no row exists) with enabled flipped.
@@ -88,17 +122,104 @@ export default function WorkspaceTemplatesPanel() {
     }
   }
 
+  /** Build these templates' images and push them, making them selectable. */
+  async function deploy(entries: TemplateCatalogEntry[]) {
+    // The build activity resolves against the DIRECTORY name, not Coder's.
+    const dirs = entries.map((entry) => entry.dir_name).filter((dir): dir is string => Boolean(dir));
+    if (dirs.length === 0) return;
+    setSubmitting(true);
+    try {
+      await coderClient.pushTemplates({ templates: dirs, build_images: true });
+      notify(
+        dirs.length === 1
+          ? `Building ${entries[0].display_name || entries[0].name} — this takes a few minutes.`
+          : `Building ${dirs.length} templates — this takes a few minutes.`,
+        'success',
+      );
+      setSelected(new Set());
+      await refresh();
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Failed to start the build', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <>
       <ErrorBanner>{error}</ErrorBanner>
 
-      <p className="shrink-0 text-sm text-gray-500">
-        Per-template container resource limits, running-workspace seat quotas, and Terraform
-        configuration. Limits and variable changes apply at the next{' '}
-        <span className="font-medium">Build &amp; push</span> (Fleet tab); seat quotas apply
-        immediately. Disabled templates are hidden from users and courses and cannot be
-        provisioned; running workspaces keep working.
-      </p>
+      <div className="shrink-0 space-y-2">
+        <p className="text-sm text-gray-500">
+          Every workspace template this deployment ships. A template is offered to users once it
+          is <span className="font-medium">deployed</span> (its image is built and pushed to
+          Coder) and <span className="font-medium">enabled</span>; disabling one hides it from
+          users and courses without touching the workspaces already running on it. Resource
+          limits and Terraform variables apply at the next build; seat quotas apply immediately.
+        </p>
+        {data && !data.catalog.templates_dir_available && (
+          <p className="text-sm text-amber-700">
+            The templates directory is not readable from the backend
+            (CODER_TEMPLATES_DIR), so only templates already in Coder are listed — nothing new
+            can be deployed from here.
+          </p>
+        )}
+      </div>
+
+      {/*
+        First run. Nothing is deployed automatically, so a fresh system lands
+        here with an empty Coder — say so plainly and put the choice in reach,
+        rather than leaving a table of "Not deployed" rows to be interpreted.
+      */}
+      {nothingDeployed && !activeTask && (
+        <div className="shrink-0 rounded-lg border border-blue-200 bg-blue-50 p-4">
+          <h3 className="text-sm font-semibold text-gray-900">
+            No workspace templates are deployed yet
+          </h3>
+          <p className="mt-1 text-sm text-gray-600">
+            Pick the ones this deployment should offer and deploy them — each builds a
+            container image, which takes a few minutes and a few gigabytes, so it is worth
+            choosing only what you need. You can come back and deploy more at any time.
+          </p>
+        </div>
+      )}
+
+      {activeTask && (
+        <div className="shrink-0">
+          <TemplateTaskProgress task={activeTask} />
+        </div>
+      )}
+
+      {deployable.length > 0 && (
+        <div className="shrink-0 flex flex-wrap items-center gap-3">
+          <Button
+            disabled={busy || selectedNames.length === 0}
+            loading={submitting}
+            loadingLabel="Starting…"
+            title={
+              selectedNames.length === 0
+                ? 'Select at least one undeployed template'
+                : undefined
+            }
+            onClick={() => deploy(selectedNames)}
+          >
+            Deploy selected ({selectedNames.length})
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={busy}
+            onClick={() => deploy(deployable)}
+            title="Build and push every template this deployment ships"
+          >
+            Deploy all ({deployable.length})
+          </Button>
+          {activeTask && (
+            <span className="text-sm text-gray-500">
+              A build is already running — wait for it to finish.
+            </span>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <ListLoading>Loading templates…</ListLoading>
@@ -107,39 +228,105 @@ export default function WorkspaceTemplatesPanel() {
           <Table>
             <Thead>
               <tr>
+                <Th className="w-10">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all undeployed templates"
+                    disabled={deployable.length === 0}
+                    checked={
+                      deployable.length > 0 && selectedNames.length === deployable.length
+                    }
+                    onChange={(event) =>
+                      setSelected(
+                        event.target.checked
+                          ? new Set(deployable.map((entry) => entry.name))
+                          : new Set(),
+                      )
+                    }
+                  />
+                </Th>
                 <Th>Template</Th>
+                <Th>State</Th>
                 <Th>Enabled</Th>
+                <Th>Workspaces</Th>
                 <Th>Memory cap</Th>
                 <Th>CPU shares</Th>
                 <Th>Seats (running / max)</Th>
-                <Th>Extra variables</Th>
                 <Th className="text-right">Actions</Th>
               </tr>
             </Thead>
             <Tbody>
               {templates.map((template) => {
                 const settings = settingsByName.get(template.name);
-                const enabled = settings?.enabled ?? true;
-                const running = runningByTemplate.get(template.name) ?? 0;
-                const extraCount = Object.keys(settings?.template_variables ?? {}).length;
+                const state = availability(template);
+                const dimmed = !template.deployed || !template.enabled;
                 return (
-                  <Tr key={template.id} className={`hover:bg-gray-50 ${enabled ? '' : 'opacity-60'}`}>
+                  <Tr key={template.name} className={`hover:bg-gray-50 ${dimmed ? 'opacity-70' : ''}`}>
                     <Td>
-                      <div className="text-sm font-medium text-gray-900">
-                        {template.display_name || template.name}
+                      {/* Only undeployed templates are deploy targets, so only
+                          they are selectable — the rest have no action here. */}
+                      {isDeployable(template) && (
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${template.display_name || template.name}`}
+                          checked={selected.has(template.name)}
+                          onChange={() => toggleSelected(template.name)}
+                        />
+                      )}
+                    </Td>
+                    <Td>
+                      <div className="flex items-start gap-3">
+                        <TemplateIcon template={template} size="sm" />
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-gray-900">
+                            {template.display_name || template.name}
+                          </div>
+                          <div className="text-xs text-gray-500">{template.name}</div>
+                          {template.description && (
+                            <div className="text-xs text-gray-400 mt-0.5 max-w-md">
+                              {template.description}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-500">{template.name}</div>
                     </Td>
                     <Td>
-                      <Button
-                        size="xs"
-                        variant={enabled ? 'secondary' : 'primary'}
-                        disabled={toggling === template.name}
-                        onClick={() => toggleEnabled(template.name, settings)}
-                      >
-                        {enabled ? 'Disable' : 'Enable'}
-                      </Button>
+                      <div className="flex flex-col items-start gap-1">
+                        <Badge color={state.color} pill>{state.label}</Badge>
+                        {template.customized && (
+                          <Badge color="blue" title="Edited on disk; no longer re-synced from the repo">
+                            customized
+                          </Badge>
+                        )}
+                        {!template.dir_name && (
+                          <span className="text-xs text-gray-400">no template directory</span>
+                        )}
+                      </div>
                     </Td>
+                    <Td>
+                      {/*
+                        No switch until the template is deployed. A template with
+                        no settings row counts as enabled, so a disabled switch
+                        would sit here in the ON position for something users
+                        cannot pick — claiming the opposite of the truth.
+                      */}
+                      {template.deployed ? (
+                        <Toggle
+                          checked={template.enabled}
+                          busy={toggling === template.name}
+                          label={`${template.display_name || template.name} available to users`}
+                          onChange={() => toggleEnabled(template.name, settings)}
+                        />
+                      ) : (
+                        <span
+                          className="text-sm text-gray-400"
+                          title="Deploy the template before it can be offered to users"
+                        >
+                          —
+                        </span>
+                      )}
+                    </Td>
+                    <Td className="text-sm text-gray-700">{template.workspace_count}</Td>
                     <Td className="text-sm text-gray-700">
                       {settings?.memory_mb ? `${settings.memory_mb} MiB` : 'Unlimited'}
                     </Td>
@@ -147,20 +334,33 @@ export default function WorkspaceTemplatesPanel() {
                       {settings?.cpu_shares ? settings.cpu_shares : 'Default'}
                     </Td>
                     <Td className="text-sm text-gray-700">
-                      {running} / {settings?.max_running_workspaces ?? '∞'}
-                    </Td>
-                    <Td className="text-sm text-gray-700">
-                      {extraCount > 0 ? extraCount : '—'}
+                      {template.running_workspace_count} / {settings?.max_running_workspaces ?? '∞'}
                     </Td>
                     <Td>
-                      <div className="flex justify-end">
-                        <ButtonLink
-                          href={`/workspaces/admin/templates/${encodeURIComponent(template.name)}`}
-                          size="xs"
-                          variant="secondary"
-                        >
-                          Configure
-                        </ButtonLink>
+                      <div className="flex justify-end gap-2">
+                        {isDeployable(template) && (
+                          <Button
+                            size="xs"
+                            disabled={busy}
+                            title={
+                              busy
+                                ? 'Another template operation is running'
+                                : 'Build the image and push the template to Coder'
+                            }
+                            onClick={() => deploy([template])}
+                          >
+                            Deploy
+                          </Button>
+                        )}
+                        {template.dir_name && (
+                          <ButtonLink
+                            href={`/workspaces/admin/templates/${encodeURIComponent(template.name)}`}
+                            size="xs"
+                            variant="secondary"
+                          >
+                            Configure
+                          </ButtonLink>
+                        )}
                       </div>
                     </Td>
                   </Tr>
@@ -168,7 +368,7 @@ export default function WorkspaceTemplatesPanel() {
               })}
               {templates.length === 0 && (
                 <Tr>
-                  <Td colSpan={7} className="py-8 text-center text-sm text-gray-500">
+                  <Td colSpan={9} className="py-8 text-center text-sm text-gray-500">
                     No templates.
                   </Td>
                 </Tr>

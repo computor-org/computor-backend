@@ -479,11 +479,8 @@ function LecturerWorkspacesContent() {
                         </Td>
                         <Td>
                           <WorkspaceStatusBadge
-                            status={
-                              w.latest_build_transition === 'stop'
-                                ? 'stopped'
-                                : w.latest_build_status
-                            }
+                            status={w.latest_build_status}
+                            transition={w.latest_build_transition}
                           />
                         </Td>
                         <Td>

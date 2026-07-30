@@ -28,16 +28,20 @@ export default function Badge({
   color = 'gray',
   pill = false,
   className = '',
+  title,
   children,
 }: {
   color?: BadgeColor;
   /** Pills for live statuses (running/active), squares for classifications. */
   pill?: boolean;
   className?: string;
+  /** Hover explanation for a badge whose one-word label needs one. */
+  title?: string;
   children: ReactNode;
 }) {
   return (
     <span
+      title={title}
       className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${
         pill ? 'rounded-full' : 'rounded'
       } ${COLOR_CLS[color]} ${className}`}

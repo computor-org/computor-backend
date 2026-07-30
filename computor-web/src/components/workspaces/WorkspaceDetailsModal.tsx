@@ -1,7 +1,9 @@
 'use client';
 
 import Modal from '@/src/components/Modal';
+import ProgressTrack from '@/src/components/ui/ProgressTrack';
 import WorkspaceStatusBadge from './WorkspaceStatusBadge';
+import { workspaceStage } from './workspaceStage';
 import type { WorkspaceDetails } from '@/src/types/workspaces';
 
 /** Read-only workspace details (status, URLs, ids) in a modal. */
@@ -13,6 +15,9 @@ export default function WorkspaceDetailsModal({
   onClose: () => void;
 }) {
   const ws = details.workspace;
+  // The details endpoint knows the agent's lifecycle, so this is the one place
+  // that can tell "the build is up" from "the editor is actually reachable".
+  const stage = workspaceStage(details.status, undefined, details.agent_lifecycle);
   return (
     <Modal title="Workspace Details" onClose={onClose} maxWidth="max-w-lg">
       <div className="p-6 pt-4 max-h-[80vh] overflow-y-auto scroll-slim">
@@ -24,8 +29,23 @@ export default function WorkspaceDetailsModal({
                 <td className="py-2 text-gray-900">{ws.name}</td>
               </tr>
               <tr>
-                <td className="py-2 font-medium text-gray-600 pr-4">Status</td>
-                <td className="py-2"><WorkspaceStatusBadge status={details.status} /></td>
+                <td className="py-2 font-medium text-gray-600 pr-4 align-top">Status</td>
+                <td className="py-2">
+                  <div className="space-y-1.5">
+                    <WorkspaceStatusBadge status={details.status} />
+                    {!stage.settled && (
+                      <>
+                        <ProgressTrack
+                          value={stage.percent}
+                          tone={stage.tone}
+                          active={stage.active}
+                          label={`${stage.label} ${ws.name}`}
+                        />
+                        <p className="text-xs text-gray-500">{stage.label}…</p>
+                      </>
+                    )}
+                  </div>
+                </td>
               </tr>
               <tr>
                 <td className="py-2 font-medium text-gray-600 pr-4">Template</td>

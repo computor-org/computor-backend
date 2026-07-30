@@ -212,6 +212,12 @@ cmd_up() {
         # template changes actually propagate; dirs WITHOUT the marker (operator-
         # customized, or seeded before markers existed) are never touched — delete
         # such a dir once to adopt syncing.
+        #
+        # EVERY template is seeded, whether or not this deployment intends to
+        # offer it. Seeding is a few kilobytes per directory; what costs anything
+        # is BUILDING the image, and nothing is built here — an admin picks which
+        # templates to deploy in the Templates tab, which can only offer what is
+        # already on disk.
         if [ -d "${OPS_DIR}/coder/templates" ]; then
             log "  ${GREEN}Seeding Coder templates...${NC}"
             for tpl_dir in "${OPS_DIR}/coder/templates"/*/; do

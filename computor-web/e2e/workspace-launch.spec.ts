@@ -108,8 +108,8 @@ test('waits while the agent is still starting, then opens when it reports ready'
 
   await page.goto('/workspaces/launch?owner=u-me&name=code');
 
-  // It must hold on the spinner while not ready...
-  await expect(page.getByText('Almost there — waiting for the editor…')).toBeVisible();
+  // It must hold on the progress view while not ready...
+  await expect(page.getByText('Preparing the editor…')).toBeVisible();
   expect(page.url()).not.toContain('8080');
 
   // A transient launch tab, not an app page: no sidebar/topbar chrome.
@@ -125,7 +125,10 @@ test('does not redirect while the workspace is merely running', async ({ page })
   await setup(page, [details({ status: 'running', lifecycle: 'starting', ready: false })]);
 
   await page.goto('/workspaces/launch?owner=u-me&name=code');
-  await expect(page.getByText('Almost there — waiting for the editor…')).toBeVisible();
+  await expect(page.getByText('Preparing the editor…')).toBeVisible();
+  // The bar reports the stage, not just "busy" — the build is up (so it is past
+  // the provisioning stages) but the agent has not reported ready.
+  await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '80');
 
   await page.waitForTimeout(5_000);
   expect(page.url()).toContain('/workspaces/launch');

@@ -346,6 +346,66 @@ class CoderAdminTaskListResponse(BaseModel):
     tasks: list[TaskInfo] = Field(default_factory=list)
 
 
+# Template catalog: what the deployment COULD offer, not just what it does
+
+
+class TemplateCatalogEntry(BaseModel):
+    """One workspace template as it exists on disk, plus its live state.
+
+    The catalog is the union of the template directories shipped with the
+    deployment and the templates Coder actually has. A directory that was
+    never pushed still appears here (``deployed=False``) — that is the whole
+    point: an admin has to be able to see and deploy a template the first
+    startup deliberately skipped.
+    """
+
+    dir_name: Optional[str] = Field(
+        None,
+        description="Template directory name (e.g. 'vscode'); null for a "
+                    "template that is live in Coder but has no directory here "
+                    "(pushed by hand, or its directory was removed) — such a "
+                    "template cannot be rebuilt from this deployment.",
+    )
+    name: str = Field(..., description="Coder template name (e.g. 'vscode-workspace')")
+    display_name: Optional[str] = Field(None, description="Human-readable name")
+    description: Optional[str] = Field(None, description="What the template offers")
+    icon: Optional[str] = Field(None, description="Coder icon path or absolute URL")
+    image_name: Optional[str] = Field(None, description="Docker image the template builds")
+    deployed: bool = Field(
+        False, description="Whether Coder currently has this template"
+    )
+    template_id: Optional[str] = Field(None, description="Coder template ID when deployed")
+    active_version_id: Optional[str] = Field(None, description="Active version when deployed")
+    enabled: bool = Field(
+        True,
+        description="Whether users may provision it (a template with no settings "
+                    "row is enabled). Independent of deployed: disabling hides a "
+                    "live template, deploying a disabled one keeps it hidden.",
+    )
+    customized: bool = Field(
+        False,
+        description="Operator-edited on disk, so no longer re-synced from the repo",
+    )
+    workspace_count: int = Field(0, description="Workspaces currently on this template")
+    running_workspace_count: int = Field(
+        0,
+        description="Workspaces of this template counting against its seat quota "
+                    "— the same rule the quota itself enforces (a start build in "
+                    "an active state).",
+    )
+
+
+class TemplateCatalogResponse(BaseModel):
+    """Every workspace template the deployment ships, deployed or not."""
+
+    templates: list[TemplateCatalogEntry] = Field(default_factory=list)
+    templates_dir_available: bool = Field(
+        True,
+        description="False when the backend cannot read the templates directory, "
+                    "in which case only already-deployed templates are listed.",
+    )
+
+
 # Workspace volumes (home + scratch), managed through the coder worker
 
 class WorkspaceVolume(BaseModel):
