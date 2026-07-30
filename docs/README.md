@@ -13,6 +13,7 @@ Coder workspace integration.
 | **[backend-patterns.md](backend-patterns.md)** | The three patterns the backend is built on: EntityInterface/DTOs, RBAC permissions, and Temporal workflows. |
 | **[git-integration.md](git-integration.md)** | How a course connects to git — in-system Forgejo vs. external GitLab, delivery modes, and configuring it from a deployment file. |
 | **[service-accounts.md](service-accounts.md)** | Machine identities — testing systems, integrations and AI agents: how to add one, the `meta.yaml`↔slug binding, API tokens and what their scopes do (and don't) restrict. |
+| **[figures.md](figures.md)** | How plots reach a student in a workspace that has no desktop: the figure-folder contract, the matplotlib backend, MATLAB's `+figurewatch`, and the viewer. |
 | **[../ops/docs/SELF_UPDATE.md](../ops/docs/SELF_UPDATE.md)** | One-click system updates from the admin UI (System → Updates) or `./computor.sh update` — config, update flow, rollback, and the rules that keep changes update-friendly. |
 
 New here? Read them in that order. For a specific task, jump straight to the relevant doc.

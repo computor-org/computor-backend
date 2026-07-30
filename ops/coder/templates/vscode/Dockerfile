@@ -77,6 +77,25 @@ RUN mkdir -p /opt/code-server/extensions \
 # Allow pip to install packages system-wide
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
+# Plotting. There is no desktop in this container, so no matplotlib GUI
+# backend can work: a student running `python task.py` in the terminal would
+# get nothing from plt.show(). computor_figures renders with Agg and publishes
+# each figure into COMPUTOR_FIGURES_DIR, where the Computor extension picks it
+# up. See docs/figures.md.
+RUN pip install --no-cache-dir matplotlib ipykernel
+
+COPY figures/computor_figures.py /tmp/computor_figures.py
+RUN python3 -c "import shutil, sysconfig; shutil.copy('/tmp/computor_figures.py', sysconfig.get_paths()['purelib'])" \
+    && rm /tmp/computor_figures.py
+
+ENV COMPUTOR_FIGURES_DIR=/tmp/computor-figures \
+    MPLBACKEND=module://computor_figures
+
+# Notebooks keep their inline plots — see the IPython profile the startup
+# script writes. It cannot be baked in here: IPython reads config from the
+# profile directory under IPYTHONDIR and from nowhere else, so it has to be
+# written into the user's home at start.
+
 # Copy VSIX from builder stage
 COPY --from=vsix-builder --chown=coder:coder /tmp/extension.vsix /opt/code-server/extension.vsix
 

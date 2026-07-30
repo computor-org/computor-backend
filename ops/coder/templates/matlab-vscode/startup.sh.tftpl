@@ -27,6 +27,29 @@ git config --global user.name "${full_name}"
 git config --global user.email "${email}"
 mkdir -p "$HOME/workspace"
 
+# MATLAB drives its figure rendering through a display even when it draws
+# nothing on screen, and this container has none — offscreen export is only
+# dependable with one attached. A virtual display is enough. Exported before
+# code-server starts so its terminals, its extension host and the background
+# MATLAB the MathWorks extension launches all inherit DISPLAY (issue #279).
+FIGURES_DIR="$${COMPUTOR_FIGURES_DIR:-/tmp/computor-figures}"
+mkdir -p "$FIGURES_DIR"
+
+if command -v Xvfb >/dev/null 2>&1; then
+  if [ ! -e /tmp/.X11-unix/X99 ]; then
+    Xvfb :99 -screen 0 1280x1024x24 -nolisten tcp >/tmp/xvfb.log 2>&1 &
+  fi
+  export DISPLAY=:99
+  # MATLAB starting against a half-open display falls back to a mode where
+  # figures never render. Xvfb needs a moment; not getting there is survivable.
+  for _ in $(seq 1 50); do
+    [ -e /tmp/.X11-unix/X99 ] && break
+    sleep 0.1
+  done
+else
+  echo "WARNING: Xvfb is missing — MATLAB figures will not be published." >&2
+fi
+
 # Configure and activate the Computor extension for this workspace.
 mkdir -p "$HOME/.computor"
 cat > "$HOME/.computor/config.json" <<COMPUTOR_EOF

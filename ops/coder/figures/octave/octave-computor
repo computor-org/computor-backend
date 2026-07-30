@@ -1,0 +1,56 @@
+#!/bin/sh
+# Octave shim: publish a script's figures to the Computor figure folder.
+#
+# Octave offers no hook that runs while a script's figures still hold their
+# content -- atexit and onCleanup both run after the graphics are torn down,
+# plotting never routes through the m-file drawnow, and newplot wipes any
+# listener put on an axes. An interactive session is fine (computor_figures
+# publishes from add_input_event_hook), but `octave task.m` needs the sync to
+# come from outside the script. That is this shim's whole job, so a student
+# still configures nothing.
+#
+# Install it as `octave` ahead of the real one on PATH and point
+# COMPUTOR_OCTAVE_REAL at the real binary. See docs/figures.md.
+
+set -e
+
+REAL="${COMPUTOR_OCTAVE_REAL:-octave.real}"
+
+# Nothing to publish into: stay out of the way entirely.
+if [ -z "${COMPUTOR_FIGURES_DIR:-}" ]; then
+    exec "$REAL" "$@"
+fi
+
+# Find the script to run: the last plain argument that names a readable file.
+# Anything else -- interactive use, --eval, --help, a missing file -- is passed
+# straight through, and interactive sessions publish on their own anyway.
+script=""
+for argument in "$@"; do
+    case "$argument" in
+        -*) ;;
+        *) if [ -f "$argument" ]; then script="$argument"; fi ;;
+    esac
+done
+
+if [ -z "$script" ]; then
+    exec "$REAL" "$@"
+fi
+
+# Everything before the script keeps its meaning; --eval replaces the script
+# argument, because Octave rejects the two together.
+options=""
+for argument in "$@"; do
+    if [ "$argument" = "$script" ]; then
+        continue
+    fi
+    options="$options $argument"
+done
+
+# Single-quote the path for Octave, doubling any quote it contains.
+quoted=$(printf '%s' "$script" | sed "s/'/''/g")
+
+# `run` so the script keeps seeing its own directory. The sync is wrapped
+# because a failing publish must never change what the student's script
+# returned -- and unwind_protect keeps it running even when the script errors.
+# shellcheck disable=SC2086
+exec "$REAL" $options --eval "unwind_protect, run('$quoted'); unwind_protect_cleanup, try, computor_figures('sync'); catch, end, end_unwind_protect"

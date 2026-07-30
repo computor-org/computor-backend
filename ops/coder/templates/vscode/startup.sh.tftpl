@@ -21,6 +21,27 @@ git config --global user.email "${email}"
 # Create default workspace folder
 mkdir -p ~/workspace
 
+# Where matplotlib publishes figures and the Computor extension reads them
+# from (issue #279). Created up front so both sides find it owned by coder.
+mkdir -p "$${COMPUTOR_FIGURES_DIR:-/tmp/computor-figures}"
+
+# Notebooks keep their inline plots. MPLBACKEND sends a terminal run to the
+# figure folder, but a notebook cell should still render its plot under the
+# cell. IPKernelApp.matplotlib is scoped to that one application, so it
+# redirects Jupyter kernels only — plain python and terminal IPython stay on
+# the figure folder. This cannot live in the image: IPython reads config from
+# the profile directory and nowhere else (there is no /etc/ipython). Written
+# only when absent, so a student who edits it keeps their version.
+IPYTHON_PROFILE="$HOME/.ipython/profile_default"
+mkdir -p "$IPYTHON_PROFILE"
+if [ ! -f "$IPYTHON_PROFILE/ipython_config.py" ]; then
+  cat > "$IPYTHON_PROFILE/ipython_config.py" <<'IPYTHON_EOF'
+# Computor: render notebook plots under the cell rather than publishing them
+# to the figure folder. See docs/figures.md.
+c.IPKernelApp.matplotlib = "inline"
+IPYTHON_EOF
+fi
+
 # Create Computor extension config directory and file
 mkdir -p ~/.computor
 cat > ~/.computor/config.json << COMPUTOR_EOF
