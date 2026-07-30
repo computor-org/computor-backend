@@ -9,16 +9,22 @@
 % including the background MATLAB that the MathWorks extension starts to run
 % and debug code, which is the session a student's plots actually come from.
 
-% OFF unless COMPUTOR_FIGUREWATCH says otherwise. This has taken the workspace
-% down twice and has never run under test — there is no MATLAB to test it on —
-% so switching it on is a deliberate, reversible experiment on one workspace
-% rather than a surprise for everyone. The same variable gates the virtual
-% display in the workspace startup script.
+% There is no graphics card in a container, so MATLAB announces that it has
+% "disabled some advanced graphics rendering features by switching to software
+% OpenGL" the first time anything draws. Software rendering is the only mode
+% this image can run in, figures export from it perfectly well, and the link
+% the message offers leads to advice about display drivers that nobody here
+% can act on — so it is silenced rather than left to alarm students.
+warning('off', 'MATLAB:hg:AutoSoftwareOpenGL');
+
+% COMPUTOR_FIGUREWATCH=0 turns publishing off, for the workspace where it turns
+% out to be the problem rather than the fix. Anything else, including unset,
+% leaves it on.
 try
-    computorFigurewatch = lower(strtrim(getenv('COMPUTOR_FIGUREWATCH')));
-    if ~any(strcmp(computorFigurewatch, {'1', 'true', 'on', 'yes'}))
-        % Silent: this is the normal state, and startup.m runs for every
-        % session including the extension's background MATLAB.
+    computorFigurewatch = strtrim(getenv('COMPUTOR_FIGUREWATCH'));
+    if any(strcmpi(computorFigurewatch, {'0', 'false', 'off', 'no'}))
+        % Silent: startup.m runs for every session in the image, and a session
+        % that was told not to publish should not talk about it.
     else
         computorMatlabPath = '/opt/computor/matlab';
         if isfolder(computorMatlabPath)

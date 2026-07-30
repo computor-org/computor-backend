@@ -27,63 +27,16 @@ git config --global user.name "${full_name}"
 git config --global user.email "${email}"
 mkdir -p "$HOME/workspace"
 
-# MATLAB figure publishing is OFF unless COMPUTOR_FIGUREWATCH says otherwise.
+# The folder MATLAB publishes its figures into, and the Computor extension
+# watches. No DISPLAY is set up for it and none is wanted: MATLAB exports
+# figures from a session with no display at all, and the virtual display this
+# script used to attach was what took the workspace down — every MATLAB in the
+# container, including the background one the MathWorks extension runs,
+# inherited a display that did not answer and blocked on it.
 #
-# It has taken this workspace down twice: once by exporting DISPLAY at a virtual
-# display that never came up, and once by starving the container while MATLAB
-# ran — bash itself stopped echoing, which no MATLAB timer can cause on its own,
-# so it is CPU, memory or /tmp being consumed. The two things that can do that
-# both arrived with this feature: figures become real X windows once a display
-# is attached and repaint, and every repaint marks the figure dirty for a
-# half-second export loop.
-#
-# None of this code has ever run under test — there is no MATLAB to run it on.
-# Off by default puts matlab-vscode back exactly where it was before, and makes
-# turning it on a deliberate, reversible experiment on one workspace instead of
-# a surprise for everyone. Python publishing is unaffected; it is a separate
-# image and is verified.
-FIGURES_DIR="$${COMPUTOR_FIGURES_DIR:-/tmp/computor-figures}"
-mkdir -p "$FIGURES_DIR"
-
-case "$${COMPUTOR_FIGUREWATCH:-}" in
-  1 | true | TRUE | on | ON | yes | YES) matlab_figures=true ;;
-  *) matlab_figures=false ;;
-esac
-
-if [ "$matlab_figures" != true ]; then
-  echo "MATLAB figure publishing is off (set COMPUTOR_FIGUREWATCH=1 to enable)." >&2
-elif command -v Xvfb >/dev/null 2>&1; then
-  if [ ! -e /tmp/.X11-unix/X99 ]; then
-    Xvfb :99 -screen 0 1280x1024x24 -nolisten tcp >/tmp/xvfb.log 2>&1 &
-  fi
-
-  for _ in $(seq 1 50); do
-    [ -e /tmp/.X11-unix/X99 ] && break
-    sleep 0.1
-  done
-
-  # The socket file appears before the server is ready to answer, so ask it a
-  # question when we have something to ask with.
-  display_ready=false
-  if [ -e /tmp/.X11-unix/X99 ]; then
-    if command -v xdpyinfo >/dev/null 2>&1; then
-      xdpyinfo -display :99 >/dev/null 2>&1 && display_ready=true
-    else
-      display_ready=true
-    fi
-  fi
-
-  if [ "$display_ready" = true ]; then
-    export DISPLAY=:99
-  else
-    echo "WARNING: Xvfb did not come up; MATLAB stays headless and figures are" \
-         "not published. Xvfb log follows." >&2
-    cat /tmp/xvfb.log >&2 2>/dev/null || true
-  fi
-else
-  echo "WARNING: Xvfb is missing — MATLAB stays headless and figures are not" \
-       "published." >&2
-fi
+# Publishing is on unless COMPUTOR_FIGUREWATCH=0 is set on the agent, which
+# turns off the MATLAB side and nothing else. See docs/figures.md.
+mkdir -p "$${COMPUTOR_FIGURES_DIR:-/tmp/computor-figures}"
 
 # Configure and activate the Computor extension for this workspace.
 mkdir -p "$HOME/.computor"

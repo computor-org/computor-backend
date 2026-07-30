@@ -32,9 +32,6 @@ FROM mathworks/matlab:r2024b@sha256:5603328923de4fd5ba5d5b610fbb925e1bcb8aec253d
 
 USER root
 
-# xvfb is already part of the MathWorks image; naming it here keeps the
-# virtual display the startup script relies on from disappearing with an
-# upstream slim-down.
 RUN export DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install --yes --no-install-recommends \
@@ -42,7 +39,6 @@ RUN export DEBIAN_FRONTEND=noninteractive \
         curl \
         git \
         socat \
-        xvfb \
     && rm -rf /var/lib/apt/lists/*
 
 # Reuse code-server from its official image. Its Node runtime is bundled under
@@ -99,7 +95,8 @@ USER root
 # COMPUTOR_FIGURES_DIR, where the Computor extension picks it up.
 # startup.m runs for every MATLAB session in this image — including the
 # background MATLAB the MathWorks extension starts to run and debug code,
-# which is the session a student's plots actually come from.
+# which is the session a student's plots actually come from. It needs no
+# display: MATLAB exports figures from a session that has none.
 # See docs/figures.md.
 COPY figures/+figurewatch /opt/computor/matlab/+figurewatch
 COPY figures/startup.m /opt/matlab/R2024b/toolbox/local/startup.m

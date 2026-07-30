@@ -97,38 +97,64 @@ config from the profile directory under `IPYTHONDIR` and from nowhere else —
 there is no `/etc/ipython` search path. The startup script only writes the file
 when it is absent, so a student who edits it keeps their version.
 
-### MATLAB — `+figurewatch` (off by default)
-
-> **Publishing from MATLAB is disabled unless `COMPUTOR_FIGUREWATCH=1` is set on
-> the workspace agent.** It has taken matlab-vscode down twice — once by
-> exporting `DISPLAY` at a virtual display that never came up, once by starving
-> the container while MATLAB ran, to the point that bash stopped echoing — and
-> none of this code has ever run under test, because no MATLAB was available to
-> run it on. The same variable gates both the virtual display and the watcher,
-> so with it unset the template behaves exactly as it did before this feature.
-> Python publishing is a different image and is unaffected.
->
-> Turning it on is a deliberate experiment on one workspace. Watch
-> `/tmp/xvfb.log` (unbounded) and the container's CPU and memory while a script
-> with figures runs.
-
+### MATLAB — `+figurewatch`
 
 [`ops/coder/templates/matlab-vscode/figures/+figurewatch`](../ops/coder/templates/matlab-vscode/figures/+figurewatch)
 watches the session's figures on a timer and mirrors them into the folder.
 `startup.m`, installed into `$MATLABROOT/toolbox/local`, starts it for every
 MATLAB session in the image — including the background MATLAB that the
 MathWorks extension launches to run and debug code, which is where a student's
-plots actually come from.
+plots actually come from. MATLAB starts in `~/Documents/MATLAB`, so only a
+`startup.m` a student puts *there* would take this one's place.
 
-Change detection is a `MarkedClean` listener on each of a figure's axes, which
-covers every edit that shows (`hold on; plot(...)`, `title(...)`, a new limit),
-plus a per-tick check for axes appearing or disappearing. The timer exports
-only figures that are new or flagged, so an idle session costs nothing.
+**No display is involved.** MATLAB exports figures perfectly well from a session
+that has none, which is how this is verified. The `Xvfb` the startup script used
+to attach is gone: it is what took the workspace down, because every MATLAB in
+the container inherited a `DISPLAY` that did not answer and blocked on it.
+Software OpenGL is the only renderer here, so `startup.m` also silences the
+`MATLAB:hg:AutoSoftwareOpenGL` warning MATLAB otherwise prints the first time a
+student draws anything — the display-driver advice it links to cannot be acted
+on inside a container.
 
-The startup script also brings up `Xvfb` on `:99` and exports `DISPLAY`. MATLAB
-drives figure rendering through a display even when it draws nothing on screen,
-and its offscreen export is only dependable with one attached. Everything
-code-server starts inherits that `DISPLAY`.
+`COMPUTOR_FIGUREWATCH=0` on the workspace agent turns publishing off, for the
+workspace where it is the problem rather than the fix. Nothing else reads it.
+
+**Change detection is a fingerprint, not an event.** Each tick hashes everything
+about a figure that shows in its picture — data, text, colours, limits, scales,
+tick modes, the figure's own size — and exports when the hash moves. The
+obvious mechanism, a `MarkedClean` listener per axes, was measured wrong in both
+directions on a session with no display, and is why plots went stale and why the
+container ran out of CPU:
+
+| | R2024b (the image) | R2025b |
+|---|---|---|
+| `set(h, 'YData', …)`, `hold on; plot(…)` | missed | missed |
+| `title`, `xlim`, `legend` | caught | missed |
+| an idle session | quiet | three events in three seconds, so every figure re-exported twice a second: 7.5 s of CPU per 20 s of nothing |
+
+What the fingerprint leaves out is the geometry MATLAB recomputes when it
+renders — an axes `Position`, `PlotBoxAspectRatio` and their neighbours, which
+move on their own about a second after an export, and once carried the export
+loop by themselves. Their `…Mode` properties are hashed instead, so `axis equal`
+and `axis manual` still register. The figure's own `Position` is hashed: that
+one is the size of the exported image and the student's to set.
+
+Costs, measured in the workspace image: 10–20 ms to fingerprint a figure,
+against 0.3 s to export one warm and 1.5 s cold. The timer runs every two
+seconds, which is both the floor on how often a figure can be exported and the
+worst-case delay before a plot shows up. Three figures over nine axes sitting
+idle cost 0.7 s of CPU per 20 s and rewrite nothing.
+
+Two other things the watcher will not do. A figure with nothing in it is not
+published — `figure` and `plot(x, y)` are two statements and the first one lets
+a tick through, so a blank picture would otherwise beat the real one to the
+viewer. And a figure closed in MATLAB takes its files with it, which is the same
+protocol the viewer's close button uses from the other side.
+
+One folder belongs to one producer, and the MathWorks extension keeps a
+background MATLAB running alongside any MATLAB in a terminal. Each publishes
+only the figures it owns, so they coexist — but if both sessions have a figure
+numbered 3, they will write over each other's `fig-000003.png`.
 
 ### R — `computor_figures.R`
 
@@ -247,7 +273,8 @@ producer side.
 must print `module://computor_figures`, and `COMPUTOR_FIGURES_DIR` must be set
 in that shell.
 
-**MATLAB writes nothing.** In the MATLAB terminal, `figurewatch.start()` reports
-why it cannot start. `timerfind('Name', 'ComputorFigureWatch')` shows whether
-the watcher is running. If exports fail, `echo $DISPLAY` should print `:99` and
-`/tmp/xvfb.log` says whether Xvfb came up.
+**MATLAB writes nothing.** `timerfind('Name', 'ComputorFigureWatch')` shows
+whether the watcher is running in that session; `figurewatch.start()` starts it
+by hand and reports why if it cannot. A figure that stays out of the folder
+while others arrive is a figure with nothing in it — `get(gcf, 'Children')`.
+`DISPLAY` is expected to be empty; MATLAB does not need one to export.
