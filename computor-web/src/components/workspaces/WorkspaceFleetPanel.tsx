@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { ScrollPanel, ListLoading } from '@/src/components/ListPageLayout';
 import { useResource } from '@/src/hooks/useResource';
 import { useNotify } from '@/src/contexts/NotificationContext';
@@ -9,11 +10,12 @@ import Badge, { type BadgeColor } from '@/src/components/Badge';
 import Button from '@/src/components/ui/Button';
 import { inputCls } from '@/src/components/ui/tokens';
 import WorkspaceStatusBadge from '@/src/components/workspaces/WorkspaceStatusBadge';
+import TemplateTaskProgress from '@/src/components/workspaces/TemplateTaskProgress';
+import { phaseLabel } from '@/src/components/workspaces/templateTaskStage';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { TaskStatus } from '@/src/types/workspaces';
 import type {
   CoderTemplateFleetStatus,
-  CoderTemplateTaskProgress,
   CoderWorkspace,
   TaskInfo,
 } from '@/src/types/workspaces';
@@ -28,23 +30,6 @@ const TERMINAL = new Set<TaskStatus>([
 
 function ownerName(workspace: CoderWorkspace): string {
   return workspace.owner_name || workspace.owner_id;
-}
-
-function taskLabel(taskName: string): string {
-  if (taskName === 'rollout_workspaces') return 'Workspace rollout';
-  if (taskName === 'build_workspace_images') return 'Image build';
-  return 'Build & push';
-}
-
-function phaseLabel(phase?: string): string {
-  return (phase || 'starting').replaceAll('_', ' ');
-}
-
-function progressColor(status: CoderTemplateTaskProgress['status']): BadgeColor {
-  if (status === 'succeeded') return 'green';
-  if (status === 'failed') return 'red';
-  if (status === 'running') return 'blue';
-  return 'gray';
 }
 
 function readiness(template: CoderTemplateFleetStatus): {
@@ -103,7 +88,6 @@ export default function WorkspaceFleetPanel() {
   const currentTask = activeTask ?? optimisticVisible ?? tasks[0] ?? null;
   const busy = Boolean(activeTask || optimisticVisible);
   const runningTask = activeTask ?? optimisticVisible;
-  const progress = currentTask?.progress;
   const selectedTemplates = templates.filter((template) => selected.has(template.name));
   const selectedReady = selectedTemplates.filter((template) => template.actionable_count > 0);
 
@@ -195,7 +179,12 @@ export default function WorkspaceFleetPanel() {
           <p className="text-sm text-gray-500 mt-1">
             Build and activate a new version for selected templates, then roll out only the
             templates that have actionable outdated workspaces. Stopped workspaces update on
-            their next start.
+            their next start. Only templates already deployed to Coder appear here — to deploy
+            one for the first time, use the{' '}
+            <Link href="/workspaces/admin?tab=templates" className="text-blue-600 hover:underline">
+              Templates
+            </Link>{' '}
+            tab.
           </p>
         </div>
 
@@ -230,51 +219,7 @@ export default function WorkspaceFleetPanel() {
           </Button>
         </div>
 
-        {currentTask && (
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4" aria-live="polite">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  {taskLabel(currentTask.task_name)} · {phaseLabel(progress?.phase)}
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {progress?.completed ?? 0} / {progress?.total ?? progress?.templates?.length ?? 0} templates
-                  {progress?.image_tag ? ` · ${progress.image_tag}` : ''}
-                  {currentTask.duration ? ` · ${currentTask.duration}` : ''}
-                </p>
-              </div>
-              <Badge
-                pill
-                color={
-                  currentTask.status === TaskStatus.FAILED || progress?.operation_status === 'completed_with_errors'
-                    ? 'red'
-                    : currentTask.status === TaskStatus.FINISHED
-                      ? 'green'
-                      : 'blue'
-                }
-              >
-                {progress?.operation_status || currentTask.status}
-              </Badge>
-            </div>
-            {progress?.templates && progress.templates.length > 0 && (
-              <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                {progress.templates.map((template) => (
-                  <div key={template.key} className="rounded border border-gray-200 bg-white px-3 py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm text-gray-800 truncate">
-                        {template.display_name || template.name}
-                      </span>
-                      <Badge color={progressColor(template.status)}>{template.status}</Badge>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">{phaseLabel(template.phase)}</p>
-                    {template.error && <p className="text-xs text-red-700 mt-1 break-words">{template.error}</p>}
-                  </div>
-                ))}
-              </div>
-            )}
-            {currentTask.error && <p className="text-sm text-red-700 mt-2">{currentTask.error}</p>}
-          </div>
-        )}
+        {currentTask && <TemplateTaskProgress task={currentTask} />}
       </div>
 
       {loading ? (
@@ -421,7 +366,12 @@ export default function WorkspaceFleetPanel() {
                       ) : null}
                     </div>
                   </Td>
-                  <Td><WorkspaceStatusBadge status={workspace.latest_build_status} /></Td>
+                  <Td>
+                    <WorkspaceStatusBadge
+                      status={workspace.latest_build_status}
+                      transition={workspace.latest_build_transition}
+                    />
+                  </Td>
                 </Tr>
               ))}
               {workspaces.length === 0 && (

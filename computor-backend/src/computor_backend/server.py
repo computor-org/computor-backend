@@ -284,41 +284,29 @@ async def startup_logic():
                 print("[STARTUP] Coder admin setup failed — Coder features will be unavailable")
                 print("[STARTUP]   Check Coder server logs and .env credentials")
             else:
-                # Check if templates exist in Coder — if not, auto-push them
+                # Which templates this deployment offers is an operator's choice,
+                # made once in the web UI (Workspaces → Administration →
+                # Templates), which lists every template shipped on disk and
+                # deploys the ones that are picked.
+                #
+                # Startup used to build and push ALL of them here. That is tens
+                # of gigabytes and the better part of an hour of image builds —
+                # MATLAB included, whether or not the site teaches it — spent
+                # before anyone had said what the deployment was for. So: report
+                # the state and let a human choose.
                 try:
                     templates = await client.list_templates()
-                    if not templates:
-                        print("[STARTUP] No Coder templates found — submitting build+push workflow")
-                        from computor_backend.api.coder import _build_template_parameters
-                        from computor_backend.tasks import get_task_executor, TaskSubmission
-
-                        params = _build_template_parameters(coder_settings)
-                        params["templates"] = None  # all templates
-                        params["build_images"] = True
-
-                        executor = get_task_executor()
-                        running_tasks = await executor.list_tasks(limit=1000, status="STARTED")
-                        template_push_running = any(
-                            task.get("task_name") == "push_coder_templates"
-                            for task in running_tasks.get("tasks", [])
-                        )
-                        if template_push_running:
-                            print(
-                                "[STARTUP] Template build+push already running — "
-                                "skipping duplicate submission"
-                            )
-                        else:
-                            workflow_id = await executor.submit_task(TaskSubmission(
-                                task_name="push_coder_templates",
-                                parameters=params,
-                                queue="coder-tasks",
-                            ))
-                            print(f"[STARTUP] Template build+push workflow submitted: {workflow_id}")
+                    if templates:
+                        print(f"[STARTUP] Coder has {len(templates)} template(s)")
                     else:
-                        print(f"[STARTUP] Coder has {len(templates)} template(s) — skipping auto-push")
+                        print(
+                            "[STARTUP] Coder has no workspace templates yet — choose "
+                            "which ones to deploy in the web UI under "
+                            "Workspaces → Administration → Templates"
+                        )
                 except Exception as e:
-                    # Non-fatal — templates can be pushed manually via API
-                    print(f"[STARTUP] Template check/push failed (non-fatal): {e}")
+                    # Non-fatal — the admin UI reports Coder's health itself.
+                    print(f"[STARTUP] Template check failed (non-fatal): {e}")
         except Exception as e:
             print(f"[STARTUP] Coder initialization failed (non-fatal): {e}")
             print("[STARTUP]   Server will start without Coder — workspace features unavailable")

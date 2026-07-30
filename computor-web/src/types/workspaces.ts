@@ -124,9 +124,34 @@ export interface WorkspaceListResponse {
   count: number;
 }
 
+/**
+ * A template an administrator is deploying right now, and how far it got.
+ *
+ * Coder does not have it yet, so it cannot appear in `templates` at all —
+ * which is exactly why this exists: without it, a user who opens the page
+ * mid-build finds a choice that silently lacks the type they were told to
+ * use, with no way to tell "not for you" from "twenty minutes away".
+ *
+ * `status`/`phase` are the workflow's own pair, so they render through the
+ * same `templateTaskStage()` the administration page uses.
+ */
+export interface TemplatePreparation {
+  name: string;
+  display_name?: string | null;
+  description?: string | null;
+  icon?: string | null;
+  status: 'pending' | 'running' | 'succeeded' | 'failed';
+  phase: string;
+  /** Coder already has it: this run is an update, and it stays usable. */
+  deployed: boolean;
+  task_name: string;
+}
+
 export interface TemplateListResponse {
   templates: CoderTemplate[];
   count: number;
+  /** Scoped exactly like `templates`; absent on older backends. */
+  preparing?: TemplatePreparation[];
 }
 
 export interface WorkspaceActionResponse {
@@ -291,6 +316,42 @@ export interface WorkspaceTemplateSettingsUpdate {
 
 export interface TemplateSettingsListResponse {
   settings: WorkspaceTemplateSettings[];
+}
+
+/**
+ * One workspace template as the deployment ships it, plus its live state.
+ *
+ * Distinct from CoderTemplate, which only exists once a template has been
+ * pushed: the catalog is the union of the template directories on disk and the
+ * templates Coder actually has. Nothing is ever pushed automatically, so a
+ * fresh system has every entry at `deployed: false` until an admin picks.
+ */
+export interface TemplateCatalogEntry {
+  /** Template directory name; null when live in Coder without a directory here. */
+  dir_name?: string | null;
+  /** Coder template name (e.g. 'vscode-workspace'). */
+  name: string;
+  display_name?: string | null;
+  description?: string | null;
+  icon?: string | null;
+  image_name?: string | null;
+  /** Whether Coder currently has this template. */
+  deployed: boolean;
+  template_id?: string | null;
+  active_version_id?: string | null;
+  /** Whether users may provision it (no settings row = enabled). */
+  enabled: boolean;
+  /** Operator-edited on disk, so no longer re-synced from the repo. */
+  customized: boolean;
+  workspace_count: number;
+  /** Workspaces counting against the template's seat quota. */
+  running_workspace_count: number;
+}
+
+export interface TemplateCatalogResponse {
+  templates: TemplateCatalogEntry[];
+  /** False when the backend cannot read the templates directory. */
+  templates_dir_available: boolean;
 }
 
 export interface TemplateFile {

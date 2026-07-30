@@ -19,6 +19,7 @@ import type {
   TaskInfo,
   CoderAdminTaskListResponse,
   CoderFleetStatusResponse,
+  TemplateCatalogResponse,
   TemplateSettingsListResponse,
   WorkspaceCredentialRotationResponse,
   WorkspaceVolumeListResponse,
@@ -159,6 +160,19 @@ export class CoderClient extends BaseEndpointClient {
   }
 
   // --- Admin: per-template settings + template editing (workspace:manage) ---
+
+  /**
+   * Every template the deployment ships, deployed to Coder or not.
+   *
+   * `listTemplates()` only sees what Coder has, and nothing is deployed
+   * automatically — so on a fresh system it sees nothing at all. This is what
+   * shows an admin the candidates and lets them deploy one.
+   */
+  async listTemplateCatalog(): Promise<TemplateCatalogResponse> {
+    return this.client.get<TemplateCatalogResponse>(
+      this.buildPath('admin', 'templates', 'catalog'),
+    );
+  }
 
   /** All stored per-template settings (resource limits, seat quota, overrides). */
   async listTemplateSettings(): Promise<TemplateSettingsListResponse> {

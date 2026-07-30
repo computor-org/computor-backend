@@ -1,11 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useResource } from '@/src/hooks/useResource';
+import { useCoderTemplates } from '@/src/hooks/useCoderTemplates';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import Button from '@/src/components/ui/Button';
-import TemplateIcon from '@/src/components/workspaces/TemplateIcon';
+import WorkspaceStatusBadge, {
+  categorizeStatus,
+} from '@/src/components/workspaces/WorkspaceStatusBadge';
+import TemplateCard, { TemplateIconButton } from '@/src/components/workspaces/TemplateCard';
+import { courseTemplateOption } from '@/src/components/workspaces/templateOptions';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { CourseWorkspacesClient } from '@/src/clients/CourseWorkspacesClient';
 import {
@@ -21,12 +26,18 @@ const courseWorkspacesClient = new CourseWorkspacesClient();
 /**
  * Launch buttons for a course's allowed workspace templates.
  *
- * Renders one icon button per (enabled) template — clicking ensures the
- * caller's per-template workspace exists (provisioning is idempotent; a
- * re-click just refreshes its token) and opens the launch tab. The non-compact
- * variant also lists the caller's existing workspaces on course templates,
- * which covers lecturer-provisioned throwaway workspaces (students can open
- * and start those, but not provision them).
+ * Renders one card per (enabled) template — clicking ensures the caller's
+ * per-template workspace exists (provisioning is idempotent; a re-click just
+ * refreshes its token) and opens the launch tab. The non-compact variant also
+ * lists the caller's existing workspaces on course templates, which covers
+ * lecturer-provisioned throwaway workspaces (students can open and start
+ * those, but not provision them).
+ *
+ * A course holds its templates by name, so it can go on offering one Coder
+ * does not have — never deployed, or still building. Those render dimmed and
+ * unclickable, with the reason in reach: the click used to travel to the
+ * server and come back as "Template 'bash-workspace' is not yet available",
+ * which reads as a broken button rather than a fact about the deployment.
  *
  * Self-hiding: renders nothing while loading, on error (non-members), or when
  * the course has no templates.
@@ -74,8 +85,32 @@ export default function CourseWorkspaceLaunchButtons({
     [courseId, compact],
   );
 
-  const templates = data?.templates ?? [];
+  // Deployment state — including the build a user may be waiting on — comes
+  // from the templates listing, but only where one of these is on the page.
+  // The compact variant sits on every card of the courses list, where a second
+  // request per course would be the page's dominant cost; there the course
+  // settings' own exists_in_coder carries the "not available" case, and an
+  // icon row has no room for a stage bar anyway.
+  const {
+    options,
+    answered: templatesAnswered,
+    error: templatesError,
+  } = useCoderTemplates({
+    enabled: !compact,
+    refetchInterval: compact ? undefined : 10000,
+  });
+
+  const templates = useMemo(() => data?.templates ?? [], [data]);
   const workspaces = data?.workspaces ?? [];
+
+  const courseOptions = useMemo(() => {
+    const byName = new Map(options.map((option) => [option.name, option]));
+    // A listing that never ran, or failed, tells us nothing — then the course
+    // settings' exists_in_coder is what is left to go on.
+    const answered = !compact && templatesAnswered && !templatesError;
+    return templates.map((t) => courseTemplateOption(t, byName.get(t.template_name), answered));
+  }, [templates, options, templatesAnswered, templatesError, compact]);
+
   if (templates.length === 0) return null;
 
   // window.open must happen synchronously inside the click — after an await it
@@ -113,24 +148,14 @@ export default function CourseWorkspaceLaunchButtons({
   if (compact) {
     return (
       <div className={`mt-2 flex flex-wrap items-center gap-1.5 ${className ?? ''}`}>
-        {templates.map((t) => (
-          <button
-            key={t.template_name}
-            type="button"
-            title={`Launch ${t.display_name || t.template_name}`}
-            aria-label={`Launch ${t.display_name || t.template_name} workspace`}
-            disabled={launching !== null}
-            onClick={(event) => {
-              // The card wraps this in a Link-adjacent row; keep the click local.
-              event.stopPropagation();
-              provisionAndLaunch(t.template_name);
-            }}
-            className={`rounded-lg transition-opacity hover:opacity-75 ${
-              launching === t.template_name ? 'animate-pulse' : ''
-            } ${launching !== null && launching !== t.template_name ? 'opacity-50' : ''}`}
-          >
-            <TemplateIcon template={{ icon: t.icon, name: t.template_name }} size="sm" />
-          </button>
+        {courseOptions.map((option) => (
+          <TemplateIconButton
+            key={option.name}
+            option={option}
+            busy={launching === option.name}
+            dimmed={launching !== null && launching !== option.name}
+            onClick={() => provisionAndLaunch(option.name)}
+          />
         ))}
       </div>
     );
@@ -139,27 +164,15 @@ export default function CourseWorkspaceLaunchButtons({
   return (
     <div className={`space-y-4 ${className ?? ''}`}>
       {title && <h2 className="text-lg font-semibold text-gray-900">{title}</h2>}
-      <div className="flex flex-wrap gap-3">
-        {templates.map((t) => (
-          <button
-            key={t.template_name}
-            type="button"
-            disabled={launching !== null}
-            onClick={() => provisionAndLaunch(t.template_name)}
-            className={`flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 pr-4 text-left transition-colors hover:border-blue-400 hover:bg-blue-50 ${
-              launching !== null && launching !== t.template_name ? 'opacity-50' : ''
-            }`}
-          >
-            <TemplateIcon template={{ icon: t.icon, name: t.template_name }} />
-            <span className="min-w-0">
-              <span className="block text-sm font-semibold text-gray-900">
-                {t.display_name || t.template_name}
-              </span>
-              <span className="block text-xs text-gray-500">
-                {launching === t.template_name ? 'Launching…' : 'Launch workspace'}
-              </span>
-            </span>
-          </button>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {courseOptions.map((option) => (
+          <TemplateCard
+            key={option.name}
+            option={option}
+            actionLabel={launching === option.name ? 'Launching…' : 'Launch workspace'}
+            busy={launching === option.name}
+            onClick={() => provisionAndLaunch(option.name)}
+          />
         ))}
       </div>
 
@@ -178,9 +191,21 @@ export default function CourseWorkspaceLaunchButtons({
                     {w.template_display_name || w.template_name}
                   </span>
                 </div>
-                <Button size="xs" variant="secondary" onClick={() => openExisting(w)}>
-                  Open
-                </Button>
+                <div className="flex shrink-0 items-center gap-2">
+                  {/*
+                    A badge, not a progress bar: this widget takes one snapshot
+                    and never polls, so a bar would animate without ever moving.
+                  */}
+                  <WorkspaceStatusBadge
+                    status={w.latest_build_status}
+                    transition={w.latest_build_transition}
+                  />
+                  <Button size="xs" variant="secondary" onClick={() => openExisting(w)}>
+                    {categorizeStatus(w.latest_build_status, w.latest_build_transition) === 'running'
+                      ? 'Open'
+                      : 'Start'}
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>

@@ -108,8 +108,8 @@ test('waits while the agent is still starting, then opens when it reports ready'
 
   await page.goto('/workspaces/launch?owner=u-me&name=code');
 
-  // It must hold on the spinner while not ready...
-  await expect(page.getByText('Almost there — waiting for the editor…')).toBeVisible();
+  // It must hold on the progress view while not ready...
+  await expect(page.getByText('Preparing the editor…')).toBeVisible();
   expect(page.url()).not.toContain('8080');
 
   // A transient launch tab, not an app page: no sidebar/topbar chrome.
@@ -125,7 +125,10 @@ test('does not redirect while the workspace is merely running', async ({ page })
   await setup(page, [details({ status: 'running', lifecycle: 'starting', ready: false })]);
 
   await page.goto('/workspaces/launch?owner=u-me&name=code');
-  await expect(page.getByText('Almost there — waiting for the editor…')).toBeVisible();
+  // The stage in words, not just "busy": the build is up, and what is left is
+  // the agent. No bar — a start has no measurable progress to draw.
+  await expect(page.getByText('Preparing the editor…')).toBeVisible();
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
 
   await page.waitForTimeout(5_000);
   expect(page.url()).toContain('/workspaces/launch');
@@ -212,6 +215,7 @@ test('creating a workspace opens a launch tab for the name the server chose', as
     json(route, {
       templates: [{ id: 't-vscode', name: 'vscode-workspace', display_name: 'VS Code' }],
       count: 1,
+      preparing: [],
     }),
   );
   await page.route(`${API_ORIGIN}/coder/workspaces/provision`, async (route) => {
@@ -227,10 +231,11 @@ test('creating a workspace opens a launch tab for the name the server chose', as
     });
   });
 
-  await page.goto('/workspaces/create');
+  // Creation is the workspaces page itself: one click on the type's card.
+  await page.goto('/workspaces');
 
   const popup = page.waitForEvent('popup');
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('button', { name: /VS Code/ }).click();
   const launchTab = await popup;
 
   // While provisioning round-trips, the tab is already the launch spinner —
@@ -240,8 +245,8 @@ test('creating a workspace opens a launch tab for the name the server chose', as
   await launchTab.waitForURL(/owner=u-me/);
   expect(launchTab.url()).toContain('name=vscode');
 
-  // The tab the user was on goes back to the list rather than following along.
-  await page.waitForURL(/\/workspaces$/);
+  // The tab the user clicked from stays where it was.
+  expect(page.url()).toMatch(/\/workspaces$/);
 });
 
 test('a tab parked on the creating state spins instead of erroring', async ({ page }) => {

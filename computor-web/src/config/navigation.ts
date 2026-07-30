@@ -33,10 +33,10 @@ export const coursesNavigation: NavItem[] = [
   },
 ];
 
-// Workspaces — gated by workspace access (_workspace_user / admin). Template
-// browsing/provisioning lives on /workspaces/create (maintainer-only), so the
-// Administration sub-item only appears for maintainers; plain workspace users
-// get a single flat entry.
+// Workspaces — gated by workspace access (_workspace_user / admin). Choosing a
+// type and creating a workspace happens on /workspaces itself, so the
+// Administration sub-item (deploying templates, fleet, volumes) only appears
+// for maintainers; plain workspace users get a single flat entry.
 export const getWorkspacesNavigation = (includeAdmin: boolean): NavItem[] => [
   {
     id: 'workspaces',

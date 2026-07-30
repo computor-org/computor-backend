@@ -5,7 +5,9 @@ This router provides endpoints for on-demand workspace provisioning.
 """
 
 import asyncio
+import json
 import logging
+import os
 import re
 from typing import Annotated, Optional
 
@@ -48,10 +50,13 @@ from computor_types.coder import (
     CoderTemplateFleetStatus,
     ImageBuildRequest,
     ProvisionResult,
+    TemplateCatalogEntry,
+    TemplateCatalogResponse,
     TemplateFile,
     TemplateFileActionResponse,
     TemplateFileUpdateRequest,
     TemplateFilesResponse,
+    TemplatePreparation,
     TemplatePushRequest,
     TemplateListResponse,
     TemplateSettingsListResponse,
@@ -70,7 +75,7 @@ from computor_types.coder import (
 from computor_backend.coder import templates_fs
 from computor_backend.model.workspace import WorkspaceTemplateSettings
 from computor_backend.tasks import get_task_executor, TaskSubmission
-from computor_types.tasks import TaskInfo
+from computor_types.tasks import TaskInfo, TaskStatus
 from computor_types.workspace_roles import WorkspaceProvisionRequest
 from computor_backend.coder.service import (
     current_workspace_app_credentials,
@@ -84,6 +89,7 @@ from computor_backend.business_logic.workspace_credentials import (
     rotate_workspace_app_credential,
 )
 from computor_backend.business_logic.course_workspaces import (
+    ACTIVE_BUILD_STATUSES,
     enforce_template_quota as _enforce_template_quota,
     get_disabled_template_names,
     get_member_course_template_names,
@@ -99,7 +105,7 @@ from computor_types.course_workspaces import CourseWorkspaceAdminListResponse
 from computor_backend.database import get_db
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
-from computor_backend.redis_cache import get_cache
+from computor_backend.redis_cache import get_cache, get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -323,7 +329,7 @@ async def health_check(
 )
 async def list_templates(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
     db: Annotated[Session, Depends(get_db)],
 ) -> TemplateListResponse:
@@ -332,6 +338,13 @@ async def list_templates(
     Managers (workspace:manage) see everything; workspace:templates holders
     see globally enabled templates; course members without a workspace role
     see the enabled templates their courses allow.
+
+    `preparing` carries the ones an administrator is deploying right now,
+    which Coder does not have yet and which therefore cannot be in `templates`
+    at all. Without it a user who has been told to use MATLAB opens the page
+    mid-build and finds a choice that simply does not include it — and no way
+    to tell "not for you" from "twenty minutes away". Scoped identically, so
+    it never advertises a template the user could not pick once it lands.
     """
     is_manager = permissions.is_admin or permissions.permitted("workspace", "manage")
     has_templates_claim = permissions.permitted("workspace", "templates")
@@ -344,14 +357,26 @@ async def list_templates(
             )
     try:
         templates = await client.list_templates()
+        live_names = {t.name for t in templates}
         if not is_manager:
-            disabled = get_disabled_template_names(db, among={t.name for t in templates})
+            disabled = get_disabled_template_names(db, among=live_names)
             templates = [t for t in templates if t.name not in disabled]
             if course_names:
                 templates = [t for t in templates if t.name in course_names]
+
+        preparing = await _template_preparations(
+            templates_fs.resolve_templates_root(settings.templates_dir), live_names
+        )
+        if not is_manager:
+            disabled = get_disabled_template_names(db, among={p.name for p in preparing})
+            preparing = [p for p in preparing if p.name not in disabled]
+            if course_names:
+                preparing = [p for p in preparing if p.name in course_names]
+
         return TemplateListResponse(
             templates=templates,
             count=len(templates),
+            preparing=preparing,
         )
     except Exception as e:
         raise _handle_coder_error(e) from e
@@ -815,6 +840,114 @@ async def _recent_coder_tasks(limit: int = 20) -> list[TaskInfo]:
     return tasks
 
 
+# Deployment runs a user can be waiting on. A rollout is deliberately not one:
+# it updates workspaces that already exist and never changes what a user can
+# create, and the restart it causes is already reported by the workspace's own
+# row — repeating it against a template would be noise.
+USER_VISIBLE_CODER_TASKS = (
+    "build_workspace_images",
+    "push_coder_templates",
+)
+
+_FINISHED_TASK_STATUSES = {
+    TaskStatus.FINISHED,
+    TaskStatus.FAILED,
+    TaskStatus.CANCELLED,
+}
+
+# The template listing is polled by every workspaces page that is open, and the
+# answer behind it is a Temporal query. A build stage lasts minutes, so a few
+# seconds of staleness costs a user nothing and keeps a lecture hall's worth of
+# pollers off the workflow service.
+_PREPARING_CACHE_KEY = "coder:templates:preparing"
+_PREPARING_CACHE_TTL = 5
+
+
+async def _compute_template_preparations(
+    templates_root: Optional[str],
+) -> list[dict]:
+    """Per-template state of the most recent deploy run, as plain dicts.
+
+    Plain dicts rather than models because this is what gets cached: the
+    per-user scoping happens afterwards, on the way out.
+    """
+    try:
+        tasks = await _recent_coder_tasks(limit=5)
+    except Exception:
+        # Never fail a template listing over the progress decoration on it.
+        logger.warning("Could not read Coder deployment activity", exc_info=True)
+        return []
+
+    task = next((t for t in tasks if t.task_name in USER_VISIBLE_CODER_TASKS), None)
+    if task is None:
+        return []
+
+    entries = (task.progress or {}).get("templates") or []
+    finished = task.status in _FINISHED_TASK_STATUSES
+    manifests = templates_fs.discover_templates(templates_root) if templates_root else {}
+
+    preparing: list[dict] = []
+    for entry in entries:
+        name = entry.get("name") or entry.get("key")
+        if not name:
+            continue
+        status = entry.get("status") or "pending"
+        # Succeeded means Coder has it now, so it is in `templates` proper —
+        # listing it here too would park a finished bar beside a usable card.
+        if status == "succeeded":
+            continue
+        # A run that is over leaves everything it never reached sitting at
+        # 'pending' for good. Of a finished run, only the failures are still
+        # true, and they are worth saying: the alternative is a card that read
+        # "Building image" quietly vanishing mid-wait.
+        if finished and status != "failed":
+            continue
+        # The workflow's progress carries a display name but no description or
+        # icon; the manifest on disk (keyed by directory, as progress is) has
+        # both, and is what the template will be pushed with.
+        manifest = manifests.get(entry.get("key") or "", {})
+        preparing.append({
+            "name": name,
+            "display_name": entry.get("display_name") or manifest.get("display_name"),
+            "description": manifest.get("description"),
+            "icon": manifest.get("icon"),
+            "status": status,
+            "phase": entry.get("phase") or "queued",
+            "task_name": task.task_name,
+        })
+    return preparing
+
+
+async def _template_preparations(
+    templates_root: Optional[str],
+    live_names: set[str],
+) -> list[TemplatePreparation]:
+    """What is being deployed right now, cached for a few seconds."""
+    payload: Optional[list[dict]] = None
+    try:
+        redis = await get_redis_client()
+        cached = await redis.get(_PREPARING_CACHE_KEY)
+        if cached:
+            payload = json.loads(cached)
+    except Exception:
+        logger.debug("Coder deployment activity cache unavailable", exc_info=True)
+
+    if payload is None:
+        payload = await _compute_template_preparations(templates_root)
+        try:
+            redis = await get_redis_client()
+            await redis.set(
+                _PREPARING_CACHE_KEY, json.dumps(payload), ex=_PREPARING_CACHE_TTL
+            )
+        except Exception:
+            logger.debug("Could not cache Coder deployment activity", exc_info=True)
+
+    return [
+        TemplatePreparation(**item, deployed=item["name"] in live_names)
+        for item in payload
+    ]
+
+
 async def _reject_conflicting_coder_task() -> None:
     """Keep image GC/template activation/rollout operations from racing."""
     executor = get_task_executor()
@@ -1154,6 +1287,105 @@ async def list_admin_courses(
     maintainers configure courses they are not members of. Pure DB read, so
     it works while Coder itself is disabled."""
     return list_admin_course_workspaces(permissions, db)
+
+
+@router.get(
+    "/admin/templates/catalog",
+    response_model=TemplateCatalogResponse,
+    summary="List every workspace template the deployment ships, deployed or not",
+)
+async def list_template_catalog(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    client: Annotated[CoderClient, Depends(get_coder_client)],
+    db: Annotated[Session, Depends(get_db)],
+) -> TemplateCatalogResponse:
+    """The union of the templates on disk and the templates live in Coder.
+
+    ``GET /coder/templates`` only ever shows what Coder has, which makes a
+    template nobody pushed invisible — and nothing is pushed automatically:
+    a fresh deployment starts with none, and an operator picks. This is the
+    endpoint that shows them the choice.
+
+    Requires workspace:manage.
+    """
+    _check_workspace_access(permissions, "manage")
+    try:
+        coder_templates, workspaces = await asyncio.gather(
+            client.list_templates(),
+            client.list_all_workspaces(),
+        )
+    except Exception as e:
+        raise _handle_coder_error(e) from e
+
+    workspace_counts: dict[str, int] = {}
+    running_counts: dict[str, int] = {}
+    for workspace in workspaces:
+        workspace_counts[workspace.template_id] = (
+            workspace_counts.get(workspace.template_id, 0) + 1
+        )
+        # The same rule enforce_template_quota() counts by, so the seats column
+        # shows the number the quota actually acts on.
+        status = (
+            workspace.latest_build_status.value
+            if workspace.latest_build_status
+            else ""
+        )
+        if workspace.latest_build_transition == "start" and status in ACTIVE_BUILD_STATUSES:
+            running_counts[workspace.template_id] = (
+                running_counts.get(workspace.template_id, 0) + 1
+            )
+    live_by_name = {template.name: template for template in coder_templates}
+
+    enabled_by_name = {
+        row.template_name: row.enabled
+        for row in db.query(WorkspaceTemplateSettings).all()
+    }
+    root = templates_fs.resolve_templates_root(settings.templates_dir)
+    manifests = templates_fs.discover_templates(root) if root else {}
+
+    entries: list[TemplateCatalogEntry] = []
+    for dir_name, manifest in manifests.items():
+        name = manifest.get("coder_template_name") or dir_name
+        live = live_by_name.pop(name, None)
+        entries.append(TemplateCatalogEntry(
+            dir_name=dir_name,
+            name=name,
+            display_name=manifest.get("display_name") or (live.display_name if live else None),
+            description=manifest.get("description") or (live.description if live else None),
+            icon=manifest.get("icon") or (live.icon if live else None),
+            image_name=manifest.get("image_name"),
+            deployed=live is not None,
+            template_id=live.id if live else None,
+            active_version_id=live.active_version_id if live else None,
+            enabled=enabled_by_name.get(name, True),
+            customized=templates_fs.is_customized(os.path.join(root, dir_name)),
+            workspace_count=workspace_counts.get(live.id, 0) if live else 0,
+            running_workspace_count=running_counts.get(live.id, 0) if live else 0,
+        ))
+
+    # Whatever is left is live in Coder without a directory here — still listed,
+    # since it is a template users can be on, just not one we can rebuild.
+    for name, live in live_by_name.items():
+        entries.append(TemplateCatalogEntry(
+            dir_name=None,
+            name=name,
+            display_name=live.display_name,
+            description=live.description,
+            icon=live.icon,
+            deployed=True,
+            template_id=live.id,
+            active_version_id=live.active_version_id,
+            enabled=enabled_by_name.get(name, True),
+            workspace_count=workspace_counts.get(live.id, 0),
+            running_workspace_count=running_counts.get(live.id, 0),
+        ))
+
+    entries.sort(key=lambda entry: (entry.display_name or entry.name).lower())
+    return TemplateCatalogResponse(
+        templates=entries,
+        templates_dir_available=root is not None,
+    )
 
 
 @router.get(

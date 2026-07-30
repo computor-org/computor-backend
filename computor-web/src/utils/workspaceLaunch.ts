@@ -25,3 +25,13 @@ export const workspaceCreatingUrl = '/workspaces/launch?creating=1';
 export function openLaunchTab(owner: string, name: string): boolean {
   return window.open(workspaceLaunchUrl(owner, name), '_blank') !== null;
 }
+
+/**
+ * The name a workspace provisioned without one gets — a mirror of the
+ * backend's derive_workspace_name(). Display and matching only: the server
+ * decides, and self-provisioners always get this name (it forces
+ * workspace_name to null), which is what caps them at one per template.
+ */
+export function derivedWorkspaceName(template: string): string {
+  return template.replace(/-workspace$/, '').replace(/[^a-z0-9-]/g, '') || 'workspace';
+}

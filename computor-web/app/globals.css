@@ -156,6 +156,36 @@ body {
 }
 
 /*
+ * Indeterminate progress: a sliver that sweeps the track instead of filling it.
+ *
+ * Provisioning has stages, not percentages — Coder tells us a workspace is
+ * "starting", never that it is 40% started. A bar that invents a number would
+ * be lying, and one frozen at its stage's width reads as stalled, so the sweep
+ * is what carries "still working" while the width carries "how far along".
+ *
+ * Under reduced motion the sweep stops but the sliver stays put and visible:
+ * an empty track would read as 0%, which is a different (and wrong) claim. The
+ * print block above already strips the animation from everything on paper.
+ */
+@keyframes progress-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}
+
+@utility progress-sweep {
+  animation: progress-sweep 1.6s ease-in-out infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    transform: translateX(0);
+  }
+}
+
+/*
  * Print support. Pages that want a clean printout wrap their report body in
  * `#printable-report`; on print we hide the app chrome (sidebar, top bar, the
  * fixed-height scroll shells) and let only that region flow onto paper. Mark

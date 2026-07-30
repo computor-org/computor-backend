@@ -38,7 +38,8 @@ function WorkspaceRow({
 }) {
   const [actionLoading, setActionLoading] = useState<'start' | 'stop' | null>(null);
   const owner = workspace.owner_name || '';
-  const category = categorizeStatus(workspace.latest_build_status);
+  const transition = workspace.latest_build_transition;
+  const category = categorizeStatus(workspace.latest_build_status, transition);
 
   const runAction = async (action: 'start' | 'stop', fn: (o: string, n: string) => Promise<void>) => {
     if (!owner) return;
@@ -59,7 +60,12 @@ function WorkspaceRow({
         {workspace.template_display_name || workspace.template_name || '—'}
       </Td>
       <Td>
-        <WorkspaceStatusBadge status={workspace.latest_build_status} />
+        {/*
+          The chip alone. A workspace starting or stopping is a wait of seconds
+          with no stages to report, and the chip already names it ("stopping") —
+          a bar beside it drew a second, vaguer copy of the same word.
+        */}
+        <WorkspaceStatusBadge status={workspace.latest_build_status} transition={transition} />
       </Td>
       <Td className="text-sm text-gray-500 whitespace-nowrap">
         {workspace.created_at ? new Date(workspace.created_at).toLocaleDateString() : '—'}
@@ -87,7 +93,7 @@ function WorkspaceRow({
               // Calls straight out of the click: the handler opens a tab, and a
               // window.open() after an await gets eaten by popup blockers.
               <Button size="xs" onClick={() => onLaunch(owner, workspace.name)}>
-                Start
+                {category === 'failed' ? 'Retry' : 'Start'}
               </Button>
             ) : (
               <Button
@@ -96,14 +102,9 @@ function WorkspaceRow({
                 loading={actionLoading === 'start'}
                 loadingLabel="Starting…"
               >
-                Start
+                {category === 'failed' ? 'Retry' : 'Start'}
               </Button>
             ))}
-          {category === 'pending' && (
-            <span className="px-2.5 py-1 text-xs font-medium text-yellow-700">
-              {workspace.latest_build_status}…
-            </span>
-          )}
           <Button size="xs" variant="ghost" onClick={() => onViewDetails(owner, workspace.name)}>
             Details
           </Button>
