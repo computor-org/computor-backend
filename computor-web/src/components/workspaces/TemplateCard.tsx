@@ -71,10 +71,10 @@ export default function TemplateCard({
           {usable ? actionLabel : availabilityLabel(option)}
         </span>
         {/*
-          Only while something is actually running. A finished-looking bar under
-          a usable card would claim a state nobody is in.
+          Only while the deployment is still going: a settled stage is a full
+          bar saying what its label says (see templateTaskStage.settled).
         */}
-        {stage && (
+        {stage && !stage.settled && (
           <ProgressTrack
             value={stage.percent}
             tone={stage.tone}

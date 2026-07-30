@@ -17,6 +17,12 @@ export interface TemplateTaskStage {
   tone: ProgressTone;
   /** Still moving — the bar sweeps rather than sitting still. */
   active: boolean;
+  /**
+   * This template is done with, one way or the other. Callers draw no bar for
+   * it: a full bar reports the same thing its label already does, and a
+   * finished run would otherwise leave a row of them sitting there for good.
+   */
+  settled: boolean;
 }
 
 export function templateTaskStage(
@@ -35,7 +41,7 @@ export function templateTaskStage(
       : phase === 'pushing' ? 'Push failed'
       : phase === 'rolling_out' ? 'Rollout failed'
       : 'Failed';
-    return { percent: 100, label: where, tone: 'red', active: false };
+    return { percent: 100, label: where, tone: 'red', active: false, settled: true };
   }
 
   if (status === 'succeeded') {
@@ -44,24 +50,31 @@ export function templateTaskStage(
       label: taskName === 'rollout_workspaces' ? 'Rolled out' : 'Version ready',
       tone: 'green',
       active: false,
+      settled: true,
     };
   }
 
   switch (phase) {
     case 'building':
-      return { percent: 30, label: 'Building image', tone: 'blue', active: status === 'running' };
+      return {
+        percent: 30, label: 'Building image', tone: 'blue',
+        active: status === 'running', settled: false,
+      };
     case 'pushing':
       // `pending` here means the image is built and the push has not started —
       // the one point in the run where a template is genuinely between stages.
       return status === 'running'
-        ? { percent: 75, label: 'Pushing template', tone: 'blue', active: true }
-        : { percent: 55, label: 'Image built', tone: 'blue', active: false };
+        ? { percent: 75, label: 'Pushing template', tone: 'blue', active: true, settled: false }
+        : { percent: 55, label: 'Image built', tone: 'blue', active: false, settled: false };
     case 'rolling_out':
-      return { percent: 50, label: 'Rolling out workspaces', tone: 'blue', active: status === 'running' };
+      return {
+        percent: 50, label: 'Rolling out workspaces', tone: 'blue',
+        active: status === 'running', settled: false,
+      };
     case 'complete':
-      return { percent: 100, label: 'Done', tone: 'green', active: false };
+      return { percent: 100, label: 'Done', tone: 'green', active: false, settled: true };
     default:
-      return { percent: 4, label: 'Queued', tone: 'gray', active: false };
+      return { percent: 4, label: 'Queued', tone: 'gray', active: false, settled: false };
   }
 }
 

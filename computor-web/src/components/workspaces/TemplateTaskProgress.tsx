@@ -43,14 +43,11 @@ export default function TemplateTaskProgress({ task }: { task: TaskInfo }) {
         </Badge>
       </div>
 
-      <ProgressTrack
-        value={total > 0 ? (completed / total) * 100 : 0}
-        tone={failed ? 'red' : finished ? 'green' : 'blue'}
-        active={!finished}
-        size="md"
-        label={`${taskLabel(task.task_name)} overall progress`}
-      />
-
+      {/*
+        No bar for the run itself. It measured the same templates the list
+        below does, one row at a time — so it said nothing the rows did not,
+        twice, in the same colour.
+      */}
       {templates.length > 0 && (
         <ul role="list" className="divide-y divide-gray-200 rounded-md border border-gray-200 bg-white">
           {templates.map((template) => {
@@ -62,12 +59,21 @@ export default function TemplateTaskProgress({ task }: { task: TaskInfo }) {
                     {template.display_name || template.name}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <ProgressTrack
-                      value={stage.percent}
-                      tone={stage.tone}
-                      active={stage.active}
-                      label={`${template.display_name || template.name}: ${stage.label}`}
-                    />
+                    {/*
+                      Only while it is still going. A finished template's bar is
+                      full by definition, so it reports what "Version ready"
+                      already says — and once the run ends every row would keep
+                      one, a wall of complete bars describing nothing in flight.
+                      The column stays so the labels beside it stay aligned.
+                    */}
+                    {!stage.settled && (
+                      <ProgressTrack
+                        value={stage.percent}
+                        tone={stage.tone}
+                        active={stage.active}
+                        label={`${template.display_name || template.name}: ${stage.label}`}
+                      />
+                    )}
                   </div>
                   <span
                     className={`w-40 shrink-0 text-right text-xs ${

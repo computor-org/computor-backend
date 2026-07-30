@@ -188,9 +188,34 @@ test('a running build reports its stages as a list with progress bars', async ({
   await expect(stages.filter({ hasText: 'MATLAB' }).getByText('Building image')).toBeVisible();
   await expect(stages.filter({ hasText: 'VS Code' }).getByText('Queued')).toBeVisible();
 
-  // One bar for the run plus one per template — the stage, not just a spinner.
-  await expect(page.getByRole('progressbar')).toHaveCount(3);
+  // One bar per template still working — the stage, not just a spinner. None
+  // for the run itself: it measured the same templates the rows do.
+  await expect(page.getByRole('progressbar')).toHaveCount(2);
   await expect(
     page.getByRole('progressbar', { name: 'MATLAB: Building image' }),
   ).toHaveAttribute('aria-valuenow', '30');
+});
+
+test('a finished run keeps its words and drops its bars', async ({ page }) => {
+  await setup(page, {
+    tasks: [{
+      task_id: 'push-matlab', workflow_id: 'push-matlab', task_name: 'push_coder_templates',
+      status: 'started', created_at: '2026-07-30T10:00:00Z',
+      progress: {
+        phase: 'complete', operation_status: 'completed', completed: 2, total: 2,
+        image_tag: 'v20260730-100000',
+        templates: [
+          { key: 'matlab', name: 'matlab-workspace', display_name: 'MATLAB', status: 'succeeded', phase: 'complete' },
+          { key: 'vscode', name: 'vscode-workspace', display_name: 'VS Code', status: 'succeeded', phase: 'complete' },
+        ],
+      },
+    }],
+  });
+  await page.goto('/workspaces/admin?tab=templates');
+
+  // The outcome is still reported, per template and for the run...
+  await expect(page.getByText('Version ready').first()).toBeVisible();
+  await expect(page.getByText('completed', { exact: true })).toBeVisible();
+  // ...without a wall of full bars repeating it in the same colour.
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
 });
