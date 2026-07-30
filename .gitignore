@@ -76,3 +76,7 @@ yarn-error.log*
 /plugins/*
 !/plugins/.gitkeep
 data/auth_plugins.json
+
+# Playwright artifacts, wherever they land (a run from the repo root writes here)
+test-results/
+playwright-report/
