@@ -227,11 +227,53 @@ class WorkspaceListResponse(BaseModel):
     count: int = Field(0, description="Total count")
 
 
+class TemplatePreparation(BaseModel):
+    """A template an administrator is deploying right now, and how far it got.
+
+    Nothing is deployed automatically, so between an admin picking a template
+    and users being able to pick it lies an image build and a push — tens of
+    minutes for something like MATLAB. Coder has no such template yet, so it
+    cannot appear in a template listing, and a user is left staring at a
+    choice that silently lacks the one they were told to use.
+
+    ``status``/``phase`` are the workflow's own pair (see
+    tasks/temporal_coder_setup.py), passed through untranslated so the web
+    renders them with the same stage vocabulary the administration page uses.
+    """
+
+    name: str = Field(..., description="Coder template name (e.g. 'vscode-workspace')")
+    display_name: Optional[str] = Field(None, description="Human-readable name")
+    description: Optional[str] = Field(None, description="What the template offers")
+    icon: Optional[str] = Field(None, description="Coder icon path or absolute URL")
+    status: str = Field(
+        ..., description="Per-template workflow status: pending | running | succeeded | failed"
+    )
+    phase: str = Field(
+        ..., description="Per-template phase: queued | building | pushing | rolling_out | complete"
+    )
+    deployed: bool = Field(
+        False,
+        description="Coder already has this template, so this run is an update and "
+                    "the current version stays usable while it runs",
+    )
+    task_name: str = Field(
+        ...,
+        description="Workflow behind it: build_workspace_images | push_coder_templates "
+                    "| rollout_workspaces",
+    )
+
+
 class TemplateListResponse(BaseModel):
     """Response for listing templates."""
 
     templates: list[CoderTemplate] = Field(default_factory=list)
     count: int = Field(0, description="Total count")
+    preparing: list[TemplatePreparation] = Field(
+        default_factory=list,
+        description="Templates being deployed right now, with the stage each has "
+                    "reached. Scoped exactly like `templates` — a user only ever "
+                    "sees the ones they would be allowed to pick.",
+    )
 
 
 class WorkspaceActionResponse(BaseModel):

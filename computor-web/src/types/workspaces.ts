@@ -124,9 +124,34 @@ export interface WorkspaceListResponse {
   count: number;
 }
 
+/**
+ * A template an administrator is deploying right now, and how far it got.
+ *
+ * Coder does not have it yet, so it cannot appear in `templates` at all —
+ * which is exactly why this exists: without it, a user who opens the page
+ * mid-build finds a choice that silently lacks the type they were told to
+ * use, with no way to tell "not for you" from "twenty minutes away".
+ *
+ * `status`/`phase` are the workflow's own pair, so they render through the
+ * same `templateTaskStage()` the administration page uses.
+ */
+export interface TemplatePreparation {
+  name: string;
+  display_name?: string | null;
+  description?: string | null;
+  icon?: string | null;
+  status: 'pending' | 'running' | 'succeeded' | 'failed';
+  phase: string;
+  /** Coder already has it: this run is an update, and it stays usable. */
+  deployed: boolean;
+  task_name: string;
+}
+
 export interface TemplateListResponse {
   templates: CoderTemplate[];
   count: number;
+  /** Scoped exactly like `templates`; absent on older backends. */
+  preparing?: TemplatePreparation[];
 }
 
 export interface WorkspaceActionResponse {

@@ -215,6 +215,7 @@ test('creating a workspace opens a launch tab for the name the server chose', as
     json(route, {
       templates: [{ id: 't-vscode', name: 'vscode-workspace', display_name: 'VS Code' }],
       count: 1,
+      preparing: [],
     }),
   );
   await page.route(`${API_ORIGIN}/coder/workspaces/provision`, async (route) => {
@@ -230,10 +231,11 @@ test('creating a workspace opens a launch tab for the name the server chose', as
     });
   });
 
-  await page.goto('/workspaces/create');
+  // Creation is the workspaces page itself: one click on the type's card.
+  await page.goto('/workspaces');
 
   const popup = page.waitForEvent('popup');
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('button', { name: /VS Code/ }).click();
   const launchTab = await popup;
 
   // While provisioning round-trips, the tab is already the launch spinner —
@@ -243,8 +245,8 @@ test('creating a workspace opens a launch tab for the name the server chose', as
   await launchTab.waitForURL(/owner=u-me/);
   expect(launchTab.url()).toContain('name=vscode');
 
-  // The tab the user was on goes back to the list rather than following along.
-  await page.waitForURL(/\/workspaces$/);
+  // The tab the user clicked from stays where it was.
+  expect(page.url()).toMatch(/\/workspaces$/);
 });
 
 test('a tab parked on the creating state spins instead of erroring', async ({ page }) => {

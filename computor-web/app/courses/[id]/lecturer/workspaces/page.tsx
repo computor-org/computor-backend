@@ -64,9 +64,15 @@ function LecturerWorkspacesContent() {
     [data],
   );
   const templates = (settings?.templates ?? []).filter((t) => t.enabled);
+  // A course keeps its templates by name, so it can offer one Coder does not
+  // have — never deployed, or deleted since. Provisioning onto it fails per
+  // student, which here means one failure per person in the selection.
+  // (`exists_in_coder` is null when Coder was unreachable: claim nothing then.)
+  const deployable = templates.filter((t) => t.exists_in_coder !== false);
   const provisionAllowed = (settings?.lecturer_provision_enabled ?? false) || (settings?.can_manage ?? false);
-  const effectiveTemplate = template || templates[0]?.template_name || '';
+  const effectiveTemplate = template || deployable[0]?.template_name || '';
   const selectedTemplate = templates.find((t) => t.template_name === effectiveTemplate);
+  const selectedIsDeployable = selectedTemplate ? selectedTemplate.exists_in_coder !== false : false;
   // Editing the policy stays a workspace-maintainer job; a lecturer sees the
   // effective values read-only next to the template picker.
   const canManage = settings?.can_manage ?? false;
@@ -293,11 +299,25 @@ function LecturerWorkspacesContent() {
                     className={inputCls}
                   >
                     {templates.map((t) => (
-                      <option key={t.template_name} value={t.template_name}>
+                      <option
+                        key={t.template_name}
+                        value={t.template_name}
+                        // Listed but unpickable: the course asks for it, so
+                        // hiding it would look like the course lost a template.
+                        disabled={t.exists_in_coder === false}
+                      >
                         {t.display_name || t.template_name}
+                        {t.exists_in_coder === false ? ' — not set up on this server' : ''}
                       </option>
                     ))}
                   </select>
+                  {selectedTemplate && !selectedIsDeployable && (
+                    <p className="mt-1 text-xs text-amber-700">
+                      This workspace type is not set up on this server yet, so nothing can be
+                      provisioned onto it. A workspace maintainer deploys it under workspace
+                      administration.
+                    </p>
+                  )}
                   {selectedTemplate && (
                     // Read-only: the policy is set by a workspace maintainer,
                     // per template and per course. Shown here so a lecturer
@@ -421,7 +441,7 @@ function LecturerWorkspacesContent() {
                   onClick={provision}
                   loading={provisioning}
                   loadingLabel="Provisioning…"
-                  disabled={selected.size === 0 || !effectiveTemplate}
+                  disabled={selected.size === 0 || !effectiveTemplate || !selectedIsDeployable}
                 >
                   Provision for {selected.size} selected
                 </Button>

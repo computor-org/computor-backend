@@ -20,7 +20,10 @@ export interface TemplateTaskStage {
 }
 
 export function templateTaskStage(
-  template: CoderTemplateTaskProgress,
+  /** Anything carrying the workflow's (status, phase) pair — a progress entry
+      from the admin task feed, or a TemplatePreparation from the user-facing
+      template listing. */
+  template: Pick<CoderTemplateTaskProgress, 'status' | 'phase'>,
   /** Which workflow this is: a rollout's single phase reads differently. */
   taskName?: string,
 ): TemplateTaskStage {

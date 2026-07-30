@@ -22,6 +22,18 @@ from computor_backend.model.workspace import WorkspaceTemplateSettings
 from computor_backend.permissions.principal import Principal
 
 
+@pytest.fixture(autouse=True)
+def no_deployment_fallback(monkeypatch):
+    """Templates resolve from the fixture root only.
+
+    resolve_templates_root() falls back to $SYSTEM_DEPLOYMENT_PATH/coder/
+    templates, which on a developer's own machine is a real directory full of
+    real templates — so "no templates directory" only meant that in a shell
+    that had not sourced .env.
+    """
+    monkeypatch.delenv("SYSTEM_DEPLOYMENT_PATH", raising=False)
+
+
 def _admin() -> Principal:
     return Principal(user_id="admin", roles=["_admin"])
 

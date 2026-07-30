@@ -6,24 +6,33 @@ import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollPanel, ListLoading } from '@/src/components/ListPageLayout';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useCoderTemplates } from '@/src/hooks/useCoderTemplates';
 import { useWorkspaceActions } from '@/src/hooks/useWorkspaceActions';
+import { useNotify } from '@/src/contexts/NotificationContext';
 import { CoderClient } from '@/src/clients/CoderClient';
 import WorkspaceTable from '@/src/components/workspaces/WorkspaceTable';
 import WorkspaceDetailsModal from '@/src/components/workspaces/WorkspaceDetailsModal';
+import WorkspaceTypeGrid, { usableOptions } from '@/src/components/workspaces/WorkspaceTypeGrid';
+import NewWorkspaceForm from '@/src/components/workspaces/NewWorkspaceForm';
 import { categorizeStatus } from '@/src/components/workspaces/WorkspaceStatusBadge';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 import EmptyState from '@/src/components/EmptyState';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
-import Button, { ButtonLink } from '@/src/components/ui/Button';
-import { openLaunchTab, workspaceLaunchUrl } from '@/src/utils/workspaceLaunch';
-import type { CoderHealthResponse, WorkspaceDetails } from '@/src/types/workspaces';
+import Button from '@/src/components/ui/Button';
+import {
+  openLaunchTab,
+  workspaceCreatingUrl,
+  workspaceLaunchUrl,
+} from '@/src/utils/workspaceLaunch';
+import type { CoderHealthResponse, CoderWorkspace, WorkspaceDetails } from '@/src/types/workspaces';
 
 const coderClient = new CoderClient();
 
 export default function WorkspacesPage() {
   const router = useRouter();
-  const { canProvisionWorkspace } = usePermissions();
+  const notify = useNotify();
+  const { isWorkspaceMaintainer } = usePermissions();
 
   // Workspace list with silent background polling (pauses on hidden tabs).
   const { data, loading, error, reload, refresh } = useResource(
@@ -39,6 +48,18 @@ export default function WorkspacesPage() {
     (ws) => categorizeStatus(ws.latest_build_status, ws.latest_build_transition) === 'pending',
   ).length;
 
+  // The types this user may have, and what is being deployed right now. Polled
+  // slower than the workspaces: a build stage lasts minutes, and the point of
+  // watching it at all is that a type can appear (or start building) while the
+  // page is open. A 403 here means "you may not create workspaces" — the
+  // section hides rather than shouting a permission error at someone who is
+  // only here to open the workspace a lecturer made for them.
+  const {
+    options,
+    error: templatesError,
+    refresh: refreshTemplates,
+  } = useCoderTemplates({ refetchInterval: 10000 });
+
   // Coder health for the status strip (no polling — cheap indicator only).
   const { data: health } = useResource<CoderHealthResponse>(
     () => coderClient.getHealth().catch(() => ({ healthy: false, message: 'Unable to connect' })),
@@ -49,6 +70,8 @@ export default function WorkspacesPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<{ owner: string; name: string } | null>(null);
   const [detailsData, setDetailsData] = useState<WorkspaceDetails | null>(null);
+  const [creating, setCreating] = useState<string | null>(null);
+  const [customFormOpen, setCustomFormOpen] = useState(false);
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -69,6 +92,42 @@ export default function WorkspacesPage() {
     if (!openLaunchTab(owner, name)) router.push(workspaceLaunchUrl(owner, name));
   };
 
+  const handleOpenOwn = (workspace: CoderWorkspace) => {
+    if (workspace.owner_name) handleLaunch(workspace.owner_name, workspace.name);
+  };
+
+  /**
+   * Create this type's workspace and open it. No name: the server derives one
+   * (and forces it for self-provisioners), which is exactly the workspace the
+   * card claims to be about.
+   */
+  const handleCreate = async (templateName: string) => {
+    // Still inside the click — see workspaceCreatingUrl.
+    const tab = window.open(workspaceCreatingUrl, '_blank');
+    setCreating(templateName);
+    try {
+      const result = await coderClient.provisionWorkspace({ body: { template: templateName } });
+      const workspaceName = result.workspace?.name;
+      if (!workspaceName) throw new Error('The workspace was not created.');
+
+      const launchUrl = workspaceLaunchUrl(result.user.username, workspaceName);
+      if (tab) {
+        tab.location.replace(launchUrl);
+        notify('Workspace created — opening in a new tab', 'success');
+      } else {
+        router.push(launchUrl);
+      }
+      refresh();
+    } catch (err) {
+      tab?.close();
+      notify(err instanceof Error ? err.message : 'Failed to create workspace', 'error');
+    } finally {
+      setCreating(null);
+    }
+  };
+
+  const creatable = usableOptions(options);
+
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
@@ -78,11 +137,22 @@ export default function WorkspacesPage() {
           subtitle="Your development workspaces — all of them share your home directory"
           actions={
             <div className="flex items-center gap-2">
-              <Button variant="secondary" onClick={() => reload()} disabled={loading}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  reload();
+                  refreshTemplates();
+                }}
+                disabled={loading}
+              >
                 Refresh
               </Button>
-              {canProvisionWorkspace && (
-                <ButtonLink href="/workspaces/create">New Workspace</ButtonLink>
+              {/* Maintainers only: everyone else gets exactly one workspace per
+                  type, so a name field would be a field with one legal value. */}
+              {isWorkspaceMaintainer && creatable.length > 0 && (
+                <Button variant="secondary" onClick={() => setCustomFormOpen((open) => !open)}>
+                  New workspace…
+                </Button>
               )}
             </div>
           }
@@ -116,6 +186,27 @@ export default function WorkspacesPage() {
           )}
         </div>
 
+        {!templatesError && (
+          <div className="shrink-0 space-y-3">
+            <h2 className="text-sm font-semibold text-gray-900">Create a workspace</h2>
+            {customFormOpen && (
+              <NewWorkspaceForm
+                options={creatable}
+                onClose={() => setCustomFormOpen(false)}
+                onCreated={refresh}
+              />
+            )}
+            <WorkspaceTypeGrid
+              options={options}
+              workspaces={workspaces}
+              busyTemplate={creating}
+              onCreate={handleCreate}
+              onOpen={handleOpenOwn}
+              isMaintainer={isWorkspaceMaintainer}
+            />
+          </div>
+        )}
+
         {loading ? (
           <ListLoading>Loading workspaces…</ListLoading>
         ) : !error && workspaces.length === 0 ? (
@@ -127,27 +218,25 @@ export default function WorkspacesPage() {
             }
             title="No workspaces"
             description={
-              canProvisionWorkspace
-                ? 'Get started by creating your first workspace.'
+              creatable.length > 0
+                ? 'Pick a workspace type above to create your first one.'
                 : 'No workspaces have been provisioned for you yet. Please contact your administrator.'
-            }
-            action={
-              canProvisionWorkspace ? (
-                <ButtonLink href="/workspaces/create">New Workspace</ButtonLink>
-              ) : undefined
             }
           />
         ) : !error ? (
-          <ScrollPanel>
-            <WorkspaceTable
-              workspaces={workspaces}
-              onStart={actions.start}
-              onStop={actions.stop}
-              onDelete={(owner, name) => setDeleteTarget({ owner, name })}
-              onViewDetails={handleViewDetails}
-              onLaunch={handleLaunch}
-            />
-          </ScrollPanel>
+          <>
+            <h2 className="shrink-0 text-sm font-semibold text-gray-900">Your workspaces</h2>
+            <ScrollPanel>
+              <WorkspaceTable
+                workspaces={workspaces}
+                onStart={actions.start}
+                onStop={actions.stop}
+                onDelete={(owner, name) => setDeleteTarget({ owner, name })}
+                onViewDetails={handleViewDetails}
+                onLaunch={handleLaunch}
+              />
+            </ScrollPanel>
+          </>
         ) : null}
 
         {/* Delete Confirmation */}
