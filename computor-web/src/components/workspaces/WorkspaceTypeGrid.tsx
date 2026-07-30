@@ -6,7 +6,6 @@ import { derivedWorkspaceName } from '@/src/utils/workspaceLaunch';
 import TemplateCard from './TemplateCard';
 import WorkspaceStatusBadge, { categorizeStatus } from './WorkspaceStatusBadge';
 import { isUsable, type TemplateOption } from './templateOptions';
-import { workspaceStage } from './workspaceStage';
 
 /**
  * The workspace types a user can have, as the place they create one.
@@ -85,20 +84,21 @@ export default function WorkspaceTypeGrid({
         }
 
         const category = categorizeStatus(own.latest_build_status, own.latest_build_transition);
-        const stage = workspaceStage(own.latest_build_status, own.latest_build_transition);
         return (
           <TemplateCard
             key={option.name}
             option={option}
-            // The card's own stage bar is about the TEMPLATE being deployed;
-            // this line is about the user's workspace on it. Both can be true
-            // at once (an update runs while your workspace is up), so they are
-            // kept as separate sentences rather than one merged status.
+            // What the click does, never what the badge beside it already
+            // says: while a workspace is stopping, "Stopping" belongs in the
+            // chip once, not in the chip and in the line under the title.
+            // (The card's own stage bar, when it has one, is about the
+            // TEMPLATE being deployed — a different fact about a different
+            // thing, which is why both can be on one card.)
             actionLabel={
               category === 'running' ? 'Open workspace'
               : category === 'stopped' ? 'Start and open'
               : category === 'failed' ? 'Failed — open for details'
-              : `${stage.label}…`
+              : 'Open when ready'
             }
             trailing={
               <WorkspaceStatusBadge

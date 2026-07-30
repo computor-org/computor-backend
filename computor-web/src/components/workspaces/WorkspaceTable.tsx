@@ -4,9 +4,7 @@ import { useState } from 'react';
 import type { CoderWorkspace } from '@/src/types/workspaces';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/src/components/ui/Table';
 import Button from '@/src/components/ui/Button';
-import ProgressTrack from '@/src/components/ui/ProgressTrack';
 import WorkspaceStatusBadge, { categorizeStatus } from './WorkspaceStatusBadge';
-import { workspaceStage } from './workspaceStage';
 
 interface WorkspaceTableProps {
   workspaces: CoderWorkspace[];
@@ -42,7 +40,6 @@ function WorkspaceRow({
   const owner = workspace.owner_name || '';
   const transition = workspace.latest_build_transition;
   const category = categorizeStatus(workspace.latest_build_status, transition);
-  const stage = workspaceStage(workspace.latest_build_status, transition);
 
   const runAction = async (action: 'start' | 'stop', fn: (o: string, n: string) => Promise<void>) => {
     if (!owner) return;
@@ -64,27 +61,11 @@ function WorkspaceRow({
       </Td>
       <Td>
         {/*
-          Fixed width so the bar appearing mid-transition does not reflow the
-          columns beside it on every poll.
+          The chip alone. A workspace starting or stopping is a wait of seconds
+          with no stages to report, and the chip already names it ("stopping") —
+          a bar beside it drew a second, vaguer copy of the same word.
         */}
-        <div className="w-44 space-y-1.5">
-          <WorkspaceStatusBadge status={workspace.latest_build_status} transition={transition} />
-          {/*
-            Only while something is happening. A permanent bar sitting at 0 for
-            every stopped workspace would be noise, not information.
-          */}
-          {!stage.settled && (
-            <>
-              <ProgressTrack
-                value={stage.percent}
-                tone={stage.tone}
-                active={stage.active}
-                label={`${stage.label} ${workspace.name}`}
-              />
-              <p className="text-xs text-gray-500">{stage.label}…</p>
-            </>
-          )}
-        </div>
+        <WorkspaceStatusBadge status={workspace.latest_build_status} transition={transition} />
       </Td>
       <Td className="text-sm text-gray-500 whitespace-nowrap">
         {workspace.created_at ? new Date(workspace.created_at).toLocaleDateString() : '—'}

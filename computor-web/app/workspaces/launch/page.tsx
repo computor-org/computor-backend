@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Button from '@/src/components/ui/Button';
-import ProgressTrack from '@/src/components/ui/ProgressTrack';
+import Spinner from '@/src/components/ui/Spinner';
 import { categorizeStatus } from '@/src/components/workspaces/WorkspaceStatusBadge';
 import { workspaceStage } from '@/src/components/workspaces/workspaceStage';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -163,15 +163,12 @@ function LaunchWorkspace() {
       ? terminalError
       : 'This link is missing the workspace to open.';
 
-  // Same stage vocabulary as the workspaces list, so the row you clicked and the
-  // tab it opened describe the wait with the same words.
-  //
-  // Before the first poll lands (and while `creating` has no workspace to poll
-  // at all) there is no status to map, so the bar starts at the provisioning
-  // stage rather than at zero: the request is already in flight.
+  // The stage in words — 'Starting', 'Preparing the editor'. Before the first
+  // poll lands (and while `creating` has no workspace to poll at all) there is
+  // no status to map, so say what we know is happening.
   const stage = details
     ? workspaceStage(details.status, undefined, details.agent_lifecycle)
-    : { percent: 15, label: hasTarget ? 'Starting' : 'Creating your workspace', tone: 'blue' as const, active: true, settled: false };
+    : { label: hasTarget ? 'Starting' : 'Creating your workspace' };
 
   useEffect(() => {
     document.title = errorMessage
@@ -201,14 +198,14 @@ function LaunchWorkspace() {
         {name && <p className="text-sm text-gray-500">{name}</p>}
       </div>
 
-      <div className="space-y-2">
-        <ProgressTrack
-          value={stage.percent}
-          tone={stage.tone}
-          active={stage.active}
-          size="md"
-          label={`${stage.label}${name ? ` ${name}` : ''}`}
-        />
+      {/*
+        A spinner and the stage in words. A bar here promised a measured wait
+        it could not deliver: the numbers were stage boundaries, and a cached
+        image passes all of them in three seconds while a cold MATLAB pull sits
+        on one for two minutes.
+      */}
+      <div className="flex flex-col items-center gap-3">
+        <Spinner size="md" label={`${stage.label}${name ? ` ${name}` : ''}`} />
         <p className="text-sm text-gray-600 text-center">{stage.label}…</p>
       </div>
 

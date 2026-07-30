@@ -125,10 +125,10 @@ test('does not redirect while the workspace is merely running', async ({ page })
   await setup(page, [details({ status: 'running', lifecycle: 'starting', ready: false })]);
 
   await page.goto('/workspaces/launch?owner=u-me&name=code');
+  // The stage in words, not just "busy": the build is up, and what is left is
+  // the agent. No bar — a start has no measurable progress to draw.
   await expect(page.getByText('Preparing the editor…')).toBeVisible();
-  // The bar reports the stage, not just "busy" — the build is up (so it is past
-  // the provisioning stages) but the agent has not reported ready.
-  await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '80');
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
 
   await page.waitForTimeout(5_000);
   expect(page.url()).toContain('/workspaces/launch');

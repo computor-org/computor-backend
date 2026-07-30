@@ -1,26 +1,20 @@
-import type { ProgressTone } from '@/src/components/ui/ProgressTrack';
 import type { AgentLifecycle } from '@/src/types/workspaces';
 import { AGENT_LIFECYCLE_GAVE_UP } from '@/src/types/workspaces';
 import { categorizeStatus, type StatusCategory } from './WorkspaceStatusBadge';
 
 /**
- * One workspace's position in its lifecycle, as something a bar can draw.
+ * What one workspace is doing, in a word.
  *
- * Coder reports stages ("starting"), never percentages, so the numbers here are
- * the *stage boundaries* of a start: queued, provisioning, agent booting, in.
- * They are honest about ordering and never about time — a MATLAB image pulling
- * for two minutes sits at the same 45 as a cached one that passes through in
- * three seconds. That is why anything unfinished also sets `active`, which
- * makes the bar sweep: the width says how far, the motion says still going.
+ * Deliberately not something a bar can draw. A workspace start or stop is a
+ * wait of seconds whose only honest content is which step it is on, and the
+ * status chip already carries that — a bar beside it drew a second, vaguer
+ * copy of the same word while sitting at a percentage nobody measured.
+ * (Template deployments are the opposite case and do get bars: tens of
+ * minutes, several templates, stages worth comparing — see templateTaskStage.)
  */
 export interface WorkspaceStage {
-  /** 0–100, the stage boundary reached. */
-  percent: number;
   /** Short human label for the stage, e.g. 'Starting'. */
   label: string;
-  tone: ProgressTone;
-  /** Work is still in flight — draw the bar as moving. */
-  active: boolean;
   /** Nothing is happening: a settled workspace (running, stopped) or a failure. */
   settled: boolean;
 }
@@ -43,24 +37,16 @@ export function workspaceStage(
   const deleting = transition === 'delete';
 
   if (category === 'failed') {
-    return { percent: 100, label: 'Failed', tone: 'red', active: false, settled: true };
+    return { label: 'Failed', settled: true };
   }
 
   if (category === 'pending') {
     const s = (status || '').toLowerCase();
-    if (deleting || s === 'deleting') {
-      return { percent: 60, label: 'Deleting', tone: 'gray', active: true, settled: false };
-    }
-    if (stopping || s === 'stopping') {
-      return { percent: 60, label: 'Stopping', tone: 'gray', active: true, settled: false };
-    }
-    if (s === 'canceling') {
-      return { percent: 60, label: 'Canceling', tone: 'gray', active: true, settled: false };
-    }
-    if (s === 'starting') {
-      return { percent: 45, label: 'Starting', tone: 'blue', active: true, settled: false };
-    }
-    return { percent: 15, label: 'Queued', tone: 'blue', active: true, settled: false };
+    if (deleting || s === 'deleting') return { label: 'Deleting', settled: false };
+    if (stopping || s === 'stopping') return { label: 'Stopping', settled: false };
+    if (s === 'canceling') return { label: 'Canceling', settled: false };
+    if (s === 'starting') return { label: 'Starting', settled: false };
+    return { label: 'Queued', settled: false };
   }
 
   if (category === 'running') {
@@ -68,23 +54,23 @@ export function workspaceStage(
     // the agent still has a startup script to finish. Only the details endpoint
     // knows; from the list, `running` is as far as we can honestly claim.
     if (agentLifecycle === undefined || agentLifecycle === null) {
-      return { percent: 100, label: 'Running', tone: 'green', active: false, settled: true };
+      return { label: 'Running', settled: true };
     }
     if (agentLifecycle === 'ready') {
-      return { percent: 100, label: 'Ready', tone: 'green', active: false, settled: true };
+      return { label: 'Ready', settled: true };
     }
     if (AGENT_LIFECYCLE_GAVE_UP.includes(agentLifecycle)) {
       // Running, but its startup script is never reporting ready. Not a build
-      // failure — the workspace opens — so amber, and settled: waiting longer
-      // changes nothing.
-      return { percent: 100, label: 'Running (startup incomplete)', tone: 'amber', active: false, settled: true };
+      // failure — the workspace opens — so settled: waiting longer changes
+      // nothing.
+      return { label: 'Running (startup incomplete)', settled: true };
     }
-    return { percent: 80, label: 'Preparing the editor', tone: 'blue', active: true, settled: false };
+    return { label: 'Preparing the editor', settled: false };
   }
 
   if (category === 'stopped') {
-    return { percent: 0, label: 'Stopped', tone: 'gray', active: false, settled: true };
+    return { label: 'Stopped', settled: true };
   }
 
-  return { percent: 0, label: 'Unknown', tone: 'gray', active: false, settled: true };
+  return { label: 'Unknown', settled: true };
 }

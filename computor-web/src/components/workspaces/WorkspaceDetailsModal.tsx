@@ -1,7 +1,6 @@
 'use client';
 
 import Modal from '@/src/components/Modal';
-import ProgressTrack from '@/src/components/ui/ProgressTrack';
 import WorkspaceStatusBadge from './WorkspaceStatusBadge';
 import { workspaceStage } from './workspaceStage';
 import type { WorkspaceDetails } from '@/src/types/workspaces';
@@ -33,16 +32,13 @@ export default function WorkspaceDetailsModal({
                 <td className="py-2">
                   <div className="space-y-1.5">
                     <WorkspaceStatusBadge status={details.status} />
+                    {/*
+                      No bar (see WorkspaceTable) — but the words stay, because
+                      this is the one view that knows the agent's lifecycle:
+                      'running' and 'preparing the editor' are the same chip.
+                    */}
                     {!stage.settled && (
-                      <>
-                        <ProgressTrack
-                          value={stage.percent}
-                          tone={stage.tone}
-                          active={stage.active}
-                          label={`${stage.label} ${ws.name}`}
-                        />
-                        <p className="text-xs text-gray-500">{stage.label}…</p>
-                      </>
+                      <p className="text-xs text-gray-500">{stage.label}…</p>
                     )}
                   </div>
                 </td>
