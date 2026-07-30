@@ -57,15 +57,67 @@ fi
 
 # Machine-level settings are scoped to this code-server instance. The official
 # extension uses this installation for language services, execution and debug.
+#
+# MATLAB.defaultEditor is off because it cannot succeed here. The extension
+# tries to make VS Code MATLAB's default editor by looking for a `code`
+# executable — `which code`, then the paths a desktop install would use — and a
+# browser-based editor has none, so every workspace greeted its owner with
+# "Unable to set MATLAB default editor to Visual Studio Code" and an extension
+# host error. Nothing in this container can satisfy the check; `edit foo.m` at
+# the MATLAB prompt has never opened a tab here and does not now.
 USER_DATA_DIR="/home/coder/.local/share/code-server-${workspace_name_lower}"
+SETTINGS_FILE="$USER_DATA_DIR/User/settings.json"
 mkdir -p "$USER_DATA_DIR/User"
-if [ ! -f "$USER_DATA_DIR/User/settings.json" ]; then
-  cat > "$USER_DATA_DIR/User/settings.json" <<'SETTINGS_EOF'
+if [ ! -f "$SETTINGS_FILE" ]; then
+  cat > "$SETTINGS_FILE" <<'SETTINGS_EOF'
 {
   "MATLAB.installPath": "/opt/matlab/R2024b",
-  "MATLAB.signIn": true
+  "MATLAB.signIn": true,
+  "MATLAB.defaultEditor": false
 }
 SETTINGS_EOF
+else
+  # Workspaces built before a setting was added already have this file, and it
+  # is written once and then owned by the student — so add what is missing and
+  # touch nothing else. A file with comments in it (VS Code allows them) is not
+  # parseable here; leaving it alone is the right answer either way.
+  python3 - "$SETTINGS_FILE" <<'MERGE_EOF' || echo "WARN: could not update $SETTINGS_FILE; MATLAB.defaultEditor stays as it is" >&2
+import json
+import os
+import sys
+import tempfile
+
+path = sys.argv[1]
+wanted = {
+    "MATLAB.installPath": "/opt/matlab/R2024b",
+    "MATLAB.signIn": True,
+    "MATLAB.defaultEditor": False,
+}
+
+try:
+    with open(path, encoding="utf-8") as handle:
+        settings = json.load(handle)
+except ValueError as error:
+    # VS Code accepts comments and trailing commas in settings.json; json does
+    # not. A file this cannot read is a file it has no business rewriting.
+    raise SystemExit("settings.json is not plain JSON (%s)" % error)
+if not isinstance(settings, dict):
+    raise SystemExit("settings.json does not hold an object")
+
+missing = {key: value for key, value in wanted.items() if key not in settings}
+if not missing:
+    raise SystemExit(0)
+
+settings.update(missing)
+with tempfile.NamedTemporaryFile(
+    "w", encoding="utf-8", dir=os.path.dirname(path), delete=False
+) as out:
+    json.dump(settings, out, indent=2)
+    out.write("\n")
+    temporary = out.name
+os.replace(temporary, path)
+print("settings.json: added " + ", ".join(sorted(missing)))
+MERGE_EOF
 fi
 
 # code-server compares its session cookie against HASHED_PASSWORD, so handing it
