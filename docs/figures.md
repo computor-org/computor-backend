@@ -271,10 +271,42 @@ The viewer only runs where there is something to watch: `COMPUTOR_FIGURES_DIR`
 set, or the default folder already present. On a lecturer's own machine it
 stays out of the way, command palette included.
 
+- `src/ui/panels/ImagePreviewPanel.ts` — the image editor, for a PNG opened
+  from the file tree rather than published to the folder. The workspace
+  templates make it the default for image files by writing
+  `workbench.editorAssociations` into the workspace settings; it is contributed
+  at `option` priority so it takes over there and nowhere else.
+
 Images travel to the webview as `data:` URIs rather than through
 `asWebviewUri`, for the same reason `renderWebviewPage` inlines CSS and JS:
 those URIs are served through a service worker that Firefox blocks under
 code-server, which is what left webviews blank in issue #267.
+
+**What that service worker actually does, measured in issue #282.** A webview's
+content is not the iframe VS Code creates — it is a *second* iframe inside that
+one. Measured against a code-server container in Firefox, that grandchild is
+not served by the service worker: `navigator.serviceWorker.controller` is set
+there and lies, so even a same-origin request from that frame is answered by
+the network, while the identical request one frame up is answered by the
+worker. Chrome and current WebKit route both. When it happens, *every*
+`asWebviewUri` resource in that webview fails at once — which is what made VS
+Code's own image editor show "An error occurred while loading the image" beside
+"The image is stored with Git LFS", neither true, and both visible only because
+the stylesheet keeping them hidden had failed to load too. Older Safari fails
+the same way for a reason of its own (issue #274).
+
+**It is not consistent, and the remaining variable is not known.** The built-in
+editor has been seen working in Firefox against a dev-mode Coder workspace on
+the same day it failed elsewhere, and a warm browser profile does not explain
+it — three consecutive visits with the service worker already installed broke
+identically. The untested difference between the two setups is the path the
+editor is served on: a bare container on `/`, against Coder's Traefik route
+with `--abs-proxy-base-path`, which is also what changes the worker's scope.
+Worth knowing before trusting a single "works for me" either way.
+
+None of this reaches anything inlined, which is why the figures above kept
+working the whole time while opening the same PNG as a file did not — and why
+the fix is to stop fetching rather than to chase the worker.
 
 ## Troubleshooting
 

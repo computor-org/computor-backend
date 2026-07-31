@@ -73,6 +73,19 @@ fi
 # ~/workspace in a single-tenant container the student owns, opened for them by
 # the workspace itself, so the question buys nothing and a student who dismisses
 # it is left with an editor that looks broken.
+#
+# Images open in the Computor viewer because the built-in one cannot show them
+# here. It fetches the picture, its stylesheet and its script from a host that
+# exists only inside the webview service worker, and under code-server the
+# webview content sits in a grandchild iframe whose requests Firefox never
+# routes through that worker (older Safari fails the same way for its own
+# reason). What a student saw instead was VS Code's own hidden panels —
+# "An error occurred while loading the image" next to "The image is stored with
+# Git LFS" — neither of them true (computor-org/issues#282). The Computor
+# viewer inlines the image as a data: URI, so there is no fetch to lose. It is
+# contributed at "option" priority precisely so this association, and not the
+# extension, decides where it takes over: a lecturer running the extension on
+# their own machine keeps the built-in editor, which works fine there.
 USER_DATA_DIR="/home/coder/.local/share/code-server-${workspace_name_lower}"
 SETTINGS_FILE="$USER_DATA_DIR/User/settings.json"
 mkdir -p "$USER_DATA_DIR/User"
@@ -82,7 +95,16 @@ if [ ! -f "$SETTINGS_FILE" ]; then
   "MATLAB.installPath": "/opt/matlab/R2024b",
   "MATLAB.signIn": true,
   "MATLAB.defaultEditor": false,
-  "security.workspace.trust.enabled": false
+  "security.workspace.trust.enabled": false,
+  "workbench.editorAssociations": {
+    "*.png": "computor.imagePreview",
+    "*.jpg": "computor.imagePreview",
+    "*.jpeg": "computor.imagePreview",
+    "*.gif": "computor.imagePreview",
+    "*.bmp": "computor.imagePreview",
+    "*.webp": "computor.imagePreview",
+    "*.svg": "computor.imagePreview"
+  }
 }
 SETTINGS_EOF
 else
@@ -102,6 +124,15 @@ wanted = {
     "MATLAB.signIn": True,
     "MATLAB.defaultEditor": False,
     "security.workspace.trust.enabled": False,
+    "workbench.editorAssociations": {
+        "*.png": "computor.imagePreview",
+        "*.jpg": "computor.imagePreview",
+        "*.jpeg": "computor.imagePreview",
+        "*.gif": "computor.imagePreview",
+        "*.bmp": "computor.imagePreview",
+        "*.webp": "computor.imagePreview",
+        "*.svg": "computor.imagePreview",
+    },
 }
 
 try:
