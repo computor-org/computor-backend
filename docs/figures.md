@@ -101,17 +101,35 @@ when it is absent, so a student who edits it keeps their version.
 
 [`ops/coder/templates/matlab-vscode/figures/+figurewatch`](../ops/coder/templates/matlab-vscode/figures/+figurewatch)
 watches the session's figures on a timer and mirrors them into the folder.
-`startup.m`, installed into `$MATLABROOT/toolbox/local`, starts it for every
-MATLAB session in the image — including the background MATLAB that the
-MathWorks extension launches to run and debug code, which is where a student's
-plots actually come from. MATLAB starts in `~/Documents/MATLAB`, so only a
-`startup.m` a student puts *there* would take this one's place.
+[`matlabrc-figurewatch.m`](../ops/coder/templates/matlab-vscode/figures/matlabrc-figurewatch.m),
+appended by the Dockerfile to `$MATLABROOT/toolbox/local/matlabrc.m`, starts it
+for every MATLAB session in the image — including the background MATLAB that
+the MathWorks extension launches to run and debug code, which is where a
+student's plots actually come from.
+
+**It is `matlabrc.m` and not `startup.m`, and that is the whole reason this
+feature ever worked.** `startup.m` is the conventional place and was the
+original one, and it published nothing at all: MATLAB runs the *first*
+`startup` on the search path, the userpath `~/Documents/MATLAB` comes before
+`$MATLABROOT/toolbox/local`, and the MathWorks base image ships a `startup.m`
+of its own into exactly that folder — a stub that copies proxy settings out of
+the environment. The shared home volume is seeded from that image, so every
+workspace had it, and Computor's file was shadowed in every session. `matlabrc`
+is the hook in the same directory that nothing claims, because MathWorks tells
+you not to edit it; it also runs before `startup.m`, so a student who writes
+one of their own keeps their figures.
+
+Two consequences worth remembering. The fix lives entirely in the image, so
+existing workspaces pick it up on a rebuild with no home-volume surgery. And
+`matlabrc.m` is a vendor file: the append is only sound because R2024b's is a
+plain script with no trailing local functions, which is worth rechecking
+whenever the MATLAB version moves.
 
 **No display is involved.** MATLAB exports figures perfectly well from a session
 that has none, which is how this is verified. The `Xvfb` the startup script used
 to attach is gone: it is what took the workspace down, because every MATLAB in
 the container inherited a `DISPLAY` that did not answer and blocked on it.
-Software OpenGL is the only renderer here, so `startup.m` also silences the
+Software OpenGL is the only renderer here, so the bootstrap also silences the
 `MATLAB:hg:AutoSoftwareOpenGL` warning MATLAB otherwise prints the first time a
 student draws anything — the display-driver advice it links to cannot be acted
 on inside a container.
@@ -275,6 +293,16 @@ in that shell.
 
 **MATLAB writes nothing.** `timerfind('Name', 'ComputorFigureWatch')` shows
 whether the watcher is running in that session; `figurewatch.start()` starts it
-by hand and reports why if it cannot. A figure that stays out of the folder
-while others arrive is a figure with nothing in it — `get(gcf, 'Children')`.
-`DISPLAY` is expected to be empty; MATLAB does not need one to export.
+by hand and reports why if it cannot. If the timer is missing in every session,
+the bootstrap is not running: `type matlabrc` should end with it, and
+`which -all startup` is worth a look for a file that has taken its place. A
+figure that stays out of the folder while others arrive is a figure with
+nothing in it — `get(gcf, 'Children')`. `DISPLAY` is expected to be empty;
+MATLAB does not need one to export.
+
+**The editor has no Computor sidebar and no Figures panel at all.** Check the
+status bar for *Restricted Mode*. Workspace trust is disabled in the settings
+the startup script writes, but a `settings.json` from an older workspace is the
+student's to own and is only added to — if `security.workspace.trust.enabled`
+is missing there it will have been added on the next start, and *Trust* in the
+Manage menu fixes the session in the meantime.
