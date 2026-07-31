@@ -65,6 +65,14 @@ fi
 # "Unable to set MATLAB default editor to Visual Studio Code" and an extension
 # host error. Nothing in this container can satisfy the check; `edit foo.m` at
 # the MATLAB prompt has never opened a tab here and does not now.
+#
+# Workspace trust is off because the prompt it puts in front of a new workspace
+# has only one honest answer and a costly wrong one. Until it is answered the
+# editor is in Restricted Mode, which disables the Computor extension outright:
+# no course tree, no Figures panel, no sign-in. The folder being asked about is
+# ~/workspace in a single-tenant container the student owns, opened for them by
+# the workspace itself, so the question buys nothing and a student who dismisses
+# it is left with an editor that looks broken.
 USER_DATA_DIR="/home/coder/.local/share/code-server-${workspace_name_lower}"
 SETTINGS_FILE="$USER_DATA_DIR/User/settings.json"
 mkdir -p "$USER_DATA_DIR/User"
@@ -73,7 +81,8 @@ if [ ! -f "$SETTINGS_FILE" ]; then
 {
   "MATLAB.installPath": "/opt/matlab/R2024b",
   "MATLAB.signIn": true,
-  "MATLAB.defaultEditor": false
+  "MATLAB.defaultEditor": false,
+  "security.workspace.trust.enabled": false
 }
 SETTINGS_EOF
 else
@@ -81,7 +90,7 @@ else
   # is written once and then owned by the student — so add what is missing and
   # touch nothing else. A file with comments in it (VS Code allows them) is not
   # parseable here; leaving it alone is the right answer either way.
-  python3 - "$SETTINGS_FILE" <<'MERGE_EOF' || echo "WARN: could not update $SETTINGS_FILE; MATLAB.defaultEditor stays as it is" >&2
+  python3 - "$SETTINGS_FILE" <<'MERGE_EOF' || echo "WARN: could not update $SETTINGS_FILE; its settings stay as they are" >&2
 import json
 import os
 import sys
@@ -92,6 +101,7 @@ wanted = {
     "MATLAB.installPath": "/opt/matlab/R2024b",
     "MATLAB.signIn": True,
     "MATLAB.defaultEditor": False,
+    "security.workspace.trust.enabled": False,
 }
 
 try:

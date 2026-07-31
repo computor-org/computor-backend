@@ -92,14 +92,25 @@ USER root
 # Figures. There is no desktop in this container, so a MATLAB figure window
 # has nowhere to appear and a student's `plot(x, y)` would produce nothing
 # they can see. figurewatch mirrors every figure of a session into
-# COMPUTOR_FIGURES_DIR, where the Computor extension picks it up.
-# startup.m runs for every MATLAB session in this image — including the
-# background MATLAB the MathWorks extension starts to run and debug code,
-# which is the session a student's plots actually come from. It needs no
+# COMPUTOR_FIGURES_DIR, where the Computor extension picks it up. It needs no
 # display: MATLAB exports figures from a session that has none.
-# See docs/figures.md.
+#
+# The bootstrap is appended to matlabrc.m rather than dropped in as
+# toolbox/local/startup.m, which is what it used to be and why it published
+# nothing: the MathWorks base image seeds its own startup.m into
+# ~/Documents/MATLAB, that folder is the userpath and comes first on the
+# search path, and MATLAB runs only the first `startup` it finds. Both files
+# run for every session in this image, including the background MATLAB the
+# MathWorks extension starts to run and debug code — but only matlabrc.m
+# cannot be shadowed from a home directory. See docs/figures.md.
+#
+# R2024b's matlabrc.m is a plain script with no trailing local functions, so
+# appending to it is sound. Recheck that when the MATLAB version moves.
 COPY figures/+figurewatch /opt/computor/matlab/+figurewatch
-COPY figures/startup.m /opt/matlab/R2024b/toolbox/local/startup.m
+COPY figures/matlabrc-figurewatch.m /tmp/matlabrc-figurewatch.m
+RUN printf '\n' >> /opt/matlab/R2024b/toolbox/local/matlabrc.m \
+    && cat /tmp/matlabrc-figurewatch.m >> /opt/matlab/R2024b/toolbox/local/matlabrc.m \
+    && rm /tmp/matlabrc-figurewatch.m
 ENV COMPUTOR_FIGURES_DIR=/tmp/computor-figures
 
 RUN chown -R coder:coder /home/coder
