@@ -64,6 +64,85 @@ if [ -x "$HOME/personalize" ]; then
   "$HOME/personalize" >/tmp/personalize.log 2>&1 || true
 fi
 
+# Images open in the Computor viewer because the built-in one cannot show them
+# here. It fetches the picture, its stylesheet and its script from a host that
+# exists only inside the webview service worker, and under code-server the
+# webview content sits in a grandchild iframe whose requests Firefox never
+# routes through that worker (older Safari fails the same way for its own
+# reason). What a student saw instead was VS Code's own hidden panels —
+# "An error occurred while loading the image" next to "The image is stored with
+# Git LFS" — neither of them true (computor-org/issues#282). The Computor
+# viewer inlines the image as a data: URI, so there is no fetch to lose. It is
+# contributed at "option" priority precisely so this association, and not the
+# extension, decides where it takes over: a lecturer running the extension on
+# their own machine keeps the built-in editor, which works fine there.
+USER_DATA_DIR="/home/coder/.local/share/code-server-${workspace_name_lower}"
+SETTINGS_FILE="$USER_DATA_DIR/User/settings.json"
+mkdir -p "$USER_DATA_DIR/User"
+if [ ! -f "$SETTINGS_FILE" ]; then
+  cat > "$SETTINGS_FILE" <<'SETTINGS_EOF'
+{
+  "workbench.editorAssociations": {
+    "*.png": "computor.imagePreview",
+    "*.jpg": "computor.imagePreview",
+    "*.jpeg": "computor.imagePreview",
+    "*.gif": "computor.imagePreview",
+    "*.bmp": "computor.imagePreview",
+    "*.webp": "computor.imagePreview",
+    "*.svg": "computor.imagePreview"
+  }
+}
+SETTINGS_EOF
+else
+  # Workspaces built before a setting was added already have this file, and it
+  # is written once and then owned by the student — so add what is missing and
+  # touch nothing else. A file with comments in it (VS Code allows them) is not
+  # parseable here; leaving it alone is the right answer either way.
+  python3 - "$SETTINGS_FILE" <<'MERGE_EOF' || echo "WARN: could not update $SETTINGS_FILE; its settings stay as they are" >&2
+import json
+import os
+import sys
+import tempfile
+
+path = sys.argv[1]
+wanted = {
+    "workbench.editorAssociations": {
+        "*.png": "computor.imagePreview",
+        "*.jpg": "computor.imagePreview",
+        "*.jpeg": "computor.imagePreview",
+        "*.gif": "computor.imagePreview",
+        "*.bmp": "computor.imagePreview",
+        "*.webp": "computor.imagePreview",
+        "*.svg": "computor.imagePreview",
+    },
+}
+
+try:
+    with open(path, encoding="utf-8") as handle:
+        settings = json.load(handle)
+except ValueError as error:
+    # VS Code accepts comments and trailing commas in settings.json; json does
+    # not. A file this cannot read is a file it has no business rewriting.
+    raise SystemExit("settings.json is not plain JSON (%s)" % error)
+if not isinstance(settings, dict):
+    raise SystemExit("settings.json does not hold an object")
+
+missing = {key: value for key, value in wanted.items() if key not in settings}
+if not missing:
+    raise SystemExit(0)
+
+settings.update(missing)
+with tempfile.NamedTemporaryFile(
+    "w", encoding="utf-8", dir=os.path.dirname(path), delete=False
+) as out:
+    json.dump(settings, out, indent=2)
+    out.write("\n")
+    temporary = out.name
+os.replace(temporary, path)
+print("settings.json: added " + ", ".join(sorted(missing)))
+MERGE_EOF
+fi
+
 # Start code-server in background
 # Configure abs-proxy-base-path for Traefik routing at /coder prefix
 # Bind to 0.0.0.0 so Traefik can reach it from outside the container
@@ -86,7 +165,7 @@ code-server \
   --bind-addr 0.0.0.0:${code_server_port} \
   --abs-proxy-base-path "${coder_base_path}/${owner_name}/${workspace_name}" \
   --extensions-dir /opt/code-server/extensions \
-  --user-data-dir "/home/coder/.local/share/code-server-${workspace_name_lower}" \
+  --user-data-dir "$USER_DATA_DIR" \
   /home/coder/workspace \
   >/tmp/code-server.log 2>&1 &
 %{ else }
@@ -97,7 +176,7 @@ code-server \
   --bind-addr 0.0.0.0:${code_server_port} \
   --abs-proxy-base-path "${coder_base_path}/${owner_name}/${workspace_name}" \
   --extensions-dir /opt/code-server/extensions \
-  --user-data-dir "/home/coder/.local/share/code-server-${workspace_name_lower}" \
+  --user-data-dir "$USER_DATA_DIR" \
   /home/coder/workspace \
   >/tmp/code-server.log 2>&1 &
 %{ endif }
