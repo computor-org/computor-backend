@@ -30,6 +30,16 @@ A template directory must contain:
 - `coder_template_name` — the name in Coder; what the provision API takes as `template`.
 - `image_name` — docker image name, pushed to the local registry as `:latest` + an immutable `:vYYYYMMDD-HHMMSS` tag that the pushed template version pins to.
 - `build_args_env` — env var names passed through as docker build args.
+- `source_repos` — external git repos the image builds from. Each entry is
+  `{"url": ..., "ref": ..., "sha_build_arg": ...}`; before every build the worker resolves `ref`
+  to its current commit (`git ls-remote`) and passes it as that build arg.
+  **A template that clones a repo must declare it here.** Docker keys a `RUN` layer on its command
+  string, so a Dockerfile that checks out a *branch name* is byte-identical on every build: the
+  first checkout ever made stays cached and no later commit reaches the image — silently, with the
+  build reporting success. The Dockerfile should fetch `${<sha_build_arg>:-${<ref arg>}}` so a bare
+  `docker build` still works. An unresolvable repo logs a warning and builds from cache rather than
+  failing. The resolved commit is stamped on the image as `computor.extension.revision`, returned by
+  the build activity, and shown in the admin panel's progress rows.
 - `display_name` / `description` / `icon` — display metadata PATCHed into Coder after each push; the web UI renders these. Icons: Coder built-ins under `/icon/*.svg` (see https://github.com/coder/coder/tree/main/site/static/icon) or an absolute URL.
 
 ## Lifecycle

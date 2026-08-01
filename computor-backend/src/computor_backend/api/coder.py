@@ -1200,6 +1200,7 @@ async def push_coder_templates(
     params["templates"] = request.templates
     params["build_images"] = request.build_images
     params["image_tag"] = request.image_tag
+    params["no_cache"] = request.no_cache
 
     submission = TaskSubmission(
         task_name="push_coder_templates",

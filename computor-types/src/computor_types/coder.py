@@ -338,6 +338,15 @@ class TemplatePushRequest(BaseModel):
         None,
         description="Immutable image tag the pushed template version pins to (and builds, when build_images). None = auto-generated from the run time.",
     )
+    no_cache: bool = Field(
+        False,
+        description=(
+            "Rebuild every image layer from scratch. Templates that build from an "
+            "external repo already re-run that checkout whenever the repo moves, so "
+            "this is only for cache staleness that mechanism does not cover — it is "
+            "much slower."
+        ),
+    )
 
 
 class WorkspaceRolloutRequest(BaseModel):

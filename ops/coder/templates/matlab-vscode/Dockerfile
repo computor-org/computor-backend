@@ -3,6 +3,17 @@ FROM node:20-bookworm AS vsix-builder
 
 ARG EXTENSION_REPO_URL=https://github.com/computor-org/computor-vscode.git
 ARG EXTENSION_REPO_REF="release/2026.10"
+# The commit EXTENSION_REPO_REF pointed at when the build was submitted,
+# resolved and passed in by build_workspace_image (see the template's
+# source_repos manifest key). It exists to move this stage's cache key: docker
+# keys a RUN layer on its command string, so checking out a *branch name* is
+# byte-identical forever — the first checkout ever made stays cached and no
+# later commit reaches the image. The extension's package.json version has no
+# bearing on that; the checkout simply never runs again.
+#
+# Empty (a bare `docker build`) falls back to the ref, and with it to the old
+# caching behaviour — fine for a one-off local build, never for the fleet.
+ARG EXTENSION_REPO_SHA=""
 
 WORKDIR /build
 
@@ -10,7 +21,13 @@ RUN apt-get update \
     && apt-get install --yes --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git clone --depth 1 --branch "${EXTENSION_REPO_REF}" "${EXTENSION_REPO_URL}" extension
+# Fetch the exact commit rather than the branch tip: it pins what the resolver
+# saw (no resolve-then-clone race) and keys the layer on the SHA.
+RUN git init extension \
+    && cd extension \
+    && git remote add origin "${EXTENSION_REPO_URL}" \
+    && git fetch --depth 1 origin "${EXTENSION_REPO_SHA:-${EXTENSION_REPO_REF}}" \
+    && git checkout --detach FETCH_HEAD
 
 WORKDIR /build/extension
 
@@ -69,6 +86,12 @@ RUN curl -fsSL \
       "https://github.com/mathworks/MATLAB-extension-for-vscode/releases/download/v${MATLAB_EXTENSION_VERSION}/language-matlab-${MATLAB_EXTENSION_VERSION}.vsix" \
       -o /tmp/language-matlab.vsix \
     && chown coder:coder /tmp/language-matlab.vsix
+
+# Record which extension commit this image carries, so "did my change actually
+# ship?" is answerable with `docker image inspect` instead of archaeology on
+# layer dates. ARGs are per-stage, hence the re-declaration.
+ARG EXTENSION_REPO_SHA=""
+LABEL computor.extension.revision="${EXTENSION_REPO_SHA}"
 
 COPY --from=vsix-builder --chown=coder:coder \
     /tmp/computor-extension.vsix /tmp/computor-extension.vsix

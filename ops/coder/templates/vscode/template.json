@@ -2,6 +2,13 @@
     "coder_template_name": "vscode-workspace",
     "image_name": "computor-workspace-vscode",
     "build_args_env": [],
+    "source_repos": [
+        {
+            "url": "https://github.com/computor-org/computor-vscode.git",
+            "ref": "release/2026.10",
+            "sha_build_arg": "EXTENSION_REPO_SHA"
+        }
+    ],
     "display_name": "VS Code",
     "description": "VS Code in the browser (code-server) with the Computor extension. Ships Python 3.13.",
     "icon": "/icon/code.svg"
