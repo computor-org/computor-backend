@@ -62,6 +62,7 @@ export default function WorkspaceFleetPanel() {
   const notify = useNotify();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [imageTag, setImageTag] = useState('');
+  const [noCache, setNoCache] = useState(false);
   const [optimisticTask, setOptimisticTask] = useState<TaskInfo | null>(null);
 
   const { data, loading, error, reload, refresh } = useResource(
@@ -117,6 +118,7 @@ export default function WorkspaceFleetPanel() {
         templates: names,
         build_images: true,
         image_tag: imageTag.trim() || null,
+        no_cache: noCache,
       });
       setOptimisticTask({
         task_id: response.workflow_id,
@@ -202,6 +204,22 @@ export default function WorkspaceFleetPanel() {
               disabled={busy}
             />
           </div>
+          {/*
+            A build already re-runs the extension checkout whenever that repo
+            moves, so this is not the normal way to get a new extension — it is
+            the fallback for cache staleness elsewhere in the image, and it
+            rebuilds everything (slow, especially for MATLAB).
+          */}
+          <label className="flex items-center gap-2 pb-2 text-xs text-gray-700">
+            <input
+              type="checkbox"
+              checked={noCache}
+              onChange={(event) => setNoCache(event.target.checked)}
+              disabled={busy}
+              className="h-4 w-4"
+            />
+            Rebuild all layers (slow)
+          </label>
           <Button
             onClick={() => runBuildPush(selectedTemplates.map((template) => template.name))}
             disabled={busy || selectedTemplates.length === 0}

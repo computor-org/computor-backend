@@ -53,6 +53,66 @@ def _stale_version_tags(tags: List[str]) -> List[str]:
     return versioned[IMAGE_VERSIONS_TO_KEEP:]
 
 
+def _resolve_remote_sha(url: str, ref: str) -> Optional[str]:
+    """Commit SHA a remote ref points at right now, or None if it can't be read.
+
+    ``git ls-remote`` rather than a forge API: the templates only need a commit
+    id, and every git host answers this. git is present in the coder worker
+    image (docker/coder-runtime/Dockerfile installs it for GitPython).
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "ls-remote", url, ref],
+            capture_output=True, text=True, timeout=30,
+        )
+    except (subprocess.SubprocessError, OSError) as e:
+        logger.warning(f"git ls-remote {url} {ref} failed: {e}")
+        return None
+    if proc.returncode != 0:
+        logger.warning(f"git ls-remote {url} {ref} exited {proc.returncode}: {proc.stderr.strip()}")
+        return None
+    for line in proc.stdout.splitlines():
+        sha, _, name = line.partition("\t")
+        # A ref matches as given (a SHA already, or a full refs/... path) or by
+        # its short name; prefer the branch over a same-named tag's ^{} peel.
+        if sha and name and not name.endswith("^{}"):
+            return sha.strip()
+    logger.warning(f"git ls-remote {url} {ref} matched no ref")
+    return None
+
+
+def _source_repo_build_args(info: Dict[str, Any], template_key: str) -> Dict[str, str]:
+    """Build args pinning each tracked source repo to its current commit.
+
+    Docker keys a RUN layer on its command string, so a Dockerfile that checks
+    out a *branch name* produces a byte-identical instruction on every build and
+    keeps the first checkout it ever made — new commits never reach the image,
+    whatever the checked-out project's own version says. Feeding the resolved
+    SHA in as a build arg moves the cache key exactly when the source moves, and
+    leaves every layer before it cached.
+
+    A repo that cannot be resolved is skipped with a warning rather than failing
+    the build: an unreachable forge should not stop an image rebuild that may
+    have nothing to do with that repo.
+    """
+    args: Dict[str, str] = {}
+    for spec in info.get("source_repos") or []:
+        url, ref, arg = spec.get("url"), spec.get("ref"), spec.get("sha_build_arg")
+        if not (url and ref and arg):
+            logger.warning(f"[build:{template_key}] ignoring malformed source_repos entry: {spec}")
+            continue
+        sha = _resolve_remote_sha(url, ref)
+        if sha:
+            args[arg] = sha
+            logger.info(f"[build:{template_key}] {ref} -> {sha[:12]} ({arg})")
+        else:
+            logger.warning(
+                f"[build:{template_key}] could not resolve {ref} in {url}; building from "
+                "cache — the image may carry a stale copy of that repo"
+            )
+    return args
+
+
 def _discover_templates(templates_dir: str) -> Dict[str, Dict[str, Any]]:
     """
     Scan the templates directory for subdirectories containing template.json.
@@ -117,6 +177,7 @@ def build_workspace_image(
     templates_dir: str,
     registry_host: str,
     image_tag: str = "latest",
+    no_cache: bool = False,
 ) -> Dict[str, Any]:
     """
     Build a workspace Docker image and push it to the local registry.
@@ -130,6 +191,12 @@ def build_workspace_image(
     workspaces actually pull the new image (a moved ``:latest`` would not be
     re-pulled by the docker provider's ``keep_locally`` image resource) and a
     rollback target exists.
+
+    Templates that build from an external repo declare it under ``source_repos``
+    and get its current commit injected as a build arg, so the layer that checks
+    that repo out is rebuilt exactly when the repo moves — see
+    :func:`_source_repo_build_args`. ``no_cache`` is the blunt fallback for
+    everything that mechanism does not cover; it rebuilds every layer.
 
     Uses the Docker SDK (already a dependency) to build and push.
     """
@@ -166,9 +233,15 @@ def build_workspace_image(
         if val:
             buildargs[env_name] = val
 
+    # Pin every tracked source repo to the commit its ref points at now. This is
+    # what makes a rebuild actually pick up new extension commits.
+    source_revisions = _source_repo_build_args(info, template_key)
+    buildargs.update(source_revisions)
+
     logger.info(
         f"Building image {repo} tags={push_tags} from {build_dir}"
         + (f" (build_args: {list(buildargs.keys())})" if buildargs else "")
+        + (" [no-cache]" if no_cache else "")
     )
 
     try:
@@ -177,7 +250,11 @@ def build_workspace_image(
         # Build (tagged with the first tag), then apply the remaining tags to the
         # same image id so every tag is byte-identical.
         image, build_logs = client.images.build(
-            path=build_dir, tag=f"{repo}:{push_tags[0]}", rm=True, buildargs=buildargs or None
+            path=build_dir,
+            tag=f"{repo}:{push_tags[0]}",
+            rm=True,
+            buildargs=buildargs or None,
+            nocache=no_cache,
         )
         for chunk in build_logs:
             if "stream" in chunk:
@@ -198,6 +275,9 @@ def build_workspace_image(
             "template": template_key,
             "image": f"{repo}:{image_tag}",
             "tags": push_tags,
+            # Which commit of each tracked repo went in, so the operator can
+            # confirm a change shipped without inspecting the image.
+            "source_revisions": source_revisions,
         }
 
     except Exception as e:
@@ -518,6 +598,9 @@ def _progress_templates(resolved: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             "status": "pending",
             "phase": "queued",
             "error": None,
+            # Filled in after a build: {sha_build_arg: commit}. Lets the UI say
+            # which extension commit an image actually carries.
+            "source_revisions": {},
         }
         for item in resolved
     ]
@@ -579,6 +662,7 @@ class BuildWorkspaceImagesWorkflow(BaseWorkflow):
         requested = parameters.get("templates")
         # One immutable image tag per run; workflow.now() is replay-deterministic.
         image_tag = parameters.get("image_tag") or ("v" + workflow.now().strftime("%Y%m%d-%H%M%S"))
+        no_cache = bool(parameters.get("no_cache", False))
         self._progress.update({"phase": "discovering", "image_tag": image_tag})
 
         # Discovery happens inside the activity (which runs on the worker).
@@ -615,7 +699,7 @@ class BuildWorkspaceImagesWorkflow(BaseWorkflow):
             _update_template_progress(self._progress, key, status="running", phase="building")
             result = await workflow.execute_activity(
                 build_workspace_image,
-                args=[key, templates_dir, registry_host, image_tag],
+                args=[key, templates_dir, registry_host, image_tag, no_cache],
                 start_to_close_timeout=timedelta(minutes=15),
                 retry_policy=RetryPolicy(
                     initial_interval=timedelta(seconds=5),
@@ -632,6 +716,7 @@ class BuildWorkspaceImagesWorkflow(BaseWorkflow):
                 phase="complete",
                 error=result.get("error"),
                 result=result,
+                source_revisions=result.get("source_revisions") or {},
             )
             self._progress["completed"] += 1
 
@@ -708,6 +793,7 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
         # the template to one would produce a version whose every workspace
         # fails with "unable to pull image ...:vYYYYMMDD-HHMMSS". Fall back to
         # the tag the last build published instead.
+        no_cache = bool(parameters.get("no_cache", False))
         image_tag = parameters.get("image_tag")
         if not image_tag:
             image_tag = (
@@ -758,7 +844,7 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
                 _update_template_progress(self._progress, key, status="running", phase="building")
                 result = await workflow.execute_activity(
                     build_workspace_image,
-                    args=[key, templates_dir, registry_host, image_tag],
+                    args=[key, templates_dir, registry_host, image_tag, no_cache],
                     start_to_close_timeout=timedelta(minutes=15),
                     retry_policy=RetryPolicy(
                         initial_interval=timedelta(seconds=5),
@@ -769,7 +855,12 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
                 build_results[key] = result
                 if result.get("success"):
                     _update_template_progress(
-                        self._progress, key, status="pending", phase="pushing", result=result
+                        self._progress,
+                        key,
+                        status="pending",
+                        phase="pushing",
+                        result=result,
+                        source_revisions=result.get("source_revisions") or {},
                     )
                 else:
                     _update_template_progress(

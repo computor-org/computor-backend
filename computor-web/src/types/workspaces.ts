@@ -210,6 +210,8 @@ export interface TemplatePushRequest {
   templates?: string[] | null;
   build_images?: boolean;
   image_tag?: string | null;
+  /** Rebuild every layer. Only for cache staleness the source-repo pinning misses. */
+  no_cache?: boolean;
 }
 
 export interface WorkspaceRolloutRequest {
@@ -259,6 +261,12 @@ export interface CoderTemplateTaskProgress {
   phase: string;
   error?: string | null;
   result?: Record<string, unknown> | null;
+  /**
+   * Commit each tracked source repo was built from, keyed by its build arg
+   * (e.g. `EXTENSION_REPO_SHA`). Absent on older backends and on pushes that
+   * did not build.
+   */
+  source_revisions?: Record<string, string> | null;
 }
 
 export interface CoderTaskProgress {

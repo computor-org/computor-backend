@@ -85,6 +85,21 @@ export default function TemplateTaskProgress({ task }: { task: TaskInfo }) {
                     {stage.label}
                   </span>
                 </div>
+                {/*
+                  The commit each tracked repo was built from. Without it a
+                  build reports success identically whether or not it picked up
+                  the change you just merged — which is exactly how stale
+                  extensions used to ship unnoticed.
+                */}
+                {template.source_revisions && Object.keys(template.source_revisions).length > 0 && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    {Object.entries(template.source_revisions).map(([arg, sha]) => (
+                      <span key={arg} className="mr-3 font-mono" title={`${arg}=${sha}`}>
+                        {sha.slice(0, 10)}
+                      </span>
+                    ))}
+                  </p>
+                )}
                 {template.error && (
                   <p className="mt-1 text-xs text-red-700 break-words">{template.error}</p>
                 )}
