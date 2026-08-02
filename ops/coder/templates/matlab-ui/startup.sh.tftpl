@@ -12,13 +12,31 @@ done
 # just first run.
 sudo chown -R coder:coder "$HOME" 2>/dev/null || true
 
-# Seed once per template (marker is template-specific so matlab-vscode's seed
-# doesn't suppress this one). Best-effort: it must never block matlab-proxy
-# from starting; --update=none only fills missing files, so re-runs are safe.
-if [ ! -f "$HOME/.matlab_ui_init_done" ]; then
+# The MATLAB release this image carries; see the Dockerfile's FROM.
+MATLAB_RELEASE=R2025b
+
+# Seed the home volume from MathWorks' original home. Best-effort: it must
+# never block matlab-proxy from starting; --update=none only fills missing
+# files, so re-runs are safe.
+#
+# The marker is per template, so matlab-vscode's seed doesn't suppress this
+# one, and per release. That second part is load-bearing here: matlab-proxy-app
+# is on PATH at /home/matlab/.local/bin, /home/matlab is a symlink to this
+# shared home, and the binary therefore comes from the *seed* rather than from
+# the image. A workspace that already ran on R2024b would otherwise keep
+# running R2024b's matlab-proxy against an R2025b MATLAB forever.
+SEED_MARKER="$HOME/.matlab_ui_init_done.$MATLAB_RELEASE"
+if [ ! -f "$SEED_MARKER" ]; then
   cp -a --update=none /opt/matlab-home-seed/. "$HOME"/ \
     || echo "WARN: matlab home seed incomplete; continuing" >&2
-  touch "$HOME/.matlab_ui_init_done"
+  # --update=none is what keeps a student's own files safe, but it would also
+  # keep the previous release's tooling. Nothing under .local is the student's.
+  if [ -d /opt/matlab-home-seed/.local ]; then
+    cp -a /opt/matlab-home-seed/.local/. "$HOME/.local"/ \
+      || echo "WARN: matlab-proxy refresh incomplete; continuing" >&2
+  fi
+  rm -f "$HOME/.matlab_ui_init_done"
+  touch "$SEED_MARKER"
 fi
 
 git config --global user.name "${full_name}"

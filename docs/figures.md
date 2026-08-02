@@ -121,9 +121,10 @@ one of their own keeps their figures.
 
 Two consequences worth remembering. The fix lives entirely in the image, so
 existing workspaces pick it up on a rebuild with no home-volume surgery. And
-`matlabrc.m` is a vendor file: the append is only sound because R2024b's is a
+`matlabrc.m` is a vendor file: the append is only sound because R2025b's is a
 plain script with no trailing local functions, which is worth rechecking
-whenever the MATLAB version moves.
+whenever the MATLAB version moves (it was rechecked when the image left
+R2024b, and still holds).
 
 **No display is involved.** MATLAB exports figures perfectly well from a session
 that has none, which is how this is verified. The `Xvfb` the startup script used
@@ -144,7 +145,7 @@ obvious mechanism, a `MarkedClean` listener per axes, was measured wrong in both
 directions on a session with no display, and is why plots went stale and why the
 container ran out of CPU:
 
-| | R2024b (the image) | R2025b |
+| | R2024b | R2025b (the image) |
 |---|---|---|
 | `set(h, 'YData', …)`, `hold on; plot(…)` | missed | missed |
 | `title`, `xlim`, `legend` | caught | missed |

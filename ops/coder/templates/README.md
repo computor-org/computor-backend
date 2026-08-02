@@ -156,7 +156,7 @@ what keeps the datastores out of reach.
 
 ## MATLAB workspaces
 
-`matlab-vscode` and `matlab-ui` are based on `mathworks/matlab:r2024b` and are
+`matlab-vscode` and `matlab-ui` are based on `mathworks/matlab:r2025b` and are
 therefore substantially larger and slower to start than the general-purpose
 templates. The VS Code variant installs both the Computor extension and the
 official MathWorks MATLAB extension; the UI variant serves MathWorks' native

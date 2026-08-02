@@ -1,4 +1,4 @@
-# MATLAB R2024b with browser-based VS Code, Computor and MathWorks extensions.
+# MATLAB R2025b with browser-based VS Code, Computor and MathWorks extensions.
 FROM node:20-bookworm AS vsix-builder
 
 ARG EXTENSION_REPO_URL=https://github.com/computor-org/computor-vscode.git
@@ -41,11 +41,15 @@ RUN npm ci \
 # patch (issue #274); built by computor.sh from docker/code-server-base/.
 FROM computor-code-server:latest AS code-server
 
-# Digest-pinned to R2024b Update 6, same digest as matlab-ui: Update 8 breaks
-# the browser desktop under a non-empty MWI_BASE_URL (matlab-proxy#88), and the
-# two matlab templates must stay on identical MATLAB builds because they seed
-# the same shared per-user home volume.
-FROM mathworks/matlab:r2024b@sha256:5603328923de4fd5ba5d5b610fbb925e1bcb8aec253df5d17e47bf95f351ca46
+# Digest-pinned to R2025b Update 5, same digest as matlab-ui — the two matlab
+# templates seed the same shared per-user home volume, so they must stay on
+# identical MATLAB builds.
+#
+# This template does not serve the browser desktop (code-server plus the
+# MathWorks extension talks to MATLAB directly), so matlab-proxy#88 never
+# applied to it; see matlab-ui's Dockerfile for how that bug was retested
+# before this bump.
+FROM mathworks/matlab:r2025b@sha256:7528b0873df0c6b640013cc37cceb848c60261aa2a7e44bd64387be7678b0ff0
 
 USER root
 
@@ -127,12 +131,14 @@ USER root
 # MathWorks extension starts to run and debug code — but only matlabrc.m
 # cannot be shadowed from a home directory. See docs/figures.md.
 #
-# R2024b's matlabrc.m is a plain script with no trailing local functions, so
-# appending to it is sound. Recheck that when the MATLAB version moves.
+# R2025b's matlabrc.m is still a plain script with no trailing local functions
+# (checked when moving off R2024b), so appending to it remains sound. Recheck
+# that when the MATLAB version moves again — a file that ends in local
+# functions cannot be extended this way.
 COPY figures/+figurewatch /opt/computor/matlab/+figurewatch
 COPY figures/matlabrc-figurewatch.m /tmp/matlabrc-figurewatch.m
-RUN printf '\n' >> /opt/matlab/R2024b/toolbox/local/matlabrc.m \
-    && cat /tmp/matlabrc-figurewatch.m >> /opt/matlab/R2024b/toolbox/local/matlabrc.m \
+RUN printf '\n' >> /opt/matlab/R2025b/toolbox/local/matlabrc.m \
+    && cat /tmp/matlabrc-figurewatch.m >> /opt/matlab/R2025b/toolbox/local/matlabrc.m \
     && rm /tmp/matlabrc-figurewatch.m
 ENV COMPUTOR_FIGURES_DIR=/tmp/computor-figures
 
