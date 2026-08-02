@@ -283,6 +283,12 @@ class MessageQuery(ListQuery):
         None, description="Filter by tag prefix (e.g., 'ai' matches #ai, #ai-help, #ai-response, etc.)"
     )
 
+    # Soft-deleted messages are hidden by default, matching the thread
+    # endpoint. Opt in only for audit/moderation views.
+    include_deleted: Optional[bool] = Field(
+        False, description="Include soft-deleted (archived) messages in the result"
+    )
+
 
 class MentionableQuery(BaseModel):
     """Query for ``GET /messages/mentionable-users``.

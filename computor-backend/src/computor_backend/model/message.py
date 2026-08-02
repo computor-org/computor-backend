@@ -1,3 +1,5 @@
+from typing import Optional
+
 from sqlalchemy import (
     BigInteger, Column, DateTime, ForeignKey,
     Index, String, text, Integer
@@ -70,16 +72,23 @@ class Message(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
         return self.archived_at is not None
 
     @property
-    def deletion_reason(self) -> str:
+    def deletion_reason(self) -> Optional[str]:
         """Get deletion reason from properties."""
         if not self.is_deleted or not self.properties:
             return None
         return self.properties.get('deletion_reason')
 
     @property
-    def deleted_by(self) -> str:
-        """Get who deleted the message (author/moderator/admin)."""
-        if not self.is_deleted or not self.properties:
+    def deleted_by(self) -> Optional[str]:
+        """Get who deleted the message (author/moderator/admin).
+
+        None for a message that is still live — it has no deleter, and
+        claiming 'author' made every message look deleted to any client that
+        read this field without checking ``is_deleted`` first.
+        """
+        if not self.is_deleted:
+            return None
+        if not self.properties:
             return 'author'
         return self.properties.get('deleted_by', 'author')
 
