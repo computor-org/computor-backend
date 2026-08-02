@@ -26,7 +26,17 @@ RUN export DEBIAN_FRONTEND=noninteractive \
     && apt-get autoremove \
     && rm -rf /var/lib/apt/lists/*
 
-RUN cd /opt/matlab/R2024b/extern/engines/python && python setup.py install
+# Derive MATLAB's root instead of naming a release. This image is built FROM
+# ${MATLAB_BASE_IMAGE}, whose tag lives in .env, so a hardcoded
+# /opt/matlab/R2024b breaks the build the moment that tag moves — and it is a
+# `cd` into a missing directory, so it fails loudly rather than silently, but
+# only after everything above it has already been built.
+#
+# Python 3.10 stays supported by the engine in R2025b (its setup.py lists
+# 3.9-3.12, unchanged from R2024b), which is what lets the worker keep the
+# 3.10 pin it shares with computor-base.
+RUN cd "$(dirname "$(dirname "$(readlink -f "$(which matlab)")")")/extern/engines/python" \
+    && python setup.py install
 
 # Pin setuptools < 70 in the system python to avoid the grapheme package
 # compatibility issue (computor deps import it at runtime).
