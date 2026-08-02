@@ -1,10 +1,16 @@
 # Copyright 2023-2024 The MathWorks, Inc.
 
-FROM mathworks/matlab:r2024b
+# Kept on the same release as the workspace templates (see
+# ops/coder/templates/matlab-ui/Dockerfile). This one grades submissions, so
+# the release students write against and the release their code is marked on
+# should not drift apart.
+FROM mathworks/matlab:r2025b
 
 ARG ADDITIONAL_PRODUCTS="Symbolic_Math_Toolbox Statistics_and_Machine_Learning_Toolbox Curve_Fitting_Toolbox Deep_Learning_Toolbox Signal_Processing_Toolbox DSP_System_Toolbox Wavelet_Toolbox"
 
-ARG MATLAB_RELEASE=r2024b
+# Must match the FROM tag: mpm installs the toolboxes for this release into the
+# MATLAB already in the image, and a mismatch installs a second one.
+ARG MATLAB_RELEASE=r2025b
 
 USER root
 
