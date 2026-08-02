@@ -101,6 +101,18 @@ class MessageInterface(MessageInterfaceBase, BackendEntityInterface):
             params: Query parameters
             reader_user_id: Current user ID for unread filtering (optional)
         """
+        # A soft-deleted message keeps its row so replies stay attached, and
+        # every other read path already hides it — ``get_message_thread`` and
+        # the unread CTEs both filter ``archived_at IS NULL``. This one did
+        # not, so a message the user had just deleted came straight back on the
+        # next refetch (computor-org/issues#288).
+        #
+        # The filter sits *before* the ``params is None`` guard so the
+        # no-parameters path is covered too, and every index on the table is
+        # already ``(target, archived_at)``.
+        if params is None or not params.include_deleted:
+            query = query.filter(Message.archived_at.is_(None))
+
         if params is None:
             return query
 

@@ -14,11 +14,11 @@ function [key, contentCount] = fingerprint(figureHandle)
 %   This replaced a MarkedClean listener per axes, which was measured wrong in
 %   both directions in a session with no display:
 %
-%     * R2024b, the release in the image, misses the two edits a student is
-%       most likely to make — `set(h, 'YData', ...)` and `hold on; plot(...)`
-%       both leave the published file stale — while catching title, xlim and
-%       legend.
-%     * R2025b fires it three times over an idle three seconds and not at all
+%     * R2024b misses the two edits a student is most likely to make —
+%       `set(h, 'YData', ...)` and `hold on; plot(...)` both leave the
+%       published file stale — while catching title, xlim and legend.
+%     * R2025b, the release in the image, fires it three times over an idle
+%       three seconds and not at all
 %       for those same two edits, so the watcher exported every figure twice a
 %       second forever: 7.5 s of CPU per 20 s of doing nothing.
 %
