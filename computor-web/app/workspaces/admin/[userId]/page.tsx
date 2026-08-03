@@ -11,6 +11,7 @@ import { CoderClient } from '@/src/clients/CoderClient';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { WorkspaceRolesClient } from '@/src/clients/WorkspaceRolesClient';
 import WorkspaceTable from '@/src/components/workspaces/WorkspaceTable';
+import { workspaceDeleteMessage } from '@/src/components/workspaces/deleteMessage';
 import WorkspaceDetailsModal from '@/src/components/workspaces/WorkspaceDetailsModal';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
@@ -78,6 +79,18 @@ export default function UserDetailPage() {
     await actions.remove(deleteTarget.owner, deleteTarget.name);
     setDeleteTarget(null);
   };
+
+  // Scratch-home workspaces (what lecturer bulk-provisioning hands out) lose
+  // their home volume with the workspace — do not promise otherwise.
+  const deleteMessage = deleteTarget
+    ? workspaceDeleteMessage(
+        deleteTarget.name,
+        workspaces.find(
+          (w) => w.name === deleteTarget.name && (w.owner_name || '') === deleteTarget.owner,
+        ),
+        'other',
+      )
+    : '';
 
   const handleOpenWorkspace = async (owner: string, name: string) => {
     const details = await actions.openOrDetails(owner, name);
@@ -242,7 +255,7 @@ export default function UserDetailPage() {
         <ConfirmDialog
           open={deleteTarget !== null}
           title="Delete Workspace"
-          message={`Are you sure you want to delete workspace "${deleteTarget?.name}"? The user's shared home directory will NOT be deleted.`}
+          message={deleteMessage}
           confirmLabel="Delete"
           variant="danger"
           onConfirm={handleDelete}

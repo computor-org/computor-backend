@@ -11,6 +11,7 @@ import { useWorkspaceActions } from '@/src/hooks/useWorkspaceActions';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { CoderClient } from '@/src/clients/CoderClient';
 import WorkspaceTable from '@/src/components/workspaces/WorkspaceTable';
+import { workspaceDeleteMessage } from '@/src/components/workspaces/deleteMessage';
 import WorkspaceDetailsModal from '@/src/components/workspaces/WorkspaceDetailsModal';
 import WorkspaceTypeGrid, { usableOptions } from '@/src/components/workspaces/WorkspaceTypeGrid';
 import NewWorkspaceForm from '@/src/components/workspaces/NewWorkspaceForm';
@@ -78,6 +79,18 @@ export default function WorkspacesPage() {
     await actions.remove(deleteTarget.owner, deleteTarget.name);
     setDeleteTarget(null);
   };
+
+  // A scratch home lives and dies with its workspace; the shared home does not.
+  // The dialog has to say which, because "your files are safe" is false for the
+  // scratch ones lecturers hand out in bulk.
+  const deleteMessage = deleteTarget
+    ? workspaceDeleteMessage(
+        deleteTarget.name,
+        workspaces.find(
+          (w) => w.name === deleteTarget.name && (w.owner_name || '') === deleteTarget.owner,
+        ),
+      )
+    : '';
 
   const handleViewDetails = async (owner: string, name: string) => {
     // Opens a running workspace in a new tab; otherwise shows its details.
@@ -231,7 +244,14 @@ export default function WorkspacesPage() {
                 workspaces={workspaces}
                 onStart={actions.start}
                 onStop={actions.stop}
-                onDelete={(owner, name) => setDeleteTarget({ owner, name })}
+                // Deleting a workspace needs workspace:delete, which no
+                // self-service role carries — showing it to everyone else only
+                // led to a confirmation dialog and then a 403.
+                onDelete={
+                  isWorkspaceMaintainer
+                    ? (owner, name) => setDeleteTarget({ owner, name })
+                    : undefined
+                }
                 onViewDetails={handleViewDetails}
                 onLaunch={handleLaunch}
               />
@@ -243,7 +263,7 @@ export default function WorkspacesPage() {
         <ConfirmDialog
           open={deleteTarget !== null}
           title="Delete Workspace"
-          message={`Are you sure you want to delete workspace "${deleteTarget?.name}"? Your home directory is shared across workspaces and will NOT be deleted.`}
+          message={deleteMessage}
           confirmLabel="Delete"
           variant="danger"
           onConfirm={handleDelete}
