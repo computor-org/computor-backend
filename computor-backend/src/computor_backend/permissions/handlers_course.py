@@ -8,7 +8,7 @@ every public name here so existing imports keep working.
 """
 
 from typing import Optional
-from sqlalchemy import and_, exists, or_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, Query, aliased
 from computor_backend.permissions.handlers import PermissionHandler
 from computor_backend.permissions.query_builders import CoursePermissionQueryBuilder
@@ -80,23 +80,14 @@ class CoursePermissionHandler(PermissionHandler):
 
 
 class CourseContentTypePermissionHandler(PermissionHandler):
-
-    def _check_role_hierarchy(self, user_roles: set, required_role: str) -> bool:
-        """Check if user roles meet the required role in hierarchy"""
-        if not user_roles:
-            return False
-
-        # Check if any user role has permission for the required role
-        for role in user_roles:
-            if course_role_hierarchy.has_role_permission(role, required_role):
-                return True
-
-        return False
-
     """Permission handler for CourseContentType entity
 
     CourseContentType can be created, updated, and deleted by lecturers and higher roles.
     Lower roles can only get and list.
+
+    Everything is scoped to the course the content type belongs to: holding a
+    role in *some* course grants nothing in *another* course. Mirrors
+    ``CourseContentPermissionHandler``.
     """
 
     ACTION_ROLE_MAP = {
@@ -116,17 +107,21 @@ class CourseContentTypePermissionHandler(PermissionHandler):
 
         min_role = self.ACTION_ROLE_MAP.get(action)
         if min_role:
-            # For read operations, allow if user has any course membership
+            # Reads are filtered per row in build_query (own courses only).
             if action in ["get", "list"]:
-                return True  # Will be filtered by query
+                return True
 
-            # For write operations, check if user has required role in any course
-            # Check if user has the required course role in their claims
-            if principal.claims and principal.claims.dependent:
-                for course_id, roles in principal.claims.dependent.get("course", {}).items():
-                    if self._check_role_hierarchy(roles, min_role):
-                        return True
-            return False
+            # Writes must name the course they target, and the role has to be
+            # held IN THAT COURSE. Checking "any course" let a lecturer of
+            # course A create/rename/delete content types of course B.
+            course_id = (context or {}).get("course_id") or resource_id
+            if not course_id:
+                return False
+            if not principal.permitted("course", action, str(course_id), course_role=min_role):
+                return False
+            return self.check_additional_context_permissions(
+                principal, context, exclude_keys=["course_id"]
+            )
 
         return False
 
@@ -139,40 +134,13 @@ class CourseContentTypePermissionHandler(PermissionHandler):
 
         min_role = self.ACTION_ROLE_MAP.get(action)
         if min_role:
-            # For CourseContentType, we need to check if the user has the required role
-            # in at least one course that uses this content type.
-            # For read operations, return all content types if user has any course membership.
-            if action in ["get", "list"]:
-                # Check if user has any course membership
-                has_membership = db.query(
-                    exists().where(
-                        CourseMember.user_id == principal.user_id
-                    )
-                ).scalar()
-
-                if has_membership:
-                    return db.query(self.entity)
-                else:
-                    # Return empty query if no membership
-                    return db.query(self.entity).filter(self.entity.id == None)
-
-            # For write operations, check role hierarchy
-            user_courses = CoursePermissionQueryBuilder.user_courses_subquery(
-                principal.user_id, min_role, db
+            # Only content types of courses where the principal holds at least
+            # `min_role`. Previously this returned an unfiltered query, so the
+            # update/delete CRUD paths (which filter by id alone) could reach
+            # any course's content types.
+            return CoursePermissionQueryBuilder.build_course_filtered_query(
+                self.entity, principal.user_id, min_role, db
             )
-
-            # Check if user has required role in any course
-            has_required_role = db.query(
-                exists().where(
-                    CourseMember.course_id.in_(user_courses)
-                )
-            ).scalar()
-
-            if has_required_role:
-                return db.query(self.entity)
-            else:
-                # Return empty query if insufficient permissions
-                return db.query(self.entity).filter(self.entity.id == None)
 
         raise ForbiddenException(detail={"entity": self.resource_name})
 
