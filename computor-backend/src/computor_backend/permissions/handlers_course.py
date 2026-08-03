@@ -14,7 +14,6 @@ from computor_backend.permissions.handlers import PermissionHandler
 from computor_backend.permissions.query_builders import CoursePermissionQueryBuilder
 from computor_backend.permissions.principal import Principal, course_role_hierarchy
 from computor_backend.exceptions import ForbiddenException
-from computor_backend.model.auth import User
 from computor_backend.model.course import (
     Course,
     CourseContent,
@@ -196,23 +195,16 @@ class CourseContentPermissionHandler(PermissionHandler):
 
         min_role = self.ACTION_ROLE_MAP.get(action)
         if min_role:
-            cm_other = aliased(CourseMember)
-
-            subquery = CoursePermissionQueryBuilder.user_courses_subquery(
-                principal.user_id, min_role, db
+            # The subquery is already scoped to the principal, so filtering on
+            # it directly is all that is needed. The previous construction
+            # joined User -> course_member -> entity without pinning
+            # User.id == principal.user_id, which emitted every content row once
+            # per member of its course: X-Total-Count was inflated by roughly the
+            # class size, and LIMIT/OFFSET (applied in SQL, before the ORM
+            # de-duplicates entities) silently dropped content from pages.
+            return CoursePermissionQueryBuilder.build_course_filtered_query(
+                self.entity, principal.user_id, min_role, db
             )
-
-            query = (
-                db.query(self.entity)
-                .select_from(User)
-                .outerjoin(cm_other, cm_other.user_id == User.id)
-                .outerjoin(self.entity, self.entity.course_id == cm_other.course_id)
-                .filter(
-                    cm_other.course_id.in_(subquery)
-                )
-            )
-
-            return query
 
         raise ForbiddenException(detail={"entity": self.resource_name})
 
