@@ -62,7 +62,10 @@ class Result(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     status = Column(Integer, nullable=False)
 
     # Relationships
-    course_content: Mapped["CourseContent"] = relationship('CourseContent', back_populates="results", uselist=False, cascade='all,delete')
+    # NOTE: no cascade here. This is the many-to-one side (Result owns the FK), so a
+    # `delete` cascade would delete the parent CourseContent when a single Result is
+    # deleted. The cascade belongs to CourseContent.results, which already has it.
+    course_content: Mapped["CourseContent"] = relationship('CourseContent', back_populates="results", uselist=False)
     course_content_type = relationship('CourseContentType', back_populates='results')
     course_member = relationship('CourseMember', back_populates='results')
     submission_group = relationship('SubmissionGroup', back_populates='results')
