@@ -98,6 +98,18 @@ class WorkerSettings(BaseSettings):
         default=100, validation_alias="TEMPORAL_ACTIVITY_EXECUTOR_MAX_WORKERS"
     )
 
+    # Cap on activities a worker runs at once. Unset means the SDK default of
+    # 100, which is right for workers whose activities are independent. It is
+    # wrong for a queue that fronts a single non-reentrant resource: the MATLAB
+    # worker drives one shared MATLAB engine over Pyro, and MATLAB executes one
+    # command at a time, so pulling 100 test activities only builds a queue
+    # inside the engine while each activity's own timeout counts down against
+    # the wait rather than the work. Set it to 1 there and scale that worker
+    # with replicas (MATLAB_TESTING_WORKER_REPLICAS), each with its own engine.
+    max_concurrent_activities: Optional[int] = Field(
+        default=None, validation_alias="TEMPORAL_MAX_CONCURRENT_ACTIVITIES"
+    )
+
     # --- Coder image / template build (tasks/temporal_coder_setup.py) -----
     # Old: os.environ.get("CODER_REGISTRY_HOST", registry_host)  -- env overrides
     #      a runtime parameter, so None == unset and the call site keeps the param.

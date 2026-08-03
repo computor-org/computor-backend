@@ -6,7 +6,7 @@ import json
 import matlab
 import matlab.engine
 import subprocess
-from threading import Thread
+from threading import RLock, Thread
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from Pyro5.api import expose, Daemon
 from computor_types.repositories import Repository
@@ -67,6 +67,13 @@ class MatlabServer(object):
       self.testing_environment_path = worker_path
       self._engine_stuck = False
       self._engine_initialized = False
+      # There is one MATLAB session behind this object and MATLAB executes one
+      # command at a time, so submissions are serialised no matter what. Making
+      # that explicit buys two things the implicit version does not: a timeout
+      # measures how long a test *ran* rather than how long it queued, and
+      # _force_restart_engine() can no longer pkill MATLAB out from under a
+      # submission that is still executing in it.
+      self._engine_lock = RLock()
       self.connect()
 
     def _force_restart_engine(self):
@@ -249,12 +256,13 @@ class MatlabServer(object):
       sys.exit(2)
 
     def evalc(self, arg):
-        self.connect()
+        with self._engine_lock:
+            self.connect()
 
-        print(f"Evaluating command: {arg}", flush=True)
-        result = self.engine.evalc(arg)
-        print(f"Result: {result}", flush=True)
-        return result
+            print(f"Evaluating command: {arg}", flush=True)
+            result = self.engine.evalc(arg)
+            print(f"Result: {result}", flush=True)
+            return result
 
     def test_student_example(self, test_file, spec_file, timeout_seconds=300):
         """
@@ -266,6 +274,13 @@ class MatlabServer(object):
             submit: Submission identifier
             timeout_seconds: Maximum execution time in seconds (default: 300 = 5 minutes)
         """
+        # Held across connect() and the test itself, so a restart triggered by
+        # one submission's timeout cannot land while another is mid-test.
+        with self._engine_lock:
+            return self._run_student_example(test_file, spec_file, timeout_seconds)
+
+    def _run_student_example(self, test_file, spec_file, timeout_seconds):
+        """Body of test_student_example; callers must hold ``_engine_lock``."""
         try:
            self.connect()
         except Exception as e:

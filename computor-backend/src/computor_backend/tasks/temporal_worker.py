@@ -92,6 +92,20 @@ class TemporalWorker:
         # otherwise) and activity concurrency is unchanged.
         max_workers = get_worker_settings().activity_executor_max_workers
 
+        # Workers fronting a single non-reentrant resource (the MATLAB worker
+        # and its one shared engine) set this to 1; everyone else leaves it
+        # unset and keeps the SDK default. The pool is sized down to match,
+        # since it never needs more threads than the SDK will hand it work.
+        max_concurrent_activities = get_worker_settings().max_concurrent_activities
+        if max_concurrent_activities is not None:
+            max_workers = max(1, max_concurrent_activities)
+
+        worker_limits = (
+            {}
+            if max_concurrent_activities is None
+            else {"max_concurrent_activities": max_concurrent_activities}
+        )
+
         # Create a worker for each task queue
         for task_queue in self.task_queues:
             logger.info(f"Creating worker for queue: {task_queue}")
@@ -106,11 +120,13 @@ class TemporalWorker:
                 workflows=workflows,
                 activities=activities,
                 activity_executor=activity_executor,
+                **worker_limits,
             )
             self.workers.append(worker)
             logger.info(
                 f"Worker created for queue: {task_queue} "
-                f"(activity thread pool max_workers={max_workers})"
+                f"(activity thread pool max_workers={max_workers}, "
+                f"max_concurrent_activities={max_concurrent_activities or 'SDK default'})"
             )
 
         # Setup signal handlers
