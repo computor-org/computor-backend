@@ -170,8 +170,28 @@ defaults = {
 # directory the new image does not have. Add-if-missing would leave it there
 # and the MathWorks extension would point at nothing, so this one is rewritten
 # on every start.
+#
+# Port forwarding is off because the only thing it ever finds here is MATLAB
+# talking to itself. Once the language server connects, MATLAB opens a
+# TLS-protected loopback port for the extension to drive it through
+# (matlabls.internal.CommunicationManager.getSecurePort, see the extension's
+# initmatlabls.m) — that channel is how completion, linting, Run and the
+# debugger work. code-server sees a new listener, assumes it is a web app the
+# student wants to visit, and offers "Your application running on port NNNN is
+# available. [Open in Browser]". It is not an application and the button leads
+# to a certificate warning and a blank page. The port number is assigned at
+# startup, so a per-port rule cannot pin it.
+#
+# This only became visible once MATLAB started reliably: before the ServiceHost
+# fix above, sessions wedged for tens of minutes and never reached the point of
+# opening the port, so there was nothing for code-server to announce.
+#
+# Enforced rather than add-if-missing because the popup is already on every
+# existing workspace's settings.json, and a default would never reach them.
+# Manual forwarding stays available in the Ports view for anyone who wants it.
 enforced = {
     "MATLAB.installPath": matlab_root,
+    "remote.autoForwardPorts": False,
 }
 
 settings = {}
