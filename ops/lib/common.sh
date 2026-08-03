@@ -99,6 +99,25 @@ assemble_compose_files() {
 
     if [ "${MATLAB_ENABLED:-}" = "true" ]; then
         COMPOSE_FILES="$COMPOSE_FILES -f ${d}/docker-compose.matlab.yaml"
+        # Source of truth for the MATLAB release the grading worker is built on.
+        # Keep it in the same release line as the Coder MATLAB workspace
+        # templates (ops/coder/templates/matlab-*/Dockerfile, digest-pinned):
+        # students should not be graded on a different MATLAB than they wrote
+        # their code against.
+        export MATLAB_RELEASE="${MATLAB_RELEASE:-r2025b}"
+        # MATLAB_BASE_IMAGE is optional. Unset (or empty) means "build it from
+        # docker/matlab/Dockerfile" — `./computor.sh up` does that build before
+        # compose, since the worker image is FROM this one. Set it in .env only
+        # to point at a prebuilt/registry image; then nothing is built locally.
+        #
+        # The managed tag carries the release rather than :latest, so bumping
+        # MATLAB_RELEASE misses the local image and triggers a rebuild instead
+        # of silently reusing the previous release's toolbox install.
+        if [ -z "${MATLAB_BASE_IMAGE:-}" ]; then
+            export MATLAB_BASE_IMAGE="computor-matlab-base:${MATLAB_RELEASE}"
+            # Read by cmd_up: only an image WE named is ours to build.
+            export MATLAB_BASE_IMAGE_MANAGED=true
+        fi
     fi
 
     # Self-update sidecar: prod-only, opt-in. The file-exists guard keeps a

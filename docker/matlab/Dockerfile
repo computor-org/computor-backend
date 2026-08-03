@@ -4,13 +4,24 @@
 # ops/coder/templates/matlab-ui/Dockerfile). This one grades submissions, so
 # the release students write against and the release their code is marked on
 # should not drift apart.
-FROM mathworks/matlab:r2025b
+#
+# One ARG drives both the base tag and the mpm install below — they MUST agree:
+# mpm adds toolboxes to the MATLAB already present in the image, and on a
+# mismatch it installs a second, separate MATLAB instead.
+#
+# `./computor.sh up` builds this image and passes MATLAB_RELEASE explicitly
+# (MATLAB_RELEASE in ops/lib/common.sh is the source of truth, and it also
+# names the resulting tag). The default here only covers a manual
+# `docker build -f docker/matlab/Dockerfile docker/matlab`.
+ARG MATLAB_RELEASE=r2025b
+FROM mathworks/matlab:${MATLAB_RELEASE}
 
 ARG ADDITIONAL_PRODUCTS="Symbolic_Math_Toolbox Statistics_and_Machine_Learning_Toolbox Curve_Fitting_Toolbox Deep_Learning_Toolbox Signal_Processing_Toolbox DSP_System_Toolbox Wavelet_Toolbox"
 
-# Must match the FROM tag: mpm installs the toolboxes for this release into the
-# MATLAB already in the image, and a mismatch installs a second one.
-ARG MATLAB_RELEASE=r2025b
+# Re-declared without a default on purpose: an ARG set before the first FROM is
+# out of scope inside the build stage, and re-declaring it here inherits the
+# value the build was invoked with (or the global default above).
+ARG MATLAB_RELEASE
 
 USER root
 
