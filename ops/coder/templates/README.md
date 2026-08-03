@@ -90,9 +90,9 @@ docker run --rm \
 ## Root and internet policy
 
 Both are **configuration, not image properties** — every template's image ships whatever it
-ships (four of the six happen to carry passwordless sudo: `bash`, `ubuntu-desktop`, `vscode`
-and both MATLAB images; `jupyter` has no `sudo` binary at all), and the container decides
-whether that sudo can actually be used.
+ships (five of the six carry passwordless sudo: `bash`, `ubuntu-desktop`, `vscode` and both
+MATLAB images; `jupyter` is the only one without, and has no `sudo` binary at all), and the
+container decides whether that sudo can actually be used.
 
 | Knob | Off means | Mechanism |
 |---|---|---|
@@ -162,9 +162,23 @@ templates. The VS Code variant installs both the Computor extension and the
 official MathWorks MATLAB extension; the UI variant serves MathWorks' native
 browser interface through MATLAB Proxy.
 
-Both templates offer an optional, masked `matlab_license_file` workspace
-parameter. Set it to a network license manager such as `27000@licenses.example`
-or to a license-file path that already exists inside the container. A host path
-is not mounted automatically. Leave it empty to use MathWorks account sign-in.
-Input masking is cosmetic: the value is passed through Terraform and the Docker
-container environment and must not be treated as an opaque secret.
+The MATLAB license is **not** a workspace parameter — there is no control to
+fill in when creating a workspace. It is a deployment-wide Terraform variable
+(`matlab_license_file`) fed from `MATLAB_MLM_LICENSE_FILE` when the templates
+are pushed, so it is set once by the operator and applies to every MATLAB
+workspace:
+
+```bash
+# .env
+MATLAB_MLM_LICENSE_FILE=27000@licenses.example
+```
+
+then push the templates again for it to take effect. The value may be a network
+license manager (`port@host`) or a license-file path that already exists inside
+the container — a host path is **not** mounted automatically. Leave it unset to
+use in-browser MathWorks account sign-in.
+
+Because it is pushed from the deployment environment, the variable is **locked**:
+`PUT /coder/admin/templates/{name}/settings` rejects attempts to override it.
+Treat it as configuration rather than a secret — it is passed through Terraform
+and into the container environment, and is readable from inside the workspace.

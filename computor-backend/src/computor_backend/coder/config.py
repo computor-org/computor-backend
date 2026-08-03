@@ -140,7 +140,14 @@ def get_coder_settings() -> CoderSettings:
     """
     Get Coder settings singleton.
 
-    Uses lru_cache to ensure settings are only loaded once.
+    Returns the override installed by ``configure_coder_settings`` when there is
+    one, otherwise builds settings from the environment. Both are memoised by
+    ``lru_cache``; ``configure_coder_settings`` and ``reset_coder_settings``
+    clear it.
+
+    (This used to ignore ``_settings`` entirely and always reconstruct from the
+    environment, which made ``configure_coder_settings`` a silent no-op for the
+    tests and embedders that call it.)
 
     Returns:
         CoderSettings instance
@@ -148,6 +155,8 @@ def get_coder_settings() -> CoderSettings:
     Raises:
         ValidationError: If required settings are missing
     """
+    if _settings is not None:
+        return _settings
     return CoderSettings()
 
 
