@@ -83,30 +83,66 @@ class TestCoursePermissionHandler:
 
 
 class TestCourseContentTypePermissionHandler:
-    def test_write_allowed_with_lecturer_role(self):
-        handler = CourseContentTypePermissionHandler(CourseContentType)
-        course_id = 'c1'
-        principal = Principal(
+    @staticmethod
+    def _lecturer_of(course_id: str) -> Principal:
+        return Principal(
             user_id='u3',
             roles=['lecturer'],
             claims=build_claims([('permissions', f'course:_lecturer:{course_id}')])
         )
-        assert handler.can_perform_action(principal, 'create') is True
 
-    def test_list_requires_membership(self):
+    def test_write_allowed_with_lecturer_role_in_that_course(self):
+        handler = CourseContentTypePermissionHandler(CourseContentType)
+        principal = self._lecturer_of('c1')
+        assert handler.can_perform_action(
+            principal, 'create', context={'course_id': 'c1'}
+        ) is True
+
+    def test_write_denied_in_a_foreign_course(self):
+        """A lecturer of c1 must not create content types in c2."""
+        handler = CourseContentTypePermissionHandler(CourseContentType)
+        principal = self._lecturer_of('c1')
+        assert handler.can_perform_action(
+            principal, 'create', context={'course_id': 'c2'}
+        ) is False
+
+    def test_write_denied_without_a_course_context(self):
+        """No target course named → nothing to authorize against."""
+        handler = CourseContentTypePermissionHandler(CourseContentType)
+        principal = self._lecturer_of('c1')
+        assert handler.can_perform_action(principal, 'create') is False
+
+    def test_reads_are_scoped_to_own_courses(self, monkeypatch):
         db = make_db()
         handler = CourseContentTypePermissionHandler(CourseContentType)
 
-        # First db.query(...).scalar() -> True (has membership),
-        # Second db.query(...) -> return q_list
-        q_membership = MagicMock()
-        q_membership.scalar.return_value = True
-        q_list = MagicMock()
-        db.query.side_effect = [q_membership, q_list]
+        sentinel = object()
+        import computor_backend.permissions.query_builders as qb
+        monkeypatch.setattr(qb.CoursePermissionQueryBuilder, 'build_course_filtered_query',
+                            lambda entity, user_id, min_role, db_: sentinel)
 
         principal = Principal(user_id='u4', roles=['student'])
-        q = handler.build_query(principal, 'list', db)
-        assert q is q_list
+        assert handler.build_query(principal, 'list', db) is sentinel
+
+    def test_writes_are_scoped_to_own_courses(self, monkeypatch):
+        """update/delete are gated by build_query alone - it must filter."""
+        db = make_db()
+        handler = CourseContentTypePermissionHandler(CourseContentType)
+
+        seen = {}
+        import computor_backend.permissions.query_builders as qb
+
+        def _capture(entity, user_id, min_role, db_):
+            seen.update(entity=entity, user_id=user_id, min_role=min_role)
+            return 'filtered'
+
+        monkeypatch.setattr(qb.CoursePermissionQueryBuilder,
+                            'build_course_filtered_query', _capture)
+
+        principal = self._lecturer_of('c1')
+        assert handler.build_query(principal, 'update', db) == 'filtered'
+        assert seen['entity'] is CourseContentType
+        assert seen['min_role'] == '_lecturer'
 
 
 class TestReadOnlyPermissionHandler:
