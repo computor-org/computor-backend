@@ -383,6 +383,27 @@ cmd_up() {
         log "\n${GREEN}Building patched code-server base (computor-code-server)...${NC}"
         (cd "$REPO_ROOT" && docker build -f docker/code-server-base/Dockerfile -t computor-code-server:latest docker/code-server-base)
     fi
+    # The MATLAB grading worker is FROM a MATLAB image carrying the graded
+    # toolboxes. Unless .env points MATLAB_BASE_IMAGE at a prebuilt one, that
+    # image is ours to build (see assemble_compose_files) and it has to exist
+    # before compose builds the worker on top of it. The first build is long —
+    # it pulls the MathWorks base and runs mpm for every toolbox — but it is
+    # cached afterwards and only redone when MATLAB_RELEASE moves.
+    if [ "${MATLAB_ENABLED:-}" = "true" ] && [ "${MATLAB_BASE_IMAGE_MANAGED:-}" = "true" ] \
+        && { [[ "$DOCKER_ARGS" == *"--build"* ]] || ! docker image inspect "$MATLAB_BASE_IMAGE" >/dev/null 2>&1; }; then
+        log "\n${GREEN}Building MATLAB base image (${MATLAB_BASE_IMAGE})...${NC}"
+        echo "  Installs MATLAB ${MATLAB_RELEASE} + the graded toolboxes; the first build takes a while."
+        # Context is docker/matlab only: the Dockerfile COPYs nothing from the repo.
+        (cd "$REPO_ROOT" && docker build -f docker/matlab/Dockerfile -t "$MATLAB_BASE_IMAGE" \
+            --build-arg MATLAB_RELEASE="$MATLAB_RELEASE" docker/matlab)
+        # The worker image sits ON that base, so it is now stale by definition —
+        # and a plain `up` reuses a cached worker image without ever consulting
+        # its base. Rebuild it here, or the release move silently does nothing.
+        if [[ "$DOCKER_ARGS" != *"--build"* ]]; then
+            log "  Rebuilding temporal-worker-matlab onto the new base..."
+            compose build temporal-worker-matlab
+        fi
+    fi
 
     # Start services
     log "\n${GREEN}Starting Computor services...${NC}"

@@ -263,7 +263,6 @@ services:
       DEBUG_MODE: ${DEBUG_MODE:-development}
       BACKEND_EXTERNAL_URL: ${BACKEND_EXTERNAL_URL:-http://host.docker.internal:8000}
       DEV_FORWARD_PORTS: ${DEV_FORWARD_PORTS:-}
-      MATLAB_BASE_IMAGE: ${MATLAB_BASE_IMAGE:-matlab-base:latest}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
