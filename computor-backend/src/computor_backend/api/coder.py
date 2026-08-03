@@ -576,6 +576,11 @@ async def get_workspaces(
     try:
         coder_user = await client._find_user_by_email(target_email)
         workspaces = await client.get_user_workspaces(coder_user.username)
+        # A scratch home is destroyed together with its workspace, a shared one
+        # is not. The UI cannot warn about that without knowing which is which,
+        # so fill it in here (bounded fan-out, one request per workspace).
+        from computor_backend.business_logic.course_workspaces import populate_home_modes
+        await populate_home_modes(client, workspaces)
         return WorkspaceListResponse(
             workspaces=workspaces,
             count=len(workspaces),

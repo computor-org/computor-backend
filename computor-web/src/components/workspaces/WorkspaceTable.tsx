@@ -10,7 +10,12 @@ interface WorkspaceTableProps {
   workspaces: CoderWorkspace[];
   onStart: (owner: string, name: string) => Promise<void>;
   onStop: (owner: string, name: string) => Promise<void>;
-  onDelete: (owner: string, name: string) => void;
+  /**
+   * Delete the workspace. Optional, and the button is only rendered when it is
+   * given: the backend has no self-service delete, so offering it to a plain
+   * workspace user only produced a confirmation dialog followed by a 403.
+   */
+  onDelete?: (owner: string, name: string) => void;
   onViewDetails: (owner: string, name: string) => void;
   /**
    * Start the workspace and open it when it is ready. Pass this for a user's own
@@ -32,7 +37,7 @@ function WorkspaceRow({
   workspace: CoderWorkspace;
   onStart: (owner: string, name: string) => Promise<void>;
   onStop: (owner: string, name: string) => Promise<void>;
-  onDelete: (owner: string, name: string) => void;
+  onDelete?: (owner: string, name: string) => void;
   onViewDetails: (owner: string, name: string) => void;
   onLaunch?: (owner: string, name: string) => void;
 }) {
@@ -108,9 +113,11 @@ function WorkspaceRow({
           <Button size="xs" variant="ghost" onClick={() => onViewDetails(owner, workspace.name)}>
             Details
           </Button>
-          <Button size="xs" variant="dangerGhost" onClick={() => onDelete(owner, workspace.name)}>
-            Delete
-          </Button>
+          {onDelete && (
+            <Button size="xs" variant="dangerGhost" onClick={() => onDelete(owner, workspace.name)}>
+              Delete
+            </Button>
+          )}
         </div>
       </Td>
     </Tr>

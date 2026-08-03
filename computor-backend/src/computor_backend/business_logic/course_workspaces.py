@@ -691,6 +691,19 @@ async def provision_student_workspaces(
     )
 
 
+async def populate_home_modes(
+    client: CoderClient, workspaces: list[CoderWorkspace]
+) -> None:
+    """Fill ``CoderWorkspace.home_mode`` on an arbitrary workspace list.
+
+    Public entry point for callers outside the course-scoped listings — notably
+    ``GET /coder/workspaces``, where the UI has to tell a shared home from a
+    scratch one before it can honestly describe what deleting a workspace
+    destroys.
+    """
+    await _populate_build_params(client, workspaces)
+
+
 async def _populate_build_params(
     client: CoderClient, workspaces: list[CoderWorkspace]
 ) -> dict[str, str]:
