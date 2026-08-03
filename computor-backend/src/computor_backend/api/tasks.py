@@ -148,6 +148,74 @@ async def submit_task(
             context={"operation": "submit_task", "task_name": submission.task_name}
         ) from e
 
+# NOTE: the static /types and /workers/status routes MUST stay above the
+# parametrized /{task_id} routes below. FastAPI matches in registration
+# order, so registering them later made them unreachable - the requests
+# resolved to get_task(task_id="types") / get_task_status(task_id="workers").
+@tasks_router.get("/types", response_model=List[str])
+async def list_task_types(
+    permissions: Annotated[Principal, Depends(get_current_principal)]
+):
+    """
+    Get list of available task types.
+
+    Admin only endpoint.
+
+    Args:
+        permissions: Current user permissions
+
+    Returns:
+        List of registered task names
+    """
+    if not permissions.is_admin:
+        raise ForbiddenException()
+
+    try:
+        registered_tasks = task_registry.list_tasks()
+        return list(registered_tasks.keys())
+
+    except Exception as e:
+        raise InternalServerException(
+            error_code="INT_001",
+            detail=f"Failed to list task types: {str(e)}",
+            context={"operation": "list_task_types"}
+        ) from e
+
+
+@tasks_router.get("/workers/status", response_model=Dict[str, Any])
+async def get_worker_status(
+    permissions: Annotated[Principal, Depends(get_current_principal)]
+):
+    """
+    Get Temporal worker and queue status information.
+
+    Admin only endpoint.
+
+    Args:
+        permissions: Current user permissions
+
+    Returns:
+        Dictionary containing worker status, queue information, and connection details
+    """
+    if not permissions.is_admin:
+        raise ForbiddenException()
+
+    try:
+        task_executor = get_task_executor()
+        # get_worker_status is async; without the await this returned a
+        # coroutine and blew up during response serialization. The route was
+        # unreachable until now, so nothing ever exercised it.
+        status_info = await task_executor.get_worker_status()
+        return status_info
+
+    except Exception as e:
+        raise InternalServerException(
+            error_code="INT_001",
+            detail=f"Failed to get worker status: {str(e)}",
+            context={"operation": "get_worker_status"}
+        ) from e
+
+
 @tasks_router.get("/{task_id}", response_model=TaskInfo)
 async def get_task(
     permissions: Annotated[Principal, Depends(get_current_principal)],
@@ -378,63 +446,4 @@ async def delete_task(
             error_code="INT_001",
             detail=f"Failed to delete task: {str(e)}",
             context={"operation": "delete_task", "task_id": task_id}
-        ) from e
-
-@tasks_router.get("/types", response_model=List[str])
-async def list_task_types(
-    permissions: Annotated[Principal, Depends(get_current_principal)]
-):
-    """
-    Get list of available task types.
-
-    Admin only endpoint.
-
-    Args:
-        permissions: Current user permissions
-
-    Returns:
-        List of registered task names
-    """
-    if not permissions.is_admin:
-        raise ForbiddenException()
-
-    try:
-        registered_tasks = task_registry.list_tasks()
-        return list(registered_tasks.keys())
-
-    except Exception as e:
-        raise InternalServerException(
-            error_code="INT_001",
-            detail=f"Failed to list task types: {str(e)}",
-            context={"operation": "list_task_types"}
-        ) from e
-
-@tasks_router.get("/workers/status", response_model=Dict[str, Any])
-async def get_worker_status(
-    permissions: Annotated[Principal, Depends(get_current_principal)]
-):
-    """
-    Get Temporal worker and queue status information.
-
-    Admin only endpoint.
-
-    Args:
-        permissions: Current user permissions
-
-    Returns:
-        Dictionary containing worker status, queue information, and connection details
-    """
-    if not permissions.is_admin:
-        raise ForbiddenException()
-
-    try:
-        task_executor = get_task_executor()
-        status_info = task_executor.get_worker_status()
-        return status_info
-
-    except Exception as e:
-        raise InternalServerException(
-            error_code="INT_001",
-            detail=f"Failed to get worker status: {str(e)}",
-            context={"operation": "get_worker_status"}
         ) from e

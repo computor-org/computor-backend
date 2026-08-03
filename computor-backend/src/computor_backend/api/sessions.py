@@ -68,40 +68,9 @@ async def get_current_session(
     return SessionGet.model_validate(session, from_attributes=True)
 
 
-@session_router.delete("/me/{session_id}")
-async def revoke_my_session(
-    session_id: str,
-    principal: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
-    cache = Depends(get_redis_client),
-):
-    """
-    Revoke a specific session (remote logout).
-    
-    Use this to logout from another device remotely.
-    """
-    from computor_backend.redis_cache import get_redis_client
-
-    session_repo = SessionRepository(db, cache)
-    session = session_repo.get(session_id)
-
-    if not session:
-        raise NotFoundException(detail="Session not found")
-
-    # CRITICAL: Verify session belongs to user
-    if str(session.user_id) != str(principal.user_id):
-        raise UnauthorizedException(detail="Cannot revoke another user's session")
-
-    # Revoke in database
-    session_repo.revoke_session(session_id, reason="User revoked via API")
-
-    # Delete from Redis cache
-    redis_client = await get_redis_client()
-    await redis_client.delete(f"sso_session:{session.session_id}")
-
-    return {"message": "Session revoked successfully", "session_id": session_id}
-
-
+# NOTE: /me/all MUST stay above the parametrized /me/{session_id} route.
+# FastAPI matches in registration order, so registering it later made
+# "revoke all my sessions" resolve to a lookup of the session id "all".
 @session_router.delete("/me/all")
 async def revoke_all_my_sessions(
     request: Request,
@@ -150,6 +119,40 @@ async def revoke_all_my_sessions(
         "count": count,
         "current_session_kept": not include_current
     }
+
+
+@session_router.delete("/me/{session_id}")
+async def revoke_my_session(
+    session_id: str,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+    cache = Depends(get_redis_client),
+):
+    """
+    Revoke a specific session (remote logout).
+    
+    Use this to logout from another device remotely.
+    """
+    from computor_backend.redis_cache import get_redis_client
+
+    session_repo = SessionRepository(db, cache)
+    session = session_repo.get(session_id)
+
+    if not session:
+        raise NotFoundException(detail="Session not found")
+
+    # CRITICAL: Verify session belongs to user
+    if str(session.user_id) != str(principal.user_id):
+        raise UnauthorizedException(detail="Cannot revoke another user's session")
+
+    # Revoke in database
+    session_repo.revoke_session(session_id, reason="User revoked via API")
+
+    # Delete from Redis cache
+    redis_client = await get_redis_client()
+    await redis_client.delete(f"sso_session:{session.session_id}")
+
+    return {"message": "Session revoked successfully", "session_id": session_id}
 
 
 # ============================================================================
