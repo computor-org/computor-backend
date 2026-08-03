@@ -83,11 +83,30 @@ class MatlabServer(object):
         finally:
           self.engine = None
 
-      # Kill any MATLAB processes forcefully - use killall as backup
+      # Kill any MATLAB processes forcefully - use killall as backup.
+      #
+      # MathWorksServiceHost is deliberately NOT killed here. It is a
+      # container-wide daemon shared by every MATLAB session (it also fronts
+      # the license checkout), not part of the stuck session, and taking it
+      # down just means the replacement engine has to cold-start it again:
+      # measured at 4.3s -> 6.9s per restart in the R2025b worker. The startup
+      # path below still clears it, where a clean slate is actually wanted.
       print("Killing MATLAB processes...", flush=True)
       os.system("pkill -9 -f MATLAB 2>/dev/null || true")
-      os.system("pkill -9 -f MathWorksServiceHost 2>/dev/null || true")
       os.system("killall -9 MATLAB 2>/dev/null || true")
+
+      # R2025b starts a private Xvfb (3840x2160x24) plus a fluxbox for it, as
+      # children of the MATLAB session. Neither matches `pkill -f MATLAB`, so
+      # without this they survive every restart and pile up for the lifetime of
+      # the container -- one framebuffer's worth of memory each. Safe to do
+      # here because the session that owned them is already gone and the
+      # replacement engine starts its own.
+      #
+      # The bracket around the first letter is the usual self-exclusion trick:
+      # the shell os.system() spawns carries the pattern in its own command
+      # line, and would otherwise match it.
+      os.system("pkill -9 -f 'sys/[X]vfb/glnxa64/bin/Xvfb' 2>/dev/null || true")
+      os.system("pkill -9 -f 'sys/[f]luxbox/glnxa64/bin/fluxbox' 2>/dev/null || true")
 
       # Clean up stale session files
       import glob
