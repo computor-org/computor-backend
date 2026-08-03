@@ -443,10 +443,15 @@ def revoke_api_token(
 
 
 def _invalidate_token_cache_sync(token_hash: bytes) -> None:
-    """Helper to invalidate token cache from sync context."""
+    """Helper to clear a revoked token's caches from sync context.
+
+    Uses ``revoke_token_caches`` so the principal kill-switch is raised too -
+    dropping only the token cache would leave the token working for up to
+    AUTH_CACHE_TTL via the cached Principal.
+    """
     import asyncio
     try:
-        from computor_backend.permissions.api_token_cache import invalidate_token_cache
+        from computor_backend.permissions.api_token_cache import revoke_token_caches
         token_hash_hex = token_hash.hex()
 
         try:
@@ -455,7 +460,7 @@ def _invalidate_token_cache_sync(token_hash: bytes) -> None:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
-        loop.run_until_complete(invalidate_token_cache(token_hash_hex))
+        loop.run_until_complete(revoke_token_caches(token_hash_hex))
     except Exception as e:
         logger.warning(f"Failed to invalidate token cache: {e}")
 
@@ -597,7 +602,7 @@ async def get_or_create_singleton_token(
         Since raw tokens are not stored (only hashes), we cannot retrieve
         an existing token's value. We always mint a fresh token.
     """
-    from computor_backend.permissions.api_token_cache import invalidate_token_cache
+    from computor_backend.permissions.api_token_cache import revoke_token_caches
 
     target_user_id = token_data.user_id or str(permissions.user_id)
     token_repo = ApiTokenRepository(db, cache)
@@ -612,7 +617,7 @@ async def get_or_create_singleton_token(
         )
         # Invalidate cache for revoked token
         try:
-            await invalidate_token_cache(old_token.token_hash.hex())
+            await revoke_token_caches(old_token.token_hash.hex())
         except Exception as e:
             logger.warning(f"Failed to invalidate token cache: {e}")
 

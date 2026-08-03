@@ -19,6 +19,20 @@ logger = logging.getLogger(__name__)
 # Configuration
 API_TOKEN_CACHE_TTL = 120  # 2 minutes - balance between performance and revocation latency
 
+# Revocation kill-switch. Deleting the token cache above is not enough: a
+# Principal built from this token is cached separately under a key derived from
+# the *raw* token (permissions/auth.py:principal_cache_key), which the server no
+# longer has after minting - so revocation cannot delete that entry. Instead we
+# stamp a flag keyed by the token hash and check it on the principal cache-HIT
+# path, mirroring the per-user ban flag in permissions/auth.py.
+REVOKED_FLAG_PREFIX = "api_token:revoked:"
+
+# The flag only has to outlive the stale Principal it guards against, i.e.
+# permissions/auth.py:AUTH_CACHE_TTL (900s). Kept well above that so a bump to
+# the auth TTL cannot silently reopen the window; test_token_revocation.py
+# asserts the relationship still holds.
+REVOKED_FLAG_TTL = 3600
+
 
 class CachedTokenData:
     """Cached API token authentication data."""
@@ -155,6 +169,53 @@ async def invalidate_token_cache(token_hash_hex: str) -> None:
         logger.info(f"Invalidated API token cache: {token_hash_hex[:16]}...")
     except Exception as e:
         logger.warning(f"Failed to invalidate API token cache: {e}")
+
+
+async def mark_token_revoked(token_hash_hex: str) -> None:
+    """Set the immediate-cutoff flag for a revoked token.
+
+    Best-effort: if Redis drops the flag the principal cache is gone with it,
+    so the next request is a cache miss and the DB gate (``revoked_at IS NULL``)
+    takes over.
+    """
+    from computor_backend.redis_cache import get_redis_client
+
+    try:
+        redis_client = await get_redis_client()
+        await redis_client.set(
+            f"{REVOKED_FLAG_PREFIX}{token_hash_hex}", "1", ex=REVOKED_FLAG_TTL
+        )
+    except Exception as e:
+        logger.warning(f"Failed to set revocation flag for token: {e}")
+
+
+async def is_token_revoked(token_hash_hex: str) -> bool:
+    """Return True if the revocation kill-switch is set for this token hash.
+
+    Used on the principal cache-HIT path, where neither the token cache nor the
+    DB is consulted. Fails open on Redis errors - the DB gate on the next cache
+    miss remains the durable backstop.
+    """
+    from computor_backend.redis_cache import get_redis_client
+
+    try:
+        redis_client = await get_redis_client()
+        return bool(await redis_client.get(f"{REVOKED_FLAG_PREFIX}{token_hash_hex}"))
+    except Exception as e:  # pragma: no cover - redis hiccup
+        logger.warning(f"Revocation-flag check failed: {e}")
+        return False
+
+
+async def revoke_token_caches(token_hash_hex: str) -> None:
+    """Everything a revocation has to do to the caches, in one call.
+
+    Drops the cached token data *and* raises the kill-switch that invalidates
+    any already-cached Principal. Revocation call sites should use this rather
+    than ``invalidate_token_cache`` alone, which leaves the 15-minute principal
+    cache window wide open.
+    """
+    await invalidate_token_cache(token_hash_hex)
+    await mark_token_revoked(token_hash_hex)
 
 
 async def invalidate_user_token_caches(user_id: str) -> None:

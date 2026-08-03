@@ -95,16 +95,27 @@ def principal_cache_key(kind: str, token: str) -> str:
     return hashlib.sha256(f"{kind}:{token}".encode()).hexdigest()
 
 
-async def _get_cached_principal(cache_key: str) -> Optional[Principal]:
-    """Fetch + deserialize a cached Principal, enforcing the ban kill-switch.
+async def _get_cached_principal(
+    cache_key: str, token_hash_hex: Optional[str] = None
+) -> Optional[Principal]:
+    """Fetch + deserialize a cached Principal, enforcing the kill-switches.
 
-    Returns the Principal on a cache hit for a non-banned user, or ``None`` on a
+    Returns the Principal on a cache hit for a live credential, or ``None`` on a
     cache miss or a deserialization/Redis error (fail-open to the DB path).
-    Raises ``ForbiddenException`` when the cached user has been banned — the DB
-    ban gate in ``PrincipalBuilder.build`` never runs on a cache hit, so the
-    per-user kill-switch flag is honoured here so a ban takes effect immediately
-    instead of waiting out ``AUTH_CACHE_TTL``.
+
+    Two gates run here because neither the DB nor the token cache is consulted on
+    a cache hit:
+    - ``ForbiddenException`` when the cached user has been banned (the DB ban
+      gate in ``PrincipalBuilder.build`` never runs on a hit);
+    - ``UnauthorizedException`` when ``token_hash_hex`` names a revoked API token
+      (the ``revoked_at IS NULL`` filter in ``authenticate_api_token`` likewise
+      never runs).
+
+    Without them a ban or a revocation would only take effect after
+    ``AUTH_CACHE_TTL``.
     """
+    from computor_backend.permissions.api_token_cache import is_token_revoked
+
     cache = await get_redis_client()
     try:
         cached_data = await cache.get(cache_key)
@@ -116,8 +127,14 @@ async def _get_cached_principal(cache_key: str) -> Optional[Principal]:
                     error_code="AUTHZ_002",
                     detail="User account is banned",
                 )
+            if token_hash_hex and await is_token_revoked(token_hash_hex):
+                logger.info("Rejected cached Principal for a revoked API token")
+                raise UnauthorizedException(
+                    error_code="AUTH_004",
+                    detail="Invalid or revoked API token",
+                )
             return principal
-    except ForbiddenException:
+    except (ForbiddenException, UnauthorizedException):
         raise
     except Exception as e:
         logger.warning(f"Cache retrieval error: {e}")
@@ -428,15 +445,21 @@ async def get_current_principal(
 
     # For cacheable auth methods, check cache FIRST before creating DB connection
     cache_key = None
+    token_hash_hex = None
     if isinstance(credentials, ApiTokenCredentials):
         cache_key = principal_cache_key("api_token_permissions", credentials.token)
+        # Revocation can only be keyed by the token hash (the raw token is never
+        # stored), so hand it down for the kill-switch check on the hit path.
+        if validate_token_format(credentials.token):
+            token_hash_hex = hash_api_token(credentials.token).hex()
     elif isinstance(credentials, SSOAuthCredentials):
         cache_key = principal_cache_key("sso_permissions", credentials.token)
 
     # Try cache first (no DB connection!). Raises ForbiddenException for a
-    # banned user; returns None on a cache miss.
+    # banned user and UnauthorizedException for a revoked token; returns None
+    # on a cache miss.
     if cache_key:
-        cached = await _get_cached_principal(cache_key)
+        cached = await _get_cached_principal(cache_key, token_hash_hex)
         if cached is not None:
             return cached
 

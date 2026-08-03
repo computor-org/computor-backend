@@ -45,7 +45,11 @@ async def resolve_principal_from_scope(scope: Scope) -> Optional[dict]:
         api_token = _decode(headers.get(b"x-api-token"))
         if api_token:
             principal = await _check_principal_cache("api_token_permissions", api_token)
-            if principal is not None:
+            # A cached Principal outlives revocation (its key is derived from the
+            # raw token, which revocation cannot compute), so honour the kill-switch
+            # here too. Falling through to the DB lookup is the correct answer: it
+            # filters revoked_at IS NULL and therefore resolves to None.
+            if principal is not None and not await _api_token_revoked(api_token):
                 return principal
             return await run_in_threadpool(_resolve_api_token_from_db, api_token)
 
@@ -106,6 +110,16 @@ async def _check_principal_cache(prefix: str, token: str) -> Optional[dict]:
     if not principal_data.get("user_id"):
         return None
     return principal_data
+
+
+async def _api_token_revoked(token: str) -> bool:
+    """Whether the revocation kill-switch is set for this raw API token."""
+    from computor_backend.permissions.api_token_cache import is_token_revoked
+    from computor_backend.utils.api_token import hash_api_token, validate_token_format
+
+    if not validate_token_format(token):
+        return False
+    return await is_token_revoked(hash_api_token(token).hex())
 
 
 def _resolve_api_token_from_db(token: str) -> Optional[dict]:
