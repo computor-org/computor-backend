@@ -39,6 +39,25 @@ if [ ! -f "$SEED_MARKER" ]; then
   touch "$SEED_MARKER"
 fi
 
+# MathWorks ServiceHost state is machine-local, but its default home is this
+# SHARED volume: its service registry records endpoints as ipc:///tmp/...
+# paths that die with their container, so every new workspace inherited the
+# dead endpoints of every previous one — R2025b sessions then grind at full
+# CPU for tens of minutes before a timeout gives up (see matlab-vscode's
+# startup script for the full story; MATLAB Answers 2183789). The symlink
+# resolves per container: blank container-local registry every start, and two
+# workspaces sharing this home cannot see each other's. LatestInstall.info is
+# seeded so ServiceHost uses the image's install instead of unpacking a fresh
+# ~1 GB per-user copy on every start.
+rm -rf "$HOME/.MathWorks/ServiceHost"
+mkdir -p /tmp/mathworks-servicehost "$HOME/.MathWorks"
+ln -sfn /tmp/mathworks-servicehost "$HOME/.MathWorks/ServiceHost"
+# The pointer file lives in the home seed (MathWorks' original /home/matlab),
+# not next to the /opt install itself.
+if [ -f /opt/matlab-home-seed/.MathWorks/ServiceHost/LatestInstall.info ]; then
+  cp /opt/matlab-home-seed/.MathWorks/ServiceHost/LatestInstall.info /tmp/mathworks-servicehost/ || true
+fi
+
 git config --global user.name "${full_name}"
 git config --global user.email "${email}"
 mkdir -p "$HOME/workspace"

@@ -41,6 +41,27 @@ if [ ! -f "$SEED_MARKER" ]; then
   touch "$SEED_MARKER"
 fi
 
+# MathWorks ServiceHost state is machine-local, but its default home is this
+# SHARED volume: its service registry records endpoints as ipc:///tmp/...
+# paths that die with their container, so every new workspace inherited the
+# dead endpoints of every previous one. R2025b's session chases them at full
+# CPU for tens of minutes before a timeout gives up — "Number of multiple
+# references has reached its maximum limit" in the ServiceHost log, every Run
+# queued behind it (MATLAB Answers 2183789 names shared state as the cause of
+# multiple-MSH-endpoint hangs). The symlink resolves per container, so each
+# session starts with a blank container-local registry and two workspaces
+# sharing this home cannot see each other's. Seeding LatestInstall.info keeps
+# ServiceHost on the image's own install instead of letting it unpack a fresh
+# ~1 GB per-user copy on every start.
+rm -rf "$HOME/.MathWorks/ServiceHost"
+mkdir -p /tmp/mathworks-servicehost "$HOME/.MathWorks"
+ln -sfn /tmp/mathworks-servicehost "$HOME/.MathWorks/ServiceHost"
+# The pointer file lives in the home seed (MathWorks' original /home/matlab),
+# not next to the /opt install itself.
+if [ -f /opt/matlab-home-seed/.MathWorks/ServiceHost/LatestInstall.info ]; then
+  cp /opt/matlab-home-seed/.MathWorks/ServiceHost/LatestInstall.info /tmp/mathworks-servicehost/ || true
+fi
+
 git config --global user.name "${full_name}"
 git config --global user.email "${email}"
 mkdir -p "$HOME/workspace"
@@ -92,6 +113,14 @@ fi
 # the workspace itself, so the question buys nothing and a student who dismisses
 # it is left with an editor that looks broken.
 #
+# Graphics prewarming is off because it is what wedged production: the
+# language server's "Prewarming graphics" step eagerly brings up the whole
+# webwindow/ServiceHost chain the moment MATLAB connects, and when that chain
+# stalls (see the ServiceHost relocation above) the session sits busy for tens
+# of minutes with every Run request queued behind it. Lazy init only defers
+# that work to the first figure a student actually draws — a few extra seconds
+# on the first plot instead of a session that starts out unusable.
+#
 # Images open in the Computor viewer because the built-in one cannot show them
 # here. It fetches the picture, its stylesheet and its script from a host that
 # exists only inside the webview service worker, and under code-server the
@@ -123,6 +152,7 @@ path, matlab_root = sys.argv[1], sys.argv[2]
 defaults = {
     "MATLAB.signIn": True,
     "MATLAB.defaultEditor": False,
+    "MATLAB.prewarmGraphics": False,
     "security.workspace.trust.enabled": False,
     "workbench.editorAssociations": {
         "*.png": "computor.imagePreview",
