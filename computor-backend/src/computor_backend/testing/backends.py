@@ -83,10 +83,20 @@ class MatlabTestingBackend(TestingBackend):
             # Connect to MATLAB server via Pyro
             matlab_server = Pyro5.api.Proxy(pyro_address)
 
-            # Get timeout from backend properties or test config (default: 5 minutes)
+            # Get timeout from backend properties or test config.
+            #
+            # The default has to cover the slowest legitimate example, not the
+            # median one. Graphics examples that build a video (make_movie2_d /
+            # make_movie3_d) render 75 frames through getframe, at ~110ms/frame
+            # headless under R2025b, and the suite runs the code twice -- once
+            # for the reference and once for the student -- so ~20s goes into
+            # rasterisation alone. The former 45s left no room for that plus a
+            # cold engine start, and a test killed on this timeout does not just
+            # fail: it marks the shared engine stuck and forces a restart, which
+            # then slows down every submission behind it.
             timeout_seconds = backend_properties.get(
                 "timeout_seconds",
-                test_job_config.get("timeout_seconds", 45)
+                test_job_config.get("timeout_seconds", 180)
             )
 
             logger.info(f"Executing MATLAB test with {timeout_seconds}s timeout")
