@@ -426,6 +426,9 @@ app.include_router(accounts_router, tags=["accounts"])
 CrudRouter(AccountInterface).register_routes(app)
 CrudRouter(GroupInterface).register_routes(app)
 # ProfileInterface and StudentProfileInterface use custom routers for fine-grained permissions
+# session_router must be registered before CrudRouter(SessionInterface) so that
+# GET /sessions/me is matched before the generic GET /sessions/{id} route.
+app.include_router(session_router, tags=["sessions"])
 CrudRouter(SessionInterface).register_routes(app)
 course_router.register_routes(app)
 organization_router.register_routes(app)
@@ -665,11 +668,7 @@ app.include_router(
     dependencies=[Depends(get_current_principal)]
 )
 
-# Session management router
-app.include_router(
-    session_router,
-    tags=["sessions"]
-)
+# Session management router is registered earlier, above CrudRouter(SessionInterface).
 
 # WebSocket router (authentication handled internally)
 app.include_router(
