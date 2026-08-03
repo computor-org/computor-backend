@@ -311,7 +311,11 @@ class ResultPermissionHandler(PermissionHandler):
         "delete": [CourseRole.LECTURER],  # Only lecturers can delete results
     }
 
-    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None) -> bool:
+    def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
+        # ``context`` is accepted for signature parity with the base class and
+        # the call site in ``business_logic/crud.py::create_entity``, which
+        # always passes it. Without the kwarg, POST /results raised a
+        # TypeError -> HTTP 500 for every non-admin caller.
         if self.check_admin(principal):
             return True
 
