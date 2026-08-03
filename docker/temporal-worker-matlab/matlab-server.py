@@ -41,10 +41,32 @@ class MatlabServer(object):
     server_thread: Thread
     testing_environment_path: str
     _engine_stuck: bool = False  # Flag to track if engine needs restart
+    _engine_initialized: bool = False  # initTest has run on the *current* engine
+
+    # Statements that isolate one submission from the next. Deliberately NOT
+    # `clear all`: the workspace has to be clean between students, the code
+    # cache does not. `clear all` empties both, so every framework class and the
+    # whole +yaml package gets re-parsed and re-JITted for each submission --
+    # measured at +1.8s on R2025b, against ~0.4s of actual test work for
+    # itpcp.pgph.mat.simple_plot. `builtin` is used because the test engine puts
+    # its own clear.m on the path, shadowing the built-in.
+    RESET_STATEMENTS = (
+        "cd ~",
+        "builtin('clear','variables')",
+        "builtin('clear','global')",
+        # A test that errors out before its teardown leaves its figures open,
+        # and the cost of creating a figure grows with how many already are.
+        "close all force",
+        # Only touches the path when a submission actually changed it.
+        "if ~isempty(getappdata(groot,'codeAbilityEnginePath')) &&"
+        " ~strcmp(path,getappdata(groot,'codeAbilityEnginePath')),"
+        " path(getappdata(groot,'codeAbilityEnginePath')); end",
+    )
 
     def __init__(self,  worker_path: str):
       self.testing_environment_path = worker_path
       self._engine_stuck = False
+      self._engine_initialized = False
       self.connect()
 
     def _force_restart_engine(self):
@@ -109,6 +131,28 @@ class MatlabServer(object):
 
       print("FORCE RESTART: Cleanup complete, starting fresh engine...", flush=True)
       self._engine_stuck = False
+      self._engine_initialized = False
+
+    def _initialize_engine(self):
+      """Bring a freshly started engine up to a runnable state.
+
+      This is where `clear all` belongs: it is the one place a clean class and
+      function cache is actually wanted, and the cost is paid once per engine
+      rather than once per submission (see RESET_STATEMENTS).
+      """
+      init_file = f"{self.testing_environment_path}/initTest.m"
+      print(f"Initializing test environment at {init_file}", flush=True)
+      initErg = self.engine.evalc(f"clear all;cd ~;run {init_file}")
+      # Remember the search path initTest built, so a submission that mangles it
+      # (addpath/rmpath/restoredefaultpath in student code) cannot break every
+      # later submission that shares this engine.
+      self.engine.eval("setappdata(groot,'codeAbilityEnginePath',path);", nargout=0)
+      self._engine_initialized = True
+      print(f'Initialization complete: {initErg}', flush=True)
+
+    def _reset_workspace(self):
+      """Clean the workspace between submissions, keeping the code cache warm."""
+      self.engine.eval(";".join(MatlabServer.RESET_STATEMENTS) + ";", nargout=0)
 
     def connect(self):
       # Check if we need to force restart due to previous timeout
@@ -122,6 +166,10 @@ class MatlabServer(object):
       while attempts < retries:
         try:
           if self.engine is None:
+            # Whatever engine we end up on below is not one we have run
+            # initTest against yet -- including an already-shared engine we
+            # merely reconnect to.
+            self._engine_initialized = False
             engines = matlab.engine.find_matlab()
             print(f"Found existing MATLAB engines: {engines}", flush=True)
             if engine_name in engines:
@@ -151,13 +199,15 @@ class MatlabServer(object):
           else:
             print('Engine is already available!', flush=True)
 
-          print(f"Initializing test environment at {self.testing_environment_path}/initTest.m", flush=True)
-          initErg = self.engine.evalc(f"clear all;cd ~;run {self.testing_environment_path}/initTest.m")
-          print(f'Initialization complete: {initErg}', flush=True)
+          if self._engine_initialized:
+            self._reset_workspace()
+          else:
+            self._initialize_engine()
           return
 
         except Exception as e:
           attempts += 1
+          self._engine_initialized = False
           print(f'Failed connection attempt #{attempts}/{retries}: {type(e).__name__}: {str(e)}', flush=True)
 
           # Clean up failed engine to ensure fresh start on retry
