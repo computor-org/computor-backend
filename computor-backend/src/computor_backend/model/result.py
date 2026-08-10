@@ -6,7 +6,14 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship, Mapped
 from typing import TYPE_CHECKING
 
+from computor_types.tasks import RETRYABLE_RESULT_STATUSES_SQL
+
 from .base import Base, UUIDPkMixin, VersionedMixin, AuditMixin
+
+# "A retryable run does not occupy the slot." Rendered from the one definition
+# in computor_types.tasks so the indexes and the endpoints that pre-check them
+# can never disagree. Changing the set requires a migration.
+_RETRYABLE = text(f'status NOT IN ({RETRYABLE_RESULT_STATUSES_SQL})')
 
 if TYPE_CHECKING:
     from .artifact import SubmissionArtifact, ResultArtifact
@@ -20,15 +27,15 @@ class Result(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
         # Partial unique indexes - allow multiple results with same version_identifier when status is FAILED(1), CANCELLED(2), or CRASHED(6)
         # Include course_content_id to allow same version for different assignments
         Index('result_version_identifier_member_content_partial_key', 'course_member_id', 'version_identifier', 'course_content_id',
-              unique=True, postgresql_where=text('status NOT IN (1, 2, 6)')),
+              unique=True, postgresql_where=_RETRYABLE),
         Index('result_version_identifier_group_content_partial_key', 'submission_group_id', 'version_identifier', 'course_content_id',
-              unique=True, postgresql_where=text('status NOT IN (1, 2, 6)')),
+              unique=True, postgresql_where=_RETRYABLE),
         # New indexes from TestResult for artifact-based testing
         Index('result_submission_artifact_idx', 'submission_artifact_id'),
         Index('result_created_at_idx', 'created_at'),
         # Prevent multiple successful tests of same artifact by same member
         Index('result_artifact_unique_success', 'submission_artifact_id', 'course_member_id',
-              unique=True, postgresql_where=text('status NOT IN (1, 2, 6)'))
+              unique=True, postgresql_where=_RETRYABLE)
     )
 
     properties = Column(JSONB)

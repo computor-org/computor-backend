@@ -3,7 +3,6 @@ Temporal client configuration and initialization.
 """
 
 from temporalio.client import Client, TLSConfig
-from temporalio.common import RetryPolicy
 from typing import Optional
 import asyncio
 
@@ -13,14 +12,10 @@ from .worker_settings import get_worker_settings
 # Default task queue
 DEFAULT_TASK_QUEUE = "computor-tasks"
 
-# Default retry policy
-DEFAULT_RETRY_POLICY = RetryPolicy(
-    initial_interval=1,
-    backoff_coefficient=2.0,
-    maximum_interval=100,
-    maximum_attempts=3,
-)
-
+# NOTE: there is deliberately no module-level default RetryPolicy here. The one
+# that used to live at this spot had bare ints where temporalio wants
+# timedeltas, so it would have raised on conversion had anything ever used it —
+# nothing did. Per-workflow policy belongs in BaseWorkflow.get_retry_policy().
 
 _client: Optional[Client] = None
 _client_lock = asyncio.Lock()

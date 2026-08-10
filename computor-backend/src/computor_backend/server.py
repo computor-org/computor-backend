@@ -316,6 +316,7 @@ async def startup_logic():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from computor_backend.maintenance_scheduler import MaintenanceReminderScheduler
+    from computor_backend.business_logic.result_reconciler import ResultReconciler
 
     await startup_logic()
 
@@ -326,7 +327,14 @@ async def lifespan(app: FastAPI):
     maintenance_scheduler = MaintenanceReminderScheduler()
     await maintenance_scheduler.start()
 
+    # Reconcile test results whose worker died without reporting back, so a
+    # row cannot sit QUEUED forever just because nobody polled it.
+    result_reconciler = ResultReconciler()
+    await result_reconciler.start()
+
     yield
+
+    await result_reconciler.stop()
 
     # Stop maintenance reminder scheduler
     await maintenance_scheduler.stop()

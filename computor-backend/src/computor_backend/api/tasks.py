@@ -26,6 +26,7 @@ from computor_backend.tasks import (
     TaskResult,
     task_registry
 )
+from computor_backend.tasks.temporal_executor import TaskNotFoundError
 from computor_backend.task_tracker import get_task_tracker
 from computor_types.tasks import TaskTrackerEntry
 
@@ -276,7 +277,7 @@ async def get_task_status(
 
     except ForbiddenException:
         raise
-    except KeyError:
+    except (KeyError, TaskNotFoundError):
         raise NotFoundException(
             error_code="TASK_001",
             detail="Task execution not found",
@@ -326,7 +327,7 @@ async def get_task_result(
 
     except ForbiddenException:
         raise
-    except KeyError:
+    except (KeyError, TaskNotFoundError):
         raise NotFoundException(
             error_code="TASK_001",
             detail="Task execution not found",
@@ -435,7 +436,7 @@ async def delete_task(
             detail=str(e),
             context={"operation": "delete_task"},
         ) from e
-    except KeyError:
+    except (KeyError, TaskNotFoundError):
         raise NotFoundException(
             error_code="TASK_001",
             detail="Task execution not found",

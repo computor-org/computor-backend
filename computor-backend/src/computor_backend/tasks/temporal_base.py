@@ -2,6 +2,7 @@
 Base classes and interfaces for Temporal workflow and activity definitions.
 """
 
+import asyncio
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -165,3 +166,36 @@ def extract_test_counts(test_results: Dict[str, Any]) -> Tuple[int, int, int]:
         test_results.get("failed", 0),
         test_results.get("total", 0),
     )
+
+# Interval between activity heartbeats. Must stay comfortably below the
+# ``heartbeat_timeout`` declared on long-running activities, so a healthy but
+# slow run is never mistaken for a dead worker.
+ACTIVITY_HEARTBEAT_INTERVAL_SECONDS = 30
+
+
+def start_activity_heartbeat(
+    interval: float = ACTIVITY_HEARTBEAT_INTERVAL_SECONDS,
+) -> "asyncio.Task":
+    """Start a background task emitting ``activity.heartbeat()`` on a timer.
+
+    A long activity that never heartbeats is indistinguishable from a worker
+    that died: Temporal only notices when ``start_to_close_timeout`` expires,
+    which for a test run meant a 30 minute wait before anything was marked
+    failed. Heartbeating lets a declared ``heartbeat_timeout`` catch a dead
+    worker in minutes instead — the test work itself is unchanged.
+
+    The caller owns the returned task and MUST ``cancel()`` it (typically in a
+    ``finally``). Safe outside an activity context: the pump simply stops, so
+    the orchestrators stay directly callable in tests.
+    """
+    from temporalio import activity as _activity
+
+    async def _pump():
+        while True:
+            await asyncio.sleep(interval)
+            try:
+                _activity.heartbeat()
+            except Exception:  # not in an activity context, or already gone
+                return
+
+    return asyncio.create_task(_pump())

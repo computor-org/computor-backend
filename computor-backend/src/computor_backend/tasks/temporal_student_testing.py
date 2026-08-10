@@ -14,7 +14,6 @@ import json
 import tempfile
 import subprocess
 import asyncio
-import uuid
 import shutil
 import logging
 from datetime import datetime, timedelta
@@ -23,7 +22,12 @@ from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ApplicationError
 
-from .temporal_base import BaseWorkflow, WorkflowResult, extract_test_counts
+from .temporal_base import (
+    BaseWorkflow,
+    WorkflowResult,
+    extract_test_counts,
+    start_activity_heartbeat,
+)
 from .registry import register_task
 from computor_types.tasks import TaskStatus, map_task_status_to_int
 from computor_types.results import ResultUpdate
@@ -41,6 +45,40 @@ logger = logging.getLogger(__name__)
 
 VERSION_MARKER_FILENAME = ".example_version_id"
 
+# Retry budget for the terminal "write the Result row" PATCH. See
+# commit_test_results_activity — losing this call loses the whole test run.
+COMMIT_MAX_ATTEMPTS = 4
+COMMIT_RETRY_BASE_DELAY = 2.0  # seconds; doubled per attempt
+
+# How long one test run may actually execute for, once a worker has picked it up.
+TEST_ACTIVITY_TIMEOUT = timedelta(minutes=30)
+
+# A heartbeat is emitted every ACTIVITY_HEARTBEAT_INTERVAL_SECONDS (30s); miss
+# several in a row and the worker is presumed dead.
+TEST_ACTIVITY_HEARTBEAT_TIMEOUT = timedelta(minutes=2)
+
+# Whole-workflow budget, which also covers waiting in the queue. Deliberately
+# much larger than TEST_ACTIVITY_TIMEOUT so a backlog delays a test rather than
+# failing it — see StudentTestingWorkflow.get_execution_timeout.
+TEST_WORKFLOW_EXECUTION_TIMEOUT = timedelta(hours=4)
+
+
+def _resolve_within(base_dir: str, filename: str) -> str:
+    """Resolve ``filename`` under ``base_dir``, refusing to escape it.
+
+    Filenames come from the API payload of an uploaded example, i.e. from
+    whoever authored that example. A plain ``os.path.join`` happily accepts
+    ``../../.ssh/authorized_keys`` or an absolute path and writes outside the
+    cache — into the worker's own home. Anchor every write instead.
+    """
+    base = os.path.realpath(base_dir)
+    candidate = os.path.realpath(os.path.join(base, filename))
+    if candidate != base and not candidate.startswith(base + os.sep):
+        raise ApplicationError(
+            f"Refusing to write example file outside its directory: {filename!r}"
+        )
+    return candidate
+
 
 def _save_example_files(target_path: str, files: Dict[str, Any]) -> None:
     """
@@ -55,7 +93,7 @@ def _save_example_files(target_path: str, files: Dict[str, Any]) -> None:
     os.makedirs(target_path, exist_ok=True)
 
     for filename, content in files.items():
-        file_path = os.path.join(target_path, filename)
+        file_path = _resolve_within(target_path, filename)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
         if isinstance(content, dict) and "base64" in content:
@@ -532,36 +570,47 @@ async def commit_test_results_activity(
     """
     logger.info(f"Committing test results for result {result_id}")
 
-    try:
-        base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
-        api_token = api_config.get("token")
-        if not api_token:
-            raise ApplicationError("API token is required but not provided in api_config")
+    base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
+    api_token = api_config.get("token")
+    if not api_token:
+        raise ApplicationError("API token is required but not provided in api_config")
 
-        async with ComputorClient(base_url=base_url, headers={"X-API-Token": api_token}) as client:
+    # Determine status based on test results
+    # Use FAILED status if there was an error or timeout
+    if test_results.get("error") or test_results.get("timeout"):
+        status = TaskStatus.FAILED
+    else:
+        status = TaskStatus.FINISHED
 
-            # Determine status based on test results
-            # Use FAILED status if there was an error or timeout
-            if test_results.get("error") or test_results.get("timeout"):
-                status = TaskStatus.FAILED
-            else:
-                status = TaskStatus.FINISHED
+    result_update = ResultUpdate(
+        status=status,
+        result=test_results.get("result_value", 0.0),
+        result_json=test_results,
+    )
 
-            # Update result
-            result_update = ResultUpdate(
-                status=status,
-                result=test_results.get("result_value", 0.0),
-                result_json=test_results,
-            )
-
-            response = await client.results.update(result_id, result_update)
+    # This PATCH is the only place a finished run becomes visible: the Result
+    # row is the source of truth and the worker holds no DB access. The client
+    # has a short timeout and no retries of its own, so a single blip used to
+    # throw away a completed test run. Retry with backoff before giving up.
+    last_error: Optional[Exception] = None
+    for attempt in range(1, COMMIT_MAX_ATTEMPTS + 1):
+        try:
+            async with ComputorClient(base_url=base_url, headers={"X-API-Token": api_token}) as client:
+                await client.results.update(result_id, result_update)
             logger.info(f"Successfully updated result {result_id}")
-
             return True
+        except Exception as e:
+            last_error = e
+            if attempt < COMMIT_MAX_ATTEMPTS:
+                delay = COMMIT_RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                logger.warning(
+                    "Failed to commit test results for %s (attempt %d/%d), retrying in %.1fs: %s",
+                    result_id, attempt, COMMIT_MAX_ATTEMPTS, delay, e,
+                )
+                await asyncio.sleep(delay)
 
-    except Exception as e:
-        logger.error(f"Failed to commit test results: {e}")
-        raise ApplicationError(message=str(e))
+    logger.error(f"Failed to commit test results after {COMMIT_MAX_ATTEMPTS} attempts: {last_error}")
+    raise ApplicationError(message=str(last_error))
 
 
 async def store_test_artifacts(
@@ -618,6 +667,12 @@ async def run_complete_student_test_activity(
     from computor_backend.tasks.api_client import resolve_api_config
     api_config = resolve_api_config(api_config)
     logger.info("[ACTIVITY API CONFIG] url=%s, token_present=%s", api_config["url"], bool(api_config["token"]))
+
+    # Keep Temporal informed that this worker is alive for the whole
+    # (potentially very long) run, so the heartbeat_timeout declared on the
+    # activity detects a killed worker within minutes instead of waiting out
+    # the 30 minute start_to_close.
+    heartbeat = start_activity_heartbeat()
 
     # Create temporary work directory for this test run.
     # TemporaryDirectory cleans up automatically — submissions are not cached.
@@ -677,11 +732,25 @@ async def run_complete_student_test_activity(
 
             logger.info(f"Test execution completed: {test_results}")
 
-            # Step 3.5: Store any generated artifacts via API
+            # Step 3.5: Store any generated artifacts via API.
+            #
+            # Best-effort on purpose: the tests have already run and their
+            # outcome is the thing that matters. Uploading figures is a large
+            # multipart POST on a client with a short timeout, so letting it
+            # throw here used to discard a *passing* run and commit
+            # {passed: 0, failed: 1} instead. Losing a plot is acceptable;
+            # losing the verdict is not.
             artifacts_path = os.path.join(work_dir, "artifacts")
             if os.path.exists(artifacts_path) and os.listdir(artifacts_path):
                 logger.info(f"Found artifacts to store in {artifacts_path}")
-                await store_test_artifacts(result_id, artifacts_path, api_config)
+                try:
+                    await store_test_artifacts(result_id, artifacts_path, api_config)
+                except Exception:
+                    logger.warning(
+                        "Failed to upload artifacts for result %s; committing test "
+                        "results anyway", result_id, exc_info=True,
+                    )
+                    test_results["artifacts_upload_failed"] = True
             else:
                 logger.info("No artifacts generated during test execution")
 
@@ -714,6 +783,9 @@ async def run_complete_student_test_activity(
 
             raise ApplicationError(message=str(e))
 
+        finally:
+            heartbeat.cancel()
+
 
 # ============================================================================
 # Workflow
@@ -730,7 +802,30 @@ class StudentTestingWorkflow(BaseWorkflow):
 
     @classmethod
     def get_execution_timeout(cls) -> timedelta:
-        return timedelta(minutes=30)
+        """Budget for the whole workflow, INCLUDING time spent queued.
+
+        This clock starts when the workflow is submitted, not when a worker
+        picks it up. It used to equal the activity's own 30 minute execution
+        budget, so during a deadline rush — when tests queue behind a
+        single-concurrency MATLAB engine — a submission could time out before it
+        ever ran, and the student saw a failed test for what was purely a
+        capacity problem. The real per-run limit is the activity's
+        start_to_close_timeout below; this only has to be generous enough to
+        cover queue wait as well.
+        """
+        return TEST_WORKFLOW_EXECUTION_TIMEOUT
+
+    @classmethod
+    def get_retry_policy(cls) -> RetryPolicy:
+        """A test run is executed exactly once.
+
+        The base policy retries a failed workflow 3x. For testing that would
+        re-execute a student's submission against the same ``result_id`` — the
+        run is visible as failed and may be retried deliberately, never
+        silently. Must stay at 1 now that ``run()`` propagates failures
+        (see the comment there).
+        """
+        return RetryPolicy(maximum_attempts=1)
 
     @workflow.run
     async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
@@ -752,7 +847,7 @@ class StudentTestingWorkflow(BaseWorkflow):
         service_type_config = parameters.get("service_type_config", {})
         result_id = parameters.get("result_id")
 
-        job_id = str(uuid.uuid4())
+        job_id = str(workflow.uuid4())
         workflow.logger.info(f"[TEST START] job={job_id}, result_id={result_id}")
         workflow.logger.info(f"[TEST CONFIG] service_slug={test_job.get('testing_service_slug')}, "
                             f"artifact_id={test_job.get('artifact_id')}, "
@@ -772,7 +867,11 @@ class StudentTestingWorkflow(BaseWorkflow):
             test_results = await workflow.execute_activity(
                 run_complete_student_test_activity,
                 args=[test_job, service_config, service_type_config, result_id, api_config],
-                start_to_close_timeout=timedelta(minutes=30),
+                start_to_close_timeout=TEST_ACTIVITY_TIMEOUT,
+                # The activity pumps activity.heartbeat() while it works, so a
+                # worker that is SIGKILLed / OOM-killed is detected in ~2 min
+                # instead of only when start_to_close expires 30 minutes later.
+                heartbeat_timeout=TEST_ACTIVITY_HEARTBEAT_TIMEOUT,
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
 
@@ -801,16 +900,19 @@ class StudentTestingWorkflow(BaseWorkflow):
             )
 
         except Exception as e:
+            # Propagate, never `return WorkflowResult(status="failed")`.
+            #
+            # Returning normally makes Temporal record the execution as
+            # COMPLETED, and the API reconciler
+            # (business_logic/testing_orchestration.sync_result_status_from_temporal)
+            # maps COMPLETED -> FINISHED without ever reading this payload. A
+            # crashed run therefore surfaced as a genuine "FINISHED, 0%" result
+            # — and since FINISHED is not a retryable status, the partial unique
+            # indexes on `result` then blocked every re-test of that version with
+            # an IntegrityError. Raising marks the workflow FAILED, which the
+            # reconciler maps to ResultStatus.FAILED (retryable).
             workflow.logger.error(f"[TEST FAILED] result_id={result_id}, error={str(e)}")
-            return WorkflowResult(
-                status="failed",
-                result=None,
-                error=str(e),
-                metadata={
-                    "workflow_type": "student_testing",
-                    "test_job_id": job_id,
-                },
-            )
+            raise
 
 
 ACTIVITIES = [

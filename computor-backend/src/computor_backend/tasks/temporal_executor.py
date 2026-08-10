@@ -8,12 +8,41 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional, List
 from temporalio.client import WorkflowHandle, WorkflowExecutionStatus
 from temporalio.common import WorkflowIDReusePolicy
+from temporalio.service import RPCError, RPCStatusCode
 from .temporal_client import get_temporal_client, get_task_queue_name, DEFAULT_TASK_QUEUE
 from .temporal_base import WorkflowResult
 from .registry import task_registry
 from computor_types.tasks import TaskStatus, TaskResult, TaskInfo, TaskSubmission
 
 logger = logging.getLogger(__name__)
+
+
+class TaskNotFoundError(Exception):
+    """The workflow genuinely does not exist (Temporal answered NOT_FOUND).
+
+    Distinct from a transport/availability failure: callers treat "gone" as a
+    terminal state (a Result row is marked CRASHED), so a Temporal outage must
+    never be reported as this. See ``get_task_status``.
+    """
+
+
+def _unwrap_workflow_result(result: Any) -> tuple[TaskStatus, Any, Optional[str]]:
+    """Normalise a workflow's return payload to (status, inner result, error).
+
+    Workflows return a ``WorkflowResult`` dataclass, but it arrives here as a
+    plain dict unless a result_type was declared. Accept both, and honour a
+    payload that reports its own failure so "completed with status=failed"
+    is not surfaced as success.
+    """
+    if isinstance(result, WorkflowResult):
+        status, inner, error = result.status, result.result, result.error
+    elif isinstance(result, dict) and "status" in result and "result" in result:
+        status, inner, error = result.get("status"), result.get("result"), result.get("error")
+    else:
+        return TaskStatus.FINISHED, result, None
+
+    task_status = TaskStatus.FAILED if status == "failed" else TaskStatus.FINISHED
+    return task_status, inner, error
 
 CODER_ADMIN_WORKFLOWS = {
     "build_workspace_images",
@@ -219,10 +248,17 @@ class TemporalTaskExecutor:
             )
             
             return task_info
-            
-        except Exception as e:
-            # Handle workflow not found
-            raise Exception(f"Task {task_id} not found: {str(e)}")
+
+        except RPCError as e:
+            # Only a NOT_FOUND answer means the workflow is really gone.
+            # Everything else (UNAVAILABLE, DEADLINE_EXCEEDED, auth) is a
+            # transient failure to *ask* — reporting it as "not found" made a
+            # brief Temporal outage mark live test runs as CRASHED and let a
+            # duplicate run start alongside them.
+            if e.status == RPCStatusCode.NOT_FOUND:
+                raise TaskNotFoundError(f"Task {task_id} not found") from e
+            logger.warning("Temporal unavailable while describing %s: %s", task_id, e)
+            raise
     
     async def get_task_result(self, task_id: str) -> TaskResult:
         """
@@ -246,13 +282,20 @@ class TemporalTaskExecutor:
             # Get workflow result
             try:
                 result = await handle.result()
-                
-                # Convert WorkflowResult to TaskResult
+
+                # ``handle.result()`` has no result_type here, so the default
+                # payload converter hands back a plain dict — the old
+                # isinstance(result, WorkflowResult) checks were always False
+                # and neither unwrapped the payload nor noticed a workflow that
+                # reported failure in its return value (BaseWorkflow.require_params
+                # still does exactly that).
+                payload_status, inner, error = _unwrap_workflow_result(result)
+
                 return TaskResult(
                     task_id=task_id,
-                    status=TaskStatus.FINISHED,
-                    result=result.result if isinstance(result, WorkflowResult) else result,
-                    error=result.error if isinstance(result, WorkflowResult) else None,
+                    status=payload_status,
+                    result=inner,
+                    error=error,
                     created_at=datetime.now(timezone.utc),
                     finished_at=datetime.now(timezone.utc),
                 )

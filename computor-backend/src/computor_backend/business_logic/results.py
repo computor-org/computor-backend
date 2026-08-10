@@ -38,5 +38,8 @@ async def get_result_status(
         task_info = await task_executor.get_task_status(result.test_system_id)
         return task_info.status
     except Exception as e:
+        # Falling back to FAILED reported a perfectly healthy run as failed
+        # whenever Temporal was briefly unreachable. The stored row is the
+        # source of truth; report that instead of inventing a verdict.
         logger.warning(f"Failed to get task status for result {result_id}: {e}")
-        return TaskStatus.FAILED
+        return map_int_to_task_status(result.status)

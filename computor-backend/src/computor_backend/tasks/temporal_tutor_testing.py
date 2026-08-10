@@ -30,13 +30,21 @@ from temporalio.exceptions import ApplicationError
 from computor_client import ComputorClient
 from computor_backend.utils.docker_utils import transform_localhost_url
 
-from .temporal_base import BaseWorkflow, WorkflowResult, extract_test_counts
+from .temporal_base import (
+    BaseWorkflow,
+    WorkflowResult,
+    extract_test_counts,
+    start_activity_heartbeat,
+)
 from .registry import register_task
 
 # Reuse from student testing
 from .temporal_student_testing import (
     fetch_example_version_with_dependencies,
     execute_tests_activity,
+    TEST_ACTIVITY_TIMEOUT,
+    TEST_ACTIVITY_HEARTBEAT_TIMEOUT,
+    TEST_WORKFLOW_EXECUTION_TIMEOUT,
 )
 from .worker_settings import get_worker_settings
 
@@ -220,6 +228,9 @@ async def run_tutor_test_activity(
     logger.info(f"Starting tutor test for {test_id}")
 
     # Create temporary work directory
+    # Keep Temporal informed this worker is alive — see the student orchestrator.
+    heartbeat = start_activity_heartbeat()
+
     with tempfile.TemporaryDirectory(prefix=f"tutor_test_{test_id}_") as work_dir:
         try:
             # Step 1: Fetch reference example with dependencies (cached, via API)
@@ -264,13 +275,22 @@ async def run_tutor_test_activity(
             logger.info(f"Test execution completed: {test_results}")
 
             # Step 4: Store artifacts via API
+            # Best-effort: the tests already ran, so a failed artifact upload
+            # must not discard their verdict (see the student orchestrator).
             artifacts_path = os.path.join(work_dir, "artifacts")
             artifact_count = 0
             if os.path.exists(artifacts_path) and os.listdir(artifacts_path):
                 logger.info(f"Storing artifacts from {artifacts_path}")
-                artifact_count = await store_tutor_test_artifacts_activity(
-                    test_id, artifacts_path, api_config
-                )
+                try:
+                    artifact_count = await store_tutor_test_artifacts_activity(
+                        test_id, artifacts_path, api_config
+                    )
+                except Exception:
+                    logger.warning(
+                        "Failed to upload artifacts for tutor test %s; storing "
+                        "results anyway", test_id, exc_info=True,
+                    )
+                    test_results["artifacts_upload_failed"] = True
             else:
                 logger.info("No artifacts generated during test execution")
 
@@ -304,6 +324,9 @@ async def run_tutor_test_activity(
 
             raise ApplicationError(message=str(e))
 
+        finally:
+            heartbeat.cancel()
+
 
 # ============================================================================
 # Workflow
@@ -326,7 +349,13 @@ class TutorTestingWorkflow(BaseWorkflow):
 
     @classmethod
     def get_execution_timeout(cls) -> timedelta:
-        return timedelta(minutes=30)
+        """Covers queue wait too — see StudentTestingWorkflow."""
+        return TEST_WORKFLOW_EXECUTION_TIMEOUT
+
+    @classmethod
+    def get_retry_policy(cls) -> RetryPolicy:
+        """Run a tutor test exactly once — see StudentTestingWorkflow."""
+        return RetryPolicy(maximum_attempts=1)
 
     @workflow.run
     async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
@@ -377,7 +406,8 @@ class TutorTestingWorkflow(BaseWorkflow):
                     test_config,
                     api_config,
                 ],
-                start_to_close_timeout=timedelta(minutes=30),
+                start_to_close_timeout=TEST_ACTIVITY_TIMEOUT,
+                heartbeat_timeout=TEST_ACTIVITY_HEARTBEAT_TIMEOUT,
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
 
@@ -412,19 +442,12 @@ class TutorTestingWorkflow(BaseWorkflow):
             )
 
         except Exception as e:
+            # Propagate so Temporal records the run as FAILED. Returning a
+            # "failed" payload normally makes the execution COMPLETED, and every
+            # status consumer reads the execution status, not this payload.
+            # See StudentTestingWorkflow.run for the full rationale.
             workflow.logger.error(f"[TUTOR TEST FAILED] test_id={test_id}, error={str(e)}")
-            return WorkflowResult(
-                status="failed",
-                result={
-                    "test_id": test_id,
-                    "error": str(e),
-                },
-                error=str(e),
-                metadata={
-                    "workflow_type": "tutor_testing",
-                    "test_id": test_id,
-                },
-            )
+            raise
 
 
 ACTIVITIES = [
