@@ -133,6 +133,18 @@ does not re-issue anything — that would silently break a running worker. Rotat
 purpose: mint the new token, update the container's `API_TOKEN`, restart it, then
 revoke the old one.
 
+The token value is also validated with the same checker authentication uses
+(`ctp_` + exactly 32 url-safe base64 characters). A near-miss used to be stored
+happily and then rejected on every request as "Invalid API token format".
+
+**Expiry is a cutoff, not a nudge.** `expires_days: 365` means that a year after
+first boot the worker stops authenticating and every test fails — and because
+the seeding check only asked "is there an unrevoked token", it kept reporting
+*already present* while the pipeline was dead. Startup now warns for the last 30
+days, and if the token has already lapsed while the deployment file still pins
+that same value, it extends the expiry (same secret, so nothing needs
+reconfiguring). Omit `expires_days` for a token that never expires.
+
 ## Wiring a testing worker
 
 ```
@@ -174,6 +186,28 @@ Consequences:
 
 That asymmetry is why only admins may mint a token for another human, and why a
 `_service_manager` is confined to service accounts (below).
+
+### …but there is a ceiling on what you may grant
+
+Because scopes only ever add authority, "who may mint" is not by itself enough:
+a `_service_manager` holds nothing but `service:*` and `api_token:*`, yet could
+once mint a service token carrying `result:update` or `user:create` and then
+authenticate as that service — forging grades in any course.
+
+`assert_may_grant_scopes` (`business_logic/api_tokens.py`) closes that:
+
+| Caller | May grant |
+|---|---|
+| `_admin` | any scope |
+| anyone else (e.g. `_service_manager`) | only the scopes in `DEFAULT_SERVICE_SCOPES` for the target service type's **category** |
+
+So provisioning a testing worker still works — `testing` category ⇒ its 15
+scopes — while a service manager cannot invent authority the type was never
+meant to have. The ceiling applies at every write: `POST /api-tokens`,
+`POST /api-tokens/admin/create`, and `PATCH /api-tokens/admin/{id}` (re-scoping
+is minting by another name). Because the same table is now also the allow-list,
+keep the defaults tight — `worker` deliberately no longer includes
+`course:create`/`course:update`.
 
 ## Governance
 
