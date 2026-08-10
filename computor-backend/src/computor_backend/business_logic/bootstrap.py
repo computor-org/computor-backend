@@ -179,11 +179,17 @@ def _ensure_service(svc: ServiceConfig, system: Principal, db) -> str:
     if not raw:
         return f"{'created' if created_now else 'present'} WITHOUT a token (no api_token.token in YAML)"
 
+    # Validate with the same function authentication uses — a token that merely
+    # *looks* close enough ("ctp_" + >=32 chars) is stored fine and then fails
+    # every worker request with "Invalid API token format".
+    from computor_backend.utils.api_token import validate_token_format
+
     token = os.path.expandvars(raw)
-    if not token or token.startswith("${") or not token.startswith("ctp_") or len(token) < 32:
+    if not token or token.startswith("${") or not validate_token_format(token):
         return (
             f"{'created' if created_now else 'present'} WITHOUT a token — api_token did not resolve "
-            f"to a valid 'ctp_' token (is TESTING_WORKER_TOKEN set & exported in the API's env?)"
+            f"to a valid token ('ctp_' + exactly 32 url-safe base64 chars). "
+            f"Is TESTING_WORKER_TOKEN set & exported in the API's env?"
         )
 
     expires_at = None
