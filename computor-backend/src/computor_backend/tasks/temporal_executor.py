@@ -25,6 +25,25 @@ class TaskNotFoundError(Exception):
     never be reported as this. See ``get_task_status``.
     """
 
+
+def _unwrap_workflow_result(result: Any) -> tuple[TaskStatus, Any, Optional[str]]:
+    """Normalise a workflow's return payload to (status, inner result, error).
+
+    Workflows return a ``WorkflowResult`` dataclass, but it arrives here as a
+    plain dict unless a result_type was declared. Accept both, and honour a
+    payload that reports its own failure so "completed with status=failed"
+    is not surfaced as success.
+    """
+    if isinstance(result, WorkflowResult):
+        status, inner, error = result.status, result.result, result.error
+    elif isinstance(result, dict) and "status" in result and "result" in result:
+        status, inner, error = result.get("status"), result.get("result"), result.get("error")
+    else:
+        return TaskStatus.FINISHED, result, None
+
+    task_status = TaskStatus.FAILED if status == "failed" else TaskStatus.FINISHED
+    return task_status, inner, error
+
 CODER_ADMIN_WORKFLOWS = {
     "build_workspace_images",
     "push_coder_templates",
@@ -263,13 +282,20 @@ class TemporalTaskExecutor:
             # Get workflow result
             try:
                 result = await handle.result()
-                
-                # Convert WorkflowResult to TaskResult
+
+                # ``handle.result()`` has no result_type here, so the default
+                # payload converter hands back a plain dict — the old
+                # isinstance(result, WorkflowResult) checks were always False
+                # and neither unwrapped the payload nor noticed a workflow that
+                # reported failure in its return value (BaseWorkflow.require_params
+                # still does exactly that).
+                payload_status, inner, error = _unwrap_workflow_result(result)
+
                 return TaskResult(
                     task_id=task_id,
-                    status=TaskStatus.FINISHED,
-                    result=result.result if isinstance(result, WorkflowResult) else result,
-                    error=result.error if isinstance(result, WorkflowResult) else None,
+                    status=payload_status,
+                    result=inner,
+                    error=error,
                     created_at=datetime.now(timezone.utc),
                     finished_at=datetime.now(timezone.utc),
                 )
