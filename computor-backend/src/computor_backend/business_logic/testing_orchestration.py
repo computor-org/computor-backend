@@ -11,6 +11,7 @@ caller; only the queries and validation live here.
 """
 import json
 import logging
+import re
 from typing import Optional
 from uuid import UUID
 
@@ -226,16 +227,103 @@ async def sync_result_status_from_temporal(
     return False
 
 
+# A service that does not name a queue is routed to the fleet for its language.
+# One worker image per language is the intended topology, so the queue is a
+# function of the language rather than a third value to keep in sync by hand.
+TASK_QUEUE_PREFIX = "testing"
+
+
+def _queue_token(value: str) -> str:
+    """Normalise one component of a derived queue name.
+
+    Lowercase; anything outside ``[a-z0-9.]`` collapses to a single dash, so
+    ``R2025b`` → ``r2025b`` and ``3.13`` stays ``3.13``.
+    """
+    slug = re.sub(r"[^a-z0-9.]+", "-", value.strip().lower())
+    return slug.strip("-")
+
+
+def default_task_queue_for_language(
+    language: str, language_version: Optional[str] = None
+) -> str:
+    """The conventional queue for a runner: ``testing-<language>[-<version>]``.
+
+    The queue names the *runner*, and a runner is identified by language AND
+    version — two workers with different Python versions are not
+    interchangeable. Keying the queue on language alone would put
+    ``python 3.11`` and ``python 3.13`` on one queue, where whichever worker
+    polled first would execute the test and the carefully-resolved version
+    would be silently ignored.
+
+    A version-less service keeps the plain ``testing-<language>`` name, so
+    single-version installations are unaffected.
+
+    Deliberately a pure function of its inputs so the API and the operator can
+    derive the same name independently — the worker is started with
+    ``--queues=<this>``.
+    """
+    queue = f"{TASK_QUEUE_PREFIX}-{_queue_token(language)}"
+    if language_version and language_version.strip():
+        queue = f"{queue}-{_queue_token(language_version)}"
+    return queue
+
+
+def _config_str(service, key: str) -> Optional[str]:
+    if service.config and isinstance(service.config, dict):
+        value = service.config.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip().lower()
+        if key == "language_version" and isinstance(value, (int, float)):
+            # A number here means the YAML was written unquoted. That is lossy
+            # and cannot be undone: `language_version: 3.10` parses as the float
+            # 3.1, so it will never match an example asking for "3.10". Warn
+            # rather than mismatch in silence.
+            if isinstance(value, float):
+                logger.warning(
+                    "Service '%s' has language_version: %s written as a NUMBER. "
+                    "YAML reads 3.10 as 3.1, so version matching will misbehave — "
+                    "quote it: language_version: \"%s\".",
+                    getattr(service, "name", "?"), value, value,
+                )
+            return str(value)
+    return None
+
+
+def service_language(service) -> Optional[str]:
+    """``Service.config.language``, or None."""
+    return _config_str(service, "language")
+
+
+def service_language_version(service) -> Optional[str]:
+    """``Service.config.language_version``, or None.
+
+    Set this when you run more than one version of a language side by side; it
+    both selects the service (examples may request a ``version``) and separates
+    the workers' queues.
+    """
+    return _config_str(service, "language_version")
+
+
 def resolve_task_queue(
     service,
     service_type,
     *,
     require_testing_path: bool = True,
 ) -> str:
-    """Extract and validate the Temporal task queue for a testing service.
+    """Resolve the Temporal task queue for a testing service.
 
-    The queue MUST live at ``service.config.temporal.task_queue``. With
-    ``require_testing_path`` the service type path must start with
+    Order:
+      1. an explicit ``service.config.temporal.task_queue`` (always wins, so
+         existing deployments and any bespoke topology are untouched);
+      2. otherwise ``testing-<config.language>``.
+
+    The fallback exists because "one worker per language" is the intended
+    shape, and making the queue a third independently-typed string meant a
+    typo, or a queue nobody deployed, was accepted silently. Deriving it means
+    a service that declares ``language: octave`` routes to ``testing-octave``
+    with nothing further to configure.
+
+    With ``require_testing_path`` the service type path must start with
     ``testing.`` (student test runs); tutor tests skip that check.
     """
     if require_testing_path and not str(service_type.path).startswith("testing."):
@@ -259,18 +347,29 @@ def resolve_task_queue(
             )
 
     if not task_queue:
+        language = service_language(service)
+        if language:
+            version = service_language_version(service)
+            task_queue = default_task_queue_for_language(language, version)
+            logger.info(
+                "Service '%s' declares no task_queue; routing to '%s' by language "
+                "'%s'%s",
+                service.name, task_queue, language,
+                f" version '{version}'" if version else "",
+            )
+
+    if not task_queue:
         config_example = {
-            "temporal": {
-                "task_queue": "testing-matlab",
-                "max_retries": 3,
-                "timeout_minutes": 30
-            }
+            "language": "octave",
+            "temporal": {"task_queue": "testing-octave"},
         }
         raise BadRequestException(
             error_code="EXT_005",
             detail=(
-                f"Testing service '{service.name}' is not properly configured. "
-                f"No task queue specified. Service configuration must include: "
+                f"Testing service '{service.name}' is not properly configured: it "
+                f"declares neither a language nor a task queue, so there is no way "
+                f"to route its tests. Set config.language (the queue is then "
+                f"derived as 'testing-<language>'), or name a queue explicitly: "
                 f"{json.dumps(config_example, indent=2)}"
             )
         )

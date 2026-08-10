@@ -87,6 +87,68 @@ async def fetch_service_config(
     return None
 
 
+# What each language needs to actually be present in THIS image. Any one of the
+# listed executables satisfies the requirement; an empty list means the runtime
+# is pure-python and always available.
+#
+# This exists because the service says what it can run and the image decides
+# whether that is true, and nothing checked the two against each other. Julia in
+# particular is installed with a trailing `|| echo "... skipping"` in
+# testing-runtimes/Dockerfile, so it can be absent from a perfectly healthy
+# build — a service declaring `language: julia` would then start, advertise
+# itself on the queue, claim every julia test and fail all of them at runtime.
+LANGUAGE_REQUIREMENTS: Dict[str, list] = {
+    "python": ["python3"],
+    "octave": ["octave-cli", "octave"],
+    "r": ["Rscript"],
+    "julia": ["julia"],
+    "c": ["gcc"],
+    "cpp": ["g++"],
+    "fortran": ["gfortran"],
+    "document": [],
+}
+
+
+def assert_language_supported(language: str) -> None:
+    """Fail fast when this image cannot provide ``language``.
+
+    A worker that cannot run what its Service advertises must not start: it
+    would poll the queue, win the work, and fail every test — which reads as
+    "the tests are broken" rather than "this worker is misconfigured".
+    """
+    import shutil
+
+    if language == "matlab":
+        raise SystemExit(
+            "This image cannot run MATLAB tests. The MATLAB worker is a separate "
+            "image with its own entrypoint (docker/temporal-worker-matlab). "
+            "Point this service at that worker, or set config.language to a "
+            "language this image provides: "
+            f"{', '.join(sorted(LANGUAGE_REQUIREMENTS))}."
+        )
+
+    if language not in LANGUAGE_REQUIREMENTS:
+        raise SystemExit(
+            f"Unknown language '{language}'. This worker image provides: "
+            f"{', '.join(sorted(LANGUAGE_REQUIREMENTS))}."
+        )
+
+    candidates = LANGUAGE_REQUIREMENTS[language]
+    if not candidates:
+        return
+
+    found = next((exe for exe in candidates if shutil.which(exe)), None)
+    if found is None:
+        raise SystemExit(
+            f"This worker is configured for language '{language}' but none of "
+            f"{candidates} is installed in the image. Refusing to start: the "
+            f"worker would claim {language} tests from the queue and fail every "
+            f"one of them. Rebuild the image with that runtime, or point this "
+            f"service's config.language at a language the image provides."
+        )
+    print(f"  ✓ {language} runtime available ({found})")
+
+
 def get_service_language(service_config: Optional[ServiceGet], config: Dict[str, Any]) -> str:
     """
     Determine which language runtime to provision in this container.
@@ -405,6 +467,10 @@ def main():
     language = get_service_language(service_config, config)
     print(f"  Primary language: {language}")
 
+    # Refuse to start if this image cannot actually provide it — better a loud
+    # failure here than a worker that claims every test and fails it.
+    assert_language_supported(language)
+
     # computor-testing is installed at Docker build time
     framework_package_path = "/home/worker/computor-testing"
 
@@ -416,6 +482,7 @@ def main():
     for lang_key in ["python", "octave", "r", "julia", "c", "fortran"]:
         if lang_key in config and lang_key != language:
             print(f"\n  Also setting up {lang_key} (found in config)...")
+            assert_language_supported(lang_key)
             setup_language_environment(lang_key, config, framework_package_path)
 
     # Step 2: Start Temporal worker
