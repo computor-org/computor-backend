@@ -66,15 +66,15 @@ That last step is how you run e.g. python 3.11 and 3.13 as separate workers:
 give each service a `config.language_version`, and examples that don't care
 still land on whichever runner declares no version.
 
-That string is matched to `Service.slug` at upload
-(`api/examples.py:_resolve_testing_service_id`), at assignment
-(`lecturer_deployment:_link_testing_service`) and again at test time
-(`business_logic/testing_service.py:resolve_testing_service`).
+The binding is resolved at upload (`api/examples.py:_resolve_testing_service_id`),
+at assignment (`lecturer_deployment:_link_testing_service`) and again at test time
+(`business_logic/testing_service.py:resolve_testing_service`) — all three now
+delegate to the single rule above.
 
 `CourseContent.testing_service_id`, `ExampleVersion.testing_service_id` and
 `Result.testing_service_id` are **caches** of that resolution, self-healing. So an
 example can be uploaded and assigned before its service exists — testing starts
-working the moment a matching slug appears.
+working the moment a matching runner appears.
 
 The slug is an **identifier you choose**. It does not select the test runner and
 carries no meaning to the code — `config.language` does that. Any name works,
