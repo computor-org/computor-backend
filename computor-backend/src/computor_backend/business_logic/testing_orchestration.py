@@ -217,16 +217,51 @@ async def sync_result_status_from_temporal(
     return False
 
 
+# A service that does not name a queue is routed to the fleet for its language.
+# One worker image per language is the intended topology, so the queue is a
+# function of the language rather than a third value to keep in sync by hand.
+TASK_QUEUE_PREFIX = "testing"
+
+
+def default_task_queue_for_language(language: str) -> str:
+    """The conventional queue for a language: ``testing-<language>``.
+
+    Deliberately a pure function of the language so the API and the operator
+    can derive the same name independently — the worker is started with
+    ``--queues=<this>``.
+    """
+    return f"{TASK_QUEUE_PREFIX}-{language.strip().lower()}"
+
+
+def service_language(service) -> Optional[str]:
+    """``Service.config.language``, or None."""
+    if service.config and isinstance(service.config, dict):
+        language = service.config.get("language")
+        if isinstance(language, str) and language.strip():
+            return language.strip().lower()
+    return None
+
+
 def resolve_task_queue(
     service,
     service_type,
     *,
     require_testing_path: bool = True,
 ) -> str:
-    """Extract and validate the Temporal task queue for a testing service.
+    """Resolve the Temporal task queue for a testing service.
 
-    The queue MUST live at ``service.config.temporal.task_queue``. With
-    ``require_testing_path`` the service type path must start with
+    Order:
+      1. an explicit ``service.config.temporal.task_queue`` (always wins, so
+         existing deployments and any bespoke topology are untouched);
+      2. otherwise ``testing-<config.language>``.
+
+    The fallback exists because "one worker per language" is the intended
+    shape, and making the queue a third independently-typed string meant a
+    typo, or a queue nobody deployed, was accepted silently. Deriving it means
+    a service that declares ``language: octave`` routes to ``testing-octave``
+    with nothing further to configure.
+
+    With ``require_testing_path`` the service type path must start with
     ``testing.`` (student test runs); tutor tests skip that check.
     """
     if require_testing_path and not str(service_type.path).startswith("testing."):
@@ -250,18 +285,26 @@ def resolve_task_queue(
             )
 
     if not task_queue:
+        language = service_language(service)
+        if language:
+            task_queue = default_task_queue_for_language(language)
+            logger.info(
+                "Service '%s' declares no task_queue; routing to '%s' by language '%s'",
+                service.name, task_queue, language,
+            )
+
+    if not task_queue:
         config_example = {
-            "temporal": {
-                "task_queue": "testing-matlab",
-                "max_retries": 3,
-                "timeout_minutes": 30
-            }
+            "language": "octave",
+            "temporal": {"task_queue": "testing-octave"},
         }
         raise BadRequestException(
             error_code="EXT_005",
             detail=(
-                f"Testing service '{service.name}' is not properly configured. "
-                f"No task queue specified. Service configuration must include: "
+                f"Testing service '{service.name}' is not properly configured: it "
+                f"declares neither a language nor a task queue, so there is no way "
+                f"to route its tests. Set config.language (the queue is then "
+                f"derived as 'testing-<language>'), or name a queue explicitly: "
                 f"{json.dumps(config_example, indent=2)}"
             )
         )
