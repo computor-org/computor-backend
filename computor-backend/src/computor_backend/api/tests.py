@@ -285,6 +285,12 @@ async def create_test_run(
     # This prevents duplicate key errors when retrying with misconfigured services
     task_queue = resolve_task_queue(service, service_type)
 
+    # ...and that a worker is actually polling it. A queue nobody listens on
+    # accepts the workflow and then never runs it, which surfaced to the student
+    # as a test stuck QUEUED until it timed out.
+    from computor_backend.tasks.queue_health import assert_queue_has_worker
+    await assert_queue_has_worker(task_queue, service.name)
+
     # Create test result record (only after validation passes)
     result = Result(
         submission_artifact_id=artifact.id,
