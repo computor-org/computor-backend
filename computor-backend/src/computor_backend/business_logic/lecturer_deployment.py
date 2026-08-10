@@ -140,8 +140,15 @@ def _link_testing_service(
     # service is only needed at test-execution time; mirroring the upload path
     # ("don't block upload when the execution backend isn't registered"), the
     # lecturer assigns now and the link is filled in once the backend exists.
-    slug = example_version.get_execution_backend_slug()
-    if not slug:
+    from computor_backend.business_logic.testing_service import (
+        resolve_service_for_execution_backend,
+    )
+
+    execution_backend = example_version.execution_backend
+    binding = None
+    if isinstance(execution_backend, dict):
+        binding = execution_backend.get("slug") or execution_backend.get("language")
+    if not binding:
         logger.warning(
             "Example version %s has no testing service link and declares no "
             "executionBackend; assigning without one (link it once the backend "
@@ -150,18 +157,16 @@ def _link_testing_service(
         )
         return
 
-    service = db.query(Service).filter(
-        Service.slug == slug,
-        Service.enabled == True,  # noqa: E712 — SQLAlchemy column comparison
-        Service.archived_at.is_(None),
-    ).first()
+    # Same shared rule as upload and test time: a pinned slug selects one
+    # specific runner; otherwise the language (optionally versioned) does.
+    service = resolve_service_for_execution_backend(db, execution_backend)
 
     if not service:
         logger.warning(
-            "Example version %s declares executionBackend '%s', which matches no "
+            "Example version %s declares executionBackend %r, which matches no "
             "enabled, non-archived service; assigning without a testing service "
-            "(register the service or fix the slug, then re-assign/redeploy).",
-            example_version.id, slug,
+            "(register the service or fix the binding, then re-assign/redeploy).",
+            example_version.id, binding,
         )
         return
 
@@ -172,9 +177,9 @@ def _link_testing_service(
     course_content.updated_by = permissions.user_id
     course_content.updated_at = datetime.now(timezone.utc)
     logger.info(
-        "Backfilled testing service '%s' onto example_version %s "
-        "and course content %s",
-        slug, example_version.id, course_content.path,
+        "Backfilled testing service '%s' (via executionBackend %r) onto "
+        "example_version %s and course content %s",
+        service.slug, binding, example_version.id, course_content.path,
     )
 
 
