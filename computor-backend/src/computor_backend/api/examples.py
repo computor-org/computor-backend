@@ -95,19 +95,21 @@ def _resolve_testing_service_id(db: Session, meta: dict) -> Optional[str]:
     so we never silently ship an untestable *assignment*, but we never block an
     *upload* either.
     """
+    from computor_backend.business_logic.testing_service import (
+        resolve_service_for_execution_backend,
+    )
+
     eb = ExampleVersion.extract_execution_backend(meta)
-    slug = eb.get('slug') if eb else None
-    if not slug:
+    binding = (eb.get('slug') or eb.get('language')) if eb else None
+    if not binding:
         return None
-    service = db.query(Service).filter(
-        Service.slug == slug,
-        Service.enabled == True,  # noqa: E712 — SQLAlchemy column comparison
-        Service.archived_at.is_(None),
-    ).first()
+    # One shared rule for upload / assignment / test time: a pinned slug wins,
+    # otherwise the language (optionally versioned) selects the runner.
+    service = resolve_service_for_execution_backend(db, eb)
     if not service:
         logger.info(
-            "Example upload: executionBackend slug %r has no enabled service yet; "
-            "storing testing_service_id=NULL (resolved at assignment time).", slug
+            "Example upload: executionBackend %r has no enabled service yet; "
+            "storing testing_service_id=NULL (resolved at assignment time).", binding
         )
         return None
     return service.id
