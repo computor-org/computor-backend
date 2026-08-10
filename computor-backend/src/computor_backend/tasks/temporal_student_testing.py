@@ -22,7 +22,12 @@ from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ApplicationError
 
-from .temporal_base import BaseWorkflow, WorkflowResult, extract_test_counts
+from .temporal_base import (
+    BaseWorkflow,
+    WorkflowResult,
+    extract_test_counts,
+    start_activity_heartbeat,
+)
 from .registry import register_task
 from computor_types.tasks import TaskStatus, map_task_status_to_int
 from computor_types.results import ResultUpdate
@@ -44,6 +49,18 @@ VERSION_MARKER_FILENAME = ".example_version_id"
 # commit_test_results_activity — losing this call loses the whole test run.
 COMMIT_MAX_ATTEMPTS = 4
 COMMIT_RETRY_BASE_DELAY = 2.0  # seconds; doubled per attempt
+
+# How long one test run may actually execute for, once a worker has picked it up.
+TEST_ACTIVITY_TIMEOUT = timedelta(minutes=30)
+
+# A heartbeat is emitted every ACTIVITY_HEARTBEAT_INTERVAL_SECONDS (30s); miss
+# several in a row and the worker is presumed dead.
+TEST_ACTIVITY_HEARTBEAT_TIMEOUT = timedelta(minutes=2)
+
+# Whole-workflow budget, which also covers waiting in the queue. Deliberately
+# much larger than TEST_ACTIVITY_TIMEOUT so a backlog delays a test rather than
+# failing it — see StudentTestingWorkflow.get_execution_timeout.
+TEST_WORKFLOW_EXECUTION_TIMEOUT = timedelta(hours=4)
 
 
 def _resolve_within(base_dir: str, filename: str) -> str:
@@ -651,6 +668,12 @@ async def run_complete_student_test_activity(
     api_config = resolve_api_config(api_config)
     logger.info("[ACTIVITY API CONFIG] url=%s, token_present=%s", api_config["url"], bool(api_config["token"]))
 
+    # Keep Temporal informed that this worker is alive for the whole
+    # (potentially very long) run, so the heartbeat_timeout declared on the
+    # activity detects a killed worker within minutes instead of waiting out
+    # the 30 minute start_to_close.
+    heartbeat = start_activity_heartbeat()
+
     # Create temporary work directory for this test run.
     # TemporaryDirectory cleans up automatically — submissions are not cached.
     with tempfile.TemporaryDirectory(prefix=f"test_{result_id}_") as work_dir:
@@ -760,6 +783,9 @@ async def run_complete_student_test_activity(
 
             raise ApplicationError(message=str(e))
 
+        finally:
+            heartbeat.cancel()
+
 
 # ============================================================================
 # Workflow
@@ -776,7 +802,18 @@ class StudentTestingWorkflow(BaseWorkflow):
 
     @classmethod
     def get_execution_timeout(cls) -> timedelta:
-        return timedelta(minutes=30)
+        """Budget for the whole workflow, INCLUDING time spent queued.
+
+        This clock starts when the workflow is submitted, not when a worker
+        picks it up. It used to equal the activity's own 30 minute execution
+        budget, so during a deadline rush — when tests queue behind a
+        single-concurrency MATLAB engine — a submission could time out before it
+        ever ran, and the student saw a failed test for what was purely a
+        capacity problem. The real per-run limit is the activity's
+        start_to_close_timeout below; this only has to be generous enough to
+        cover queue wait as well.
+        """
+        return TEST_WORKFLOW_EXECUTION_TIMEOUT
 
     @classmethod
     def get_retry_policy(cls) -> RetryPolicy:
@@ -830,7 +867,11 @@ class StudentTestingWorkflow(BaseWorkflow):
             test_results = await workflow.execute_activity(
                 run_complete_student_test_activity,
                 args=[test_job, service_config, service_type_config, result_id, api_config],
-                start_to_close_timeout=timedelta(minutes=30),
+                start_to_close_timeout=TEST_ACTIVITY_TIMEOUT,
+                # The activity pumps activity.heartbeat() while it works, so a
+                # worker that is SIGKILLed / OOM-killed is detected in ~2 min
+                # instead of only when start_to_close expires 30 minutes later.
+                heartbeat_timeout=TEST_ACTIVITY_HEARTBEAT_TIMEOUT,
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
 

@@ -30,13 +30,21 @@ from temporalio.exceptions import ApplicationError
 from computor_client import ComputorClient
 from computor_backend.utils.docker_utils import transform_localhost_url
 
-from .temporal_base import BaseWorkflow, WorkflowResult, extract_test_counts
+from .temporal_base import (
+    BaseWorkflow,
+    WorkflowResult,
+    extract_test_counts,
+    start_activity_heartbeat,
+)
 from .registry import register_task
 
 # Reuse from student testing
 from .temporal_student_testing import (
     fetch_example_version_with_dependencies,
     execute_tests_activity,
+    TEST_ACTIVITY_TIMEOUT,
+    TEST_ACTIVITY_HEARTBEAT_TIMEOUT,
+    TEST_WORKFLOW_EXECUTION_TIMEOUT,
 )
 from .worker_settings import get_worker_settings
 
@@ -220,6 +228,9 @@ async def run_tutor_test_activity(
     logger.info(f"Starting tutor test for {test_id}")
 
     # Create temporary work directory
+    # Keep Temporal informed this worker is alive — see the student orchestrator.
+    heartbeat = start_activity_heartbeat()
+
     with tempfile.TemporaryDirectory(prefix=f"tutor_test_{test_id}_") as work_dir:
         try:
             # Step 1: Fetch reference example with dependencies (cached, via API)
@@ -313,6 +324,9 @@ async def run_tutor_test_activity(
 
             raise ApplicationError(message=str(e))
 
+        finally:
+            heartbeat.cancel()
+
 
 # ============================================================================
 # Workflow
@@ -335,7 +349,8 @@ class TutorTestingWorkflow(BaseWorkflow):
 
     @classmethod
     def get_execution_timeout(cls) -> timedelta:
-        return timedelta(minutes=30)
+        """Covers queue wait too — see StudentTestingWorkflow."""
+        return TEST_WORKFLOW_EXECUTION_TIMEOUT
 
     @classmethod
     def get_retry_policy(cls) -> RetryPolicy:
@@ -391,7 +406,8 @@ class TutorTestingWorkflow(BaseWorkflow):
                     test_config,
                     api_config,
                 ],
-                start_to_close_timeout=timedelta(minutes=30),
+                start_to_close_timeout=TEST_ACTIVITY_TIMEOUT,
+                heartbeat_timeout=TEST_ACTIVITY_HEARTBEAT_TIMEOUT,
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
 
