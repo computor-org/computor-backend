@@ -34,6 +34,11 @@ services:
     api_token:
       token: ${TESTING_WORKER_TOKEN}     # expanded from the environment at apply time
       name: Testing Worker Token
+      # Expiry is a hard cutoff: when it passes, this service stops
+      # authenticating and every test fails. Bootstrap warns for the last
+      # 30 days, and if the token lapses while this file still pins the
+      # same value it extends it rather than leaving the pipeline dead.
+      # Omit the field entirely for a token that never expires.
       expires_days: 365
     config:
       temporal:
