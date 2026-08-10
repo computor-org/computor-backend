@@ -218,6 +218,9 @@ services:
     networks:
       - computor-network
     restart: unless-stopped
+    # Must be >= TEMPORAL_GRACEFUL_SHUTDOWN_SECONDS (default 300s), or Docker
+    # SIGKILLs the worker while it is still draining a live run.
+    stop_grace_period: 330s
     security_opt:
       - "no-new-privileges:true"
     logging:

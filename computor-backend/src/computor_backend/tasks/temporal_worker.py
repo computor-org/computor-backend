@@ -7,7 +7,7 @@ import logging
 import signal
 import sys
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 from temporalio.worker import Worker
 from temporalio.client import Client
@@ -55,11 +55,28 @@ class TemporalWorker:
         self._shutdown = False
         self._heartbeat_interval = heartbeat_interval
         self._start_time: Optional[datetime] = None
+        # Set on shutdown so the heartbeat loop wakes immediately instead of
+        # sitting out the rest of its sleep.
+        self._shutdown_event: Optional[asyncio.Event] = None
 
     async def _heartbeat_loop(self):
-        """Log periodic heartbeat to show worker is alive."""
+        """Log periodic heartbeat to show worker is alive.
+
+        Sleeps on the shutdown event rather than a bare ``asyncio.sleep`` — the
+        gather in ``start()`` cannot return until this coroutine does, so a plain
+        sleep kept a SIGTERM'd worker alive for up to a full interval (300s),
+        long past Docker's stop timeout, and the container was SIGKILLed
+        mid-test instead of stopping cleanly.
+        """
+        assert self._shutdown_event is not None
         while not self._shutdown:
-            await asyncio.sleep(self._heartbeat_interval)
+            try:
+                await asyncio.wait_for(
+                    self._shutdown_event.wait(), timeout=self._heartbeat_interval
+                )
+                return  # event set — shutting down
+            except asyncio.TimeoutError:
+                pass  # normal interval elapsed
             if not self._shutdown:
                 uptime = datetime.utcnow() - self._start_time if self._start_time else "unknown"
                 logger.info(
@@ -106,6 +123,14 @@ class TemporalWorker:
             else {"max_concurrent_activities": max_concurrent_activities}
         )
 
+        # Give in-flight activities time to finish when we are asked to stop.
+        # Without this the SDK default of 0 cancels a running test the instant
+        # the worker is signalled, and test activities are deliberately never
+        # retried — so a routine restart destroyed the run.
+        graceful_shutdown = timedelta(
+            seconds=get_worker_settings().graceful_shutdown_seconds
+        )
+
         # Create a worker for each task queue
         for task_queue in self.task_queues:
             logger.info(f"Creating worker for queue: {task_queue}")
@@ -120,6 +145,7 @@ class TemporalWorker:
                 workflows=workflows,
                 activities=activities,
                 activity_executor=activity_executor,
+                graceful_shutdown_timeout=graceful_shutdown,
                 **worker_limits,
             )
             self.workers.append(worker)
@@ -129,11 +155,23 @@ class TemporalWorker:
                 f"max_concurrent_activities={max_concurrent_activities or 'SDK default'})"
             )
 
-        # Setup signal handlers
-        signal.signal(signal.SIGINT, self._signal_handler)
-        signal.signal(signal.SIGTERM, self._signal_handler)
+        # Setup signal handlers. add_signal_handler runs the callback ON the
+        # event loop, so scheduling the shutdown coroutines from it is safe;
+        # signal.signal() fires on an arbitrary stack where asyncio.create_task
+        # can raise "no running event loop".
+        self._shutdown_event = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                loop.add_signal_handler(sig, self._request_shutdown, sig)
+            except NotImplementedError:  # pragma: no cover - non-POSIX
+                signal.signal(sig, lambda s, _f: self._request_shutdown(s))
 
         logger.info(f"Worker ready - listening on {len(self.task_queues)} queue(s)")
+        logger.info(
+            f"Graceful shutdown timeout: {graceful_shutdown.total_seconds():.0f}s "
+            f"(container stop_grace_period must be at least this long)"
+        )
         logger.info(f"Registered {len(workflows)} workflows and {len(activities)} activities")
 
         # Start heartbeat loop and workers concurrently
@@ -149,25 +187,44 @@ class TemporalWorker:
         finally:
             await self.shutdown()
 
-    def _signal_handler(self, signum, frame):
-        """Handle shutdown signals."""
-        logger.info(f"Received signal {signum}, shutting down workers...")
+    def _request_shutdown(self, signum):
+        """Begin a graceful shutdown (runs on the event loop)."""
+        if self._shutdown:
+            return
+        logger.info(
+            f"Received signal {signum}, draining workers "
+            f"(in-flight activities get up to "
+            f"{get_worker_settings().graceful_shutdown_seconds}s to finish)..."
+        )
         self._shutdown = True
-        # Cancel all worker tasks
+        if self._shutdown_event is not None:
+            self._shutdown_event.set()
+        # Worker.shutdown() stops polling and waits out graceful_shutdown_timeout
+        # for running activities before cancelling them.
         for worker in self.workers:
             asyncio.create_task(worker.shutdown())
 
     async def shutdown(self):
-        """Shutdown the worker gracefully."""
+        """Release worker-owned resources after the run loop has ended."""
         logger.info("Shutting down Temporal workers...")
 
-        # Workers are already shutting down from signal handler
-        # Just wait a bit for graceful shutdown
-        await asyncio.sleep(1)
+        self._shutdown = True
+        if self._shutdown_event is not None:
+            self._shutdown_event.set()
 
-        # Close client connection
-        if self.client:
-            await self.client.close()
+        # NOTE: temporalio 1.5.1's Client has no close()/aclose() — calling one
+        # raised AttributeError here on every single shutdown, which skipped the
+        # thread-pool cleanup below and turned every graceful stop into a
+        # traceback. The client owns no resources needing explicit release; the
+        # hasattr guard only exists so a future SDK that adds one is honoured.
+        close = getattr(self.client, "close", None) if self.client else None
+        if callable(close):
+            try:
+                maybe = close()
+                if asyncio.iscoroutine(maybe):
+                    await maybe
+            except Exception as e:  # pragma: no cover - defensive
+                logger.warning(f"Error closing Temporal client: {e}")
 
         # Release the activity thread pools.
         for executor in self._activity_executors:

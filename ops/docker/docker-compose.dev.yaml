@@ -57,6 +57,9 @@ services:
     networks:
       - computor-network
     restart: unless-stopped
+    # Must be >= TEMPORAL_GRACEFUL_SHUTDOWN_SECONDS (default 300s), or Docker
+    # SIGKILLs the worker while it is still draining a live run.
+    stop_grace_period: 330s
     security_opt:
       - "no-new-privileges:true"
     logging:
@@ -116,6 +119,9 @@ services:
     networks:
       - computor-network
     restart: unless-stopped
+    # Must be >= TEMPORAL_GRACEFUL_SHUTDOWN_SECONDS (default 300s), or Docker
+    # SIGKILLs the worker while it is still draining a live run.
+    stop_grace_period: 330s
     security_opt:
       - "no-new-privileges:true"
     logging:
@@ -135,7 +141,7 @@ services:
       - TEMPORAL_PORT=7233
       - TEMPORAL_NAMESPACE=default
       - API_URL=${API_URL}
-      - API_TOKEN=${TESTING_WORKER_TOKEN}
+      - API_TOKEN=${TESTING_WORKER_TOKEN:?set TESTING_WORKER_TOKEN in .env — the worker cannot report results without it}
       # Default testing configuration (can be overridden by service.config)
       - TESTING_EXECUTABLE=computor-test
       # Extra pip packages installed into the test venv at worker startup

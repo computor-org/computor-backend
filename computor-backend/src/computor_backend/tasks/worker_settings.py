@@ -110,6 +110,16 @@ class WorkerSettings(BaseSettings):
         default=None, validation_alias="TEMPORAL_MAX_CONCURRENT_ACTIVITIES"
     )
 
+    # How long a shutting-down worker waits for its in-flight activities before
+    # cancelling them. The SDK default is 0 — a plain `docker compose restart`
+    # cancelled a running student test instantly, and since test activities are
+    # never retried that lost the run. A test executes for minutes, so give it
+    # real time to land; the container's stop_grace_period must be at least
+    # this large or Docker SIGKILLs the worker before the wait can finish.
+    graceful_shutdown_seconds: int = Field(
+        default=300, validation_alias="TEMPORAL_GRACEFUL_SHUTDOWN_SECONDS"
+    )
+
     # --- Coder image / template build (tasks/temporal_coder_setup.py) -----
     # Old: os.environ.get("CODER_REGISTRY_HOST", registry_host)  -- env overrides
     #      a runtime parameter, so None == unset and the call site keeps the param.
