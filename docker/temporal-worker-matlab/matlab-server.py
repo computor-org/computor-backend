@@ -6,7 +6,7 @@ import json
 import matlab
 import matlab.engine
 import subprocess
-from threading import Thread
+from threading import RLock, Thread
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from Pyro5.api import expose, Daemon
 from computor_types.repositories import Repository
@@ -41,10 +41,39 @@ class MatlabServer(object):
     server_thread: Thread
     testing_environment_path: str
     _engine_stuck: bool = False  # Flag to track if engine needs restart
+    _engine_initialized: bool = False  # initTest has run on the *current* engine
+
+    # Statements that isolate one submission from the next. Deliberately NOT
+    # `clear all`: the workspace has to be clean between students, the code
+    # cache does not. `clear all` empties both, so every framework class and the
+    # whole +yaml package gets re-parsed and re-JITted for each submission --
+    # measured at +1.8s on R2025b, against ~0.4s of actual test work for
+    # itpcp.pgph.mat.simple_plot. `builtin` is used because the test engine puts
+    # its own clear.m on the path, shadowing the built-in.
+    RESET_STATEMENTS = (
+        "cd ~",
+        "builtin('clear','variables')",
+        "builtin('clear','global')",
+        # A test that errors out before its teardown leaves its figures open,
+        # and the cost of creating a figure grows with how many already are.
+        "close all force",
+        # Only touches the path when a submission actually changed it.
+        "if ~isempty(getappdata(groot,'codeAbilityEnginePath')) &&"
+        " ~strcmp(path,getappdata(groot,'codeAbilityEnginePath')),"
+        " path(getappdata(groot,'codeAbilityEnginePath')); end",
+    )
 
     def __init__(self,  worker_path: str):
       self.testing_environment_path = worker_path
       self._engine_stuck = False
+      self._engine_initialized = False
+      # There is one MATLAB session behind this object and MATLAB executes one
+      # command at a time, so submissions are serialised no matter what. Making
+      # that explicit buys two things the implicit version does not: a timeout
+      # measures how long a test *ran* rather than how long it queued, and
+      # _force_restart_engine() can no longer pkill MATLAB out from under a
+      # submission that is still executing in it.
+      self._engine_lock = RLock()
       self.connect()
 
     def _force_restart_engine(self):
@@ -61,11 +90,30 @@ class MatlabServer(object):
         finally:
           self.engine = None
 
-      # Kill any MATLAB processes forcefully - use killall as backup
+      # Kill any MATLAB processes forcefully - use killall as backup.
+      #
+      # MathWorksServiceHost is deliberately NOT killed here. It is a
+      # container-wide daemon shared by every MATLAB session (it also fronts
+      # the license checkout), not part of the stuck session, and taking it
+      # down just means the replacement engine has to cold-start it again:
+      # measured at 4.3s -> 6.9s per restart in the R2025b worker. The startup
+      # path below still clears it, where a clean slate is actually wanted.
       print("Killing MATLAB processes...", flush=True)
       os.system("pkill -9 -f MATLAB 2>/dev/null || true")
-      os.system("pkill -9 -f MathWorksServiceHost 2>/dev/null || true")
       os.system("killall -9 MATLAB 2>/dev/null || true")
+
+      # R2025b starts a private Xvfb (3840x2160x24) plus a fluxbox for it, as
+      # children of the MATLAB session. Neither matches `pkill -f MATLAB`, so
+      # without this they survive every restart and pile up for the lifetime of
+      # the container -- one framebuffer's worth of memory each. Safe to do
+      # here because the session that owned them is already gone and the
+      # replacement engine starts its own.
+      #
+      # The bracket around the first letter is the usual self-exclusion trick:
+      # the shell os.system() spawns carries the pattern in its own command
+      # line, and would otherwise match it.
+      os.system("pkill -9 -f 'sys/[X]vfb/glnxa64/bin/Xvfb' 2>/dev/null || true")
+      os.system("pkill -9 -f 'sys/[f]luxbox/glnxa64/bin/fluxbox' 2>/dev/null || true")
 
       # Clean up stale session files
       import glob
@@ -109,6 +157,28 @@ class MatlabServer(object):
 
       print("FORCE RESTART: Cleanup complete, starting fresh engine...", flush=True)
       self._engine_stuck = False
+      self._engine_initialized = False
+
+    def _initialize_engine(self):
+      """Bring a freshly started engine up to a runnable state.
+
+      This is where `clear all` belongs: it is the one place a clean class and
+      function cache is actually wanted, and the cost is paid once per engine
+      rather than once per submission (see RESET_STATEMENTS).
+      """
+      init_file = f"{self.testing_environment_path}/initTest.m"
+      print(f"Initializing test environment at {init_file}", flush=True)
+      initErg = self.engine.evalc(f"clear all;cd ~;run {init_file}")
+      # Remember the search path initTest built, so a submission that mangles it
+      # (addpath/rmpath/restoredefaultpath in student code) cannot break every
+      # later submission that shares this engine.
+      self.engine.eval("setappdata(groot,'codeAbilityEnginePath',path);", nargout=0)
+      self._engine_initialized = True
+      print(f'Initialization complete: {initErg}', flush=True)
+
+    def _reset_workspace(self):
+      """Clean the workspace between submissions, keeping the code cache warm."""
+      self.engine.eval(";".join(MatlabServer.RESET_STATEMENTS) + ";", nargout=0)
 
     def connect(self):
       # Check if we need to force restart due to previous timeout
@@ -122,6 +192,10 @@ class MatlabServer(object):
       while attempts < retries:
         try:
           if self.engine is None:
+            # Whatever engine we end up on below is not one we have run
+            # initTest against yet -- including an already-shared engine we
+            # merely reconnect to.
+            self._engine_initialized = False
             engines = matlab.engine.find_matlab()
             print(f"Found existing MATLAB engines: {engines}", flush=True)
             if engine_name in engines:
@@ -151,13 +225,15 @@ class MatlabServer(object):
           else:
             print('Engine is already available!', flush=True)
 
-          print(f"Initializing test environment at {self.testing_environment_path}/initTest.m", flush=True)
-          initErg = self.engine.evalc(f"clear all;cd ~;run {self.testing_environment_path}/initTest.m")
-          print(f'Initialization complete: {initErg}', flush=True)
+          if self._engine_initialized:
+            self._reset_workspace()
+          else:
+            self._initialize_engine()
           return
 
         except Exception as e:
           attempts += 1
+          self._engine_initialized = False
           print(f'Failed connection attempt #{attempts}/{retries}: {type(e).__name__}: {str(e)}', flush=True)
 
           # Clean up failed engine to ensure fresh start on retry
@@ -180,12 +256,13 @@ class MatlabServer(object):
       sys.exit(2)
 
     def evalc(self, arg):
-        self.connect()
+        with self._engine_lock:
+            self.connect()
 
-        print(f"Evaluating command: {arg}", flush=True)
-        result = self.engine.evalc(arg)
-        print(f"Result: {result}", flush=True)
-        return result
+            print(f"Evaluating command: {arg}", flush=True)
+            result = self.engine.evalc(arg)
+            print(f"Result: {result}", flush=True)
+            return result
 
     def test_student_example(self, test_file, spec_file, timeout_seconds=300):
         """
@@ -197,6 +274,13 @@ class MatlabServer(object):
             submit: Submission identifier
             timeout_seconds: Maximum execution time in seconds (default: 300 = 5 minutes)
         """
+        # Held across connect() and the test itself, so a restart triggered by
+        # one submission's timeout cannot land while another is mid-test.
+        with self._engine_lock:
+            return self._run_student_example(test_file, spec_file, timeout_seconds)
+
+    def _run_student_example(self, test_file, spec_file, timeout_seconds):
+        """Body of test_student_example; callers must hold ``_engine_lock``."""
         try:
            self.connect()
         except Exception as e:

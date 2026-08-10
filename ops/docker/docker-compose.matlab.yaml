@@ -44,6 +44,11 @@ services:
       - TEMPORAL_HOST=temporal
       - TEMPORAL_PORT=7233
       - TEMPORAL_NAMESPACE=default
+      # This replica owns exactly one MATLAB engine, and MATLAB runs one command
+      # at a time. Pulling more than one test activity at a time would only
+      # queue them inside that engine while their timeouts count down. Scale
+      # throughput with MATLAB_TESTING_WORKER_REPLICAS, not with concurrency.
+      - TEMPORAL_MAX_CONCURRENT_ACTIVITIES=1
       - PYTHONPATH=/home/matlab/computor-backend/src
       - API_URL=${API_URL}
       - API_TOKEN=${MATLAB_WORKER_TOKEN:?}
