@@ -46,6 +46,23 @@ COMMIT_MAX_ATTEMPTS = 4
 COMMIT_RETRY_BASE_DELAY = 2.0  # seconds; doubled per attempt
 
 
+def _resolve_within(base_dir: str, filename: str) -> str:
+    """Resolve ``filename`` under ``base_dir``, refusing to escape it.
+
+    Filenames come from the API payload of an uploaded example, i.e. from
+    whoever authored that example. A plain ``os.path.join`` happily accepts
+    ``../../.ssh/authorized_keys`` or an absolute path and writes outside the
+    cache — into the worker's own home. Anchor every write instead.
+    """
+    base = os.path.realpath(base_dir)
+    candidate = os.path.realpath(os.path.join(base, filename))
+    if candidate != base and not candidate.startswith(base + os.sep):
+        raise ApplicationError(
+            f"Refusing to write example file outside its directory: {filename!r}"
+        )
+    return candidate
+
+
 def _save_example_files(target_path: str, files: Dict[str, Any]) -> None:
     """
     Save example files to disk, handling base64-encoded content.
@@ -59,7 +76,7 @@ def _save_example_files(target_path: str, files: Dict[str, Any]) -> None:
     os.makedirs(target_path, exist_ok=True)
 
     for filename, content in files.items():
-        file_path = os.path.join(target_path, filename)
+        file_path = _resolve_within(target_path, filename)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
         if isinstance(content, dict) and "base64" in content:
