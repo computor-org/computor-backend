@@ -141,13 +141,38 @@ docker-compose        Service (DB)                 worker container
   --queues=testing    config.temporal.task_queue    → config.language → runtime setup
 ```
 
-Three things must agree, and nothing checks them for you:
+Three things must agree — and two of them are now checked for you:
 
 1. The container's `API_TOKEN` must be an active token on the service's user.
-2. `config.temporal.task_queue` must equal the container's `--queues=` value. **A
-   queue with no listening worker leaves test workflows queued forever** rather
-   than failing — the symptom is a submission that never completes.
-3. `config.language` must name a runtime the image actually has.
+2. `config.temporal.task_queue` must equal the container's `--queues=` value.
+   **Checked:** `POST /tests` refuses a service whose queue has no listening
+   worker, naming the queue, instead of leaving the run stuck. You can also just
+   omit `task_queue` — see below.
+3. `config.language` must name a runtime the image actually has. **Checked:** the
+   worker refuses to start if its image cannot provide the language its service
+   advertises, rather than claiming tests it will certainly fail.
+
+### One worker per language
+
+The intended topology is one worker image per language, so the queue is derived
+from the language: a service with `language: octave` and no `temporal.task_queue`
+routes to **`testing-octave`**, and you start that worker with
+`--queues=testing-octave`. An explicit `task_queue` always wins, so existing
+deployments (and bespoke topologies like `testing-python-gpu`) are unaffected.
+
+To add a language:
+
+```bash
+scripts/add-testing-language.sh octave
+```
+
+That mints a conforming token into `.env`, writes
+`data/deployments/testing-worker-octave.yaml` (bootstrap globs that directory,
+so no existing file is edited), and prints the compose block to paste. Restart
+the API to seed the service, then `./computor.sh up`.
+
+Scaling *one* language across several containers does not need any of this —
+use `replicas` on the same queue.
 
 `last_seen_at` on the service is a heartbeat (`PUT /service-accounts/{id}/heartbeat`).
 The unified testing worker does not currently call it, so "never" there is not yet
