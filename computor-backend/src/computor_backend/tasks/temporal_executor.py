@@ -8,12 +8,22 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional, List
 from temporalio.client import WorkflowHandle, WorkflowExecutionStatus
 from temporalio.common import WorkflowIDReusePolicy
+from temporalio.service import RPCError, RPCStatusCode
 from .temporal_client import get_temporal_client, get_task_queue_name, DEFAULT_TASK_QUEUE
 from .temporal_base import WorkflowResult
 from .registry import task_registry
 from computor_types.tasks import TaskStatus, TaskResult, TaskInfo, TaskSubmission
 
 logger = logging.getLogger(__name__)
+
+
+class TaskNotFoundError(Exception):
+    """The workflow genuinely does not exist (Temporal answered NOT_FOUND).
+
+    Distinct from a transport/availability failure: callers treat "gone" as a
+    terminal state (a Result row is marked CRASHED), so a Temporal outage must
+    never be reported as this. See ``get_task_status``.
+    """
 
 CODER_ADMIN_WORKFLOWS = {
     "build_workspace_images",
@@ -219,10 +229,17 @@ class TemporalTaskExecutor:
             )
             
             return task_info
-            
-        except Exception as e:
-            # Handle workflow not found
-            raise Exception(f"Task {task_id} not found: {str(e)}")
+
+        except RPCError as e:
+            # Only a NOT_FOUND answer means the workflow is really gone.
+            # Everything else (UNAVAILABLE, DEADLINE_EXCEEDED, auth) is a
+            # transient failure to *ask* — reporting it as "not found" made a
+            # brief Temporal outage mark live test runs as CRASHED and let a
+            # duplicate run start alongside them.
+            if e.status == RPCStatusCode.NOT_FOUND:
+                raise TaskNotFoundError(f"Task {task_id} not found") from e
+            logger.warning("Temporal unavailable while describing %s: %s", task_id, e)
+            raise
     
     async def get_task_result(self, task_id: str) -> TaskResult:
         """

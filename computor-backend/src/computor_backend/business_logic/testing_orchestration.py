@@ -169,6 +169,7 @@ async def sync_result_status_from_temporal(
     transitions (status-poll endpoints) instead of only terminal ones.
     """
     from computor_backend.tasks import get_task_executor
+    from computor_backend.tasks.temporal_executor import TaskNotFoundError
 
     if not result.test_system_id:
         return False
@@ -176,7 +177,7 @@ async def sync_result_status_from_temporal(
     task_executor = get_task_executor()
     try:
         task_info = await task_executor.get_task_status(result.test_system_id)
-    except Exception as e:
+    except TaskNotFoundError as e:
         if treat_missing_as_crashed:
             logger.warning(
                 f"Temporal workflow {result.test_system_id} not found, "
@@ -187,6 +188,15 @@ async def sync_result_status_from_temporal(
         else:
             logger.warning(f"Could not check Temporal status: {e}")
         return False
+    except Exception as e:
+        # Temporal is unreachable, not the workflow missing. Report "still
+        # running" so a live run is never declared dead (and never duplicated)
+        # just because we briefly could not ask.
+        logger.warning(
+            f"Temporal unreachable while syncing Result {result.id}; "
+            f"leaving status unchanged: {e}"
+        )
+        return result.status in IN_PROGRESS_STATUSES
 
     if task_info.status in (TaskStatus.QUEUED, TaskStatus.STARTED):
         if sync_in_progress:
