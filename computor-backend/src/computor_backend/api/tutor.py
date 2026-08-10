@@ -1011,6 +1011,37 @@ async def download_tutor_test_input(
     )
 
 
+async def _assert_may_report_for_tutor_test(
+    test_id: str,
+    permissions: Principal,
+    redis,
+) -> dict:
+    """Gate the worker-facing write endpoints for a tutor test.
+
+    These report the *outcome* of a run, so only the test runner (a service
+    account) or an admin may call them — not the tutor who started the test,
+    and certainly not an unrelated signed-in user. Both endpoints previously
+    had authentication but no authorization at all: any logged-in user could
+    POST arbitrary results or artifacts for any ``test_id`` they could guess.
+
+    Returns the test metadata so callers can rely on the test existing.
+    """
+    metadata = await get_tutor_test_metadata(redis, test_id)
+    if not metadata:
+        raise NotFoundException(
+            detail="Tutor test not found or expired",
+            context={"test_id": str(test_id)},
+        )
+
+    if not (permissions.is_service or permissions.is_admin):
+        raise ForbiddenException(
+            detail="Only the testing service may report results for a tutor test",
+            context={"test_id": str(test_id)},
+        )
+
+    return metadata
+
+
 @tutor_router.post("/tests/{test_id}/results")
 async def submit_tutor_test_results(
     test_id: str,
@@ -1023,7 +1054,10 @@ async def submit_tutor_test_results(
 
     Used by the testing worker to report results after test execution.
     Stores result.json in MinIO and updates Redis state.
+
+    **Permissions**: service account (the test runner) or admin.
     """
+    await _assert_may_report_for_tutor_test(test_id, permissions, redis)
 
     # Store result.json in MinIO (persistent storage)
     await store_result_minio(test_id, result_data)
@@ -1049,13 +1083,17 @@ async def upload_tutor_test_artifacts(
     test_id: str,
     file: Annotated[bytes, File()],
     permissions: Annotated[Principal, Depends(get_current_principal)],
+    redis=Depends(get_redis_client),
 ):
     """
     Upload test artifacts as a ZIP archive.
 
     Used by the testing worker to upload generated artifacts (plots, figures,
     debug output) after test execution.
+
+    **Permissions**: service account (the test runner) or admin.
     """
+    await _assert_may_report_for_tutor_test(test_id, permissions, redis)
 
     artifacts_stored = await store_tutor_test_artifacts_from_zip(test_id, file)
 
