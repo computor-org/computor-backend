@@ -29,6 +29,23 @@ class ResultStatus(IntEnum):
     CRASHED = 6
     PAUSED = 7
 
+
+# A test in one of these states may always be re-run. This is the single
+# definition: the partial unique indexes on ``result`` (model/result.py) build
+# their ``status NOT IN (...)`` predicate from it, and the endpoints that decide
+# "is an earlier run still blocking this one" filter on it. Keeping app logic
+# and the DB constraint derived from one tuple is what stops them drifting into
+# IntegrityError 500s.
+RETRYABLE_RESULT_STATUSES: tuple[int, ...] = (
+    int(ResultStatus.FAILED),
+    int(ResultStatus.CANCELLED),
+    int(ResultStatus.CRASHED),
+)
+
+# The same set rendered for a SQL ``IN`` list, e.g. "1, 2, 6".
+RETRYABLE_RESULT_STATUSES_SQL: str = ", ".join(str(s) for s in RETRYABLE_RESULT_STATUSES)
+
+
 def map_task_status_to_int(status: TaskStatus) -> int:
     """Map TaskStatus enum to legacy integer for database storage."""
     mapping = {

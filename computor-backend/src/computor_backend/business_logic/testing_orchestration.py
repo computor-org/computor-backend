@@ -21,6 +21,7 @@ from computor_backend.exceptions import BadRequestException, NotFoundException
 from computor_backend.model.artifact import SubmissionArtifact
 from computor_backend.model.result import Result
 from computor_types.tasks import (
+    RETRYABLE_RESULT_STATUSES,
     ResultStatus,
     TaskStatus,
     map_task_status_to_int,
@@ -29,12 +30,10 @@ from computor_types.tasks import (
 logger = logging.getLogger(__name__)
 
 # A member's earlier test only stops a re-run while it is not in one of these
-# states (a crashed/cancelled/failed run may always be retried).
-RETRYABLE_STATUSES = (
-    int(ResultStatus.FAILED),
-    int(ResultStatus.CANCELLED),
-    int(ResultStatus.CRASHED),
-)
+# states (a crashed/cancelled/failed run may always be retried). Defined once in
+# computor_types.tasks, which the partial unique indexes on ``result`` are also
+# built from — these must not drift apart.
+RETRYABLE_STATUSES = RETRYABLE_RESULT_STATUSES
 
 IN_PROGRESS_STATUSES = (
     int(ResultStatus.SCHEDULED),

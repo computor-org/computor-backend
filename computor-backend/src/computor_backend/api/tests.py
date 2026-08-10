@@ -15,6 +15,7 @@ from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.course_access import require_submission_group_access
 from computor_backend.business_logic.testing_orchestration import (
     IN_PROGRESS_STATUSES,
+    RETRYABLE_STATUSES,
     build_testing_submission,
     enforce_max_test_runs,
     find_active_test,
@@ -263,7 +264,9 @@ async def create_test_run(
         Result.course_member_id == course_member.id,
         Result.version_identifier == version_identifier,
         Result.course_content_id == course_content.id,
-        Result.status.notin_([1, 2, 6])  # Not already FAILED(1), CANCELLED(2), or CRASHED(6)
+        # Must mirror the partial unique index predicate exactly — both are
+        # derived from RETRYABLE_RESULT_STATUSES so they cannot drift.
+        Result.status.notin_(RETRYABLE_STATUSES)
     ).first()
 
     if existing_result:
