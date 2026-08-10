@@ -10,7 +10,7 @@ the CourseContent model which links examples to specific course contexts.
 """
 
 from typing import List, Optional, Union
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_yaml import to_yaml_str
 
 # Version regex pattern
@@ -99,10 +99,37 @@ class CodeAbilityPerson(CodeAbilityBase):
     affiliation: Optional[str] = Field(None, min_length=1, description="Institutional affiliation")
 
 class CourseExecutionBackendConfig(CodeAbilityBase):
-    """Configuration for course execution backend."""
-    slug: str = Field(description="Unique identifier for the execution backend")
-    version: str = Field(description="Version of the execution backend (e.g., 'r2024b', 'v1.0')")
+    """Configuration for course execution backend.
+
+    Declare EITHER ``language`` (portable: "this is octave code", matched
+    against any runner providing it) OR ``slug`` (a pin: "run it on exactly
+    this registered service"). ``slug`` was once required, which hardcoded one
+    deployment's service name into every example and made content
+    non-transferable between installations; it is now optional.
+    """
+    slug: Optional[str] = Field(
+        None,
+        description="Pin a specific registered execution backend by Service.slug",
+    )
+    language: Optional[str] = Field(
+        None,
+        description="Language this example needs (python, octave, r, julia, c, "
+                    "cpp, fortran, document, matlab) — matched against a runner",
+    )
+    version: Optional[str] = Field(
+        None,
+        description="Language/backend version requirement (e.g. '3.13', 'r2024b')",
+    )
     settings: Optional[dict] = Field(None, description="Backend-specific settings")
+
+    @model_validator(mode="after")
+    def require_slug_or_language(self):
+        if not (self.slug or self.language):
+            raise ValueError(
+                "executionBackend needs either 'language' (portable) or 'slug' "
+                "(pin a specific runner)"
+            )
+        return self
 
 # TypeConfig removed - content types are managed at CourseContent level, not in examples
 
@@ -328,18 +355,36 @@ class ExecutionBackend(CodeAbilityBase):
         coerce_numbers_to_str=True,
     )
 
-    slug: str = Field(
+    slug: Optional[str] = Field(
+        default=None,
         min_length=1,
-        description="Backend identifier (e.g., 'itpcp.exec.mat', 'itpcp.exec.c')"
+        description="Pin a specific runner by Service.slug (e.g. 'itpcp.exec.mat'). "
+                    "Prefer 'language' unless you really need one exact service."
+    )
+    language: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        description="Language this example needs (python, octave, r, julia, c, "
+                    "cpp, fortran, document, matlab). Portable across installations."
     )
     version: Optional[str] = Field(
         default=None,
-        description="Backend/language version requirement"
+        description="Backend/language version requirement, matched against a "
+                    "runner's config.language_version"
     )
     settings: Optional[ExecutionBackendSettings] = Field(
         default=None,
         description="Backend-specific settings (timeout, memory, etc.)"
     )
+
+    @model_validator(mode="after")
+    def require_slug_or_language(self):
+        if not (self.slug or self.language):
+            raise ValueError(
+                "executionBackend needs either 'language' (portable) or 'slug' "
+                "(pin a specific runner)"
+            )
+        return self
 
 
 class ContentMetadata(CodeAbilityBase):
