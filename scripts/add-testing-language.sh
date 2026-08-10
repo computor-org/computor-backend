@@ -10,10 +10,11 @@
 # the compose block for the third.
 #
 # Usage:
-#   scripts/add-testing-language.sh <language> [--queue <name>] [--slug <slug>]
+#   scripts/add-testing-language.sh <language> [--version <v>] [--queue <name>] [--slug <slug>]
 #
 # Example:
 #   scripts/add-testing-language.sh octave
+#   scripts/add-testing-language.sh python --version 3.13
 #
 set -euo pipefail
 
@@ -32,11 +33,12 @@ usage() { sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 
 [[ $# -ge 1 ]] || usage
 LANGUAGE="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"; shift
-QUEUE=""; SLUG=""
+QUEUE=""; SLUG=""; VERSION=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --queue) QUEUE="$2"; shift 2 ;;
-    --slug)  SLUG="$2";  shift 2 ;;
+    --queue)   QUEUE="$2";   shift 2 ;;
+    --slug)    SLUG="$2";    shift 2 ;;
+    --version) VERSION="$2"; shift 2 ;;
     *) echo "${RED}Unknown option: $1${NC}"; usage ;;
   esac
 done
@@ -53,14 +55,29 @@ if ! printf '%s\n' $SUPPORTED | grep -qx "$LANGUAGE"; then
   exit 1
 fi
 
-# Defaults follow the convention the backend derives queues from, so leaving
-# task_queue unset in the service config would resolve to the same name.
-[[ -n "$QUEUE" ]] || QUEUE="testing-${LANGUAGE}"
-[[ -n "$SLUG"  ]] || SLUG="itpcp.exec.${LANGUAGE}"
+# Defaults follow the convention the backend derives queues from
+# (testing-<language>[-<version>]), so leaving task_queue unset in the service
+# config resolves to exactly the same name.
+VERSION_TOKEN=""
+if [[ -n "$VERSION" ]]; then
+  VERSION_TOKEN="$(printf '%s' "$VERSION" | tr '[:upper:]' '[:lower:]' \
+    | sed -E 's/[^a-z0-9.]+/-/g; s/^-+//; s/-+$//')"
+fi
 
-LANG_UPPER="$(printf '%s' "$LANGUAGE" | tr '[:lower:]' '[:upper:]')"
+if [[ -z "$QUEUE" ]]; then
+  QUEUE="testing-${LANGUAGE}"
+  [[ -n "$VERSION_TOKEN" ]] && QUEUE="${QUEUE}-${VERSION_TOKEN}"
+fi
+if [[ -z "$SLUG" ]]; then
+  SLUG="itpcp.exec.${LANGUAGE}"
+  [[ -n "$VERSION_TOKEN" ]] && SLUG="${SLUG}.${VERSION_TOKEN}"
+fi
+
+LANG_UPPER="$(printf '%s' "${LANGUAGE}${VERSION_TOKEN:+_$VERSION_TOKEN}" \
+  | tr '[:lower:].-' '[:upper:]__')"
 TOKEN_VAR="TESTING_WORKER_TOKEN_${LANG_UPPER}"
-DEPLOY_FILE="${DEPLOY_DIR}/testing-worker-${LANGUAGE}.yaml"
+NAME_SUFFIX="${LANGUAGE}${VERSION_TOKEN:+-$VERSION_TOKEN}"
+DEPLOY_FILE="${DEPLOY_DIR}/testing-worker-${NAME_SUFFIX}.yaml"
 
 [[ -f "$ENV_FILE" ]] || { echo "${RED}No .env at ${ENV_FILE}${NC} — run ./setup-env.sh first."; exit 1; }
 
@@ -92,7 +109,7 @@ services:
     language: ${LANGUAGE}         # selects the runner AND, by default, the queue
     description: ${LANGUAGE} testing worker
     user:
-      email: testing-worker-${LANGUAGE}@computor.local
+      email: testing-worker-${NAME_SUFFIX}@computor.local
       given_name: Testing
       family_name: Worker ${LANGUAGE}
     api_token:
@@ -101,7 +118,12 @@ services:
       # Omit expires_days for a token that never expires. If you set one, note
       # that expiry is a hard cutoff: the worker stops authenticating and every
       # test fails. Startup warns for the last 30 days.
-    config:
+    config:${VERSION:+
+      # Set when several versions of this language run side by side: it both
+      # selects this service (examples may request executionBackend.version)
+      # and keeps this worker on its own queue. MUST stay quoted — unquoted
+      # YAML would read 3.10 as the float 3.1 and silently break the match.
+      language_version: \"${VERSION}\"}
       temporal:
         task_queue: ${QUEUE}      # must equal the container's --queues value
 YAML
@@ -112,7 +134,7 @@ cat <<EOF
 
 ${YELLOW}Add this service to ops/docker/docker-compose.dev.yaml (and .prod.yaml):${NC}
 
-  temporal-worker-testing-${LANGUAGE}:
+  temporal-worker-testing-${NAME_SUFFIX}:
     build:
       context: ../../
       dockerfile: ./docker/temporal-worker-testing/Dockerfile
