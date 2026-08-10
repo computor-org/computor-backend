@@ -46,11 +46,16 @@ class ApiTokenInterface(ApiTokenInterfaceBase, BackendEntityInterface):
 
         # Active tokens only (not revoked and not expired)
         if hasattr(params, 'active') and params.active is not None:
-            from datetime import datetime
+            from datetime import datetime, timezone
             if params.active:
+                # Aware, not utcnow(): expires_at is timestamptz, so a naive
+                # bound would be resolved against the database session's time
+                # zone. That is UTC today, which is the only reason the naive
+                # form worked — it would silently skew the active/expired
+                # boundary the moment that setting changed.
                 query = query.filter(
                     ApiToken.revoked == False,
-                    (ApiToken.expires_at == None) | (ApiToken.expires_at > datetime.utcnow())
+                    (ApiToken.expires_at == None) | (ApiToken.expires_at > datetime.now(timezone.utc))
                 )
 
         return query

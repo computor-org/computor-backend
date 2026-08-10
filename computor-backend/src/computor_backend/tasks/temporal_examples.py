@@ -3,7 +3,7 @@ Example Temporal workflow and activity implementations.
 """
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
@@ -16,12 +16,12 @@ from .registry import register_task
 @activity.defn(name="simulate_processing")
 async def simulate_processing_activity(duration: int, message: str) -> Dict[str, Any]:
     """Simulate processing work."""
-    start_time = datetime.utcnow()
-    
+    start_time = datetime.now(timezone.utc)
+
     # Simulate work
     await asyncio.sleep(duration)
-    
-    end_time = datetime.utcnow()
+
+    end_time = datetime.now(timezone.utc)
     
     return {
         "message": message,

@@ -266,7 +266,7 @@ def _ensure_service(svc: ServiceConfig, system: Principal, db) -> str:
 
     expires_at = None
     if svc.api_token.expires_days:
-        expires_at = datetime.utcnow() + timedelta(days=svc.api_token.expires_days)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=svc.api_token.expires_days)
 
     create_api_token_admin(
         ApiTokenAdminCreate(

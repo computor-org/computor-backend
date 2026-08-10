@@ -20,7 +20,7 @@ import zipfile
 import tempfile
 import logging
 from io import BytesIO
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import Dict, Any
 
 from temporalio import workflow, activity
@@ -384,7 +384,10 @@ class TutorTestingWorkflow(BaseWorkflow):
             f"[TUTOR TEST CONFIG] service_slug={test_config.get('testing_service_slug')}, "
             f"example_version_id={example_version_id}"
         )
-        started_at = datetime.utcnow()
+        # workflow.now(), not datetime.utcnow() — see StudentTestingWorkflow:
+        # workflow code needs Temporal's clock, which is both tz-aware and
+        # stable across replays.
+        started_at = workflow.now()
 
         try:
             # API configuration - activities read from their own os.environ
@@ -411,7 +414,7 @@ class TutorTestingWorkflow(BaseWorkflow):
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
 
-            completed_at = datetime.utcnow()
+            completed_at = workflow.now()
             duration = (completed_at - started_at).total_seconds()
 
             # Extract results

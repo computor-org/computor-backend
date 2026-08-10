@@ -16,7 +16,7 @@ import subprocess
 import asyncio
 import shutil
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Dict, Any, Optional, List
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
@@ -852,7 +852,14 @@ class StudentTestingWorkflow(BaseWorkflow):
         workflow.logger.info(f"[TEST CONFIG] service_slug={test_job.get('testing_service_slug')}, "
                             f"artifact_id={test_job.get('artifact_id')}, "
                             f"example_version_id={test_job.get('example_version_id')}")
-        started_at = datetime.utcnow()
+        # workflow.now(), not datetime.utcnow(): this is workflow code, so the
+        # clock has to come from Temporal. utcnow() is both naive (its
+        # isoformat() below carried no offset, so consumers read UTC as local)
+        # and non-deterministic — on a replay it re-stamps with the replay
+        # time instead of the original start, silently corrupting the reported
+        # duration. It only ran at all because these workflows are declared
+        # sandboxed=False; the sandbox rejects datetime.utcnow() outright.
+        started_at = workflow.now()
 
         try:
             # API configuration - activities read from their own os.environ
@@ -875,7 +882,7 @@ class StudentTestingWorkflow(BaseWorkflow):
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
 
-            completed_at = datetime.utcnow()
+            completed_at = workflow.now()
             duration = (completed_at - started_at).total_seconds()
 
             # Extract results
