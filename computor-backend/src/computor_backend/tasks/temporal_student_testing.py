@@ -14,7 +14,6 @@ import json
 import tempfile
 import subprocess
 import asyncio
-import uuid
 import shutil
 import logging
 from datetime import datetime, timedelta
@@ -40,6 +39,11 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 VERSION_MARKER_FILENAME = ".example_version_id"
+
+# Retry budget for the terminal "write the Result row" PATCH. See
+# commit_test_results_activity — losing this call loses the whole test run.
+COMMIT_MAX_ATTEMPTS = 4
+COMMIT_RETRY_BASE_DELAY = 2.0  # seconds; doubled per attempt
 
 
 def _save_example_files(target_path: str, files: Dict[str, Any]) -> None:
@@ -532,36 +536,47 @@ async def commit_test_results_activity(
     """
     logger.info(f"Committing test results for result {result_id}")
 
-    try:
-        base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
-        api_token = api_config.get("token")
-        if not api_token:
-            raise ApplicationError("API token is required but not provided in api_config")
+    base_url = transform_localhost_url(api_config.get("url", "http://localhost:8000"))
+    api_token = api_config.get("token")
+    if not api_token:
+        raise ApplicationError("API token is required but not provided in api_config")
 
-        async with ComputorClient(base_url=base_url, headers={"X-API-Token": api_token}) as client:
+    # Determine status based on test results
+    # Use FAILED status if there was an error or timeout
+    if test_results.get("error") or test_results.get("timeout"):
+        status = TaskStatus.FAILED
+    else:
+        status = TaskStatus.FINISHED
 
-            # Determine status based on test results
-            # Use FAILED status if there was an error or timeout
-            if test_results.get("error") or test_results.get("timeout"):
-                status = TaskStatus.FAILED
-            else:
-                status = TaskStatus.FINISHED
+    result_update = ResultUpdate(
+        status=status,
+        result=test_results.get("result_value", 0.0),
+        result_json=test_results,
+    )
 
-            # Update result
-            result_update = ResultUpdate(
-                status=status,
-                result=test_results.get("result_value", 0.0),
-                result_json=test_results,
-            )
-
-            response = await client.results.update(result_id, result_update)
+    # This PATCH is the only place a finished run becomes visible: the Result
+    # row is the source of truth and the worker holds no DB access. The client
+    # has a short timeout and no retries of its own, so a single blip used to
+    # throw away a completed test run. Retry with backoff before giving up.
+    last_error: Optional[Exception] = None
+    for attempt in range(1, COMMIT_MAX_ATTEMPTS + 1):
+        try:
+            async with ComputorClient(base_url=base_url, headers={"X-API-Token": api_token}) as client:
+                await client.results.update(result_id, result_update)
             logger.info(f"Successfully updated result {result_id}")
-
             return True
+        except Exception as e:
+            last_error = e
+            if attempt < COMMIT_MAX_ATTEMPTS:
+                delay = COMMIT_RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                logger.warning(
+                    "Failed to commit test results for %s (attempt %d/%d), retrying in %.1fs: %s",
+                    result_id, attempt, COMMIT_MAX_ATTEMPTS, delay, e,
+                )
+                await asyncio.sleep(delay)
 
-    except Exception as e:
-        logger.error(f"Failed to commit test results: {e}")
-        raise ApplicationError(message=str(e))
+    logger.error(f"Failed to commit test results after {COMMIT_MAX_ATTEMPTS} attempts: {last_error}")
+    raise ApplicationError(message=str(last_error))
 
 
 async def store_test_artifacts(
@@ -677,11 +692,25 @@ async def run_complete_student_test_activity(
 
             logger.info(f"Test execution completed: {test_results}")
 
-            # Step 3.5: Store any generated artifacts via API
+            # Step 3.5: Store any generated artifacts via API.
+            #
+            # Best-effort on purpose: the tests have already run and their
+            # outcome is the thing that matters. Uploading figures is a large
+            # multipart POST on a client with a short timeout, so letting it
+            # throw here used to discard a *passing* run and commit
+            # {passed: 0, failed: 1} instead. Losing a plot is acceptable;
+            # losing the verdict is not.
             artifacts_path = os.path.join(work_dir, "artifacts")
             if os.path.exists(artifacts_path) and os.listdir(artifacts_path):
                 logger.info(f"Found artifacts to store in {artifacts_path}")
-                await store_test_artifacts(result_id, artifacts_path, api_config)
+                try:
+                    await store_test_artifacts(result_id, artifacts_path, api_config)
+                except Exception:
+                    logger.warning(
+                        "Failed to upload artifacts for result %s; committing test "
+                        "results anyway", result_id, exc_info=True,
+                    )
+                    test_results["artifacts_upload_failed"] = True
             else:
                 logger.info("No artifacts generated during test execution")
 
@@ -732,6 +761,18 @@ class StudentTestingWorkflow(BaseWorkflow):
     def get_execution_timeout(cls) -> timedelta:
         return timedelta(minutes=30)
 
+    @classmethod
+    def get_retry_policy(cls) -> RetryPolicy:
+        """A test run is executed exactly once.
+
+        The base policy retries a failed workflow 3x. For testing that would
+        re-execute a student's submission against the same ``result_id`` — the
+        run is visible as failed and may be retried deliberately, never
+        silently. Must stay at 1 now that ``run()`` propagates failures
+        (see the comment there).
+        """
+        return RetryPolicy(maximum_attempts=1)
+
     @workflow.run
     async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
         """
@@ -752,7 +793,7 @@ class StudentTestingWorkflow(BaseWorkflow):
         service_type_config = parameters.get("service_type_config", {})
         result_id = parameters.get("result_id")
 
-        job_id = str(uuid.uuid4())
+        job_id = str(workflow.uuid4())
         workflow.logger.info(f"[TEST START] job={job_id}, result_id={result_id}")
         workflow.logger.info(f"[TEST CONFIG] service_slug={test_job.get('testing_service_slug')}, "
                             f"artifact_id={test_job.get('artifact_id')}, "
@@ -801,16 +842,19 @@ class StudentTestingWorkflow(BaseWorkflow):
             )
 
         except Exception as e:
+            # Propagate, never `return WorkflowResult(status="failed")`.
+            #
+            # Returning normally makes Temporal record the execution as
+            # COMPLETED, and the API reconciler
+            # (business_logic/testing_orchestration.sync_result_status_from_temporal)
+            # maps COMPLETED -> FINISHED without ever reading this payload. A
+            # crashed run therefore surfaced as a genuine "FINISHED, 0%" result
+            # — and since FINISHED is not a retryable status, the partial unique
+            # indexes on `result` then blocked every re-test of that version with
+            # an IntegrityError. Raising marks the workflow FAILED, which the
+            # reconciler maps to ResultStatus.FAILED (retryable).
             workflow.logger.error(f"[TEST FAILED] result_id={result_id}, error={str(e)}")
-            return WorkflowResult(
-                status="failed",
-                result=None,
-                error=str(e),
-                metadata={
-                    "workflow_type": "student_testing",
-                    "test_job_id": job_id,
-                },
-            )
+            raise
 
 
 ACTIVITIES = [
