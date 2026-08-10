@@ -6,6 +6,7 @@ from typing import Annotated, Optional
 import logging
 import uuid
 from fastapi import Depends, APIRouter
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from computor_backend.exceptions import BadRequestException, NotFoundException, RateLimitException
@@ -281,6 +282,23 @@ async def create_test_run(
                 detail=f"A test is already running for this version. Please wait for it to complete."
             )
 
+        # Not running, and the sync left it in a state the partial unique index
+        # still counts (i.e. FINISHED). Falling through here reached the INSERT
+        # and died on
+        # result_version_identifier_member_content_partial_key with a 500.
+        #
+        # This is the same "already tested" rule the artifact-keyed guard above
+        # enforces as SUBMIT_008; it is only reachable by a different key,
+        # because two SubmissionArtifacts can share a version_identifier (a
+        # byte-identical re-upload hashes to the same content id). Same policy,
+        # so raise the same error instead of crashing.
+        if existing_result.status not in RETRYABLE_STATUSES:
+            raise BadRequestException(
+                error_code="SUBMIT_008",
+                detail="You have already tested this version. "
+                       "Multiple tests are not allowed unless the previous test crashed or was cancelled."
+            )
+
     # Validate task queue configuration BEFORE creating the Result record
     # This prevents duplicate key errors when retrying with misconfigured services
     task_queue = resolve_task_queue(service, service_type)
@@ -308,8 +326,20 @@ async def create_test_run(
         reference_version_identifier=deployment.version_identifier,
     )
 
+    # The guards above cover the sequential case, but two requests racing each
+    # other (double-click, retrying client) can both pass them and only the
+    # index can arbitrate. Translate that into the same 400 rather than a 500 —
+    # the rate limiter makes this rare, not impossible.
     db.add(result)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise BadRequestException(
+            error_code="SUBMIT_008",
+            detail="You have already tested this version. "
+                   "Multiple tests are not allowed unless the previous test crashed or was cancelled."
+        )
     db.refresh(result)
 
     # Start Temporal workflow for testing
