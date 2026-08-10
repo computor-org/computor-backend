@@ -25,16 +25,46 @@ precedence over `Authorization` (`permissions/auth.py:parse_authorization_header
 
 ## Two contracts worth getting right
 
-### 1. The slug binds examples to services — and nothing else
+### 1. An example declares what it needs; the slug is an optional pin
 
-An example's `meta.yaml` declares which testing system may run it:
+An example's `meta.yaml` declares how it must be executed. Prefer **language** —
+it says what the example actually is, and resolves on any installation that has
+a runner for it:
 
 ```yaml
 properties:
   executionBackend:
-    slug: acme.exec.py     # ← must equal Service.slug
+    language: python        # ← what this example needs (portable)
+    version: "3.13"         # ← optional; matched against Service.config.language_version
     settings: { timeout: 60 }
 ```
+
+Use **slug** only when you genuinely need one specific registered service:
+
+```yaml
+properties:
+  executionBackend:
+    slug: acme.exec.py      # ← must equal Service.slug (a pin)
+```
+
+Exactly one of the two is required. A pin is honoured **strictly**: if that
+service is missing or disabled, resolution returns nothing rather than
+substituting a different runner — silently running a student's code on a
+backend the author didn't choose is not a favour. Language binding is what makes
+examples transferable; a slug hardcodes one deployment's service naming into the
+content, so sharing those examples between installations requires editing every
+`meta.yaml`.
+
+Resolution (one rule, shared by upload, assignment and test time —
+`business_logic/testing_service.py:resolve_service_for_execution_backend`):
+
+1. a pinned `slug` → that enabled service, or nothing;
+2. else `language` → a runner whose `config.language` matches, preferring an
+   exact `config.language_version` match, then a runner that declares no version.
+
+That last step is how you run e.g. python 3.11 and 3.13 as separate workers:
+give each service a `config.language_version`, and examples that don't care
+still land on whichever runner declares no version.
 
 That string is matched to `Service.slug` at upload
 (`api/examples.py:_resolve_testing_service_id`), at assignment
@@ -47,7 +77,9 @@ example can be uploaded and assigned before its service exists — testing start
 working the moment a matching slug appears.
 
 The slug is an **identifier you choose**. It does not select the test runner and
-carries no meaning to the code. Any name works.
+carries no meaning to the code — `config.language` does that. Any name works,
+which is exactly why binding content to it is a liability: the name is arbitrary
+and local to one deployment.
 
 ### 2. `config.language` selects the runner
 
