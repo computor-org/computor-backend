@@ -134,6 +134,52 @@ def get_default_scopes_for_service(
     return DEFAULT_SERVICE_SCOPES.get(service_type.category, [])
 
 
+def assert_may_grant_scopes(
+    target_user,
+    requested_scopes: Optional[List[str]],
+    permissions: Principal,
+    db: Session,
+    cache: Optional["Cache"] = None,
+) -> None:
+    """Gate WHICH scopes a caller may put on a token (the scope ceiling).
+
+    ``assert_may_mint_token_for`` only decides *whose* token may be minted. On
+    its own that left a hole: token scopes become ordinary
+    ``("permissions", scope)`` claims that non-admin handlers honour, so a
+    ``_service_manager`` — who holds nothing but ``service:*`` and
+    ``api_token:*`` — could mint a service token carrying ``result:update`` or
+    ``user:create`` and then authenticate as that service to forge grades in
+    any course. Delegating machine identities is supposed to be strictly weaker
+    than admin.
+
+    The rule: an admin may grant anything; anyone else may grant only the
+    scopes the target service's own type category already entitles it to
+    (``DEFAULT_SERVICE_SCOPES``) — exactly the set the backend would have
+    assigned by itself. That keeps the intended workflow working (provision a
+    testing service, mint it its 15 testing scopes) while making it impossible
+    to hand a service authority its type was never meant to have.
+    """
+    if permissions.is_admin or not requested_scopes:
+        return
+
+    allowed = set(get_default_scopes_for_service(str(target_user.id), db, cache))
+    excess = sorted({s for s in requested_scopes if s not in allowed})
+    if not excess:
+        return
+
+    raise ForbiddenException(
+        detail=(
+            "You may not grant these scopes: " + ", ".join(excess) + ". "
+            "Only an administrator can issue a token with scopes beyond the "
+            "service type's defaults."
+        ),
+        context={
+            "target_user_id": str(target_user.id),
+            "rejected_scopes": excess,
+        },
+    )
+
+
 def assert_may_mint_token_for(user, permissions: Principal) -> None:
     """Gate minting a token on behalf of another user.
 
@@ -201,6 +247,7 @@ def create_api_token(
         raise BadRequestException(detail="User not found")
 
     assert_may_mint_token_for(user, permissions)
+    assert_may_grant_scopes(user, token_data.scopes, permissions, db, cache)
 
     # Determine scopes: use provided scopes, or get defaults for service accounts
     scopes = token_data.scopes
@@ -362,6 +409,14 @@ def update_api_token_admin(
     if not token:
         raise NotFoundException(detail="API token not found")
 
+    # Re-scoping is minting by another name — apply the same ceiling, or a
+    # non-admin could simply PATCH the scopes they were refused at create time.
+    if token_data.scopes is not None:
+        token_owner = UserRepository(db, cache).get_by_id_optional(str(token.user_id))
+        if token_owner is None:
+            raise NotFoundException(detail="API token owner not found")
+        assert_may_grant_scopes(token_owner, token_data.scopes, permissions, db, cache)
+
     try:
         # Build updates dict
         updates = {"updated_by": permissions.user_id, "updated_at": datetime.now(timezone.utc)}
@@ -499,6 +554,7 @@ def create_api_token_admin(
     # Same rule as create_api_token: a predefined value doesn't make minting
     # for a human account any less of an escalation.
     assert_may_mint_token_for(user, permissions)
+    assert_may_grant_scopes(user, token_data.scopes, permissions, db, cache)
 
     # Validate token format
     predefined_token = token_data.predefined_token
