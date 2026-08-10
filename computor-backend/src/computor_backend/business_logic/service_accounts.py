@@ -237,10 +237,18 @@ def get_service_account(
     permissions: Principal,
     db: Session,
 ) -> ServiceGet:
-    """Get service account by ID."""
+    """Get service account by ID.
+
+    Archived services are excluded, exactly as in ``list_service_accounts``.
+    Without this filter a soft-deleted service was invisible in the list yet
+    fully readable — and writable — by id.
+    """
     query = check_permissions(permissions, Service, "get", db)
 
-    service = query.filter(Service.id == service_id).first()
+    service = query.filter(
+        Service.id == service_id,
+        Service.archived_at.is_(None),
+    ).first()
     if not service:
         raise NotFoundException(detail="Service not found")
 
@@ -332,7 +340,13 @@ def update_service_account(
     """
     query = check_permissions(permissions, Service, "update", db)
 
-    service = query.filter(Service.id == service_id).first()
+    # An archived service is deleted as far as the API is concerned; it must
+    # not be silently resurrected (e.g. by PATCHing enabled=true) through a
+    # direct id reference that the list endpoint would never have surfaced.
+    service = query.filter(
+        Service.id == service_id,
+        Service.archived_at.is_(None),
+    ).first()
     if not service:
         raise NotFoundException(detail="Service not found")
 
@@ -411,8 +425,12 @@ def update_service_heartbeat(
     db: Session,
 ) -> None:
     """Update service last_seen_at timestamp (heartbeat)."""
-    # Service can update its own heartbeat
-    service = db.query(Service).filter(Service.id == service_id).first()
+    # Service can update its own heartbeat. Archived services are gone as far
+    # as the API is concerned and must not report liveness.
+    service = db.query(Service).filter(
+        Service.id == service_id,
+        Service.archived_at.is_(None),
+    ).first()
     if not service:
         raise NotFoundException(detail="Service not found")
 

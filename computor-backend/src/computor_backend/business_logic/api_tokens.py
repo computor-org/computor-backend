@@ -61,11 +61,17 @@ DEFAULT_SERVICE_SCOPES = {
         "example:download",
     ],
     "worker": [
-        # General workers need broader access for orchestration
+        # General workers read course data for orchestration.
+        #
+        # NOTE: `course:create` and `course:update` used to be granted here by
+        # default, which handed every worker-category service system-wide
+        # course-write authority without anyone asking for it. Since
+        # assert_may_grant_scopes now also treats this table as the ceiling a
+        # non-admin may grant, a broad default is doubly expensive. A worker
+        # that genuinely provisions courses should have those two scopes
+        # granted explicitly by an admin.
         "course:get",
         "course:list",
-        "course:create",
-        "course:update",
         "course_content:get",
         "course_content:list",
         "organization:get",
@@ -132,6 +138,78 @@ def get_default_scopes_for_service(
 
     # Return default scopes based on category
     return DEFAULT_SERVICE_SCOPES.get(service_type.category, [])
+
+
+def _constraint_name(error: IntegrityError) -> str:
+    """Best-effort name of the violated constraint (psycopg2 exposes diag)."""
+    diag = getattr(getattr(error, "orig", None), "diag", None)
+    return getattr(diag, "constraint_name", None) or ""
+
+
+def _is_token_hash_collision(error: IntegrityError) -> bool:
+    """True when the insert failed because the generated token hash exists.
+
+    That is the only failure a retry can fix. Prefer the structured constraint
+    name; fall back to the message for drivers that do not expose diagnostics.
+    """
+    name = _constraint_name(error)
+    if name:
+        return "token_hash" in name
+    return "token_hash" in str(getattr(error, "orig", error))
+
+
+def _constraint_hint(error: IntegrityError) -> str:
+    """Human-readable reason for a non-collision integrity failure."""
+    name = _constraint_name(error)
+    if name == "ck_api_token_expiration":
+        return "expires_at must be later than the token's creation time"
+    return f"database constraint violated{f' ({name})' if name else ''}"
+
+
+def assert_may_grant_scopes(
+    target_user,
+    requested_scopes: Optional[List[str]],
+    permissions: Principal,
+    db: Session,
+    cache: Optional["Cache"] = None,
+) -> None:
+    """Gate WHICH scopes a caller may put on a token (the scope ceiling).
+
+    ``assert_may_mint_token_for`` only decides *whose* token may be minted. On
+    its own that left a hole: token scopes become ordinary
+    ``("permissions", scope)`` claims that non-admin handlers honour, so a
+    ``_service_manager`` — who holds nothing but ``service:*`` and
+    ``api_token:*`` — could mint a service token carrying ``result:update`` or
+    ``user:create`` and then authenticate as that service to forge grades in
+    any course. Delegating machine identities is supposed to be strictly weaker
+    than admin.
+
+    The rule: an admin may grant anything; anyone else may grant only the
+    scopes the target service's own type category already entitles it to
+    (``DEFAULT_SERVICE_SCOPES``) — exactly the set the backend would have
+    assigned by itself. That keeps the intended workflow working (provision a
+    testing service, mint it its 15 testing scopes) while making it impossible
+    to hand a service authority its type was never meant to have.
+    """
+    if permissions.is_admin or not requested_scopes:
+        return
+
+    allowed = set(get_default_scopes_for_service(str(target_user.id), db, cache))
+    excess = sorted({s for s in requested_scopes if s not in allowed})
+    if not excess:
+        return
+
+    raise ForbiddenException(
+        detail=(
+            "You may not grant these scopes: " + ", ".join(excess) + ". "
+            "Only an administrator can issue a token with scopes beyond the "
+            "service type's defaults."
+        ),
+        context={
+            "target_user_id": str(target_user.id),
+            "rejected_scopes": excess,
+        },
+    )
 
 
 def assert_may_mint_token_for(user, permissions: Principal) -> None:
@@ -201,6 +279,7 @@ def create_api_token(
         raise BadRequestException(detail="User not found")
 
     assert_may_mint_token_for(user, permissions)
+    assert_may_grant_scopes(user, token_data.scopes, permissions, db, cache)
 
     # Determine scopes: use provided scopes, or get defaults for service accounts
     scopes = token_data.scopes
@@ -251,8 +330,20 @@ def create_api_token(
                 created_at=api_token.created_at,
             )
 
-        except IntegrityError:
+        except IntegrityError as e:
             db.rollback()
+
+            # Retrying only makes sense for a token-hash collision — a fresh
+            # random value fixes that. Any other constraint (e.g. the
+            # expires_at > created_at CHECK) fails identically on all five
+            # attempts and then reported "Failed to generate unique token",
+            # which pointed at the wrong thing entirely.
+            if not _is_token_hash_collision(e):
+                logger.error(f"API token insert violated a constraint: {e}")
+                raise BadRequestException(
+                    detail=f"Could not create API token: {_constraint_hint(e)}"
+                ) from e
+
             if attempt == MAX_TOKEN_GENERATION_RETRIES - 1:
                 logger.error(
                     f"Failed to generate unique API token after {MAX_TOKEN_GENERATION_RETRIES} attempts"
@@ -361,6 +452,14 @@ def update_api_token_admin(
     token = query.filter(ApiToken.id == str(token_id)).first()
     if not token:
         raise NotFoundException(detail="API token not found")
+
+    # Re-scoping is minting by another name — apply the same ceiling, or a
+    # non-admin could simply PATCH the scopes they were refused at create time.
+    if token_data.scopes is not None:
+        token_owner = UserRepository(db, cache).get_by_id_optional(str(token.user_id))
+        if token_owner is None:
+            raise NotFoundException(detail="API token owner not found")
+        assert_may_grant_scopes(token_owner, token_data.scopes, permissions, db, cache)
 
     try:
         # Build updates dict
@@ -499,17 +598,29 @@ def create_api_token_admin(
     # Same rule as create_api_token: a predefined value doesn't make minting
     # for a human account any less of an escalation.
     assert_may_mint_token_for(user, permissions)
+    assert_may_grant_scopes(user, token_data.scopes, permissions, db, cache)
 
-    # Validate token format
+    # Validate the token with the SAME validator authentication uses.
+    #
+    # This used to accept anything starting with "ctp_" and at least 32 chars
+    # long, but permissions/auth.py rejects a token that is not exactly
+    # len("ctp_") + 32 characters of url-safe base64 *before* it ever hashes
+    # it. A 40-character or oddly-charactered value was therefore stored
+    # happily and then failed every single authentication with "Invalid API
+    # token format" — a token dead on arrival, with nothing flagged at
+    # creation time. Reject it here instead.
+    from computor_backend.utils.api_token import validate_token_format
+
     predefined_token = token_data.predefined_token
-    if not predefined_token.startswith("ctp_"):
+    if not validate_token_format(predefined_token):
         raise BadRequestException(
-            detail="Predefined token must start with 'ctp_' prefix"
-        )
-
-    if len(predefined_token) < 32:
-        raise BadRequestException(
-            detail="Predefined token must be at least 32 characters long"
+            detail=(
+                "Predefined token is not a valid Computor API token. It must be "
+                "'ctp_' followed by exactly 32 url-safe base64 characters "
+                "(A-Z a-z 0-9 - _), e.g. the output of "
+                "`computor token create`. A token that does not match this "
+                "format would be stored but rejected at every authentication."
+            )
         )
 
     # Extract prefix (first 12 characters) and hash the token

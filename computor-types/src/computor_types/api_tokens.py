@@ -3,11 +3,29 @@ API Token DTOs for token-based authentication.
 """
 
 from __future__ import annotations
-from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict
+from datetime import datetime, timezone
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional, List, Dict, Any
 
 from computor_types.base import BaseEntityGet, BaseEntityList, EntityInterface, ListQuery
+
+
+def _reject_past_expiry(value: Optional[datetime]) -> Optional[datetime]:
+    """Reject an expiry that is already in the past.
+
+    ``api_token`` carries a CHECK constraint (``expires_at > created_at``), so
+    a past date fails at INSERT — but the create path treats *any* IntegrityError
+    as a token-hash collision and retries five times before reporting
+    "Failed to generate unique token", which says nothing about the real
+    problem. Catch it here, where the message can name the actual field.
+    """
+    if value is None:
+        return value
+    # Naive datetimes are treated as UTC (bootstrap builds them with utcnow()).
+    reference = datetime.now(timezone.utc) if value.tzinfo else datetime.utcnow()
+    if value <= reference:
+        raise ValueError("expires_at must be in the future")
+    return value
 
 
 class ApiTokenCreate(BaseModel):
@@ -22,6 +40,8 @@ class ApiTokenCreate(BaseModel):
     user_id: Optional[str] = Field(None, description="User ID that owns this token (defaults to the authenticated user)")
     scopes: List[str] = Field(default_factory=list, description="Token scopes (e.g., ['read:courses', 'write:results'])")
     expires_at: Optional[datetime] = Field(None, description="Token expiration date (null = never expires)")
+
+    _validate_expires_at = field_validator("expires_at")(_reject_past_expiry)
     properties: Optional[Dict[str, Any]] = Field(None, description="Additional properties")
 
 
@@ -38,6 +58,8 @@ class ApiTokenAdminCreate(BaseModel):
     predefined_token: str = Field(..., min_length=32, description="Predefined token value (must start with 'ctp_')")
     scopes: List[str] = Field(default_factory=list, description="Token scopes (e.g., ['read:courses', 'write:results'])")
     expires_at: Optional[datetime] = Field(None, description="Token expiration date (null = never expires)")
+
+    _validate_expires_at = field_validator("expires_at")(_reject_past_expiry)
     properties: Optional[Dict[str, Any]] = Field(None, description="Additional properties")
 
 

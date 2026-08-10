@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import yaml
@@ -43,6 +43,7 @@ from computor_backend.database import get_db_session
 from computor_backend.model.example import ExampleRepository
 from computor_backend.model.service import ApiToken, Service
 from computor_backend.permissions.principal import Principal
+from computor_backend.utils.api_token import hash_api_token, validate_token_format
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +131,74 @@ def _merged_config(svc: ServiceConfig) -> dict:
     return config
 
 
+# A seeded worker token expiring is a total outage for that worker, so start
+# complaining well before it happens.
+TOKEN_EXPIRY_WARNING_DAYS = 30
+
+
+def _report_token_expiry(token: ApiToken, svc: ServiceConfig, created_now: bool, db) -> str:
+    """Describe an existing token's expiry, self-healing an expired pinned one.
+
+    A bootstrap-pinned token is a shared constant: the same value sits in the
+    API's environment and the worker's ``API_TOKEN``. Letting it lapse buys no
+    security (the secret never changes) but takes the whole testing pipeline
+    down with an error that points at authentication rather than at a calendar.
+
+    So: warn as expiry approaches, and if it has already lapsed while the YAML
+    still pins that very same value, extend it. That is not a rotation — the
+    secret is unchanged, nothing that holds it breaks — it just restores a
+    service the operator plainly still wants.
+    """
+    prefix = "created" if created_now else "present"
+    if token.expires_at is None:
+        return f"{prefix} (token already present, never expires)"
+
+    expires_at = token.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
+    days_left = (expires_at - now).days
+
+    if days_left > TOKEN_EXPIRY_WARNING_DAYS:
+        return f"{prefix} (token already present, expires in {days_left}d)"
+
+    if days_left >= 0:
+        logger.warning(
+            "Service '%s': API token expires in %d day(s) (%s). When it does, "
+            "this service stops authenticating entirely. Mint a replacement, "
+            "update the worker's API_TOKEN, then revoke the old one.",
+            svc.slug, days_left, expires_at.isoformat(),
+        )
+        return f"{prefix} (token already present, EXPIRES IN {days_left}d — rotate it)"
+
+    # Already expired: the service is dead right now.
+    raw = svc.api_token.token if svc.api_token else None
+    pinned = os.path.expandvars(raw) if raw else None
+    same_secret = False
+    if pinned and validate_token_format(pinned):
+        same_secret = hash_api_token(pinned) == token.token_hash
+
+    if not same_secret:
+        logger.error(
+            "Service '%s': API token expired on %s and the deployment file does "
+            "not pin that same token, so it cannot be revived automatically. "
+            "Mint a new token and update the worker's API_TOKEN.",
+            svc.slug, expires_at.isoformat(),
+        )
+        return f"{prefix} (token EXPIRED on {expires_at.date()} — service cannot authenticate)"
+
+    new_expiry = now + timedelta(days=svc.api_token.expires_days or 365)
+    token.expires_at = new_expiry
+    db.commit()
+    logger.warning(
+        "Service '%s': API token had expired on %s; extended to %s. The secret "
+        "is unchanged (still the value pinned in the deployment file), so no "
+        "worker needs reconfiguring.",
+        svc.slug, expires_at.isoformat(), new_expiry.isoformat(),
+    )
+    return f"{prefix} (token had EXPIRED — expiry extended to {new_expiry.date()})"
+
+
 def _ensure_service(svc: ServiceConfig, system: Principal, db) -> str:
     """Ensure one service + its token exist. Returns a short human status."""
     existing = db.query(Service).filter(Service.slug == svc.slug).first()
@@ -173,17 +242,26 @@ def _ensure_service(svc: ServiceConfig, system: Principal, db) -> str:
         .first()
     )
     if has_token is not None:
-        return "created (token already present)" if created_now else "already present"
+        # ...but "exists and is not revoked" is not the same as "works". This
+        # check ignored expiry, and the seeded tokens carry expires_days: 365 —
+        # so roughly a year after first boot the worker's token quietly expired,
+        # every request started failing AUTH_005, and bootstrap still reported
+        # "already present" on every restart. Nothing surfaced it.
+        return _report_token_expiry(has_token, svc, created_now, db)
 
     raw = svc.api_token.token if svc.api_token else None
     if not raw:
         return f"{'created' if created_now else 'present'} WITHOUT a token (no api_token.token in YAML)"
 
+    # Validate with the same function authentication uses — a token that merely
+    # *looks* close enough ("ctp_" + >=32 chars) is stored fine and then fails
+    # every worker request with "Invalid API token format".
     token = os.path.expandvars(raw)
-    if not token or token.startswith("${") or not token.startswith("ctp_") or len(token) < 32:
+    if not token or token.startswith("${") or not validate_token_format(token):
         return (
             f"{'created' if created_now else 'present'} WITHOUT a token — api_token did not resolve "
-            f"to a valid 'ctp_' token (is TESTING_WORKER_TOKEN set & exported in the API's env?)"
+            f"to a valid token ('ctp_' + exactly 32 url-safe base64 chars). "
+            f"Is TESTING_WORKER_TOKEN set & exported in the API's env?"
         )
 
     expires_at = None
