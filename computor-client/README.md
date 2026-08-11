@@ -29,10 +29,10 @@ pip install computor-client[dev]
 from computor_client import ComputorClient
 
 async def main():
-    async with ComputorClient(base_url="http://localhost:8000") as client:
-        # Authenticate
-        await client.login(username="admin", password="secret")
-
+    async with ComputorClient(
+        base_url="http://localhost:8000",
+        api_token="ct_...",
+    ) as client:
         # List resources
         organizations = await client.organizations.list()
 
@@ -64,15 +64,23 @@ asyncio.run(main())
 
 ## Authentication
 
-### Username/Password Login
+The API supports two schemes, and there is deliberately **no username/password
+option** — it exposes no local credential-exchange endpoint.
+
+### API token (services, automation, agents)
 
 ```python
-async with ComputorClient(base_url="http://localhost:8000") as client:
-    await client.login(username="user", password="pass")
-    # Client is now authenticated
+async with ComputorClient(
+    base_url="http://localhost:8000",
+    api_token="ct_...",          # sent as the X-API-Token header
+) as client:
+    ...
 ```
 
-### Pre-existing Tokens
+### SSO bearer token
+
+Obtained from the Keycloak browser flow. Pair it with a refresh token to get
+automatic renewal when a request comes back 401.
 
 ```python
 client = ComputorClient(
@@ -80,6 +88,9 @@ client = ComputorClient(
     access_token="your-access-token",
     refresh_token="your-refresh-token",
 )
+
+client.access_token                    # read it back, e.g. for a WebSocket handshake
+await client.refresh_access_token()    # force a refresh
 ```
 
 ### Manual Token Management
@@ -101,15 +112,30 @@ client.course_families # CourseFamilyClient
 # ... and more
 ```
 
-Each client provides standard CRUD operations:
+Method names are derived from the route itself, so they are the same shape
+everywhere: `list`/`list_<subject>` for array responses, `get`/`get_<subject>`
+otherwise, and `create` / `update` / `replace` / `delete` for the rest.
 
 - `get(id)` - Get a single resource by ID
-- `list(skip, limit, query)` - List resources with pagination
+- `list(skip, limit, query)` - List resources, returning the rows
+- `list_page(skip, limit, query)` - Same request, returning a `Page`
 - `create(data)` - Create a new resource
 - `update(id, data)` - Update an existing resource
 - `delete(id)` - Delete a resource
-- `exists(id)` - Check if a resource exists
-- `get_all(query)` - Get all matching resources (handles pagination)
+
+### Pagination
+
+List endpoints report the total row count in the `X-Total-Count` header rather
+than in the body. `list()` returns just the rows; use `list_page()` when you
+need to know whether more remain:
+
+```python
+page = await client.courses.list_page(skip=0, limit=50)
+print(len(page), "of", page.total)
+
+while page.has_more:
+    page = await client.courses.list_page(skip=page.next_skip, limit=50)
+```
 
 ## Exception Handling
 

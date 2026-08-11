@@ -10,7 +10,7 @@ This module provides a robust async HTTP client built on httpx with:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Type, TypeVar, Union
+from typing import Any, Awaitable, Callable, Dict, Optional, TypeVar, Union
 from urllib.parse import urljoin
 import logging
 
@@ -64,7 +64,12 @@ class TokenAuthProvider(AuthProvider):
     ):
         self._access_token = access_token
         self._refresh_token = refresh_token
-        self._refresh_callback: Optional[callable] = None
+        self._refresh_callback: Optional[Callable[[str], Awaitable[Optional[Dict[str, str]]]]] = None
+
+    @property
+    def access_token(self) -> Optional[str]:
+        """The current access token, without awaiting."""
+        return self._access_token
 
     async def get_access_token(self) -> Optional[str]:
         return self._access_token
@@ -97,7 +102,10 @@ class TokenAuthProvider(AuthProvider):
         self._access_token = None
         self._refresh_token = None
 
-    def set_refresh_callback(self, callback: callable) -> None:
+    def set_refresh_callback(
+        self,
+        callback: Callable[[str], Awaitable[Optional[Dict[str, str]]]],
+    ) -> None:
         """Set the callback function for token refresh."""
         self._refresh_callback = callback
 
@@ -375,6 +383,23 @@ class AsyncHTTPClient:
         """Make a DELETE request."""
         return await self._request(
             "DELETE",
+            path,
+            params=params,
+            headers=headers,
+            authenticated=authenticated,
+        )
+
+    async def head(
+        self,
+        path: str,
+        *,
+        params: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
+        authenticated: bool = True,
+    ) -> httpx.Response:
+        """Make a HEAD request."""
+        return await self._request(
+            "HEAD",
             path,
             params=params,
             headers=headers,
