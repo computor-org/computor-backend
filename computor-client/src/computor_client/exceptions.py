@@ -318,8 +318,9 @@ class UserNotFoundError(NotFoundError):
         error_code: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
     ):
+        default = f"User not found: {user_id}" if user_id else "User not found"
         super().__init__(
-            message or f"User not found: {user_id}" if user_id else "User not found",
+            message or default,
             status_code=404,
             error_code=error_code or "NF_002",
             details=details,
@@ -339,8 +340,9 @@ class CourseNotFoundError(NotFoundError):
         error_code: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
     ):
+        default = f"Course not found: {course_id}" if course_id else "Course not found"
         super().__init__(
-            message or f"Course not found: {course_id}" if course_id else "Course not found",
+            message or default,
             status_code=404,
             error_code=error_code or "NF_003",
             details=details,
@@ -535,13 +537,17 @@ class ConnectionError(NetworkError):
 # Exception Mapping
 # =============================================================================
 
-# Map HTTP status codes to exception classes
+# Map HTTP status codes to exception classes. This is the single source of
+# truth: ``raise_for_response`` and ``exception_from_response`` both consult it,
+# so they can no longer disagree (503 used to map to ServiceUnavailableError in
+# one and ServerError in the other).
 STATUS_CODE_EXCEPTIONS = {
     400: ValidationError,
     401: AuthenticationError,
     403: AuthorizationError,
     404: NotFoundError,
     409: ConflictError,
+    422: ValidationError,
     429: RateLimitError,
     500: ServerError,
     502: ServerError,
@@ -549,48 +555,111 @@ STATUS_CODE_EXCEPTIONS = {
     504: ServerError,
 }
 
+# Codes that identify a more specific failure than the status alone. Only
+# subclasses that take the standard ``(message, *, error_code, details)``
+# signature belong here.
+ERROR_CODE_EXCEPTIONS = {
+    "AUTH_002": InvalidCredentialsError,
+    "AUTH_003": TokenExpiredError,
+    "AUTHZ_002": AdminRequiredError,
+    "AUTHZ_003": CourseAccessDeniedError,
+}
+
+
+def _exception_class_for(status_code: int, error_code: Optional[str]):
+    """Pick the most specific exception class for a status/error-code pair."""
+    if error_code and error_code in ERROR_CODE_EXCEPTIONS:
+        return ERROR_CODE_EXCEPTIONS[error_code]
+    if status_code in STATUS_CODE_EXCEPTIONS:
+        return STATUS_CODE_EXCEPTIONS[status_code]
+    if 500 <= status_code < 600:
+        return ServerError
+    return ComputorClientError
+
+
+def _coerce_message(value: Any) -> str:
+    """Render an error body's message field as a string.
+
+    FastAPI's own 422 handler (and some proxies) put a *list* of per-field
+    dicts in ``detail``. Passing that through unchanged made ``str(exc)`` blow
+    up with a TypeError inside the caller's ``except`` block — which is exactly
+    where an error message is least welcome.
+    """
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        parts = []
+        for item in value:
+            if isinstance(item, dict):
+                loc = item.get("loc") or item.get("field")
+                msg = item.get("msg") or item.get("message") or str(item)
+                if isinstance(loc, (list, tuple)):
+                    loc = ".".join(str(p) for p in loc)
+                parts.append(f"{loc}: {msg}" if loc else str(msg))
+            else:
+                parts.append(str(item))
+        return "; ".join(parts)
+    return str(value)
+
+
+def _field_errors_from(details: Dict[str, Any]) -> Dict[str, str]:
+    """Flatten the backend's ``details.validation_errors`` into field -> message."""
+    errors = details.get("validation_errors")
+    if not isinstance(errors, list):
+        return {}
+    out: Dict[str, str] = {}
+    for item in errors:
+        if isinstance(item, dict) and item.get("field"):
+            out[str(item["field"])] = str(item.get("message", ""))
+    return out
+
 
 def raise_for_response(response) -> None:
     """Raise the appropriate ``ComputorClientError`` for an error HTTP response.
 
-    Shared by the async HTTP client and the sync facade so both map status
-    codes to typed exceptions identically. No-op for 2xx responses.
+    Shared by the async HTTP client and the sync facade so both map responses to
+    typed exceptions identically. No-op for 2xx responses.
+
+    The backend answers errors with ``{"message", "error_code", "details"}``;
+    ``details.validation_errors`` carries the per-field reasons, which are
+    surfaced as ``ValidationError.field_errors`` rather than being dropped.
     """
     status_code = response.status_code
     if status_code < 400:
         return
 
-    # Try to parse error details from response body
+    details: Dict[str, Any] = {}
+    error_code = None
     try:
         error_data = response.json()
-        detail = error_data.get("detail") or error_data.get("message") or str(error_data)
-        error_code = error_data.get("error_code")
     except Exception:
-        detail = response.text or f"HTTP {status_code}"
-        error_code = None
+        error_data = None
 
-    if status_code == 401:
-        raise AuthenticationError(detail, status_code=status_code, error_code=error_code)
-    elif status_code == 403:
-        raise AuthorizationError(detail, status_code=status_code, error_code=error_code)
-    elif status_code == 404:
-        raise NotFoundError(detail, status_code=status_code, error_code=error_code)
-    elif status_code == 400:
-        raise ValidationError(detail, status_code=status_code, error_code=error_code)
-    elif status_code == 409:
-        raise ConflictError(detail, status_code=status_code, error_code=error_code)
-    elif status_code == 429:
-        retry_after = response.headers.get("Retry-After")
-        raise RateLimitError(
-            detail,
-            status_code=status_code,
-            error_code=error_code,
-            retry_after=int(retry_after) if retry_after else None,
-        )
-    elif 500 <= status_code < 600:
-        raise ServerError(detail, status_code=status_code, error_code=error_code)
+    if isinstance(error_data, dict):
+        raw_detail = error_data.get("detail")
+        if raw_detail is None:
+            raw_detail = error_data.get("message")
+        detail = _coerce_message(raw_detail) if raw_detail is not None else str(error_data)
+        error_code = error_data.get("error_code")
+        if isinstance(error_data.get("details"), dict):
+            details = error_data["details"]
     else:
-        raise ComputorClientError(detail, status_code=status_code, error_code=error_code)
+        detail = response.text or f"HTTP {status_code}"
+
+    exception_class = _exception_class_for(status_code, error_code)
+    kwargs: Dict[str, Any] = {"error_code": error_code, "details": details or None}
+
+    # The promoted subclasses pin their own status code.
+    if exception_class not in ERROR_CODE_EXCEPTIONS.values():
+        kwargs["status_code"] = status_code
+
+    if exception_class is ValidationError:
+        kwargs["field_errors"] = _field_errors_from(details) or None
+    elif exception_class is RateLimitError:
+        retry_after = response.headers.get("Retry-After")
+        kwargs["retry_after"] = int(retry_after) if retry_after and retry_after.isdigit() else None
+
+    raise exception_class(detail, **kwargs)
 
 
 def exception_from_response(
@@ -611,7 +680,10 @@ def exception_from_response(
     Returns:
         Appropriate ComputorClientError subclass
     """
-    exception_class = STATUS_CODE_EXCEPTIONS.get(status_code, ComputorClientError)
+    exception_class = _exception_class_for(status_code, error_code)
+    if exception_class in ERROR_CODE_EXCEPTIONS.values():
+        # These pin their own status code.
+        return exception_class(message, error_code=error_code, details=details)
     return exception_class(
         message,
         status_code=status_code,

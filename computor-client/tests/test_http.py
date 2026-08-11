@@ -262,3 +262,53 @@ class TestAsyncHTTPClientMethods:
 
         mock_request.assert_called_once()
         assert result["id"] == "new-123"
+
+
+class TestRetryPolicy:
+    """Transport failures are only replayed when replaying is safe."""
+
+    @staticmethod
+    def _always_failing_client(monkeypatch_target, exc):
+        calls = {"n": 0}
+
+        async def request(*args, **kwargs):
+            calls["n"] += 1
+            raise exc
+
+        client = AsyncMock()
+        client.request = request
+        client.is_closed = False
+        monkeypatch_target._client = client
+        return calls
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("method,expected_attempts", [
+        ("GET", 3),
+        ("DELETE", 3),
+        ("PUT", 3),
+        ("POST", 1),
+        ("PATCH", 1),
+    ])
+    async def test_only_idempotent_methods_are_retried(self, method, expected_attempts):
+        """A timed-out POST may already have been applied server-side."""
+        http = AsyncHTTPClient("http://testserver", max_retries=3, backoff_factor=0.0)
+        calls = self._always_failing_client(http, httpx.ConnectTimeout("boom"))
+
+        with pytest.raises(ClientTimeoutError):
+            await http._request(method, "/x")
+
+        assert calls["n"] == expected_attempts
+
+    @pytest.mark.asyncio
+    async def test_backoff_grows_exponentially_and_is_capped(self):
+        http = AsyncHTTPClient(
+            "http://testserver", max_retries=4, backoff_factor=0.5, max_backoff=1.0
+        )
+        self._always_failing_client(http, httpx.ConnectTimeout("boom"))
+
+        delays = []
+        with patch("asyncio.sleep", new=AsyncMock(side_effect=lambda d: delays.append(d))):
+            with pytest.raises(ClientTimeoutError):
+                await http._request("GET", "/x")
+
+        assert delays == [0.5, 1.0, 1.0]

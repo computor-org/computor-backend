@@ -5,12 +5,13 @@ This module provides a robust async HTTP client built on httpx with:
 - Bearer token authentication
 - Automatic token refresh
 - Request/response logging
-- Retry logic with exponential backoff
+- Exponential-backoff retries, for idempotent methods only
 - Timeout configuration
 """
 
+import asyncio
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Type, TypeVar, Union
+from typing import Any, Awaitable, Callable, Dict, Optional, TypeVar, Union
 from urllib.parse import urljoin
 import logging
 
@@ -33,6 +34,11 @@ from computor_client.exceptions import (
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
+
+# Methods that HTTP defines as idempotent, and which are therefore safe to
+# replay after a transport failure. POST and PATCH are absent deliberately: a
+# request that timed out may already have been applied.
+IDEMPOTENT_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "PUT", "DELETE"})
 
 
 class AuthProvider(ABC):
@@ -64,7 +70,12 @@ class TokenAuthProvider(AuthProvider):
     ):
         self._access_token = access_token
         self._refresh_token = refresh_token
-        self._refresh_callback: Optional[callable] = None
+        self._refresh_callback: Optional[Callable[[str], Awaitable[Optional[Dict[str, str]]]]] = None
+
+    @property
+    def access_token(self) -> Optional[str]:
+        """The current access token, without awaiting."""
+        return self._access_token
 
     async def get_access_token(self) -> Optional[str]:
         return self._access_token
@@ -97,7 +108,10 @@ class TokenAuthProvider(AuthProvider):
         self._access_token = None
         self._refresh_token = None
 
-    def set_refresh_callback(self, callback: callable) -> None:
+    def set_refresh_callback(
+        self,
+        callback: Callable[[str], Awaitable[Optional[Dict[str, str]]]],
+    ) -> None:
         """Set the callback function for token refresh."""
         self._refresh_callback = callback
 
@@ -120,6 +134,8 @@ class AsyncHTTPClient:
         timeout: float = 30.0,
         max_retries: int = 3,
         headers: Optional[Dict[str, str]] = None,
+        backoff_factor: float = 0.5,
+        max_backoff: float = 10.0,
     ):
         """
         Initialize the HTTP client.
@@ -128,13 +144,20 @@ class AsyncHTTPClient:
             base_url: Base URL for the API (e.g., "http://localhost:8000")
             auth_provider: Authentication provider for token management
             timeout: Request timeout in seconds
-            max_retries: Maximum number of retries for failed requests
+            max_retries: Total attempts for a transport failure, including the
+                first. Only idempotent methods are retried; see
+                ``IDEMPOTENT_METHODS``.
             headers: Additional headers to include in all requests
+            backoff_factor: Base delay in seconds; attempt *n* waits
+                ``backoff_factor * 2**n``.
+            max_backoff: Upper bound on a single backoff delay, in seconds.
         """
         self.base_url = base_url.rstrip("/")
         self.auth_provider = auth_provider or TokenAuthProvider()
         self.timeout = timeout
         self.max_retries = max_retries
+        self.backoff_factor = backoff_factor
+        self.max_backoff = max_backoff
         self._default_headers = headers or {}
         self._client: Optional[httpx.AsyncClient] = None
 
@@ -238,7 +261,9 @@ class AsyncHTTPClient:
         if files:
             request_headers.pop("Content-Type", None)
 
-        last_exception = None
+        retriable = method.upper() in IDEMPOTENT_METHODS
+
+        last_exception: Optional[ComputorClientError] = None
         for attempt in range(self.max_retries):
             try:
                 response = await client.request(
@@ -255,7 +280,9 @@ class AsyncHTTPClient:
                 if response.is_success:
                     return response
 
-                # Handle 401 with token refresh on first attempt
+                # A 401 means the server rejected the credential, not that the
+                # request was applied — so retrying after a refresh is safe for
+                # every method, unlike the transient-failure retries below.
                 if response.status_code == 401 and attempt == 0 and authenticated:
                     new_token = await self.auth_provider.refresh_token()
                     if new_token:
@@ -265,26 +292,30 @@ class AsyncHTTPClient:
                 # Convert error response to exception
                 self._handle_error_response(response)
 
-            except httpx.TimeoutException as e:
-                last_exception = ClientTimeoutError(f"Request timed out: {e}")
-                if attempt < self.max_retries - 1:
-                    continue
-            except httpx.ConnectError as e:
-                last_exception = NetworkError(f"Connection failed: {e}")
-                if attempt < self.max_retries - 1:
-                    continue
-            except httpx.HTTPStatusError as e:
-                self._handle_error_response(e.response)
             except ComputorClientError:
                 raise
-            except Exception as e:
-                last_exception = NetworkError(f"Request failed: {e}")
-                if attempt < self.max_retries - 1:
-                    continue
+            except httpx.HTTPStatusError as e:
+                self._handle_error_response(e.response)
+            except (httpx.TimeoutException, httpx.ConnectError, httpx.TransportError) as e:
+                if isinstance(e, httpx.TimeoutException):
+                    last_exception = ClientTimeoutError(f"Request timed out: {e}")
+                else:
+                    last_exception = NetworkError(f"Connection failed: {e}")
 
-        if last_exception:
-            raise last_exception
-        raise NetworkError("Request failed after retries")
+                # A timed-out POST may well have been applied server-side, so
+                # replaying it would duplicate the submission/message/artifact.
+                # Only methods that are idempotent by HTTP semantics are retried.
+                if not retriable or attempt >= self.max_retries - 1:
+                    raise last_exception
+                await self._sleep_before_retry(attempt)
+
+        raise last_exception or NetworkError("Request failed after retries")
+
+    async def _sleep_before_retry(self, attempt: int) -> None:
+        """Wait before retry ``attempt`` using capped exponential backoff."""
+        delay = min(self.backoff_factor * (2 ** attempt), self.max_backoff)
+        logger.debug("Retrying in %.2fs (attempt %d)", delay, attempt + 1)
+        await asyncio.sleep(delay)
 
     async def get(
         self,
@@ -368,13 +399,36 @@ class AsyncHTTPClient:
         self,
         path: str,
         *,
+        json_data: Optional[Union[Dict[str, Any], BaseModel]] = None,
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Dict[str, str]] = None,
         authenticated: bool = True,
     ) -> httpx.Response:
-        """Make a DELETE request."""
+        """Make a DELETE request.
+
+        Accepts a body: ``DELETE /documents/files`` and
+        ``DELETE /documents/directories`` both require one.
+        """
         return await self._request(
             "DELETE",
+            path,
+            json_data=json_data,
+            params=params,
+            headers=headers,
+            authenticated=authenticated,
+        )
+
+    async def head(
+        self,
+        path: str,
+        *,
+        params: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
+        authenticated: bool = True,
+    ) -> httpx.Response:
+        """Make a HEAD request."""
+        return await self._request(
+            "HEAD",
             path,
             params=params,
             headers=headers,

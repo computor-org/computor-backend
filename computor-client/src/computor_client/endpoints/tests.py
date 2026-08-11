@@ -6,14 +6,13 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, Dict, Union
 
 from computor_types.results import ResultList
-from computor_types.tests import TestCreate
+from computor_types.test_jobs import TestCreate
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.urls import quote_path
 
 
 class TestsClient:
@@ -30,15 +29,15 @@ class TestsClient:
         **kwargs: Any,
     ) -> ResultList:
         """Create Test Run"""
-        response = await self._http.post(f"/tests", json_data=data, params=kwargs)
+        response = await self._http.post("/tests", json_data=data, params=kwargs)
         return ResultList.model_validate(response.json())
 
-    async def status(
+    async def get_status(
         self,
         result_id: str,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Get Test Status"""
-        response = await self._http.get(f"/tests/status/{result_id}", params=kwargs)
+        response = await self._http.get(f"/tests/status/{quote_path(result_id)}", params=kwargs)
         return response.json()
 

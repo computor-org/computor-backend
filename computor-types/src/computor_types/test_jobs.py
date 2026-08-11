@@ -5,8 +5,8 @@ One of three similarly-named test modules — keep them distinct:
   * ``testing``        — test.yaml *spec* models
   * ``testing_report`` — testSummary.json *report* models
 
-Renamed from ``computor_types.tests`` (TASK-511); ``tests`` remains as a
-deprecated re-export shim.
+Renamed from ``computor_types.tests`` (TASK-511). The deprecated ``tests``
+re-export shim has since been removed.
 """
 from typing import Optional
 from pydantic import BaseModel

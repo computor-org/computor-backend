@@ -137,6 +137,15 @@ class CourseContentList(BaseModel):
 
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
     
+class CourseContentMoveRequest(BaseModel):
+    """Request body for ``PATCH /course-contents/{content_id}/move``.
+
+    A move is a path change plus a reposition; the backend cascades the new
+    path to all descendants in one transaction.
+    """
+    path: str
+    position: float
+
 class CourseContentUpdate(BaseModel):
     """DTO for updating course content."""
     path: Optional[str] = None

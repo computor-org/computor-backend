@@ -480,6 +480,7 @@ from computor_types.tutor_tests import (
     TutorTestGet,
     TutorTestArtifactList,
     TutorTestArtifactInfo,
+    TutorTestResultSubmit,
 )
 
 # Hoisted from function bodies (TASK-213):
@@ -487,7 +488,7 @@ import io
 import json
 import zipfile
 from computor_backend.repositories.example_version_repo import ExampleVersionRepository
-from computor_backend.services.tutor_test_state import TutorTestStatus as TutorTestStatusEnum, create_tutor_test_entry, get_tutor_test_full, get_tutor_test_metadata, store_tutor_test_result as store_result_redis, update_tutor_test_status
+from computor_backend.services.tutor_test_state import TutorTestState as TutorTestStateEnum, create_tutor_test_entry, get_tutor_test_full, get_tutor_test_metadata, store_tutor_test_result as store_result_redis, update_tutor_test_status
 from computor_backend.services.tutor_test_storage import download_tutor_test_artifacts_as_zip, download_tutor_test_input_as_zip, get_tutor_test_result_from_minio, list_tutor_test_artifacts, store_tutor_test_artifacts_from_zip, store_tutor_test_input, store_tutor_test_result as store_result_minio
 from computor_backend.tasks import get_task_executor
 from datetime import datetime, timezone
@@ -734,9 +735,9 @@ async def _get_tutor_test_info_and_sync(
         if minio_result is not None:
             # Workflow completed - update Redis with results
             if minio_result.get("error"):
-                status_enum = TutorTestStatusEnum.FAILED
+                status_enum = TutorTestStateEnum.FAILED
             else:
-                status_enum = TutorTestStatusEnum.COMPLETED
+                status_enum = TutorTestStateEnum.COMPLETED
 
             await store_tutor_test_result(
                 redis_client=redis,
@@ -755,7 +756,7 @@ async def _get_tutor_test_info_and_sync(
             await update_tutor_test_status(
                 redis_client=redis,
                 test_id=test_id,
-                status=TutorTestStatusEnum.RUNNING,
+                status=TutorTestStateEnum.RUNNING,
                 started_at=datetime.now(timezone.utc),
             )
             test_info["status"] = "running"
@@ -1045,7 +1046,7 @@ async def _assert_may_report_for_tutor_test(
 @tutor_router.post("/tests/{test_id}/results")
 async def submit_tutor_test_results(
     test_id: str,
-    result_data: dict,
+    result_data: TutorTestResultSubmit,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     redis=Depends(get_redis_client),
 ):
@@ -1059,19 +1060,25 @@ async def submit_tutor_test_results(
     """
     await _assert_may_report_for_tutor_test(test_id, permissions, redis)
 
+    # `extra="allow"` keeps every key the runner sent; `exclude_none` keeps
+    # undeclared-and-absent fields absent instead of materialising them as
+    # nulls, which GET /tutors/tests/{id} would then read as a present-but-
+    # None `summary`.
+    stored_result = result_data.model_dump(mode="json", exclude_none=True)
+
     # Store result.json in MinIO (persistent storage)
-    await store_result_minio(test_id, result_data)
+    await store_result_minio(test_id, stored_result)
 
     # Update Redis state
-    if result_data.get("error"):
-        status_enum = TutorTestStatusEnum.FAILED
+    if result_data.error:
+        status_enum = TutorTestStateEnum.FAILED
     else:
-        status_enum = TutorTestStatusEnum.COMPLETED
+        status_enum = TutorTestStateEnum.COMPLETED
 
     await store_result_redis(
         redis_client=redis,
         test_id=test_id,
-        result=result_data,
+        result=stored_result,
         status=status_enum,
     )
 

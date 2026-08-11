@@ -6,16 +6,17 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, Dict, Union
 
 from computor_types.course_member_import import (
+    CourseMemberImportFileParseRequest,
+    CourseMemberImportParseResponse,
     CourseMemberImportRequest,
     CourseMemberImportResponse,
 )
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.urls import quote_path
 
 
 class CourseMemberImportClient:
@@ -26,22 +27,23 @@ class CourseMemberImportClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def post(
+    async def parse(
+        self,
+        course_id: str,
+        data: Union[CourseMemberImportFileParseRequest, Dict[str, Any]],
+        **kwargs: Any,
+    ) -> CourseMemberImportParseResponse:
+        """Parse Member File"""
+        response = await self._http.post(f"/course-member-import/parse/{quote_path(course_id)}", json_data=data, params=kwargs)
+        return CourseMemberImportParseResponse.model_validate(response.json())
+
+    async def create(
         self,
         course_id: str,
         data: Union[CourseMemberImportRequest, Dict[str, Any]],
         **kwargs: Any,
     ) -> CourseMemberImportResponse:
         """Import Member"""
-        response = await self._http.post(f"/course-member-import/{course_id}", json_data=data, params=kwargs)
+        response = await self._http.post(f"/course-member-import/{quote_path(course_id)}", json_data=data, params=kwargs)
         return CourseMemberImportResponse.model_validate(response.json())
-
-    async def parse(
-        self,
-        course_id: str,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Parse Member File"""
-        response = await self._http.post(f"/course-member-import/parse/{course_id}", params=kwargs)
-        return response.json()
 

@@ -25,6 +25,7 @@ from computor_client.exceptions import (
     TimeoutError,
     ConnectionError,
     exception_from_response,
+    raise_for_response,
 )
 
 
@@ -292,3 +293,93 @@ class TestExceptionFromResponse:
         )
         assert error.error_code == "NF_002"
         assert error.details == details
+
+# ============================================================================
+# Response -> exception mapping (regression tests)
+# ============================================================================
+
+
+class TestRaiseForResponseMapping:
+    """The dispatch that turns an error body into a typed exception."""
+
+    @staticmethod
+    def _response(status, *, body=None, text=None, headers=None):
+        import httpx
+
+        request = httpx.Request("POST", "http://testserver/courses")
+        if body is not None:
+            return httpx.Response(status, json=body, headers=headers or {}, request=request)
+        return httpx.Response(status, text=text or "", headers=headers or {}, request=request)
+
+    def test_validation_details_reach_field_errors(self):
+        """The backend's per-field reasons used to be dropped on the floor."""
+        response = self._response(400, body={
+            "message": "Request validation failed",
+            "error_code": "VAL_001",
+            "details": {"validation_errors": [
+                {"field": "message", "message": "Field required", "type": "missing"},
+            ]},
+        })
+        with pytest.raises(ValidationError) as exc_info:
+            raise_for_response(response)
+        assert exc_info.value.field_errors == {"message": "Field required"}
+        assert exc_info.value.error_code == "VAL_001"
+
+    def test_list_shaped_detail_does_not_break_str(self):
+        """FastAPI's own 422 puts a list in `detail`; str() used to TypeError."""
+        response = self._response(422, body={"detail": [
+            {"loc": ["body", "message"], "msg": "Field required", "type": "missing"},
+        ]})
+        with pytest.raises(ValidationError) as exc_info:
+            raise_for_response(response)
+        assert "body.message: Field required" in str(exc_info.value)
+
+    @pytest.mark.parametrize("error_code,status,expected", [
+        ("AUTH_002", 401, InvalidCredentialsError),
+        ("AUTH_003", 401, TokenExpiredError),
+        ("AUTHZ_002", 403, AdminRequiredError),
+        ("AUTHZ_003", 403, CourseAccessDeniedError),
+    ])
+    def test_error_code_promotes_to_the_specific_subclass(self, error_code, status, expected):
+        response = self._response(status, body={"message": "nope", "error_code": error_code})
+        with pytest.raises(expected):
+            raise_for_response(response)
+
+    def test_status_mapping_agrees_across_both_entry_points(self):
+        """503 used to be ServiceUnavailableError in one path, ServerError in the other."""
+        response = self._response(503, body={"message": "down"})
+        with pytest.raises(ServiceUnavailableError):
+            raise_for_response(response)
+        assert isinstance(exception_from_response(503, "down"), ServiceUnavailableError)
+
+    def test_retry_after_is_parsed_when_numeric_and_ignored_otherwise(self):
+        with pytest.raises(RateLimitError) as exc_info:
+            raise_for_response(self._response(429, body={"message": "slow"},
+                                              headers={"Retry-After": "30"}))
+        assert exc_info.value.retry_after == 30
+
+        with pytest.raises(RateLimitError) as exc_info:
+            raise_for_response(self._response(
+                429, body={"message": "slow"},
+                headers={"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"}))
+        assert exc_info.value.retry_after is None
+
+    def test_non_json_body_still_produces_a_typed_error(self):
+        with pytest.raises(ServerError) as exc_info:
+            raise_for_response(self._response(502, text="<html>bad gateway</html>"))
+        assert "bad gateway" in exc_info.value.message
+
+    def test_success_responses_are_a_no_op(self):
+        raise_for_response(self._response(204, text=""))
+
+
+class TestNotFoundMessagePrecedence:
+    """`message or f"..." if id else "..."` dropped an explicit message."""
+
+    def test_explicit_message_survives_without_an_id(self):
+        assert UserNotFoundError(message="custom").message == "custom"
+        assert CourseNotFoundError(message="custom").message == "custom"
+
+    def test_default_message_still_mentions_the_id(self):
+        assert "u-1" in UserNotFoundError("u-1").message
+        assert "c-1" in CourseNotFoundError("c-1").message

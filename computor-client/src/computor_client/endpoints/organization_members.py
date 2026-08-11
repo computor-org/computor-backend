@@ -8,10 +8,17 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
+from computor_types.organization_members import (
+    OrganizationMemberCreate,
+    OrganizationMemberGet,
+    OrganizationMemberList,
+    OrganizationMemberUpdate,
+)
 from pydantic import BaseModel
 
-
 from computor_client.http import AsyncHTTPClient
+from computor_client.pagination import Page
+from computor_client.urls import quote_path
 
 
 class OrganizationMembersClient:
@@ -22,45 +29,39 @@ class OrganizationMembersClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def create(
-        self,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Create Organization-Members"""
-        response = await self._http.post(f"/organization-members", params=kwargs)
-        return response.json()
-
     async def list(
         self,
+        skip: int = 0,
+        limit: int = 100,
         query: Optional[BaseModel] = None,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> List[OrganizationMemberList]:
         """List Organization-Members"""
-        params = query.model_dump(exclude_none=True) if query else {}
+        page = await self.list_page(skip=skip, limit=limit, query=query, **kwargs)
+        return page.items
+
+    async def list_page(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[BaseModel] = None,
+        **kwargs: Any,
+    ) -> Page[OrganizationMemberList]:
+        """List Organization-Members (one page, with the total row count)."""
+        params = query.model_dump(mode="json", exclude_none=True) if query else {}
+        params.update({"skip": skip, "limit": limit})
         params.update(kwargs)
-        response = await self._http.get(
-            f"/organization-members",
-            params=params,
-        )
-        return response.json()
+        response = await self._http.get("/organization-members", params=params)
+        return Page.from_response(response, OrganizationMemberList, skip=skip, limit=limit)
 
-    async def get(
+    async def create(
         self,
-        id: str,
+        data: Union[OrganizationMemberCreate, Dict[str, Any]],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Get Organization-Members"""
-        response = await self._http.get(f"/organization-members/{id}", params=kwargs)
-        return response.json()
-
-    async def update(
-        self,
-        id: str,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Update Organization-Members"""
-        response = await self._http.patch(f"/organization-members/{id}", params=kwargs)
-        return response.json()
+    ) -> OrganizationMemberGet:
+        """Create Organization-Members"""
+        response = await self._http.post("/organization-members", json_data=data, params=kwargs)
+        return OrganizationMemberGet.model_validate(response.json())
 
     async def delete(
         self,
@@ -68,6 +69,25 @@ class OrganizationMembersClient:
         **kwargs: Any,
     ) -> None:
         """Delete Organization-Members"""
-        await self._http.delete(f"/organization-members/{id}", params=kwargs)
+        await self._http.delete(f"/organization-members/{quote_path(id)}", params=kwargs)
         return
+
+    async def get(
+        self,
+        id: str,
+        **kwargs: Any,
+    ) -> OrganizationMemberGet:
+        """Get Organization-Members"""
+        response = await self._http.get(f"/organization-members/{quote_path(id)}", params=kwargs)
+        return OrganizationMemberGet.model_validate(response.json())
+
+    async def update(
+        self,
+        id: str,
+        data: Union[OrganizationMemberUpdate, Dict[str, Any]],
+        **kwargs: Any,
+    ) -> OrganizationMemberGet:
+        """Update Organization-Members"""
+        response = await self._http.patch(f"/organization-members/{quote_path(id)}", json_data=data, params=kwargs)
+        return OrganizationMemberGet.model_validate(response.json())
 

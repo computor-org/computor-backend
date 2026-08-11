@@ -6,10 +6,9 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
-from pydantic import BaseModel
-
+from computor_types.instance import InstanceInfoGet
 
 from computor_client.http import AsyncHTTPClient
 
@@ -22,11 +21,11 @@ class InstanceClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def instance_info(
+    async def get_instance_info(
         self,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> InstanceInfoGet:
         """Get Instance Info"""
-        response = await self._http.get(f"/instance-info", params=kwargs)
-        return response.json()
+        response = await self._http.get("/instance-info", params=kwargs)
+        return InstanceInfoGet.model_validate(response.json())
 

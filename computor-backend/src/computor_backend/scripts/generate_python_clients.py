@@ -14,12 +14,19 @@ Output structure:
     └── ...
 """
 
+import importlib
+import inspect
 import json
+import pkgutil
 import re
 import urllib.request
 from collections import defaultdict
+from enum import Enum
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
+
+from pydantic import BaseModel
 
 
 def load_openapi_spec_offline() -> Dict[str, Any]:
@@ -92,8 +99,35 @@ def sanitize_method_name(name: str) -> str:
     return name
 
 
-def path_to_method_name(path: str, method: str, operation_id: str, base_segments: List[str]) -> str:
-    """Generate a method name from path and operation."""
+def path_to_method_name(
+    path: str,
+    method: str,
+    operation: Dict[str, Any],
+    base_segments: List[str],
+) -> str:
+    """Derive a method name from the route, deterministically.
+
+    The name depends only on the route itself — its path, its HTTP method and
+    whether it answers with an array — never on the order routes happen to be
+    registered in. That matters because the previous scheme resolved clashes by
+    "first one wins", so the same name meant opposite things in different
+    modules (``students.courses()`` listed, ``tutors.courses()`` fetched one)
+    and could flip whenever a route moved.
+
+    The rules:
+
+    * Segments belonging to the tag itself are dropped, leaving a *subject*
+      (``/tutors/course-members/{id}/course-contents`` under tag ``tutors``
+      gives ``course_members_course_contents``).
+    * GET answering with an array is ``list``/``list_<subject>``; any other GET
+      is ``get``/``get_<subject>``. Using the response shape rather than
+      "does the path end in a parameter" keeps action sub-paths such as
+      ``/submissions/artifacts/download`` out of the ``list_`` namespace.
+    * POST keeps the bare subject, because on action routes the verb is already
+      the last path segment (``.../validate``); with no subject it is ``create``.
+    * PATCH/PUT/DELETE are ``update``/``replace``/``delete``, suffixed with the
+      subject when there is one.
+    """
     segments = [s for s in path.split("/") if s and not s.startswith("{")]
 
     # Normalize base segments - also create the joined version for hyphenated paths
@@ -108,45 +142,25 @@ def path_to_method_name(path: str, method: str, operation_id: str, base_segments
         if seg_normalized not in normalized_base and seg_normalized != joined_base:
             remaining.append(seg)
 
-    if not remaining:
-        # Standard CRUD
-        if method == "GET" and not path.endswith("}"):
-            return "list"
-        elif method == "GET" and path.endswith("}"):
-            return "get"
-        elif method == "POST" and not any(s.startswith("{") for s in path.split("/")[-2:]):
-            return "create"
-        elif method == "PATCH" and path.count("{") == 1:
-            return "update"
-        elif method == "PUT" and path.count("{") == 1:
-            return "replace"
-        elif method == "DELETE" and path.count("{") == 1:
-            return "delete"
-        return method.lower()
+    subject = "_".join(filter(None, (sanitize_method_name(seg) for seg in remaining)))
 
-    # Use remaining segments for method name
-    name_parts = []
-    for seg in remaining:
-        seg_clean = sanitize_method_name(seg)
-        if seg_clean:
-            name_parts.append(seg_clean)
+    _, is_list_response, _ = get_response_schema(operation)
 
-    method_name = "_".join(name_parts)
+    if method == "GET":
+        verb = "list" if is_list_response else "get"
+    elif method == "POST":
+        verb = "" if subject else "create"
+    elif method == "PATCH":
+        verb = "update"
+    elif method == "PUT":
+        verb = "replace"
+    elif method == "DELETE":
+        verb = "delete"
+    else:
+        verb = method.lower()
 
-    # Add method prefix for non-standard operations
-    if method == "POST" and "upload" not in method_name and "submit" not in method_name:
-        if method_name not in ["login", "logout", "register", "refresh", "validate", "join", "sync"]:
-            method_name = method_name
-    elif method == "DELETE" and path.count("{") > 1:
-        if not method_name.startswith("delete"):
-            method_name = f"delete_{method_name}" if method_name else "delete"
-    elif method == "GET" and path.count("{") > 1:
-        if not method_name.startswith("get"):
-            method_name = f"get_{method_name}" if method_name else "get"
-
-    # Ensure final name is valid
-    method_name = sanitize_method_name(method_name)
-    return method_name if method_name else method.lower()
+    method_name = "_".join(filter(None, (verb, subject)))
+    return sanitize_method_name(method_name) or method.lower()
 
 
 def find_schema_ref(schema: Dict[str, Any]) -> Optional[str]:
@@ -169,7 +183,9 @@ def get_response_schema(operation: Dict[str, Any]) -> Tuple[Optional[str], bool,
         Tuple of (schema_name, is_list, is_binary)
     """
     responses = operation.get("responses", {})
-    for status in ["200", "201"]:
+    # 202 covers the task-submission endpoints, which return a TaskResponse
+    # body that used to be typed as a bare dict.
+    for status in ["200", "201", "202"]:
         if status in responses:
             content = responses[status].get("content", {})
             # Check for binary responses (ZIP, octet-stream, etc.)
@@ -195,448 +211,182 @@ def get_request_schema(operation: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-# Complete mapping of schema names to their module locations in computor_types
-# Generated by scanning the actual source files
-SCHEMA_TO_MODULE = {
-    "AccountCreate": "accounts",
-    "AccountDeployment": "deployment_config",
-    "AccountGet": "accounts",
-    "AccountInterface": "accounts",
-    "AccountList": "accounts",
-    "AccountQuery": "accounts",
-    "AccountUpdate": "accounts",
-    "AdminResetPasswordRequest": "password_management",
-    "AdminSetPasswordRequest": "password_management",
-    "ApiTokenAdminCreate": "api_tokens",
-    "ApiTokenCreate": "api_tokens",
-    "ApiTokenCreateResponse": "api_tokens",
-    "ApiTokenGet": "api_tokens",
-    "ApiTokenInterface": "api_tokens",
-    "ApiTokenList": "api_tokens",
-    "ApiTokenQuery": "api_tokens",
-    "ApiTokenRevoke": "api_tokens",
-    "ApiTokenUpdate": "api_tokens",
-    "AssignExampleRequest": "lecturer_deployments",
-    "AssignExampleResponse": "lecturer_deployments",
-    "AuthConfig": "auth",
-    "BucketCreate": "storage",
-    "BucketInfo": "storage",
-    "BucketList": "storage",
-    "ChangePasswordRequest": "password_management",
-    "Claims": "permissions",
-    "CommentCreate": "course_member_comments",
-    "CommentUpdate": "course_member_comments",
-    "ContentValidationCreate": "lecturer_content_validation",
-    "ContentValidationGet": "lecturer_content_validation",
-    "ContentValidationInterface": "lecturer_content_validation",
-    "ContentValidationItem": "lecturer_content_validation",
-    "ContentValidationResult": "lecturer_content_validation",
-    "ContentTypeGradingStats": "course_member_gradings",
-    "CourseContentConfig": "deployment_config",
-    "CourseContentCreate": "course_contents",
-    "CourseContentDeploymentCreate": "deployment",
-    "CourseContentDeploymentGet": "deployment",
-    "CourseContentDeploymentList": "deployment",
-    "CourseContentDeploymentUpdate": "deployment",
-    "CourseContentGet": "course_contents",
-    "CourseContentInterface": "course_contents",
-    "CourseContentKindCreate": "course_content_kind",
-    "CourseContentKindGet": "course_content_kind",
-    "CourseContentKindInterface": "course_content_kind",
-    "CourseContentKindList": "course_content_kind",
-    "CourseContentKindQuery": "course_content_kind",
-    "CourseContentKindUpdate": "course_content_kind",
-    "CourseContentLecturerGet": "lecturer_course_contents",
-    "CourseContentLecturerInterface": "lecturer_course_contents",
-    "CourseContentLecturerList": "lecturer_course_contents",
-    "CourseContentLecturerQuery": "lecturer_course_contents",
-    "CourseContentList": "course_contents",
-    "CourseContentProperties": "course_contents",
-    "CourseContentPropertiesGet": "course_contents",
-    "CourseContentQuery": "course_contents",
-    "CourseContentRepositoryLecturerGet": "lecturer_course_contents",
-    "CourseContentStudentGet": "student_course_contents",
-    "CourseContentStudentInterface": "student_course_contents",
-    "CourseContentStudentList": "student_course_contents",
-    "CourseContentStudentProperties": "student_course_contents",
-    "CourseContentStudentQuery": "student_course_contents",
-    "CourseContentStudentUpdate": "student_course_contents",
-    "CourseContentTypeConfig": "deployment_config",
-    "CourseContentTypeCreate": "course_content_types",
-    "CourseContentTypeGet": "course_content_types",
-    "CourseContentTypeInterface": "course_content_types",
-    "CourseContentTypeList": "course_content_types",
-    "CourseContentTypeQuery": "course_content_types",
-    "CourseContentTypeUpdate": "course_content_types",
-    "CourseContentUpdate": "course_contents",
-    "CourseCreate": "courses",
-    "CourseFamilyConfig": "deployments",
-    "CourseFamilyCreate": "course_families",
-    "CourseFamilyGet": "course_families",
-    "CourseFamilyInterface": "course_families",
-    "CourseFamilyList": "course_families",
-    "CourseFamilyProperties": "course_families",
-    "CourseFamilyPropertiesGet": "course_families",
-    "CourseFamilyQuery": "course_families",
-    "CourseFamilyUpdate": "course_families",
-    "CourseGet": "courses",
-    "CourseGroupConfig": "deployments",
-    "CourseGroupCreate": "course_groups",
-    "CourseGroupGet": "course_groups",
-    "CourseGroupInterface": "course_groups",
-    "CourseGroupList": "course_groups",
-    "CourseGroupQuery": "course_groups",
-    "CourseGroupUpdate": "course_groups",
-    "CourseInterface": "courses",
-    "CourseList": "courses",
-    "CourseMemberCommentCreate": "course_member_comments",
-    "CourseMemberCommentGet": "course_member_comments",
-    "CourseMemberCommentInterface": "course_member_comments",
-    "CourseMemberCommentList": "course_member_comments",
-    "CourseMemberCommentQuery": "course_member_comments",
-    "CourseMemberCommentUpdate": "course_member_comments",
-    "CourseMemberCreate": "course_members",
-    "CourseMemberDeployment": "deployment_config",
-    "CourseMemberGet": "course_members",
-    "CourseMemberGitLabConfig": "course_members",
-    "CourseMemberGradingNode": "course_member_gradings",
-    "CourseMemberGradingsGet": "course_member_gradings",
-    "CourseMemberGradingsInterface": "course_member_gradings",
-    "CourseMemberGradingsList": "course_member_gradings",
-    "CourseMemberGradingsQuery": "course_member_gradings",
-    "CourseMemberImportRequest": "course_member_import",
-    "CourseMemberImportResponse": "course_member_import",
-    "CourseMemberInterface": "course_members",
-    "CourseMemberList": "course_members",
-    "CourseMemberProperties": "course_members",
-    "CourseMemberProviderAccountUpdate": "course_member_accounts",
-    "CourseMemberQuery": "course_members",
-    "CourseMemberReadinessStatus": "course_member_accounts",
-    "CourseMemberUpdate": "course_members",
-    "CourseMemberValidationRequest": "course_member_accounts",
-    "CourseProjects": "deployment_config",
-    "CourseProperties": "courses",
-    "CoursePropertiesGet": "courses",
-    "CourseQuery": "courses",
-    "CourseRoleGet": "course_roles",
-    "CourseRoleInterface": "course_roles",
-    "CourseRoleList": "course_roles",
-    "CourseRoleQuery": "course_roles",
-    "CourseStudentGet": "student_courses",
-    "CourseStudentInterface": "student_courses",
-    "CourseStudentList": "student_courses",
-    "CourseStudentQuery": "student_courses",
-    "CourseTaskRequest": "system",
-    "CourseTutorGet": "tutor_courses",
-    "CourseTutorInterface": "tutor_courses",
-    "CourseTutorList": "tutor_courses",
-    "CourseTutorQuery": "tutor_courses",
-    "CourseTutorRepository": "tutor_courses",
-    "CourseUpdate": "courses",
-    "DeploymentGet": "lecturer_deployments",
-    "DeploymentHistoryCreate": "deployment",
-    "DeploymentHistoryGet": "deployment",
-    "DeploymentHistoryList": "deployment",
-    "DeploymentList": "lecturer_deployments",
-    "DeploymentMetadata": "deployment",
-    "DeploymentSummary": "deployment",
-    "DeploymentWithHistory": "deployment",
-    "ErrorResponse": "errors",
-    "ExampleBatchUploadRequest": "example",
-    "ExampleCreate": "example",
-    "ExampleDependencyCreate": "example",
-    "ExampleDependencyGet": "example",
-    "ExampleDownloadResponse": "example",
-    "ExampleFileSet": "example",
-    "ExampleGet": "example",
-    "ExampleInterface": "example",
-    "ExampleList": "example",
-    "ExampleQuery": "example",
-    "ExampleRepositoryCreate": "example",
-    "ExampleRepositoryGet": "example",
-    "ExampleRepositoryInterface": "example",
-    "ExampleRepositoryList": "example",
-    "ExampleRepositoryQuery": "example",
-    "ExampleRepositoryUpdate": "example",
-    "ExampleUpdate": "example",
-    "ExampleUploadRequest": "example",
-    "ExampleValidationResult": "lecturer_content_validation",
-    "ExampleVersionCreate": "example",
-    "ExampleVersionGet": "example",
-    "ExampleVersionList": "example",
-    "ExampleVersionQuery": "example",
-    "ExtensionInterface": "extensions",
-    "ExtensionMetadata": "extensions",
-    "ExtensionPublishRequest": "extensions",
-    "ExtensionPublishResponse": "extensions",
-    "ExtensionVersionBase": "extensions",
-    "ExtensionVersionDetail": "extensions",
-    "ExtensionVersionListItem": "extensions",
-    "ExtensionVersionListResponse": "extensions",
-    "ExtensionVersionYankRequest": "extensions",
-    "GenerateAssignmentsRequest": "system",
-    "GenerateAssignmentsResponse": "system",
-    "GenerateTemplateRequest": "system",
-    "GenerateTemplateResponse": "system",
-    "GitCommit": "git",
-    "GitLabConfig": "deployments",
-    "GitLabConfigGet": "deployments",
-    "GitLabPATCredentials": "password_management",
-    "GitLabSyncRequest": "lecturer_gitlab_sync",
-    "GitLabSyncResult": "lecturer_gitlab_sync",
-    "GradedArtifactInfo": "tutor_grading",
-    "GradedByCourseMember": "grading",
-    "GradingAuthor": "grading",
-    "GradingStatus": "grading",
-    "GradingStudentView": "grading",
-    "GradingSummary": "grading",
-    "GroupClaimCreate": "group_claims",
-    "GroupClaimGet": "group_claims",
-    "GroupClaimInterface": "group_claims",
-    "GroupClaimList": "group_claims",
-    "GroupClaimQuery": "group_claims",
-    "GroupClaimUpdate": "group_claims",
-    "GroupCreate": "groups",
-    "GroupGet": "groups",
-    "GroupInterface": "groups",
-    "GroupList": "groups",
-    "GroupQuery": "groups",
-    "GroupType": "groups",
-    "GroupUpdate": "groups",
-    "LanguageCreate": "languages",
-    "LanguageGet": "languages",
-    "LanguageInterface": "languages",
-    "LanguageList": "languages",
-    "LanguageQuery": "languages",
-    "LanguageUpdate": "languages",
-    "ListQuery": "base",
-    "LocalLoginRequest": "auth",
-    "LocalLoginResponse": "auth",
-    "LocalTokenRefreshRequest": "auth",
-    "LocalTokenRefreshResponse": "auth",
-    "LoginRequest": "auth",
-    "LogoutRequest": "auth",
-    "LogoutResponse": "auth",
-    "MessageAuthor": "messages",
-    "MessageCreate": "messages",
-    "MessageGet": "messages",
-    "MessageInterface": "messages",
-    "MessageList": "messages",
-    "MessageQuery": "messages",
-    "MessageUpdate": "messages",
-    "OrganizationConfig": "deployments",
-    "OrganizationCreate": "organizations",
-    "OrganizationGet": "organizations",
-    "OrganizationInterface": "organizations",
-    "OrganizationList": "organizations",
-    "OrganizationProperties": "organizations",
-    "OrganizationPropertiesGet": "organizations",
-    "OrganizationQuery": "organizations",
-    "OrganizationType": "organizations",
-    "OrganizationUpdate": "organizations",
-    "OrganizationUpdateTokenQuery": "organizations",
-    "OrganizationUpdateTokenUpdate": "organizations",
-    "PasswordOperationResponse": "password_management",
-    "PasswordStatusResponse": "password_management",
-    "PresignedUrlRequest": "storage",
-    "PresignedUrlResponse": "storage",
-    "Principal": "permissions",
-    "ProfileCreate": "profiles",
-    "ProfileGet": "profiles",
-    "ProfileInterface": "profiles",
-    "ProfileList": "profiles",
-    "ProfileQuery": "profiles",
-    "ProfileUpdate": "profiles",
-    "ProviderAuthCredentials": "password_management",
-    "ProviderInfo": "auth",
-    "ReleaseOverride": "system",
-    "ReleaseSelection": "system",
-    "ReleaseValidationError": "lecturer_deployments",
-    "Repository": "repositories",
-    "ResultArtifactCreate": "artifacts",
-    "ResultArtifactInterface": "artifacts",
-    "ResultArtifactListItem": "artifacts",
-    "ResultArtifactQuery": "artifacts",
-    "ResultCreate": "results",
-    "ResultGet": "results",
-    "ResultInterface": "results",
-    "ResultList": "results",
-    "ResultQuery": "results",
-    "ResultStudentGet": "student_course_contents",
-    "ResultStudentList": "student_course_contents",
-    "ResultUpdate": "results",
-    "ResultWithGrading": "results",
-    "RoleClaimGet": "roles_claims",
-    "RoleClaimInterface": "roles_claims",
-    "RoleClaimList": "roles_claims",
-    "RoleClaimQuery": "roles_claims",
-    "RoleGet": "roles",
-    "RoleInterface": "roles",
-    "RoleList": "roles",
-    "RoleQuery": "roles",
-    "ServiceCreate": "services",
-    "ServiceGet": "services",
-    "ServiceInterface": "services",
-    "ServiceList": "services",
-    "ServiceQuery": "services",
-    "ServiceTypeBase": "service_type",
-    "ServiceTypeCreate": "service_type",
-    "ServiceTypeGet": "service_type",
-    "ServiceTypeInterface": "service_type",
-    "ServiceTypeList": "service_type",
-    "ServiceTypeQuery": "service_type",
-    "ServiceTypeUpdate": "service_type",
-    "ServiceUpdate": "services",
-    "SessionCreate": "sessions",
-    "SessionGet": "sessions",
-    "SessionInterface": "sessions",
-    "SessionList": "sessions",
-    "SessionQuery": "sessions",
-    "SessionUpdate": "sessions",
-    "SetPasswordRequest": "password_management",
-    "StorageInterface": "storage",
-    "StorageObjectCreate": "storage",
-    "StorageObjectGet": "storage",
-    "StorageObjectList": "storage",
-    "StorageObjectMetadata": "storage",
-    "StorageObjectQuery": "storage",
-    "StorageObjectUpdate": "storage",
-    "StorageUsageStats": "storage",
-    "StudentProfileCreate": "student_profile",
-    "StudentProfileGet": "student_profile",
-    "StudentProfileInterface": "student_profile",
-    "StudentProfileList": "student_profile",
-    "StudentProfileQuery": "student_profile",
-    "StudentProfileUpdate": "student_profile",
-    "SubmissionArtifactCreate": "artifacts",
-    "SubmissionArtifactGet": "artifacts",
-    "SubmissionArtifactInterface": "artifacts",
-    "SubmissionArtifactList": "artifacts",
-    "SubmissionArtifactQuery": "artifacts",
-    "SubmissionArtifactUpdate": "artifacts",
-    "SubmissionCreate": "submissions",
-    "SubmissionGradeCreate": "artifacts",
-    "SubmissionGradeDetail": "artifacts",
-    "SubmissionGradeInterface": "artifacts",
-    "SubmissionGradeList": "artifacts",
-    "SubmissionGradeQuery": "artifacts",
-    "SubmissionGradeUpdate": "artifacts",
-    "SubmissionGroupCreate": "submission_groups",
-    "SubmissionGroupDetailed": "submission_groups",
-    "SubmissionGroupGet": "submission_groups",
-    "SubmissionGroupGradingCreate": "grading",
-    "SubmissionGroupGradingGet": "grading",
-    "SubmissionGroupGradingInterface": "grading",
-    "SubmissionGroupGradingList": "grading",
-    "SubmissionGroupGradingQuery": "grading",
-    "SubmissionGroupGradingUpdate": "grading",
-    "SubmissionGroupInterface": "submission_groups",
-    "SubmissionGroupList": "submission_groups",
-    "SubmissionGroupMemberBasic": "student_course_contents",
-    "SubmissionGroupMemberCreate": "submission_group_members",
-    "SubmissionGroupMemberGet": "submission_group_members",
-    "SubmissionGroupMemberInterface": "submission_group_members",
-    "SubmissionGroupMemberList": "submission_group_members",
-    "SubmissionGroupMemberProperties": "submission_group_members",
-    "SubmissionGroupMemberQuery": "submission_group_members",
-    "SubmissionGroupMemberUpdate": "submission_group_members",
-    "SubmissionGroupProperties": "submission_groups",
-    "SubmissionGroupQuery": "submission_groups",
-    "SubmissionGroupRepository": "student_course_contents",
-    "SubmissionGroupStudentGet": "student_course_contents",
-    "SubmissionGroupStudentList": "student_course_contents",
-    "SubmissionGroupStudentQuery": "submission_groups",
-    "SubmissionGroupUpdate": "submission_groups",
-    "SubmissionGroupWithGrading": "submission_groups",
-    "SubmissionInterface": "submissions",
-    "SubmissionListItem": "submissions",
-    "SubmissionQuery": "submissions",
-    "SubmissionReviewCreate": "artifacts",
-    "SubmissionReviewDetail": "artifacts",
-    "SubmissionReviewInterface": "artifacts",
-    "SubmissionReviewListItem": "artifacts",
-    "SubmissionReviewQuery": "artifacts",
-    "SubmissionReviewUpdate": "artifacts",
-    "SubmissionUploadResponseModel": "submissions",
-    "SubmissionUploadedFile": "submissions",
-    "TaskInfo": "tasks",
-    "TaskResponse": "system",
-    "TaskResult": "tasks",
-    "TaskStatus": "tasks",
-    "TaskSubmission": "tasks",
-    "TaskTrackerEntry": "tasks",
-    "TestCreate": "test_jobs",
-    "TestDependency": "codeability_meta",
-    "TestJob": "test_jobs",
-    "TokenRefreshRequest": "auth",
-    "TokenRefreshResponse": "auth",
-    "TutorCourseMemberCourseContent": "tutor_course_members",
-    "TutorCourseMemberGet": "tutor_course_members",
-    "TutorCourseMemberList": "tutor_course_members",
-    "TutorGradeCreate": "tutor_grading",
-    "TutorGradeResponse": "tutor_grading",
-    "TutorSubmissionGroupGet": "tutor_submission_groups",
-    "TutorSubmissionGroupList": "tutor_submission_groups",
-    "TutorSubmissionGroupMember": "tutor_submission_groups",
-    "TutorSubmissionGroupQuery": "tutor_submission_groups",
-    "UnassignExampleResponse": "lecturer_deployments",
-    "UserCreate": "users",
-    "UserGet": "users",
-    "UserGroupCreate": "user_groups",
-    "UserGroupGet": "user_groups",
-    "UserGroupInterface": "user_groups",
-    "UserGroupList": "user_groups",
-    "UserGroupQuery": "user_groups",
-    "UserGroupUpdate": "user_groups",
-    "UserInterface": "users",
-    "UserList": "users",
-    "UserManagerResetPasswordRequest": "password_management",
-    "UserPassword": "users",
-    "UserQuery": "users",
-    "UserRegistrationRequest": "auth",
-    "UserRegistrationResponse": "auth",
-    "UserRoleCreate": "user_roles",
-    "UserRoleGet": "user_roles",
-    "UserRoleInterface": "user_roles",
-    "UserRoleList": "user_roles",
-    "UserRoleQuery": "user_roles",
-    "UserRoleUpdate": "user_roles",
-    "UserUpdate": "users",
-}
+# ---------------------------------------------------------------------------
+# Schema resolution
+# ---------------------------------------------------------------------------
+#
+# Schema names in the OpenAPI spec are bare class names ("CourseGet"); to emit an
+# import for one, the generator needs the module that defines it. That mapping
+# used to be a hand-maintained literal dict, and it rotted quietly: a schema
+# missing from it produced an untyped `Dict[str, Any]` return and — far worse —
+# a request body with no `data` parameter at all, i.e. a method that could never
+# send its payload. The index is now derived by importing computor_types and
+# reading each class's own `__module__`, so it cannot fall behind the DTOs.
 
-# Known enum types (these use constructor instead of model_validate)
-ENUM_TYPES = {
-    "TaskStatus",
-    "GradingStatus",
-    "OrganizationType",
-    "GroupType",
-}
+
+class SchemaIndex:
+    """DTO class name -> the computor_types module that defines it."""
+
+    def __init__(
+        self,
+        by_name: Dict[str, str],
+        ambiguous: Dict[str, List[str]],
+        enums: Set[str],
+    ):
+        self.by_name = by_name
+        self.ambiguous = ambiguous
+        self.enums = enums
+
+    def module_for(self, schema_name: str) -> Optional[str]:
+        return self.by_name.get(schema_name)
+
+    def is_enum(self, schema_name: str) -> bool:
+        return schema_name in self.enums
+
+
+@lru_cache(maxsize=1)
+def build_schema_index() -> SchemaIndex:
+    """Index every pydantic model and enum exported by ``computor_types``.
+
+    Walks the package, imports each module and records ``cls.__module__`` — the
+    *defining* module, so a class re-exported through a deprecation shim still
+    resolves to its real home. A name defined in two different modules is left
+    unresolved rather than guessed at.
+
+    Raises:
+        RuntimeError: If any computor_types module fails to import. A partial
+            index would silently drop schemas, which is the exact failure mode
+            this replaced.
+    """
+    import computor_types
+
+    found: Dict[str, Set[str]] = defaultdict(set)
+    enums: Set[str] = set()
+    failed: List[Tuple[str, str]] = []
+
+    for mod_info in pkgutil.walk_packages(computor_types.__path__, prefix="computor_types."):
+        try:
+            module = importlib.import_module(mod_info.name)
+        except Exception as e:
+            failed.append((mod_info.name, f"{type(e).__name__}: {e}"))
+            continue
+
+        for obj in vars(module).values():
+            if not inspect.isclass(obj) or not issubclass(obj, (BaseModel, Enum)):
+                continue
+            # Skip pydantic's own bases and anything re-exported from outside.
+            if not obj.__module__.startswith("computor_types."):
+                continue
+            found[obj.__name__].add(obj.__module__)
+            if issubclass(obj, Enum):
+                enums.add(obj.__name__)
+
+    if failed:
+        raise RuntimeError(
+            "Could not import these computor_types modules, so the schema index "
+            "would be incomplete:\n"
+            + "\n".join(f"  {name}: {err}" for name, err in failed)
+        )
+
+    by_name = {name: next(iter(mods)) for name, mods in found.items() if len(mods) == 1}
+    ambiguous = {name: sorted(mods) for name, mods in found.items() if len(mods) > 1}
+    return SchemaIndex(by_name, ambiguous, enums)
+
+
+# Schemas the generator deliberately never imports: FastAPI's own error envelope
+# and the `Body_*` wrappers it synthesises for multipart form endpoints.
+_INTERNAL_SCHEMA_NAMES = frozenset({"HTTPValidationError", "ValidationError"})
+
+
+def is_internal_schema(schema_name: str) -> bool:
+    """True for FastAPI-internal schemas that have no computor_types counterpart."""
+    return schema_name in _INTERNAL_SCHEMA_NAMES or schema_name.startswith("Body_")
 
 
 def is_enum_type(schema_name: str) -> bool:
-    """Check if a schema name is a known enum type."""
-    return schema_name in ENUM_TYPES
+    """Enums are constructed (``Status(value)``), not ``model_validate``d."""
+    return build_schema_index().is_enum(schema_name)
 
 
 def map_schema_to_import(schema_name: str) -> Optional[Tuple[str, str]]:
-    """Map a schema name to its import path."""
-    if not schema_name:
+    """Map a schema name to ``(module, class_name)``, or None if not importable."""
+    if not schema_name or is_internal_schema(schema_name):
+        return None
+    module = build_schema_index().module_for(schema_name)
+    if module is None:
+        return None
+    return (module, schema_name)
+
+
+def _is_binary_property(prop: Dict[str, Any]) -> bool:
+    """True when a form property is a file upload rather than a scalar field."""
+    if prop.get("format") == "binary":
+        return True
+    # Optional uploads arrive as anyOf[{binary}, {null}]; repeated ones as arrays.
+    for variant in prop.get("anyOf", []):
+        if variant.get("format") == "binary":
+            return True
+    return prop.get("items", {}).get("format") == "binary"
+
+
+def get_form_body(
+    operation: Dict[str, Any],
+    schemas: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """Describe a multipart / urlencoded request body, if the operation has one.
+
+    FastAPI synthesises a ``Body_*`` wrapper schema whose properties are the
+    individual form fields, with ``format: "binary"`` marking file uploads.
+    That wrapper has no computor_types counterpart, which is why these bodies
+    used to be dropped entirely.
+
+    Returns ``{"content_type", "files", "fields"}`` — ``files`` and ``fields``
+    being lists of ``(name, is_required)`` — or None when the body is not a form.
+    """
+    content = operation.get("requestBody", {}).get("content", {})
+    form_type = next(
+        (
+            ct for ct in content
+            if ct.startswith("multipart/") or ct == "application/x-www-form-urlencoded"
+        ),
+        None,
+    )
+    if form_type is None:
         return None
 
-    # Skip internal FastAPI/Pydantic schemas
-    if schema_name in ["HTTPValidationError", "ValidationError"] or schema_name.startswith("Body_"):
-        return None
+    ref = content[form_type].get("schema", {}).get("$ref", "")
+    body_schema = schemas.get(ref.split("/")[-1], {})
+    required = set(body_schema.get("required", []))
 
-    # Skip schemas with namespaced names (e.g., computor_types__deployment__AssignExampleRequest)
-    if "__" in schema_name:
-        return None
+    files: List[Tuple[str, bool]] = []
+    fields: List[Tuple[str, bool]] = []
+    for name, prop in body_schema.get("properties", {}).items():
+        target = files if _is_binary_property(prop) else fields
+        target.append((name, name in required))
 
-    # Look up in the known mapping
-    if schema_name in SCHEMA_TO_MODULE:
-        module = SCHEMA_TO_MODULE[schema_name]
-        return (f"computor_types.{module}", schema_name)
+    return {"content_type": form_type, "files": files, "fields": fields}
 
-    return None
+
+def has_json_body(operation: Dict[str, Any]) -> bool:
+    """True when the operation declares a JSON request body of any shape."""
+    return "application/json" in operation.get("requestBody", {}).get("content", {})
+
+
+def _path_expr(path: str) -> str:
+    """Render a request path as a Python literal.
+
+    Only paths that actually interpolate a parameter get an f-prefix; a bare
+    ``f"/messages"`` is an f-string with no placeholders (ruff F541).
+    """
+    return f'f"{path}"' if "{" in path else f'"{path}"'
+
+
+def _form_dict_expr(entries: List[Tuple[str, bool]]) -> str:
+    """Render form entries as a dict expression, dropping unset optional ones."""
+    literal = "{" + ", ".join(f'"{name}": {name}' for name, _ in entries) + "}"
+    if all(required for _, required in entries):
+        return literal
+    return "{k: v for k, v in " + literal + ".items() if v is not None}"
 
 
 def group_operations_by_tag(spec: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
@@ -668,13 +418,19 @@ def generate_method(
     operation: Dict[str, Any],
     operation_id: str,
     tag: str,
+    schemas: Dict[str, Any],
 ) -> Tuple[str, Set[Tuple[str, str]]]:
-    """Generate a single method for an endpoint."""
+    """Generate a single method for an endpoint.
+
+    Args:
+        schemas: ``components.schemas`` from the spec, needed to expand the
+            ``Body_*`` wrappers FastAPI synthesises for form endpoints.
+    """
     imports = set()
 
     # Determine base segments from tag
     base_segments = tag.replace("_", "-").split("-")
-    method_name = path_to_method_name(path, method, operation_id, base_segments)
+    method_name = path_to_method_name(path, method, operation, base_segments)
 
     # Avoid duplicate method names
     path_params = extract_path_params(path)
@@ -682,26 +438,49 @@ def generate_method(
     # Get schemas
     request_schema = get_request_schema(operation)
     response_schema, is_list_response, is_binary_response = get_response_schema(operation)
+    form_body = get_form_body(operation, schemas)
 
-    # Collect imports
-    if request_schema:
-        import_info = map_schema_to_import(request_schema)
-        if import_info:
-            imports.add(import_info)
-
+    # Collect imports. The request DTO is only imported when its parameter is
+    # actually emitted — FastAPI attaches a requestBody to some GET routes
+    # (a query model with a nested BaseModel field), which would otherwise
+    # leave an unused import behind.
     if response_schema:
         import_info = map_schema_to_import(response_schema)
         if import_info:
             imports.add(import_info)
 
-    # Build parameters
+    # Build parameters. Required ones must precede defaulted ones, so the two
+    # groups are collected separately and joined at the end.
     params = ["self"]
+    optional_params: List[str] = []
     for pp in path_params:
         params.append(f"{pp}: str")
 
-    # Only add data parameter for methods that use request body (not GET/DELETE)
-    if request_schema and map_schema_to_import(request_schema) and method in ["POST", "PUT", "PATCH"]:
+    # DELETE is included: /documents/files and /documents/directories both
+    # require a body, and omitting it produced methods that always 400.
+    takes_body = method in ["POST", "PUT", "PATCH", "DELETE"]
+    typed_body = bool(request_schema and map_schema_to_import(request_schema))
+
+    if takes_body and form_body:
+        # Multipart / urlencoded: one parameter per form field, uploads as bytes.
+        for name, required in form_body["files"]:
+            if required:
+                params.append(f"{name}: bytes")
+            else:
+                optional_params.append(f"{name}: Optional[bytes] = None")
+        for name, required in form_body["fields"]:
+            if required:
+                params.append(f"{name}: str")
+            else:
+                optional_params.append(f"{name}: Optional[str] = None")
+    elif takes_body and typed_body:
         params.append(f"data: Union[{request_schema}, Dict[str, Any]]")
+        imports.add(map_schema_to_import(request_schema))
+    elif takes_body and has_json_body(operation):
+        # A body with no named schema (the endpoint declares a bare ``dict``).
+        # Emit it untyped rather than omitting it — a method that cannot send
+        # its payload is worse than one that sends an unchecked one.
+        params.append("data: Dict[str, Any]")
 
     # Query params (skip user_id as it's auto-injected)
     query_params = []
@@ -712,9 +491,22 @@ def generate_method(
             if pname not in ["skip", "limit"]:
                 query_params.append(pname)
 
-    # Add query parameter for list endpoints to accept Query objects
+    # A "list" method is only *paginated* when the response really is an array
+    # of a known DTO. GET /user is named list but returns a single UserGet, and
+    # must keep its plain shape.
+    is_paginated_list = (
+        method_name == "list"
+        and is_list_response
+        and bool(response_schema and map_schema_to_import(response_schema))
+    )
+
     if method_name == "list":
-        params.append("query: Optional[BaseModel] = None")
+        if is_paginated_list:
+            optional_params.insert(0, "skip: int = 0")
+            optional_params.insert(1, "limit: int = 100")
+        optional_params.append("query: Optional[BaseModel] = None")
+
+    params.extend(optional_params)
 
     # Return type
     if is_binary_response:
@@ -724,7 +516,7 @@ def generate_method(
             return_type = f"List[{response_schema}]"
         else:
             return_type = response_schema
-    elif method == "DELETE" or operation.get("responses", {}).get("204"):
+    elif "204" in operation.get("responses", {}) or method == "DELETE":
         return_type = "None"
     else:
         return_type = "Dict[str, Any]"
@@ -733,7 +525,7 @@ def generate_method(
     docstring = operation.get("summary", f"{method} {path}")
     path_formatted = path
     for pp in path_params:
-        path_formatted = path_formatted.replace(f"{{{pp}}}", "{" + pp + "}")
+        path_formatted = path_formatted.replace(f"{{{pp}}}", "{quote_path(" + pp + ")}")
 
     lines = [
         f"    async def {method_name}(",
@@ -746,27 +538,84 @@ def generate_method(
         f'        """{docstring}"""',
     ])
 
-    # HTTP call
+    # HTTP call. Methods that return nothing must not bind `response` — an
+    # unused local (ruff F841) in every archive/unarchive/mark-read method.
+    assign = "" if return_type == "None" else "response = "
     http_method = method.lower()
     if http_method == "get":
+        if is_paginated_list:
+            # list() stays a plain List[...] for callers that just want rows;
+            # list_page() additionally reports the X-Total-Count total so
+            # pagination can terminate correctly.
+            arg_list = "skip=skip, limit=limit, query=query, **kwargs"
+            lines = [
+                f"    async def {method_name}(",
+                "        self,",
+                "        skip: int = 0,",
+                "        limit: int = 100,",
+                "        query: Optional[BaseModel] = None,",
+                "        **kwargs: Any,",
+                f"    ) -> {return_type}:",
+                f'        """{docstring}"""',
+                f"        page = await self.{method_name}_page({arg_list})",
+                "        return page.items",
+                "",
+                f"    async def {method_name}_page(",
+                "        self,",
+                "        skip: int = 0,",
+                "        limit: int = 100,",
+                "        query: Optional[BaseModel] = None,",
+                "        **kwargs: Any,",
+                f"    ) -> Page[{response_schema}]:",
+                f'        """{docstring} (one page, with the total row count)."""',
+                "        params = query.model_dump(mode=\"json\", exclude_none=True) if query else {}",
+                "        params.update({\"skip\": skip, \"limit\": limit})",
+                "        params.update(kwargs)",
+                f'        response = await self._http.get({_path_expr(path_formatted)}, params=params)',
+                f"        return Page.from_response(response, {response_schema}, skip=skip, limit=limit)",
+            ]
+            return "\n".join(lines), imports
         if method_name == "list":
-            lines.append(f'        params = query.model_dump(exclude_none=True) if query else {{}}'  )
+            lines.append(f'        params = query.model_dump(mode="json", exclude_none=True) if query else {{}}'  )
             lines.append(f'        params.update(kwargs)')
             lines.append(f'        response = await self._http.get(')
-            lines.append(f'            f"{path_formatted}",')
+            lines.append(f'            {_path_expr(path_formatted)},')
             lines.append(f'            params=params,')
             lines.append('        )')
         else:
-            lines.append(f'        response = await self._http.get(f"{path_formatted}", params=kwargs)')
+            lines.append(f'        {assign}await self._http.get({_path_expr(path_formatted)}, params=kwargs)')
     elif http_method in ["post", "patch", "put"]:
-        if request_schema and map_schema_to_import(request_schema):
-            lines.append(f'        response = await self._http.{http_method}(f"{path_formatted}", json_data=data, params=kwargs)')
+        if form_body:
+            call_args = []
+            if form_body["files"]:
+                lines.append("        files = " + _form_dict_expr(form_body["files"]))
+                call_args.append("files=files")
+            if form_body["fields"]:
+                lines.append("        form_fields = " + _form_dict_expr(form_body["fields"]))
+                call_args.append("data=form_fields")
+            joined = ", ".join(call_args)
+            lines.append(
+                f'        {assign}await self._http.{http_method}('
+                f'{_path_expr(path_formatted)}, {joined}, params=kwargs)'
+            )
+        elif typed_body or has_json_body(operation):
+            lines.append(f'        {assign}await self._http.{http_method}({_path_expr(path_formatted)}, json_data=data, params=kwargs)')
         else:
-            lines.append(f'        response = await self._http.{http_method}(f"{path_formatted}", params=kwargs)')
+            lines.append(f'        {assign}await self._http.{http_method}({_path_expr(path_formatted)}, params=kwargs)')
     elif http_method == "delete":
-        lines.append(f'        await self._http.delete(f"{path_formatted}", params=kwargs)')
-        lines.append('        return')
-        return "\n".join(lines), imports
+        body_arg = "json_data=data, " if (typed_body or has_json_body(operation)) else ""
+        if return_type == "None":
+            lines.append(
+                f'        await self._http.delete({_path_expr(path_formatted)}, {body_arg}params=kwargs)'
+            )
+            lines.append('        return')
+            return "\n".join(lines), imports
+        # A DELETE that declares a response body (e.g. the comments endpoints,
+        # which return the refreshed list) must actually parse and return it;
+        # this used to return None behind a lying annotation.
+        lines.append(
+            f'        response = await self._http.delete({_path_expr(path_formatted)}, {body_arg}params=kwargs)'
+        )
 
     # Parse response
     if is_binary_response:
@@ -795,9 +644,34 @@ def generate_method(
     return "\n".join(lines), imports
 
 
+def disambiguate_method_name(
+    method_name: str,
+    path: str,
+    taken: Set[str],
+) -> str:
+    """Make ``method_name`` unique using the route's own path parameters.
+
+    Two routes only collide when they share a tag, verb and subject, which means
+    they differ in their parameters — so the parameter names are what tells them
+    apart. Deriving the suffix from the path (rather than a positional counter
+    or a truncated slice of it, which is where ``get_urse_member_id_...`` came
+    from) keeps the name stable no matter what order routes are processed in.
+    """
+    for param in reversed(extract_path_params(path)):
+        candidate = sanitize_method_name(f"{method_name}_by_{param}")
+        if candidate not in taken:
+            return candidate
+
+    suffix = 2
+    while f"{method_name}_{suffix}" in taken:
+        suffix += 1
+    return f"{method_name}_{suffix}"
+
+
 def generate_client_class(
     tag: str,
     operations: List[Dict[str, Any]],
+    schemas: Dict[str, Any],
 ) -> Tuple[str, Set[Tuple[str, str]], str]:
     """Generate a complete client class for a tag."""
     class_name = snake_to_pascal(tag) + "Client"
@@ -806,31 +680,32 @@ def generate_client_class(
     methods = []
     seen_method_names = set()
 
-    for op in operations:
+    # Sort by route, not spec order, so the emitted file (and therefore any
+    # collision handling below) does not shift when routes are re-registered.
+    for op in sorted(operations, key=lambda o: (o["path"], o["method"])):
         method_code, imports = generate_method(
             op["path"],
             op["method"],
             op["operation"],
             op["operation_id"],
             tag,
+            schemas,
         )
 
-        # Extract method name to check for duplicates
         match = re.search(r"async def (\w+)\(", method_code)
         if match:
             method_name = match.group(1)
             if method_name in seen_method_names:
-                # Add HTTP method and path hint to make unique
-                http_method = op["method"].lower()
-                path_hint = sanitize_method_name(op["path"].replace("/", "_").replace("{", "").replace("}", ""))
-                # Use HTTP method as prefix to disambiguate
-                new_name = f"{http_method}_{method_name}"
-                if new_name in seen_method_names:
-                    # Also add path hint
-                    new_name = f"{http_method}_{path_hint[-30:]}" if len(path_hint) > 30 else f"{http_method}_{path_hint}"
-                new_name = sanitize_method_name(new_name)
-                method_code = method_code.replace(f"async def {method_name}(", f"async def {new_name}(")
-                method_name = new_name
+                unique = disambiguate_method_name(method_name, op["path"], seen_method_names)
+                method_code = method_code.replace(
+                    f"async def {method_name}(", f"async def {unique}("
+                )
+                # list_page() companions carry the same stem.
+                method_code = method_code.replace(
+                    f"async def {method_name}_page(", f"async def {unique}_page("
+                )
+                method_code = method_code.replace(f"self.{method_name}_page(", f"self.{unique}_page(")
+                method_name = unique
             seen_method_names.add(method_name)
 
         methods.append(method_code)
@@ -854,13 +729,27 @@ def generate_client_class(
     return "\n".join(lines), all_imports, class_name
 
 
-def generate_file(tag: str, operations: List[Dict[str, Any]]) -> Tuple[str, str]:
+def generate_file(
+    tag: str,
+    operations: List[Dict[str, Any]],
+    schemas: Dict[str, Any],
+) -> Tuple[str, str]:
     """Generate a complete Python file for a tag."""
-    class_code, imports, class_name = generate_client_class(tag, operations)
+    class_code, imports, class_name = generate_client_class(tag, operations, schemas)
 
     imports_by_module = defaultdict(set)
     for module, name in imports:
         imports_by_module[module].add(name)
+
+    # Import only what the body references — a fixed import line leaves unused
+    # names in most files (ruff F401), which buries any genuine finding.
+    # Strip docstrings first: """List Student Workspaces""" is not a use of
+    # typing.List, but a bare name search cannot tell the difference.
+    code_only = re.sub(r'"""(?:.|\n)*?"""', "", class_code)
+    typing_names = [
+        name for name in ("Any", "Dict", "List", "Optional", "Union")
+        if re.search(rf"\b{name}\b", code_only)
+    ]
 
     lines = [
         '"""',
@@ -871,38 +760,137 @@ def generate_file(tag: str, operations: List[Dict[str, Any]]) -> Tuple[str, str]
         'Run `bash generate.sh python-client` to regenerate.',
         '"""',
         '',
-        'from typing import Any, Dict, List, Optional, Union',
-        '',
-        'from pydantic import BaseModel',
-        '',
     ]
+    if typing_names:
+        lines.append(f"from typing import {', '.join(typing_names)}")
+        lines.append('')
 
+    # Third-party block, alphabetically: computor_types then pydantic. Emitting
+    # pydantic first leaves every generated file failing ruff's I001.
+    third_party = []
     for module in sorted(imports_by_module.keys()):
         names = sorted(imports_by_module[module])
         if len(names) == 1:
-            lines.append(f'from {module} import {names[0]}')
+            third_party.append(f'from {module} import {names[0]}')
         else:
-            lines.append(f'from {module} import (')
-            for name in names:
-                lines.append(f'    {name},')
-            lines.append(')')
+            third_party.append(f'from {module} import (')
+            third_party.extend(f'    {name},' for name in names)
+            third_party.append(')')
+    if re.search(r"\bBaseModel\b", code_only):
+        third_party.append('from pydantic import BaseModel')
+    if third_party:
+        lines.extend(third_party)
+        lines.append('')
 
-    lines.extend([
-        '',
-        'from computor_client.http import AsyncHTTPClient',
-        '',
-        '',
-        class_code,
-    ])
+    # First-party block.
+    lines.append('from computor_client.http import AsyncHTTPClient')
+    if "Page[" in class_code:
+        lines.append('from computor_client.pagination import Page')
+    if "quote_path(" in class_code:
+        lines.append('from computor_client.urls import quote_path')
+    lines.extend(['', '', class_code])
 
     return "\n".join(lines), class_name
 
 
-def main(output_dir: Optional[Path] = None, spec_url: Optional[str] = None):
+def collect_unresolvable_schemas(spec: Dict[str, Any]) -> List[Tuple[str, str, str]]:
+    """Find *named* schemas with no importable computor_types counterpart.
+
+    These are the dangerous ones: the spec says "this is a `FooCreate`" but the
+    generator cannot import ``FooCreate``, so it degrades the type. Bodies that
+    were never named at all (inline objects, multipart forms) are a different,
+    milder case — see :func:`collect_untyped_bodies`.
+
+    Returns ``(schema_name, "METHOD /path", "request"|"response")`` tuples,
+    sorted and de-duplicated.
+    """
+    found: Set[Tuple[str, str, str]] = set()
+
+    for path, methods in spec.get("paths", {}).items():
+        for method, operation in methods.items():
+            if method not in ["get", "post", "put", "patch", "delete"]:
+                continue
+            where = f"{method.upper()} {path}"
+
+            request_schema = get_request_schema(operation)
+            if request_schema and not is_internal_schema(request_schema):
+                if not map_schema_to_import(request_schema):
+                    found.add((request_schema, where, "request"))
+
+            response_schema, _, _ = get_response_schema(operation)
+            if response_schema and not is_internal_schema(response_schema):
+                if not map_schema_to_import(response_schema):
+                    found.add((response_schema, where, "response"))
+
+    return sorted(found)
+
+
+def collect_untyped_bodies(spec: Dict[str, Any]) -> List[Tuple[str, str]]:
+    """Find request bodies that carry no named schema to type them with.
+
+    Two shapes land here: an endpoint declaring a bare ``dict`` (FastAPI emits
+    an anonymous ``{"type": "object"}``), and multipart/form endpoints (FastAPI
+    synthesises a ``Body_*`` wrapper). Both are generatable — the body is
+    emitted untyped — but they lose compile-time checking, so they are always
+    reported rather than passing silently.
+
+    Returns sorted ``("METHOD /path", content_type)`` tuples.
+    """
+    found: Set[Tuple[str, str]] = set()
+
+    for path, methods in spec.get("paths", {}).items():
+        for method, operation in methods.items():
+            if method not in ["post", "put", "patch"]:
+                continue
+            content = operation.get("requestBody", {}).get("content", {})
+            if not content or get_request_schema(operation):
+                continue
+            found.add((f"{method.upper()} {path}", ", ".join(sorted(content))))
+
+    return sorted(found)
+
+
+def format_unresolvable_report(unresolvable: List[Tuple[str, str, str]]) -> str:
+    """Build the abort message for named schemas the generator cannot import."""
+    index = build_schema_index()
+    lines = [
+        f"{len(unresolvable)} schema reference(s) could not be resolved to a "
+        "computor_types import:",
+        "",
+    ]
+    for name, where, kind in unresolvable:
+        note = ""
+        if name in index.ambiguous:
+            note = f"  (defined in more than one module: {', '.join(index.ambiguous[name])})"
+        lines.append(f"  {name}  <- {kind} of {where}{note}")
+    lines += [
+        "",
+        "Generating anyway would silently degrade these: a response falls back to",
+        "Dict[str, Any], and a *request* body loses its declared type.",
+        "",
+        "Usual causes:",
+        "  - the DTO lives in computor-backend instead of computor-types",
+        "    (see scripts/check_dto_location.py)",
+        "  - the same class name is defined in two computor_types modules",
+        "",
+        "Pass --allow-unresolved-schemas to generate regardless.",
+    ]
+    return "\n".join(lines)
+
+
+def main(
+    output_dir: Optional[Path] = None,
+    spec_url: Optional[str] = None,
+    allow_unresolved_schemas: bool = False,
+):
     """Main generator entry point.
 
     ``spec_url=None`` (default) builds the spec offline from the FastAPI app;
     pass a URL to fetch it from a running server instead.
+
+    Raises:
+        SystemExit: If any referenced schema cannot be resolved to a
+            computor_types import, unless ``allow_unresolved_schemas`` is set.
     """
     if output_dir is None:
         script_dir = Path(__file__).parent
@@ -918,6 +906,24 @@ def main(output_dir: Optional[Path] = None, spec_url: Optional[str] = None):
         print("Failed to load OpenAPI spec.")
         return []
 
+    unresolvable = collect_unresolvable_schemas(spec)
+    if unresolvable:
+        report = format_unresolvable_report(unresolvable)
+        if not allow_unresolved_schemas:
+            raise SystemExit(f"Aborting: {report}")
+        print(f"WARNING: {report}")
+        print()
+
+    untyped_bodies = collect_untyped_bodies(spec)
+    if untyped_bodies:
+        print(f"{len(untyped_bodies)} request body/bodies have no named schema and "
+              "will be generated untyped:")
+        for where, content_types in untyped_bodies:
+            print(f"  {where}  [{content_types}]")
+        print()
+
+    schemas = spec.get("components", {}).get("schemas", {})
+
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for file in output_dir.glob("*.py"):
@@ -932,6 +938,16 @@ def main(output_dir: Optional[Path] = None, spec_url: Optional[str] = None):
     generated_files = []
     all_clients = []
 
+    untagged = operations_by_tag.get("default", [])
+    if untagged:
+        print(
+            f"WARNING: {len(untagged)} operation(s) carry no OpenAPI tag and will "
+            "NOT be generated. Add `tags=[...]` to the route:"
+        )
+        for op in untagged:
+            print(f"  {op['method']} {op['path']}")
+        print()
+
     for tag in sorted(operations_by_tag.keys()):
         operations = operations_by_tag[tag]
         if tag in ["default"]:
@@ -940,16 +956,14 @@ def main(output_dir: Optional[Path] = None, spec_url: Optional[str] = None):
         filename = tag + ".py"
         output_file = output_dir / filename
 
-        try:
-            file_content, class_name = generate_file(tag, operations)
-            output_file.write_text(file_content + "\n")
-            generated_files.append(output_file)
-            all_clients.append((tag, class_name))
-            print(f"Generated {filename} ({len(operations)} endpoints)")
-        except Exception as e:
-            print(f"Failed to generate {filename}: {e}")
-            import traceback
-            traceback.print_exc()
+        # No try/except here on purpose: a tag that fails to generate used to
+        # be logged and skipped, leaving a client that imports cleanly but is
+        # missing whole endpoint groups. Fail the run instead.
+        file_content, class_name = generate_file(tag, operations, schemas)
+        output_file.write_text(file_content + "\n")
+        generated_files.append(output_file)
+        all_clients.append((tag, class_name))
+        print(f"Generated {filename} ({len(operations)} endpoints)")
 
     print()
 
@@ -1005,8 +1019,16 @@ if __name__ == "__main__":
         default=None,
         help="Override the endpoints output directory.",
     )
+    parser.add_argument(
+        "--allow-unresolved-schemas",
+        action="store_true",
+        help="Generate even when a schema cannot be resolved to a computor_types "
+             "import. Off by default: an unresolved request schema produces a "
+             "method with no body parameter, which can never send its payload.",
+    )
     args = parser.parse_args()
     main(
         output_dir=Path(args.output_dir) if args.output_dir else None,
         spec_url=args.url,
+        allow_unresolved_schemas=args.allow_unresolved_schemas,
     )

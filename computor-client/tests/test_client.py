@@ -4,11 +4,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from computor_client.client import ComputorClient
-from computor_client.exceptions import (
-    AuthenticationError,
-    InvalidCredentialsError,
-    ComputorClientError,
-)
+from computor_client.exceptions import ComputorClientError, NetworkError
 
 
 # ============================================================================
@@ -38,18 +34,6 @@ def authenticated_client(base_url):
     )
 
 
-@pytest.fixture
-def mock_login_response():
-    """Mock successful login response."""
-    return {
-        "access_token": "new-access-token",
-        "refresh_token": "new-refresh-token",
-        "expires_in": 3600,
-        "user_id": "user-123",
-        "token_type": "Bearer",
-    }
-
-
 # ============================================================================
 # Tests for Client Initialization
 # ============================================================================
@@ -63,7 +47,6 @@ class TestClientInitialization:
         client = ComputorClient(base_url=base_url)
         assert client.base_url == base_url
         assert not client.is_authenticated
-        assert client.user_id is None
 
     def test_initialization_with_tokens(self, base_url):
         """Test initialization with pre-existing tokens."""
@@ -84,6 +67,31 @@ class TestClientInitialization:
         )
         assert client._timeout == 60.0
         assert client._max_retries == 5
+
+    def test_api_token_becomes_the_x_api_token_header(self, base_url):
+        """API-token auth is the scheme services actually use."""
+        client = ComputorClient(base_url=base_url, api_token="ct_secret")
+        assert client.auth_headers["X-API-Token"] == "ct_secret"
+        # No bearer session is involved, so is_authenticated stays False.
+        assert not client.is_authenticated
+
+    def test_explicit_header_wins_over_api_token(self, base_url):
+        client = ComputorClient(
+            base_url=base_url,
+            api_token="ct_from_kwarg",
+            headers={"X-API-Token": "ct_from_headers"},
+        )
+        assert client.auth_headers["X-API-Token"] == "ct_from_headers"
+
+    def test_access_token_is_publicly_readable(self, base_url):
+        """Callers authenticating a side channel should not need private attrs."""
+        client = ComputorClient(base_url=base_url, access_token="bearer-abc")
+        assert client.access_token == "bearer-abc"
+        assert ComputorClient(base_url=base_url).access_token is None
+
+    def test_there_is_no_login_method(self, base_url):
+        """The API exposes no local credential exchange; the method is gone."""
+        assert not hasattr(ComputorClient(base_url=base_url), "login")
 
     def test_base_url_trailing_slash_removed(self):
         """Test that trailing slash is removed from base_url."""
@@ -113,35 +121,6 @@ class TestClientAuthentication:
     """Tests for client authentication methods."""
 
     @pytest.mark.asyncio
-    async def test_login_success(self, client, mock_login_response):
-        """Test successful login."""
-        mock_response = MagicMock()
-        mock_response.json.return_value = mock_login_response
-
-        with patch.object(client._http, "post", return_value=mock_response) as mock_post:
-            result = await client.login("testuser", "password123")
-
-        mock_post.assert_called_once_with(
-            "/auth/login",
-            json_data={"username": "testuser", "password": "password123"},
-            authenticated=False,
-        )
-        assert client.is_authenticated
-        assert client.user_id == "user-123"
-        assert result["access_token"] == "new-access-token"
-
-    @pytest.mark.asyncio
-    async def test_login_invalid_credentials(self, client):
-        """Test login with invalid credentials."""
-        with patch.object(
-            client._http,
-            "post",
-            side_effect=AuthenticationError("Invalid credentials"),
-        ):
-            with pytest.raises(InvalidCredentialsError):
-                await client.login("baduser", "badpass")
-
-    @pytest.mark.asyncio
     async def test_logout_success(self, authenticated_client):
         """Test successful logout."""
         mock_response = MagicMock()
@@ -151,7 +130,6 @@ class TestClientAuthentication:
             result = await authenticated_client.logout()
 
         assert not authenticated_client.is_authenticated
-        assert authenticated_client.user_id is None
         assert result["message"] == "Logged out"
 
     @pytest.mark.asyncio
@@ -182,7 +160,17 @@ class TestClientAuthentication:
         authenticated_client.clear_tokens()
 
         assert not authenticated_client.is_authenticated
-        assert authenticated_client.user_id is None
+
+    @pytest.mark.asyncio
+    async def test_refresh_access_token_is_public(self, authenticated_client):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"access_token": "rotated"}
+
+        with patch.object(authenticated_client._http, "post", return_value=mock_response):
+            token = await authenticated_client.refresh_access_token()
+
+        assert token == "rotated"
+        assert authenticated_client.access_token == "rotated"
 
     @pytest.mark.asyncio
     async def test_token_refresh_callback(self, authenticated_client):
@@ -331,17 +319,19 @@ class TestUtilityMethods:
 
     @pytest.mark.asyncio
     async def test_health_check_success(self, client):
-        """Test health check returns True when API is healthy."""
-        with patch.object(client._http, "get") as mock_get:
+        """Health check probes HEAD / — the only liveness route the API serves."""
+        with patch.object(client._http, "head") as mock_head:
             result = await client.health_check()
 
         assert result is True
-        mock_get.assert_called_once_with("/health", authenticated=False)
+        mock_head.assert_called_once_with("/", authenticated=False)
 
     @pytest.mark.asyncio
     async def test_health_check_failure(self, client):
         """Test health check returns False when API is unhealthy."""
-        with patch.object(client._http, "get", side_effect=Exception("Connection failed")):
+        with patch.object(
+            client._http, "head", side_effect=NetworkError("Connection failed")
+        ):
             result = await client.health_check()
 
         assert result is False
@@ -361,3 +351,36 @@ class TestUtilityMethods:
 
         assert result["id"] == "user-123"
         assert result["username"] == "testuser"
+
+
+class TestEndpointResolution:
+    """__getattr__ resolves endpoint clients lazily; it must not recurse."""
+
+    def test_resolves_and_caches_by_attribute_name(self, client):
+        first = client.courses
+        assert type(first).__name__ == "CoursesClient"
+        assert client.courses is first
+
+    @pytest.mark.parametrize("attribute,expected", [
+        ("auth", "AuthenticationClient"),
+        ("api_tokens", "TokensClient"),
+        ("course_families", "CourseFamiliesClient"),
+    ])
+    def test_aliases_and_snake_case(self, client, attribute, expected):
+        assert type(getattr(client, attribute)).__name__ == expected
+
+    def test_unknown_endpoint_raises_attribute_error(self, client):
+        with pytest.raises(AttributeError, match="No endpoint client found"):
+            client.not_an_endpoint
+
+    def test_copy_does_not_recurse(self, client):
+        """__getattr__ used to recurse on dunders probed by copy/pickle."""
+        import copy
+
+        copy.copy(client)
+
+    def test_attribute_access_before_init_does_not_recurse(self):
+        bare = ComputorClient.__new__(ComputorClient)
+        with pytest.raises(AttributeError):
+            bare.courses
+

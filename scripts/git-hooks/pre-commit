@@ -178,6 +178,36 @@ else
     echo -e "${YELLOW}⚠️  Python3 not found, skipping import check...${NC}"
 fi
 
+# Check that the committed Python client still matches the API spec. Only runs
+# when the commit touches something that could change it — regenerating the
+# spec means importing the whole backend, which is too slow for every commit.
+if echo "$STAGED_FILES" | grep -qE '^(computor-backend/src/computor_backend/(api|scripts)/|computor-types/src/|computor-client/src/computor_client/endpoints/)'; then
+    echo
+    echo "🔍 Checking generated Python client for drift..."
+    PYTHON_BIN="python3"
+    if [ -x ".venv/bin/python" ]; then
+        PYTHON_BIN=".venv/bin/python"
+    fi
+    if [ -f "scripts/check_client_drift.py" ]; then
+        if "$PYTHON_BIN" scripts/check_client_drift.py --quiet; then
+            echo -e "${GREEN}✅ Generated Python client is up to date.${NC}"
+        else
+            echo
+            echo -e "${RED}❌ Generated Python client is out of date! Commit blocked.${NC}"
+            echo
+            echo "To fix this:"
+            echo "  bash generate.sh python-client"
+            echo "  git add computor-client/src/computor_client/endpoints"
+            echo
+            echo "If you must skip this check (NOT RECOMMENDED):"
+            echo "  git commit --no-verify"
+            exit 1
+        fi
+    else
+        echo -e "${YELLOW}⚠️  Drift checker not found, skipping...${NC}"
+    fi
+fi
+
 echo
 echo -e "${GREEN}✅ All pre-commit checks passed!${NC}"
 exit 0

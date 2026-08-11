@@ -6,9 +6,7 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, List
 
 from computor_types.student_course_contents import (
     CourseContentStudentGet,
@@ -20,6 +18,7 @@ from computor_types.student_courses import (
 )
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.urls import quote_path
 
 
 class StudentsClient:
@@ -30,32 +29,32 @@ class StudentsClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def course_contents(
-        self,
-        course_content_id: str,
-        **kwargs: Any,
-    ) -> CourseContentStudentGet:
-        """Student Get Course Content Endpoint"""
-        response = await self._http.get(f"/students/course-contents/{course_content_id}", params=kwargs)
-        return CourseContentStudentGet.model_validate(response.json())
-
-    async def get_course_contents(
+    async def list_course_contents(
         self,
         **kwargs: Any,
     ) -> List[CourseContentStudentList]:
         """Student List Course Contents Endpoint"""
-        response = await self._http.get(f"/students/course-contents", params=kwargs)
+        response = await self._http.get("/students/course-contents", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [CourseContentStudentList.model_validate(item) for item in data]
         return []
 
-    async def courses(
+    async def get_course_contents(
+        self,
+        course_content_id: str,
+        **kwargs: Any,
+    ) -> CourseContentStudentGet:
+        """Student Get Course Content Endpoint"""
+        response = await self._http.get(f"/students/course-contents/{quote_path(course_content_id)}", params=kwargs)
+        return CourseContentStudentGet.model_validate(response.json())
+
+    async def list_courses(
         self,
         **kwargs: Any,
     ) -> List[CourseStudentList]:
         """Student List Courses Endpoint"""
-        response = await self._http.get(f"/students/courses", params=kwargs)
+        response = await self._http.get("/students/courses", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [CourseStudentList.model_validate(item) for item in data]
@@ -67,6 +66,6 @@ class StudentsClient:
         **kwargs: Any,
     ) -> CourseStudentGet:
         """Student Get Course Endpoint"""
-        response = await self._http.get(f"/students/courses/{course_id}", params=kwargs)
+        response = await self._http.get(f"/students/courses/{quote_path(course_id)}", params=kwargs)
         return CourseStudentGet.model_validate(response.json())
 

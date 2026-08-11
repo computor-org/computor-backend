@@ -1,7 +1,7 @@
 """Minimal DTOs for tutor testing - ephemeral test runs for debugging."""
 
 from typing import List, Optional, Literal, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 
 
@@ -61,3 +61,31 @@ class TutorTestArtifactList(BaseModel):
     test_id: str
     artifacts: List[TutorTestArtifactInfo] = []
     total_count: int = 0
+
+
+class TutorTestResultSummary(BaseModel):
+    """Test counts as reported by the testing framework."""
+    total: Optional[int] = None
+    passed: Optional[int] = None
+    failed: Optional[int] = None
+    skipped: Optional[int] = None
+
+
+class TutorTestResultSubmit(BaseModel):
+    """Body of ``POST /tutors/tests/{test_id}/results``.
+
+    Posted by the testing worker once a run finishes. The document is stored
+    verbatim as ``result.json`` in MinIO and handed back out again as
+    ``TutorTestGet.result_dict``, so unknown keys are *preserved* rather than
+    rejected — only the fields the backend itself reads are declared here.
+    Counts arrive either nested under ``summary`` or flat at the top level,
+    depending on the language runner; both are accepted.
+    """
+    model_config = ConfigDict(extra="allow")
+
+    summary: Optional[TutorTestResultSummary] = None
+    total: Optional[int] = None
+    passed: Optional[int] = None
+    failed: Optional[int] = None
+    result_value: Optional[float] = None
+    error: Optional[str] = None

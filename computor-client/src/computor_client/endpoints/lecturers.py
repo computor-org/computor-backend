@@ -6,9 +6,7 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, Dict, List, Union
 
 from computor_types.courses import (
     CourseGet,
@@ -25,8 +23,11 @@ from computor_types.lecturer_course_contents import (
 from computor_types.lecturer_deployments import (
     AssignExampleRequest,
     AssignExampleResponse,
+    CourseDeploymentGet,
     DeploymentGet,
     UnassignExampleResponse,
+    VersionUpgradeCreate,
+    VersionUpgradeGet,
 )
 from computor_types.lecturer_gitlab_sync import (
     GitLabSyncRequest,
@@ -34,6 +35,7 @@ from computor_types.lecturer_gitlab_sync import (
 )
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.urls import quote_path
 
 
 class LecturersClient:
@@ -44,45 +46,25 @@ class LecturersClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def courses(
-        self,
-        course_id: str,
-        **kwargs: Any,
-    ) -> CourseGet:
-        """Lecturer Get Courses Endpoint"""
-        response = await self._http.get(f"/lecturers/courses/{course_id}", params=kwargs)
-        return CourseGet.model_validate(response.json())
-
-    async def get_courses(
+    async def list_course_contents(
         self,
         **kwargs: Any,
-    ) -> List[CourseList]:
-        """Lecturer List Courses Endpoint"""
-        response = await self._http.get(f"/lecturers/courses", params=kwargs)
+    ) -> List[CourseContentLecturerList]:
+        """Lecturer List Course Contents Endpoint"""
+        response = await self._http.get("/lecturers/course-contents", params=kwargs)
         data = response.json()
         if isinstance(data, list):
-            return [CourseList.model_validate(item) for item in data]
+            return [CourseContentLecturerList.model_validate(item) for item in data]
         return []
 
-    async def course_contents(
+    async def get_course_contents(
         self,
         course_content_id: str,
         **kwargs: Any,
     ) -> CourseContentLecturerGet:
         """Lecturer Get Course Contents Endpoint"""
-        response = await self._http.get(f"/lecturers/course-contents/{course_content_id}", params=kwargs)
+        response = await self._http.get(f"/lecturers/course-contents/{quote_path(course_content_id)}", params=kwargs)
         return CourseContentLecturerGet.model_validate(response.json())
-
-    async def get_course_contents(
-        self,
-        **kwargs: Any,
-    ) -> List[CourseContentLecturerList]:
-        """Lecturer List Course Contents Endpoint"""
-        response = await self._http.get(f"/lecturers/course-contents", params=kwargs)
-        data = response.json()
-        if isinstance(data, list):
-            return [CourseContentLecturerList.model_validate(item) for item in data]
-        return []
 
     async def course_contents_assign_example(
         self,
@@ -91,17 +73,8 @@ class LecturersClient:
         **kwargs: Any,
     ) -> AssignExampleResponse:
         """Assign Example To Course Content"""
-        response = await self._http.post(f"/lecturers/course-contents/{course_content_id}/assign-example", json_data=data, params=kwargs)
+        response = await self._http.post(f"/lecturers/course-contents/{quote_path(course_content_id)}/assign-example", json_data=data, params=kwargs)
         return AssignExampleResponse.model_validate(response.json())
-
-    async def course_contents_deployment(
-        self,
-        course_content_id: str,
-        **kwargs: Any,
-    ) -> DeploymentGet:
-        """Get Course Content Deployment"""
-        response = await self._http.get(f"/lecturers/course-contents/{course_content_id}/deployment", params=kwargs)
-        return DeploymentGet.model_validate(response.json())
 
     async def delete_course_contents_deployment(
         self,
@@ -109,36 +82,17 @@ class LecturersClient:
         **kwargs: Any,
     ) -> UnassignExampleResponse:
         """Unassign Example From Course Content"""
-        await self._http.delete(f"/lecturers/course-contents/{course_content_id}/deployment", params=kwargs)
-        return
+        response = await self._http.delete(f"/lecturers/course-contents/{quote_path(course_content_id)}/deployment", params=kwargs)
+        return UnassignExampleResponse.model_validate(response.json())
 
-    async def courses_deployments(
+    async def get_course_contents_deployment(
         self,
-        course_id: str,
+        course_content_id: str,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Get Course Deployments Endpoint"""
-        response = await self._http.get(f"/lecturers/courses/{course_id}/deployments", params=kwargs)
-        return response.json()
-
-    async def courses_upgrade_versions(
-        self,
-        course_id: str,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Batch Upgrade Versions Endpoint"""
-        response = await self._http.post(f"/lecturers/courses/{course_id}/upgrade-versions", params=kwargs)
-        return response.json()
-
-    async def courses_validate(
-        self,
-        course_id: str,
-        data: Union[ContentValidationCreate, Dict[str, Any]],
-        **kwargs: Any,
-    ) -> ContentValidationGet:
-        """Validate Course Content Batch"""
-        response = await self._http.post(f"/lecturers/courses/{course_id}/validate", json_data=data, params=kwargs)
-        return ContentValidationGet.model_validate(response.json())
+    ) -> DeploymentGet:
+        """Get Course Content Deployment"""
+        response = await self._http.get(f"/lecturers/course-contents/{quote_path(course_content_id)}/deployment", params=kwargs)
+        return DeploymentGet.model_validate(response.json())
 
     async def course_members_sync_gitlab(
         self,
@@ -147,6 +101,55 @@ class LecturersClient:
         **kwargs: Any,
     ) -> GitLabSyncResult:
         """Sync Member Gitlab Permissions Endpoint"""
-        response = await self._http.post(f"/lecturers/course-members/{course_member_id}/sync-gitlab", json_data=data, params=kwargs)
+        response = await self._http.post(f"/lecturers/course-members/{quote_path(course_member_id)}/sync-gitlab", json_data=data, params=kwargs)
         return GitLabSyncResult.model_validate(response.json())
+
+    async def list_courses(
+        self,
+        **kwargs: Any,
+    ) -> List[CourseList]:
+        """Lecturer List Courses Endpoint"""
+        response = await self._http.get("/lecturers/courses", params=kwargs)
+        data = response.json()
+        if isinstance(data, list):
+            return [CourseList.model_validate(item) for item in data]
+        return []
+
+    async def get_courses(
+        self,
+        course_id: str,
+        **kwargs: Any,
+    ) -> CourseGet:
+        """Lecturer Get Courses Endpoint"""
+        response = await self._http.get(f"/lecturers/courses/{quote_path(course_id)}", params=kwargs)
+        return CourseGet.model_validate(response.json())
+
+    async def get_courses_deployments(
+        self,
+        course_id: str,
+        **kwargs: Any,
+    ) -> CourseDeploymentGet:
+        """Get Course Deployments Endpoint"""
+        response = await self._http.get(f"/lecturers/courses/{quote_path(course_id)}/deployments", params=kwargs)
+        return CourseDeploymentGet.model_validate(response.json())
+
+    async def courses_upgrade_versions(
+        self,
+        course_id: str,
+        data: Union[VersionUpgradeCreate, Dict[str, Any]],
+        **kwargs: Any,
+    ) -> VersionUpgradeGet:
+        """Batch Upgrade Versions Endpoint"""
+        response = await self._http.post(f"/lecturers/courses/{quote_path(course_id)}/upgrade-versions", json_data=data, params=kwargs)
+        return VersionUpgradeGet.model_validate(response.json())
+
+    async def courses_validate(
+        self,
+        course_id: str,
+        data: Union[ContentValidationCreate, Dict[str, Any]],
+        **kwargs: Any,
+    ) -> ContentValidationGet:
+        """Validate Course Content Batch"""
+        response = await self._http.post(f"/lecturers/courses/{quote_path(course_id)}/validate", json_data=data, params=kwargs)
+        return ContentValidationGet.model_validate(response.json())
 

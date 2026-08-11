@@ -12,7 +12,7 @@ from computor_backend.business_logic.crud import (
     update_entity as update_db,
     delete_entity as delete_db
 )
-from typing import Annotated, Optional
+from typing import Annotated, Iterable, Optional
 from computor_backend.api._pagination import paginated_list
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.database import get_db
@@ -176,21 +176,44 @@ class CrudRouter:
             return await filter_db(permissions, db, self.dto.model, params, self.dto.search, filters)
         return route
 
-    def register_routes(self, app: FastAPI):
-        
-        scope_name = self.path.replace("/","").replace("_"," ")
+    def register_routes(self, app: FastAPI, *, skip: Optional[Iterable[str]] = None):
+        """Register the generic CRUD routes and mount the router on ``app``.
 
-        self.router.add_api_route("", self.create(), methods=["POST"], 
+        Args:
+            app: The FastAPI application to mount on.
+            skip: Names of generated operations to omit — any of ``"create"``,
+                ``"get"``, ``"list"``, ``"update"``, ``"delete"``. Pass this
+                when the module hand-declares its own handler for that
+                operation: module-level decorators run at import time, so a
+                hand-written ``@router.delete("/{course_id}")`` is registered
+                *before* the generated ``DELETE /{id}`` and permanently
+                shadows it. Registering both leaves a dead route that codegen
+                still faithfully reproduces.
+        """
+
+        scope_name = self.path.replace("/","").replace("_"," ")
+        skipped = set(skip or ())
+        unknown = skipped - {"create", "get", "list", "update", "delete"}
+        if unknown:
+            raise ValueError(f"register_routes(skip=...) got unknown operations: {sorted(unknown)}")
+
+        if "create" not in skipped:
+            self.router.add_api_route("", self.create(), methods=["POST"],
                     status_code=status.HTTP_201_CREATED, name=f"{self.create.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_principal)])
-        self.router.add_api_route(f"/{{{CrudRouter.id_type}}}", self.get(), methods=["GET"], 
+        if "get" not in skipped:
+            self.router.add_api_route(f"/{{{CrudRouter.id_type}}}", self.get(), methods=["GET"],
                     status_code=status.HTTP_200_OK, name=f"{self.get.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_principal)])
-        self.router.add_api_route("", self.list(), methods=["GET"], 
+        if "list" not in skipped:
+            self.router.add_api_route("", self.list(), methods=["GET"],
                     status_code=status.HTTP_200_OK, name=f"{self.list.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_principal)])
-        self.router.add_api_route(f"/{{{CrudRouter.id_type}}}", self.update(), methods=["PATCH"], 
+        if "update" not in skipped:
+            self.router.add_api_route(f"/{{{CrudRouter.id_type}}}", self.update(), methods=["PATCH"],
                     status_code=status.HTTP_200_OK, name=f"{self.update.__name__} {scope_name.capitalize()}",dependencies=[Depends(get_current_principal)])
-        self.router.add_api_route(f"/{{{CrudRouter.id_type}}}", self.delete(), methods=["DELETE"], 
+        if "delete" not in skipped:
+            self.router.add_api_route(f"/{{{CrudRouter.id_type}}}", self.delete(), methods=["DELETE"],
                     status_code=status.HTTP_204_NO_CONTENT, name=f"{self.delete.__name__} {scope_name.capitalize()}", dependencies=[Depends(get_current_principal)])
-        
+
+
         archive_fun = self.archive()
 
         if archive_fun is not None:
