@@ -707,6 +707,7 @@ def get_status_head():
 @app.get(
     "/extensions-public",
     response_model=str,
+    tags=["extensions"],
 )
 async def get_public_extension_url():
     """Public endpoint to get extension download URL.
@@ -723,6 +724,7 @@ async def get_public_extension_url():
 @app.get(
     "/extensions-getting-started",
     response_model=str,
+    tags=["extensions"],
 )
 async def get_getting_started_url():
     """Public endpoint to get extension getting started guide URL.

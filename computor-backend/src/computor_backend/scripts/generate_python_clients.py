@@ -176,7 +176,9 @@ def get_response_schema(operation: Dict[str, Any]) -> Tuple[Optional[str], bool,
         Tuple of (schema_name, is_list, is_binary)
     """
     responses = operation.get("responses", {})
-    for status in ["200", "201"]:
+    # 202 covers the task-submission endpoints, which return a TaskResponse
+    # body that used to be typed as a bare dict.
+    for status in ["200", "201", "202"]:
         if status in responses:
             content = responses[status].get("content", {})
             # Check for binary responses (ZIP, octet-stream, etc.)
@@ -497,7 +499,7 @@ def generate_method(
             return_type = f"List[{response_schema}]"
         else:
             return_type = response_schema
-    elif method == "DELETE" or operation.get("responses", {}).get("204"):
+    elif "204" in operation.get("responses", {}) or method == "DELETE":
         return_type = "None"
     else:
         return_type = "Dict[str, Any]"
@@ -506,7 +508,7 @@ def generate_method(
     docstring = operation.get("summary", f"{method} {path}")
     path_formatted = path
     for pp in path_params:
-        path_formatted = path_formatted.replace(f"{{{pp}}}", "{" + pp + "}")
+        path_formatted = path_formatted.replace(f"{{{pp}}}", "{quote_path(" + pp + ")}")
 
     lines = [
         f"    async def {method_name}(",
@@ -582,9 +584,14 @@ def generate_method(
         else:
             lines.append(f'        response = await self._http.{http_method}(f"{path_formatted}", params=kwargs)')
     elif http_method == "delete":
-        lines.append(f'        await self._http.delete(f"{path_formatted}", params=kwargs)')
-        lines.append('        return')
-        return "\n".join(lines), imports
+        if return_type == "None":
+            lines.append(f'        await self._http.delete(f"{path_formatted}", params=kwargs)')
+            lines.append('        return')
+            return "\n".join(lines), imports
+        # A DELETE that declares a response body (e.g. the comments endpoints,
+        # which return the refreshed list) must actually parse and return it;
+        # this used to return None behind a lying annotation.
+        lines.append(f'        response = await self._http.delete(f"{path_formatted}", params=kwargs)')
 
     # Parse response
     if is_binary_response:
@@ -717,6 +724,8 @@ def generate_file(
     ])
     if "Page[" in class_code:
         lines.append('from computor_client.pagination import Page')
+    if "quote_path(" in class_code:
+        lines.append('from computor_client.urls import quote_path')
     lines.extend([
         '',
         '',
@@ -870,6 +879,16 @@ def main(
 
     generated_files = []
     all_clients = []
+
+    untagged = operations_by_tag.get("default", [])
+    if untagged:
+        print(
+            f"WARNING: {len(untagged)} operation(s) carry no OpenAPI tag and will "
+            "NOT be generated. Add `tags=[...]` to the route:"
+        )
+        for op in untagged:
+            print(f"  {op['method']} {op['path']}")
+        print()
 
     for tag in sorted(operations_by_tag.keys()):
         operations = operations_by_tag[tag]
