@@ -351,3 +351,36 @@ class TestUtilityMethods:
 
         assert result["id"] == "user-123"
         assert result["username"] == "testuser"
+
+
+class TestEndpointResolution:
+    """__getattr__ resolves endpoint clients lazily; it must not recurse."""
+
+    def test_resolves_and_caches_by_attribute_name(self, client):
+        first = client.courses
+        assert type(first).__name__ == "CoursesClient"
+        assert client.courses is first
+
+    @pytest.mark.parametrize("attribute,expected", [
+        ("auth", "AuthenticationClient"),
+        ("api_tokens", "TokensClient"),
+        ("course_families", "CourseFamiliesClient"),
+    ])
+    def test_aliases_and_snake_case(self, client, attribute, expected):
+        assert type(getattr(client, attribute)).__name__ == expected
+
+    def test_unknown_endpoint_raises_attribute_error(self, client):
+        with pytest.raises(AttributeError, match="No endpoint client found"):
+            client.not_an_endpoint
+
+    def test_copy_does_not_recurse(self, client):
+        """__getattr__ used to recurse on dunders probed by copy/pickle."""
+        import copy
+
+        copy.copy(client)
+
+    def test_attribute_access_before_init_does_not_recurse(self):
+        bare = ComputorClient.__new__(ComputorClient)
+        with pytest.raises(AttributeError):
+            bare.courses
+

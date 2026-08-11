@@ -18,6 +18,13 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
+# Attribute names whose PascalCase form does not match the generated class name,
+# because the OpenAPI tag differs from how callers refer to the endpoint.
+ENDPOINT_ALIASES = {
+    "AuthClient": "AuthenticationClient",
+    "ApiTokensClient": "TokensClient",
+}
+
 
 class ComputorClient:
     """
@@ -259,15 +266,7 @@ class ComputorClient:
     # Endpoint Clients
     # =========================================================================
 
-    def _get_endpoint_client(self, client_class: Type[T]) -> T:
-        """Get or create an endpoint client instance."""
-        class_name = client_class.__name__
-        if class_name not in self._endpoint_clients:
-            self._endpoint_clients[class_name] = client_class(self._http)
-        return self._endpoint_clients[class_name]
-
-    # Endpoint client properties are generated dynamically
-    # See __getattr__ for dynamic access
+    # Endpoint clients are resolved dynamically; see __getattr__.
 
     def __getattr__(self, name: str) -> Any:
         """
@@ -275,10 +274,10 @@ class ComputorClient:
 
         This allows accessing clients like `client.organizations` without
         explicitly importing them. The client classes are imported lazily
-        from the endpoints module.
+        from the endpoints module and cached per attribute name.
 
         Args:
-            name: Endpoint name (e.g., "organizations", "users", "courses", "auth")
+            name: Endpoint name (e.g., "organizations", "users", "courses")
 
         Returns:
             The endpoint client instance
@@ -286,55 +285,46 @@ class ComputorClient:
         Raises:
             AttributeError: If no client exists for the given name
         """
-        # Check if we've already cached this client
-        if name in self._endpoint_clients:
-            return self._endpoint_clients[name]
+        # __getattr__ runs for *any* missing attribute, including dunders probed
+        # by copy/pickle and anything touched before __init__ has finished. Both
+        # would recurse forever on the self._endpoint_clients lookup below.
+        if name.startswith("__") or "_endpoint_clients" not in self.__dict__:
+            raise AttributeError(
+                f"{type(self).__name__!r} object has no attribute {name!r}"
+            )
 
-        # Convert name to expected client class name
-        # e.g., "organizations" -> "OrganizationsClient"
-        # e.g., "course_families" -> "CourseFamiliesClient"
-        # e.g., "auth" -> "AuthenticationClient"
-        parts = name.split("_")
-        class_name = "".join(p.capitalize() for p in parts) + "Client"
+        cached = self._endpoint_clients.get(name)
+        if cached is not None:
+            return cached
 
-        # Try to import the client class
         try:
             from computor_client import endpoints
-
-            # First, try the exact name
-            client_class = getattr(endpoints, class_name, None)
-
-            # If not found, try some common aliases
-            if client_class is None:
-                aliases = {
-                    "AuthClient": "AuthenticationClient",
-                    "StorageClient": "StorageClient",
-                    "UserClient": "UserClient",
-                    "SystemClient": "SystemClient",
-                    # api_tokens -> TokensClient (tag is "tokens" but interface name is "api_tokens")
-                    "ApiTokensClient": "TokensClient",
-                }
-                actual_name = aliases.get(class_name)
-                if actual_name:
-                    client_class = getattr(endpoints, actual_name, None)
-
-            if client_class is None:
-                raise AttributeError(
-                    f"No endpoint client found for '{name}'. "
-                    f"Expected class: {class_name}"
-                )
-
-            # Create and cache the client instance
-            client = client_class(self._http)
-            self._endpoint_clients[name] = client
-            return client
-
         except ImportError as e:
             raise AttributeError(
                 f"Failed to import endpoint clients. "
                 f"Run 'bash generate.sh python-client' to generate them. "
                 f"Error: {e}"
+            ) from e
+
+        # "course_families" -> "CourseFamiliesClient"
+        class_name = "".join(part.capitalize() for part in name.split("_")) + "Client"
+        client_class = getattr(endpoints, class_name, None)
+
+        if client_class is None:
+            alias = ENDPOINT_ALIASES.get(class_name)
+            if alias:
+                client_class = getattr(endpoints, alias, None)
+
+        if client_class is None:
+            raise AttributeError(
+                f"No endpoint client found for {name!r} (looked for "
+                f"{class_name}). Available: "
+                f"{', '.join(sorted(getattr(endpoints, '__all__', [])))}"
             )
+
+        client = client_class(self._http)
+        self._endpoint_clients[name] = client
+        return client
 
     # =========================================================================
     # Lifecycle Management
