@@ -438,9 +438,12 @@ CrudRouter(GroupInterface).register_routes(app)
 # GET /sessions/me is matched before the generic GET /sessions/{id} route.
 app.include_router(session_router, tags=["sessions"])
 CrudRouter(SessionInterface).register_routes(app)
-course_router.register_routes(app)
-organization_router.register_routes(app)
-course_family_router.register_routes(app)
+# These three hand-declare a cascade-aware DELETE (see api/{courses,organizations,
+# course_families}.py), which shadows the generic one — skip it rather than
+# registering a second, unreachable route.
+course_router.register_routes(app, skip={"delete"})
+organization_router.register_routes(app, skip={"delete"})
+course_family_router.register_routes(app, skip={"delete"})
 CrudRouter(CourseGroupInterface).register_routes(app)
 from computor_backend.interfaces.course_member import guard_course_member_delete
 _course_member_router = CrudRouter(CourseMemberInterface)
