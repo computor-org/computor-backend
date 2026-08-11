@@ -425,7 +425,7 @@ class MentionableQuery(BaseModel):
 
 
 class MessageReadBulk(BaseModel):
-    """Body for ``POST /messages/reads`` — mark many messages read at once.
+    """Body for ``POST /messages/reads/bulk`` — mark many messages read at once.
 
     Ids the caller cannot see are skipped rather than rejecting the batch:
     a read sweep is best-effort, and a client learns nothing useful from
