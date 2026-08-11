@@ -41,13 +41,8 @@ from computor_client.http import (
     TokenAuthProvider,
 )
 
-# Base classes (for building custom clients)
-from computor_client.base import (
-    BaseEndpointClient,
-    ReadOnlyEndpointClient,
-    CRUDEndpointClient,
-    TypedEndpointClient,
-)
+# Pagination
+from computor_client.pagination import Page
 
 # Exceptions
 from computor_client.exceptions import (
@@ -95,11 +90,8 @@ __all__ = [
     "AsyncHTTPClient",
     "AuthProvider",
     "TokenAuthProvider",
-    # Base classes
-    "BaseEndpointClient",
-    "ReadOnlyEndpointClient",
-    "CRUDEndpointClient",
-    "TypedEndpointClient",
+    # Pagination
+    "Page",
     # Exceptions
     "ComputorClientError",
     "AuthenticationError",
