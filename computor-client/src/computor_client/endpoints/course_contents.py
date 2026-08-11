@@ -8,8 +8,6 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
-
 from computor_types.course_contents import (
     CourseContentCreate,
     CourseContentGet,
@@ -21,6 +19,7 @@ from computor_types.deployment import (
     DeploymentSummary,
     DeploymentWithHistory,
 )
+from pydantic import BaseModel
 
 from computor_client.http import AsyncHTTPClient
 from computor_client.pagination import Page
@@ -57,7 +56,7 @@ class CourseContentsClient:
         params = query.model_dump(mode="json", exclude_none=True) if query else {}
         params.update({"skip": skip, "limit": limit})
         params.update(kwargs)
-        response = await self._http.get(f"/course-contents", params=params)
+        response = await self._http.get("/course-contents", params=params)
         return Page.from_response(response, CourseContentList, skip=skip, limit=limit)
 
     async def create(
@@ -66,7 +65,7 @@ class CourseContentsClient:
         **kwargs: Any,
     ) -> CourseContentGet:
         """Create Course-Contents"""
-        response = await self._http.post(f"/course-contents", json_data=data, params=kwargs)
+        response = await self._http.post("/course-contents", json_data=data, params=kwargs)
         return CourseContentGet.model_validate(response.json())
 
     async def get_courses_deployment_summary(
@@ -149,7 +148,7 @@ class CourseContentsClient:
         **kwargs: Any,
     ) -> None:
         """Route Course-Contents"""
-        response = await self._http.patch(f"/course-contents/{quote_path(id)}/archive", params=kwargs)
+        await self._http.patch(f"/course-contents/{quote_path(id)}/archive", params=kwargs)
         return
 
     async def update_unarchive(
@@ -158,6 +157,6 @@ class CourseContentsClient:
         **kwargs: Any,
     ) -> None:
         """Unarchive Course-Contents"""
-        response = await self._http.patch(f"/course-contents/{quote_path(id)}/unarchive", params=kwargs)
+        await self._http.patch(f"/course-contents/{quote_path(id)}/unarchive", params=kwargs)
         return
 

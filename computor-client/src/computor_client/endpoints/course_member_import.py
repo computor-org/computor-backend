@@ -6,9 +6,7 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, Dict, Union
 
 from computor_types.course_member_import import (
     CourseMemberImportFileParseRequest,

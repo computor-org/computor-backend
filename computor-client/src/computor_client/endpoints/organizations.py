@@ -8,8 +8,6 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
-
 from computor_types.cascade_deletion import CascadeDeleteResult
 from computor_types.organizations import (
     OrganizationCreate,
@@ -18,6 +16,7 @@ from computor_types.organizations import (
     OrganizationUpdate,
     OrganizationUpdateTokenUpdate,
 )
+from pydantic import BaseModel
 
 from computor_client.http import AsyncHTTPClient
 from computor_client.pagination import Page
@@ -54,7 +53,7 @@ class OrganizationsClient:
         params = query.model_dump(mode="json", exclude_none=True) if query else {}
         params.update({"skip": skip, "limit": limit})
         params.update(kwargs)
-        response = await self._http.get(f"/organizations", params=params)
+        response = await self._http.get("/organizations", params=params)
         return Page.from_response(response, OrganizationList, skip=skip, limit=limit)
 
     async def create(
@@ -63,7 +62,7 @@ class OrganizationsClient:
         **kwargs: Any,
     ) -> OrganizationGet:
         """Create Organizations"""
-        response = await self._http.post(f"/organizations", json_data=data, params=kwargs)
+        response = await self._http.post("/organizations", json_data=data, params=kwargs)
         return OrganizationGet.model_validate(response.json())
 
     async def get(
@@ -91,7 +90,7 @@ class OrganizationsClient:
         **kwargs: Any,
     ) -> None:
         """Route Organizations"""
-        response = await self._http.patch(f"/organizations/{quote_path(id)}/archive", params=kwargs)
+        await self._http.patch(f"/organizations/{quote_path(id)}/archive", params=kwargs)
         return
 
     async def update_unarchive(
@@ -100,7 +99,7 @@ class OrganizationsClient:
         **kwargs: Any,
     ) -> None:
         """Unarchive Organizations"""
-        response = await self._http.patch(f"/organizations/{quote_path(id)}/unarchive", params=kwargs)
+        await self._http.patch(f"/organizations/{quote_path(id)}/unarchive", params=kwargs)
         return
 
     async def delete(

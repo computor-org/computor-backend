@@ -8,8 +8,6 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
-
 from computor_types.student_course_contents import (
     CourseContentStudentGet,
     CourseContentStudentList,
@@ -86,7 +84,7 @@ class TutorsClient:
         **kwargs: Any,
     ) -> List[TutorCourseMemberList]:
         """Tutor List Course Members Endpoint"""
-        response = await self._http.get(f"/tutors/course-members", params=kwargs)
+        response = await self._http.get("/tutors/course-members", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [TutorCourseMemberList.model_validate(item) for item in data]
@@ -139,7 +137,7 @@ class TutorsClient:
         **kwargs: Any,
     ) -> List[CourseTutorList]:
         """Tutor List Courses Endpoint"""
-        response = await self._http.get(f"/tutors/courses", params=kwargs)
+        response = await self._http.get("/tutors/courses", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [CourseTutorList.model_validate(item) for item in data]
@@ -159,7 +157,7 @@ class TutorsClient:
         **kwargs: Any,
     ) -> List[TutorSubmissionGroupList]:
         """Tutor List Submission Groups Endpoint"""
-        response = await self._http.get(f"/tutors/submission-groups", params=kwargs)
+        response = await self._http.get("/tutors/submission-groups", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [TutorSubmissionGroupList.model_validate(item) for item in data]

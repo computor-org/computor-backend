@@ -6,9 +6,7 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, Dict, Union
 
 from computor_types.course_git import (
     CourseGitDescriptor,
@@ -44,7 +42,7 @@ class UserClient:
         **kwargs: Any,
     ) -> UserGet:
         """Get Current User Endpoint"""
-        response = await self._http.get(f"/user", params=kwargs)
+        response = await self._http.get("/user", params=kwargs)
         return UserGet.model_validate(response.json())
 
     async def get_courses_git(
@@ -137,7 +135,7 @@ class UserClient:
         **kwargs: Any,
     ) -> UserScopes:
         """Get Current User Scopes"""
-        response = await self._http.get(f"/user/scopes", params=kwargs)
+        response = await self._http.get("/user/scopes", params=kwargs)
         return UserScopes.model_validate(response.json())
 
     async def list_views(
@@ -145,7 +143,7 @@ class UserClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Get Course Views For Current User"""
-        response = await self._http.get(f"/user/views", params=kwargs)
+        response = await self._http.get("/user/views", params=kwargs)
         return response.json()
 
     async def list_views_by_course_id(

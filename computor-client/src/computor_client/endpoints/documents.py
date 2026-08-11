@@ -8,8 +8,6 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
-
 from computor_types.documents import (
     DocumentDelete,
     DocumentDirectoryCreate,
@@ -34,10 +32,11 @@ class DocumentsClient:
 
     async def delete_directories(
         self,
+        data: Union[DocumentDirectoryDelete, Dict[str, Any]],
         **kwargs: Any,
     ) -> None:
         """Delete Document Directory"""
-        await self._http.delete(f"/documents/directories", params=kwargs)
+        await self._http.delete("/documents/directories", json_data=data, params=kwargs)
         return
 
     async def update_directories(
@@ -46,7 +45,7 @@ class DocumentsClient:
         **kwargs: Any,
     ) -> DocumentDirectoryGet:
         """Rename Document Directory"""
-        response = await self._http.patch(f"/documents/directories", json_data=data, params=kwargs)
+        response = await self._http.patch("/documents/directories", json_data=data, params=kwargs)
         return DocumentDirectoryGet.model_validate(response.json())
 
     async def directories(
@@ -55,15 +54,16 @@ class DocumentsClient:
         **kwargs: Any,
     ) -> DocumentDirectoryGet:
         """Create Document Directory"""
-        response = await self._http.post(f"/documents/directories", json_data=data, params=kwargs)
+        response = await self._http.post("/documents/directories", json_data=data, params=kwargs)
         return DocumentDirectoryGet.model_validate(response.json())
 
     async def delete_files(
         self,
+        data: Union[DocumentDelete, Dict[str, Any]],
         **kwargs: Any,
     ) -> None:
         """Delete Document File"""
-        await self._http.delete(f"/documents/files", params=kwargs)
+        await self._http.delete("/documents/files", json_data=data, params=kwargs)
         return
 
     async def get_files(
@@ -71,7 +71,7 @@ class DocumentsClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Get Document File"""
-        response = await self._http.get(f"/documents/files", params=kwargs)
+        response = await self._http.get("/documents/files", params=kwargs)
         return response.json()
 
     async def update_files(
@@ -80,7 +80,7 @@ class DocumentsClient:
         **kwargs: Any,
     ) -> DocumentGet:
         """Rename Document File"""
-        response = await self._http.patch(f"/documents/files", json_data=data, params=kwargs)
+        response = await self._http.patch("/documents/files", json_data=data, params=kwargs)
         return DocumentGet.model_validate(response.json())
 
     async def files(
@@ -94,7 +94,7 @@ class DocumentsClient:
         """Upload Document File"""
         files = {"file": file}
         form_fields = {k: v for k, v in {"scope": scope, "path": path, "scope_id": scope_id}.items() if v is not None}
-        response = await self._http.post(f"/documents/files", files=files, data=form_fields, params=kwargs)
+        response = await self._http.post("/documents/files", files=files, data=form_fields, params=kwargs)
         return DocumentGet.model_validate(response.json())
 
     async def list_list(
@@ -102,7 +102,7 @@ class DocumentsClient:
         **kwargs: Any,
     ) -> List[DocumentList]:
         """List Documents Directory"""
-        response = await self._http.get(f"/documents/list", params=kwargs)
+        response = await self._http.get("/documents/list", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [DocumentList.model_validate(item) for item in data]

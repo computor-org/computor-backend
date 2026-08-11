@@ -6,9 +6,7 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, Dict, Union
 
 from computor_types.tasks import (
     TaskInfo,
@@ -33,7 +31,7 @@ class TasksClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """List Tasks"""
-        response = await self._http.get(f"/tasks", params=kwargs)
+        response = await self._http.get("/tasks", params=kwargs)
         return response.json()
 
     async def submit(
@@ -42,7 +40,7 @@ class TasksClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Submit Task"""
-        response = await self._http.post(f"/tasks/submit", json_data=data, params=kwargs)
+        response = await self._http.post("/tasks/submit", json_data=data, params=kwargs)
         return response.json()
 
     async def list_types(
@@ -50,7 +48,7 @@ class TasksClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """List Task Types"""
-        response = await self._http.get(f"/tasks/types", params=kwargs)
+        response = await self._http.get("/tasks/types", params=kwargs)
         return response.json()
 
     async def get_workers_status(
@@ -58,7 +56,7 @@ class TasksClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Get Worker Status"""
-        response = await self._http.get(f"/tasks/workers/status", params=kwargs)
+        response = await self._http.get("/tasks/workers/status", params=kwargs)
         return response.json()
 
     async def delete(

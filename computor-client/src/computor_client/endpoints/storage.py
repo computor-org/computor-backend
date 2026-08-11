@@ -8,8 +8,6 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
-
 from computor_types.storage import (
     BucketCreate,
     BucketInfo,
@@ -37,7 +35,7 @@ class StorageClient:
         **kwargs: Any,
     ) -> List[BucketInfo]:
         """List Buckets"""
-        response = await self._http.get(f"/storage/buckets", params=kwargs)
+        response = await self._http.get("/storage/buckets", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [BucketInfo.model_validate(item) for item in data]
@@ -49,7 +47,7 @@ class StorageClient:
         **kwargs: Any,
     ) -> BucketInfo:
         """Create Bucket"""
-        response = await self._http.post(f"/storage/buckets", json_data=data, params=kwargs)
+        response = await self._http.post("/storage/buckets", json_data=data, params=kwargs)
         return BucketInfo.model_validate(response.json())
 
     async def delete_buckets(
@@ -81,7 +79,7 @@ class StorageClient:
     ) -> Dict[str, Any]:
         """Copy Object"""
         form_fields = {k: v for k, v in {"source_object": source_object, "dest_object": dest_object, "source_bucket": source_bucket, "dest_bucket": dest_bucket, "metadata": metadata}.items() if v is not None}
-        response = await self._http.post(f"/storage/copy", data=form_fields, params=kwargs)
+        response = await self._http.post("/storage/copy", data=form_fields, params=kwargs)
         return response.json()
 
     async def get_download(
@@ -98,7 +96,7 @@ class StorageClient:
         **kwargs: Any,
     ) -> List[StorageObjectList]:
         """List Objects"""
-        response = await self._http.get(f"/storage/objects", params=kwargs)
+        response = await self._http.get("/storage/objects", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [StorageObjectList.model_validate(item) for item in data]
@@ -128,7 +126,7 @@ class StorageClient:
         **kwargs: Any,
     ) -> PresignedUrlResponse:
         """Generate Presigned Url"""
-        response = await self._http.post(f"/storage/presigned-url", json_data=data, params=kwargs)
+        response = await self._http.post("/storage/presigned-url", json_data=data, params=kwargs)
         return PresignedUrlResponse.model_validate(response.json())
 
     async def upload(
@@ -142,6 +140,6 @@ class StorageClient:
         """Upload File"""
         files = {"file": file}
         form_fields = {k: v for k, v in {"object_key": object_key, "bucket_name": bucket_name, "metadata": metadata}.items() if v is not None}
-        response = await self._http.post(f"/storage/upload", files=files, data=form_fields, params=kwargs)
+        response = await self._http.post("/storage/upload", files=files, data=form_fields, params=kwargs)
         return StorageObjectGet.model_validate(response.json())
 

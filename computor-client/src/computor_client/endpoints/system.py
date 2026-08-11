@@ -6,9 +6,7 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, Dict, Union
 
 from computor_types.maintenance import (
     MaintenanceActivate,
@@ -77,7 +75,7 @@ class SystemClient:
         **kwargs: Any,
     ) -> TaskResponse:
         """Create Course Async"""
-        response = await self._http.post(f"/system/deploy/courses", json_data=data, params=kwargs)
+        response = await self._http.post("/system/deploy/courses", json_data=data, params=kwargs)
         return TaskResponse.model_validate(response.json())
 
     async def hierarchy_create(
@@ -86,7 +84,7 @@ class SystemClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Create Hierarchy"""
-        response = await self._http.post(f"/system/hierarchy/create", json_data=data, params=kwargs)
+        response = await self._http.post("/system/hierarchy/create", json_data=data, params=kwargs)
         return response.json()
 
     async def get_hierarchy_status(
@@ -104,7 +102,7 @@ class SystemClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Activate Maintenance"""
-        response = await self._http.post(f"/system/maintenance/activate", json_data=data, params=kwargs)
+        response = await self._http.post("/system/maintenance/activate", json_data=data, params=kwargs)
         return response.json()
 
     async def maintenance_deactivate(
@@ -112,7 +110,7 @@ class SystemClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Deactivate Maintenance"""
-        response = await self._http.post(f"/system/maintenance/deactivate", params=kwargs)
+        response = await self._http.post("/system/maintenance/deactivate", params=kwargs)
         return response.json()
 
     async def delete_maintenance_schedule(
@@ -120,7 +118,7 @@ class SystemClient:
         **kwargs: Any,
     ) -> None:
         """Cancel Scheduled Maintenance"""
-        await self._http.delete(f"/system/maintenance/schedule", params=kwargs)
+        await self._http.delete("/system/maintenance/schedule", params=kwargs)
         return
 
     async def maintenance_schedule(
@@ -129,7 +127,7 @@ class SystemClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Schedule Maintenance"""
-        response = await self._http.post(f"/system/maintenance/schedule", json_data=data, params=kwargs)
+        response = await self._http.post("/system/maintenance/schedule", json_data=data, params=kwargs)
         return response.json()
 
     async def get_maintenance_status(
@@ -137,7 +135,7 @@ class SystemClient:
         **kwargs: Any,
     ) -> MaintenanceStatusGet:
         """Get Maintenance Status"""
-        response = await self._http.get(f"/system/maintenance/status", params=kwargs)
+        response = await self._http.get("/system/maintenance/status", params=kwargs)
         return MaintenanceStatusGet.model_validate(response.json())
 
     async def update(
@@ -145,7 +143,7 @@ class SystemClient:
         **kwargs: Any,
     ) -> SystemUpdateTriggerResponse:
         """Trigger Update"""
-        response = await self._http.post(f"/system/update", params=kwargs)
+        response = await self._http.post("/system/update", params=kwargs)
         return SystemUpdateTriggerResponse.model_validate(response.json())
 
     async def update_check(
@@ -153,7 +151,7 @@ class SystemClient:
         **kwargs: Any,
     ) -> SystemUpdateStatusGet:
         """Check For Update"""
-        response = await self._http.post(f"/system/update/check", params=kwargs)
+        response = await self._http.post("/system/update/check", params=kwargs)
         return SystemUpdateStatusGet.model_validate(response.json())
 
     async def update_reset(
@@ -161,7 +159,7 @@ class SystemClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Reset Update State"""
-        response = await self._http.post(f"/system/update/reset", params=kwargs)
+        response = await self._http.post("/system/update/reset", params=kwargs)
         return response.json()
 
     async def delete_update_schedule(
@@ -169,7 +167,7 @@ class SystemClient:
         **kwargs: Any,
     ) -> None:
         """Cancel Scheduled Update"""
-        await self._http.delete(f"/system/update/schedule", params=kwargs)
+        await self._http.delete("/system/update/schedule", params=kwargs)
         return
 
     async def update_schedule(
@@ -178,7 +176,7 @@ class SystemClient:
         **kwargs: Any,
     ) -> SystemUpdateScheduleResponse:
         """Schedule Update"""
-        response = await self._http.post(f"/system/update/schedule", json_data=data, params=kwargs)
+        response = await self._http.post("/system/update/schedule", json_data=data, params=kwargs)
         return SystemUpdateScheduleResponse.model_validate(response.json())
 
     async def get_update_status(
@@ -186,6 +184,6 @@ class SystemClient:
         **kwargs: Any,
     ) -> SystemUpdateStatusGet:
         """Get Update Status"""
-        response = await self._http.get(f"/system/update/status", params=kwargs)
+        response = await self._http.get("/system/update/status", params=kwargs)
         return SystemUpdateStatusGet.model_validate(response.json())
 

@@ -6,9 +6,7 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any
 
 from computor_types.instance import InstanceInfoGet
 
@@ -28,6 +26,6 @@ class InstanceClient:
         **kwargs: Any,
     ) -> InstanceInfoGet:
         """Get Instance Info"""
-        response = await self._http.get(f"/instance-info", params=kwargs)
+        response = await self._http.get("/instance-info", params=kwargs)
         return InstanceInfoGet.model_validate(response.json())
 

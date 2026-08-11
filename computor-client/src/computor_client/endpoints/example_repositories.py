@@ -8,14 +8,13 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
-
 from computor_types.example import (
     ExampleRepositoryCreate,
     ExampleRepositoryGet,
     ExampleRepositoryList,
     ExampleRepositoryUpdate,
 )
+from pydantic import BaseModel
 
 from computor_client.http import AsyncHTTPClient
 from computor_client.pagination import Page
@@ -52,7 +51,7 @@ class ExampleRepositoriesClient:
         params = query.model_dump(mode="json", exclude_none=True) if query else {}
         params.update({"skip": skip, "limit": limit})
         params.update(kwargs)
-        response = await self._http.get(f"/example-repositories", params=params)
+        response = await self._http.get("/example-repositories", params=params)
         return Page.from_response(response, ExampleRepositoryList, skip=skip, limit=limit)
 
     async def create(
@@ -61,7 +60,7 @@ class ExampleRepositoriesClient:
         **kwargs: Any,
     ) -> ExampleRepositoryGet:
         """Create Example-Repositories"""
-        response = await self._http.post(f"/example-repositories", json_data=data, params=kwargs)
+        response = await self._http.post("/example-repositories", json_data=data, params=kwargs)
         return ExampleRepositoryGet.model_validate(response.json())
 
     async def delete(

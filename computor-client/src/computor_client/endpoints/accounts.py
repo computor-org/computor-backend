@@ -8,8 +8,6 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
-
 from computor_types.accounts import (
     AccountCreate,
     AccountGet,
@@ -17,6 +15,7 @@ from computor_types.accounts import (
     AccountProvider,
     AccountUpdate,
 )
+from pydantic import BaseModel
 
 from computor_client.http import AsyncHTTPClient
 from computor_client.pagination import Page
@@ -53,7 +52,7 @@ class AccountsClient:
         params = query.model_dump(mode="json", exclude_none=True) if query else {}
         params.update({"skip": skip, "limit": limit})
         params.update(kwargs)
-        response = await self._http.get(f"/accounts", params=params)
+        response = await self._http.get("/accounts", params=params)
         return Page.from_response(response, AccountList, skip=skip, limit=limit)
 
     async def create(
@@ -62,7 +61,7 @@ class AccountsClient:
         **kwargs: Any,
     ) -> AccountGet:
         """Create Accounts"""
-        response = await self._http.post(f"/accounts", json_data=data, params=kwargs)
+        response = await self._http.post("/accounts", json_data=data, params=kwargs)
         return AccountGet.model_validate(response.json())
 
     async def list_providers(
@@ -70,7 +69,7 @@ class AccountsClient:
         **kwargs: Any,
     ) -> List[AccountProvider]:
         """List Account Providers"""
-        response = await self._http.get(f"/accounts/providers", params=kwargs)
+        response = await self._http.get("/accounts/providers", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [AccountProvider.model_validate(item) for item in data]

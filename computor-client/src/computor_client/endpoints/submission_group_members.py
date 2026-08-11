@@ -8,14 +8,13 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
-
 from computor_types.submission_group_members import (
     SubmissionGroupMemberCreate,
     SubmissionGroupMemberGet,
     SubmissionGroupMemberList,
     SubmissionGroupMemberUpdate,
 )
+from pydantic import BaseModel
 
 from computor_client.http import AsyncHTTPClient
 from computor_client.pagination import Page
@@ -52,7 +51,7 @@ class SubmissionGroupMembersClient:
         params = query.model_dump(mode="json", exclude_none=True) if query else {}
         params.update({"skip": skip, "limit": limit})
         params.update(kwargs)
-        response = await self._http.get(f"/submission-group-members", params=params)
+        response = await self._http.get("/submission-group-members", params=params)
         return Page.from_response(response, SubmissionGroupMemberList, skip=skip, limit=limit)
 
     async def create(
@@ -61,7 +60,7 @@ class SubmissionGroupMembersClient:
         **kwargs: Any,
     ) -> SubmissionGroupMemberGet:
         """Create Submission-Group-Members"""
-        response = await self._http.post(f"/submission-group-members", json_data=data, params=kwargs)
+        response = await self._http.post("/submission-group-members", json_data=data, params=kwargs)
         return SubmissionGroupMemberGet.model_validate(response.json())
 
     async def delete(

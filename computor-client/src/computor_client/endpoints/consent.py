@@ -6,9 +6,7 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, Dict, List, Union
 
 from computor_types.consent import (
     ConsentCreate,
@@ -35,7 +33,7 @@ class ConsentClient:
         **kwargs: Any,
     ) -> ConsentStatusGet:
         """Give Consent"""
-        response = await self._http.post(f"/consent", json_data=data, params=kwargs)
+        response = await self._http.post("/consent", json_data=data, params=kwargs)
         return ConsentStatusGet.model_validate(response.json())
 
     async def get_policy(
@@ -43,7 +41,7 @@ class ConsentClient:
         **kwargs: Any,
     ) -> PolicyTextGet:
         """Get Policy Text"""
-        response = await self._http.get(f"/consent/policy", params=kwargs)
+        response = await self._http.get("/consent/policy", params=kwargs)
         return PolicyTextGet.model_validate(response.json())
 
     async def list_policy_versions(
@@ -51,7 +49,7 @@ class ConsentClient:
         **kwargs: Any,
     ) -> List[PolicyVersionGet]:
         """List Policy Versions"""
-        response = await self._http.get(f"/consent/policy-versions", params=kwargs)
+        response = await self._http.get("/consent/policy-versions", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [PolicyVersionGet.model_validate(item) for item in data]
@@ -63,7 +61,7 @@ class ConsentClient:
         **kwargs: Any,
     ) -> PolicyVersionGet:
         """Publish Policy Version"""
-        response = await self._http.post(f"/consent/policy-versions", json_data=data, params=kwargs)
+        response = await self._http.post("/consent/policy-versions", json_data=data, params=kwargs)
         return PolicyVersionGet.model_validate(response.json())
 
     async def get_status(
@@ -71,7 +69,7 @@ class ConsentClient:
         **kwargs: Any,
     ) -> ConsentStatusGet:
         """Get Consent Status"""
-        response = await self._http.get(f"/consent/status", params=kwargs)
+        response = await self._http.get("/consent/status", params=kwargs)
         return ConsentStatusGet.model_validate(response.json())
 
     async def withdraw(
@@ -79,6 +77,6 @@ class ConsentClient:
         **kwargs: Any,
     ) -> ConsentStatusGet:
         """Withdraw Consent"""
-        response = await self._http.post(f"/consent/withdraw", params=kwargs)
+        response = await self._http.post("/consent/withdraw", params=kwargs)
         return ConsentStatusGet.model_validate(response.json())
 

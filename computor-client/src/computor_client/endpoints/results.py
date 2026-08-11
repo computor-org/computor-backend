@@ -8,8 +8,6 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
-
 from computor_types.artifacts import ResultArtifactListItem
 from computor_types.results import (
     ResultCreate,
@@ -18,6 +16,7 @@ from computor_types.results import (
     ResultUpdate,
 )
 from computor_types.tasks import TaskStatus
+from pydantic import BaseModel
 
 from computor_client.http import AsyncHTTPClient
 from computor_client.pagination import Page
@@ -54,7 +53,7 @@ class ResultsClient:
         params = query.model_dump(mode="json", exclude_none=True) if query else {}
         params.update({"skip": skip, "limit": limit})
         params.update(kwargs)
-        response = await self._http.get(f"/results", params=params)
+        response = await self._http.get("/results", params=params)
         return Page.from_response(response, ResultList, skip=skip, limit=limit)
 
     async def create(
@@ -63,7 +62,7 @@ class ResultsClient:
         **kwargs: Any,
     ) -> ResultGet:
         """Create Result"""
-        response = await self._http.post(f"/results", json_data=data, params=kwargs)
+        response = await self._http.post("/results", json_data=data, params=kwargs)
         return ResultGet.model_validate(response.json())
 
     async def delete(

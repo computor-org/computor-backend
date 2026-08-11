@@ -6,9 +6,7 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, Dict, List, Union
 
 from computor_types.invites import (
     InviteAccept,
@@ -35,7 +33,7 @@ class InvitesClient:
         **kwargs: Any,
     ) -> List[InviteLinkList]:
         """List Invites"""
-        response = await self._http.get(f"/admin/invites", params=kwargs)
+        response = await self._http.get("/admin/invites", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [InviteLinkList.model_validate(item) for item in data]
@@ -47,7 +45,7 @@ class InvitesClient:
         **kwargs: Any,
     ) -> InviteLinkGet:
         """Create Invite"""
-        response = await self._http.post(f"/admin/invites", json_data=data, params=kwargs)
+        response = await self._http.post("/admin/invites", json_data=data, params=kwargs)
         return InviteLinkGet.model_validate(response.json())
 
     async def delete_admin(

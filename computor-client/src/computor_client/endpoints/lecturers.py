@@ -6,9 +6,7 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, Dict, List, Union
 
 from computor_types.courses import (
     CourseGet,
@@ -53,7 +51,7 @@ class LecturersClient:
         **kwargs: Any,
     ) -> List[CourseContentLecturerList]:
         """Lecturer List Course Contents Endpoint"""
-        response = await self._http.get(f"/lecturers/course-contents", params=kwargs)
+        response = await self._http.get("/lecturers/course-contents", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [CourseContentLecturerList.model_validate(item) for item in data]
@@ -111,7 +109,7 @@ class LecturersClient:
         **kwargs: Any,
     ) -> List[CourseList]:
         """Lecturer List Courses Endpoint"""
-        response = await self._http.get(f"/lecturers/courses", params=kwargs)
+        response = await self._http.get("/lecturers/courses", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [CourseList.model_validate(item) for item in data]

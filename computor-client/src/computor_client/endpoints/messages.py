@@ -8,8 +8,6 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
-
 from computor_types.messages import (
     MessageCreate,
     MessageGet,
@@ -18,6 +16,7 @@ from computor_types.messages import (
     MessageThread,
     MessageUpdate,
 )
+from pydantic import BaseModel
 
 from computor_client.http import AsyncHTTPClient
 from computor_client.pagination import Page
@@ -54,7 +53,7 @@ class MessagesClient:
         params = query.model_dump(mode="json", exclude_none=True) if query else {}
         params.update({"skip": skip, "limit": limit})
         params.update(kwargs)
-        response = await self._http.get(f"/messages", params=params)
+        response = await self._http.get("/messages", params=params)
         return Page.from_response(response, MessageList, skip=skip, limit=limit)
 
     async def create(
@@ -63,7 +62,7 @@ class MessagesClient:
         **kwargs: Any,
     ) -> MessageGet:
         """Create Message"""
-        response = await self._http.post(f"/messages", json_data=data, params=kwargs)
+        response = await self._http.post("/messages", json_data=data, params=kwargs)
         return MessageGet.model_validate(response.json())
 
     async def list_mentionable_users(
@@ -71,7 +70,7 @@ class MessagesClient:
         **kwargs: Any,
     ) -> List[MessageMentionRef]:
         """List Mentionable Users Endpoint"""
-        response = await self._http.get(f"/messages/mentionable-users", params=kwargs)
+        response = await self._http.get("/messages/mentionable-users", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [MessageMentionRef.model_validate(item) for item in data]
@@ -129,7 +128,7 @@ class MessagesClient:
         **kwargs: Any,
     ) -> None:
         """Mark Message Read"""
-        response = await self._http.post(f"/messages/{quote_path(id)}/reads", params=kwargs)
+        await self._http.post(f"/messages/{quote_path(id)}/reads", params=kwargs)
         return
 
     async def get_thread(

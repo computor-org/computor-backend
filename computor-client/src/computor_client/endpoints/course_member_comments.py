@@ -8,13 +8,12 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
-
 from computor_types.course_member_comments import (
     CommentCreate,
     CommentUpdate,
     CourseMemberCommentList,
 )
+from pydantic import BaseModel
 
 from computor_client.http import AsyncHTTPClient
 from computor_client.pagination import Page
@@ -51,7 +50,7 @@ class CourseMemberCommentsClient:
         params = query.model_dump(mode="json", exclude_none=True) if query else {}
         params.update({"skip": skip, "limit": limit})
         params.update(kwargs)
-        response = await self._http.get(f"/course-member-comments", params=params)
+        response = await self._http.get("/course-member-comments", params=params)
         return Page.from_response(response, CourseMemberCommentList, skip=skip, limit=limit)
 
     async def create(
@@ -60,7 +59,7 @@ class CourseMemberCommentsClient:
         **kwargs: Any,
     ) -> List[CourseMemberCommentList]:
         """Create Comment"""
-        response = await self._http.post(f"/course-member-comments", json_data=data, params=kwargs)
+        response = await self._http.post("/course-member-comments", json_data=data, params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [CourseMemberCommentList.model_validate(item) for item in data]

@@ -6,9 +6,7 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, Dict, List, Union
 
 from computor_types.artifacts import (
     SubmissionArtifactGet,
@@ -47,7 +45,7 @@ class SubmissionsClient:
         **kwargs: Any,
     ) -> List[SubmissionArtifactList]:
         """List Submission Artifacts"""
-        response = await self._http.get(f"/submissions/artifacts", params=kwargs)
+        response = await self._http.get("/submissions/artifacts", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [SubmissionArtifactList.model_validate(item) for item in data]
@@ -62,7 +60,7 @@ class SubmissionsClient:
         """Upload Submission"""
         files = {"file": file}
         form_fields = {"submission_create": submission_create}
-        response = await self._http.post(f"/submissions/artifacts", files=files, data=form_fields, params=kwargs)
+        response = await self._http.post("/submissions/artifacts", files=files, data=form_fields, params=kwargs)
         return SubmissionUploadResponseModel.model_validate(response.json())
 
     async def get_artifacts_download(
@@ -70,7 +68,7 @@ class SubmissionsClient:
         **kwargs: Any,
     ) -> bytes:
         """Download Latest Submission"""
-        response = await self._http.get(f"/submissions/artifacts/download", params=kwargs)
+        response = await self._http.get("/submissions/artifacts/download", params=kwargs)
         return response.content
 
     async def get_artifacts(
@@ -172,7 +170,7 @@ class SubmissionsClient:
         **kwargs: Any,
     ) -> List[SubmissionGradeList]:
         """List Grades"""
-        response = await self._http.get(f"/submissions/grades", params=kwargs)
+        response = await self._http.get("/submissions/grades", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [SubmissionGradeList.model_validate(item) for item in data]

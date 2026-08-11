@@ -6,9 +6,7 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, Dict, List, Union
 
 from computor_types.services import (
     ServiceCreate,
@@ -33,7 +31,7 @@ class ServicesClient:
         **kwargs: Any,
     ) -> List[ServiceGet]:
         """List Services Endpoint"""
-        response = await self._http.get(f"/service-accounts", params=kwargs)
+        response = await self._http.get("/service-accounts", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [ServiceGet.model_validate(item) for item in data]
@@ -45,7 +43,7 @@ class ServicesClient:
         **kwargs: Any,
     ) -> ServiceGet:
         """Create Service Endpoint"""
-        response = await self._http.post(f"/service-accounts", json_data=data, params=kwargs)
+        response = await self._http.post("/service-accounts", json_data=data, params=kwargs)
         return ServiceGet.model_validate(response.json())
 
     async def get_service_accounts_me(
@@ -53,7 +51,7 @@ class ServicesClient:
         **kwargs: Any,
     ) -> ServiceGet:
         """Get Service Me"""
-        response = await self._http.get(f"/service-accounts/me", params=kwargs)
+        response = await self._http.get("/service-accounts/me", params=kwargs)
         return ServiceGet.model_validate(response.json())
 
     async def delete_service_accounts(
@@ -90,6 +88,6 @@ class ServicesClient:
         **kwargs: Any,
     ) -> None:
         """Service Heartbeat Endpoint"""
-        response = await self._http.put(f"/service-accounts/{quote_path(service_id)}/heartbeat", params=kwargs)
+        await self._http.put(f"/service-accounts/{quote_path(service_id)}/heartbeat", params=kwargs)
         return
 

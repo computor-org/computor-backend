@@ -8,14 +8,13 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
-
 from computor_types.profiles import (
     ProfileCreate,
     ProfileGet,
     ProfileList,
     ProfileUpdate,
 )
+from pydantic import BaseModel
 
 from computor_client.http import AsyncHTTPClient
 from computor_client.pagination import Page
@@ -52,7 +51,7 @@ class ProfilesClient:
         params = query.model_dump(mode="json", exclude_none=True) if query else {}
         params.update({"skip": skip, "limit": limit})
         params.update(kwargs)
-        response = await self._http.get(f"/profiles", params=params)
+        response = await self._http.get("/profiles", params=params)
         return Page.from_response(response, ProfileList, skip=skip, limit=limit)
 
     async def create(
@@ -61,7 +60,7 @@ class ProfilesClient:
         **kwargs: Any,
     ) -> ProfileGet:
         """Create Profile Endpoint"""
-        response = await self._http.post(f"/profiles", json_data=data, params=kwargs)
+        response = await self._http.post("/profiles", json_data=data, params=kwargs)
         return ProfileGet.model_validate(response.json())
 
     async def delete(

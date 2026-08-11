@@ -6,15 +6,14 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, List, Optional
 
 from computor_types.roles import (
     RoleGet,
     RoleList,
 )
 from computor_types.roles_claims import RoleClaimList
+from pydantic import BaseModel
 
 from computor_client.http import AsyncHTTPClient
 from computor_client.pagination import Page
@@ -34,7 +33,7 @@ class RolesClient:
         **kwargs: Any,
     ) -> List[RoleClaimList]:
         """List Role Claim"""
-        response = await self._http.get(f"/role-claims", params=kwargs)
+        response = await self._http.get("/role-claims", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [RoleClaimList.model_validate(item) for item in data]
@@ -62,7 +61,7 @@ class RolesClient:
         params = query.model_dump(mode="json", exclude_none=True) if query else {}
         params.update({"skip": skip, "limit": limit})
         params.update(kwargs)
-        response = await self._http.get(f"/roles", params=params)
+        response = await self._http.get("/roles", params=params)
         return Page.from_response(response, RoleList, skip=skip, limit=limit)
 
     async def get(

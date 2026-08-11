@@ -372,6 +372,15 @@ def has_json_body(operation: Dict[str, Any]) -> bool:
     return "application/json" in operation.get("requestBody", {}).get("content", {})
 
 
+def _path_expr(path: str) -> str:
+    """Render a request path as a Python literal.
+
+    Only paths that actually interpolate a parameter get an f-prefix; a bare
+    ``f"/messages"`` is an f-string with no placeholders (ruff F541).
+    """
+    return f'f"{path}"' if "{" in path else f'"{path}"'
+
+
 def _form_dict_expr(entries: List[Tuple[str, bool]]) -> str:
     """Render form entries as a dict expression, dropping unset optional ones."""
     literal = "{" + ", ".join(f'"{name}": {name}' for name, _ in entries) + "}"
@@ -431,12 +440,10 @@ def generate_method(
     response_schema, is_list_response, is_binary_response = get_response_schema(operation)
     form_body = get_form_body(operation, schemas)
 
-    # Collect imports
-    if request_schema:
-        import_info = map_schema_to_import(request_schema)
-        if import_info:
-            imports.add(import_info)
-
+    # Collect imports. The request DTO is only imported when its parameter is
+    # actually emitted — FastAPI attaches a requestBody to some GET routes
+    # (a query model with a nested BaseModel field), which would otherwise
+    # leave an unused import behind.
     if response_schema:
         import_info = map_schema_to_import(response_schema)
         if import_info:
@@ -449,7 +456,9 @@ def generate_method(
     for pp in path_params:
         params.append(f"{pp}: str")
 
-    takes_body = method in ["POST", "PUT", "PATCH"]
+    # DELETE is included: /documents/files and /documents/directories both
+    # require a body, and omitting it produced methods that always 400.
+    takes_body = method in ["POST", "PUT", "PATCH", "DELETE"]
     typed_body = bool(request_schema and map_schema_to_import(request_schema))
 
     if takes_body and form_body:
@@ -466,6 +475,7 @@ def generate_method(
                 optional_params.append(f"{name}: Optional[str] = None")
     elif takes_body and typed_body:
         params.append(f"data: Union[{request_schema}, Dict[str, Any]]")
+        imports.add(map_schema_to_import(request_schema))
     elif takes_body and has_json_body(operation):
         # A body with no named schema (the endpoint declares a bare ``dict``).
         # Emit it untyped rather than omitting it — a method that cannot send
@@ -528,7 +538,9 @@ def generate_method(
         f'        """{docstring}"""',
     ])
 
-    # HTTP call
+    # HTTP call. Methods that return nothing must not bind `response` — an
+    # unused local (ruff F841) in every archive/unarchive/mark-read method.
+    assign = "" if return_type == "None" else "response = "
     http_method = method.lower()
     if http_method == "get":
         if is_paginated_list:
@@ -559,7 +571,7 @@ def generate_method(
                 "        params = query.model_dump(mode=\"json\", exclude_none=True) if query else {}",
                 "        params.update({\"skip\": skip, \"limit\": limit})",
                 "        params.update(kwargs)",
-                f'        response = await self._http.get(f"{path_formatted}", params=params)',
+                f'        response = await self._http.get({_path_expr(path_formatted)}, params=params)',
                 f"        return Page.from_response(response, {response_schema}, skip=skip, limit=limit)",
             ]
             return "\n".join(lines), imports
@@ -567,11 +579,11 @@ def generate_method(
             lines.append(f'        params = query.model_dump(mode="json", exclude_none=True) if query else {{}}'  )
             lines.append(f'        params.update(kwargs)')
             lines.append(f'        response = await self._http.get(')
-            lines.append(f'            f"{path_formatted}",')
+            lines.append(f'            {_path_expr(path_formatted)},')
             lines.append(f'            params=params,')
             lines.append('        )')
         else:
-            lines.append(f'        response = await self._http.get(f"{path_formatted}", params=kwargs)')
+            lines.append(f'        {assign}await self._http.get({_path_expr(path_formatted)}, params=kwargs)')
     elif http_method in ["post", "patch", "put"]:
         if form_body:
             call_args = []
@@ -583,22 +595,27 @@ def generate_method(
                 call_args.append("data=form_fields")
             joined = ", ".join(call_args)
             lines.append(
-                f'        response = await self._http.{http_method}('
-                f'f"{path_formatted}", {joined}, params=kwargs)'
+                f'        {assign}await self._http.{http_method}('
+                f'{_path_expr(path_formatted)}, {joined}, params=kwargs)'
             )
         elif typed_body or has_json_body(operation):
-            lines.append(f'        response = await self._http.{http_method}(f"{path_formatted}", json_data=data, params=kwargs)')
+            lines.append(f'        {assign}await self._http.{http_method}({_path_expr(path_formatted)}, json_data=data, params=kwargs)')
         else:
-            lines.append(f'        response = await self._http.{http_method}(f"{path_formatted}", params=kwargs)')
+            lines.append(f'        {assign}await self._http.{http_method}({_path_expr(path_formatted)}, params=kwargs)')
     elif http_method == "delete":
+        body_arg = "json_data=data, " if (typed_body or has_json_body(operation)) else ""
         if return_type == "None":
-            lines.append(f'        await self._http.delete(f"{path_formatted}", params=kwargs)')
+            lines.append(
+                f'        await self._http.delete({_path_expr(path_formatted)}, {body_arg}params=kwargs)'
+            )
             lines.append('        return')
             return "\n".join(lines), imports
         # A DELETE that declares a response body (e.g. the comments endpoints,
         # which return the refreshed list) must actually parse and return it;
         # this used to return None behind a lying annotation.
-        lines.append(f'        response = await self._http.delete(f"{path_formatted}", params=kwargs)')
+        lines.append(
+            f'        response = await self._http.delete({_path_expr(path_formatted)}, {body_arg}params=kwargs)'
+        )
 
     # Parse response
     if is_binary_response:
@@ -724,6 +741,16 @@ def generate_file(
     for module, name in imports:
         imports_by_module[module].add(name)
 
+    # Import only what the body references — a fixed import line leaves unused
+    # names in most files (ruff F401), which buries any genuine finding.
+    # Strip docstrings first: """List Student Workspaces""" is not a use of
+    # typing.List, but a bare name search cannot tell the difference.
+    code_only = re.sub(r'"""(?:.|\n)*?"""', "", class_code)
+    typing_names = [
+        name for name in ("Any", "Dict", "List", "Optional", "Union")
+        if re.search(rf"\b{name}\b", code_only)
+    ]
+
     lines = [
         '"""',
         'Auto-generated endpoint client.',
@@ -733,35 +760,35 @@ def generate_file(
         'Run `bash generate.sh python-client` to regenerate.',
         '"""',
         '',
-        'from typing import Any, Dict, List, Optional, Union',
-        '',
-        'from pydantic import BaseModel',
-        '',
     ]
+    if typing_names:
+        lines.append(f"from typing import {', '.join(typing_names)}")
+        lines.append('')
 
+    # Third-party block, alphabetically: computor_types then pydantic. Emitting
+    # pydantic first leaves every generated file failing ruff's I001.
+    third_party = []
     for module in sorted(imports_by_module.keys()):
         names = sorted(imports_by_module[module])
         if len(names) == 1:
-            lines.append(f'from {module} import {names[0]}')
+            third_party.append(f'from {module} import {names[0]}')
         else:
-            lines.append(f'from {module} import (')
-            for name in names:
-                lines.append(f'    {name},')
-            lines.append(')')
+            third_party.append(f'from {module} import (')
+            third_party.extend(f'    {name},' for name in names)
+            third_party.append(')')
+    if re.search(r"\bBaseModel\b", code_only):
+        third_party.append('from pydantic import BaseModel')
+    if third_party:
+        lines.extend(third_party)
+        lines.append('')
 
-    lines.extend([
-        '',
-        'from computor_client.http import AsyncHTTPClient',
-    ])
+    # First-party block.
+    lines.append('from computor_client.http import AsyncHTTPClient')
     if "Page[" in class_code:
         lines.append('from computor_client.pagination import Page')
     if "quote_path(" in class_code:
         lines.append('from computor_client.urls import quote_path')
-    lines.extend([
-        '',
-        '',
-        class_code,
-    ])
+    lines.extend(['', '', class_code])
 
     return "\n".join(lines), class_name
 

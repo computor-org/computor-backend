@@ -6,14 +6,13 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, List, Optional
 
 from computor_types.course_family_roles import (
     CourseFamilyRoleGet,
     CourseFamilyRoleList,
 )
+from pydantic import BaseModel
 
 from computor_client.http import AsyncHTTPClient
 from computor_client.pagination import Page
@@ -50,7 +49,7 @@ class CourseFamilyRolesClient:
         params = query.model_dump(mode="json", exclude_none=True) if query else {}
         params.update({"skip": skip, "limit": limit})
         params.update(kwargs)
-        response = await self._http.get(f"/course-family-roles", params=params)
+        response = await self._http.get("/course-family-roles", params=params)
         return Page.from_response(response, CourseFamilyRoleList, skip=skip, limit=limit)
 
     async def get(

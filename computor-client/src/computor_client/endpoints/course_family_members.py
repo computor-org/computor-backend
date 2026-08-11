@@ -8,14 +8,13 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
-
 from computor_types.course_family_members import (
     CourseFamilyMemberCreate,
     CourseFamilyMemberGet,
     CourseFamilyMemberList,
     CourseFamilyMemberUpdate,
 )
+from pydantic import BaseModel
 
 from computor_client.http import AsyncHTTPClient
 from computor_client.pagination import Page
@@ -52,7 +51,7 @@ class CourseFamilyMembersClient:
         params = query.model_dump(mode="json", exclude_none=True) if query else {}
         params.update({"skip": skip, "limit": limit})
         params.update(kwargs)
-        response = await self._http.get(f"/course-family-members", params=params)
+        response = await self._http.get("/course-family-members", params=params)
         return Page.from_response(response, CourseFamilyMemberList, skip=skip, limit=limit)
 
     async def create(
@@ -61,7 +60,7 @@ class CourseFamilyMembersClient:
         **kwargs: Any,
     ) -> CourseFamilyMemberGet:
         """Create Course-Family-Members"""
-        response = await self._http.post(f"/course-family-members", json_data=data, params=kwargs)
+        response = await self._http.post("/course-family-members", json_data=data, params=kwargs)
         return CourseFamilyMemberGet.model_validate(response.json())
 
     async def delete(

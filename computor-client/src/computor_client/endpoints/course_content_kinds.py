@@ -8,14 +8,13 @@ Run `bash generate.sh python-client` to regenerate.
 
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel
-
 from computor_types.course_content_kind import (
     CourseContentKindCreate,
     CourseContentKindGet,
     CourseContentKindList,
     CourseContentKindUpdate,
 )
+from pydantic import BaseModel
 
 from computor_client.http import AsyncHTTPClient
 from computor_client.pagination import Page
@@ -52,7 +51,7 @@ class CourseContentKindsClient:
         params = query.model_dump(mode="json", exclude_none=True) if query else {}
         params.update({"skip": skip, "limit": limit})
         params.update(kwargs)
-        response = await self._http.get(f"/course-content-kinds", params=params)
+        response = await self._http.get("/course-content-kinds", params=params)
         return Page.from_response(response, CourseContentKindList, skip=skip, limit=limit)
 
     async def create(
@@ -61,7 +60,7 @@ class CourseContentKindsClient:
         **kwargs: Any,
     ) -> CourseContentKindGet:
         """Create Course-Content-Kinds"""
-        response = await self._http.post(f"/course-content-kinds", json_data=data, params=kwargs)
+        response = await self._http.post("/course-content-kinds", json_data=data, params=kwargs)
         return CourseContentKindGet.model_validate(response.json())
 
     async def delete(

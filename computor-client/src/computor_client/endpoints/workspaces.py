@@ -6,9 +6,7 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, Dict, List, Union
 
 from computor_types.workspace_roles import (
     WorkspaceRoleAssign,
@@ -33,7 +31,7 @@ class WorkspacesClient:
         **kwargs: Any,
     ) -> WorkspaceRoleUser:
         """Assign a workspace role by email"""
-        response = await self._http.post(f"/workspaces/roles/assign", json_data=data, params=kwargs)
+        response = await self._http.post("/workspaces/roles/assign", json_data=data, params=kwargs)
         return WorkspaceRoleUser.model_validate(response.json())
 
     async def list_roles_users(
@@ -41,7 +39,7 @@ class WorkspacesClient:
         **kwargs: Any,
     ) -> List[WorkspaceRoleUser]:
         """List all users with their workspace roles"""
-        response = await self._http.get(f"/workspaces/roles/users", params=kwargs)
+        response = await self._http.get("/workspaces/roles/users", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [WorkspaceRoleUser.model_validate(item) for item in data]

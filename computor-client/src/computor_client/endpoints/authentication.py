@@ -6,9 +6,7 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, Dict, List, Union
 
 from computor_types.auth import (
     LocalTokenRefreshRequest,
@@ -36,7 +34,7 @@ class AuthenticationClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """List All Plugins"""
-        response = await self._http.get(f"/auth/admin/plugins", params=kwargs)
+        response = await self._http.get("/auth/admin/plugins", params=kwargs)
         return response.json()
 
     async def auth_admin_plugins_reload(
@@ -44,7 +42,7 @@ class AuthenticationClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Reload Plugins"""
-        response = await self._http.post(f"/auth/admin/plugins/reload", params=kwargs)
+        response = await self._http.post("/auth/admin/plugins/reload", params=kwargs)
         return response.json()
 
     async def auth_admin_plugins_disable(
@@ -70,7 +68,7 @@ class AuthenticationClient:
         **kwargs: Any,
     ) -> LogoutResponse:
         """Logout"""
-        response = await self._http.post(f"/auth/logout", params=kwargs)
+        response = await self._http.post("/auth/logout", params=kwargs)
         return LogoutResponse.model_validate(response.json())
 
     async def list_auth_providers(
@@ -78,7 +76,7 @@ class AuthenticationClient:
         **kwargs: Any,
     ) -> List[ProviderInfo]:
         """List Providers"""
-        response = await self._http.get(f"/auth/providers", params=kwargs)
+        response = await self._http.get("/auth/providers", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [ProviderInfo.model_validate(item) for item in data]
@@ -90,7 +88,7 @@ class AuthenticationClient:
         **kwargs: Any,
     ) -> TokenRefreshResponse:
         """Refresh Token"""
-        response = await self._http.post(f"/auth/refresh", json_data=data, params=kwargs)
+        response = await self._http.post("/auth/refresh", json_data=data, params=kwargs)
         return TokenRefreshResponse.model_validate(response.json())
 
     async def auth_refresh_local(
@@ -99,7 +97,7 @@ class AuthenticationClient:
         **kwargs: Any,
     ) -> LocalTokenRefreshResponse:
         """Refresh Local Token"""
-        response = await self._http.post(f"/auth/refresh/local", json_data=data, params=kwargs)
+        response = await self._http.post("/auth/refresh/local", json_data=data, params=kwargs)
         return LocalTokenRefreshResponse.model_validate(response.json())
 
     async def get_auth_success(
@@ -107,7 +105,7 @@ class AuthenticationClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Sso Success"""
-        response = await self._http.get(f"/auth/success", params=kwargs)
+        response = await self._http.get("/auth/success", params=kwargs)
         return response.json()
 
     async def get_auth_verify_coder_access(
@@ -115,7 +113,7 @@ class AuthenticationClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Verify Coder Access"""
-        response = await self._http.get(f"/auth/verify-coder-access", params=kwargs)
+        response = await self._http.get("/auth/verify-coder-access", params=kwargs)
         return response.json()
 
     async def get_auth_verify_documents_access(
@@ -123,7 +121,7 @@ class AuthenticationClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Verify Documents Access"""
-        response = await self._http.get(f"/auth/verify-documents-access", params=kwargs)
+        response = await self._http.get("/auth/verify-documents-access", params=kwargs)
         return response.json()
 
     async def get_auth_callback(

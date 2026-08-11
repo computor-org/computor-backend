@@ -6,9 +6,7 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, Dict, List, Union
 
 from computor_types.api_tokens import (
     ApiTokenAdminCreate,
@@ -35,7 +33,7 @@ class TokensClient:
         **kwargs: Any,
     ) -> List[ApiTokenGet]:
         """List Tokens Endpoint"""
-        response = await self._http.get(f"/api-tokens", params=kwargs)
+        response = await self._http.get("/api-tokens", params=kwargs)
         data = response.json()
         if isinstance(data, list):
             return [ApiTokenGet.model_validate(item) for item in data]
@@ -47,7 +45,7 @@ class TokensClient:
         **kwargs: Any,
     ) -> ApiTokenCreateResponse:
         """Create Token Endpoint"""
-        response = await self._http.post(f"/api-tokens", json_data=data, params=kwargs)
+        response = await self._http.post("/api-tokens", json_data=data, params=kwargs)
         return ApiTokenCreateResponse.model_validate(response.json())
 
     async def api_tokens_admin_create(
@@ -56,7 +54,7 @@ class TokensClient:
         **kwargs: Any,
     ) -> ApiTokenCreateResponse:
         """Create Token Admin Endpoint"""
-        response = await self._http.post(f"/api-tokens/admin/create", json_data=data, params=kwargs)
+        response = await self._http.post("/api-tokens/admin/create", json_data=data, params=kwargs)
         return ApiTokenCreateResponse.model_validate(response.json())
 
     async def update_api_tokens_admin(

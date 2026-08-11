@@ -399,14 +399,20 @@ class AsyncHTTPClient:
         self,
         path: str,
         *,
+        json_data: Optional[Union[Dict[str, Any], BaseModel]] = None,
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Dict[str, str]] = None,
         authenticated: bool = True,
     ) -> httpx.Response:
-        """Make a DELETE request."""
+        """Make a DELETE request.
+
+        Accepts a body: ``DELETE /documents/files`` and
+        ``DELETE /documents/directories`` both require one.
+        """
         return await self._request(
             "DELETE",
             path,
+            json_data=json_data,
             params=params,
             headers=headers,
             authenticated=authenticated,

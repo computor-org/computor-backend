@@ -6,9 +6,7 @@ Hand edits are silently overwritten on the next regeneration.
 Run `bash generate.sh python-client` to regenerate.
 """
 
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel
+from typing import Any, Dict, Optional, Union
 
 from computor_types.extensions import (
     ExtensionMetadata,
@@ -17,6 +15,7 @@ from computor_types.extensions import (
     ExtensionVersionListResponse,
     ExtensionVersionYankRequest,
 )
+from pydantic import BaseModel
 
 from computor_client.http import AsyncHTTPClient
 from computor_client.urls import quote_path
@@ -35,7 +34,7 @@ class ExtensionsClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Get Getting Started Url"""
-        response = await self._http.get(f"/extensions-getting-started", params=kwargs)
+        response = await self._http.get("/extensions-getting-started", params=kwargs)
         return response.json()
 
     async def get_extensions_public(
@@ -43,7 +42,7 @@ class ExtensionsClient:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Get Public Extension Url"""
-        response = await self._http.get(f"/extensions-public", params=kwargs)
+        response = await self._http.get("/extensions-public", params=kwargs)
         return response.json()
 
     async def list(
@@ -55,7 +54,7 @@ class ExtensionsClient:
         params = query.model_dump(mode="json", exclude_none=True) if query else {}
         params.update(kwargs)
         response = await self._http.get(
-            f"/extensions/",
+            "/extensions/",
             params=params,
         )
         return response.json()
