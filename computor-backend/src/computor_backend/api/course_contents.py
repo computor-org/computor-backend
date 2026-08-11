@@ -29,7 +29,7 @@ from computor_backend.exceptions import (
     ForbiddenException
 )
 from computor_backend.database import get_db, get_db_session, set_db_user
-from computor_types.course_contents import CourseContentGet
+from computor_types.course_contents import CourseContentGet, CourseContentMoveRequest
 from computor_backend.interfaces import CourseContentInterface
 from computor_types.deployment import (
     CourseContentDeploymentGet,
@@ -540,12 +540,6 @@ async def get_content_deployment(
         deployment=deployment,
         history=history
     )
-
-
-class CourseContentMoveRequest(BaseModel):
-    """Request body for moving a course content (path change + position)."""
-    path: str
-    position: float
 
 
 @course_content_router.router.patch(
