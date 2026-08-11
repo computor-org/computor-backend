@@ -63,27 +63,3 @@ export interface RoleClaimQuery {
   claim_type?: string | null;
   claim_value?: string | null;
 }
-
-/**
- * Request to assign a workspace role by email.
- */
-export interface WorkspaceRoleAssign {
-  email: string;
-  role_id: string;
-}
-
-/**
- * Request to provision a workspace.
- */
-export interface WorkspaceProvisionRequest {
-  /** Target user email. If omitted, provisions for the current user. */
-  email?: string | null;
-  /** Workspace template to use */
-  template?: WorkspaceTemplate;
-  /** Custom workspace name */
-  workspace_name?: string | null;
-}
-
-
-
-export type WorkspaceTemplate = "python-workspace" | "matlab-workspace";

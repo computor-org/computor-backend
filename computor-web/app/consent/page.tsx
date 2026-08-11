@@ -6,7 +6,10 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { API_BASE_URL, CONSENT_REDIRECT_KEY, apiGet, apiPost } from '@/src/utils/apiClient';
-import type { ConsentStatus, PolicyText } from '@/src/types/consent';
+import type {
+  ConsentStatusGet as ConsentStatus,
+  PolicyTextGet as PolicyText,
+} from 'types/generated';
 
 // Deliberately a standalone page (no AuthenticatedLayout): the sidebar/topbar
 // fire API calls that are blocked by the consent gate, and this page must work
@@ -177,7 +180,7 @@ export default function ConsentPage() {
         <div className="bg-white rounded-lg shadow border border-gray-200 p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-900">Privacy notice</h2>
-            {policy && policy.languages.length > 1 && (
+            {policy?.languages && policy.languages.length > 1 && (
               <div className="flex gap-2">
                 {policy.languages.map((lang) => (
                   <button

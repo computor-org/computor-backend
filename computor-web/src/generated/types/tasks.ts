@@ -13,6 +13,53 @@ import type { Repository } from './common';
 
 
 /**
+ * Every environment variable read by the task / testing / worker layer.
+ */
+export interface WorkerSettings {
+  api_url?: string;
+  api_token?: string | null;
+  system_git_email?: string;
+  system_git_name?: string;
+  example_cache_dir?: string;
+  temporal_host?: string;
+  temporal_port?: number;
+  temporal_namespace?: string;
+  temporal_tls_cert?: string | null;
+  temporal_tls_key?: string | null;
+  temporal_tls_ca?: string | null;
+  activity_executor_max_workers?: number;
+  max_concurrent_activities?: number | null;
+  graceful_shutdown_seconds?: number;
+  coder_registry_host?: string | null;
+  coder_url?: string | null;
+  coder_registry_container?: string;
+  docker_socket_path?: string;
+  testing_executable?: string | null;
+  runtime_environment?: string;
+  running_in_docker?: string | null;
+}
+
+export interface TestJob {
+  user_id: string;
+  course_member_id: string;
+  course_content_id: string;
+  testing_service_id: string;
+  testing_service_slug: string;
+  testing_service_type_path: string;
+  module: Repository;
+  reference?: Repository | null;
+}
+
+/**
+ * Response with task ID for async operation.
+ */
+export interface TaskResponse {
+  task_id: string;
+  status: string;
+  message: string;
+}
+
+/**
  * Task execution result container.
  */
 export interface TaskResult {
@@ -83,26 +130,6 @@ export interface TaskTrackerEntry {
   entity_type?: string | null;
   entity_id?: string | null;
   description?: string | null;
-}
-
-export interface TestJob {
-  user_id: string;
-  course_member_id: string;
-  course_content_id: string;
-  testing_service_id: string;
-  testing_service_slug: string;
-  testing_service_type_path: string;
-  module: Repository;
-  reference?: Repository | null;
-}
-
-/**
- * Response with task ID for async operation.
- */
-export interface TaskResponse {
-  task_id: string;
-  status: string;
-  message: string;
 }
 
 

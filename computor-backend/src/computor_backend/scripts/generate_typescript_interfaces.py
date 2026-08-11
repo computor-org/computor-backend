@@ -268,8 +268,10 @@ class TypeScriptGenerator:
         enum_names: Set[str] = set()
 
         for py_file in directory.rglob(pattern):
-            # Skip test files and __pycache__
-            if '__pycache__' in str(py_file) or 'test_' in py_file.name:
+            # Skip __pycache__ and unit-test directories. Match on path parts,
+            # not on the file name: DTO modules may legitimately be named
+            # test_*.py (test_jobs.py was silently skipped by a name match).
+            if '__pycache__' in py_file.parts or 'tests' in py_file.parts:
                 continue
 
             try:
@@ -414,6 +416,8 @@ class TypeScriptGenerator:
             'tasks': [],
             'examples': [],
             'messages': [],
+            'workspaces': [],
+            'update': [],
             'websocket': [],
             'common': [],
         }
@@ -449,6 +453,14 @@ class TypeScriptGenerator:
             # Special handling for GitLab and deployment configs
             elif 'gitlab' in model_name or 'deployment' in model_name or 'deployment' in module_name:
                 category = 'common'
+            # Coder workspace and system-update domains, matched on module only
+            # so UserUpdate/CourseUpdate-style DTOs stay in their own categories.
+            # Must precede the auth/course/role rules, which would otherwise
+            # steal workspace token/course_workspaces/workspace_roles models.
+            elif module_name.endswith('.coder') or 'workspace' in module_name:
+                category = 'workspaces'
+            elif module_name.endswith('.update'):
+                category = 'update'
             elif 'auth' in module_name or 'auth' in model_name or 'login' in model_name or 'token' in model_name:
                 category = 'auth'
             elif 'user' in module_name or 'user' in model_name or 'account' in model_name:
@@ -480,6 +492,11 @@ class TypeScriptGenerator:
                 category = 'websocket'
             elif 'gitlab' in enum_name or 'deployment' in enum_name or 'deployment' in module_name:
                 category = 'common'
+            # Keep in sync with the model categorization above.
+            elif module_name.endswith('.coder') or 'workspace' in module_name:
+                category = 'workspaces'
+            elif module_name.endswith('.update'):
+                category = 'update'
             elif 'auth' in module_name or 'auth' in enum_name:
                 category = 'auth'
             elif 'user' in module_name or 'user' in enum_name:
