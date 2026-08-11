@@ -43,7 +43,12 @@ async def create_comment(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
-    """Create a comment for a course member."""
+    """Create a comment for a course member.
+
+    Returns the course member's **full refreshed comment list**, not the single
+    created row — the VS Code tutor view re-renders straight from this response.
+    The update and delete endpoints return the same refreshed list.
+    """
     return create_course_member_comment(
         payload.course_member_id,
         payload.message,
@@ -58,7 +63,7 @@ async def update_comment(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
-    """Update a course member comment."""
+    """Update a course member comment. Returns the full refreshed comment list."""
     return update_course_member_comment(
         course_member_comment_id,
         payload.message,
@@ -72,7 +77,7 @@ async def delete_comment(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
 ):
-    """Delete a course member comment."""
+    """Delete a course member comment. Returns the full refreshed comment list."""
     return delete_course_member_comment(
         course_member_comment_id,
         permissions,
