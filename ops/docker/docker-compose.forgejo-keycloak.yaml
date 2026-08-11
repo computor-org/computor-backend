@@ -32,7 +32,7 @@ services:
     restart: "no"
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/forgejo/data:/data
-      - ../../computor-forgejo/scripts/keycloak_setup.sh:/keycloak_setup.sh:ro
+      - ../forgejo/keycloak_setup.sh:/keycloak_setup.sh:ro
     environment:
       GITEA_WORK_DIR: /data
       # Used only to build the Forgejo login source's auto-discover URL.
