@@ -11,5 +11,7 @@ export * from './organizations';
 export * from './roles';
 export * from './sso';
 export * from './tasks';
+export * from './update';
 export * from './users';
 export * from './websocket';
+export * from './workspaces';

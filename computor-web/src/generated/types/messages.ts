@@ -197,6 +197,8 @@ export interface MessageQuery {
   tags_match_all?: boolean | null;
   /** Filter by tag prefix (e.g., 'ai' matches #ai, #ai-help, #ai-response, etc.) */
   tag_scope?: string | null;
+  /** Include soft-deleted (archived) messages in the result */
+  include_deleted?: boolean | null;
 }
 
 /**
