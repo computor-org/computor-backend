@@ -309,6 +309,68 @@ def map_schema_to_import(schema_name: str) -> Optional[Tuple[str, str]]:
     return (module, schema_name)
 
 
+def _is_binary_property(prop: Dict[str, Any]) -> bool:
+    """True when a form property is a file upload rather than a scalar field."""
+    if prop.get("format") == "binary":
+        return True
+    # Optional uploads arrive as anyOf[{binary}, {null}]; repeated ones as arrays.
+    for variant in prop.get("anyOf", []):
+        if variant.get("format") == "binary":
+            return True
+    return prop.get("items", {}).get("format") == "binary"
+
+
+def get_form_body(
+    operation: Dict[str, Any],
+    schemas: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """Describe a multipart / urlencoded request body, if the operation has one.
+
+    FastAPI synthesises a ``Body_*`` wrapper schema whose properties are the
+    individual form fields, with ``format: "binary"`` marking file uploads.
+    That wrapper has no computor_types counterpart, which is why these bodies
+    used to be dropped entirely.
+
+    Returns ``{"content_type", "files", "fields"}`` — ``files`` and ``fields``
+    being lists of ``(name, is_required)`` — or None when the body is not a form.
+    """
+    content = operation.get("requestBody", {}).get("content", {})
+    form_type = next(
+        (
+            ct for ct in content
+            if ct.startswith("multipart/") or ct == "application/x-www-form-urlencoded"
+        ),
+        None,
+    )
+    if form_type is None:
+        return None
+
+    ref = content[form_type].get("schema", {}).get("$ref", "")
+    body_schema = schemas.get(ref.split("/")[-1], {})
+    required = set(body_schema.get("required", []))
+
+    files: List[Tuple[str, bool]] = []
+    fields: List[Tuple[str, bool]] = []
+    for name, prop in body_schema.get("properties", {}).items():
+        target = files if _is_binary_property(prop) else fields
+        target.append((name, name in required))
+
+    return {"content_type": form_type, "files": files, "fields": fields}
+
+
+def has_json_body(operation: Dict[str, Any]) -> bool:
+    """True when the operation declares a JSON request body of any shape."""
+    return "application/json" in operation.get("requestBody", {}).get("content", {})
+
+
+def _form_dict_expr(entries: List[Tuple[str, bool]]) -> str:
+    """Render form entries as a dict expression, dropping unset optional ones."""
+    literal = "{" + ", ".join(f'"{name}": {name}' for name, _ in entries) + "}"
+    if all(required for _, required in entries):
+        return literal
+    return "{k: v for k, v in " + literal + ".items() if v is not None}"
+
+
 def group_operations_by_tag(spec: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
     """Group all operations by their primary tag."""
     by_tag = defaultdict(list)
@@ -338,8 +400,14 @@ def generate_method(
     operation: Dict[str, Any],
     operation_id: str,
     tag: str,
+    schemas: Dict[str, Any],
 ) -> Tuple[str, Set[Tuple[str, str]]]:
-    """Generate a single method for an endpoint."""
+    """Generate a single method for an endpoint.
+
+    Args:
+        schemas: ``components.schemas`` from the spec, needed to expand the
+            ``Body_*`` wrappers FastAPI synthesises for form endpoints.
+    """
     imports = set()
 
     # Determine base segments from tag
@@ -352,6 +420,7 @@ def generate_method(
     # Get schemas
     request_schema = get_request_schema(operation)
     response_schema, is_list_response, is_binary_response = get_response_schema(operation)
+    form_body = get_form_body(operation, schemas)
 
     # Collect imports
     if request_schema:
@@ -364,14 +433,35 @@ def generate_method(
         if import_info:
             imports.add(import_info)
 
-    # Build parameters
+    # Build parameters. Required ones must precede defaulted ones, so the two
+    # groups are collected separately and joined at the end.
     params = ["self"]
+    optional_params: List[str] = []
     for pp in path_params:
         params.append(f"{pp}: str")
 
-    # Only add data parameter for methods that use request body (not GET/DELETE)
-    if request_schema and map_schema_to_import(request_schema) and method in ["POST", "PUT", "PATCH"]:
+    takes_body = method in ["POST", "PUT", "PATCH"]
+    typed_body = bool(request_schema and map_schema_to_import(request_schema))
+
+    if takes_body and form_body:
+        # Multipart / urlencoded: one parameter per form field, uploads as bytes.
+        for name, required in form_body["files"]:
+            if required:
+                params.append(f"{name}: bytes")
+            else:
+                optional_params.append(f"{name}: Optional[bytes] = None")
+        for name, required in form_body["fields"]:
+            if required:
+                params.append(f"{name}: str")
+            else:
+                optional_params.append(f"{name}: Optional[str] = None")
+    elif takes_body and typed_body:
         params.append(f"data: Union[{request_schema}, Dict[str, Any]]")
+    elif takes_body and has_json_body(operation):
+        # A body with no named schema (the endpoint declares a bare ``dict``).
+        # Emit it untyped rather than omitting it — a method that cannot send
+        # its payload is worse than one that sends an unchecked one.
+        params.append("data: Dict[str, Any]")
 
     # Query params (skip user_id as it's auto-injected)
     query_params = []
@@ -384,7 +474,9 @@ def generate_method(
 
     # Add query parameter for list endpoints to accept Query objects
     if method_name == "list":
-        params.append("query: Optional[BaseModel] = None")
+        optional_params.append("query: Optional[BaseModel] = None")
+
+    params.extend(optional_params)
 
     # Return type
     if is_binary_response:
@@ -429,7 +521,20 @@ def generate_method(
         else:
             lines.append(f'        response = await self._http.get(f"{path_formatted}", params=kwargs)')
     elif http_method in ["post", "patch", "put"]:
-        if request_schema and map_schema_to_import(request_schema):
+        if form_body:
+            call_args = []
+            if form_body["files"]:
+                lines.append("        files = " + _form_dict_expr(form_body["files"]))
+                call_args.append("files=files")
+            if form_body["fields"]:
+                lines.append("        form_fields = " + _form_dict_expr(form_body["fields"]))
+                call_args.append("data=form_fields")
+            joined = ", ".join(call_args)
+            lines.append(
+                f'        response = await self._http.{http_method}('
+                f'f"{path_formatted}", {joined}, params=kwargs)'
+            )
+        elif typed_body or has_json_body(operation):
             lines.append(f'        response = await self._http.{http_method}(f"{path_formatted}", json_data=data, params=kwargs)')
         else:
             lines.append(f'        response = await self._http.{http_method}(f"{path_formatted}", params=kwargs)')
@@ -468,6 +573,7 @@ def generate_method(
 def generate_client_class(
     tag: str,
     operations: List[Dict[str, Any]],
+    schemas: Dict[str, Any],
 ) -> Tuple[str, Set[Tuple[str, str]], str]:
     """Generate a complete client class for a tag."""
     class_name = snake_to_pascal(tag) + "Client"
@@ -483,6 +589,7 @@ def generate_client_class(
             op["operation"],
             op["operation_id"],
             tag,
+            schemas,
         )
 
         # Extract method name to check for duplicates
@@ -524,9 +631,13 @@ def generate_client_class(
     return "\n".join(lines), all_imports, class_name
 
 
-def generate_file(tag: str, operations: List[Dict[str, Any]]) -> Tuple[str, str]:
+def generate_file(
+    tag: str,
+    operations: List[Dict[str, Any]],
+    schemas: Dict[str, Any],
+) -> Tuple[str, str]:
     """Generate a complete Python file for a tag."""
-    class_code, imports, class_name = generate_client_class(tag, operations)
+    class_code, imports, class_name = generate_client_class(tag, operations, schemas)
 
     imports_by_module = defaultdict(set)
     for module, name in imports:
@@ -697,6 +808,8 @@ def main(
             print(f"  {where}  [{content_types}]")
         print()
 
+    schemas = spec.get("components", {}).get("schemas", {})
+
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for file in output_dir.glob("*.py"):
@@ -719,16 +832,14 @@ def main(
         filename = tag + ".py"
         output_file = output_dir / filename
 
-        try:
-            file_content, class_name = generate_file(tag, operations)
-            output_file.write_text(file_content + "\n")
-            generated_files.append(output_file)
-            all_clients.append((tag, class_name))
-            print(f"Generated {filename} ({len(operations)} endpoints)")
-        except Exception as e:
-            print(f"Failed to generate {filename}: {e}")
-            import traceback
-            traceback.print_exc()
+        # No try/except here on purpose: a tag that fails to generate used to
+        # be logged and skipped, leaving a client that imports cleanly but is
+        # missing whole endpoint groups. Fail the run instead.
+        file_content, class_name = generate_file(tag, operations, schemas)
+        output_file.write_text(file_content + "\n")
+        generated_files.append(output_file)
+        all_clients.append((tag, class_name))
+        print(f"Generated {filename} ({len(operations)} endpoints)")
 
     print()
 
