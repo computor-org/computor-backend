@@ -9,7 +9,7 @@ from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_permissions
 from computor_backend.model.message import Message
 from computor_types.messages import (
-    MessageCreate, MessageQuery, MessageList, MessageThread,
+    MESSAGE_TARGET_FIELDS, MessageCreate, MessageQuery, MessageList, MessageThread,
 )
 from .permissions import (
     _check_global_write_permission,
@@ -25,18 +25,11 @@ from .mentions import validate_message_mentions, _transient_message_for_targets
 from .read_status import list_messages_with_read_status
 
 
-# Most-specific to least-specific. Mirrors the hierarchy comment on
-# ``model.message.Message`` and powers single-target enforcement on create.
-MESSAGE_TARGET_FIELDS = (
-    'user_id',
-    'course_member_id',
-    'submission_group_id',
-    'course_content_id',
-    'course_group_id',
-    'course_id',
-    'course_family_id',
-    'organization_id',
-)
+# ``MESSAGE_TARGET_FIELDS`` (most-specific first) now lives in
+# ``computor_types.messages`` so that create-time single-target enforcement,
+# the @mention audience gate and the WebSocket channel resolver all agree on
+# one list — they used to keep three copies, and two of them disagreed on
+# whether course_group or course_content was the more specific target.
 
 
 # Scopes that support back-and-forth conversations (i.e. ``parent_id``

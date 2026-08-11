@@ -12,6 +12,8 @@ class MessageTargetProtocol(Protocol):
     Used for duck-typing SQLAlchemy models and Pydantic DTOs
     when determining WebSocket broadcast channels.
     """
+    user_id: Optional[str]
+    course_member_id: Optional[str]
     submission_group_id: Optional[str]
     course_content_id: Optional[str]
     course_group_id: Optional[str]
@@ -30,6 +32,49 @@ MessageScope = Literal[
     "course_member",    # Direct message to a course member
     "user",             # Direct message to a user (outside course context)
 ]
+
+
+# Every target column on ``Message``, ordered most-specific first. The create
+# path keeps exactly one of these set and forces the rest to NULL (the
+# single-target invariant), and ``scope`` below is derived from whichever one
+# survived — so this tuple and the ``scope`` priority chain must stay in the
+# same order. It is the single source of truth for "what targets exist":
+# message creation, the @mention audience gate and the WebSocket channel
+# resolver all read it from here.
+#
+# ``course_group`` and ``course_content`` are siblings under a course, so
+# their relative order is arbitrary — but it has to be *decided*, because
+# a payload that sets both has to resolve the same way on the create path
+# and in ``scope``. It previously did not.
+MESSAGE_TARGET_FIELDS: tuple[str, ...] = (
+    "user_id",
+    "course_member_id",
+    "submission_group_id",
+    "course_group_id",
+    "course_content_id",
+    "course_id",
+    "course_family_id",
+    "organization_id",
+)
+
+
+def scope_for_targets(targets) -> MessageScope:
+    """The scope of a message with the given target values.
+
+    ``targets`` is anything supporting attribute *or* key access for the
+    names in ``MESSAGE_TARGET_FIELDS`` — a Message row, a DTO, or the dict
+    the create path builds. Returns ``"global"`` when no target is set.
+    """
+    for field in MESSAGE_TARGET_FIELDS:
+        value = (
+            targets.get(field)
+            if isinstance(targets, dict)
+            else getattr(targets, field, None)
+        )
+        if value is not None:
+            # ``field`` is "<scope>_id"; the scope is the prefix.
+            return field[:-3]  # type: ignore[return-value]
+    return "global"
 
 
 class MessageAuthor(BaseModel):
@@ -121,25 +166,8 @@ class MessageGet(BaseEntityGet):
     @computed_field
     @property
     def scope(self) -> MessageScope:
-        """Determine message scope based on target fields (priority order: most specific first)"""
-        if self.user_id is not None:
-            return "user"
-        if self.course_member_id is not None:
-            return "course_member"
-        if self.submission_group_id is not None:
-            return "submission_group"
-        if self.course_group_id is not None:
-            return "course_group"
-        if self.course_content_id is not None:
-            return "course_content"
-        if self.course_id is not None:
-            return "course"
-        if self.course_family_id is not None:
-            return "course_family"
-        if self.organization_id is not None:
-            return "organization"
-        # No target set = global message
-        return "global"
+        """Message scope, derived from whichever target field is set."""
+        return scope_for_targets(self)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -175,25 +203,8 @@ class MessageList(BaseEntityList):
     @computed_field
     @property
     def scope(self) -> MessageScope:
-        """Determine message scope based on target fields (priority order: most specific first)"""
-        if self.user_id is not None:
-            return "user"
-        if self.course_member_id is not None:
-            return "course_member"
-        if self.submission_group_id is not None:
-            return "submission_group"
-        if self.course_group_id is not None:
-            return "course_group"
-        if self.course_content_id is not None:
-            return "course_content"
-        if self.course_id is not None:
-            return "course"
-        if self.course_family_id is not None:
-            return "course_family"
-        if self.organization_id is not None:
-            return "organization"
-        # No target set = global message
-        return "global"
+        """Message scope, derived from whichever target field is set."""
+        return scope_for_targets(self)
 
     model_config = ConfigDict(from_attributes=True)
 

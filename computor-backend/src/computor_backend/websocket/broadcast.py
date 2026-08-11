@@ -39,7 +39,7 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 
 from computor_backend.websocket.pubsub import pubsub
-from computor_types.messages import MessageTargetProtocol
+from computor_types.messages import MESSAGE_TARGET_FIELDS, MessageTargetProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +161,11 @@ class WebSocketBroadcast:
         their unread badges) AND on the reader's own ``user:<id>`` channel
         (so other tabs / devices of the same user stay in sync).
 
+        Only genuinely global messages fall back to ``GLOBAL_CHANNEL``. A
+        direct message has no scope channel, and announcing "user X read
+        message Y" to every connected client is exactly the leak the
+        message body itself used to have.
+
         Uses a flat payload (``type`` at top level, no nested ``data``) for
         backwards compatibility with the existing WebSocket client handler.
         """
@@ -168,9 +173,10 @@ class WebSocketBroadcast:
         from computor_backend.redis_cache import get_redis_client
         import json
 
-        scope_channels = self._get_message_channels(message)
-        if not scope_channels:
+        if self._is_global_message(message):
             scope_channels = [GLOBAL_CHANNEL]
+        else:
+            scope_channels = self._get_message_channels(message)
         channels = scope_channels + [f"user:{user_id}"]
 
         redis_client = await get_redis_client()
@@ -283,6 +289,20 @@ class WebSocketBroadcast:
     # Message channel resolution
     # =========================================================================
 
+    @staticmethod
+    def _is_global_message(message: MessageTargetProtocol) -> bool:
+        """True only when *every* target column is unset.
+
+        This is the one honest test for "global". Callers used to infer it
+        from ``_get_message_channels() == []``, which is a different
+        question — a ``user_id`` direct message also has no scope channel,
+        and that conflation published DMs to ``GLOBAL_CHANNEL``, which
+        every connection is auto-subscribed to on connect.
+        """
+        return not any(
+            getattr(message, field, None) for field in MESSAGE_TARGET_FIELDS
+        )
+
     def _get_message_channels(self, message: MessageTargetProtocol) -> List[str]:
         """Scope channel(s) for the message — derived from its target columns.
 
@@ -290,11 +310,20 @@ class WebSocketBroadcast:
         message has at most one target column set, so this normally
         returns a single-element list. The list is still ordered
         most-specific to least-specific to keep the API resilient if
-        legacy multi-target rows show up. Returns ``[]`` for global
-        messages (no targets) — the broadcast layer handles those by
-        publishing to the dedicated ``GLOBAL_CHANNEL``.
+        legacy multi-target rows show up.
+
+        Returns ``[]`` for two very different cases, so never read an
+        empty list as "global" — use ``_is_global_message``:
+
+        * a global message (no targets), which publishes to ``GLOBAL_CHANNEL``;
+        * a ``user_id`` direct message, which has no shared scope id at
+          all (the "channel" is a *pair* of users). Those are delivered
+          purely through the per-user inbox channels of their audience,
+          which is both sufficient and privacy-safe.
         """
         channels: List[str] = []
+        if message.course_member_id:
+            channels.append(f"course_member:{message.course_member_id}")
         if message.submission_group_id:
             channels.append(f"submission_group:{message.submission_group_id}")
         if message.course_content_id:
@@ -319,19 +348,20 @@ class WebSocketBroadcast:
     def _get_all_channels(
         self, message: MessageTargetProtocol, db: Session
     ) -> List[str]:
-        """Full broadcast target list: scope + per-recipient inbox + global.
+        """Full broadcast target list: scope + per-recipient inbox, or global.
 
-        For global messages (no target columns set), returns just
+        For global messages (every target column unset), returns just
         ``[GLOBAL_CHANNEL]`` — every connected client is auto-subscribed
         to it, so per-user fanout to N-thousand recipients is skipped.
 
-        For targeted messages, returns the scope channel plus
-        ``user:<id>`` for every user in the read audience (computed via
-        ``get_message_recipient_user_ids``). The author and every system
-        admin are always in that audience.
+        For targeted messages, returns the scope channel (if the scope has
+        one) plus ``user:<id>`` for every user in the read audience
+        (computed via ``get_message_recipient_user_ids``). The author and
+        every system admin are always in that audience, so a ``user_id``
+        direct message — which has no scope channel — still reaches both
+        participants, and *only* them.
         """
-        scope_channels = self._get_message_channels(message)
-        if not scope_channels:
+        if self._is_global_message(message):
             return [GLOBAL_CHANNEL]
 
         # Local import — avoids a circular dependency at module import.
@@ -339,6 +369,7 @@ class WebSocketBroadcast:
             get_message_recipient_user_ids,
         )
 
+        scope_channels = self._get_message_channels(message)
         recipients = get_message_recipient_user_ids(message, db)
         return scope_channels + [f"user:{uid}" for uid in sorted(recipients)]
 

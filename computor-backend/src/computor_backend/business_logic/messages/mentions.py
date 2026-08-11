@@ -16,17 +16,11 @@ from computor_backend.exceptions import BadRequestException
 from computor_backend.model.message import Message, MessageMention
 from computor_backend.model.course import CourseMember
 from computor_backend.model.auth import User
-from computor_types.messages import MessageMentionRef
+from computor_types.messages import MESSAGE_TARGET_FIELDS, MessageMentionRef
 from .audience import get_message_recipient_user_ids
 
 
 MENTION_PATTERN = re.compile(r'@\[[^\]]*\]\(([0-9a-fA-F-]{36})\)')
-
-
-_MENTION_TARGET_ATTRS = (
-    'user_id', 'course_member_id', 'submission_group_id', 'course_group_id',
-    'course_content_id', 'course_id', 'course_family_id', 'organization_id',
-)
 
 
 def extract_mention_user_ids(content: Optional[str]) -> list[str]:
@@ -67,7 +61,7 @@ def message_audience_user_ids(message_like, db: Session) -> Optional[set[str]]:
     """User ids allowed to see ``message_like``, or ``None`` for global
     (everyone). Thin wrapper over ``get_message_recipient_user_ids`` — the
     canonical inverse of ``MessagePermissionHandler``."""
-    if not any(getattr(message_like, attr, None) for attr in _MENTION_TARGET_ATTRS):
+    if not any(getattr(message_like, attr, None) for attr in MESSAGE_TARGET_FIELDS):
         return None  # global → everyone
     # Mentionability is narrower than read-visibility: a global admin (or any
     # privilege-bypass viewer) who isn't actually a participant of the scope —

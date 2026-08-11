@@ -56,15 +56,26 @@ def _check_user_message_write_permission(
 ) -> None:
     """Direct user-to-user message (one-on-one chat).
 
-    The handler path is wired end-to-end (visibility, audit, broadcast)
-    but creation is intentionally disabled until the product side
-    settles on rate-limiting / abuse handling. To enable: drop the raise
-    below — the rest of the path is already correct.
+    Creation is intentionally disabled until the product side settles on
+    rate-limiting / abuse handling.
 
-    Intended rules when enabled:
-    - recipient must exist
-    - author must not message themselves
-    - no role required (this is a direct chat)
+    Enabling this is NOT just deleting the raise below. Read visibility,
+    audit and WebSocket delivery are correct, but the following are not
+    yet implemented and a DM scope without them is unsafe or broken:
+
+    - the rules in this function (recipient exists; author is not the
+      recipient; no role required, this is a direct chat);
+    - a client-side conversation channel. A DM has no shared scope id —
+      the "channel" is a *pair* of users — so delivery rides the per-user
+      inbox channels (``user:<id>``) of the audience. The extension
+      currently subscribes a DM thread to ``user:<other_person_id>``,
+      which the connection manager correctly refuses; that needs to point
+      at the viewer's own inbox channel and filter by ``user_id``.
+
+    (A third landmine — the broadcast layer treating "no scope channel"
+    as "global", which would have published every DM to the channel all
+    connections auto-subscribe to — is fixed; see
+    ``WebSocketBroadcast._is_global_message``.)
     """
     raise NotImplementedException(
         detail="Direct user-to-user messages are not implemented yet"
