@@ -568,11 +568,104 @@ def generate_file(tag: str, operations: List[Dict[str, Any]]) -> Tuple[str, str]
     return "\n".join(lines), class_name
 
 
-def main(output_dir: Optional[Path] = None, spec_url: Optional[str] = None):
+def collect_unresolvable_schemas(spec: Dict[str, Any]) -> List[Tuple[str, str, str]]:
+    """Find *named* schemas with no importable computor_types counterpart.
+
+    These are the dangerous ones: the spec says "this is a `FooCreate`" but the
+    generator cannot import ``FooCreate``, so it degrades the type. Bodies that
+    were never named at all (inline objects, multipart forms) are a different,
+    milder case — see :func:`collect_untyped_bodies`.
+
+    Returns ``(schema_name, "METHOD /path", "request"|"response")`` tuples,
+    sorted and de-duplicated.
+    """
+    found: Set[Tuple[str, str, str]] = set()
+
+    for path, methods in spec.get("paths", {}).items():
+        for method, operation in methods.items():
+            if method not in ["get", "post", "put", "patch", "delete"]:
+                continue
+            where = f"{method.upper()} {path}"
+
+            request_schema = get_request_schema(operation)
+            if request_schema and not is_internal_schema(request_schema):
+                if not map_schema_to_import(request_schema):
+                    found.add((request_schema, where, "request"))
+
+            response_schema, _, _ = get_response_schema(operation)
+            if response_schema and not is_internal_schema(response_schema):
+                if not map_schema_to_import(response_schema):
+                    found.add((response_schema, where, "response"))
+
+    return sorted(found)
+
+
+def collect_untyped_bodies(spec: Dict[str, Any]) -> List[Tuple[str, str]]:
+    """Find request bodies that carry no named schema to type them with.
+
+    Two shapes land here: an endpoint declaring a bare ``dict`` (FastAPI emits
+    an anonymous ``{"type": "object"}``), and multipart/form endpoints (FastAPI
+    synthesises a ``Body_*`` wrapper). Both are generatable — the body is
+    emitted untyped — but they lose compile-time checking, so they are always
+    reported rather than passing silently.
+
+    Returns sorted ``("METHOD /path", content_type)`` tuples.
+    """
+    found: Set[Tuple[str, str]] = set()
+
+    for path, methods in spec.get("paths", {}).items():
+        for method, operation in methods.items():
+            if method not in ["post", "put", "patch"]:
+                continue
+            content = operation.get("requestBody", {}).get("content", {})
+            if not content or get_request_schema(operation):
+                continue
+            found.add((f"{method.upper()} {path}", ", ".join(sorted(content))))
+
+    return sorted(found)
+
+
+def format_unresolvable_report(unresolvable: List[Tuple[str, str, str]]) -> str:
+    """Build the abort message for named schemas the generator cannot import."""
+    index = build_schema_index()
+    lines = [
+        f"{len(unresolvable)} schema reference(s) could not be resolved to a "
+        "computor_types import:",
+        "",
+    ]
+    for name, where, kind in unresolvable:
+        note = ""
+        if name in index.ambiguous:
+            note = f"  (defined in more than one module: {', '.join(index.ambiguous[name])})"
+        lines.append(f"  {name}  <- {kind} of {where}{note}")
+    lines += [
+        "",
+        "Generating anyway would silently degrade these: a response falls back to",
+        "Dict[str, Any], and a *request* body loses its declared type.",
+        "",
+        "Usual causes:",
+        "  - the DTO lives in computor-backend instead of computor-types",
+        "    (see scripts/check_dto_location.py)",
+        "  - the same class name is defined in two computor_types modules",
+        "",
+        "Pass --allow-unresolved-schemas to generate regardless.",
+    ]
+    return "\n".join(lines)
+
+
+def main(
+    output_dir: Optional[Path] = None,
+    spec_url: Optional[str] = None,
+    allow_unresolved_schemas: bool = False,
+):
     """Main generator entry point.
 
     ``spec_url=None`` (default) builds the spec offline from the FastAPI app;
     pass a URL to fetch it from a running server instead.
+
+    Raises:
+        SystemExit: If any referenced schema cannot be resolved to a
+            computor_types import, unless ``allow_unresolved_schemas`` is set.
     """
     if output_dir is None:
         script_dir = Path(__file__).parent
@@ -587,6 +680,22 @@ def main(output_dir: Optional[Path] = None, spec_url: Optional[str] = None):
     if not spec:
         print("Failed to load OpenAPI spec.")
         return []
+
+    unresolvable = collect_unresolvable_schemas(spec)
+    if unresolvable:
+        report = format_unresolvable_report(unresolvable)
+        if not allow_unresolved_schemas:
+            raise SystemExit(f"Aborting: {report}")
+        print(f"WARNING: {report}")
+        print()
+
+    untyped_bodies = collect_untyped_bodies(spec)
+    if untyped_bodies:
+        print(f"{len(untyped_bodies)} request body/bodies have no named schema and "
+              "will be generated untyped:")
+        for where, content_types in untyped_bodies:
+            print(f"  {where}  [{content_types}]")
+        print()
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -675,8 +784,16 @@ if __name__ == "__main__":
         default=None,
         help="Override the endpoints output directory.",
     )
+    parser.add_argument(
+        "--allow-unresolved-schemas",
+        action="store_true",
+        help="Generate even when a schema cannot be resolved to a computor_types "
+             "import. Off by default: an unresolved request schema produces a "
+             "method with no body parameter, which can never send its payload.",
+    )
     args = parser.parse_args()
     main(
         output_dir=Path(args.output_dir) if args.output_dir else None,
         spec_url=args.url,
+        allow_unresolved_schemas=args.allow_unresolved_schemas,
     )
