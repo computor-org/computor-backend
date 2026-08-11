@@ -268,8 +268,10 @@ class TypeScriptGenerator:
         enum_names: Set[str] = set()
 
         for py_file in directory.rglob(pattern):
-            # Skip test files and __pycache__
-            if '__pycache__' in str(py_file) or 'test_' in py_file.name:
+            # Skip __pycache__ and unit-test directories. Match on path parts,
+            # not on the file name: DTO modules may legitimately be named
+            # test_*.py (test_jobs.py was silently skipped by a name match).
+            if '__pycache__' in py_file.parts or 'tests' in py_file.parts:
                 continue
 
             try:
