@@ -28,7 +28,7 @@ TUTOR_TEST_TTL = 3600
 KEY_PREFIX = "tutor_test"
 
 
-class TutorTestStatus(str, Enum):
+class TutorTestState(str, Enum):
     """Status values for tutor tests."""
     PENDING = "pending"
     RUNNING = "running"
@@ -103,7 +103,7 @@ async def create_tutor_test_entry(
     # Set initial status
     pipe.set(
         _get_status_key(test_id),
-        TutorTestStatus.PENDING.value,
+        TutorTestState.PENDING.value,
         ex=TUTOR_TEST_TTL
     )
 
@@ -113,7 +113,7 @@ async def create_tutor_test_entry(
 
     return {
         "test_id": test_id_str,
-        "status": TutorTestStatus.PENDING.value,
+        "status": TutorTestState.PENDING.value,
         "created_at": created_at,
     }
 
@@ -203,7 +203,7 @@ async def get_tutor_test_full(
 
     response = {
         "test_id": str(test_id),
-        "status": status if status else TutorTestStatus.PENDING.value,
+        "status": status if status else TutorTestState.PENDING.value,
     }
 
     if meta_raw:
@@ -227,7 +227,7 @@ async def get_tutor_test_full(
 async def update_tutor_test_status(
     redis_client,
     test_id: str | UUID,
-    status: TutorTestStatus,
+    status: TutorTestState,
     started_at: Optional[datetime] = None,
     finished_at: Optional[datetime] = None,
 ) -> bool:
@@ -283,7 +283,7 @@ async def store_tutor_test_result(
     redis_client,
     test_id: str | UUID,
     result: dict,
-    status: TutorTestStatus = TutorTestStatus.COMPLETED,
+    status: TutorTestState = TutorTestState.COMPLETED,
 ) -> bool:
     """
     Store test results and update status.
