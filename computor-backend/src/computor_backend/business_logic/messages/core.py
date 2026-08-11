@@ -122,6 +122,7 @@ def create_message_with_author(
     model_dump = payload.model_dump(exclude_unset=True)
     model_dump['author_id'] = permissions.user_id
 
+    parent_message = None
     if model_dump.get('parent_id'):
         parent_message = db.query(Message).filter(Message.id == model_dump['parent_id']).first()
         if not parent_message:
@@ -172,7 +173,7 @@ def create_message_with_author(
     model_dump['title'] = enforce_title_rule(model_dump.get('title'), scope)
 
     if primary_target is None:
-        _check_global_write_permission(permissions)
+        _check_global_write_permission(permissions, db)
     elif primary_target == 'user_id':
         _check_user_message_write_permission(permissions, model_dump['user_id'], db)
     elif primary_target == 'course_member_id':
@@ -192,8 +193,13 @@ def create_message_with_author(
     elif primary_target == 'organization_id':
         _check_organization_write_permission(permissions, model_dump['organization_id'])
 
-    if 'level' not in model_dump or model_dump['level'] is None:
-        model_dump['level'] = 0
+    # Depth is derived, never taken from the client. It used to be whatever
+    # the caller sent: the extension guessed it from its in-memory page and
+    # fell back to 1 when the parent wasn't loaded, and the agent didn't send
+    # it at all, so every agent reply was stored at depth 0. The webview
+    # seeds a root's indentation from this column, so a wrong value renders
+    # wrong.
+    model_dump['level'] = (parent_message.level or 0) + 1 if parent_message else 0
 
     # Gate @mentions against the message's audience before persistence — you
     # cannot mention a user who could not see the message. The relation rows

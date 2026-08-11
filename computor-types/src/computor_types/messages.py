@@ -167,7 +167,14 @@ class MessageCreate(BaseModel):
     """
     # author_id is always the current user; set in API
     parent_id: Optional[str] = None
-    level: int = Field(default=0)
+    level: int = Field(
+        default=0,
+        deprecated=True,
+        description=(
+            "Ignored. Thread depth is derived server-side from parent_id "
+            "(parent.level + 1, or 0 for a root)."
+        ),
+    )
     title: Optional[str] = Field(
         None,
         max_length=255,

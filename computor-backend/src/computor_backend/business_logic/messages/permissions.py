@@ -11,6 +11,7 @@ from computor_backend.model.course import (
     SubmissionGroup,
     SubmissionGroupMember,
 )
+from computor_backend.model.role import UserRole
 
 
 def _principal_has_course_role(
@@ -41,11 +42,35 @@ def _principal_has_course_role(
     ).scalar())
 
 
-def _check_global_write_permission(permissions: Principal) -> None:
-    """Global messages (no target set) are admin-only."""
-    if not permissions.is_admin:
+def _check_global_write_permission(permissions: Principal, db: Session) -> None:
+    """Global announcements: ``_admin`` or ``_user_manager``.
+
+    ``_user_manager`` already owns platform-wide people operations —
+    invites and bans — so a platform-wide announcement is squarely within
+    the role. The VS Code extension has offered them the compose box for
+    a while (``canPostGlobal`` takes an ``isUserManager`` flag); the
+    backend refused it, so they got a form and a 403. This closes that in
+    the direction the client already assumed.
+
+    Checked against the DB rather than claims: the role list on a
+    long-lived token can be stale, and posting to every user on the
+    platform is worth one query.
+    """
+    if permissions.is_admin:
+        return
+
+    has_role = db.query(
+        db.query(UserRole.user_id)
+        .filter(
+            UserRole.user_id == permissions.user_id,
+            UserRole.role_id == "_user_manager",
+        )
+        .exists()
+    ).scalar()
+
+    if not has_role:
         raise ForbiddenException(
-            detail="Only administrators can create global messages"
+            detail="Only administrators or user managers can create global messages"
         )
 
 

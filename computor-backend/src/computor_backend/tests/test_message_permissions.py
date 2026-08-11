@@ -97,6 +97,18 @@ def _payload(**fields):
     return _Fake(**fields)
 
 
+def _db_without_role():
+    """A db mock whose ``EXISTS`` role probe answers False.
+
+    ``_check_global_write_permission`` asks the DB whether the caller holds
+    ``_user_manager``. A bare MagicMock answers with a truthy mock, which
+    would silently grant global posting to everyone in these tests.
+    """
+    db = MagicMock()
+    db.query.return_value.scalar.return_value = False
+    return db
+
+
 def _stub_helpers(monkeypatch):
     """Replace every per-scope helper with a no-op MagicMock.
 
@@ -133,17 +145,36 @@ class TestGlobalScope:
     def test_admin_can_post_global(self):
         admin = _principal(is_admin=True)
         # Should not raise.
-        _check_global_write_permission(admin)
+        _check_global_write_permission(admin, db=MagicMock())
 
     def test_non_admin_blocked(self):
         user = _principal("organization:_owner:o1")  # high org role still not enough
         with pytest.raises(ForbiddenException):
-            _check_global_write_permission(user)
+            _check_global_write_permission(user, db=_db_without_role())
 
     def test_non_admin_blocked_via_create(self):
         user = _principal("course:_owner:c1")
         with pytest.raises(ForbiddenException):
-            create_message_with_author(_payload(), user, db=MagicMock())
+            create_message_with_author(_payload(), user, db=_db_without_role())
+
+    def test_user_manager_allowed(self):
+        # _user_manager already owns invites and bans; a platform-wide
+        # announcement is the same blast radius. The extension has offered
+        # them the compose box for a while and the backend 403'd it.
+        p = _principal(user_id="u-um")
+        db = MagicMock()
+        db.query.return_value.scalar.return_value = True
+        _check_global_write_permission(p, db)  # no raise
+
+    def test_role_is_read_from_the_db_not_claims(self):
+        # A long-lived token's role list goes stale, and this posts to every
+        # user on the platform — worth one query.
+        p = _principal(user_id="u-um")
+        db = MagicMock()
+        db.query.return_value.scalar.return_value = False
+        with pytest.raises(ForbiddenException):
+            _check_global_write_permission(p, db)
+        assert db.query.called
 
     def test_admin_create_global_succeeds(self, monkeypatch):
         mocks = _stub_helpers(monkeypatch)
@@ -152,7 +183,7 @@ class TestGlobalScope:
         # Bypass the stubbed _check_global_write_permission and verify it
         # got called.
         result = create_message_with_author(_payload(), admin, db=MagicMock())
-        mocks["_check_global_write_permission"].assert_called_once_with(admin)
+        mocks["_check_global_write_permission"].assert_called_once()
         # Every target column must be NULL on a global row.
         for f in MESSAGE_TARGET_FIELDS:
             assert result.get(f) is None
@@ -248,7 +279,7 @@ class TestPrimaryTargetDispatch:
         mocks = _stub_helpers(monkeypatch)
         p = _principal(is_admin=True)
         create_message_with_author(_payload(), p, db=MagicMock())
-        mocks["_check_global_write_permission"].assert_called_once_with(p)
+        mocks["_check_global_write_permission"].assert_called_once()
 
     def test_user_id_target_raises_not_implemented(self, monkeypatch):
         # Even with the helpers stubbed, user_id must dispatch to the
@@ -343,6 +374,7 @@ class TestReplyInheritance:
         parent = SimpleNamespace(
             **{f: None for f in MESSAGE_TARGET_FIELDS},
             id="m-parent",
+            level=0,
         )
         parent.submission_group_id = "sg1"
         db = _mock_db_returning_message(parent)
@@ -362,6 +394,7 @@ class TestReplyInheritance:
         parent = SimpleNamespace(
             **{f: None for f in MESSAGE_TARGET_FIELDS},
             id="m-parent",
+            level=0,
         )
         parent.submission_group_id = "sg1"
         db = _mock_db_returning_message(parent)
@@ -407,6 +440,7 @@ class TestNonConversationalReplyGuard:
                 "course_family_id", "organization_id",
             ]},
             id="m-parent",
+            level=0,
         )
         if parent_target_field is not None:
             setattr(parent, parent_target_field, parent_target_id)
@@ -638,7 +672,7 @@ class TestSubjectRule:
         # be applied after inheritance, not before.
         _stub_helpers(monkeypatch)
         parent = SimpleNamespace(
-            **{f: None for f in MESSAGE_TARGET_FIELDS}, id="m-parent"
+            **{f: None for f in MESSAGE_TARGET_FIELDS}, id="m-parent", level=0
         )
         parent.submission_group_id = "sg-1"
         db = _mock_db_returning_message(parent)
@@ -786,3 +820,60 @@ class TestBulkMarkRead:
             ["m-1", "m-1", "m-1"], _principal(), db
         )
         assert len(result) == 1
+
+
+# ---------------------------------------------------------------------------
+# Thread depth is derived, not client-supplied
+# ---------------------------------------------------------------------------
+
+
+class TestDerivedLevel:
+    def _db_with_parent(self, parent_level):
+        parent = SimpleNamespace(
+            **{f: None for f in MESSAGE_TARGET_FIELDS},
+            id="m-parent",
+            level=parent_level,
+        )
+        parent.submission_group_id = "sg-1"
+        return _mock_db_returning_message(parent)
+
+    def test_root_is_level_zero(self, monkeypatch):
+        _stub_helpers(monkeypatch)
+        result = create_message_with_author(
+            _payload(course_id="c-1"), _principal(is_admin=True), MagicMock()
+        )
+        assert result["level"] == 0
+
+    @pytest.mark.parametrize("parent_level,expected", [(0, 1), (1, 2), (4, 5)])
+    def test_reply_is_one_deeper_than_its_parent(
+        self, monkeypatch, parent_level, expected
+    ):
+        _stub_helpers(monkeypatch)
+        result = create_message_with_author(
+            _payload(parent_id="m-parent"),
+            _principal(is_admin=True),
+            self._db_with_parent(parent_level),
+        )
+        assert result["level"] == expected
+
+    def test_client_supplied_level_is_ignored(self, monkeypatch):
+        # It used to be taken verbatim: the extension guessed from its
+        # in-memory page (falling back to 1 when the parent wasn't loaded)
+        # and the agent never sent it, so agent replies were stored at 0.
+        _stub_helpers(monkeypatch)
+        result = create_message_with_author(
+            _payload(parent_id="m-parent", level=99),
+            _principal(is_admin=True),
+            self._db_with_parent(0),
+        )
+        assert result["level"] == 1
+
+    def test_null_parent_level_is_treated_as_zero(self, monkeypatch):
+        # Legacy rows exist with a NULL depth.
+        _stub_helpers(monkeypatch)
+        result = create_message_with_author(
+            _payload(parent_id="m-parent"),
+            _principal(is_admin=True),
+            self._db_with_parent(None),
+        )
+        assert result["level"] == 1

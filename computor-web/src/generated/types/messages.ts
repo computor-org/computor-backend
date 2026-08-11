@@ -41,6 +41,7 @@ export interface MessageMentionRef {
  */
 export interface MessageCreate {
   parent_id?: string | null;
+  /** Ignored. Thread depth is derived server-side from parent_id (parent.level + 1, or 0 for a root). */
   level?: number;
   /** Subject line. Required for announcement scopes (global, organization, course_family, course, course_content, course_group); must be omitted for conversational scopes (submission_group, course_member, user). */
   title?: string | null;
