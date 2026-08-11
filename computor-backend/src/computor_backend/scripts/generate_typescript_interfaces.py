@@ -414,6 +414,8 @@ class TypeScriptGenerator:
             'tasks': [],
             'examples': [],
             'messages': [],
+            'workspaces': [],
+            'update': [],
             'websocket': [],
             'common': [],
         }
@@ -449,6 +451,14 @@ class TypeScriptGenerator:
             # Special handling for GitLab and deployment configs
             elif 'gitlab' in model_name or 'deployment' in model_name or 'deployment' in module_name:
                 category = 'common'
+            # Coder workspace and system-update domains, matched on module only
+            # so UserUpdate/CourseUpdate-style DTOs stay in their own categories.
+            # Must precede the auth/course/role rules, which would otherwise
+            # steal workspace token/course_workspaces/workspace_roles models.
+            elif module_name.endswith('.coder') or 'workspace' in module_name:
+                category = 'workspaces'
+            elif module_name.endswith('.update'):
+                category = 'update'
             elif 'auth' in module_name or 'auth' in model_name or 'login' in model_name or 'token' in model_name:
                 category = 'auth'
             elif 'user' in module_name or 'user' in model_name or 'account' in model_name:
@@ -480,6 +490,11 @@ class TypeScriptGenerator:
                 category = 'websocket'
             elif 'gitlab' in enum_name or 'deployment' in enum_name or 'deployment' in module_name:
                 category = 'common'
+            # Keep in sync with the model categorization above.
+            elif module_name.endswith('.coder') or 'workspace' in module_name:
+                category = 'workspaces'
+            elif module_name.endswith('.update'):
+                category = 'update'
             elif 'auth' in module_name or 'auth' in enum_name:
                 category = 'auth'
             elif 'user' in module_name or 'user' in enum_name:
