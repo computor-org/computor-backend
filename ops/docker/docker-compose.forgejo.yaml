@@ -163,7 +163,7 @@ services:
     restart: "no"
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/forgejo/data:/data
-      - ../../computor-forgejo/scripts/bootstrap.sh:/bootstrap.sh:ro
+      - ../forgejo/bootstrap.sh:/bootstrap.sh:ro
     environment:
       GITEA_WORK_DIR: /data
       FORGEJO_ADMIN_USERNAME: ${GIT_SERVER_ADMIN_USERNAME:?}
