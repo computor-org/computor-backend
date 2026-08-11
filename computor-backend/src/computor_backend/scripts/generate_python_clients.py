@@ -99,8 +99,35 @@ def sanitize_method_name(name: str) -> str:
     return name
 
 
-def path_to_method_name(path: str, method: str, operation_id: str, base_segments: List[str]) -> str:
-    """Generate a method name from path and operation."""
+def path_to_method_name(
+    path: str,
+    method: str,
+    operation: Dict[str, Any],
+    base_segments: List[str],
+) -> str:
+    """Derive a method name from the route, deterministically.
+
+    The name depends only on the route itself — its path, its HTTP method and
+    whether it answers with an array — never on the order routes happen to be
+    registered in. That matters because the previous scheme resolved clashes by
+    "first one wins", so the same name meant opposite things in different
+    modules (``students.courses()`` listed, ``tutors.courses()`` fetched one)
+    and could flip whenever a route moved.
+
+    The rules:
+
+    * Segments belonging to the tag itself are dropped, leaving a *subject*
+      (``/tutors/course-members/{id}/course-contents`` under tag ``tutors``
+      gives ``course_members_course_contents``).
+    * GET answering with an array is ``list``/``list_<subject>``; any other GET
+      is ``get``/``get_<subject>``. Using the response shape rather than
+      "does the path end in a parameter" keeps action sub-paths such as
+      ``/submissions/artifacts/download`` out of the ``list_`` namespace.
+    * POST keeps the bare subject, because on action routes the verb is already
+      the last path segment (``.../validate``); with no subject it is ``create``.
+    * PATCH/PUT/DELETE are ``update``/``replace``/``delete``, suffixed with the
+      subject when there is one.
+    """
     segments = [s for s in path.split("/") if s and not s.startswith("{")]
 
     # Normalize base segments - also create the joined version for hyphenated paths
@@ -115,45 +142,25 @@ def path_to_method_name(path: str, method: str, operation_id: str, base_segments
         if seg_normalized not in normalized_base and seg_normalized != joined_base:
             remaining.append(seg)
 
-    if not remaining:
-        # Standard CRUD
-        if method == "GET" and not path.endswith("}"):
-            return "list"
-        elif method == "GET" and path.endswith("}"):
-            return "get"
-        elif method == "POST" and not any(s.startswith("{") for s in path.split("/")[-2:]):
-            return "create"
-        elif method == "PATCH" and path.count("{") == 1:
-            return "update"
-        elif method == "PUT" and path.count("{") == 1:
-            return "replace"
-        elif method == "DELETE" and path.count("{") == 1:
-            return "delete"
-        return method.lower()
+    subject = "_".join(filter(None, (sanitize_method_name(seg) for seg in remaining)))
 
-    # Use remaining segments for method name
-    name_parts = []
-    for seg in remaining:
-        seg_clean = sanitize_method_name(seg)
-        if seg_clean:
-            name_parts.append(seg_clean)
+    _, is_list_response, _ = get_response_schema(operation)
 
-    method_name = "_".join(name_parts)
+    if method == "GET":
+        verb = "list" if is_list_response else "get"
+    elif method == "POST":
+        verb = "" if subject else "create"
+    elif method == "PATCH":
+        verb = "update"
+    elif method == "PUT":
+        verb = "replace"
+    elif method == "DELETE":
+        verb = "delete"
+    else:
+        verb = method.lower()
 
-    # Add method prefix for non-standard operations
-    if method == "POST" and "upload" not in method_name and "submit" not in method_name:
-        if method_name not in ["login", "logout", "register", "refresh", "validate", "join", "sync"]:
-            method_name = method_name
-    elif method == "DELETE" and path.count("{") > 1:
-        if not method_name.startswith("delete"):
-            method_name = f"delete_{method_name}" if method_name else "delete"
-    elif method == "GET" and path.count("{") > 1:
-        if not method_name.startswith("get"):
-            method_name = f"get_{method_name}" if method_name else "get"
-
-    # Ensure final name is valid
-    method_name = sanitize_method_name(method_name)
-    return method_name if method_name else method.lower()
+    method_name = "_".join(filter(None, (verb, subject)))
+    return sanitize_method_name(method_name) or method.lower()
 
 
 def find_schema_ref(schema: Dict[str, Any]) -> Optional[str]:
@@ -414,7 +421,7 @@ def generate_method(
 
     # Determine base segments from tag
     base_segments = tag.replace("_", "-").split("-")
-    method_name = path_to_method_name(path, method, operation_id, base_segments)
+    method_name = path_to_method_name(path, method, operation, base_segments)
 
     # Avoid duplicate method names
     path_params = extract_path_params(path)
@@ -620,6 +627,30 @@ def generate_method(
     return "\n".join(lines), imports
 
 
+def disambiguate_method_name(
+    method_name: str,
+    path: str,
+    taken: Set[str],
+) -> str:
+    """Make ``method_name`` unique using the route's own path parameters.
+
+    Two routes only collide when they share a tag, verb and subject, which means
+    they differ in their parameters — so the parameter names are what tells them
+    apart. Deriving the suffix from the path (rather than a positional counter
+    or a truncated slice of it, which is where ``get_urse_member_id_...`` came
+    from) keeps the name stable no matter what order routes are processed in.
+    """
+    for param in reversed(extract_path_params(path)):
+        candidate = sanitize_method_name(f"{method_name}_by_{param}")
+        if candidate not in taken:
+            return candidate
+
+    suffix = 2
+    while f"{method_name}_{suffix}" in taken:
+        suffix += 1
+    return f"{method_name}_{suffix}"
+
+
 def generate_client_class(
     tag: str,
     operations: List[Dict[str, Any]],
@@ -632,7 +663,9 @@ def generate_client_class(
     methods = []
     seen_method_names = set()
 
-    for op in operations:
+    # Sort by route, not spec order, so the emitted file (and therefore any
+    # collision handling below) does not shift when routes are re-registered.
+    for op in sorted(operations, key=lambda o: (o["path"], o["method"])):
         method_code, imports = generate_method(
             op["path"],
             op["method"],
@@ -642,22 +675,20 @@ def generate_client_class(
             schemas,
         )
 
-        # Extract method name to check for duplicates
         match = re.search(r"async def (\w+)\(", method_code)
         if match:
             method_name = match.group(1)
             if method_name in seen_method_names:
-                # Add HTTP method and path hint to make unique
-                http_method = op["method"].lower()
-                path_hint = sanitize_method_name(op["path"].replace("/", "_").replace("{", "").replace("}", ""))
-                # Use HTTP method as prefix to disambiguate
-                new_name = f"{http_method}_{method_name}"
-                if new_name in seen_method_names:
-                    # Also add path hint
-                    new_name = f"{http_method}_{path_hint[-30:]}" if len(path_hint) > 30 else f"{http_method}_{path_hint}"
-                new_name = sanitize_method_name(new_name)
-                method_code = method_code.replace(f"async def {method_name}(", f"async def {new_name}(")
-                method_name = new_name
+                unique = disambiguate_method_name(method_name, op["path"], seen_method_names)
+                method_code = method_code.replace(
+                    f"async def {method_name}(", f"async def {unique}("
+                )
+                # list_page() companions carry the same stem.
+                method_code = method_code.replace(
+                    f"async def {method_name}_page(", f"async def {unique}_page("
+                )
+                method_code = method_code.replace(f"self.{method_name}_page(", f"self.{unique}_page(")
+                method_name = unique
             seen_method_names.add(method_name)
 
         methods.append(method_code)
