@@ -188,8 +188,12 @@ class CourseContentLecturerInterface(EntityInterface):
     # Mounted at /lecturers/course-contents in backend
     # Only supports GET list and GET by id operations
 
-# Fix forward references
+# Fix forward references. ExampleVersionGet must be in the rebuild call's frame
+# namespace so the nested deployment models resolve their 'ExampleVersionGet'
+# annotations (deployment.py only imports it under TYPE_CHECKING) — otherwise
+# this module only imports when course_contents happens to be imported first.
 from .deployment import CourseContentDeploymentGet, CourseContentDeploymentList
+from .example import ExampleVersionGet
 
 CourseContentLecturerGet.model_rebuild()
 CourseContentLecturerList.model_rebuild()
