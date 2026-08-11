@@ -297,10 +297,13 @@ def get_message_thread(
     Raises:
         BadRequestException: If message not found
     """
-    # Walk up to root
+    # Walk up to root. The anchor may itself be deleted — a client can hold
+    # the id of a message that was removed while its replies live on, and
+    # ``GET /messages/{id}`` still resolves it, so refusing here just made
+    # the two endpoints disagree. Whether the tombstone is returned is
+    # decided below, by whether anything still hangs off it.
     start_message = db.query(Message).filter(
         Message.id == message_id,
-        Message.archived_at.is_(None),
     ).first()
 
     if not start_message:
@@ -331,14 +334,39 @@ def get_message_thread(
         .filter(Message.parent_id == cte.c.id)
     )
 
-    # Fetch all thread messages, ordered chronologically
-    thread_messages = (
+    # Fetch the thread, then drop deleted messages that nothing depends on.
+    #
+    # A soft-deleted message keeps its row precisely so its replies stay
+    # attached — but every read path filtered it out unconditionally, which
+    # removed the node and left its replies pointing at a parent that was no
+    # longer in the response. The client rendered those as bare "↳ reply"
+    # with no context, and the tombstone the delete path writes ("[This
+    # message was deleted by ...]") was never displayed anywhere.
+    #
+    # Keep a deleted message only when it still has a live descendant, so the
+    # reply chain reads continuously and the gap is explained rather than
+    # silently swallowed.
+    all_thread_messages = (
         db.query(Message)
         .filter(Message.id.in_(db.query(cte.c.id)))
-        .filter(Message.archived_at.is_(None))
         .order_by(Message.created_at.asc())
         .all()
     )
+
+    by_id = {str(m.id): m for m in all_thread_messages}
+    keep: set[str] = set()
+    for message in all_thread_messages:
+        if message.archived_at is not None:
+            continue
+        keep.add(str(message.id))
+        # Walk up, keeping deleted ancestors that this live reply hangs off.
+        parent_id = str(message.parent_id) if message.parent_id else None
+        while parent_id and parent_id in by_id and parent_id not in keep:
+            keep.add(parent_id)
+            parent = by_id[parent_id]
+            parent_id = str(parent.parent_id) if parent.parent_id else None
+
+    thread_messages = [m for m in all_thread_messages if str(m.id) in keep]
 
     # Enrich with read status and author info
     items = [MessageList.model_validate(msg, from_attributes=True) for msg in thread_messages]
