@@ -55,6 +55,7 @@ from .read_status import (
     list_messages_with_read_status,
     mark_message_as_read,
     mark_message_as_unread,
+    mark_messages_as_read,
 )
 from .lifecycle import (
     soft_delete_message,
@@ -97,6 +98,7 @@ __all__ = [
     "list_messages_with_read_status",
     "mark_message_as_read",
     "mark_message_as_unread",
+    "mark_messages_as_read",
     "soft_delete_message",
     "update_message_with_audit",
     "create_message_audit",

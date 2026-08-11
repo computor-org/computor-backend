@@ -37,7 +37,7 @@ from computor_backend.business_logic.crud import (
 from computor_backend.database import get_db
 from computor_backend.redis_cache import get_cache
 from computor_backend.cache import Cache
-from computor_types.messages import MentionableQuery, MessageCreate, MessageGet, MessageList, MessageMentionRef, MessageQuery, MessageThread, MessageUpdate
+from computor_types.messages import MentionableQuery, MessageCreate, MessageGet, MessageList, MessageMentionRef, MessageQuery, MessageReadBulk, MessageReadBulkResult, MessageThread, MessageUpdate
 from computor_backend.interfaces.message import MessageInterface
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
@@ -58,6 +58,7 @@ from computor_backend.business_logic.messages import (
     mark_author_as_reader,
     mark_message_as_read,
     mark_message_as_unread,
+    mark_messages_as_read,
     message_audience_user_ids,
     sync_message_mentions,
     validate_message_mentions,
@@ -331,6 +332,43 @@ async def mark_message_read(
     )
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+# Path is ``/reads/bulk`` rather than the tidier collection-level
+# ``/reads``: the client generator names methods after the path, so a bare
+# ``/messages/reads`` collides with ``/messages/{id}/reads`` and renames the
+# existing single-message ``reads(id=...)`` out from under its callers
+# (computor-agent calls it in two places).
+@messages_router.post("/reads/bulk", response_model=MessageReadBulkResult)
+async def mark_messages_read_bulk(
+    payload: MessageReadBulk,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache),
+):
+    """Mark many messages as read for the current user in one request.
+
+    Opening a thread marks everything in it read. Doing that one message
+    at a time cost a request, a full per-user cache invalidation and two
+    Redis publishes *each* — so a panel with 200 unread paid all of it
+    200 times. This does one permission-filtered query, one bulk insert,
+    one invalidation, and one broadcast per affected channel.
+
+    Ids the caller cannot read are skipped, not rejected: a read sweep is
+    best-effort, and the response reports how many actually landed.
+    """
+    requested = len(dict.fromkeys(str(mid) for mid in payload.message_ids))
+    newly_read = mark_messages_as_read(payload.message_ids, permissions, db, cache)
+
+    if newly_read:
+        await _safe_broadcast(
+            ws_broadcast.reads_updated(
+                newly_read, str(permissions.user_id), is_read=True
+            ),
+            op="read:update:bulk",
+        )
+
+    return MessageReadBulkResult(marked=len(newly_read), requested=requested)
+
 
 @messages_router.delete("/{id}/reads", status_code=status.HTTP_204_NO_CONTENT)
 async def mark_message_unread(

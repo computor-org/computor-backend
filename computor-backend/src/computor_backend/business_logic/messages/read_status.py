@@ -1,8 +1,10 @@
 """Per-user read status, author enrichment and read/unread mutations."""
 from uuid import UUID
 from typing import Optional, Tuple, List, Dict
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.principal import Principal
 from computor_backend.model.message import MessageRead, Message
 from computor_backend.model.course import CourseMember
@@ -291,6 +293,132 @@ def mark_message_as_read(
         _invalidate_message_cache(message_id, str(permissions.user_id), db, cache)
     else:
         logger.info(f"Message {message_id} already marked as read by user {permissions.user_id}")
+
+
+def mark_messages_as_read(
+    message_ids: List[str],
+    permissions: Principal,
+    db: Session,
+    cache: Optional[Cache] = None,
+) -> List[Message]:
+    """Mark many messages read for the current user in one pass.
+
+    Opening a thread marks everything in it read, which used to mean one
+    request per message — each one writing a row, calling
+    ``cache.invalidate_user_views`` (which drops *every* cached view for
+    that user, not just the message-bearing ones) and publishing two Redis
+    events. A panel with 200 unread did all of that 200 times, which is
+    why the inbox had to grow a concurrency limiter and a WS-suppression
+    window just to survive its own read sweep.
+
+    Only messages the caller can actually see are marked; ids they cannot
+    read are silently skipped rather than 403-ing the whole batch, since a
+    sweep is best-effort by nature and the caller learns nothing from an
+    id it was never shown.
+
+    Returns the Message rows newly marked read (already-read ones are
+    excluded), so the caller can broadcast per scope channel.
+    """
+    if not message_ids:
+        return []
+
+    unique_ids = list(dict.fromkeys(str(mid) for mid in message_ids))
+
+    # Narrow to what this principal may read, in one query.
+    visible_query = check_permissions(permissions, Message, "get", db)
+    if visible_query is None:
+        return []
+    visible = (
+        visible_query
+        .filter(Message.id.in_(unique_ids), Message.archived_at.is_(None))
+        .all()
+    )
+    if not visible:
+        return []
+
+    already_read = {
+        str(row[0])
+        for row in db.query(MessageRead.message_id)
+        .filter(
+            MessageRead.reader_user_id == permissions.user_id,
+            MessageRead.message_id.in_([str(m.id) for m in visible]),
+        )
+        .all()
+    }
+
+    newly_read = [m for m in visible if str(m.id) not in already_read]
+    if not newly_read:
+        return []
+
+    db.add_all([
+        MessageRead(message_id=m.id, reader_user_id=permissions.user_id)
+        for m in newly_read
+    ])
+    try:
+        db.commit()
+    except IntegrityError:
+        # Raced with a concurrent single mark-read for one of these ids.
+        # The unique index did its job; fall back to per-row inserts so
+        # the rest of the batch still lands.
+        db.rollback()
+        newly_read = _insert_reads_individually(newly_read, permissions, db)
+        if not newly_read:
+            return []
+
+    # One invalidation for the whole batch instead of one per message.
+    _invalidate_message_cache_bulk(newly_read, str(permissions.user_id), cache)
+
+    return newly_read
+
+
+def _insert_reads_individually(
+    messages: List[Message],
+    permissions: Principal,
+    db: Session,
+) -> List[Message]:
+    """Per-row fallback for the bulk insert; skips rows that now conflict."""
+    inserted: List[Message] = []
+    for message in messages:
+        try:
+            db.add(MessageRead(message_id=message.id, reader_user_id=permissions.user_id))
+            db.commit()
+            inserted.append(message)
+        except IntegrityError:
+            db.rollback()
+    return inserted
+
+
+def _invalidate_message_cache_bulk(
+    messages: List[Message],
+    reader_user_id: str,
+    cache: Optional[Cache] = None,
+) -> None:
+    """Batch equivalent of ``_invalidate_message_cache``.
+
+    ``invalidate_user_views`` is the expensive, blunt part and is
+    user-scoped, so it runs exactly once no matter how many messages were
+    read. The per-entity tags are deduped across the batch — a thread's
+    messages nearly all share one target, so this collapses N tag drops
+    into one.
+    """
+    if not cache or not messages:
+        return
+
+    cache.invalidate_user_views(user_id=reader_user_id)
+
+    tags: set[str] = set()
+    for message in messages:
+        for scope in ("submission_group", "course_content", "course_member",
+                      "course_group", "course", "course_family", "organization"):
+            target_id = getattr(message, f"{scope}_id", None)
+            if target_id:
+                tags.add(f"{scope}:{target_id}")
+                tags.add(f"{scope}_id:{target_id}")
+        if message.user_id:
+            tags.add(f"user:{message.user_id}")
+
+    for tag in tags:
+        cache.invalidate_tags(tag)
 
 
 def mark_message_as_unread(

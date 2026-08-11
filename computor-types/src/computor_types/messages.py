@@ -417,6 +417,31 @@ class MentionableQuery(BaseModel):
     limit: int = Field(50, le=200, description="Maximum number of candidates to return")
 
 
+class MessageReadBulk(BaseModel):
+    """Body for ``POST /messages/reads`` — mark many messages read at once.
+
+    Ids the caller cannot see are skipped rather than rejecting the batch:
+    a read sweep is best-effort, and a client learns nothing useful from
+    an id it was never shown in the first place.
+    """
+    message_ids: List[str] = Field(
+        ...,
+        min_length=1,
+        max_length=1000,
+        description="Message ids to mark as read for the current user",
+    )
+
+
+class MessageReadBulkResult(BaseModel):
+    """What a bulk mark-read actually changed."""
+    marked: int = Field(
+        0, description="How many messages were newly marked read"
+    )
+    requested: int = Field(
+        0, description="How many ids were submitted (after de-duplication)"
+    )
+
+
 class MessageThread(BaseModel):
     """Full conversation thread for a message.
 

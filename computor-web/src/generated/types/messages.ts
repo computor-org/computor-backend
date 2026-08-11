@@ -257,6 +257,28 @@ export interface MentionableQuery {
 }
 
 /**
+ * Body for ``POST /messages/reads`` — mark many messages read at once.
+ * 
+ * Ids the caller cannot see are skipped rather than rejecting the batch:
+ * a read sweep is best-effort, and a client learns nothing useful from
+ * an id it was never shown in the first place.
+ */
+export interface MessageReadBulk {
+  /** Message ids to mark as read for the current user */
+  message_ids: string[];
+}
+
+/**
+ * What a bulk mark-read actually changed.
+ */
+export interface MessageReadBulkResult {
+  /** How many messages were newly marked read */
+  marked?: number;
+  /** How many ids were submitted (after de-duplication) */
+  requested?: number;
+}
+
+/**
  * Full conversation thread for a message.
  * 
  * Returns all messages sharing the same root, ordered by created_at.

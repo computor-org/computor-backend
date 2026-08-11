@@ -195,6 +195,65 @@ class WebSocketBroadcast:
             f"Broadcast read:update (read={is_read}) to {channels} for message {message_id}"
         )
 
+    async def reads_updated(
+        self,
+        messages: List[MessageTargetProtocol],
+        user_id: str,
+        *,
+        is_read: bool,
+    ):
+        """Broadcast a read-state change covering many messages at once.
+
+        Emits one ``read:update`` per distinct channel carrying every
+        affected id in ``message_ids``, rather than one event per message.
+        A thread's messages nearly all share a scope channel, so a sweep
+        over 200 unread collapses from 400 publishes to 2.
+
+        ``message_id`` is still set (to the first id) so a client written
+        against the single-message shape keeps working; clients that know
+        about ``message_ids`` should prefer it.
+        """
+        from computor_backend.websocket.pubsub import CHANNEL_PREFIX
+        from computor_backend.redis_cache import get_redis_client
+        import json
+
+        if not messages:
+            return
+
+        by_channel: dict[str, List[str]] = {}
+        for message in messages:
+            if self._is_global_message(message):
+                channels = [GLOBAL_CHANNEL]
+            else:
+                channels = self._get_message_channels(message)
+            for channel in channels:
+                by_channel.setdefault(channel, []).append(str(message.id))
+
+        # The reader's own inbox channel always hears about all of them, so
+        # their other tabs and devices converge.
+        by_channel.setdefault(f"user:{user_id}", []).extend(
+            str(m.id) for m in messages
+        )
+
+        redis_client = await get_redis_client()
+        for channel, ids in by_channel.items():
+            unique_ids = list(dict.fromkeys(ids))
+            await redis_client.publish(
+                f"{CHANNEL_PREFIX}{channel}",
+                json.dumps({
+                    "type": "read:update",
+                    "channel": channel,
+                    "message_id": unique_ids[0],
+                    "message_ids": unique_ids,
+                    "user_id": user_id,
+                    "read": is_read,
+                }),
+            )
+        logger.debug(
+            "Broadcast bulk read:update (read=%s) for %d messages across %d channels",
+            is_read, len(messages), len(by_channel),
+        )
+
     # =========================================================================
     # Deployment events
     # =========================================================================

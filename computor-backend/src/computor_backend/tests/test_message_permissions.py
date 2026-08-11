@@ -680,3 +680,109 @@ class TestKindDerivation:
     )
     def test_kind_for_every_scope(self, scope, expected):
         assert kind_for_scope(scope) == expected
+
+
+# ---------------------------------------------------------------------------
+# Bulk mark-read — permission filtering and idempotence
+# ---------------------------------------------------------------------------
+
+
+class TestBulkMarkRead:
+    """``mark_messages_as_read`` narrows to what the caller may read.
+
+    The visibility query and the MessageRead lookup are stubbed; what
+    matters here is that unreadable ids are dropped silently rather than
+    failing the batch, that already-read ids don't produce duplicate rows,
+    and that the expensive per-user cache invalidation runs once.
+    """
+
+    def _db(self, visible, already_read):
+        db = MagicMock()
+
+        read_rows = MagicMock()
+        read_rows.filter.return_value.all.return_value = [
+            (mid,) for mid in already_read
+        ]
+        db.query.return_value = read_rows
+        return db
+
+    def _patch_visibility(self, monkeypatch, visible):
+        visible_query = MagicMock()
+        visible_query.filter.return_value.all.return_value = visible
+        monkeypatch.setattr(
+            messages_bl.read_status,
+            "check_permissions",
+            lambda principal, entity, action, db: visible_query,
+        )
+
+    def test_empty_input_is_a_no_op(self):
+        assert messages_bl.mark_messages_as_read([], _principal(), MagicMock()) == []
+
+    def test_unreadable_ids_are_skipped_not_rejected(self, monkeypatch):
+        # A read sweep is best-effort — a client learns nothing from an id
+        # it was never shown, so the batch must not 403 as a whole.
+        visible = [SimpleNamespace(id="m-1", **{f: None for f in MESSAGE_TARGET_FIELDS})]
+        self._patch_visibility(monkeypatch, visible)
+        db = self._db(visible, already_read=[])
+
+        result = messages_bl.mark_messages_as_read(
+            ["m-1", "m-not-mine"], _principal(), db
+        )
+
+        assert [str(m.id) for m in result] == ["m-1"]
+
+    def test_already_read_ids_are_not_reinserted(self, monkeypatch):
+        visible = [
+            SimpleNamespace(id="m-1", **{f: None for f in MESSAGE_TARGET_FIELDS}),
+            SimpleNamespace(id="m-2", **{f: None for f in MESSAGE_TARGET_FIELDS}),
+        ]
+        self._patch_visibility(monkeypatch, visible)
+        db = self._db(visible, already_read=["m-1"])
+
+        result = messages_bl.mark_messages_as_read(["m-1", "m-2"], _principal(), db)
+
+        assert [str(m.id) for m in result] == ["m-2"]
+        db.add_all.assert_called_once()
+
+    def test_nothing_new_skips_the_write_entirely(self, monkeypatch):
+        visible = [SimpleNamespace(id="m-1", **{f: None for f in MESSAGE_TARGET_FIELDS})]
+        self._patch_visibility(monkeypatch, visible)
+        db = self._db(visible, already_read=["m-1"])
+
+        assert messages_bl.mark_messages_as_read(["m-1"], _principal(), db) == []
+        db.add_all.assert_not_called()
+        db.commit.assert_not_called()
+
+    def test_user_view_cache_is_invalidated_once_for_the_whole_batch(self, monkeypatch):
+        # The per-message path called invalidate_user_views once per message,
+        # and each call drops *every* cached view for that user.
+        visible = [
+            SimpleNamespace(
+                id=f"m-{i}",
+                **{**{f: None for f in MESSAGE_TARGET_FIELDS},
+                   "submission_group_id": "sg-1"},
+            )
+            for i in range(50)
+        ]
+        self._patch_visibility(monkeypatch, visible)
+        db = self._db(visible, already_read=[])
+        cache = MagicMock()
+
+        messages_bl.mark_messages_as_read(
+            [f"m-{i}" for i in range(50)], _principal(), db, cache
+        )
+
+        cache.invalidate_user_views.assert_called_once()
+        # 50 messages sharing one submission group collapse to that group's
+        # two tags, not 100 tag drops.
+        assert cache.invalidate_tags.call_count == 2
+
+    def test_duplicate_ids_are_collapsed(self, monkeypatch):
+        visible = [SimpleNamespace(id="m-1", **{f: None for f in MESSAGE_TARGET_FIELDS})]
+        self._patch_visibility(monkeypatch, visible)
+        db = self._db(visible, already_read=[])
+
+        result = messages_bl.mark_messages_as_read(
+            ["m-1", "m-1", "m-1"], _principal(), db
+        )
+        assert len(result) == 1

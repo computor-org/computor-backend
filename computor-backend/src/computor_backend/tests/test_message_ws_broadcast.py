@@ -301,6 +301,100 @@ class TestReadUpdated:
 
 
 # ---------------------------------------------------------------------------
+# reads_updated — one event per channel for a whole batch
+# ---------------------------------------------------------------------------
+
+
+class TestReadsUpdatedBulk:
+    def setup_method(self):
+        self.b = WebSocketBroadcast()
+
+    def _capture(self, monkeypatch):
+        captured = []
+
+        async def fake_publish(channel, payload_str):
+            captured.append((channel, json.loads(payload_str)))
+
+        async def fake_get_redis_client():
+            return SimpleNamespace(publish=fake_publish)
+
+        monkeypatch.setattr(
+            "computor_backend.redis_cache.get_redis_client", fake_get_redis_client
+        )
+        return captured
+
+    def test_thread_sweep_collapses_to_two_publishes(self, monkeypatch):
+        # The whole point of the bulk path: 200 messages in one submission
+        # group used to be 400 publishes (scope + reader, per message).
+        captured = self._capture(monkeypatch)
+        messages = [
+            _msg(id=f"m-{i}", submission_group_id="sg-1") for i in range(200)
+        ]
+
+        _run(self.b.reads_updated(messages, "u-reader", is_read=True))
+
+        from computor_backend.websocket.pubsub import CHANNEL_PREFIX
+        assert len(captured) == 2
+        channels = {c for c, _ in captured}
+        assert channels == {
+            f"{CHANNEL_PREFIX}submission_group:sg-1",
+            f"{CHANNEL_PREFIX}user:u-reader",
+        }
+        for _, payload in captured:
+            assert len(payload["message_ids"]) == 200
+            assert payload["read"] is True
+            # Kept for clients written against the single-message shape.
+            assert payload["message_id"] == payload["message_ids"][0]
+
+    def test_mixed_scopes_get_one_publish_each(self, monkeypatch):
+        captured = self._capture(monkeypatch)
+        messages = [
+            _msg(id="m-1", submission_group_id="sg-1"),
+            _msg(id="m-2", submission_group_id="sg-1"),
+            _msg(id="m-3", course_id="c-1"),
+        ]
+
+        _run(self.b.reads_updated(messages, "u-reader", is_read=True))
+
+        from computor_backend.websocket.pubsub import CHANNEL_PREFIX
+        by_channel = {c: p for c, p in captured}
+        assert by_channel[f"{CHANNEL_PREFIX}submission_group:sg-1"]["message_ids"] == [
+            "m-1", "m-2",
+        ]
+        assert by_channel[f"{CHANNEL_PREFIX}course:c-1"]["message_ids"] == ["m-3"]
+        # The reader hears about every id, so their other tabs converge.
+        assert set(
+            by_channel[f"{CHANNEL_PREFIX}user:u-reader"]["message_ids"]
+        ) == {"m-1", "m-2", "m-3"}
+
+    def test_direct_messages_stay_off_the_global_channel(self, monkeypatch):
+        captured = self._capture(monkeypatch)
+
+        _run(self.b.reads_updated(
+            [_msg(id="m-1", user_id="u-recipient")], "u-reader", is_read=True
+        ))
+
+        from computor_backend.websocket.pubsub import CHANNEL_PREFIX
+        channels = [c for c, _ in captured]
+        assert f"{CHANNEL_PREFIX}{GLOBAL_CHANNEL}" not in channels
+        assert channels == [f"{CHANNEL_PREFIX}user:u-reader"]
+
+    def test_global_messages_use_the_global_channel(self, monkeypatch):
+        captured = self._capture(monkeypatch)
+
+        _run(self.b.reads_updated([_msg(id="m-1")], "u-reader", is_read=True))
+
+        from computor_backend.websocket.pubsub import CHANNEL_PREFIX
+        channels = {c for c, _ in captured}
+        assert f"{CHANNEL_PREFIX}{GLOBAL_CHANNEL}" in channels
+
+    def test_empty_batch_publishes_nothing(self, monkeypatch):
+        captured = self._capture(monkeypatch)
+        _run(self.b.reads_updated([], "u-reader", is_read=True))
+        assert captured == []
+
+
+# ---------------------------------------------------------------------------
 # Audience helper — get_message_recipient_user_ids
 #
 # We mock the DB session to verify dispatch (which branch fires per scope)
