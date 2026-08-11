@@ -4,8 +4,8 @@ Generic YAML config read/write plumbing (dependency-free).
 Provides YAML load/dump helpers decoupled from deployment types, so any
 pydantic config model can be serialized to / loaded from a YAML file without
 importing deployment DTOs. ``deployment_base.DeploymentFactory`` and
-``BaseDeployment`` delegate to these helpers, and lightweight CLI configs
-(e.g. ``computor_cli.config.CLIAuthConfig``) can use them directly.
+``BaseDeployment`` delegate to these helpers, and any lightweight config
+model can use them directly.
 """
 
 from typing import Any, Optional, Type, TypeVar

@@ -11,9 +11,9 @@ generation, and tests.
 ## Setup
 
 ```bash
-# 1. Virtualenv + editable installs (order matters: types → client → cli → backend)
+# 1. Virtualenv + editable installs (order matters: types → client → backend)
 python3.10 -m venv .venv && source .venv/bin/activate
-pip install -e computor-types/ -e computor-client/ -e computor-cli/ -e computor-backend/
+pip install -e computor-types/ -e computor-client/ -e computor-backend/
 
 # 2. Environment — generate .env with fresh secrets (never overwrites an existing .env)
 ./setup-env.sh
@@ -37,8 +37,6 @@ migrations automatically, so `migrations.sh` is only for the rare standalone cas
 Verify:
 
 ```bash
-computor --help          # CLI installed
-computor login           # authenticate against the API
 curl localhost:8000/docs # Swagger UI is up
 ```
 

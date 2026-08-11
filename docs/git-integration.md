@@ -62,9 +62,9 @@ Two entry points. Both end in the same `CourseGitBinding`.
 
 ### 2. From a deployment file
 
-Deploying a course file — via **CLI** (`computor deployment`), **web upload**, or the
-**VSCode** extension — sets up the git binding straight from the file. This is the
-recommended path: the connection travels with the course definition.
+Deploying a course file — via **web upload** or the **VSCode** extension — sets up
+the git binding straight from the file. This is the recommended path: the
+connection travels with the course definition.
 
 The `git:` block on a course is a `CourseGitConfig`:
 

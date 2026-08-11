@@ -4,7 +4,6 @@ Check for forbidden imports in packages to maintain clean architecture.
 
 This script ensures that:
 - computor-types remains pure (no web framework dependencies)
-- computor-cli doesn't depend on backend
 - computor-client doesn't depend on backend
 
 Usage:
@@ -28,14 +27,6 @@ FORBIDDEN_IMPORTS = {
         'flask': 'Web framework - types should be framework-agnostic',
         'django': 'Web framework - types should be framework-agnostic',
         'computor_backend': 'Backend code - creates circular dependency',
-    },
-    'computor-cli': {
-        'computor_backend': 'Backend code - CLI should use computor-client instead',
-        'fastapi': 'Web framework - CLI should use httpx/computor-client',
-        'starlette': 'ASGI framework - CLI should use httpx/computor-client',
-        'sqlalchemy': 'Database ORM - CLI should use HTTP API',
-        'flask': 'Web framework - CLI should use httpx/computor-client',
-        'django': 'Web framework - CLI should use httpx/computor-client',
     },
     'computor-client': {
         'computor_backend': 'Backend code - client should be independent',

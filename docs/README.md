@@ -21,9 +21,9 @@ New here? Read them in that order. For a specific task, jump straight to the rel
 ## Quick start
 
 ```bash
-# 1. Editable installs (order matters: types → client → cli → backend)
+# 1. Editable installs (order matters: types → client → backend)
 python3.10 -m venv .venv && source .venv/bin/activate
-pip install -e computor-types/ -e computor-client/ -e computor-cli/ -e computor-backend/
+pip install -e computor-types/ -e computor-client/ -e computor-backend/
 
 # 2. Environment: generate .env with fresh secrets (never overwrites an existing .env)
 ./setup-env.sh

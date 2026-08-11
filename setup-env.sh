@@ -53,8 +53,8 @@ generate_hex_token() {
     openssl rand -hex 32 2>/dev/null || cat /dev/urandom | head -c 32 | xxd -p -c 256
 }
 
-# Generate an API token in the backend's format: "ctp_" + 32 url-safe base64 chars.
-# Mirrors computor_cli.api_token_cli.generate_api_token (secrets.token_urlsafe(24)[:32]).
+# Generate an API token in the backend's format: "ctp_" + 32 url-safe base64 chars
+# (secrets.token_urlsafe(24)[:32], same scheme as the backend's token generation).
 # A deployment later registers this token's prefix + sha256 hash to create the
 # matching service user, so the format must match exactly.
 generate_api_token() {

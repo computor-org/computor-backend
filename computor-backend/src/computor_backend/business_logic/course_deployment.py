@@ -1,8 +1,7 @@
 """Deploy a single course (identity + content tree) from a course-level config.
 
-This is the server-side counterpart to the CLI's ``_deploy_course_contents``
-orchestration (``computor-cli``), but scoped to ONE course under an existing
-course family and driven by the web "create course" upload. It takes a
+Course deployment scoped to ONE course under an existing
+course family, driven by the web "create course" upload. It takes a
 :class:`HierarchicalCourseConfig` (parsed from ``course_deployment.yaml``) and:
 
   1. authorizes course creation in the family (same gate as ``POST /courses``);

@@ -3,13 +3,11 @@
 This directory holds the **privacy-notice / consent policy versions** that back
 the consent gate (`computor-backend` `middleware/consent.py`). It sits parallel
 to `data/deployments/` but is **not** applied at startup — publishing a notice
-immediately re-gates every user, so it is always an explicit action via:
+immediately re-gates every user, so it is always an explicit action via the
+web UI: **System → Privacy Notices → Publish** (admins only).
 
-- the CLI: `ctutor consent publish data/consent/<version>` , or
-- the web UI: **System → Privacy Notices → Publish** (admins only).
-
-Both call `POST /consent/policy-versions` (admin), which uploads the Markdown to
-MinIO (`policies/{version}/{lang}.md`) and inserts an **append-only** row.
+Publishing calls `POST /consent/policy-versions` (admin), which uploads the Markdown
+to MinIO (`policies/{version}/{lang}.md`) and inserts an **append-only** row.
 
 ## Layout
 

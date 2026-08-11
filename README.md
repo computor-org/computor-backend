@@ -8,7 +8,6 @@ A university programming course management platform with automated GitLab integr
 |---------|-------------|
 | `computor-types` | Pydantic DTOs - shared data structures for API contracts |
 | `computor-client` | Auto-generated async HTTP client library |
-| `computor-cli` | Command-line interface for admin and dev tasks |
 | `computor-backend` | FastAPI server with business logic and Temporal workflows |
 | `computor-web` | Next.js frontend application |
 
@@ -35,8 +34,6 @@ source .venv/bin/activate
 # Install packages (editable mode for development)
 pip install -e computor-types/
 pip install -e computor-client/
-pip install -e computor-cli/
-pip install -e computor-utils/
 pip install -e computor-backend/
 
 # Configure environment (generates .env with fresh secrets; never overwrites an existing .env)

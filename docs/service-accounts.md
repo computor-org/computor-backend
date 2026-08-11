@@ -107,30 +107,12 @@ the valid values — it never guesses.
 
 ## Adding a service account
 
-Three routes to the same rows. Pick by how reproducible it needs to be.
+Two routes to the same rows. Pick by how reproducible it needs to be.
 
 ### Web UI — `/admin/services`
 
 Admin or `_service_manager`. Create the service, then mint its token on the detail
 page; the value is shown **once**. Best for ad-hoc and delegated work.
-
-### CLI
-
-```bash
-computor service create \
-  --slug acme.exec.py \
-  --name "Acme Python Runner" \
-  --service-type testing.temporal \
-  --email acme-runner@computor.local \
-  --create-token --token-expires-days 365
-```
-
-Other subcommands: `service list|get|update|create-token|revoke-tokens|list-types|create-type`,
-and `computor token create|list|revoke|verify`.
-
-> The CLI has no `--config`/`--language` flag yet, so a CLI-created testing service
-> still needs its `config.language` set afterwards (web UI, or `PATCH
-> /service-accounts/{id}`). Worth a follow-up.
 
 ### Bootstrap YAML — the reproducible one
 
@@ -321,4 +303,3 @@ default to `[]` and an agent's authority comes from its course membership.
 | Runner dispatch | `…/testing/backends.py` |
 | Slug resolution | `…/business_logic/testing_service.py` |
 | Web UI | `computor-web/app/admin/services/` |
-| CLI | `computor-cli/…/service_cli.py`, `…/api_token_cli.py` |
