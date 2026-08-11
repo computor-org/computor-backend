@@ -34,7 +34,34 @@ import path from 'node:path';
 import process from 'node:process';
 
 const WEB_ROOT = path.resolve(new URL('..', import.meta.url).pathname);
-const BASE_REF = process.env.COMPUTOR_BASE_REF || 'release/2026.10';
+/*
+ * The ratchet baseline: which ref "changed files" is measured against.
+ *
+ * Hardcoding one integration branch breaks on both sides of a release. Work
+ * currently targets release/2026.10, so baselining on main (which trails it)
+ * would mark long-settled files as changed and report inherited findings on a
+ * clean branch — but baselining on release/2026.10 goes stale the moment that
+ * branch merges into main and the next release line opens.
+ *
+ * So don't choose — measure. Take the candidate whose merge-base with HEAD is
+ * the most recent commit: the closest common ancestor, i.e. the tightest
+ * baseline, i.e. the fewest inherited findings. Self-corrects as branches merge
+ * and as release lines are renamed, with no edit here.
+ */
+const BASE_CANDIDATES = ['release/2026.10', 'main', 'origin/release/2026.10', 'origin/main'];
+
+function pickBaseRef() {
+  if (process.env.COMPUTOR_BASE_REF) return process.env.COMPUTOR_BASE_REF;
+  let best = null;
+  let bestTs = -1;
+  for (const ref of BASE_CANDIDATES) {
+    const mb = sh(`git merge-base HEAD ${ref}`).trim();
+    if (!mb) continue;
+    const ts = parseInt(sh(`git show -s --format=%ct ${mb}`).trim(), 10);
+    if (Number.isFinite(ts) && ts > bestTs) { bestTs = ts; best = ref; }
+  }
+  return best;
+}
 
 const PALETTE =
   /\b(?:bg|text|border|ring|divide|from|to|via|outline|decoration|placeholder|accent|caret|shadow)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}\b/g;
@@ -54,8 +81,8 @@ function sh(cmd) {
 }
 
 function changedFiles() {
-  let base = sh(`git merge-base HEAD ${BASE_REF}`).trim();
-  if (!base) base = 'HEAD';
+  const ref = pickBaseRef();
+  let base = (ref ? sh(`git merge-base HEAD ${ref}`).trim() : '') || 'HEAD';
   const out = [
     sh(`git diff --name-only --diff-filter=ACM ${base}`),
     sh('git diff --name-only --diff-filter=ACM'),
