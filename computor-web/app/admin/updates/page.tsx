@@ -12,7 +12,7 @@ import { useResource } from '@/src/hooks/useResource';
 import { UpdateClient } from '@/src/clients/UpdateClient';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
-import type { SystemUpdateState, SystemUpdateStatusGet } from '@/src/types/update';
+import type { SystemUpdateState, SystemUpdateStatusGet } from 'types/generated';
 
 const updateClient = new UpdateClient();
 
@@ -150,7 +150,8 @@ export default function UpdatesPage() {
     }
   };
 
-  const handleCopyCommit = async (commit: string) => {
+  const handleCopyCommit = async (commit?: string) => {
+    if (!commit) return;
     try {
       await navigator.clipboard.writeText(commit);
       notify('Commit hash copied', 'success');
@@ -304,7 +305,7 @@ export default function UpdatesPage() {
               <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Scheduled Update</h2>
                 {view.last_schedule_result &&
-                  ['missed', 'skipped_lock'].includes(view.last_schedule_result.outcome) &&
+                  ['missed', 'skipped_lock'].includes(view.last_schedule_result.outcome ?? '') &&
                   dismissedResult !== view.last_schedule_result.resolved_at && (
                     <div className="p-3 mb-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start justify-between gap-3">
                       <p className="text-sm text-yellow-800">

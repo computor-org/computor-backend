@@ -9,7 +9,7 @@ import type {
   SystemUpdateScheduleResponse,
   SystemUpdateStatusGet,
   SystemUpdateTriggerResponse,
-} from '@/src/types/update';
+} from 'types/generated';
 
 export class UpdateClient extends BaseEndpointClient {
   constructor(client: APIClient = apiClient) {
