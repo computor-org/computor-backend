@@ -9,7 +9,9 @@ from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_permissions
 from computor_backend.model.message import Message
 from computor_types.messages import (
-    MESSAGE_TARGET_FIELDS, MessageCreate, MessageQuery, MessageList, MessageThread,
+    CONVERSATIONAL_SCOPES, MESSAGE_TARGET_FIELDS, MessageCreate, MessageQuery,
+    MessageList, MessageScope, MessageThread, kind_for_scope, normalize_title,
+    scope_for_targets,
 )
 from .permissions import (
     _check_global_write_permission,
@@ -32,16 +34,46 @@ from .read_status import list_messages_with_read_status
 # whether course_group or course_content was the more specific target.
 
 
-# Scopes that support back-and-forth conversations (i.e. ``parent_id``
-# replies are meaningful). Everything else is broadcast / announcement
-# territory: a student replying to a course-wide announcement would
-# otherwise have their reply fan out to every course member, which is
-# the opposite of what announcements are for.
-CONVERSATIONAL_TARGET_FIELDS = frozenset({
-    'user_id',
-    'course_member_id',
-    'submission_group_id',
-})
+# Kept as the field-name view of ``CONVERSATIONAL_SCOPES`` for existing
+# importers; the scope set in ``computor_types.messages`` is the source of
+# truth, and everything in this module reasons in scopes via
+# ``kind_for_scope``.
+CONVERSATIONAL_TARGET_FIELDS = frozenset(
+    f"{scope}_id" for scope in CONVERSATIONAL_SCOPES
+)
+
+
+def enforce_title_rule(title, scope: MessageScope):
+    """Return the subject to persist for ``scope``, or raise.
+
+    Announcements are list items — a course's announcements are read as a
+    list of subjects, so a blank one is unusable. Conversations are chat;
+    a subject on a chat line is noise, and the only thing that ever put
+    one there was the retired ``#ai`` tag convention.
+
+    Blank input is normalized to ``None`` before the check, so a client
+    that renders no subject field can keep sending ``title: ""``.
+    """
+    normalized = normalize_title(title)
+
+    if kind_for_scope(scope) == "conversation":
+        if normalized is not None:
+            raise BadRequestException(
+                detail=(
+                    f"Messages in the {scope} scope are a conversation and "
+                    "carry no subject. Put it in the content instead."
+                )
+            )
+        return None
+
+    if normalized is None:
+        raise BadRequestException(
+            detail=(
+                f"A subject is required for {scope} announcements — it is "
+                "what identifies the announcement in a list."
+            )
+        )
+    return normalized
 
 
 def create_message_with_author(
@@ -117,20 +149,27 @@ def create_message_with_author(
         if field != primary_target:
             model_dump[field] = None
 
+    scope = scope_for_targets(model_dump)
+
     # Replies are only meaningful on conversational scopes. Allowing a
     # reply on e.g. ``course_id`` would fan a student's reply out to
     # every course member — that's the opposite of what an announcement
-    # scope is for. Mirrors the client-side reply policy shipped in the
-    # vscode extension.
-    if model_dump.get('parent_id') and primary_target not in CONVERSATIONAL_TARGET_FIELDS:
-        scope_label = primary_target or 'global'
+    # scope is for.
+    if model_dump.get('parent_id') and kind_for_scope(scope) != 'conversation':
         raise BadRequestException(
             detail=(
-                f"Replies are not allowed on {scope_label} messages — "
-                "those scopes are announcement-only. Conversational "
-                "scopes are: user, course_member, submission_group."
+                f"Replies are not allowed on {scope} messages — those "
+                "scopes are announcement-only. Conversational scopes are: "
+                + ", ".join(sorted(CONVERSATIONAL_SCOPES))
+                + "."
             )
         )
+
+    # Subject rule: announcements need one, conversations must not have
+    # one. Runs before the write-permission checks so a caller learns
+    # about a malformed payload rather than a permission they may also
+    # be missing.
+    model_dump['title'] = enforce_title_rule(model_dump.get('title'), scope)
 
     if primary_target is None:
         _check_global_write_permission(permissions)

@@ -30,10 +30,19 @@ export interface MessageMentionRef {
   course_role_id?: string | null;
 }
 
+/**
+ * A new message.
+ * 
+ * ``title`` is the human subject line, and whether it is required is
+ * decided by the target's kind (see ``CONVERSATIONAL_SCOPES``):
+ * announcements must carry one, conversations must not. That rule is
+ * enforced server-side on create, because it is the only place that
+ * knows the resolved scope.
+ */
 export interface MessageCreate {
   parent_id?: string | null;
   level?: number;
-  /** Message title (optional, used for tags like #ai) */
+  /** Subject line. Required for announcement scopes (global, organization, course_family, course, course_content, course_group); must be omitted for conversational scopes (submission_group, course_member, user). */
   title?: string | null;
   content: string;
   /** Organization-level message */
@@ -54,6 +63,14 @@ export interface MessageCreate {
   user_id?: string | null;
 }
 
+/**
+ * A partial edit. Only the fields actually sent are applied.
+ * 
+ * An omitted ``title`` leaves the subject alone. A sent ``title`` is
+ * held to the same per-kind rule as on create, so an announcement
+ * cannot be stripped of its subject by an edit and a conversation
+ * cannot acquire one.
+ */
 export interface MessageUpdate {
   title?: string | null;
   content?: string | null;
@@ -93,8 +110,14 @@ export interface MessageGet {
   submission_group_id?: string | null;
   course_member_id?: string | null;
   user_id?: string | null;
-  /** Determine message scope based on target fields (priority order: most specific first) */
+  /** Message scope, derived from whichever target field is set. */
   scope: "global" | "organization" | "course_family" | "course" | "course_content" | "course_group" | "submission_group" | "course_member" | "user";
+  /** Conversation or announcement — see ``CONVERSATIONAL_SCOPES``.
+
+Shipped alongside ``scope`` so clients can branch on it (subject,
+replies, how to render the list) without re-deriving the split and
+drifting from the server. */
+  kind: "announcement" | "conversation";
 }
 
 export interface MessageList {
@@ -129,8 +152,14 @@ export interface MessageList {
   submission_group_id?: string | null;
   course_member_id?: string | null;
   user_id?: string | null;
-  /** Determine message scope based on target fields (priority order: most specific first) */
+  /** Message scope, derived from whichever target field is set. */
   scope: "global" | "organization" | "course_family" | "course" | "course_content" | "course_group" | "submission_group" | "course_member" | "user";
+  /** Conversation or announcement — see ``CONVERSATIONAL_SCOPES``.
+
+Shipped alongside ``scope`` so clients can branch on it (subject,
+replies, how to render the list) without re-deriving the split and
+drifting from the server. */
+  kind: "announcement" | "conversation";
 }
 
 /**
@@ -181,6 +210,7 @@ export interface MessageQuery {
   course_member_id?: string | null;
   user_id?: string | null;
   scope?: "global" | "organization" | "course_family" | "course" | "course_content" | "course_group" | "submission_group" | "course_member" | "user" | null;
+  kind?: "announcement" | "conversation" | null;
   /** Filter messages created at or after this datetime (inclusive) */
   created_after?: string | null;
   /** Filter messages created at or before this datetime (inclusive) */

@@ -48,6 +48,7 @@ from computor_backend.exceptions import BadRequestException, PermissionDeniedAsN
 # Import business logic
 from computor_backend.business_logic.messages import (
     create_message_with_author,
+    enforce_title_rule,
     get_message_with_read_status,
     get_message_thread,
     invalidate_dashboard_views_for_message,
@@ -242,12 +243,21 @@ async def update_message(
     if payload.content is not None:
         validate_message_mentions(existing, payload.content, db)
 
+    # Hold an edited subject to the same per-kind rule as create, against
+    # the message's own (unchangeable) scope. An omitted title means "leave
+    # the subject alone" — only a title the client actually sent is
+    # checked, so a conversational client can keep posting title-less
+    # edits and an announcement can't be stripped of its subject.
+    new_title = None
+    if 'title' in payload.model_fields_set:
+        new_title = enforce_title_rule(payload.title, existing.scope)
+
     # Update with audit
     message = update_message_with_audit(
         message_id=id,
         principal=permissions,
         db=db,
-        new_title=payload.title,
+        new_title=new_title,
         new_content=payload.content
     )
 

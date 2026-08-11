@@ -15,6 +15,7 @@ from .core import (
     MESSAGE_TARGET_FIELDS,
     CONVERSATIONAL_TARGET_FIELDS,
     create_message_with_author,
+    enforce_title_rule,
     list_messages_with_filters,
     get_message_thread,
 )
@@ -66,6 +67,7 @@ __all__ = [
     "MESSAGE_TARGET_FIELDS",
     "CONVERSATIONAL_TARGET_FIELDS",
     "create_message_with_author",
+    "enforce_title_rule",
     "list_messages_with_filters",
     "get_message_thread",
     "_principal_has_course_role",

@@ -298,6 +298,19 @@ class MessageInterface(MessageInterfaceBase, BackendEntityInterface):
                     Message.user_id.is_(None),
                 ))
 
+        # Kind filter — the coarse conversation/announcement split. Under
+        # the single-target invariant a set conversational column *is* the
+        # message's scope, so no NULL chain is needed here.
+        if params.kind is not None:
+            is_conversation = or_(
+                Message.user_id.isnot(None),
+                Message.course_member_id.isnot(None),
+                Message.submission_group_id.isnot(None),
+            )
+            query = query.filter(
+                is_conversation if params.kind == "conversation" else not_(is_conversation)
+            )
+
         # Datetime boundary filters
         if params.created_after is not None:
             query = query.filter(Message.created_at >= params.created_after)

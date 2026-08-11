@@ -58,6 +58,50 @@ MESSAGE_TARGET_FIELDS: tuple[str, ...] = (
 )
 
 
+MessageKind = Literal[
+    "announcement",   # one-to-many broadcast: has a subject, no replies
+    "conversation",   # back-and-forth chat: no subject, replies allowed
+]
+
+
+# The scopes that host a back-and-forth conversation. Everything else is
+# announcement territory.
+#
+# This is the single source of truth for a split the system was already
+# making in three places independently: replies were gated on it in the
+# backend, and the VS Code extension re-derived it twice (once to hide the
+# Reply button, once to hide the subject input). The rules that follow from
+# it — subject required vs. forbidden, replies allowed vs. not, how a client
+# should render the thread — now all read from here, and ``MessageGet.kind``
+# ships it to clients so they never have to re-derive it at all.
+#
+# A student replying to a course-wide announcement would fan their reply out
+# to every course member, which is the opposite of what an announcement is
+# for; that is why the broadcast scopes are one-way.
+CONVERSATIONAL_SCOPES: frozenset = frozenset({
+    "user",
+    "course_member",
+    "submission_group",
+})
+
+
+def kind_for_scope(scope: MessageScope) -> MessageKind:
+    """Whether ``scope`` is a conversation or an announcement."""
+    return "conversation" if scope in CONVERSATIONAL_SCOPES else "announcement"
+
+
+def normalize_title(title: Optional[str]) -> Optional[str]:
+    """Collapse a blank subject to ``None``.
+
+    A subject is either present or absent; ``""`` is neither. Clients that
+    render no subject input still posted ``title: ""``, which filled the
+    column with empty strings and made ``title IS NULL`` a lie.
+    """
+    if title is None:
+        return None
+    return title.strip() or None
+
+
 def scope_for_targets(targets) -> MessageScope:
     """The scope of a message with the given target values.
 
@@ -113,10 +157,27 @@ class MessageMentionRef(BaseModel):
 
 
 class MessageCreate(BaseModel):
+    """A new message.
+
+    ``title`` is the human subject line, and whether it is required is
+    decided by the target's kind (see ``CONVERSATIONAL_SCOPES``):
+    announcements must carry one, conversations must not. That rule is
+    enforced server-side on create, because it is the only place that
+    knows the resolved scope.
+    """
     # author_id is always the current user; set in API
     parent_id: Optional[str] = None
     level: int = Field(default=0)
-    title: Optional[str] = Field(None, description="Message title (optional, used for tags like #ai)")
+    title: Optional[str] = Field(
+        None,
+        max_length=255,
+        description=(
+            "Subject line. Required for announcement scopes (global, "
+            "organization, course_family, course, course_content, "
+            "course_group); must be omitted for conversational scopes "
+            "(submission_group, course_member, user)."
+        ),
+    )
     content: str
 
     # Targets (at least one should be provided, or none for global)
@@ -131,7 +192,14 @@ class MessageCreate(BaseModel):
     user_id: Optional[str] = Field(None, description="Direct message to a user (outside course context)")
 
 class MessageUpdate(BaseModel):
-    title: Optional[str] = None
+    """A partial edit. Only the fields actually sent are applied.
+
+    An omitted ``title`` leaves the subject alone. A sent ``title`` is
+    held to the same per-kind rule as on create, so an announcement
+    cannot be stripped of its subject by an edit and a conversation
+    cannot acquire one.
+    """
+    title: Optional[str] = Field(None, max_length=255)
     content: Optional[str] = None
 
 class MessageGet(BaseEntityGet):
@@ -169,6 +237,17 @@ class MessageGet(BaseEntityGet):
         """Message scope, derived from whichever target field is set."""
         return scope_for_targets(self)
 
+    @computed_field
+    @property
+    def kind(self) -> MessageKind:
+        """Conversation or announcement — see ``CONVERSATIONAL_SCOPES``.
+
+        Shipped alongside ``scope`` so clients can branch on it (subject,
+        replies, how to render the list) without re-deriving the split and
+        drifting from the server.
+        """
+        return kind_for_scope(self.scope)
+
     model_config = ConfigDict(from_attributes=True)
 
 class MessageList(BaseEntityList):
@@ -205,6 +284,17 @@ class MessageList(BaseEntityList):
     def scope(self) -> MessageScope:
         """Message scope, derived from whichever target field is set."""
         return scope_for_targets(self)
+
+    @computed_field
+    @property
+    def kind(self) -> MessageKind:
+        """Conversation or announcement — see ``CONVERSATIONAL_SCOPES``.
+
+        Shipped alongside ``scope`` so clients can branch on it (subject,
+        replies, how to render the list) without re-deriving the split and
+        drifting from the server.
+        """
+        return kind_for_scope(self.scope)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -260,6 +350,11 @@ class MessageQuery(ListQuery):
 
     # Filter by message scope (e.g., "global", "organization", "course", "course_content", "submission_group")
     scope: Optional[MessageScope] = None
+
+    # Filter by kind — every conversational scope at once, or every
+    # announcement scope at once. Coarser than ``scope`` and the natural
+    # axis for an inbox that renders the two differently.
+    kind: Optional[MessageKind] = None
 
     # Datetime boundary filters (based on created_at)
     created_after: Optional[datetime] = Field(

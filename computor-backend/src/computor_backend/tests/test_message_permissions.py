@@ -47,6 +47,7 @@ from computor_backend.business_logic.messages import (
     create_message_with_author,
 )
 from computor_backend.permissions.principal import Principal, build_claims
+from computor_types.messages import kind_for_scope, scope_for_targets
 
 
 # ---------------------------------------------------------------------------
@@ -68,9 +69,23 @@ def _payload(**fields):
     We don't need the real Pydantic model — ``create_message_with_author``
     only calls ``.content`` and ``.model_dump(exclude_unset=True)``. Using
     a SimpleNamespace keeps these tests free of the heavy DTO module.
+
+    Announcement scopes get a default subject so that tests about dispatch,
+    target selection and invariants aren't all rewritten as subject tests.
+    The subject rule itself is covered explicitly in ``TestSubjectRule``;
+    pass ``title=`` to override, including with a blank to assert rejection.
     """
 
     fields.setdefault("content", "hello")
+    # A reply inherits its parent's target, which only a DB lookup resolves,
+    # so we can't tell its scope here — but replies are conversational by
+    # definition and never carry a subject, so leaving it unset is right.
+    if (
+        "title" not in fields
+        and not fields.get("parent_id")
+        and kind_for_scope(scope_for_targets(fields)) == "announcement"
+    ):
+        fields["title"] = "Default test subject"
 
     class _Fake(SimpleNamespace):
         def model_dump(self, exclude_unset: bool = False):
@@ -547,3 +562,121 @@ class TestInvariants:
             _payload(course_id="c1"), p, db=MagicMock()
         )
         assert result["level"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Subject rule — announcements require one, conversations forbid one
+# ---------------------------------------------------------------------------
+
+
+ANNOUNCEMENT_TARGETS = [
+    ({}, "global"),
+    ({"organization_id": "o-1"}, "organization"),
+    ({"course_family_id": "f-1"}, "course_family"),
+    ({"course_id": "c-1"}, "course"),
+    ({"course_group_id": "cg-1"}, "course_group"),
+    ({"course_content_id": "cc-1"}, "course_content"),
+]
+
+
+class TestSubjectRule:
+    """``enforce_title_rule`` applied through ``create_message_with_author``.
+
+    The split is the one in ``CONVERSATIONAL_SCOPES``: an announcement is a
+    list item and needs a subject to be identifiable; a conversation is chat
+    and a subject there is noise.
+    """
+
+    @pytest.mark.parametrize("targets,scope", ANNOUNCEMENT_TARGETS)
+    def test_announcement_keeps_its_subject(self, monkeypatch, targets, scope):
+        _stub_helpers(monkeypatch)
+        p = _principal(is_admin=True)
+        result = create_message_with_author(
+            _payload(title="  Exam moved to Friday  ", **targets), p, db=MagicMock()
+        )
+        # Stored trimmed — leading/trailing space is not part of a subject.
+        assert result["title"] == "Exam moved to Friday"
+
+    @pytest.mark.parametrize("targets,scope", ANNOUNCEMENT_TARGETS)
+    @pytest.mark.parametrize("blank", [None, "", "   ", "\t\n"])
+    def test_announcement_without_a_subject_is_rejected(
+        self, monkeypatch, targets, scope, blank
+    ):
+        _stub_helpers(monkeypatch)
+        p = _principal(is_admin=True)
+        with pytest.raises(BadRequestException) as exc:
+            create_message_with_author(
+                _payload(title=blank, **targets), p, db=MagicMock()
+            )
+        assert "subject is required" in str(exc.value).lower()
+
+    @pytest.mark.parametrize("blank", [None, "", "   "])
+    def test_conversation_normalizes_blank_subject_to_none(self, monkeypatch, blank):
+        # The compose UI renders no subject field on conversational scopes
+        # but still posts title: "" — that must land as NULL, not '', or
+        # `title IS NULL` lies about every chat message in the table.
+        _stub_helpers(monkeypatch)
+        p = _principal(is_admin=True)
+        result = create_message_with_author(
+            _payload(title=blank, submission_group_id="sg-1"), p, db=MagicMock()
+        )
+        assert result["title"] is None
+
+    def test_conversation_with_a_subject_is_rejected(self, monkeypatch):
+        _stub_helpers(monkeypatch)
+        p = _principal(is_admin=True)
+        with pytest.raises(BadRequestException) as exc:
+            create_message_with_author(
+                _payload(title="Re: your submission", submission_group_id="sg-1"),
+                p,
+                db=MagicMock(),
+            )
+        assert "carry no subject" in str(exc.value).lower()
+
+    def test_reply_inherits_the_conversational_rule(self, monkeypatch):
+        # A reply's scope comes from its parent, so the subject rule has to
+        # be applied after inheritance, not before.
+        _stub_helpers(monkeypatch)
+        parent = SimpleNamespace(
+            **{f: None for f in MESSAGE_TARGET_FIELDS}, id="m-parent"
+        )
+        parent.submission_group_id = "sg-1"
+        db = _mock_db_returning_message(parent)
+        p = _principal(is_admin=True)
+
+        with pytest.raises(BadRequestException) as exc:
+            create_message_with_author(
+                _payload(parent_id="m-parent", title="A subject"), p, db
+            )
+        assert "carry no subject" in str(exc.value).lower()
+
+
+class TestKindDerivation:
+    def test_conversational_scopes_are_exactly_the_reply_allowed_ones(self):
+        # One map, two rules. If these ever diverge, a scope would accept
+        # replies while refusing to render as a conversation (or vice versa).
+        from computor_types.messages import CONVERSATIONAL_SCOPES
+
+        assert CONVERSATIONAL_SCOPES == {"user", "course_member", "submission_group"}
+        assert messages_bl.CONVERSATIONAL_TARGET_FIELDS == {
+            "user_id",
+            "course_member_id",
+            "submission_group_id",
+        }
+
+    @pytest.mark.parametrize(
+        "scope,expected",
+        [
+            ("global", "announcement"),
+            ("organization", "announcement"),
+            ("course_family", "announcement"),
+            ("course", "announcement"),
+            ("course_content", "announcement"),
+            ("course_group", "announcement"),
+            ("submission_group", "conversation"),
+            ("course_member", "conversation"),
+            ("user", "conversation"),
+        ],
+    )
+    def test_kind_for_every_scope(self, scope, expected):
+        assert kind_for_scope(scope) == expected
