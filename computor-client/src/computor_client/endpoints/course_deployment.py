@@ -10,8 +10,13 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel
 
+from computor_types.course_deployment import (
+    CourseDeployRequest,
+    CourseDeployResult,
+)
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.urls import quote_path
 
 
 class CourseDeploymentClient:
@@ -25,9 +30,10 @@ class CourseDeploymentClient:
     async def course_families_deploy_course(
         self,
         course_family_id: str,
+        data: Union[CourseDeployRequest, Dict[str, Any]],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> CourseDeployResult:
         """Deploy Course"""
-        response = await self._http.post(f"/course-families/{course_family_id}/deploy-course", params=kwargs)
-        return response.json()
+        response = await self._http.post(f"/course-families/{quote_path(course_family_id)}/deploy-course", json_data=data, params=kwargs)
+        return CourseDeployResult.model_validate(response.json())
 

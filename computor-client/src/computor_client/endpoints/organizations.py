@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel
 
+from computor_types.cascade_deletion import CascadeDeleteResult
 from computor_types.organizations import (
     OrganizationCreate,
     OrganizationGet,
@@ -19,6 +20,8 @@ from computor_types.organizations import (
 )
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.pagination import Page
+from computor_client.urls import quote_path
 
 
 class OrganizationsClient:
@@ -29,24 +32,30 @@ class OrganizationsClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def token(
+    async def list(
         self,
-        organization_id: str,
-        data: Union[OrganizationUpdateTokenUpdate, Dict[str, Any]],
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[BaseModel] = None,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Patch Organizations Token"""
-        response = await self._http.patch(f"/organizations/{organization_id}/token", json_data=data, params=kwargs)
-        return response.json()
+    ) -> List[OrganizationList]:
+        """List Organizations"""
+        page = await self.list_page(skip=skip, limit=limit, query=query, **kwargs)
+        return page.items
 
-    async def delete(
+    async def list_page(
         self,
-        organization_id: str,
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[BaseModel] = None,
         **kwargs: Any,
-    ) -> None:
-        """Delete organization and all descendant data"""
-        await self._http.delete(f"/organizations/{organization_id}", params=kwargs)
-        return
+    ) -> Page[OrganizationList]:
+        """List Organizations (one page, with the total row count)."""
+        params = query.model_dump(mode="json", exclude_none=True) if query else {}
+        params.update({"skip": skip, "limit": limit})
+        params.update(kwargs)
+        response = await self._http.get(f"/organizations", params=params)
+        return Page.from_response(response, OrganizationList, skip=skip, limit=limit)
 
     async def create(
         self,
@@ -57,30 +66,13 @@ class OrganizationsClient:
         response = await self._http.post(f"/organizations", json_data=data, params=kwargs)
         return OrganizationGet.model_validate(response.json())
 
-    async def list(
-        self,
-        query: Optional[BaseModel] = None,
-        **kwargs: Any,
-    ) -> List[OrganizationList]:
-        """List Organizations"""
-        params = query.model_dump(exclude_none=True) if query else {}
-        params.update(kwargs)
-        response = await self._http.get(
-            f"/organizations",
-            params=params,
-        )
-        data = response.json()
-        if isinstance(data, list):
-            return [OrganizationList.model_validate(item) for item in data]
-        return []
-
     async def get(
         self,
         id: str,
         **kwargs: Any,
     ) -> OrganizationGet:
         """Get Organizations"""
-        response = await self._http.get(f"/organizations/{id}", params=kwargs)
+        response = await self._http.get(f"/organizations/{quote_path(id)}", params=kwargs)
         return OrganizationGet.model_validate(response.json())
 
     async def update(
@@ -90,33 +82,43 @@ class OrganizationsClient:
         **kwargs: Any,
     ) -> OrganizationGet:
         """Update Organizations"""
-        response = await self._http.patch(f"/organizations/{id}", json_data=data, params=kwargs)
+        response = await self._http.patch(f"/organizations/{quote_path(id)}", json_data=data, params=kwargs)
         return OrganizationGet.model_validate(response.json())
 
-    async def delete_delete(
-        self,
-        id: str,
-        **kwargs: Any,
-    ) -> None:
-        """Delete Organizations"""
-        await self._http.delete(f"/organizations/{id}", params=kwargs)
-        return
-
-    async def archive(
+    async def update_archive(
         self,
         id: str,
         **kwargs: Any,
     ) -> None:
         """Route Organizations"""
-        response = await self._http.patch(f"/organizations/{id}/archive", params=kwargs)
+        response = await self._http.patch(f"/organizations/{quote_path(id)}/archive", params=kwargs)
         return
 
-    async def unarchive(
+    async def update_unarchive(
         self,
         id: str,
         **kwargs: Any,
     ) -> None:
         """Unarchive Organizations"""
-        response = await self._http.patch(f"/organizations/{id}/unarchive", params=kwargs)
+        response = await self._http.patch(f"/organizations/{quote_path(id)}/unarchive", params=kwargs)
         return
+
+    async def delete(
+        self,
+        organization_id: str,
+        **kwargs: Any,
+    ) -> CascadeDeleteResult:
+        """Delete organization and all descendant data"""
+        response = await self._http.delete(f"/organizations/{quote_path(organization_id)}", params=kwargs)
+        return CascadeDeleteResult.model_validate(response.json())
+
+    async def update_token(
+        self,
+        organization_id: str,
+        data: Union[OrganizationUpdateTokenUpdate, Dict[str, Any]],
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Patch Organizations Token"""
+        response = await self._http.patch(f"/organizations/{quote_path(organization_id)}/token", json_data=data, params=kwargs)
+        return response.json()
 

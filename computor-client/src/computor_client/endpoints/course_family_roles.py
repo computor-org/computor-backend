@@ -10,8 +10,14 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel
 
+from computor_types.course_family_roles import (
+    CourseFamilyRoleGet,
+    CourseFamilyRoleList,
+)
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.pagination import Page
+from computor_client.urls import quote_path
 
 
 class CourseFamilyRolesClient:
@@ -22,26 +28,37 @@ class CourseFamilyRolesClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
+    async def list(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[BaseModel] = None,
+        **kwargs: Any,
+    ) -> List[CourseFamilyRoleList]:
+        """List Course-Family-Roles"""
+        page = await self.list_page(skip=skip, limit=limit, query=query, **kwargs)
+        return page.items
+
+    async def list_page(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[BaseModel] = None,
+        **kwargs: Any,
+    ) -> Page[CourseFamilyRoleList]:
+        """List Course-Family-Roles (one page, with the total row count)."""
+        params = query.model_dump(mode="json", exclude_none=True) if query else {}
+        params.update({"skip": skip, "limit": limit})
+        params.update(kwargs)
+        response = await self._http.get(f"/course-family-roles", params=params)
+        return Page.from_response(response, CourseFamilyRoleList, skip=skip, limit=limit)
+
     async def get(
         self,
         id: str,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> CourseFamilyRoleGet:
         """Get Course-Family-Roles"""
-        response = await self._http.get(f"/course-family-roles/{id}", params=kwargs)
-        return response.json()
-
-    async def list(
-        self,
-        query: Optional[BaseModel] = None,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """List Course-Family-Roles"""
-        params = query.model_dump(exclude_none=True) if query else {}
-        params.update(kwargs)
-        response = await self._http.get(
-            f"/course-family-roles",
-            params=params,
-        )
-        return response.json()
+        response = await self._http.get(f"/course-family-roles/{quote_path(id)}", params=kwargs)
+        return CourseFamilyRoleGet.model_validate(response.json())
 

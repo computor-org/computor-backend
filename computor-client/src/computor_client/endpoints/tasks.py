@@ -17,6 +17,7 @@ from computor_types.tasks import (
 )
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.urls import quote_path
 
 
 class TasksClient:
@@ -27,18 +28,12 @@ class TasksClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def list(
+    async def get(
         self,
-        query: Optional[BaseModel] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """List Tasks"""
-        params = query.model_dump(exclude_none=True) if query else {}
-        params.update(kwargs)
-        response = await self._http.get(
-            f"/tasks",
-            params=params,
-        )
+        response = await self._http.get(f"/tasks", params=kwargs)
         return response.json()
 
     async def submit(
@@ -50,52 +45,7 @@ class TasksClient:
         response = await self._http.post(f"/tasks/submit", json_data=data, params=kwargs)
         return response.json()
 
-    async def get(
-        self,
-        task_id: str,
-        **kwargs: Any,
-    ) -> TaskInfo:
-        """Get Task"""
-        response = await self._http.get(f"/tasks/{task_id}", params=kwargs)
-        return TaskInfo.model_validate(response.json())
-
-    async def delete(
-        self,
-        task_id: str,
-        **kwargs: Any,
-    ) -> None:
-        """Delete Task"""
-        await self._http.delete(f"/tasks/{task_id}", params=kwargs)
-        return
-
-    async def status(
-        self,
-        task_id: str,
-        **kwargs: Any,
-    ) -> TaskInfo:
-        """Get Task Status"""
-        response = await self._http.get(f"/tasks/{task_id}/status", params=kwargs)
-        return TaskInfo.model_validate(response.json())
-
-    async def result(
-        self,
-        task_id: str,
-        **kwargs: Any,
-    ) -> TaskResult:
-        """Get Task Result"""
-        response = await self._http.get(f"/tasks/{task_id}/result", params=kwargs)
-        return TaskResult.model_validate(response.json())
-
-    async def cancel(
-        self,
-        task_id: str,
-        **kwargs: Any,
-    ) -> None:
-        """Cancel Task"""
-        await self._http.delete(f"/tasks/{task_id}/cancel", params=kwargs)
-        return
-
-    async def types(
+    async def list_types(
         self,
         **kwargs: Any,
     ) -> Dict[str, Any]:
@@ -103,11 +53,56 @@ class TasksClient:
         response = await self._http.get(f"/tasks/types", params=kwargs)
         return response.json()
 
-    async def workers_status(
+    async def get_workers_status(
         self,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Get Worker Status"""
         response = await self._http.get(f"/tasks/workers/status", params=kwargs)
         return response.json()
+
+    async def delete(
+        self,
+        task_id: str,
+        **kwargs: Any,
+    ) -> None:
+        """Delete Task"""
+        await self._http.delete(f"/tasks/{quote_path(task_id)}", params=kwargs)
+        return
+
+    async def get_by_task_id(
+        self,
+        task_id: str,
+        **kwargs: Any,
+    ) -> TaskInfo:
+        """Get Task"""
+        response = await self._http.get(f"/tasks/{quote_path(task_id)}", params=kwargs)
+        return TaskInfo.model_validate(response.json())
+
+    async def delete_cancel(
+        self,
+        task_id: str,
+        **kwargs: Any,
+    ) -> None:
+        """Cancel Task"""
+        await self._http.delete(f"/tasks/{quote_path(task_id)}/cancel", params=kwargs)
+        return
+
+    async def get_result(
+        self,
+        task_id: str,
+        **kwargs: Any,
+    ) -> TaskResult:
+        """Get Task Result"""
+        response = await self._http.get(f"/tasks/{quote_path(task_id)}/result", params=kwargs)
+        return TaskResult.model_validate(response.json())
+
+    async def get_status(
+        self,
+        task_id: str,
+        **kwargs: Any,
+    ) -> TaskInfo:
+        """Get Task Status"""
+        response = await self._http.get(f"/tasks/{quote_path(task_id)}/status", params=kwargs)
+        return TaskInfo.model_validate(response.json())
 

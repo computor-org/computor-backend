@@ -10,8 +10,13 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel
 
+from computor_types.course_git import (
+    CourseGitBindingGet,
+    CourseGitBindingUpsert,
+)
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.urls import quote_path
 
 
 class CourseGitClient:
@@ -22,21 +27,22 @@ class CourseGitClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def courses(
-        self,
-        course_id: str,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Upsert Course Git Binding Endpoint"""
-        response = await self._http.put(f"/courses/{course_id}/git", params=kwargs)
-        return response.json()
-
     async def get_courses(
         self,
         course_id: str,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> CourseGitBindingGet:
         """Get Course Git Binding Endpoint"""
-        response = await self._http.get(f"/courses/{course_id}/git", params=kwargs)
-        return response.json()
+        response = await self._http.get(f"/courses/{quote_path(course_id)}/git", params=kwargs)
+        return CourseGitBindingGet.model_validate(response.json())
+
+    async def replace_courses(
+        self,
+        course_id: str,
+        data: Union[CourseGitBindingUpsert, Dict[str, Any]],
+        **kwargs: Any,
+    ) -> CourseGitBindingGet:
+        """Upsert Course Git Binding Endpoint"""
+        response = await self._http.put(f"/courses/{quote_path(course_id)}/git", json_data=data, params=kwargs)
+        return CourseGitBindingGet.model_validate(response.json())
 

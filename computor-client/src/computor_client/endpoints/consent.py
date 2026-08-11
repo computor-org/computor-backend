@@ -10,6 +10,13 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel
 
+from computor_types.consent import (
+    ConsentCreate,
+    ConsentStatusGet,
+    PolicyTextGet,
+    PolicyVersionCreate,
+    PolicyVersionGet,
+)
 
 from computor_client.http import AsyncHTTPClient
 
@@ -22,51 +29,56 @@ class ConsentClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def status(
-        self,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Get Consent Status"""
-        response = await self._http.get(f"/consent/status", params=kwargs)
-        return response.json()
-
     async def create(
         self,
+        data: Union[ConsentCreate, Dict[str, Any]],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> ConsentStatusGet:
         """Give Consent"""
-        response = await self._http.post(f"/consent", params=kwargs)
-        return response.json()
+        response = await self._http.post(f"/consent", json_data=data, params=kwargs)
+        return ConsentStatusGet.model_validate(response.json())
+
+    async def get_policy(
+        self,
+        **kwargs: Any,
+    ) -> PolicyTextGet:
+        """Get Policy Text"""
+        response = await self._http.get(f"/consent/policy", params=kwargs)
+        return PolicyTextGet.model_validate(response.json())
+
+    async def list_policy_versions(
+        self,
+        **kwargs: Any,
+    ) -> List[PolicyVersionGet]:
+        """List Policy Versions"""
+        response = await self._http.get(f"/consent/policy-versions", params=kwargs)
+        data = response.json()
+        if isinstance(data, list):
+            return [PolicyVersionGet.model_validate(item) for item in data]
+        return []
+
+    async def policy_versions(
+        self,
+        data: Union[PolicyVersionCreate, Dict[str, Any]],
+        **kwargs: Any,
+    ) -> PolicyVersionGet:
+        """Publish Policy Version"""
+        response = await self._http.post(f"/consent/policy-versions", json_data=data, params=kwargs)
+        return PolicyVersionGet.model_validate(response.json())
+
+    async def get_status(
+        self,
+        **kwargs: Any,
+    ) -> ConsentStatusGet:
+        """Get Consent Status"""
+        response = await self._http.get(f"/consent/status", params=kwargs)
+        return ConsentStatusGet.model_validate(response.json())
 
     async def withdraw(
         self,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> ConsentStatusGet:
         """Withdraw Consent"""
         response = await self._http.post(f"/consent/withdraw", params=kwargs)
-        return response.json()
-
-    async def policy(
-        self,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Get Policy Text"""
-        response = await self._http.get(f"/consent/policy", params=kwargs)
-        return response.json()
-
-    async def policy_versions(
-        self,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """List Policy Versions"""
-        response = await self._http.get(f"/consent/policy-versions", params=kwargs)
-        return response.json()
-
-    async def post_policy_versions(
-        self,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Publish Policy Version"""
-        response = await self._http.post(f"/consent/policy-versions", params=kwargs)
-        return response.json()
+        return ConsentStatusGet.model_validate(response.json())
 

@@ -17,6 +17,8 @@ from computor_types.user_roles import (
 )
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.pagination import Page
+from computor_client.urls import quote_path
 
 
 class UserRolesClient:
@@ -29,20 +31,28 @@ class UserRolesClient:
 
     async def list(
         self,
+        skip: int = 0,
+        limit: int = 100,
         query: Optional[BaseModel] = None,
         **kwargs: Any,
     ) -> List[UserRoleList]:
         """List User Roles"""
-        params = query.model_dump(exclude_none=True) if query else {}
+        page = await self.list_page(skip=skip, limit=limit, query=query, **kwargs)
+        return page.items
+
+    async def list_page(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[BaseModel] = None,
+        **kwargs: Any,
+    ) -> Page[UserRoleList]:
+        """List User Roles (one page, with the total row count)."""
+        params = query.model_dump(mode="json", exclude_none=True) if query else {}
+        params.update({"skip": skip, "limit": limit})
         params.update(kwargs)
-        response = await self._http.get(
-            f"/user-roles",
-            params=params,
-        )
-        data = response.json()
-        if isinstance(data, list):
-            return [UserRoleList.model_validate(item) for item in data]
-        return []
+        response = await self._http.get(f"/user-roles", params=params)
+        return Page.from_response(response, UserRoleList, skip=skip, limit=limit)
 
     async def create(
         self,
@@ -53,16 +63,6 @@ class UserRolesClient:
         response = await self._http.post(f"/user-roles", json_data=data, params=kwargs)
         return UserRoleGet.model_validate(response.json())
 
-    async def get_users(
-        self,
-        user_id: str,
-        role_id: str,
-        **kwargs: Any,
-    ) -> UserRoleGet:
-        """Get User Role Endpoint"""
-        response = await self._http.get(f"/user-roles/users/{user_id}/roles/{role_id}", params=kwargs)
-        return UserRoleGet.model_validate(response.json())
-
     async def delete_users(
         self,
         user_id: str,
@@ -70,6 +70,16 @@ class UserRolesClient:
         **kwargs: Any,
     ) -> None:
         """Delete User Role Endpoint"""
-        await self._http.delete(f"/user-roles/users/{user_id}/roles/{role_id}", params=kwargs)
+        await self._http.delete(f"/user-roles/users/{quote_path(user_id)}/roles/{quote_path(role_id)}", params=kwargs)
         return
+
+    async def get_users(
+        self,
+        user_id: str,
+        role_id: str,
+        **kwargs: Any,
+    ) -> UserRoleGet:
+        """Get User Role Endpoint"""
+        response = await self._http.get(f"/user-roles/users/{quote_path(user_id)}/roles/{quote_path(role_id)}", params=kwargs)
+        return UserRoleGet.model_validate(response.json())
 

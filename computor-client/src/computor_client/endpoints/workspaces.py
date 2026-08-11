@@ -10,8 +10,13 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel
 
+from computor_types.workspace_roles import (
+    WorkspaceRoleAssign,
+    WorkspaceRoleUser,
+)
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.urls import quote_path
 
 
 class WorkspacesClient:
@@ -22,21 +27,25 @@ class WorkspacesClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def roles_users(
-        self,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """List all users with their workspace roles"""
-        response = await self._http.get(f"/workspaces/roles/users", params=kwargs)
-        return response.json()
-
     async def roles_assign(
         self,
+        data: Union[WorkspaceRoleAssign, Dict[str, Any]],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> WorkspaceRoleUser:
         """Assign a workspace role by email"""
-        response = await self._http.post(f"/workspaces/roles/assign", params=kwargs)
-        return response.json()
+        response = await self._http.post(f"/workspaces/roles/assign", json_data=data, params=kwargs)
+        return WorkspaceRoleUser.model_validate(response.json())
+
+    async def list_roles_users(
+        self,
+        **kwargs: Any,
+    ) -> List[WorkspaceRoleUser]:
+        """List all users with their workspace roles"""
+        response = await self._http.get(f"/workspaces/roles/users", params=kwargs)
+        data = response.json()
+        if isinstance(data, list):
+            return [WorkspaceRoleUser.model_validate(item) for item in data]
+        return []
 
     async def delete_roles_users(
         self,
@@ -45,6 +54,6 @@ class WorkspacesClient:
         **kwargs: Any,
     ) -> None:
         """Remove a workspace role from a user"""
-        await self._http.delete(f"/workspaces/roles/users/{user_id}/{role_id}", params=kwargs)
+        await self._http.delete(f"/workspaces/roles/users/{quote_path(user_id)}/{quote_path(role_id)}", params=kwargs)
         return
 

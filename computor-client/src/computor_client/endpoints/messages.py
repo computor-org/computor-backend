@@ -14,10 +14,14 @@ from computor_types.messages import (
     MessageCreate,
     MessageGet,
     MessageList,
+    MessageMentionRef,
+    MessageThread,
     MessageUpdate,
 )
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.pagination import Page
+from computor_client.urls import quote_path
 
 
 class MessagesClient:
@@ -28,6 +32,31 @@ class MessagesClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
+    async def list(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[BaseModel] = None,
+        **kwargs: Any,
+    ) -> List[MessageList]:
+        """List Messages"""
+        page = await self.list_page(skip=skip, limit=limit, query=query, **kwargs)
+        return page.items
+
+    async def list_page(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[BaseModel] = None,
+        **kwargs: Any,
+    ) -> Page[MessageList]:
+        """List Messages (one page, with the total row count)."""
+        params = query.model_dump(mode="json", exclude_none=True) if query else {}
+        params.update({"skip": skip, "limit": limit})
+        params.update(kwargs)
+        response = await self._http.get(f"/messages", params=params)
+        return Page.from_response(response, MessageList, skip=skip, limit=limit)
+
     async def create(
         self,
         data: Union[MessageCreate, Dict[str, Any]],
@@ -37,30 +66,25 @@ class MessagesClient:
         response = await self._http.post(f"/messages", json_data=data, params=kwargs)
         return MessageGet.model_validate(response.json())
 
-    async def list(
-        self,
-        query: Optional[BaseModel] = None,
-        **kwargs: Any,
-    ) -> List[MessageList]:
-        """List Messages"""
-        params = query.model_dump(exclude_none=True) if query else {}
-        params.update(kwargs)
-        response = await self._http.get(
-            f"/messages",
-            params=params,
-        )
-        data = response.json()
-        if isinstance(data, list):
-            return [MessageList.model_validate(item) for item in data]
-        return []
-
-    async def mentionable_users(
+    async def list_mentionable_users(
         self,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> List[MessageMentionRef]:
         """List Mentionable Users Endpoint"""
         response = await self._http.get(f"/messages/mentionable-users", params=kwargs)
-        return response.json()
+        data = response.json()
+        if isinstance(data, list):
+            return [MessageMentionRef.model_validate(item) for item in data]
+        return []
+
+    async def delete(
+        self,
+        id: str,
+        **kwargs: Any,
+    ) -> None:
+        """Delete Message"""
+        await self._http.delete(f"/messages/{quote_path(id)}", params=kwargs)
+        return
 
     async def get(
         self,
@@ -68,7 +92,7 @@ class MessagesClient:
         **kwargs: Any,
     ) -> MessageGet:
         """Get Message"""
-        response = await self._http.get(f"/messages/{id}", params=kwargs)
+        response = await self._http.get(f"/messages/{quote_path(id)}", params=kwargs)
         return MessageGet.model_validate(response.json())
 
     async def update(
@@ -78,16 +102,25 @@ class MessagesClient:
         **kwargs: Any,
     ) -> MessageGet:
         """Update Message"""
-        response = await self._http.patch(f"/messages/{id}", json_data=data, params=kwargs)
+        response = await self._http.patch(f"/messages/{quote_path(id)}", json_data=data, params=kwargs)
         return MessageGet.model_validate(response.json())
 
-    async def delete(
+    async def get_audit(
+        self,
+        id: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Get Message Audit"""
+        response = await self._http.get(f"/messages/{quote_path(id)}/audit", params=kwargs)
+        return response.json()
+
+    async def delete_reads(
         self,
         id: str,
         **kwargs: Any,
     ) -> None:
-        """Delete Message"""
-        await self._http.delete(f"/messages/{id}", params=kwargs)
+        """Mark Message Unread"""
+        await self._http.delete(f"/messages/{quote_path(id)}/reads", params=kwargs)
         return
 
     async def reads(
@@ -96,33 +129,15 @@ class MessagesClient:
         **kwargs: Any,
     ) -> None:
         """Mark Message Read"""
-        response = await self._http.post(f"/messages/{id}/reads", params=kwargs)
+        response = await self._http.post(f"/messages/{quote_path(id)}/reads", params=kwargs)
         return
 
-    async def delete_reads(
+    async def get_thread(
         self,
         id: str,
         **kwargs: Any,
-    ) -> None:
-        """Mark Message Unread"""
-        await self._http.delete(f"/messages/{id}/reads", params=kwargs)
-        return
-
-    async def thread(
-        self,
-        id: str,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> MessageThread:
         """Get Message Thread Endpoint"""
-        response = await self._http.get(f"/messages/{id}/thread", params=kwargs)
-        return response.json()
-
-    async def audit(
-        self,
-        id: str,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Get Message Audit"""
-        response = await self._http.get(f"/messages/{id}/audit", params=kwargs)
-        return response.json()
+        response = await self._http.get(f"/messages/{quote_path(id)}/thread", params=kwargs)
+        return MessageThread.model_validate(response.json())
 

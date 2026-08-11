@@ -20,6 +20,7 @@ from computor_types.student_courses import (
 )
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.urls import quote_path
 
 
 class StudentsClient:
@@ -30,16 +31,7 @@ class StudentsClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def course_contents(
-        self,
-        course_content_id: str,
-        **kwargs: Any,
-    ) -> CourseContentStudentGet:
-        """Student Get Course Content Endpoint"""
-        response = await self._http.get(f"/students/course-contents/{course_content_id}", params=kwargs)
-        return CourseContentStudentGet.model_validate(response.json())
-
-    async def get_course_contents(
+    async def list_course_contents(
         self,
         **kwargs: Any,
     ) -> List[CourseContentStudentList]:
@@ -50,7 +42,16 @@ class StudentsClient:
             return [CourseContentStudentList.model_validate(item) for item in data]
         return []
 
-    async def courses(
+    async def get_course_contents(
+        self,
+        course_content_id: str,
+        **kwargs: Any,
+    ) -> CourseContentStudentGet:
+        """Student Get Course Content Endpoint"""
+        response = await self._http.get(f"/students/course-contents/{quote_path(course_content_id)}", params=kwargs)
+        return CourseContentStudentGet.model_validate(response.json())
+
+    async def list_courses(
         self,
         **kwargs: Any,
     ) -> List[CourseStudentList]:
@@ -67,6 +68,6 @@ class StudentsClient:
         **kwargs: Any,
     ) -> CourseStudentGet:
         """Student Get Course Endpoint"""
-        response = await self._http.get(f"/students/courses/{course_id}", params=kwargs)
+        response = await self._http.get(f"/students/courses/{quote_path(course_id)}", params=kwargs)
         return CourseStudentGet.model_validate(response.json())
 

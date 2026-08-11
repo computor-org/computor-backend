@@ -10,14 +10,25 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel
 
+from computor_types.course_git import (
+    CourseGitDescriptor,
+    CourseMemberRepositoryGet,
+    CourseMemberRepositoryRegister,
+    StudentRepositoryProvisioned,
+    TemplateAccessGet,
+)
 from computor_types.course_member_accounts import (
     CourseMemberProviderAccountUpdate,
     CourseMemberReadinessStatus,
     CourseMemberValidationRequest,
 )
-from computor_types.users import UserGet
+from computor_types.users import (
+    UserGet,
+    UserScopes,
+)
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.urls import quote_path
 
 
 class UserClient:
@@ -28,98 +39,87 @@ class UserClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def list(
+    async def get(
         self,
-        query: Optional[BaseModel] = None,
         **kwargs: Any,
     ) -> UserGet:
         """Get Current User Endpoint"""
-        params = query.model_dump(exclude_none=True) if query else {}
-        params.update(kwargs)
-        response = await self._http.get(
-            f"/user",
-            params=params,
-        )
+        response = await self._http.get(f"/user", params=kwargs)
         return UserGet.model_validate(response.json())
 
-    async def scopes(
-        self,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Get Current User Scopes"""
-        response = await self._http.get(f"/user/scopes", params=kwargs)
-        return response.json()
-
-    async def views(
-        self,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Get Course Views For Current User"""
-        response = await self._http.get(f"/user/views", params=kwargs)
-        return response.json()
-
-    async def get_views(
+    async def get_courses_git(
         self,
         course_id: str,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Get Course Views For Current User By Course"""
-        response = await self._http.get(f"/user/views/{course_id}", params=kwargs)
-        return response.json()
-
-    async def courses_git(
-        self,
-        course_id: str,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> CourseGitDescriptor:
         """Get Course Git Descriptor Endpoint"""
-        response = await self._http.get(f"/user/courses/{course_id}/git", params=kwargs)
-        return response.json()
-
-    async def courses_repository(
-        self,
-        course_id: str,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Get Student Repository Endpoint"""
-        response = await self._http.get(f"/user/courses/{course_id}/repository", params=kwargs)
-        return response.json()
+        response = await self._http.get(f"/user/courses/{quote_path(course_id)}/git", params=kwargs)
+        return CourseGitDescriptor.model_validate(response.json())
 
     async def courses_provision_repository(
         self,
         course_id: str,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> StudentRepositoryProvisioned:
         """Provision Student Repository Endpoint"""
-        response = await self._http.post(f"/user/courses/{course_id}/provision-repository", params=kwargs)
-        return response.json()
+        response = await self._http.post(f"/user/courses/{quote_path(course_id)}/provision-repository", params=kwargs)
+        return StudentRepositoryProvisioned.model_validate(response.json())
 
-    async def courses_register_repository(
+    async def courses_register(
         self,
         course_id: str,
+        data: Union[CourseMemberProviderAccountUpdate, Dict[str, Any]],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Register Student Repository Endpoint"""
-        response = await self._http.post(f"/user/courses/{course_id}/register-repository", params=kwargs)
-        return response.json()
+    ) -> CourseMemberReadinessStatus:
+        """Register Current User Course Account"""
+        response = await self._http.post(f"/user/courses/{quote_path(course_id)}/register", json_data=data, params=kwargs)
+        return CourseMemberReadinessStatus.model_validate(response.json())
 
     async def courses_register_gitlab(
         self,
         course_id: str,
         data: Union[CourseMemberValidationRequest, Dict[str, Any]],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> CourseMemberRepositoryGet:
         """Register Gitlab Managed Endpoint"""
-        response = await self._http.post(f"/user/courses/{course_id}/register-gitlab", json_data=data, params=kwargs)
-        return response.json()
+        response = await self._http.post(f"/user/courses/{quote_path(course_id)}/register-gitlab", json_data=data, params=kwargs)
+        return CourseMemberRepositoryGet.model_validate(response.json())
 
-    async def courses_template_archive(
+    async def courses_register_repository(
+        self,
+        course_id: str,
+        data: Union[CourseMemberRepositoryRegister, Dict[str, Any]],
+        **kwargs: Any,
+    ) -> CourseMemberRepositoryGet:
+        """Register Student Repository Endpoint"""
+        response = await self._http.post(f"/user/courses/{quote_path(course_id)}/register-repository", json_data=data, params=kwargs)
+        return CourseMemberRepositoryGet.model_validate(response.json())
+
+    async def get_courses_repository(
+        self,
+        course_id: str,
+        **kwargs: Any,
+    ) -> CourseMemberRepositoryGet:
+        """Get Student Repository Endpoint"""
+        response = await self._http.get(f"/user/courses/{quote_path(course_id)}/repository", params=kwargs)
+        return CourseMemberRepositoryGet.model_validate(response.json())
+
+    async def courses_template_access(
+        self,
+        course_id: str,
+        **kwargs: Any,
+    ) -> TemplateAccessGet:
+        """Template Access Endpoint"""
+        response = await self._http.post(f"/user/courses/{quote_path(course_id)}/template-access", params=kwargs)
+        return TemplateAccessGet.model_validate(response.json())
+
+    async def get_courses_template_archive(
         self,
         course_id: str,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Download Template Archive Endpoint"""
-        response = await self._http.get(f"/user/courses/{course_id}/template/archive", params=kwargs)
+        response = await self._http.get(f"/user/courses/{quote_path(course_id)}/template/archive", params=kwargs)
         return response.json()
 
     async def courses_validate(
@@ -129,16 +129,31 @@ class UserClient:
         **kwargs: Any,
     ) -> CourseMemberReadinessStatus:
         """Validate Current User Course"""
-        response = await self._http.post(f"/user/courses/{course_id}/validate", json_data=data, params=kwargs)
+        response = await self._http.post(f"/user/courses/{quote_path(course_id)}/validate", json_data=data, params=kwargs)
         return CourseMemberReadinessStatus.model_validate(response.json())
 
-    async def courses_register(
+    async def get_scopes(
+        self,
+        **kwargs: Any,
+    ) -> UserScopes:
+        """Get Current User Scopes"""
+        response = await self._http.get(f"/user/scopes", params=kwargs)
+        return UserScopes.model_validate(response.json())
+
+    async def list_views(
+        self,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Get Course Views For Current User"""
+        response = await self._http.get(f"/user/views", params=kwargs)
+        return response.json()
+
+    async def list_views_by_course_id(
         self,
         course_id: str,
-        data: Union[CourseMemberProviderAccountUpdate, Dict[str, Any]],
         **kwargs: Any,
-    ) -> CourseMemberReadinessStatus:
-        """Register Current User Course Account"""
-        response = await self._http.post(f"/user/courses/{course_id}/register", json_data=data, params=kwargs)
-        return CourseMemberReadinessStatus.model_validate(response.json())
+    ) -> Dict[str, Any]:
+        """Get Course Views For Current User By Course"""
+        response = await self._http.get(f"/user/views/{quote_path(course_id)}", params=kwargs)
+        return response.json()
 

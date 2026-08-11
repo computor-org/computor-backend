@@ -10,8 +10,15 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel
 
+from computor_types.git_registry import (
+    GitServerCreate,
+    GitServerGet,
+    GitServerUpdate,
+)
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.pagination import Page
+from computor_client.urls import quote_path
 
 
 class GitServersClient:
@@ -22,45 +29,39 @@ class GitServersClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def create(
-        self,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Create Git Server Endpoint"""
-        response = await self._http.post(f"/git-servers", params=kwargs)
-        return response.json()
-
     async def list(
         self,
+        skip: int = 0,
+        limit: int = 100,
         query: Optional[BaseModel] = None,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> List[GitServerGet]:
         """List Git Servers Endpoint"""
-        params = query.model_dump(exclude_none=True) if query else {}
+        page = await self.list_page(skip=skip, limit=limit, query=query, **kwargs)
+        return page.items
+
+    async def list_page(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[BaseModel] = None,
+        **kwargs: Any,
+    ) -> Page[GitServerGet]:
+        """List Git Servers Endpoint (one page, with the total row count)."""
+        params = query.model_dump(mode="json", exclude_none=True) if query else {}
+        params.update({"skip": skip, "limit": limit})
         params.update(kwargs)
-        response = await self._http.get(
-            f"/git-servers",
-            params=params,
-        )
-        return response.json()
+        response = await self._http.get(f"/git-servers", params=params)
+        return Page.from_response(response, GitServerGet, skip=skip, limit=limit)
 
-    async def get(
+    async def create(
         self,
-        server_id: str,
+        data: Union[GitServerCreate, Dict[str, Any]],
         **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Get Git Server Endpoint"""
-        response = await self._http.get(f"/git-servers/{server_id}", params=kwargs)
-        return response.json()
-
-    async def update(
-        self,
-        server_id: str,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Update Git Server Endpoint"""
-        response = await self._http.patch(f"/git-servers/{server_id}", params=kwargs)
-        return response.json()
+    ) -> GitServerGet:
+        """Create Git Server Endpoint"""
+        response = await self._http.post(f"/git-servers", json_data=data, params=kwargs)
+        return GitServerGet.model_validate(response.json())
 
     async def delete(
         self,
@@ -68,6 +69,25 @@ class GitServersClient:
         **kwargs: Any,
     ) -> None:
         """Delete Git Server Endpoint"""
-        await self._http.delete(f"/git-servers/{server_id}", params=kwargs)
+        await self._http.delete(f"/git-servers/{quote_path(server_id)}", params=kwargs)
         return
+
+    async def get(
+        self,
+        server_id: str,
+        **kwargs: Any,
+    ) -> GitServerGet:
+        """Get Git Server Endpoint"""
+        response = await self._http.get(f"/git-servers/{quote_path(server_id)}", params=kwargs)
+        return GitServerGet.model_validate(response.json())
+
+    async def update(
+        self,
+        server_id: str,
+        data: Union[GitServerUpdate, Dict[str, Any]],
+        **kwargs: Any,
+    ) -> GitServerGet:
+        """Update Git Server Endpoint"""
+        response = await self._http.patch(f"/git-servers/{quote_path(server_id)}", json_data=data, params=kwargs)
+        return GitServerGet.model_validate(response.json())
 

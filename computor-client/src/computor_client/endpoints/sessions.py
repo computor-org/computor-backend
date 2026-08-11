@@ -18,6 +18,8 @@ from computor_types.sessions import (
 )
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.pagination import Page
+from computor_client.urls import quote_path
 
 
 class SessionsClient:
@@ -28,6 +30,31 @@ class SessionsClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
+    async def list(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[BaseModel] = None,
+        **kwargs: Any,
+    ) -> List[SessionList]:
+        """List Sessions"""
+        page = await self.list_page(skip=skip, limit=limit, query=query, **kwargs)
+        return page.items
+
+    async def list_page(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[BaseModel] = None,
+        **kwargs: Any,
+    ) -> Page[SessionList]:
+        """List Sessions (one page, with the total row count)."""
+        params = query.model_dump(mode="json", exclude_none=True) if query else {}
+        params.update({"skip": skip, "limit": limit})
+        params.update(kwargs)
+        response = await self._http.get(f"/sessions", params=params)
+        return Page.from_response(response, SessionList, skip=skip, limit=limit)
+
     async def create(
         self,
         data: Union[SessionCreate, Dict[str, Any]],
@@ -37,52 +64,45 @@ class SessionsClient:
         response = await self._http.post(f"/sessions", json_data=data, params=kwargs)
         return SessionGet.model_validate(response.json())
 
-    async def list(
+    async def get_admin_stats(
         self,
-        query: Optional[BaseModel] = None,
         **kwargs: Any,
-    ) -> List[SessionList]:
-        """List Sessions"""
-        params = query.model_dump(exclude_none=True) if query else {}
-        params.update(kwargs)
-        response = await self._http.get(
-            f"/sessions",
-            params=params,
-        )
+    ) -> Dict[str, Any]:
+        """Get Session Stats"""
+        response = await self._http.get(f"/sessions/admin/stats", params=kwargs)
+        return response.json()
+
+    async def list_admin_users(
+        self,
+        user_id: str,
+        **kwargs: Any,
+    ) -> List[SessionGet]:
+        """List User Sessions Admin"""
+        response = await self._http.get(f"/sessions/admin/users/{quote_path(user_id)}", params=kwargs)
         data = response.json()
         if isinstance(data, list):
-            return [SessionList.model_validate(item) for item in data]
+            return [SessionGet.model_validate(item) for item in data]
         return []
 
-    async def get(
+    async def delete_admin_users_all(
         self,
-        id: str,
-        **kwargs: Any,
-    ) -> SessionGet:
-        """Get Sessions"""
-        response = await self._http.get(f"/sessions/{id}", params=kwargs)
-        return SessionGet.model_validate(response.json())
-
-    async def update(
-        self,
-        id: str,
-        data: Union[SessionUpdate, Dict[str, Any]],
-        **kwargs: Any,
-    ) -> SessionGet:
-        """Update Sessions"""
-        response = await self._http.patch(f"/sessions/{id}", json_data=data, params=kwargs)
-        return SessionGet.model_validate(response.json())
-
-    async def delete(
-        self,
-        id: str,
+        user_id: str,
         **kwargs: Any,
     ) -> None:
-        """Delete Sessions"""
-        await self._http.delete(f"/sessions/{id}", params=kwargs)
+        """Revoke All User Sessions Admin"""
+        await self._http.delete(f"/sessions/admin/users/{quote_path(user_id)}/all", params=kwargs)
         return
 
-    async def me(
+    async def delete_admin(
+        self,
+        session_id: str,
+        **kwargs: Any,
+    ) -> None:
+        """Revoke Session Admin"""
+        await self._http.delete(f"/sessions/admin/{quote_path(session_id)}", params=kwargs)
+        return
+
+    async def list_me(
         self,
         **kwargs: Any,
     ) -> List[SessionList]:
@@ -93,7 +113,15 @@ class SessionsClient:
             return [SessionList.model_validate(item) for item in data]
         return []
 
-    async def me_current(
+    async def delete_me_all(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        """Revoke All My Sessions"""
+        await self._http.delete(f"/sessions/me/all", params=kwargs)
+        return
+
+    async def get_me_current(
         self,
         **kwargs: Any,
     ) -> SessionGet:
@@ -107,52 +135,34 @@ class SessionsClient:
         **kwargs: Any,
     ) -> None:
         """Revoke My Session"""
-        await self._http.delete(f"/sessions/me/{session_id}", params=kwargs)
+        await self._http.delete(f"/sessions/me/{quote_path(session_id)}", params=kwargs)
         return
 
-    async def me_all(
+    async def delete(
         self,
+        id: str,
         **kwargs: Any,
     ) -> None:
-        """Revoke All My Sessions"""
-        await self._http.delete(f"/sessions/me/all", params=kwargs)
+        """Delete Sessions"""
+        await self._http.delete(f"/sessions/{quote_path(id)}", params=kwargs)
         return
 
-    async def admin_users(
+    async def get(
         self,
-        user_id: str,
+        id: str,
         **kwargs: Any,
-    ) -> List[SessionGet]:
-        """List User Sessions Admin"""
-        response = await self._http.get(f"/sessions/admin/users/{user_id}", params=kwargs)
-        data = response.json()
-        if isinstance(data, list):
-            return [SessionGet.model_validate(item) for item in data]
-        return []
+    ) -> SessionGet:
+        """Get Sessions"""
+        response = await self._http.get(f"/sessions/{quote_path(id)}", params=kwargs)
+        return SessionGet.model_validate(response.json())
 
-    async def admin(
+    async def update(
         self,
-        session_id: str,
+        id: str,
+        data: Union[SessionUpdate, Dict[str, Any]],
         **kwargs: Any,
-    ) -> None:
-        """Revoke Session Admin"""
-        await self._http.delete(f"/sessions/admin/{session_id}", params=kwargs)
-        return
-
-    async def admin_users_all(
-        self,
-        user_id: str,
-        **kwargs: Any,
-    ) -> None:
-        """Revoke All User Sessions Admin"""
-        await self._http.delete(f"/sessions/admin/users/{user_id}/all", params=kwargs)
-        return
-
-    async def admin_stats(
-        self,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Get Session Stats"""
-        response = await self._http.get(f"/sessions/admin/stats", params=kwargs)
-        return response.json()
+    ) -> SessionGet:
+        """Update Sessions"""
+        response = await self._http.patch(f"/sessions/{quote_path(id)}", json_data=data, params=kwargs)
+        return SessionGet.model_validate(response.json())
 

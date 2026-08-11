@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel
 
 from computor_types.users import (
+    UserBanRequest,
     UserCreate,
     UserGet,
     UserList,
@@ -18,6 +19,8 @@ from computor_types.users import (
 )
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.pagination import Page
+from computor_client.urls import quote_path
 
 
 class UsersClient:
@@ -28,6 +31,31 @@ class UsersClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
+    async def list(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[BaseModel] = None,
+        **kwargs: Any,
+    ) -> List[UserList]:
+        """List Users"""
+        page = await self.list_page(skip=skip, limit=limit, query=query, **kwargs)
+        return page.items
+
+    async def list_page(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[BaseModel] = None,
+        **kwargs: Any,
+    ) -> Page[UserList]:
+        """List Users (one page, with the total row count)."""
+        params = query.model_dump(mode="json", exclude_none=True) if query else {}
+        params.update({"skip": skip, "limit": limit})
+        params.update(kwargs)
+        response = await self._http.get(f"/users", params=params)
+        return Page.from_response(response, UserList, skip=skip, limit=limit)
+
     async def create(
         self,
         data: Union[UserCreate, Dict[str, Any]],
@@ -37,22 +65,14 @@ class UsersClient:
         response = await self._http.post(f"/users", json_data=data, params=kwargs)
         return UserGet.model_validate(response.json())
 
-    async def list(
+    async def delete(
         self,
-        query: Optional[BaseModel] = None,
+        id: str,
         **kwargs: Any,
-    ) -> List[UserList]:
-        """List Users"""
-        params = query.model_dump(exclude_none=True) if query else {}
-        params.update(kwargs)
-        response = await self._http.get(
-            f"/users",
-            params=params,
-        )
-        data = response.json()
-        if isinstance(data, list):
-            return [UserList.model_validate(item) for item in data]
-        return []
+    ) -> None:
+        """Delete Users"""
+        await self._http.delete(f"/users/{quote_path(id)}", params=kwargs)
+        return
 
     async def get(
         self,
@@ -60,7 +80,7 @@ class UsersClient:
         **kwargs: Any,
     ) -> UserGet:
         """Get Users"""
-        response = await self._http.get(f"/users/{id}", params=kwargs)
+        response = await self._http.get(f"/users/{quote_path(id)}", params=kwargs)
         return UserGet.model_validate(response.json())
 
     async def update(
@@ -70,51 +90,43 @@ class UsersClient:
         **kwargs: Any,
     ) -> UserGet:
         """Update Users"""
-        response = await self._http.patch(f"/users/{id}", json_data=data, params=kwargs)
+        response = await self._http.patch(f"/users/{quote_path(id)}", json_data=data, params=kwargs)
         return UserGet.model_validate(response.json())
 
-    async def delete(
-        self,
-        id: str,
-        **kwargs: Any,
-    ) -> None:
-        """Delete Users"""
-        await self._http.delete(f"/users/{id}", params=kwargs)
-        return
-
-    async def archive(
+    async def update_archive(
         self,
         id: str,
         **kwargs: Any,
     ) -> None:
         """Route Users"""
-        response = await self._http.patch(f"/users/{id}/archive", params=kwargs)
+        response = await self._http.patch(f"/users/{quote_path(id)}/archive", params=kwargs)
         return
 
-    async def unarchive(
+    async def update_unarchive(
         self,
         id: str,
         **kwargs: Any,
     ) -> None:
         """Unarchive Users"""
-        response = await self._http.patch(f"/users/{id}/unarchive", params=kwargs)
+        response = await self._http.patch(f"/users/{quote_path(id)}/unarchive", params=kwargs)
         return
 
-    async def ban(
+    async def update_ban(
         self,
         user_id: str,
+        data: Union[UserBanRequest, Dict[str, Any]],
         **kwargs: Any,
     ) -> UserGet:
         """Ban User"""
-        response = await self._http.patch(f"/users/{user_id}/ban", params=kwargs)
+        response = await self._http.patch(f"/users/{quote_path(user_id)}/ban", json_data=data, params=kwargs)
         return UserGet.model_validate(response.json())
 
-    async def unban(
+    async def update_unban(
         self,
         user_id: str,
         **kwargs: Any,
     ) -> UserGet:
         """Unban User"""
-        response = await self._http.patch(f"/users/{user_id}/unban", params=kwargs)
+        response = await self._http.patch(f"/users/{quote_path(user_id)}/unban", params=kwargs)
         return UserGet.model_validate(response.json())
 

@@ -19,6 +19,7 @@ from computor_types.api_tokens import (
 )
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.urls import quote_path
 
 
 class TokensClient:
@@ -29,16 +30,7 @@ class TokensClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
-    async def api_tokens(
-        self,
-        data: Union[ApiTokenCreate, Dict[str, Any]],
-        **kwargs: Any,
-    ) -> ApiTokenCreateResponse:
-        """Create Token Endpoint"""
-        response = await self._http.post(f"/api-tokens", json_data=data, params=kwargs)
-        return ApiTokenCreateResponse.model_validate(response.json())
-
-    async def get_api_tokens(
+    async def list_api_tokens(
         self,
         **kwargs: Any,
     ) -> List[ApiTokenGet]:
@@ -49,6 +41,15 @@ class TokensClient:
             return [ApiTokenGet.model_validate(item) for item in data]
         return []
 
+    async def api_tokens(
+        self,
+        data: Union[ApiTokenCreate, Dict[str, Any]],
+        **kwargs: Any,
+    ) -> ApiTokenCreateResponse:
+        """Create Token Endpoint"""
+        response = await self._http.post(f"/api-tokens", json_data=data, params=kwargs)
+        return ApiTokenCreateResponse.model_validate(response.json())
+
     async def api_tokens_admin_create(
         self,
         data: Union[ApiTokenAdminCreate, Dict[str, Any]],
@@ -58,23 +59,14 @@ class TokensClient:
         response = await self._http.post(f"/api-tokens/admin/create", json_data=data, params=kwargs)
         return ApiTokenCreateResponse.model_validate(response.json())
 
-    async def api_tokens_admin(
+    async def update_api_tokens_admin(
         self,
         token_id: str,
         data: Union[ApiTokenUpdate, Dict[str, Any]],
         **kwargs: Any,
     ) -> ApiTokenGet:
         """Update Token Admin Endpoint"""
-        response = await self._http.patch(f"/api-tokens/admin/{token_id}", json_data=data, params=kwargs)
-        return ApiTokenGet.model_validate(response.json())
-
-    async def get_api_tokens_token_id(
-        self,
-        token_id: str,
-        **kwargs: Any,
-    ) -> ApiTokenGet:
-        """Get Token Endpoint"""
-        response = await self._http.get(f"/api-tokens/{token_id}", params=kwargs)
+        response = await self._http.patch(f"/api-tokens/admin/{quote_path(token_id)}", json_data=data, params=kwargs)
         return ApiTokenGet.model_validate(response.json())
 
     async def delete_api_tokens(
@@ -83,6 +75,15 @@ class TokensClient:
         **kwargs: Any,
     ) -> None:
         """Revoke Token Endpoint"""
-        await self._http.delete(f"/api-tokens/{token_id}", params=kwargs)
+        await self._http.delete(f"/api-tokens/{quote_path(token_id)}", params=kwargs)
         return
+
+    async def get_api_tokens(
+        self,
+        token_id: str,
+        **kwargs: Any,
+    ) -> ApiTokenGet:
+        """Get Token Endpoint"""
+        response = await self._http.get(f"/api-tokens/{quote_path(token_id)}", params=kwargs)
+        return ApiTokenGet.model_validate(response.json())
 

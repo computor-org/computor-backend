@@ -16,6 +16,8 @@ from computor_types.course_member_gradings import (
 )
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.pagination import Page
+from computor_client.urls import quote_path
 
 
 class CourseMemberGradingsClient:
@@ -28,20 +30,28 @@ class CourseMemberGradingsClient:
 
     async def list(
         self,
+        skip: int = 0,
+        limit: int = 100,
         query: Optional[BaseModel] = None,
         **kwargs: Any,
     ) -> List[CourseMemberGradingsList]:
         """List course member grading statistics for a course"""
-        params = query.model_dump(exclude_none=True) if query else {}
+        page = await self.list_page(skip=skip, limit=limit, query=query, **kwargs)
+        return page.items
+
+    async def list_page(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[BaseModel] = None,
+        **kwargs: Any,
+    ) -> Page[CourseMemberGradingsList]:
+        """List course member grading statistics for a course (one page, with the total row count)."""
+        params = query.model_dump(mode="json", exclude_none=True) if query else {}
+        params.update({"skip": skip, "limit": limit})
         params.update(kwargs)
-        response = await self._http.get(
-            f"/course-member-gradings",
-            params=params,
-        )
-        data = response.json()
-        if isinstance(data, list):
-            return [CourseMemberGradingsList.model_validate(item) for item in data]
-        return []
+        response = await self._http.get(f"/course-member-gradings", params=params)
+        return Page.from_response(response, CourseMemberGradingsList, skip=skip, limit=limit)
 
     async def get(
         self,
@@ -49,6 +59,6 @@ class CourseMemberGradingsClient:
         **kwargs: Any,
     ) -> CourseMemberGradingsGet:
         """Get course member grading statistics"""
-        response = await self._http.get(f"/course-member-gradings/{course_member_id}", params=kwargs)
+        response = await self._http.get(f"/course-member-gradings/{quote_path(course_member_id)}", params=kwargs)
         return CourseMemberGradingsGet.model_validate(response.json())
 

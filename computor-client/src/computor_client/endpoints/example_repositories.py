@@ -18,6 +18,8 @@ from computor_types.example import (
 )
 
 from computor_client.http import AsyncHTTPClient
+from computor_client.pagination import Page
+from computor_client.urls import quote_path
 
 
 class ExampleRepositoriesClient:
@@ -28,6 +30,31 @@ class ExampleRepositoriesClient:
     def __init__(self, http_client: AsyncHTTPClient) -> None:
         self._http = http_client
 
+    async def list(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[BaseModel] = None,
+        **kwargs: Any,
+    ) -> List[ExampleRepositoryList]:
+        """List Example-Repositories"""
+        page = await self.list_page(skip=skip, limit=limit, query=query, **kwargs)
+        return page.items
+
+    async def list_page(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        query: Optional[BaseModel] = None,
+        **kwargs: Any,
+    ) -> Page[ExampleRepositoryList]:
+        """List Example-Repositories (one page, with the total row count)."""
+        params = query.model_dump(mode="json", exclude_none=True) if query else {}
+        params.update({"skip": skip, "limit": limit})
+        params.update(kwargs)
+        response = await self._http.get(f"/example-repositories", params=params)
+        return Page.from_response(response, ExampleRepositoryList, skip=skip, limit=limit)
+
     async def create(
         self,
         data: Union[ExampleRepositoryCreate, Dict[str, Any]],
@@ -37,22 +64,14 @@ class ExampleRepositoriesClient:
         response = await self._http.post(f"/example-repositories", json_data=data, params=kwargs)
         return ExampleRepositoryGet.model_validate(response.json())
 
-    async def list(
+    async def delete(
         self,
-        query: Optional[BaseModel] = None,
+        id: str,
         **kwargs: Any,
-    ) -> List[ExampleRepositoryList]:
-        """List Example-Repositories"""
-        params = query.model_dump(exclude_none=True) if query else {}
-        params.update(kwargs)
-        response = await self._http.get(
-            f"/example-repositories",
-            params=params,
-        )
-        data = response.json()
-        if isinstance(data, list):
-            return [ExampleRepositoryList.model_validate(item) for item in data]
-        return []
+    ) -> None:
+        """Delete Example-Repositories"""
+        await self._http.delete(f"/example-repositories/{quote_path(id)}", params=kwargs)
+        return
 
     async def get(
         self,
@@ -60,7 +79,7 @@ class ExampleRepositoriesClient:
         **kwargs: Any,
     ) -> ExampleRepositoryGet:
         """Get Example-Repositories"""
-        response = await self._http.get(f"/example-repositories/{id}", params=kwargs)
+        response = await self._http.get(f"/example-repositories/{quote_path(id)}", params=kwargs)
         return ExampleRepositoryGet.model_validate(response.json())
 
     async def update(
@@ -70,15 +89,6 @@ class ExampleRepositoriesClient:
         **kwargs: Any,
     ) -> ExampleRepositoryGet:
         """Update Example-Repositories"""
-        response = await self._http.patch(f"/example-repositories/{id}", json_data=data, params=kwargs)
+        response = await self._http.patch(f"/example-repositories/{quote_path(id)}", json_data=data, params=kwargs)
         return ExampleRepositoryGet.model_validate(response.json())
-
-    async def delete(
-        self,
-        id: str,
-        **kwargs: Any,
-    ) -> None:
-        """Delete Example-Repositories"""
-        await self._http.delete(f"/example-repositories/{id}", params=kwargs)
-        return
 
