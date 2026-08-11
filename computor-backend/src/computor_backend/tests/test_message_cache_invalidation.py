@@ -28,6 +28,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from computor_backend.business_logic import messages as messages_bl
+from computor_backend.business_logic.messages import cache as messages_cache
 
 
 # ---------------------------------------------------------------------------
@@ -64,9 +65,15 @@ def _cache():
 
 def _patch_course_resolution(monkeypatch, course_ids):
     """Stub ``_affected_course_ids_for_message`` so we don't need a real DB
-    schema to drive the invalidator's branching logic."""
+    schema to drive the invalidator's branching logic.
+
+    Patch the *defining* module, not the package: the caller resolves the
+    name in ``business_logic.messages.cache``'s own globals, so rebinding
+    the re-export on the package left the real implementation running and
+    every assertion below comparing against live DB output.
+    """
     monkeypatch.setattr(
-        messages_bl,
+        messages_cache,
         "_affected_course_ids_for_message",
         lambda message, db: set(course_ids),
     )

@@ -42,6 +42,11 @@ from .cache import (
     invalidate_dashboard_views_for_message,
     invalidate_tutor_lecturer_views_for_message,
     invalidate_course_dashboards,
+    # Private, but re-exported deliberately: the invalidation tests patch
+    # these through the package namespace, and every other submodule's
+    # private helpers are re-exported here too.
+    _affected_course_ids_for_message,
+    _invalidate_message_cache,
 )
 from .read_status import (
     mark_author_as_reader,
@@ -83,6 +88,8 @@ __all__ = [
     "invalidate_dashboard_views_for_message",
     "invalidate_tutor_lecturer_views_for_message",
     "invalidate_course_dashboards",
+    "_affected_course_ids_for_message",
+    "_invalidate_message_cache",
     "mark_author_as_reader",
     "get_message_with_read_status",
     "list_messages_with_read_status",
