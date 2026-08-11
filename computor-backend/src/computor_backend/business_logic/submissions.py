@@ -486,7 +486,12 @@ async def upload_submission_artifact(
         uploaded_by_course_member_id=submitting_member.id,
         total_size=total_filtered_size,
         files_count=len(files_included),
-        uploaded_at=datetime.utcnow(),
+        # The value actually stored (timestamptz, server_default now()), not a
+        # second clock reading: utcnow() produced a naive stamp that both drifted
+        # from the row by the duration of the upload and, having no offset, was
+        # read as local time by clients — so this response and a later artifact
+        # listing disagreed by the UTC offset.
+        uploaded_at=created_artifact.uploaded_at,
         version_identifier=manual_version_identifier,
     )
 

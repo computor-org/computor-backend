@@ -21,9 +21,14 @@ def _reject_past_expiry(value: Optional[datetime]) -> Optional[datetime]:
     """
     if value is None:
         return value
-    # Naive datetimes are treated as UTC (bootstrap builds them with utcnow()).
-    reference = datetime.now(timezone.utc) if value.tzinfo else datetime.utcnow()
-    if value <= reference:
+    # A caller may still send an offset-less datetime ("2027-01-01T00:00:00"),
+    # which pydantic parses as naive. Interpret it as UTC and return it that
+    # way, rather than comparing it against a naive "now": every column here is
+    # timestamptz, so a naive value would otherwise be resolved against the
+    # database session's time zone instead of the one the caller meant.
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    if value <= datetime.now(timezone.utc):
         raise ValueError("expires_at must be in the future")
     return value
 

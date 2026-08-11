@@ -10,7 +10,7 @@ import os
 import pkgutil
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Type
 
@@ -140,7 +140,7 @@ class TypeScriptClientGenerator:
         if not self.include_timestamp:
             raise RuntimeError("Timestamp requested but include_timestamp is False")
         if self._timestamp_value is None:
-            self._timestamp_value = datetime.utcnow().isoformat()
+            self._timestamp_value = datetime.now(timezone.utc).isoformat()
         return self._timestamp_value
 
     # ------------------------------------------------------------------

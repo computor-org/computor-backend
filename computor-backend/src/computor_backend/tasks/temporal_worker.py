@@ -7,7 +7,7 @@ import logging
 import signal
 import sys
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from temporalio.worker import Worker
 from temporalio.client import Client
@@ -78,7 +78,7 @@ class TemporalWorker:
             except asyncio.TimeoutError:
                 pass  # normal interval elapsed
             if not self._shutdown:
-                uptime = datetime.utcnow() - self._start_time if self._start_time else "unknown"
+                uptime = datetime.now(timezone.utc) - self._start_time if self._start_time else "unknown"
                 logger.info(
                     f"[HEARTBEAT] Worker alive - queues: {self.task_queues}, "
                     f"uptime: {uptime}"
@@ -86,7 +86,11 @@ class TemporalWorker:
 
     async def start(self):
         """Start the worker and begin processing workflows."""
-        self._start_time = datetime.utcnow()
+        # Aware UTC. The worker container runs on UTC by design, but a naive
+        # stamp logged its isoformat() with no offset ("2026-08-10T11:03:52"),
+        # which reads as local time to anyone correlating it against a wall
+        # clock or feeding it to a parser.
+        self._start_time = datetime.now(timezone.utc)
         logger.info(f"Starting Temporal worker for queues: {', '.join(self.task_queues)}")
         logger.info(f"Worker start time: {self._start_time.isoformat()}")
 
@@ -230,7 +234,7 @@ class TemporalWorker:
         for executor in self._activity_executors:
             executor.shutdown(wait=False)
 
-        uptime = datetime.utcnow() - self._start_time if self._start_time else "unknown"
+        uptime = datetime.now(timezone.utc) - self._start_time if self._start_time else "unknown"
         logger.info(f"Workers shut down - uptime: {uptime}")
 
 
