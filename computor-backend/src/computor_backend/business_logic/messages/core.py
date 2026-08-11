@@ -9,7 +9,9 @@ from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_permissions
 from computor_backend.model.message import Message
 from computor_types.messages import (
-    MessageCreate, MessageQuery, MessageList, MessageThread,
+    CONVERSATIONAL_SCOPES, MESSAGE_TARGET_FIELDS, MessageCreate, MessageQuery,
+    MessageList, MessageScope, MessageThread, kind_for_scope, normalize_title,
+    scope_for_targets,
 )
 from .permissions import (
     _check_global_write_permission,
@@ -25,30 +27,61 @@ from .mentions import validate_message_mentions, _transient_message_for_targets
 from .read_status import list_messages_with_read_status
 
 
-# Most-specific to least-specific. Mirrors the hierarchy comment on
-# ``model.message.Message`` and powers single-target enforcement on create.
-MESSAGE_TARGET_FIELDS = (
-    'user_id',
-    'course_member_id',
-    'submission_group_id',
-    'course_content_id',
-    'course_group_id',
-    'course_id',
-    'course_family_id',
-    'organization_id',
+# ``MESSAGE_TARGET_FIELDS`` (most-specific first) now lives in
+# ``computor_types.messages`` so that create-time single-target enforcement,
+# the @mention audience gate and the WebSocket channel resolver all agree on
+# one list — they used to keep three copies, and two of them disagreed on
+# whether course_group or course_content was the more specific target.
+
+
+# Kept as the field-name view of ``CONVERSATIONAL_SCOPES`` for existing
+# importers; the scope set in ``computor_types.messages`` is the source of
+# truth, and everything in this module reasons in scopes via
+# ``kind_for_scope``.
+CONVERSATIONAL_TARGET_FIELDS = frozenset(
+    f"{scope}_id" for scope in CONVERSATIONAL_SCOPES
 )
 
 
-# Scopes that support back-and-forth conversations (i.e. ``parent_id``
-# replies are meaningful). Everything else is broadcast / announcement
-# territory: a student replying to a course-wide announcement would
-# otherwise have their reply fan out to every course member, which is
-# the opposite of what announcements are for.
-CONVERSATIONAL_TARGET_FIELDS = frozenset({
-    'user_id',
-    'course_member_id',
-    'submission_group_id',
-})
+# Hard ceiling on one page of messages. Chosen to sit above the extension's
+# 500-row auto-paging window so normal clients never notice it, and below
+# anything that would make the per-page enrichment (authors, read status,
+# mentions) expensive. ``X-Total-Count`` still reports the true total, so a
+# client that wants everything pages for it.
+MAX_MESSAGE_PAGE_SIZE = 1000
+
+
+def enforce_title_rule(title, scope: MessageScope):
+    """Return the subject to persist for ``scope``, or raise.
+
+    Announcements are list items — a course's announcements are read as a
+    list of subjects, so a blank one is unusable. Conversations are chat;
+    a subject on a chat line is noise, and the only thing that ever put
+    one there was the retired ``#ai`` tag convention.
+
+    Blank input is normalized to ``None`` before the check, so a client
+    that renders no subject field can keep sending ``title: ""``.
+    """
+    normalized = normalize_title(title)
+
+    if kind_for_scope(scope) == "conversation":
+        if normalized is not None:
+            raise BadRequestException(
+                detail=(
+                    f"Messages in the {scope} scope are a conversation and "
+                    "carry no subject. Put it in the content instead."
+                )
+            )
+        return None
+
+    if normalized is None:
+        raise BadRequestException(
+            detail=(
+                f"A subject is required for {scope} announcements — it is "
+                "what identifies the announcement in a list."
+            )
+        )
+    return normalized
 
 
 def create_message_with_author(
@@ -97,6 +130,7 @@ def create_message_with_author(
     model_dump = payload.model_dump(exclude_unset=True)
     model_dump['author_id'] = permissions.user_id
 
+    parent_message = None
     if model_dump.get('parent_id'):
         parent_message = db.query(Message).filter(Message.id == model_dump['parent_id']).first()
         if not parent_message:
@@ -124,23 +158,30 @@ def create_message_with_author(
         if field != primary_target:
             model_dump[field] = None
 
+    scope = scope_for_targets(model_dump)
+
     # Replies are only meaningful on conversational scopes. Allowing a
     # reply on e.g. ``course_id`` would fan a student's reply out to
     # every course member — that's the opposite of what an announcement
-    # scope is for. Mirrors the client-side reply policy shipped in the
-    # vscode extension.
-    if model_dump.get('parent_id') and primary_target not in CONVERSATIONAL_TARGET_FIELDS:
-        scope_label = primary_target or 'global'
+    # scope is for.
+    if model_dump.get('parent_id') and kind_for_scope(scope) != 'conversation':
         raise BadRequestException(
             detail=(
-                f"Replies are not allowed on {scope_label} messages — "
-                "those scopes are announcement-only. Conversational "
-                "scopes are: user, course_member, submission_group."
+                f"Replies are not allowed on {scope} messages — those "
+                "scopes are announcement-only. Conversational scopes are: "
+                + ", ".join(sorted(CONVERSATIONAL_SCOPES))
+                + "."
             )
         )
 
+    # Subject rule: announcements need one, conversations must not have
+    # one. Runs before the write-permission checks so a caller learns
+    # about a malformed payload rather than a permission they may also
+    # be missing.
+    model_dump['title'] = enforce_title_rule(model_dump.get('title'), scope)
+
     if primary_target is None:
-        _check_global_write_permission(permissions)
+        _check_global_write_permission(permissions, db)
     elif primary_target == 'user_id':
         _check_user_message_write_permission(permissions, model_dump['user_id'], db)
     elif primary_target == 'course_member_id':
@@ -160,8 +201,13 @@ def create_message_with_author(
     elif primary_target == 'organization_id':
         _check_organization_write_permission(permissions, model_dump['organization_id'])
 
-    if 'level' not in model_dump or model_dump['level'] is None:
-        model_dump['level'] = 0
+    # Depth is derived, never taken from the client. It used to be whatever
+    # the caller sent: the extension guessed it from its in-memory page and
+    # fell back to 1 when the parent wasn't loaded, and the agent didn't send
+    # it at all, so every agent reply was stored at depth 0. The webview
+    # seeds a root's indentation from this column, so a wrong value renders
+    # wrong.
+    model_dump['level'] = (parent_message.level or 0) + 1 if parent_message else 0
 
     # Gate @mentions against the message's audience before persistence — you
     # cannot mention a user who could not see the message. The relation rows
@@ -211,8 +257,14 @@ def list_messages_with_filters(
     total = query.order_by(None).count()
 
     paginated_query = query
-    if params.limit is not None:
-        paginated_query = paginated_query.limit(params.limit)
+    # ``ListQuery.limit`` has no ceiling, and every returned row is then run
+    # through the author / read-status / mention enrichers. Cap it here
+    # rather than globally, so one client asking for everything can't turn
+    # a list call into an unbounded enrichment pass.
+    limit = MAX_MESSAGE_PAGE_SIZE if params.limit is None else min(
+        params.limit, MAX_MESSAGE_PAGE_SIZE
+    )
+    paginated_query = paginated_query.limit(limit)
     if params.skip is not None:
         paginated_query = paginated_query.offset(params.skip)
 
@@ -245,10 +297,13 @@ def get_message_thread(
     Raises:
         BadRequestException: If message not found
     """
-    # Walk up to root
+    # Walk up to root. The anchor may itself be deleted — a client can hold
+    # the id of a message that was removed while its replies live on, and
+    # ``GET /messages/{id}`` still resolves it, so refusing here just made
+    # the two endpoints disagree. Whether the tombstone is returned is
+    # decided below, by whether anything still hangs off it.
     start_message = db.query(Message).filter(
         Message.id == message_id,
-        Message.archived_at.is_(None),
     ).first()
 
     if not start_message:
@@ -279,14 +334,39 @@ def get_message_thread(
         .filter(Message.parent_id == cte.c.id)
     )
 
-    # Fetch all thread messages, ordered chronologically
-    thread_messages = (
+    # Fetch the thread, then drop deleted messages that nothing depends on.
+    #
+    # A soft-deleted message keeps its row precisely so its replies stay
+    # attached — but every read path filtered it out unconditionally, which
+    # removed the node and left its replies pointing at a parent that was no
+    # longer in the response. The client rendered those as bare "↳ reply"
+    # with no context, and the tombstone the delete path writes ("[This
+    # message was deleted by ...]") was never displayed anywhere.
+    #
+    # Keep a deleted message only when it still has a live descendant, so the
+    # reply chain reads continuously and the gap is explained rather than
+    # silently swallowed.
+    all_thread_messages = (
         db.query(Message)
         .filter(Message.id.in_(db.query(cte.c.id)))
-        .filter(Message.archived_at.is_(None))
         .order_by(Message.created_at.asc())
         .all()
     )
+
+    by_id = {str(m.id): m for m in all_thread_messages}
+    keep: set[str] = set()
+    for message in all_thread_messages:
+        if message.archived_at is not None:
+            continue
+        keep.add(str(message.id))
+        # Walk up, keeping deleted ancestors that this live reply hangs off.
+        parent_id = str(message.parent_id) if message.parent_id else None
+        while parent_id and parent_id in by_id and parent_id not in keep:
+            keep.add(parent_id)
+            parent = by_id[parent_id]
+            parent_id = str(parent.parent_id) if parent.parent_id else None
+
+    thread_messages = [m for m in all_thread_messages if str(m.id) in keep]
 
     # Enrich with read status and author info
     items = [MessageList.model_validate(msg, from_attributes=True) for msg in thread_messages]

@@ -20,9 +20,21 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "comp
 def collect_constants() -> Dict[str, Any]:
     """Collect exportable constants from computor-types."""
     from computor_types.example import EXAMPLE_EXCLUDE_PATTERNS
+    from computor_types.messages import (
+        CONVERSATIONAL_SCOPES,
+        MESSAGE_TARGET_FIELDS,
+    )
 
     return {
         'EXAMPLE_EXCLUDE_PATTERNS': EXAMPLE_EXCLUDE_PATTERNS,
+        # Message target columns, most-specific first. Clients derive a
+        # not-yet-created message's scope from the target they are about to
+        # post to, and the order decides which one wins.
+        'MESSAGE_TARGET_FIELDS': MESSAGE_TARGET_FIELDS,
+        # The scopes that host a conversation rather than a broadcast.
+        # Sorted so the generated output is stable across runs — the Python
+        # side is a frozenset.
+        'CONVERSATIONAL_SCOPES': sorted(CONVERSATIONAL_SCOPES),
     }
 
 
@@ -37,7 +49,7 @@ def generate_typescript(constants: Dict[str, Any]) -> str:
     ]
 
     for name, value in constants.items():
-        if isinstance(value, list):
+        if isinstance(value, (list, tuple)):
             items = ', '.join(json.dumps(v) for v in value)
             lines.append(f'export const {name}: readonly string[] = [{items}] as const;')
         elif isinstance(value, str):

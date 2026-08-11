@@ -15,6 +15,7 @@ from .core import (
     MESSAGE_TARGET_FIELDS,
     CONVERSATIONAL_TARGET_FIELDS,
     create_message_with_author,
+    enforce_title_rule,
     list_messages_with_filters,
     get_message_thread,
 )
@@ -42,6 +43,11 @@ from .cache import (
     invalidate_dashboard_views_for_message,
     invalidate_tutor_lecturer_views_for_message,
     invalidate_course_dashboards,
+    # Private, but re-exported deliberately: the invalidation tests patch
+    # these through the package namespace, and every other submodule's
+    # private helpers are re-exported here too.
+    _affected_course_ids_for_message,
+    _invalidate_message_cache,
 )
 from .read_status import (
     mark_author_as_reader,
@@ -49,6 +55,7 @@ from .read_status import (
     list_messages_with_read_status,
     mark_message_as_read,
     mark_message_as_unread,
+    mark_messages_as_read,
 )
 from .lifecycle import (
     soft_delete_message,
@@ -61,6 +68,7 @@ __all__ = [
     "MESSAGE_TARGET_FIELDS",
     "CONVERSATIONAL_TARGET_FIELDS",
     "create_message_with_author",
+    "enforce_title_rule",
     "list_messages_with_filters",
     "get_message_thread",
     "_principal_has_course_role",
@@ -83,11 +91,14 @@ __all__ = [
     "invalidate_dashboard_views_for_message",
     "invalidate_tutor_lecturer_views_for_message",
     "invalidate_course_dashboards",
+    "_affected_course_ids_for_message",
+    "_invalidate_message_cache",
     "mark_author_as_reader",
     "get_message_with_read_status",
     "list_messages_with_read_status",
     "mark_message_as_read",
     "mark_message_as_unread",
+    "mark_messages_as_read",
     "soft_delete_message",
     "update_message_with_audit",
     "create_message_audit",

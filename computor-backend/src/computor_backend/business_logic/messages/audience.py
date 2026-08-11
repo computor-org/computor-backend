@@ -149,6 +149,62 @@ def get_message_recipient_user_ids(message: Message, db: Session, include_global
     return set()
 
 
+def course_ids_for_messages(messages, db: Session) -> dict:
+    """Resolve each message's course in a fixed number of queries.
+
+    Maps ``str(message.id) -> course_id or None``. A message's course is
+    either stamped on it directly or reachable through its target
+    (course_content / course_group / submission_group / course_member);
+    family-, organization- and user-scoped messages have no single course.
+
+    Resolving this per message — as the author and mention enrichers both
+    used to — costs a lazy-load SELECT each, and the list endpoint runs
+    the enrichers over every row it returns. The extension auto-pages at
+    500 rows, so a single panel open could issue thousands of queries.
+    Here it is at most four, regardless of batch size.
+    """
+    result = {str(m.id): None for m in messages}
+
+    pending: dict[str, list] = {
+        "course_content_id": [],
+        "course_group_id": [],
+        "submission_group_id": [],
+        "course_member_id": [],
+    }
+
+    for message in messages:
+        if message.course_id:
+            result[str(message.id)] = message.course_id
+            continue
+        for field in pending:
+            target_id = getattr(message, field, None)
+            if target_id:
+                pending[field].append((str(message.id), target_id))
+                break
+
+    lookups = (
+        ("course_content_id", CourseContent),
+        ("course_group_id", CourseGroup),
+        ("submission_group_id", SubmissionGroup),
+        ("course_member_id", CourseMember),
+    )
+    for field, model in lookups:
+        entries = pending[field]
+        if not entries:
+            continue
+        target_ids = {target_id for _, target_id in entries}
+        course_by_target = {
+            str(row[0]): row[1]
+            for row in db.query(model.id, model.course_id)
+            .filter(model.id.in_(target_ids))
+            .all()
+        }
+        for message_id, target_id in entries:
+            result[message_id] = course_by_target.get(str(target_id))
+
+    return result
+
+
 def _elevated_user_ids(db: Session, course_id) -> set[str]:
     """User IDs holding ``_tutor`` or higher in ``course_id``."""
     rows = (

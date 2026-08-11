@@ -1,8 +1,10 @@
 """Per-user read status, author enrichment and read/unread mutations."""
 from uuid import UUID
 from typing import Optional, Tuple, List, Dict
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.principal import Principal
 from computor_backend.model.message import MessageRead, Message
 from computor_backend.model.course import CourseMember
@@ -11,6 +13,7 @@ from computor_backend.cache import Cache
 from computor_types.messages import (
     MessageGet, MessageAuthor, MessageAuthorCourseMember, MessageMentionRef,
 )
+from .audience import course_ids_for_messages
 from .mentions import _get_mentions_info
 from .cache import _invalidate_message_cache
 
@@ -144,48 +147,50 @@ def _get_author_info(
                 family_name=user.family_name
             )
 
-    # For course-scoped messages, find author's course membership
-    # Course-scoped = has any of: organization_id, course_family_id, course_id, course_content_id,
-    #                 course_group_id, submission_group_id, course_member_id (but not just user_id or global)
-    author_course_member_map: Dict[str, Optional[MessageAuthorCourseMember]] = {}
+    # For course-scoped messages, attach the author's membership in that
+    # course. Both halves are batched: the message->course resolution (one
+    # query per target type) and the membership lookup (one query for the
+    # whole page). This used to be a lazy-load plus a CourseMember query
+    # *per message*, and the list endpoint runs it over every row returned.
+    author_course_member_map: Dict[str, Optional[MessageAuthorCourseMember]] = {
+        str(msg.id): None for msg in db_messages
+    }
+
+    course_by_message = course_ids_for_messages(db_messages, db)
+
+    wanted = {
+        (str(msg.author_id), str(course_by_message[str(msg.id)]))
+        for msg in db_messages
+        if course_by_message.get(str(msg.id))
+    }
+    if not wanted:
+        return author_map, author_course_member_map
+
+    membership_by_pair = {
+        (str(user_id), str(course_id)): (cm_id, role_id)
+        for cm_id, user_id, course_id, role_id in db.query(
+            CourseMember.id,
+            CourseMember.user_id,
+            CourseMember.course_id,
+            CourseMember.course_role_id,
+        ).filter(
+            CourseMember.user_id.in_({author for author, _ in wanted}),
+            CourseMember.course_id.in_({course for _, course in wanted}),
+        ).all()
+    }
 
     for msg in db_messages:
-        msg_id = str(msg.id)
-        author_course_member_map[msg_id] = None
-
-        # Determine if this is a course-scoped message
-        course_id = None
-
-        if msg.course_id:
-            course_id = msg.course_id
-        elif msg.course_content_id and msg.course_content:
-            course_id = msg.course_content.course_id
-        elif msg.course_group_id and msg.course_group:
-            course_id = msg.course_group.course_id
-        elif msg.submission_group_id and msg.submission_group:
-            course_id = msg.submission_group.course_id
-        elif msg.course_member_id and msg.course_member:
-            course_id = msg.course_member.course_id
-        elif msg.course_family_id:
-            # Course family level - no specific course membership
-            pass
-        elif msg.organization_id:
-            # Organization level - no specific course membership
-            pass
-
-        if course_id:
-            # Find author's course membership for this course
-            course_member = db.query(CourseMember).filter(
-                CourseMember.user_id == msg.author_id,
-                CourseMember.course_id == course_id
-            ).first()
-
-            if course_member:
-                author_course_member_map[msg_id] = MessageAuthorCourseMember(
-                    id=str(course_member.id),
-                    course_role_id=course_member.course_role_id,
-                    course_id=str(course_id)
-                )
+        course_id = course_by_message.get(str(msg.id))
+        if not course_id:
+            continue
+        membership = membership_by_pair.get((str(msg.author_id), str(course_id)))
+        if membership:
+            cm_id, role_id = membership
+            author_course_member_map[str(msg.id)] = MessageAuthorCourseMember(
+                id=str(cm_id),
+                course_role_id=role_id,
+                course_id=str(course_id),
+            )
 
     return author_map, author_course_member_map
 
@@ -291,6 +296,132 @@ def mark_message_as_read(
         _invalidate_message_cache(message_id, str(permissions.user_id), db, cache)
     else:
         logger.info(f"Message {message_id} already marked as read by user {permissions.user_id}")
+
+
+def mark_messages_as_read(
+    message_ids: List[str],
+    permissions: Principal,
+    db: Session,
+    cache: Optional[Cache] = None,
+) -> List[Message]:
+    """Mark many messages read for the current user in one pass.
+
+    Opening a thread marks everything in it read, which used to mean one
+    request per message — each one writing a row, calling
+    ``cache.invalidate_user_views`` (which drops *every* cached view for
+    that user, not just the message-bearing ones) and publishing two Redis
+    events. A panel with 200 unread did all of that 200 times, which is
+    why the inbox had to grow a concurrency limiter and a WS-suppression
+    window just to survive its own read sweep.
+
+    Only messages the caller can actually see are marked; ids they cannot
+    read are silently skipped rather than 403-ing the whole batch, since a
+    sweep is best-effort by nature and the caller learns nothing from an
+    id it was never shown.
+
+    Returns the Message rows newly marked read (already-read ones are
+    excluded), so the caller can broadcast per scope channel.
+    """
+    if not message_ids:
+        return []
+
+    unique_ids = list(dict.fromkeys(str(mid) for mid in message_ids))
+
+    # Narrow to what this principal may read, in one query.
+    visible_query = check_permissions(permissions, Message, "get", db)
+    if visible_query is None:
+        return []
+    visible = (
+        visible_query
+        .filter(Message.id.in_(unique_ids), Message.archived_at.is_(None))
+        .all()
+    )
+    if not visible:
+        return []
+
+    already_read = {
+        str(row[0])
+        for row in db.query(MessageRead.message_id)
+        .filter(
+            MessageRead.reader_user_id == permissions.user_id,
+            MessageRead.message_id.in_([str(m.id) for m in visible]),
+        )
+        .all()
+    }
+
+    newly_read = [m for m in visible if str(m.id) not in already_read]
+    if not newly_read:
+        return []
+
+    db.add_all([
+        MessageRead(message_id=m.id, reader_user_id=permissions.user_id)
+        for m in newly_read
+    ])
+    try:
+        db.commit()
+    except IntegrityError:
+        # Raced with a concurrent single mark-read for one of these ids.
+        # The unique index did its job; fall back to per-row inserts so
+        # the rest of the batch still lands.
+        db.rollback()
+        newly_read = _insert_reads_individually(newly_read, permissions, db)
+        if not newly_read:
+            return []
+
+    # One invalidation for the whole batch instead of one per message.
+    _invalidate_message_cache_bulk(newly_read, str(permissions.user_id), cache)
+
+    return newly_read
+
+
+def _insert_reads_individually(
+    messages: List[Message],
+    permissions: Principal,
+    db: Session,
+) -> List[Message]:
+    """Per-row fallback for the bulk insert; skips rows that now conflict."""
+    inserted: List[Message] = []
+    for message in messages:
+        try:
+            db.add(MessageRead(message_id=message.id, reader_user_id=permissions.user_id))
+            db.commit()
+            inserted.append(message)
+        except IntegrityError:
+            db.rollback()
+    return inserted
+
+
+def _invalidate_message_cache_bulk(
+    messages: List[Message],
+    reader_user_id: str,
+    cache: Optional[Cache] = None,
+) -> None:
+    """Batch equivalent of ``_invalidate_message_cache``.
+
+    ``invalidate_user_views`` is the expensive, blunt part and is
+    user-scoped, so it runs exactly once no matter how many messages were
+    read. The per-entity tags are deduped across the batch — a thread's
+    messages nearly all share one target, so this collapses N tag drops
+    into one.
+    """
+    if not cache or not messages:
+        return
+
+    cache.invalidate_user_views(user_id=reader_user_id)
+
+    tags: set[str] = set()
+    for message in messages:
+        for scope in ("submission_group", "course_content", "course_member",
+                      "course_group", "course", "course_family", "organization"):
+            target_id = getattr(message, f"{scope}_id", None)
+            if target_id:
+                tags.add(f"{scope}:{target_id}")
+                tags.add(f"{scope}_id:{target_id}")
+        if message.user_id:
+            tags.add(f"user:{message.user_id}")
+
+    for tag in tags:
+        cache.invalidate_tags(tag)
 
 
 def mark_message_as_unread(

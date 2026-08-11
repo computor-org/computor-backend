@@ -47,6 +47,7 @@ from computor_backend.business_logic.messages import (
     create_message_with_author,
 )
 from computor_backend.permissions.principal import Principal, build_claims
+from computor_types.messages import kind_for_scope, scope_for_targets
 
 
 # ---------------------------------------------------------------------------
@@ -68,9 +69,23 @@ def _payload(**fields):
     We don't need the real Pydantic model — ``create_message_with_author``
     only calls ``.content`` and ``.model_dump(exclude_unset=True)``. Using
     a SimpleNamespace keeps these tests free of the heavy DTO module.
+
+    Announcement scopes get a default subject so that tests about dispatch,
+    target selection and invariants aren't all rewritten as subject tests.
+    The subject rule itself is covered explicitly in ``TestSubjectRule``;
+    pass ``title=`` to override, including with a blank to assert rejection.
     """
 
     fields.setdefault("content", "hello")
+    # A reply inherits its parent's target, which only a DB lookup resolves,
+    # so we can't tell its scope here — but replies are conversational by
+    # definition and never carry a subject, so leaving it unset is right.
+    if (
+        "title" not in fields
+        and not fields.get("parent_id")
+        and kind_for_scope(scope_for_targets(fields)) == "announcement"
+    ):
+        fields["title"] = "Default test subject"
 
     class _Fake(SimpleNamespace):
         def model_dump(self, exclude_unset: bool = False):
@@ -80,6 +95,18 @@ def _payload(**fields):
             return data
 
     return _Fake(**fields)
+
+
+def _db_without_role():
+    """A db mock whose ``EXISTS`` role probe answers False.
+
+    ``_check_global_write_permission`` asks the DB whether the caller holds
+    ``_user_manager``. A bare MagicMock answers with a truthy mock, which
+    would silently grant global posting to everyone in these tests.
+    """
+    db = MagicMock()
+    db.query.return_value.scalar.return_value = False
+    return db
 
 
 def _stub_helpers(monkeypatch):
@@ -118,17 +145,36 @@ class TestGlobalScope:
     def test_admin_can_post_global(self):
         admin = _principal(is_admin=True)
         # Should not raise.
-        _check_global_write_permission(admin)
+        _check_global_write_permission(admin, db=MagicMock())
 
     def test_non_admin_blocked(self):
         user = _principal("organization:_owner:o1")  # high org role still not enough
         with pytest.raises(ForbiddenException):
-            _check_global_write_permission(user)
+            _check_global_write_permission(user, db=_db_without_role())
 
     def test_non_admin_blocked_via_create(self):
         user = _principal("course:_owner:c1")
         with pytest.raises(ForbiddenException):
-            create_message_with_author(_payload(), user, db=MagicMock())
+            create_message_with_author(_payload(), user, db=_db_without_role())
+
+    def test_user_manager_allowed(self):
+        # _user_manager already owns invites and bans; a platform-wide
+        # announcement is the same blast radius. The extension has offered
+        # them the compose box for a while and the backend 403'd it.
+        p = _principal(user_id="u-um")
+        db = MagicMock()
+        db.query.return_value.scalar.return_value = True
+        _check_global_write_permission(p, db)  # no raise
+
+    def test_role_is_read_from_the_db_not_claims(self):
+        # A long-lived token's role list goes stale, and this posts to every
+        # user on the platform — worth one query.
+        p = _principal(user_id="u-um")
+        db = MagicMock()
+        db.query.return_value.scalar.return_value = False
+        with pytest.raises(ForbiddenException):
+            _check_global_write_permission(p, db)
+        assert db.query.called
 
     def test_admin_create_global_succeeds(self, monkeypatch):
         mocks = _stub_helpers(monkeypatch)
@@ -137,7 +183,7 @@ class TestGlobalScope:
         # Bypass the stubbed _check_global_write_permission and verify it
         # got called.
         result = create_message_with_author(_payload(), admin, db=MagicMock())
-        mocks["_check_global_write_permission"].assert_called_once_with(admin)
+        mocks["_check_global_write_permission"].assert_called_once()
         # Every target column must be NULL on a global row.
         for f in MESSAGE_TARGET_FIELDS:
             assert result.get(f) is None
@@ -233,7 +279,7 @@ class TestPrimaryTargetDispatch:
         mocks = _stub_helpers(monkeypatch)
         p = _principal(is_admin=True)
         create_message_with_author(_payload(), p, db=MagicMock())
-        mocks["_check_global_write_permission"].assert_called_once_with(p)
+        mocks["_check_global_write_permission"].assert_called_once()
 
     def test_user_id_target_raises_not_implemented(self, monkeypatch):
         # Even with the helpers stubbed, user_id must dispatch to the
@@ -328,6 +374,7 @@ class TestReplyInheritance:
         parent = SimpleNamespace(
             **{f: None for f in MESSAGE_TARGET_FIELDS},
             id="m-parent",
+            level=0,
         )
         parent.submission_group_id = "sg1"
         db = _mock_db_returning_message(parent)
@@ -347,6 +394,7 @@ class TestReplyInheritance:
         parent = SimpleNamespace(
             **{f: None for f in MESSAGE_TARGET_FIELDS},
             id="m-parent",
+            level=0,
         )
         parent.submission_group_id = "sg1"
         db = _mock_db_returning_message(parent)
@@ -392,6 +440,7 @@ class TestNonConversationalReplyGuard:
                 "course_family_id", "organization_id",
             ]},
             id="m-parent",
+            level=0,
         )
         if parent_target_field is not None:
             setattr(parent, parent_target_field, parent_target_id)
@@ -547,3 +596,284 @@ class TestInvariants:
             _payload(course_id="c1"), p, db=MagicMock()
         )
         assert result["level"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Subject rule — announcements require one, conversations forbid one
+# ---------------------------------------------------------------------------
+
+
+ANNOUNCEMENT_TARGETS = [
+    ({}, "global"),
+    ({"organization_id": "o-1"}, "organization"),
+    ({"course_family_id": "f-1"}, "course_family"),
+    ({"course_id": "c-1"}, "course"),
+    ({"course_group_id": "cg-1"}, "course_group"),
+    ({"course_content_id": "cc-1"}, "course_content"),
+]
+
+
+class TestSubjectRule:
+    """``enforce_title_rule`` applied through ``create_message_with_author``.
+
+    The split is the one in ``CONVERSATIONAL_SCOPES``: an announcement is a
+    list item and needs a subject to be identifiable; a conversation is chat
+    and a subject there is noise.
+    """
+
+    @pytest.mark.parametrize("targets,scope", ANNOUNCEMENT_TARGETS)
+    def test_announcement_keeps_its_subject(self, monkeypatch, targets, scope):
+        _stub_helpers(monkeypatch)
+        p = _principal(is_admin=True)
+        result = create_message_with_author(
+            _payload(title="  Exam moved to Friday  ", **targets), p, db=MagicMock()
+        )
+        # Stored trimmed — leading/trailing space is not part of a subject.
+        assert result["title"] == "Exam moved to Friday"
+
+    @pytest.mark.parametrize("targets,scope", ANNOUNCEMENT_TARGETS)
+    @pytest.mark.parametrize("blank", [None, "", "   ", "\t\n"])
+    def test_announcement_without_a_subject_is_rejected(
+        self, monkeypatch, targets, scope, blank
+    ):
+        _stub_helpers(monkeypatch)
+        p = _principal(is_admin=True)
+        with pytest.raises(BadRequestException) as exc:
+            create_message_with_author(
+                _payload(title=blank, **targets), p, db=MagicMock()
+            )
+        assert "subject is required" in str(exc.value).lower()
+
+    @pytest.mark.parametrize("blank", [None, "", "   "])
+    def test_conversation_normalizes_blank_subject_to_none(self, monkeypatch, blank):
+        # The compose UI renders no subject field on conversational scopes
+        # but still posts title: "" — that must land as NULL, not '', or
+        # `title IS NULL` lies about every chat message in the table.
+        _stub_helpers(monkeypatch)
+        p = _principal(is_admin=True)
+        result = create_message_with_author(
+            _payload(title=blank, submission_group_id="sg-1"), p, db=MagicMock()
+        )
+        assert result["title"] is None
+
+    def test_conversation_with_a_subject_is_rejected(self, monkeypatch):
+        _stub_helpers(monkeypatch)
+        p = _principal(is_admin=True)
+        with pytest.raises(BadRequestException) as exc:
+            create_message_with_author(
+                _payload(title="Re: your submission", submission_group_id="sg-1"),
+                p,
+                db=MagicMock(),
+            )
+        assert "carry no subject" in str(exc.value).lower()
+
+    def test_reply_inherits_the_conversational_rule(self, monkeypatch):
+        # A reply's scope comes from its parent, so the subject rule has to
+        # be applied after inheritance, not before.
+        _stub_helpers(monkeypatch)
+        parent = SimpleNamespace(
+            **{f: None for f in MESSAGE_TARGET_FIELDS}, id="m-parent", level=0
+        )
+        parent.submission_group_id = "sg-1"
+        db = _mock_db_returning_message(parent)
+        p = _principal(is_admin=True)
+
+        with pytest.raises(BadRequestException) as exc:
+            create_message_with_author(
+                _payload(parent_id="m-parent", title="A subject"), p, db
+            )
+        assert "carry no subject" in str(exc.value).lower()
+
+
+class TestKindDerivation:
+    def test_conversational_scopes_are_exactly_the_reply_allowed_ones(self):
+        # One map, two rules. If these ever diverge, a scope would accept
+        # replies while refusing to render as a conversation (or vice versa).
+        from computor_types.messages import CONVERSATIONAL_SCOPES
+
+        assert CONVERSATIONAL_SCOPES == {"user", "course_member", "submission_group"}
+        assert messages_bl.CONVERSATIONAL_TARGET_FIELDS == {
+            "user_id",
+            "course_member_id",
+            "submission_group_id",
+        }
+
+    @pytest.mark.parametrize(
+        "scope,expected",
+        [
+            ("global", "announcement"),
+            ("organization", "announcement"),
+            ("course_family", "announcement"),
+            ("course", "announcement"),
+            ("course_content", "announcement"),
+            ("course_group", "announcement"),
+            ("submission_group", "conversation"),
+            ("course_member", "conversation"),
+            ("user", "conversation"),
+        ],
+    )
+    def test_kind_for_every_scope(self, scope, expected):
+        assert kind_for_scope(scope) == expected
+
+
+# ---------------------------------------------------------------------------
+# Bulk mark-read — permission filtering and idempotence
+# ---------------------------------------------------------------------------
+
+
+class TestBulkMarkRead:
+    """``mark_messages_as_read`` narrows to what the caller may read.
+
+    The visibility query and the MessageRead lookup are stubbed; what
+    matters here is that unreadable ids are dropped silently rather than
+    failing the batch, that already-read ids don't produce duplicate rows,
+    and that the expensive per-user cache invalidation runs once.
+    """
+
+    def _db(self, visible, already_read):
+        db = MagicMock()
+
+        read_rows = MagicMock()
+        read_rows.filter.return_value.all.return_value = [
+            (mid,) for mid in already_read
+        ]
+        db.query.return_value = read_rows
+        return db
+
+    def _patch_visibility(self, monkeypatch, visible):
+        visible_query = MagicMock()
+        visible_query.filter.return_value.all.return_value = visible
+        monkeypatch.setattr(
+            messages_bl.read_status,
+            "check_permissions",
+            lambda principal, entity, action, db: visible_query,
+        )
+
+    def test_empty_input_is_a_no_op(self):
+        assert messages_bl.mark_messages_as_read([], _principal(), MagicMock()) == []
+
+    def test_unreadable_ids_are_skipped_not_rejected(self, monkeypatch):
+        # A read sweep is best-effort — a client learns nothing from an id
+        # it was never shown, so the batch must not 403 as a whole.
+        visible = [SimpleNamespace(id="m-1", **{f: None for f in MESSAGE_TARGET_FIELDS})]
+        self._patch_visibility(monkeypatch, visible)
+        db = self._db(visible, already_read=[])
+
+        result = messages_bl.mark_messages_as_read(
+            ["m-1", "m-not-mine"], _principal(), db
+        )
+
+        assert [str(m.id) for m in result] == ["m-1"]
+
+    def test_already_read_ids_are_not_reinserted(self, monkeypatch):
+        visible = [
+            SimpleNamespace(id="m-1", **{f: None for f in MESSAGE_TARGET_FIELDS}),
+            SimpleNamespace(id="m-2", **{f: None for f in MESSAGE_TARGET_FIELDS}),
+        ]
+        self._patch_visibility(monkeypatch, visible)
+        db = self._db(visible, already_read=["m-1"])
+
+        result = messages_bl.mark_messages_as_read(["m-1", "m-2"], _principal(), db)
+
+        assert [str(m.id) for m in result] == ["m-2"]
+        db.add_all.assert_called_once()
+
+    def test_nothing_new_skips_the_write_entirely(self, monkeypatch):
+        visible = [SimpleNamespace(id="m-1", **{f: None for f in MESSAGE_TARGET_FIELDS})]
+        self._patch_visibility(monkeypatch, visible)
+        db = self._db(visible, already_read=["m-1"])
+
+        assert messages_bl.mark_messages_as_read(["m-1"], _principal(), db) == []
+        db.add_all.assert_not_called()
+        db.commit.assert_not_called()
+
+    def test_user_view_cache_is_invalidated_once_for_the_whole_batch(self, monkeypatch):
+        # The per-message path called invalidate_user_views once per message,
+        # and each call drops *every* cached view for that user.
+        visible = [
+            SimpleNamespace(
+                id=f"m-{i}",
+                **{**{f: None for f in MESSAGE_TARGET_FIELDS},
+                   "submission_group_id": "sg-1"},
+            )
+            for i in range(50)
+        ]
+        self._patch_visibility(monkeypatch, visible)
+        db = self._db(visible, already_read=[])
+        cache = MagicMock()
+
+        messages_bl.mark_messages_as_read(
+            [f"m-{i}" for i in range(50)], _principal(), db, cache
+        )
+
+        cache.invalidate_user_views.assert_called_once()
+        # 50 messages sharing one submission group collapse to that group's
+        # two tags, not 100 tag drops.
+        assert cache.invalidate_tags.call_count == 2
+
+    def test_duplicate_ids_are_collapsed(self, monkeypatch):
+        visible = [SimpleNamespace(id="m-1", **{f: None for f in MESSAGE_TARGET_FIELDS})]
+        self._patch_visibility(monkeypatch, visible)
+        db = self._db(visible, already_read=[])
+
+        result = messages_bl.mark_messages_as_read(
+            ["m-1", "m-1", "m-1"], _principal(), db
+        )
+        assert len(result) == 1
+
+
+# ---------------------------------------------------------------------------
+# Thread depth is derived, not client-supplied
+# ---------------------------------------------------------------------------
+
+
+class TestDerivedLevel:
+    def _db_with_parent(self, parent_level):
+        parent = SimpleNamespace(
+            **{f: None for f in MESSAGE_TARGET_FIELDS},
+            id="m-parent",
+            level=parent_level,
+        )
+        parent.submission_group_id = "sg-1"
+        return _mock_db_returning_message(parent)
+
+    def test_root_is_level_zero(self, monkeypatch):
+        _stub_helpers(monkeypatch)
+        result = create_message_with_author(
+            _payload(course_id="c-1"), _principal(is_admin=True), MagicMock()
+        )
+        assert result["level"] == 0
+
+    @pytest.mark.parametrize("parent_level,expected", [(0, 1), (1, 2), (4, 5)])
+    def test_reply_is_one_deeper_than_its_parent(
+        self, monkeypatch, parent_level, expected
+    ):
+        _stub_helpers(monkeypatch)
+        result = create_message_with_author(
+            _payload(parent_id="m-parent"),
+            _principal(is_admin=True),
+            self._db_with_parent(parent_level),
+        )
+        assert result["level"] == expected
+
+    def test_client_supplied_level_is_ignored(self, monkeypatch):
+        # It used to be taken verbatim: the extension guessed from its
+        # in-memory page (falling back to 1 when the parent wasn't loaded)
+        # and the agent never sent it, so agent replies were stored at 0.
+        _stub_helpers(monkeypatch)
+        result = create_message_with_author(
+            _payload(parent_id="m-parent", level=99),
+            _principal(is_admin=True),
+            self._db_with_parent(0),
+        )
+        assert result["level"] == 1
+
+    def test_null_parent_level_is_treated_as_zero(self, monkeypatch):
+        # Legacy rows exist with a NULL depth.
+        _stub_helpers(monkeypatch)
+        result = create_message_with_author(
+            _payload(parent_id="m-parent"),
+            _principal(is_admin=True),
+            self._db_with_parent(None),
+        )
+        assert result["level"] == 1

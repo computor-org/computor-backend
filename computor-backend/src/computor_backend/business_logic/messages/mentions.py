@@ -16,17 +16,11 @@ from computor_backend.exceptions import BadRequestException
 from computor_backend.model.message import Message, MessageMention
 from computor_backend.model.course import CourseMember
 from computor_backend.model.auth import User
-from computor_types.messages import MessageMentionRef
-from .audience import get_message_recipient_user_ids
+from computor_types.messages import MESSAGE_TARGET_FIELDS, MessageMentionRef
+from .audience import course_ids_for_messages, get_message_recipient_user_ids
 
 
 MENTION_PATTERN = re.compile(r'@\[[^\]]*\]\(([0-9a-fA-F-]{36})\)')
-
-
-_MENTION_TARGET_ATTRS = (
-    'user_id', 'course_member_id', 'submission_group_id', 'course_group_id',
-    'course_content_id', 'course_id', 'course_family_id', 'organization_id',
-)
 
 
 def extract_mention_user_ids(content: Optional[str]) -> list[str]:
@@ -67,7 +61,7 @@ def message_audience_user_ids(message_like, db: Session) -> Optional[set[str]]:
     """User ids allowed to see ``message_like``, or ``None`` for global
     (everyone). Thin wrapper over ``get_message_recipient_user_ids`` — the
     canonical inverse of ``MessagePermissionHandler``."""
-    if not any(getattr(message_like, attr, None) for attr in _MENTION_TARGET_ATTRS):
+    if not any(getattr(message_like, attr, None) for attr in MESSAGE_TARGET_FIELDS):
         return None  # global → everyone
     # Mentionability is narrower than read-visibility: a global admin (or any
     # privilege-bypass viewer) who isn't actually a participant of the scope —
@@ -159,20 +153,14 @@ def list_mentionable_users(
     return q.limit(limit).all()
 
 
-def _course_id_for_message(msg: Message):
+def _course_id_for_message(msg: Message, db: Session):
     """The course a message belongs to (for resolving a participant's role),
-    or None for user-direct / family / org / global scopes."""
-    if msg.course_id:
-        return msg.course_id
-    if msg.course_content_id and msg.course_content:
-        return msg.course_content.course_id
-    if msg.course_group_id and msg.course_group:
-        return msg.course_group.course_id
-    if msg.submission_group_id and msg.submission_group:
-        return msg.submission_group.course_id
-    if msg.course_member_id and msg.course_member:
-        return msg.course_member.course_id
-    return None
+    or None for user-direct / family / org / global scopes.
+
+    Single-message convenience over ``course_ids_for_messages``; batch
+    callers should use that directly rather than looping over this.
+    """
+    return course_ids_for_messages([msg], db).get(str(msg.id))
 
 
 def _get_mentions_info(db_messages: List[Message], db: Session) -> Dict[str, List[MessageMentionRef]]:
@@ -190,8 +178,9 @@ def _get_mentions_info(db_messages: List[Message], db: Session) -> Dict[str, Lis
         .all()
     )
 
-    # Resolve each message's course so the mentioned user's role can be attached.
-    course_by_msg = {str(m.id): _course_id_for_message(m) for m in db_messages}
+    # Resolve each message's course so the mentioned user's role can be
+    # attached — batched, not one lazy-loading pass per message.
+    course_by_msg = course_ids_for_messages(db_messages, db)
     user_ids = {str(u) for (_mid, u, _g, _f) in rows}
     course_ids = {str(c) for c in course_by_msg.values() if c}
     role_map: Dict[tuple, str] = {}

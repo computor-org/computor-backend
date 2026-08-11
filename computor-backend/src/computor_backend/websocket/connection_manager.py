@@ -395,10 +395,12 @@ class ConnectionManager:
 
         Special channels:
         - ``global`` (no colon) is auto-subscribable by everyone — it is
-          the broadcast target for global messages.
+          the broadcast target for global messages, and *only* those.
         - ``user:<own_id>`` is only subscribable by the owning user.
           (The connect path auto-subscribes this; explicit subscribe is
-          allowed too for clients that are defensive about it.)
+          allowed too for clients that are defensive about it.) This is
+          also how ``user_id`` direct messages are delivered — they have
+          no shared scope channel, by design.
         """
         # Admins can subscribe to anything.
         if getattr(principal, "is_admin", False):
@@ -418,6 +420,9 @@ class ConnectionManager:
             if str(target_id) == str(principal.user_id):
                 return True, ""
             return False, "Cannot subscribe to another user's inbox channel"
+
+        if scope == "course_member":
+            return await self._can_access_course_member(principal, target_id, db)
 
         if scope == "submission_group":
             return await self._can_access_submission_group(principal, target_id, db)
@@ -529,6 +534,44 @@ class ConnectionManager:
             return True, ""
 
         return False, "No access to this organization"
+
+    async def _can_access_course_member(
+        self,
+        principal: Principal,
+        course_member_id: str,
+        db: Session,
+    ) -> tuple[bool, str]:
+        """The course member themselves, or ``_tutor``+ in their course.
+
+        Mirrors the ``course_member_id`` branch of
+        ``MessagePermissionHandler.build_query``. Without this branch the
+        scope fell through to "Unknown channel scope" and the channel was
+        unsubscribable even for its own participants.
+        """
+        member = db.query(CourseMember).filter(
+            CourseMember.id == course_member_id
+        ).first()
+
+        if not member:
+            return False, "Course member not found"
+
+        if str(member.user_id) == str(principal.user_id):
+            return True, ""
+
+        has_elevated_role = db.query(
+            db.query(CourseMember.id)
+            .filter(
+                CourseMember.course_id == member.course_id,
+                CourseMember.user_id == principal.user_id,
+                CourseMember.course_role_id != "_student",
+            )
+            .exists()
+        ).scalar()
+
+        if has_elevated_role:
+            return True, ""
+
+        return False, "Not this course member, nor elevated in their course"
 
     async def _can_access_submission_group(
         self,

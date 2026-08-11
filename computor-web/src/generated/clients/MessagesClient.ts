@@ -3,7 +3,7 @@
  * Endpoint: /messages
  */
 
-import type { MessageCreate, MessageGet, MessageList, MessageMentionRef, MessageThread, MessageUpdate } from 'types/generated';
+import type { MessageCreate, MessageGet, MessageList, MessageMentionRef, MessageReadBulk, MessageReadBulkResult, MessageThread, MessageUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -32,7 +32,7 @@ export class MessagesClient extends BaseEndpointClient {
    * - ``tags_match_all``: True = must match ALL tags, False = match ANY tag
    * - ``tag_scope``: tag prefix filter (e.g., "ai" matches #ai, #ai-help, #ai-response)
    */
-  async listMessagesMessagesGet({ authorId, courseContentId, courseFamilyId, courseGroupId, courseId, courseMemberId, createdAfter, createdBefore, id, limit, mentionedUserId, mentionsMe, organizationId, parentId, scope, skip, submissionGroupId, tagScope, tags, tagsMatchAll, unread, userId }: { authorId?: string | null; courseContentId?: string | null; courseFamilyId?: string | null; courseGroupId?: string | null; courseId?: string | null; courseMemberId?: string | null; createdAfter?: string | null; createdBefore?: string | null; id?: string | null; limit?: number | null; mentionedUserId?: string | null; mentionsMe?: boolean | null; organizationId?: string | null; parentId?: string | null; scope?: 'global' | 'organization' | 'course_family' | 'course' | 'course_content' | 'course_group' | 'submission_group' | 'course_member' | 'user' | null; skip?: number | null; submissionGroupId?: string | null; tagScope?: string | null; tags?: string[] | null; tagsMatchAll?: boolean | null; unread?: boolean | null; userId?: string | null }): Promise<MessageList[]> {
+  async listMessagesMessagesGet({ authorId, courseContentId, courseFamilyId, courseGroupId, courseId, courseMemberId, createdAfter, createdBefore, id, includeDeleted, kind, limit, mentionedUserId, mentionsMe, organizationId, parentId, scope, skip, submissionGroupId, tagScope, tags, tagsMatchAll, unread, userId }: { authorId?: string | null; courseContentId?: string | null; courseFamilyId?: string | null; courseGroupId?: string | null; courseId?: string | null; courseMemberId?: string | null; createdAfter?: string | null; createdBefore?: string | null; id?: string | null; includeDeleted?: boolean | null; kind?: 'announcement' | 'conversation' | null; limit?: number | null; mentionedUserId?: string | null; mentionsMe?: boolean | null; organizationId?: string | null; parentId?: string | null; scope?: 'global' | 'organization' | 'course_family' | 'course' | 'course_content' | 'course_group' | 'submission_group' | 'course_member' | 'user' | null; skip?: number | null; submissionGroupId?: string | null; tagScope?: string | null; tags?: string[] | null; tagsMatchAll?: boolean | null; unread?: boolean | null; userId?: string | null }): Promise<MessageList[]> {
     const queryParams: Record<string, unknown> = {
       author_id: authorId,
       course_content_id: courseContentId,
@@ -43,6 +43,8 @@ export class MessagesClient extends BaseEndpointClient {
       created_after: createdAfter,
       created_before: createdBefore,
       id,
+      include_deleted: includeDeleted,
+      kind,
       limit,
       mentioned_user_id: mentionedUserId,
       mentions_me: mentionsMe,
@@ -96,6 +98,24 @@ export class MessagesClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.get<MessageMentionRef[]>(this.buildPath('mentionable-users'), { params: queryParams });
+  }
+
+  /**
+   * Mark Messages Read Bulk
+   * Mark many messages as read for the current user in one request.
+   * Opening a thread marks everything in it read. Doing that one message
+   * at a time cost a request, a full per-user cache invalidation and two
+   * Redis publishes *each* — so a panel with 200 unread paid all of it
+   * 200 times. This does one permission-filtered query, one bulk insert,
+   * one invalidation, and one broadcast per affected channel.
+   * Ids the caller cannot read are skipped, not rejected: a read sweep is
+   * best-effort, and the response reports how many actually landed.
+   */
+  async markMessagesReadBulkMessagesReadsBulkPost({ userId, body }: { userId?: string | null; body: MessageReadBulk }): Promise<MessageReadBulkResult> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.post<MessageReadBulkResult>(this.buildPath('reads', 'bulk'), body, { params: queryParams });
   }
 
   /**

@@ -92,6 +92,7 @@ class TestScopeChannelEnumeration:
             ("course_group_id", "course_group"),
             ("course_content_id", "course_content"),
             ("submission_group_id", "submission_group"),
+            ("course_member_id", "course_member"),
         ],
     )
     def test_single_target_returns_single_scope_channel(self, field, channel_prefix):
@@ -102,6 +103,19 @@ class TestScopeChannelEnumeration:
         # Global messages have no scope channel — caller falls back to
         # GLOBAL_CHANNEL via _get_all_channels.
         assert self.b._get_message_channels(_msg()) == []
+
+    def test_direct_message_has_no_scope_channel(self):
+        # A DM's "channel" is a *pair* of users, so there is no shared
+        # scope id to publish to. Delivery rides the per-user inbox
+        # channels instead (see TestAllChannelsEnumeration).
+        assert self.b._get_message_channels(_msg(user_id="u-recipient")) == []
+
+    def test_is_global_message_distinguishes_dm_from_global(self):
+        # The whole point: an empty channel list is NOT proof of a global
+        # message. Treating it as one published DMs to GLOBAL_CHANNEL.
+        assert self.b._is_global_message(_msg()) is True
+        assert self.b._is_global_message(_msg(user_id="u-recipient")) is False
+        assert self.b._is_global_message(_msg(course_member_id="cm-1")) is False
 
     def test_dedupes_defensively_for_legacy_multi_target_rows(self):
         # Single-target invariant is enforced at create, but the channel
@@ -159,6 +173,33 @@ class TestAllChannelsEnumeration:
         )
         channels = self.b._get_all_channels(_msg(course_id="c-1"), db=MagicMock())
         assert channels == ["course:c-1"]
+
+    def test_direct_message_never_reaches_the_global_channel(self, monkeypatch):
+        # Regression: _get_all_channels used to read "no scope channel" as
+        # "global message" and return [GLOBAL_CHANNEL] — the channel every
+        # connection is auto-subscribed to on connect. That published the
+        # full body of a one-to-one DM to every logged-in client.
+        m = _msg(user_id="u-recipient")
+        monkeypatch.setattr(
+            messages_bl,
+            "get_message_recipient_user_ids",
+            lambda message, db: {"u-author", "u-recipient"},
+        )
+
+        channels = self.b._get_all_channels(m, db=MagicMock())
+
+        assert GLOBAL_CHANNEL not in channels
+        assert set(channels) == {"user:u-author", "user:u-recipient"}
+
+    def test_course_member_message_gets_its_scope_channel(self, monkeypatch):
+        monkeypatch.setattr(
+            messages_bl,
+            "get_message_recipient_user_ids",
+            lambda message, db: {"u-author"},
+        )
+        channels = self.b._get_all_channels(_msg(course_member_id="cm-1"), db=MagicMock())
+        assert channels[0] == "course_member:cm-1"
+        assert GLOBAL_CHANNEL not in channels
 
 
 # ---------------------------------------------------------------------------
@@ -239,6 +280,118 @@ class TestReadUpdated:
         channels = [c for c, _ in captured]
         assert f"{CHANNEL_PREFIX}{GLOBAL_CHANNEL}" in channels
         assert f"{CHANNEL_PREFIX}user:u-reader" in channels
+
+    def test_direct_message_read_receipt_stays_off_the_global_channel(self, monkeypatch):
+        # Same conflation as the message body: read_updated fell back to
+        # GLOBAL_CHANNEL whenever there was no scope channel, announcing
+        # "user X read message Y" to every connected client.
+        captured = self._capture_publishes(monkeypatch)
+
+        _run(self.b.read_updated(
+            _msg(user_id="u-recipient"),
+            message_id="m-1",
+            user_id="u-reader",
+            is_read=True,
+        ))
+
+        from computor_backend.websocket.pubsub import CHANNEL_PREFIX
+        channels = [c for c, _ in captured]
+        assert f"{CHANNEL_PREFIX}{GLOBAL_CHANNEL}" not in channels
+        assert channels == [f"{CHANNEL_PREFIX}user:u-reader"]
+
+
+# ---------------------------------------------------------------------------
+# reads_updated — one event per channel for a whole batch
+# ---------------------------------------------------------------------------
+
+
+class TestReadsUpdatedBulk:
+    def setup_method(self):
+        self.b = WebSocketBroadcast()
+
+    def _capture(self, monkeypatch):
+        captured = []
+
+        async def fake_publish(channel, payload_str):
+            captured.append((channel, json.loads(payload_str)))
+
+        async def fake_get_redis_client():
+            return SimpleNamespace(publish=fake_publish)
+
+        monkeypatch.setattr(
+            "computor_backend.redis_cache.get_redis_client", fake_get_redis_client
+        )
+        return captured
+
+    def test_thread_sweep_collapses_to_two_publishes(self, monkeypatch):
+        # The whole point of the bulk path: 200 messages in one submission
+        # group used to be 400 publishes (scope + reader, per message).
+        captured = self._capture(monkeypatch)
+        messages = [
+            _msg(id=f"m-{i}", submission_group_id="sg-1") for i in range(200)
+        ]
+
+        _run(self.b.reads_updated(messages, "u-reader", is_read=True))
+
+        from computor_backend.websocket.pubsub import CHANNEL_PREFIX
+        assert len(captured) == 2
+        channels = {c for c, _ in captured}
+        assert channels == {
+            f"{CHANNEL_PREFIX}submission_group:sg-1",
+            f"{CHANNEL_PREFIX}user:u-reader",
+        }
+        for _, payload in captured:
+            assert len(payload["message_ids"]) == 200
+            assert payload["read"] is True
+            # Kept for clients written against the single-message shape.
+            assert payload["message_id"] == payload["message_ids"][0]
+
+    def test_mixed_scopes_get_one_publish_each(self, monkeypatch):
+        captured = self._capture(monkeypatch)
+        messages = [
+            _msg(id="m-1", submission_group_id="sg-1"),
+            _msg(id="m-2", submission_group_id="sg-1"),
+            _msg(id="m-3", course_id="c-1"),
+        ]
+
+        _run(self.b.reads_updated(messages, "u-reader", is_read=True))
+
+        from computor_backend.websocket.pubsub import CHANNEL_PREFIX
+        by_channel = {c: p for c, p in captured}
+        assert by_channel[f"{CHANNEL_PREFIX}submission_group:sg-1"]["message_ids"] == [
+            "m-1", "m-2",
+        ]
+        assert by_channel[f"{CHANNEL_PREFIX}course:c-1"]["message_ids"] == ["m-3"]
+        # The reader hears about every id, so their other tabs converge.
+        assert set(
+            by_channel[f"{CHANNEL_PREFIX}user:u-reader"]["message_ids"]
+        ) == {"m-1", "m-2", "m-3"}
+
+    def test_direct_messages_stay_off_the_global_channel(self, monkeypatch):
+        captured = self._capture(monkeypatch)
+
+        _run(self.b.reads_updated(
+            [_msg(id="m-1", user_id="u-recipient")], "u-reader", is_read=True
+        ))
+
+        from computor_backend.websocket.pubsub import CHANNEL_PREFIX
+        channels = [c for c, _ in captured]
+        assert f"{CHANNEL_PREFIX}{GLOBAL_CHANNEL}" not in channels
+        assert channels == [f"{CHANNEL_PREFIX}user:u-reader"]
+
+    def test_global_messages_use_the_global_channel(self, monkeypatch):
+        captured = self._capture(monkeypatch)
+
+        _run(self.b.reads_updated([_msg(id="m-1")], "u-reader", is_read=True))
+
+        from computor_backend.websocket.pubsub import CHANNEL_PREFIX
+        channels = {c for c, _ in captured}
+        assert f"{CHANNEL_PREFIX}{GLOBAL_CHANNEL}" in channels
+
+    def test_empty_batch_publishes_nothing(self, monkeypatch):
+        captured = self._capture(monkeypatch)
+        _run(self.b.reads_updated([], "u-reader", is_read=True))
+        assert captured == []
 
 
 # ---------------------------------------------------------------------------
@@ -412,6 +565,27 @@ class TestCanSubscribe:
         denied, reason = _run(self.mgr._can_subscribe(regular, "course", db=MagicMock()))
         assert not denied
         assert "format" in reason.lower()
+
+    def test_course_member_scope_is_dispatched_not_unknown(self):
+        # Regression: `course_member` had no branch, so it fell through to
+        # "Unknown channel scope" and its own participants could not
+        # subscribe to a channel the broadcaster now publishes on.
+        from computor_backend.permissions.principal import Principal, build_claims
+
+        regular = Principal(
+            user_id="u-1", is_admin=False, claims=build_claims([])
+        )
+        db = MagicMock()
+        # The member row exists and belongs to this very user.
+        db.query.return_value.filter.return_value.first.return_value = SimpleNamespace(
+            id="cm-1", user_id="u-1", course_id="c-1"
+        )
+
+        ok, reason = _run(
+            self.mgr._can_subscribe(regular, "course_member:cm-1", db=db)
+        )
+        assert ok, reason
+        assert "unknown channel scope" not in reason.lower()
 
     def test_organization_scope_routes_to_access_check(self):
         # Holding an explicit org scoped role bypasses the cascade lookup.

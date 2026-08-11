@@ -13,6 +13,8 @@ from computor_types.messages import (
     MessageGet,
     MessageList,
     MessageMentionRef,
+    MessageReadBulk,
+    MessageReadBulkResult,
     MessageThread,
     MessageUpdate,
 )
@@ -75,6 +77,15 @@ class MessagesClient:
         if isinstance(data, list):
             return [MessageMentionRef.model_validate(item) for item in data]
         return []
+
+    async def reads_bulk(
+        self,
+        data: Union[MessageReadBulk, Dict[str, Any]],
+        **kwargs: Any,
+    ) -> MessageReadBulkResult:
+        """Mark Messages Read Bulk"""
+        response = await self._http.post("/messages/reads/bulk", json_data=data, params=kwargs)
+        return MessageReadBulkResult.model_validate(response.json())
 
     async def delete(
         self,

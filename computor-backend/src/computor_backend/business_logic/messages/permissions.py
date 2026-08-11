@@ -11,6 +11,7 @@ from computor_backend.model.course import (
     SubmissionGroup,
     SubmissionGroupMember,
 )
+from computor_backend.model.role import UserRole
 
 
 def _principal_has_course_role(
@@ -41,11 +42,35 @@ def _principal_has_course_role(
     ).scalar())
 
 
-def _check_global_write_permission(permissions: Principal) -> None:
-    """Global messages (no target set) are admin-only."""
-    if not permissions.is_admin:
+def _check_global_write_permission(permissions: Principal, db: Session) -> None:
+    """Global announcements: ``_admin`` or ``_user_manager``.
+
+    ``_user_manager`` already owns platform-wide people operations —
+    invites and bans — so a platform-wide announcement is squarely within
+    the role. The VS Code extension has offered them the compose box for
+    a while (``canPostGlobal`` takes an ``isUserManager`` flag); the
+    backend refused it, so they got a form and a 403. This closes that in
+    the direction the client already assumed.
+
+    Checked against the DB rather than claims: the role list on a
+    long-lived token can be stale, and posting to every user on the
+    platform is worth one query.
+    """
+    if permissions.is_admin:
+        return
+
+    has_role = db.query(
+        db.query(UserRole.user_id)
+        .filter(
+            UserRole.user_id == permissions.user_id,
+            UserRole.role_id == "_user_manager",
+        )
+        .exists()
+    ).scalar()
+
+    if not has_role:
         raise ForbiddenException(
-            detail="Only administrators can create global messages"
+            detail="Only administrators or user managers can create global messages"
         )
 
 
@@ -56,15 +81,26 @@ def _check_user_message_write_permission(
 ) -> None:
     """Direct user-to-user message (one-on-one chat).
 
-    The handler path is wired end-to-end (visibility, audit, broadcast)
-    but creation is intentionally disabled until the product side
-    settles on rate-limiting / abuse handling. To enable: drop the raise
-    below — the rest of the path is already correct.
+    Creation is intentionally disabled until the product side settles on
+    rate-limiting / abuse handling.
 
-    Intended rules when enabled:
-    - recipient must exist
-    - author must not message themselves
-    - no role required (this is a direct chat)
+    Enabling this is NOT just deleting the raise below. Read visibility,
+    audit and WebSocket delivery are correct, but the following are not
+    yet implemented and a DM scope without them is unsafe or broken:
+
+    - the rules in this function (recipient exists; author is not the
+      recipient; no role required, this is a direct chat);
+    - a client-side conversation channel. A DM has no shared scope id —
+      the "channel" is a *pair* of users — so delivery rides the per-user
+      inbox channels (``user:<id>``) of the audience. The extension
+      currently subscribes a DM thread to ``user:<other_person_id>``,
+      which the connection manager correctly refuses; that needs to point
+      at the viewer's own inbox channel and filter by ``user_id``.
+
+    (A third landmine — the broadcast layer treating "no scope channel"
+    as "global", which would have published every DM to the channel all
+    connections auto-subscribe to — is fixed; see
+    ``WebSocketBroadcast._is_global_message``.)
     """
     raise NotImplementedException(
         detail="Direct user-to-user messages are not implemented yet"
