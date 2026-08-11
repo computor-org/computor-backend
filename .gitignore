@@ -83,3 +83,8 @@ data/auth_plugins.json
 # Playwright artifacts, wherever they land (a run from the repo root writes here)
 test-results/
 playwright-report/
+
+# Claude Code: agents/skills are shared, personal settings are not.
+# settings.local.json accumulates machine-specific permission rules and has
+# held credentials before — never commit it.
+.claude/settings.local.json
