@@ -13,6 +13,7 @@ from computor_backend.cache import Cache
 from computor_types.messages import (
     MessageGet, MessageAuthor, MessageAuthorCourseMember, MessageMentionRef,
 )
+from .audience import course_ids_for_messages
 from .mentions import _get_mentions_info
 from .cache import _invalidate_message_cache
 
@@ -146,48 +147,50 @@ def _get_author_info(
                 family_name=user.family_name
             )
 
-    # For course-scoped messages, find author's course membership
-    # Course-scoped = has any of: organization_id, course_family_id, course_id, course_content_id,
-    #                 course_group_id, submission_group_id, course_member_id (but not just user_id or global)
-    author_course_member_map: Dict[str, Optional[MessageAuthorCourseMember]] = {}
+    # For course-scoped messages, attach the author's membership in that
+    # course. Both halves are batched: the message->course resolution (one
+    # query per target type) and the membership lookup (one query for the
+    # whole page). This used to be a lazy-load plus a CourseMember query
+    # *per message*, and the list endpoint runs it over every row returned.
+    author_course_member_map: Dict[str, Optional[MessageAuthorCourseMember]] = {
+        str(msg.id): None for msg in db_messages
+    }
+
+    course_by_message = course_ids_for_messages(db_messages, db)
+
+    wanted = {
+        (str(msg.author_id), str(course_by_message[str(msg.id)]))
+        for msg in db_messages
+        if course_by_message.get(str(msg.id))
+    }
+    if not wanted:
+        return author_map, author_course_member_map
+
+    membership_by_pair = {
+        (str(user_id), str(course_id)): (cm_id, role_id)
+        for cm_id, user_id, course_id, role_id in db.query(
+            CourseMember.id,
+            CourseMember.user_id,
+            CourseMember.course_id,
+            CourseMember.course_role_id,
+        ).filter(
+            CourseMember.user_id.in_({author for author, _ in wanted}),
+            CourseMember.course_id.in_({course for _, course in wanted}),
+        ).all()
+    }
 
     for msg in db_messages:
-        msg_id = str(msg.id)
-        author_course_member_map[msg_id] = None
-
-        # Determine if this is a course-scoped message
-        course_id = None
-
-        if msg.course_id:
-            course_id = msg.course_id
-        elif msg.course_content_id and msg.course_content:
-            course_id = msg.course_content.course_id
-        elif msg.course_group_id and msg.course_group:
-            course_id = msg.course_group.course_id
-        elif msg.submission_group_id and msg.submission_group:
-            course_id = msg.submission_group.course_id
-        elif msg.course_member_id and msg.course_member:
-            course_id = msg.course_member.course_id
-        elif msg.course_family_id:
-            # Course family level - no specific course membership
-            pass
-        elif msg.organization_id:
-            # Organization level - no specific course membership
-            pass
-
-        if course_id:
-            # Find author's course membership for this course
-            course_member = db.query(CourseMember).filter(
-                CourseMember.user_id == msg.author_id,
-                CourseMember.course_id == course_id
-            ).first()
-
-            if course_member:
-                author_course_member_map[msg_id] = MessageAuthorCourseMember(
-                    id=str(course_member.id),
-                    course_role_id=course_member.course_role_id,
-                    course_id=str(course_id)
-                )
+        course_id = course_by_message.get(str(msg.id))
+        if not course_id:
+            continue
+        membership = membership_by_pair.get((str(msg.author_id), str(course_id)))
+        if membership:
+            cm_id, role_id = membership
+            author_course_member_map[str(msg.id)] = MessageAuthorCourseMember(
+                id=str(cm_id),
+                course_role_id=role_id,
+                course_id=str(course_id),
+            )
 
     return author_map, author_course_member_map
 

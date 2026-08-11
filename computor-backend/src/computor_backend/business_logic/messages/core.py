@@ -43,6 +43,14 @@ CONVERSATIONAL_TARGET_FIELDS = frozenset(
 )
 
 
+# Hard ceiling on one page of messages. Chosen to sit above the extension's
+# 500-row auto-paging window so normal clients never notice it, and below
+# anything that would make the per-page enrichment (authors, read status,
+# mentions) expensive. ``X-Total-Count`` still reports the true total, so a
+# client that wants everything pages for it.
+MAX_MESSAGE_PAGE_SIZE = 1000
+
+
 def enforce_title_rule(title, scope: MessageScope):
     """Return the subject to persist for ``scope``, or raise.
 
@@ -249,8 +257,14 @@ def list_messages_with_filters(
     total = query.order_by(None).count()
 
     paginated_query = query
-    if params.limit is not None:
-        paginated_query = paginated_query.limit(params.limit)
+    # ``ListQuery.limit`` has no ceiling, and every returned row is then run
+    # through the author / read-status / mention enrichers. Cap it here
+    # rather than globally, so one client asking for everything can't turn
+    # a list call into an unbounded enrichment pass.
+    limit = MAX_MESSAGE_PAGE_SIZE if params.limit is None else min(
+        params.limit, MAX_MESSAGE_PAGE_SIZE
+    )
+    paginated_query = paginated_query.limit(limit)
     if params.skip is not None:
         paginated_query = paginated_query.offset(params.skip)
 
