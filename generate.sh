@@ -87,7 +87,7 @@ if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
 fi
 
 # Set PYTHONPATH
-export PYTHONPATH="${ROOT_DIR}/computor-backend/src:${ROOT_DIR}/computor-types/src:${ROOT_DIR}/computor-cli/src${PYTHONPATH:+:${PYTHONPATH}}"
+export PYTHONPATH="${ROOT_DIR}/computor-backend/src:${ROOT_DIR}/computor-types/src${PYTHONPATH:+:${PYTHONPATH}}"
 
 # Function to generate TypeScript types
 generate_types() {
