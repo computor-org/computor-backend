@@ -472,8 +472,19 @@ def generate_method(
             if pname not in ["skip", "limit"]:
                 query_params.append(pname)
 
-    # Add query parameter for list endpoints to accept Query objects
+    # A "list" method is only *paginated* when the response really is an array
+    # of a known DTO. GET /user is named list but returns a single UserGet, and
+    # must keep its plain shape.
+    is_paginated_list = (
+        method_name == "list"
+        and is_list_response
+        and bool(response_schema and map_schema_to_import(response_schema))
+    )
+
     if method_name == "list":
+        if is_paginated_list:
+            optional_params.insert(0, "skip: int = 0")
+            optional_params.insert(1, "limit: int = 100")
         optional_params.append("query: Optional[BaseModel] = None")
 
     params.extend(optional_params)
@@ -511,8 +522,40 @@ def generate_method(
     # HTTP call
     http_method = method.lower()
     if http_method == "get":
+        if is_paginated_list:
+            # list() stays a plain List[...] for callers that just want rows;
+            # list_page() additionally reports the X-Total-Count total so
+            # pagination can terminate correctly.
+            arg_list = "skip=skip, limit=limit, query=query, **kwargs"
+            lines = [
+                f"    async def {method_name}(",
+                "        self,",
+                "        skip: int = 0,",
+                "        limit: int = 100,",
+                "        query: Optional[BaseModel] = None,",
+                "        **kwargs: Any,",
+                f"    ) -> {return_type}:",
+                f'        """{docstring}"""',
+                f"        page = await self.{method_name}_page({arg_list})",
+                "        return page.items",
+                "",
+                f"    async def {method_name}_page(",
+                "        self,",
+                "        skip: int = 0,",
+                "        limit: int = 100,",
+                "        query: Optional[BaseModel] = None,",
+                "        **kwargs: Any,",
+                f"    ) -> Page[{response_schema}]:",
+                f'        """{docstring} (one page, with the total row count)."""',
+                "        params = query.model_dump(mode=\"json\", exclude_none=True) if query else {}",
+                "        params.update({\"skip\": skip, \"limit\": limit})",
+                "        params.update(kwargs)",
+                f'        response = await self._http.get(f"{path_formatted}", params=params)',
+                f"        return Page.from_response(response, {response_schema}, skip=skip, limit=limit)",
+            ]
+            return "\n".join(lines), imports
         if method_name == "list":
-            lines.append(f'        params = query.model_dump(exclude_none=True) if query else {{}}'  )
+            lines.append(f'        params = query.model_dump(mode="json", exclude_none=True) if query else {{}}'  )
             lines.append(f'        params.update(kwargs)')
             lines.append(f'        response = await self._http.get(')
             lines.append(f'            f"{path_formatted}",')
@@ -671,6 +714,10 @@ def generate_file(
     lines.extend([
         '',
         'from computor_client.http import AsyncHTTPClient',
+    ])
+    if "Page[" in class_code:
+        lines.append('from computor_client.pagination import Page')
+    lines.extend([
         '',
         '',
         class_code,
