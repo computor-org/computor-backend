@@ -4,7 +4,7 @@ Tests for edge cases and error handling in DTO validation and functionality.
 
 import pytest
 from pydantic import ValidationError
-from datetime import datetime
+from datetime import datetime, timezone
 
 from computor_types.users import UserCreate, UserGet, UserUpdate
 from computor_types.organizations import OrganizationCreate, OrganizationType
@@ -201,6 +201,9 @@ class TestDataTypeEdgeCases:
         # Test None datetime
         from computor_types.sessions import SessionGet
         session = SessionGet(
+            sid="sid-1",
+            created_at=datetime.now(timezone.utc),
+            created_ip="127.0.0.1",
             id="123",
             user_id="user-123",
             session_id="session-123",
@@ -325,9 +328,9 @@ class TestCornerCases:
             session = SessionCreate(
                 user_id="user-123",
                 session_id="session-123",
-                ip_address=ip
+                created_ip=ip,
             )
-            assert session.ip_address == ip
+            assert session.created_ip == ip
         
         # Valid IPv6 edge cases
         valid_ipv6s = [
@@ -341,9 +344,9 @@ class TestCornerCases:
             session = SessionCreate(
                 user_id="user-123",
                 session_id="session-123",
-                ip_address=ip
+                created_ip=ip,
             )
-            assert session.ip_address == ip
+            assert session.created_ip == ip
         
         # Invalid IP addresses
         invalid_ips = [
@@ -359,7 +362,7 @@ class TestCornerCases:
                 SessionCreate(
                     user_id="user-123",
                     session_id="session-123",
-                    ip_address=ip
+                    created_ip=ip
                 )
     
     def test_ltree_path_edge_cases(self):

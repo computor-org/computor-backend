@@ -3,7 +3,7 @@ Test color validation system.
 """
 
 import pytest
-from computor_backend.utils.color_validation import (
+from computor_types.utils.color_validation import (
     is_valid_color, validate_color, is_valid_hex_color,
     is_valid_rgb_color, is_valid_hsl_color, is_valid_css_named_color,
     get_color_examples
