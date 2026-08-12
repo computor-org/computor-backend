@@ -22,6 +22,7 @@ class TestComputedProperties:
         """Test User display name logic"""
         # Full name available
         user_full = UserGet(
+            is_service=False,
             id="123",
             given_name="John",
             family_name="Doe",
@@ -32,6 +33,7 @@ class TestComputedProperties:
         
         # Only given name
         user_given = UserGet(
+            is_service=False,
             id="123",
             given_name="John",
             email="john@example.com"
@@ -41,6 +43,7 @@ class TestComputedProperties:
 
         # Fallback to user ID (email is not used as a display name)
         user_minimal = UserGet(
+            is_service=False,
             id="123456789",
             email="john@example.com"
         )
@@ -51,6 +54,7 @@ class TestComputedProperties:
         """Test UserList display name logic"""
         # Full name
         user_list = UserList(
+            is_service=False,
             id="123",
             given_name="Jane",
             family_name="Smith",
@@ -60,6 +64,7 @@ class TestComputedProperties:
 
         # ID fallback
         user_list_minimal = UserList(
+            is_service=False,
             id="123456789",
             email="jane@example.com"
         )
@@ -135,6 +140,8 @@ class TestComputedProperties:
         
         # Active session
         active_session = SessionGet(
+            sid="sid-1",
+            created_ip="127.0.0.1",
             id="123",
             user_id="user-123",
             session_id="session-active-123456789",
@@ -143,37 +150,48 @@ class TestComputedProperties:
         )
         assert active_session.is_active is True
         assert active_session.session_duration is None
-        assert "session-" in active_session.display_name
-        assert "Active" in active_session.display_name
+        # display_name is "<device_label or 'Unknown Device'> (<Active|Ended>)";
+        # it no longer embeds the session id or the IP.
+        assert active_session.display_name == "Unknown Device (Active)"
         
         # Logged out session
         logged_out_session = SessionGet(
+            sid="sid-1",
+            created_ip="127.0.0.1",
             id="456",
             user_id="user-123",
             session_id="session-logged-out-123456789",
             ip_address="192.168.1.2",
+            device_label="Firefox on Linux",
             created_at=base_time,
-            logout_time=base_time + timedelta(hours=2, minutes=30)
+            # is_active keys off revoked_at/ended_at/expires_at now, not logout_time.
+            ended_at=base_time + timedelta(hours=2, minutes=30),
         )
         assert logged_out_session.is_active is False
         assert logged_out_session.session_duration == 9000  # 2.5 hours in seconds
-        assert "Logged out" in logged_out_session.display_name
+        assert logged_out_session.display_name == "Firefox on Linux (Ended)"
     
     def test_session_list_properties(self):
         """Test SessionList properties"""
         session_list = SessionList(
+            sid="sid-1",
+            created_at=datetime.now(timezone.utc),
+            created_ip="127.0.0.1",
             id="123",
             user_id="user-123",
             session_id="session-123",
             ip_address="10.0.0.1",
-            logout_time=datetime.now(timezone.utc)
+            device_label="Chrome on macOS",
+            ended_at=datetime.now(timezone.utc),
         )
         assert session_list.is_active is False
-        assert "10.0.0.1" in session_list.display_name
-        assert "Logged out" in session_list.display_name
+        assert session_list.display_name == "Chrome on macOS (Ended)"
         
         # Active session
         active_session_list = SessionList(
+            sid="sid-1",
+            created_at=datetime.now(timezone.utc),
+            created_ip="127.0.0.1",
             id="456",
             user_id="user-123",
             session_id="session-456",
@@ -237,6 +255,7 @@ class TestPropertyEdgeCases:
     def test_empty_string_handling(self):
         """Test handling of empty strings in properties"""
         user = UserGet(
+            is_service=False,
             id="123",
             given_name="",
             family_name="",
@@ -257,6 +276,7 @@ class TestPropertyEdgeCases:
     def test_none_handling(self):
         """Test handling of None values"""
         user = UserGet(
+            is_service=False,
             id="123",
             given_name=None,
             family_name=None,
@@ -282,6 +302,8 @@ class TestPropertyEdgeCases:
         
         # Same time login/logout (immediate logout)
         immediate_logout = SessionGet(
+            sid="sid-1",
+            created_ip="127.0.0.1",
             id="123",
             user_id="user-123",
             session_id="session-123",
@@ -293,6 +315,8 @@ class TestPropertyEdgeCases:
         
         # Very short session (1 second)
         short_session = SessionGet(
+            sid="sid-1",
+            created_ip="127.0.0.1",
             id="456",
             user_id="user-123",
             session_id="session-456",
@@ -310,12 +334,14 @@ class TestPropertyConsistency:
         """Test that display_name is consistent across Get and List DTOs"""
         # User consistency
         user_get = UserGet(
+            is_service=False,
             id="123",
             given_name="John",
             family_name="Doe",
             email="john@example.com"
         )
         user_list = UserList(
+            is_service=False,
             id="123",
             given_name="John",
             family_name="Doe",
@@ -325,12 +351,18 @@ class TestPropertyConsistency:
         
         # Session consistency
         session_get = SessionGet(
+            sid="sid-1",
+            created_at=datetime.now(timezone.utc),
+            created_ip="127.0.0.1",
             id="123",
             user_id="user-123",
             session_id="session-abc",
             ip_address="192.168.1.1"
         )
         session_list = SessionList(
+            sid="sid-1",
+            created_at=datetime.now(timezone.utc),
+            created_ip="127.0.0.1",
             id="123",
             user_id="user-123",
             session_id="session-abc",
@@ -345,8 +377,8 @@ class TestPropertyConsistency:
         short_id = "123"
         long_id = "123456789012345"
         
-        user_short = UserGet(id=short_id, email="test@example.com")
-        user_long = UserGet(id=long_id, email="test@example.com")
+        user_short = UserGet(id=short_id, email="test@example.com", is_service=False)
+        user_long = UserGet(id=long_id, email="test@example.com", is_service=False)
         
         # Should use first 8 characters (or full ID if shorter)
         assert user_short.display_name == "User 123"
@@ -356,6 +388,9 @@ class TestPropertyConsistency:
         """Test consistent boolean property behavior"""
         # Session active property
         active_session = SessionGet(
+            sid="sid-1",
+            created_at=datetime.now(timezone.utc),
+            created_ip="127.0.0.1",
             id="123",
             user_id="user-123",
             session_id="session-123",
@@ -385,6 +420,7 @@ class TestPropertyPerformance:
     def test_property_caching(self):
         """Test that properties can be called multiple times efficiently"""
         user = UserGet(
+            is_service=False,
             id="123",
             given_name="John",
             family_name="Doe",
