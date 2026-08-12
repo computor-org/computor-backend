@@ -11,6 +11,7 @@ import FormPanel, { Field } from '@/src/components/FormPanel';
 import { inputCls } from '@/src/components/ui/tokens';
 import { CourseGroupsClient } from '@/src/generated/clients/CourseGroupsClient';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
+import { displayName } from '@/src/utils/displayName';
 
 const groupsClient = new CourseGroupsClient();
 const coursesClient = new CoursesClient();
@@ -33,7 +34,7 @@ export default function CourseGroupCreatePage() {
     [courseId],
     { enabled: canManage },
   );
-  const courseLabel = course?.title || course?.path || 'Course';
+  const courseLabel = displayName(course, 'Course');
 
   async function save() {
     setSaving(true);

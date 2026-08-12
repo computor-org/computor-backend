@@ -7,6 +7,7 @@ import { CourseMembersClient } from '@/src/generated/clients/CourseMembersClient
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { COURSE_ROLES, COURSE_ROLE_LABEL } from '@/src/utils/courseRoles';
 import type { CourseList, CourseMemberList } from 'types/generated';
+import { displayName } from '@/src/utils/displayName';
 
 const courseMembersClient = new CourseMembersClient();
 const coursesClient = new CoursesClient();
@@ -59,7 +60,7 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
   const available = courses.filter((c) => !enrolledCourseIds.has(c.id));
   const courseLabel = (id: string) => {
     const course = courses.find((c) => c.id === id);
-    return course?.title || course?.path || id;
+    return displayName(course, 'Unknown course');
   };
 
   async function enrol() {
@@ -105,7 +106,7 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
             <select className={inputCls} value={courseId} onChange={(e) => setCourseId(e.target.value)}>
               <option value="">Select a course…</option>
               {available.map((c) => (
-                <option key={c.id} value={c.id}>{c.title || c.path}</option>
+                <option key={c.id} value={c.id}>{displayName(c, 'Untitled Course')}</option>
               ))}
             </select>
           </div>

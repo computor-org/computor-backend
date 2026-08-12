@@ -7,6 +7,7 @@ import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
+import { displayName } from '@/src/utils/displayName';
 import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
 import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
 
@@ -58,8 +59,8 @@ export default function OrganizationsPage() {
             {orgs.map((o) => (
               <div key={o.id} className="flex items-center justify-between gap-4 bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-sm transition-all">
                 <Link href={`/organizations/${o.id}`} className="min-w-0 group flex-1">
-                  <div className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600">{o.title || o.path}</div>
-                  <div className="text-xs text-gray-500">{o.path} · {o.organization_type}</div>
+                  <div className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600">{displayName(o, 'Untitled Organization')}</div>
+                  <div className="text-xs text-gray-500">{o.organization_type}</div>
                 </Link>
                 <Link href={`/course-families?organization_id=${o.id}`} className="text-sm text-blue-600 hover:underline whitespace-nowrap">
                   {familyCounts[o.id] ?? 0} course {(familyCounts[o.id] ?? 0) === 1 ? 'family' : 'families'} →

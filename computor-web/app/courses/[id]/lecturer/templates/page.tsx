@@ -13,6 +13,7 @@ import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
 import type { CourseGet } from 'types/generated';
+import { displayName } from '@/src/utils/displayName';
 
 type Layout = 'flat' | 'hierarchical';
 
@@ -100,12 +101,11 @@ export default function LecturerTemplatesPage() {
         <PageHeader
           breadcrumbs={[
             { label: 'Courses', href: '/courses' },
-            { label: course?.title || course?.path || 'Course', href: `/courses/${courseId}` },
+            { label: displayName(course, 'Course'), href: `/courses/${courseId}` },
             { label: 'Lecturer View', href: `/courses/${courseId}/lecturer` },
             { label: 'Templates' },
           ]}
           title="Templates"
-          subtitle={course ? <span className="text-sm text-gray-500 font-mono">{course.path}</span> : undefined}
         />
 
         <ErrorBanner>{error}</ErrorBanner>

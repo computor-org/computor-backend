@@ -13,6 +13,7 @@ import EmptyState from '@/src/components/EmptyState';
 import Badge from '@/src/components/Badge';
 import type { CourseContentStudentList } from 'types/generated';
 import { lastSegment } from '@/src/utils/ltree';
+import { humanizeSegment } from '@/src/utils/displayName';
 
 // NOTE: this page keeps its own tree builder (below) rather than the shared
 // utils/ltree buildTree because it SYNTHESISES missing container nodes from the
@@ -56,7 +57,9 @@ export default function StudentCourseContentsPage() {
 
         if (!nodeMap.has(currentPath)) {
           const node: TreeNode = {
-            label: lastSegment(currentPath),
+            // Synthetic containers have no content row of their own, so their
+            // only available name is the humanised path segment.
+            label: humanizeSegment(lastSegment(currentPath)),
             path: part,
             fullPath: currentPath,
             children: [],

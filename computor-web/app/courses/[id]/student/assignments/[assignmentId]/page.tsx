@@ -94,7 +94,6 @@ export default function AssignmentDetailPage() {
               ></span>
               <h1 className="text-3xl font-bold text-gray-900">{assignment.title}</h1>
             </div>
-            <p className="mt-2 text-gray-600 font-mono text-sm">{assignment.path}</p>
           </div>
 
           {/* Submission Status Badge */}

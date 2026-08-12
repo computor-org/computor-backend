@@ -9,6 +9,7 @@ import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
+import { displayName } from '@/src/utils/displayName';
 import type { CourseList } from '@/src/generated/types/courses';
 
 export default function DashboardPage() {
@@ -67,7 +68,7 @@ export default function DashboardPage() {
                             href={`/courses/${c.id}`}
                             className="min-w-0 text-sm font-medium text-gray-900 hover:underline"
                           >
-                            <span className="block truncate">{c.title || c.path}</span>
+                            <span className="block truncate">{displayName(c, 'Untitled Course')}</span>
                           </Link>
                           {role && (
                             <span className="shrink-0 px-2 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-700">
@@ -75,7 +76,6 @@ export default function DashboardPage() {
                             </span>
                           )}
                         </div>
-                        {c.title && c.path && <p className="text-xs text-gray-500">{c.path}</p>}
                         {/* Template icon launchers; hides itself when the
                             course offers no workspaces. Members only — the
                             fetch would 403 for courses visible without a role. */}

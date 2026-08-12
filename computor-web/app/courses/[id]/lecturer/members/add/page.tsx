@@ -16,6 +16,7 @@ import { CourseGroupsClient } from '@/src/generated/clients/CourseGroupsClient';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import type { CourseGroupList } from 'types/generated';
 import { assignableRoles, highestCourseRole, maxAssignableRole } from '@/src/utils/courseRoles';
+import { displayName } from '@/src/utils/displayName';
 
 const groupsClient = new CourseGroupsClient();
 const coursesClient = new CoursesClient();
@@ -42,7 +43,7 @@ export default function AddCourseMembersPage() {
     [courseId],
     { enabled: canManage },
   );
-  const courseLabel = courseData?.title || courseData?.path || 'Course';
+  const courseLabel = displayName(courseData, 'Course');
 
   // Course groups — a student must be assigned to one (DB constraint), so the
   // user-list tab needs a group picker. Also feeds a sensible default below.

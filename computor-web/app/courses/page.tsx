@@ -11,6 +11,7 @@ import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import EmptyState from '@/src/components/EmptyState';
 import Badge from '@/src/components/Badge';
+import { displayName } from '@/src/utils/displayName';
 import type { CourseList } from 'types/generated';
 
 const coursesClient = new CoursesClient();
@@ -93,7 +94,7 @@ function CourseCard({ course, role }: { course: CourseList; role: string | null 
       <Link href={`/courses/${course.id}`} className="flex flex-col flex-grow cursor-pointer">
         <div className="flex items-start justify-between mb-4 gap-2">
           <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
-            {course.title || 'Untitled Course'}
+            {displayName(course, 'Untitled Course')}
           </h3>
           {role && (
             <Badge color="blue" className="shrink-0">
@@ -103,12 +104,6 @@ function CourseCard({ course, role }: { course: CourseList; role: string | null 
         </div>
 
         <div className="space-y-2 mb-4 flex-grow">
-          <div className="flex items-center text-sm text-gray-600">
-            <svg className="h-4 w-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-            </svg>
-            <span className="font-mono text-xs">{course.path}</span>
-          </div>
           {course.language_code && (
             <div className="flex items-center text-sm text-gray-600">
               <svg className="h-4 w-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
