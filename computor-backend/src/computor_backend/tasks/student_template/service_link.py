@@ -73,11 +73,13 @@ def link_testing_service(db: Session, content, files: Optional[Dict[str, bytes]]
             logger.warning("ServiceType 'testing.temporal' not found - run 'alembic upgrade head' (seeded by migration)")
             return
 
-        # Prefer an enabled service whose language matches
+        # Prefer an enabled service whose language matches. The language lives
+        # in Service.config (see business_logic/service_accounts.py), not in
+        # Service.properties — filtering on properties never matched anything.
         service = db.query(Service).filter(
             Service.service_type_id == service_type.id,
             Service.enabled == True,  # noqa: E712
-            Service.properties['language'].astext == language
+            Service.config['language'].astext == language
         ).first()
 
         if service:

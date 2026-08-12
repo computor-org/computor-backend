@@ -105,6 +105,18 @@ def get_solution(pytestconfig, idx_main: int, where: Solution) -> Dict[str, Any]
         setup_code = apply_token_exchange_to_code(setup_code, _report, where)
         teardown_code = apply_token_exchange_to_code(teardown_code, _report, where)
 
+        # Save open figures as result artifacts. Runs as teardown inside the
+        # same Octave session, while the figures still exist.
+        if store_graphics_artifacts and specification.artifactDirectory:
+            art_dir = specification.artifactDirectory.replace("'", "''")
+            teardown_code = list(teardown_code) + [
+                "__ct_figs__ = get(0, 'children');",
+                "for __ct_i__ = 1:numel(__ct_figs__); try; "
+                f"saveas(__ct_figs__(__ct_i__), fullfile('{art_dir}', "
+                f"sprintf('{where}_test_{idx}_figure_%d.png', __ct_i__))); "
+                "catch; end; end;",
+            ]
+
         error = False
         errormsg = ""
         status = StatusEnum.scheduled

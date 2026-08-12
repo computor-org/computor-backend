@@ -155,9 +155,19 @@ def get_solution(mm, pytestconfig, idx: int, where: Solution) -> dict:
 
     # Graphics tests require in-process execution to access matplotlib figures
     if main.type == TypeEnum.graphics:
+        store_graphics_artifacts = main.storeGraphicsArtifacts
+        if specification.storeGraphicsArtifacts is not None:
+            store_graphics_artifacts = specification.storeGraphicsArtifacts
+        artifact_dir = (
+            specification.artifactDirectory
+            if store_graphics_artifacts and specification.artifactDirectory
+            else None
+        )
         _execute_graphics_inprocess(
             _solution, where, script_path, _dir, setup_code, teardown_code,
-            main, plt
+            main, plt,
+            artifact_dir=artifact_dir,
+            artifact_prefix=f"{where}_test_{idx}",
         )
     else:
         _execute_subprocess(
@@ -170,7 +180,8 @@ def get_solution(mm, pytestconfig, idx: int, where: Solution) -> dict:
 
 
 def _execute_graphics_inprocess(
-    _solution, where, script_path, _dir, setup_code, teardown_code, main, plt
+    _solution, where, script_path, _dir, setup_code, teardown_code, main, plt,
+    artifact_dir=None, artifact_prefix="",
 ):
     """Execute Python code in-process for graphics tests."""
     try:
@@ -201,7 +212,7 @@ def _execute_graphics_inprocess(
                 from matplotlib import pyplot as plt_mod
                 namespace['plt'] = plt_mod
             except ImportError:
-                pass
+                plt_mod = None
 
             namespace["_graphics_object_"] = {}
             for test in main.tests:
@@ -210,6 +221,19 @@ def _execute_graphics_inprocess(
                     namespace["_graphics_object_"][test.name] = eval(fun2eval, namespace)
                 except (AttributeError, NameError, SyntaxError, KeyError):
                     pass
+
+            # Persist the open figures as result artifacts while they are
+            # still alive — plt.close('all') in the finally wipes them.
+            if artifact_dir and plt_mod is not None:
+                for fig_num in plt_mod.get_fignums():
+                    try:
+                        plt_mod.figure(fig_num).savefig(os.path.join(
+                            artifact_dir,
+                            f"{artifact_prefix}_figure_{fig_num}.png",
+                        ))
+                    except Exception as e:
+                        print(f"Warning: could not save figure {fig_num}: {e}",
+                              file=sys.stderr)
 
             _solution[where] = {
                 "status": StatusEnum.completed, "errormsg": "",

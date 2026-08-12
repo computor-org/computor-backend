@@ -157,6 +157,10 @@ class BaseTester(ABC):
         # relative `sys.path.append("../<dep>/")` imports resolve.
         self._stage_test_dependencies(testroot, spec)
 
+        # Stage grader-provided test files (specification.testDirectory) into
+        # the execution directories.
+        self._stage_test_files(spec)
+
         # Write temporary specification file
         spec_data = spec.model_dump()
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
@@ -273,6 +277,35 @@ class BaseTester(ABC):
                         f"{src} -> {dest}: {e}",
                         file=sys.stderr,
                     )
+
+    def _stage_test_files(self, spec: ComputorSpecification) -> None:
+        """Copy `specification.testDirectory` into the execution directories.
+
+        These are grader-provided fixtures (meta.yaml `properties.testFiles`,
+        staged by the testing worker). They deliberately OVERWRITE same-named
+        files in the student directory: a fixture the tests rely on must not
+        be replaceable by a student's own copy.
+        """
+        src_dir = getattr(spec, "testDirectory", None)
+        if not src_dir or not os.path.isdir(src_dir) or not os.listdir(src_dir):
+            return
+
+        targets = []
+        for d in (spec.studentDirectory, spec.referenceDirectory):
+            if d and os.path.isdir(d):
+                abs_d = os.path.abspath(d)
+                if abs_d != os.path.abspath(src_dir) and abs_d not in targets:
+                    targets.append(abs_d)
+
+        for target in targets:
+            try:
+                shutil.copytree(src_dir, target, dirs_exist_ok=True)
+            except Exception as e:
+                print(
+                    f"Warning: failed to stage test files "
+                    f"{src_dir} -> {target}: {e}",
+                    file=sys.stderr,
+                )
 
     def _print_header(
         self,
