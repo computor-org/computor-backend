@@ -12,6 +12,12 @@ from typing import List, Dict, Any
 
 # Base URL for the API server
 BASE_URL = "http://localhost:8000"
+
+# These drive a REAL running backend over HTTP; they are integration tests and
+# cannot pass from a bare unit run. Skip unless the API is actually up.
+from computor_backend.tests.conftest import requires_service
+
+pytestmark = requires_service("localhost", 8000, "backend API")
 AUTH = ("admin", "admin")
 
 class TestAPIEndpoints:

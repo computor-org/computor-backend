@@ -6,6 +6,11 @@ from datetime import datetime, timezone
 from minio.error import S3Error
 
 from computor_backend.minio_client import get_minio_client, reset_minio_client
+from computor_backend.tests.conftest import requires_service
+
+# get_minio_client() opens a real connection, unlike the mocked tests below.
+MINIO_HOST = os.environ.get("MINIO_HOST", "localhost")
+MINIO_PORT = int(os.environ.get("MINIO_PORT", "9000"))
 from computor_backend.services.storage_service import StorageService, get_storage_service
 from computor_types.storage import (
     StorageObjectMetadata,
@@ -47,6 +52,7 @@ def storage_service(mock_minio_client):
 class TestMinIOClient:
     """Test MinIO client initialization and configuration"""
     
+    @requires_service(MINIO_HOST, MINIO_PORT, "MinIO")
     def test_minio_client_singleton(self):
         """Test that MinIO client is a singleton"""
         client1 = get_minio_client()

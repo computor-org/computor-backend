@@ -13,6 +13,33 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from computor_backend.model import Base
 
+
+# ---------------------------------------------------------------------------
+# Reachability guards
+# ---------------------------------------------------------------------------
+# Some modules in this directory are integration tests wearing a unit-test
+# costume: they talk to a live API, postgres or MinIO. Without a guard they fail
+# with "Connection refused" on any machine that does not happen to have the
+# stack up, which buries the failures that actually mean something. Skip them
+# instead, and say why.
+
+def service_available(host: str, port: int, timeout: float = 0.35) -> bool:
+    """True if something is listening on host:port."""
+    import socket
+    try:
+        with socket.create_connection((host, int(port)), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def requires_service(host: str, port: int, name: str):
+    """Module-level marker: skip unless host:port accepts a connection."""
+    return pytest.mark.skipif(
+        not service_available(host, port),
+        reason=f"needs a running {name} at {host}:{port} (integration test)",
+    )
+
 # Import specific fixtures from fixtures.py to make them available to all tests
 from computor_backend.tests.fixtures import (
     test_db,
@@ -45,7 +72,7 @@ def database_url():
 
 @pytest.fixture(scope="session")
 def engine(database_url):
-    """Create database engine."""
+    """Create database engine (lazy — create_engine does not connect)."""
     return create_engine(database_url)
 
 
@@ -57,7 +84,17 @@ def Session(engine):
 
 @pytest.fixture
 def session(Session):
-    """Create a new database session for a test."""
+    """Create a new database session for a test.
+
+    Skips rather than failing with "Connection refused" when no postgres is
+    running: anything asking for a real session is an integration test. Note the
+    guard lives here and NOT on `engine` — the autouse setup_test_database
+    fixture depends on `engine`, so skipping there skips the entire suite.
+    """
+    host = os.environ.get("POSTGRES_HOST", "localhost")
+    port = os.environ.get("POSTGRES_PORT", "5432")
+    if not service_available(host, int(port)):
+        pytest.skip(f"needs a running postgres at {host}:{port} (integration test)")
     session = Session()
     try:
         yield session
