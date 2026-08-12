@@ -12,9 +12,24 @@ from sqlalchemy.orm import Session
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from computor_backend.permissions.principal import Principal, Claims
+from computor_backend.permissions.principal import Principal, Claims, build_claims
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.database import get_db
+
+
+# See test_permissions_comprehensive.py for the full rationale. In short: the
+# app is real but the database is a Mock, so results come in classes, not exact
+# codes. Validation/persistence failures are 400 (VAL_001, never FastAPI's 422);
+# a refusal is 403 or 404 (NF_001); an allowed create still cannot persist and
+# lands on 400. A 200 from a list proves wiring ran, NOT that row filtering is
+# right — that needs a live database.
+DENIED = [403, 404]               # permission layer refused
+# Non-admin reads of scope-owned entities compose a real subquery and hand it to
+# Column.in_(); a Mock session yields a Mock there, which SQLAlchemy rejects.
+NEEDS_REAL_DB = pytest.mark.skip(
+    reason="Scoped subquery composition needs a live database, not a Mock session."
+)
+REACHED_PERSISTENCE = [201, 400]  # allowed through; mock DB cannot persist
 
 
 def assert_status_in(response, expected_statuses):
@@ -30,8 +45,8 @@ class TestOrganizationEndpoints:
     
     @pytest.mark.parametrize("user_type,expected_statuses", [
         ("admin", [200, 404]),
-        ("student", [200, 404]),  
-        ("unauthorized", [200, 403, 404]),
+        pytest.param("student", [200, 404], marks=NEEDS_REAL_DB),
+        pytest.param("unauthorized", [200, 403, 404], marks=NEEDS_REAL_DB),
     ])
     def test_list_organizations(self, test_users, mock_db_session, user_type, expected_statuses):
         """Test GET /organizations with different user roles"""
@@ -43,10 +58,10 @@ class TestOrganizationEndpoints:
         assert_status_in(response, expected_statuses)
     
     @pytest.mark.parametrize("user_type,expected_statuses", [
-        ("admin", [201, 400, 422]),  # May succeed or fail validation
-        ("student", [403, 422]),     # Forbidden or validation error
-        ("lecturer", [403, 422]),
-        ("unauthorized", [403, 422]),
+        ("admin", REACHED_PERSISTENCE),
+        ("student", DENIED),
+        ("lecturer", DENIED),
+        ("unauthorized", DENIED),
     ])
     def test_create_organization(self, test_users, mock_db_session, user_type, expected_statuses):
         """Test POST /organizations with different user roles"""
@@ -55,8 +70,9 @@ class TestOrganizationEndpoints:
         client = TestClient(app)
         
         org_data = {
-            "path": "test.org",
-            "organization_type": "university",
+            "path": "test_org",
+            "title": "Test Organization",
+            "organization_type": "organization",
             "properties": {}
         }
         
@@ -83,11 +99,12 @@ class TestCourseEndpoints:
         assert_status_in(response, expected_statuses)
     
     @pytest.mark.parametrize("user_type,expected_statuses", [
-        ("admin", [201, 400, 422, 404]),
-        ("student", [403, 422, 404]),
-        ("lecturer", [403, 422, 404]),
-        ("maintainer", [201, 400, 422, 404]),
-        ("unauthorized", [403, 422, 404]),
+        ("admin", REACHED_PERSISTENCE),
+        ("student", DENIED),
+        ("lecturer", DENIED),
+        # A _maintainer inside course-123 cannot create a NEW course.
+        ("maintainer", DENIED),
+        ("unauthorized", DENIED),
     ])
     def test_create_course(self, test_users, mock_db_session, user_type, expected_statuses):
         """Test POST /courses with different user roles"""
@@ -97,6 +114,7 @@ class TestCourseEndpoints:
         
         course_data = {
             "path": "org.family.course",
+            "course_family_id": "family-123",
             "properties": {
                 "name": "Test Course",
                 "description": "A test course"
@@ -127,12 +145,12 @@ class TestCourseContentEndpoints:
         assert_status_in(response, expected_statuses)
     
     @pytest.mark.parametrize("user_type,expected_statuses", [
-        ("admin", [201, 400, 422, 404]),
-        ("student", [403, 422, 404]),
-        ("tutor", [403, 422, 404]),
-        ("lecturer", [201, 400, 422, 404]),
-        ("maintainer", [201, 400, 422, 404]),
-        ("unauthorized", [403, 422, 404]),
+        ("admin", REACHED_PERSISTENCE),
+        ("student", DENIED),
+        ("tutor", DENIED),
+        ("lecturer", REACHED_PERSISTENCE),
+        ("maintainer", REACHED_PERSISTENCE),
+        ("unauthorized", DENIED),
     ])
     def test_create_course_content(self, test_users, mock_db_session, user_type, expected_statuses):
         """Test POST /course-contents with different course roles"""
@@ -141,9 +159,10 @@ class TestCourseContentEndpoints:
         client = TestClient(app)
         
         content_data = {
-            "course_id": str(uuid.uuid4()),
-            "name": "Test Assignment",
-            "kind_id": "assignment",
+            "path": "assignment1",
+            "course_id": "course-123",
+            "course_content_type_id": "type-123",
+            "title": "Test Assignment",
             "properties": {}
         }
         
@@ -171,11 +190,12 @@ class TestCourseMemberEndpoints:
         assert_status_in(response, expected_statuses)
     
     @pytest.mark.parametrize("user_type,expected_statuses", [
-        ("admin", [201, 400, 404, 422]),
-        ("student", [403, 404, 422]),
-        ("tutor", [403, 404, 422]),
-        ("lecturer", [403, 404, 422]),
-        ("maintainer", [201, 400, 404, 422]),
+        ("admin", REACHED_PERSISTENCE),
+        ("student", DENIED),
+        ("tutor", DENIED),
+        # ACTION_ROLE_MAP maps course-member "create" to LECTURER.
+        ("lecturer", REACHED_PERSISTENCE),
+        ("maintainer", REACHED_PERSISTENCE),
     ])
     def test_add_course_member(self, test_users, mock_db_session, user_type, expected_statuses):
         """Test POST /course-members with different roles"""
@@ -184,7 +204,7 @@ class TestCourseMemberEndpoints:
         client = TestClient(app)
         
         member_data = {
-            "course_id": str(uuid.uuid4()),
+            "course_id": "course-123",
             "user_id": str(uuid.uuid4()),
             "course_role_id": "_student"
         }
@@ -240,11 +260,11 @@ def test_users():
         )
     }
     
-    # Add course roles for relevant users
+    # Course claims must be nested as dependent["course"][course_id] = {roles};
+    # assigning dependent[course_id] directly (as this used to) means the
+    # handlers never see the role. build_claims() is the production builder.
     for role in ["student", "tutor", "lecturer", "maintainer"]:
-        claims = Claims()
-        claims.dependent["course-123"] = {f"_{role}"}
-        users[role].claims = claims
+        users[role].claims = build_claims([("permissions", f"course:_{role}:course-123")])
     
     return users
 

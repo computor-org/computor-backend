@@ -17,7 +17,14 @@ from sqlalchemy.orm import Session
 from computor_backend.server import app
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.database import get_db
-from computor_backend.permissions.principal import Principal, Claims
+from computor_backend.permissions.principal import Principal, Claims, build_claims
+
+# See test_permissions_comprehensive.py for the full rationale: the app is real
+# but the database is a Mock, so outcomes come in classes. Validation and
+# persistence failures are 400 (VAL_001), never FastAPI's 422; a refusal is 403
+# or 404 (NF_001); an allowed create cannot persist and lands on 400.
+DENIED = [403, 404]               # permission layer refused
+REACHED_PERSISTENCE = [201, 400]  # allowed through; mock DB cannot persist
 from computor_backend.permissions.core import check_permissions, check_admin, check_course_permissions
 
 
@@ -38,14 +45,14 @@ def create_mock_principal(
         roles=roles or []
     )
     
-    # Build claims for course roles
+    # Course claims nest as dependent["course"][course_id] = {roles}. Writing
+    # dependent[course_id] directly (as this used to) means the handlers never
+    # see the role, so every course-scoped test silently checked nothing.
     if course_roles:
-        claims = Claims()
-        for course_id, role in course_roles.items():
-            if course_id not in claims.dependent:
-                claims.dependent[course_id] = set()
-            claims.dependent[course_id].add(role)
-        principal.claims = claims
+        principal.claims = build_claims([
+            ("permissions", f"course:{role}:{course_id}")
+            for course_id, role in course_roles.items()
+        ])
     
     return principal
 
@@ -226,7 +233,7 @@ class TestPermissionSystem:
         )
         assert student.user_id == 'student-test'
         assert student.is_admin == False
-        assert '_student' in student.claims.dependent.get('course-123', set())
+        assert '_student' in student.claims.dependent['course']['course-123']
 
 
 class TestOrganizationPermissions:
@@ -239,11 +246,13 @@ class TestOrganizationPermissions:
         ("lecturer", "GET", 200),
         ("unauthorized", "GET", 200),
         
-        # POST /organizations - only admin can create
-        ("admin", "POST", 422),  # 422 because we're not sending valid data
-        ("student", "POST", [403, 422]),  # May get 422 if validation happens first
-        ("lecturer", "POST", [403, 422]),  # May get 422 if validation happens first
-        ("unauthorized", "POST", [403, 422]),  # May get 422 if validation happens first
+        # POST /organizations with an EMPTY body: validation answers before the
+        # permission layer, so every role gets 400 (VAL_001) regardless of role.
+        # Role separation for creates is covered in test_permissions_comprehensive.
+        ("admin", "POST", [400]),
+        ("student", "POST", [400]),
+        ("lecturer", "POST", [400]),
+        ("unauthorized", "POST", [400]),
     ])
     def test_organization_permissions(self, user_type, method, expected_status):
         """Test organization endpoint with different users and methods"""
@@ -332,6 +341,7 @@ class TestCoursePermissions:
         
         course_data = {
             "path": "test.university.cs.101",
+            "course_family_id": "family-123",
             "properties": {
                 "name": "Test Course"
             }
@@ -340,10 +350,9 @@ class TestCoursePermissions:
         response = client.post("/courses", json=course_data)
         
         if expected_can_create:
-            # Might fail with 422 (validation) or 409 (conflict) or 201 (success)
-            assert response.status_code in [201, 409, 422, 500]
+            assert response.status_code in REACHED_PERSISTENCE + [409]
         else:
-            assert response.status_code in [403, 404, 422]  # 422 if validation happens first
+            assert response.status_code in DENIED
         
         app.dependency_overrides.clear()
 
@@ -383,19 +392,19 @@ class TestCourseContentPermissions:
         client = create_test_client(user_type)
         
         content_data = {
+            "path": "assignment1",
             "course_id": "course-123",
-            "name": "Test Assignment",
-            "kind_id": "assignment",
+            "course_content_type_id": "type-123",
+            "title": "Test Assignment",
             "properties": {}
         }
         
         response = client.post("/course-contents", json=content_data)
         
         if expected_can_create:
-            # Might fail due to missing course or validation
-            assert response.status_code in [201, 404, 422, 500]
+            assert response.status_code in REACHED_PERSISTENCE
         else:
-            assert response.status_code in [403, 404, 422]  # 422 if validation happens first
+            assert response.status_code in DENIED
         
         app.dependency_overrides.clear()
 
@@ -461,8 +470,9 @@ class TestCorePermissions:
         
         # Students can view but not create most things
         assert client.get("/courses").status_code in [200, 404]
-        assert client.post("/courses", json={}).status_code in [403, 422]
-        assert client.post("/organizations", json={}).status_code in [403, 422]  # 422 if validation happens first
+        # Empty bodies: validation answers first, so both are 400 (VAL_001).
+        assert client.post("/courses", json={}).status_code == 400
+        assert client.post("/organizations", json={}).status_code == 400
     
     def test_lecturer_course_permissions(self):
         """Test lecturer course permissions"""
@@ -470,13 +480,14 @@ class TestCorePermissions:
         
         # Lecturers can create course content
         content_data = {
+            "path": "content1",
             "course_id": "course-123",
-            "name": "Test Content",
-            "kind_id": "assignment"
+            "course_content_type_id": "type-123",
+            "title": "Test Content"
         }
         response = client.post("/course-contents", json=content_data)
-        # Should either succeed or fail due to missing course, not permissions
-        assert response.status_code in [201, 404, 422, 500]
+        # Should get past the permission layer; the mock DB then blocks the write.
+        assert response.status_code in REACHED_PERSISTENCE
 
 
 # ============================================================================

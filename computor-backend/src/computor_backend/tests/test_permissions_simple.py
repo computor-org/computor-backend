@@ -83,12 +83,16 @@ class TestSimplePermissions:
         response = client.get("/courses")
         assert response.status_code in [200, 404]
         
-        # Test that student cannot create organizations
+        # Test that student cannot create organizations. The payload has to be
+        # VALID or validation answers 400 before the permission layer runs and
+        # the assertion proves nothing about authorization.
         response = client.post("/organizations", json={
-            "path": "test.org",
+            "path": "test_org",
+            "title": "Test Organization",
+            "organization_type": "organization",
             "properties": {}
         })
-        assert response.status_code in [403, 422]  # 403 Forbidden or 422 if validation happens first
+        assert response.status_code in [403, 404]  # refused (404 hides existence)
         
         # Clean up
         client.cleanup()
@@ -201,8 +205,11 @@ class TestAPIIntegration:
     @pytest.mark.parametrize("user_type,endpoint,method,expected_status", [
         ("admin", "/organizations", "GET", [200, 404]),
         ("student", "/organizations", "GET", [200, 404]),
-        ("admin", "/organizations", "POST", [201, 422, 400]),
-        ("student", "/organizations", "POST", [403, 422]),  # May get 422 if validation happens first
+        # POST with an EMPTY body: validation (400 / VAL_001) answers before the
+        # permission layer, so the role makes no difference here. Role separation
+        # for creates is covered by test_permissions_comprehensive.
+        ("admin", "/organizations", "POST", [400]),
+        ("student", "/organizations", "POST", [400]),
         ("admin", "/courses", "GET", [200, 404]),
         ("student", "/courses", "GET", [200, 404]),
     ])
