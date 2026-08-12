@@ -15,6 +15,7 @@ import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPa
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
+import { displayName } from '@/src/utils/displayName';
 import type { StudentRepositoryProvisioned } from 'types/generated';
 
 const coursesClient = new CoursesClient();
@@ -103,11 +104,11 @@ export default function CoursePage() {
   // the flat Courses list when those aren't readable (e.g. for students).
   const crumbs: { label: string; href?: string }[] = [];
   if (organization)
-    crumbs.push({ label: organization.title || organization.path, href: `/organizations/${organization.id}` });
+    crumbs.push({ label: displayName(organization), href: `/organizations/${organization.id}` });
   if (courseFamily)
-    crumbs.push({ label: courseFamily.title || courseFamily.path, href: `/course-families/${courseFamily.id}` });
+    crumbs.push({ label: displayName(courseFamily), href: `/course-families/${courseFamily.id}` });
   if (crumbs.length === 0) crumbs.push({ label: 'Courses', href: '/courses' });
-  crumbs.push({ label: course.title || course.path });
+  crumbs.push({ label: displayName(course, 'Untitled Course') });
 
   const repoRow = (label: string, value: ReactNode) => (
     <div className="flex gap-3">
@@ -121,16 +122,13 @@ export default function CoursePage() {
       <ListPageLayout>
         <PageHeader
           breadcrumbs={crumbs}
-          title={course.title || 'Untitled Course'}
+          title={displayName(course, 'Untitled Course')}
           subtitle={
-            <span className="flex items-center gap-3">
-              <span className="font-mono text-sm truncate">{course.path}</span>
-              {course.language_code && (
-                <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded uppercase">
-                  {course.language_code}
-                </span>
-              )}
-            </span>
+            course.language_code && (
+              <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded uppercase">
+                {course.language_code}
+              </span>
+            )
           }
           actions={
             canManage && (
@@ -153,13 +151,13 @@ export default function CoursePage() {
             {organization && (
               <div>
                 <dt className="text-gray-500">Organization</dt>
-                <dd className="mt-1 text-gray-900">{organization.title || organization.path}</dd>
+                <dd className="mt-1 text-gray-900">{displayName(organization)}</dd>
               </div>
             )}
             {courseFamily && (
               <div>
                 <dt className="text-gray-500">Course family</dt>
-                <dd className="mt-1 text-gray-900">{courseFamily.title || courseFamily.path}</dd>
+                <dd className="mt-1 text-gray-900">{displayName(courseFamily)}</dd>
               </div>
             )}
             {course.language_code && (

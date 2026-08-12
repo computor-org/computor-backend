@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
-import { depthOf, lastSegment } from '@/src/utils/ltree';
+import { depthOf } from '@/src/utils/ltree';
 import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
@@ -11,6 +11,7 @@ import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge, { BadgeColor } from '@/src/components/Badge';
 import type { CourseGet, CourseContentLecturerList, CourseContentTypeList } from 'types/generated';
+import { displayName } from '@/src/utils/displayName';
 
 // Deployment status → badge styling. The lecturer list always carries the
 // top-level has_deployment + deployment_status (no include needed); values are
@@ -122,12 +123,11 @@ export default function LecturerContentPage() {
         <PageHeader
           breadcrumbs={[
             { label: 'Courses', href: '/courses' },
-            { label: course?.title || course?.path || 'Course', href: `/courses/${courseId}` },
+            { label: displayName(course, 'Course'), href: `/courses/${courseId}` },
             { label: 'Lecturer View', href: `/courses/${courseId}/lecturer` },
             { label: 'Assignments' },
           ]}
           title="Assignments"
-          subtitle={course ? <span className="text-sm text-gray-500 font-mono">{course.path}</span> : undefined}
         />
 
         <ErrorBanner>{error}</ErrorBanner>
@@ -201,9 +201,8 @@ export default function LecturerContentPage() {
                       />
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium text-gray-900 truncate">
-                          {c.title || lastSegment(c.path)}
+                          {displayName(c)}
                         </div>
-                        <div className="text-xs text-gray-400 font-mono truncate">{c.path}</div>
                       </div>
                       {type && (
                         <span className="shrink-0 px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded">

@@ -15,6 +15,7 @@ import FormPanel, { Field } from '@/src/components/FormPanel';
 import { inputCls } from '@/src/components/ui/tokens';
 import type { CourseFamilyList, CourseGitBindingUpsert } from '@/src/generated/types/courses';
 import type { GitServerGet } from '@/src/generated/types/common';
+import { displayName } from '@/src/utils/displayName';
 
 const coursesClient = new CoursesClient();
 const courseFamiliesClient = new CourseFamiliesClient();
@@ -236,7 +237,7 @@ function CreateInner() {
           <select value={familyId} onChange={(e) => setFamilyId(e.target.value)} className={inputCls}>
             <option value="">Select a course family…</option>
             {families.map((f) => (
-              <option key={f.id} value={f.id}>{f.title || f.path}</option>
+              <option key={f.id} value={f.id}>{displayName(f, 'Untitled Course Family')}</option>
             ))}
           </select>
         </Field>

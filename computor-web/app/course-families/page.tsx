@@ -7,6 +7,7 @@ import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
+import { displayName } from '@/src/utils/displayName';
 import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
 import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
@@ -36,7 +37,7 @@ export default function CourseFamiliesPage() {
   const courseCounts = data?.courseCounts ?? {};
   const orgLabel = (id: string) => {
     const o = orgs.find((x) => x.id === id);
-    return o ? o.title || o.path : id;
+    return o ? displayName(o, 'Untitled Organization') : 'Unknown organization';
   };
 
   return (
@@ -66,12 +67,12 @@ export default function CourseFamiliesPage() {
             {families.map((f) => (
               <Link key={f.id} href={`/course-families/${f.id}`} className="block bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-sm transition-all">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-sm font-medium text-gray-900">{f.title || f.path}</div>
+                  <div className="text-sm font-medium text-gray-900">{displayName(f, 'Untitled Course Family')}</div>
                   <span className="shrink-0 text-xs text-gray-500">
                     {courseCounts[f.id] ?? 0} {(courseCounts[f.id] ?? 0) === 1 ? 'course' : 'courses'}
                   </span>
                 </div>
-                <div className="text-xs text-gray-500">{f.path} · {orgLabel(f.organization_id)}</div>
+                <div className="text-xs text-gray-500">{orgLabel(f.organization_id)}</div>
               </Link>
             ))}
           </ScrollArea>

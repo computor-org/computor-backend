@@ -14,6 +14,7 @@ import Forbidden from '@/src/components/Forbidden';
 import { Field } from '@/src/components/FormPanel';
 import { inputCls } from '@/src/components/ui/tokens';
 import type { CourseGet, CourseGitBindingGet, CourseGitBindingUpsert, GitServerGet } from 'types/generated';
+import { displayName } from '@/src/utils/displayName';
 
 const coursesClient = new CoursesClient();
 const gitServersClient = new GitServersClient();
@@ -168,11 +169,10 @@ export default function CourseEditPage() {
         <PageHeader
           breadcrumbs={[
             { label: 'Courses', href: '/courses' },
-            { label: course?.title || course?.path || 'Course', href: `/courses/${courseId}` },
+            { label: displayName(course, 'Course'), href: `/courses/${courseId}` },
             { label: 'Edit' },
           ]}
           title="Edit course"
-          subtitle={course ? <span className="text-sm text-gray-500 font-mono">{course.path}</span> : undefined}
         />
 
         <ErrorBanner>{error}</ErrorBanner>

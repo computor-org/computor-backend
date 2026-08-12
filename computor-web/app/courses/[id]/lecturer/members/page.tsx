@@ -18,6 +18,7 @@ import { CourseGroupsClient } from '@/src/generated/clients/CourseGroupsClient';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import type { CourseMemberList, CourseGroupList } from 'types/generated';
 import { Table, Thead, Tbody, Th } from '@/src/components/ui/Table';
+import { displayName } from '@/src/utils/displayName';
 import {
   assignableRoles,
   canManageMemberRole,
@@ -139,7 +140,7 @@ export default function CourseMembersPage() {
     );
   }
 
-  const courseLabel = course?.title || course?.path || 'Course';
+  const courseLabel = displayName(course, 'Course');
 
   return (
     <AuthenticatedLayout>
@@ -224,7 +225,7 @@ export default function CourseMembersPage() {
                             <option value="">— no group —</option>
                             {groups.map((g) => (
                               <option key={g.id} value={g.id}>
-                                {g.title || g.id}
+                                {g.title || 'Untitled group'}
                               </option>
                             ))}
                           </select>

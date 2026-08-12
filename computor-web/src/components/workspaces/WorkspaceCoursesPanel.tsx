@@ -6,6 +6,7 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import { ButtonLink } from '@/src/components/ui/Button';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/src/components/ui/Table';
+import { displayName } from '@/src/utils/displayName';
 
 const coderClient = new CoderClient();
 
@@ -43,9 +44,8 @@ export default function WorkspaceCoursesPanel() {
                 <Tr key={course.course_id} className="hover:bg-gray-50">
                   <Td>
                     <div className="text-sm font-medium text-gray-900">
-                      {course.title || course.path || course.course_id}
+                      {displayName(course, 'Untitled Course')}
                     </div>
-                    {course.path && <div className="text-xs text-gray-500">{course.path}</div>}
                   </Td>
                   <Td>
                     {course.template_names.length > 0 ? (

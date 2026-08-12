@@ -10,6 +10,7 @@ import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
 import { inputCls } from '@/src/components/ui/tokens';
 import type { CourseFamilyGet } from '@/src/generated/types/courses';
+import { displayName } from '@/src/utils/displayName';
 import type { OrganizationList } from '@/src/generated/types/organizations';
 import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
 import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
@@ -84,7 +85,7 @@ function CreateInner() {
           <select value={organizationId} onChange={(e) => setOrganizationId(e.target.value)} className={inputCls}>
             <option value="">Select an organization…</option>
             {orgs.map((o) => (
-              <option key={o.id} value={o.id}>{o.title || o.path}</option>
+              <option key={o.id} value={o.id}>{displayName(o, 'Untitled Organization')}</option>
             ))}
           </select>
         </Field>

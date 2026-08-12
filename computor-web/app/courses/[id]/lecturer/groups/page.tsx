@@ -17,6 +17,7 @@ import { CourseMembersClient } from '@/src/generated/clients/CourseMembersClient
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import type { CourseGroupList } from 'types/generated';
 import { Table, Thead, Tbody, Th } from '@/src/components/ui/Table';
+import { displayName } from '@/src/utils/displayName';
 
 const groupsClient = new CourseGroupsClient();
 const membersClient = new CourseMembersClient();
@@ -78,7 +79,7 @@ export default function CourseGroupsPage() {
     );
   }
 
-  const courseLabel = course?.title || course?.path || 'Course';
+  const courseLabel = displayName(course, 'Course');
 
   return (
     <AuthenticatedLayout>
@@ -125,7 +126,7 @@ export default function CourseGroupsPage() {
                           href={`/courses/${courseId}/lecturer/groups/${g.id}/edit`}
                           className="font-medium text-gray-900 text-sm hover:text-blue-600"
                         >
-                          {g.title || g.id}
+                          {g.title || 'Untitled group'}
                         </Link>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">{count}</td>
@@ -171,8 +172,8 @@ export default function CourseGroupsPage() {
       {toDelete && (
         <ConfirmDeleteDialog
           title="Delete group"
-          message={`Delete the group "${toDelete.title || toDelete.id}"? This cannot be undone.`}
-          confirmWord={toDelete.title || toDelete.id}
+          message={`Delete the group "${toDelete.title || 'Untitled group'}"? This cannot be undone.`}
+          confirmWord={toDelete.title || 'Untitled group'}
           onConfirm={() => deleteGroup(toDelete)}
           onClose={() => setToDelete(null)}
         />

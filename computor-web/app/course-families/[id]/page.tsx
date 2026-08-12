@@ -11,6 +11,7 @@ import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPa
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
+import { displayName } from '@/src/utils/displayName';
 import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 
@@ -32,6 +33,7 @@ export default function CourseFamilyDetailPage() {
   );
   const family = data?.family ?? null;
   const courses = data?.courses ?? [];
+  const familyName = displayName(family, 'Course Family');
   const mayCreateCourse = family ? canCreateCourse(family.organization_id, familyId) : false;
 
   async function doDelete() {
@@ -43,9 +45,8 @@ export default function CourseFamilyDetailPage() {
     <AuthenticatedLayout>
       <ListPageLayout width="narrow">
         <PageHeader
-          breadcrumbs={[{ label: 'Course Families', href: '/course-families' }, { label: family?.title || family?.path || 'Course Family' }]}
-          title={family?.title || family?.path || 'Course Family'}
-          subtitle={family && <span className="font-mono text-sm text-gray-500">{family.path}</span>}
+          breadcrumbs={[{ label: 'Course Families', href: '/course-families' }, { label: familyName }]}
+          title={familyName}
           actions={
             <>
               {mayCreateCourse && (
@@ -83,8 +84,7 @@ export default function CourseFamilyDetailPage() {
                 {courses.map((c) => (
                   <Link key={c.id} href={`/courses/${c.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-gray-900 truncate">{c.title || c.path}</div>
-                      <div className="text-xs text-gray-500 font-mono">{c.path}</div>
+                      <div className="text-sm font-medium text-gray-900 truncate">{displayName(c, 'Untitled Course')}</div>
                     </div>
                     <span className="text-gray-300">›</span>
                   </Link>
@@ -97,9 +97,9 @@ export default function CourseFamilyDetailPage() {
 
       {confirmDelete && family && (
         <ConfirmDeleteDialog
-          title={`Delete course family “${family.title || family.path}”?`}
+          title={`Delete course family “${familyName}”?`}
           message="This permanently deletes the course family and is irreversible. It must have no courses first."
-          confirmWord={family.path}
+          confirmWord={familyName}
           onConfirm={doDelete}
           onClose={() => setConfirmDelete(false)}
         />

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { CourseMemberGradingNode } from 'types/generated';
 import { buildTree, type TreeNode as LtreeNode } from '@/src/utils/ltree';
+import { displayName } from '@/src/utils/displayName';
 
 interface ContentTreeProps {
   nodes: CourseMemberGradingNode[];
@@ -68,7 +69,7 @@ function TreeNodeRow({ node, defaultExpanded }: { node: TreeNode; defaultExpande
               />
             )}
             <span className={`text-sm truncate ${isAssignment ? 'text-gray-700' : 'font-medium text-gray-900'}`}>
-              {node.title || node.path.split('.').pop()}
+              {displayName(node)}
             </span>
           </div>
         </td>

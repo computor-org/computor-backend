@@ -11,6 +11,7 @@ import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPa
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
+import { displayName } from '@/src/utils/displayName';
 import type { OrganizationGet, CourseFamilyList } from 'types/generated';
 import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
 import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
@@ -33,6 +34,7 @@ export default function OrganizationDetailPage() {
   );
   const org = data?.org ?? null;
   const families = data?.families ?? [];
+  const orgName = displayName(org, 'Organization');
 
   async function doDelete() {
     await api.del(`/organizations/${orgId}`);
@@ -43,9 +45,9 @@ export default function OrganizationDetailPage() {
     <AuthenticatedLayout>
       <ListPageLayout width="narrow">
         <PageHeader
-          breadcrumbs={[{ label: 'Organizations', href: '/organizations' }, { label: org?.title || org?.path || 'Organization' }]}
-          title={org?.title || org?.path || 'Organization'}
-          subtitle={org && <span className="font-mono text-sm text-gray-500">{org.path} · {org.organization_type}</span>}
+          breadcrumbs={[{ label: 'Organizations', href: '/organizations' }, { label: orgName }]}
+          title={orgName}
+          subtitle={org && <span className="text-sm text-gray-500">{org.organization_type}</span>}
           actions={
             org && canManage ? (
               <>
@@ -84,8 +86,7 @@ export default function OrganizationDetailPage() {
                   {families.map((f) => (
                     <Link key={f.id} href={`/course-families/${f.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-gray-900 truncate">{f.title || f.path}</div>
-                        <div className="text-xs text-gray-400 font-mono truncate">{f.path}</div>
+                        <div className="text-sm font-medium text-gray-900 truncate">{displayName(f, 'Untitled Course Family')}</div>
                       </div>
                       <span className="text-gray-300">›</span>
                     </Link>
@@ -99,9 +100,9 @@ export default function OrganizationDetailPage() {
 
       {confirmDelete && org && (
         <ConfirmDeleteDialog
-          title={`Delete organization “${org.title || org.path}”?`}
+          title={`Delete organization “${orgName}”?`}
           message="This permanently deletes the organization and is irreversible. It must have no course families first."
-          confirmWord={org.path}
+          confirmWord={orgName}
           onConfirm={doDelete}
           onClose={() => setConfirmDelete(false)}
         />
