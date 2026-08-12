@@ -90,7 +90,8 @@ if [ ! -f "$SETTINGS_FILE" ]; then
     "*.bmp": "computor.imagePreview",
     "*.webp": "computor.imagePreview",
     "*.svg": "computor.imagePreview"
-  }
+  },
+  "workbench.editor.closeEmptyGroups": false
 }
 SETTINGS_EOF
 else
@@ -115,6 +116,9 @@ wanted = {
         "*.webp": "computor.imagePreview",
         "*.svg": "computor.imagePreview",
     },
+    # Keep the empty aux group alive: closing the last file in a group must
+    # not collapse the two-column layout (computor-org/issues#286).
+    "workbench.editor.closeEmptyGroups": False,
 }
 
 try:
