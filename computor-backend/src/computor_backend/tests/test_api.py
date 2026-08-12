@@ -41,14 +41,17 @@ class TestInterfaceImports:
     def test_import_courses_interface(self):
         """Test importing courses interface."""
         import computor_types.courses
-        assert computor_backend.interface.courses is not None
+        # The interface modules moved out of computor_backend into computor_types.
+        assert computor_types.courses is not None
     
     def test_import_users_interface(self):
         """Test importing users interface."""
         import computor_types.users
-        assert computor_backend.interface.users is not None
+        # The interface modules moved out of computor_backend into computor_types.
+        assert computor_types.users is not None
     
     def test_import_organizations_interface(self):
         """Test importing organizations interface."""
         import computor_types.organizations
-        assert computor_backend.interface.organizations is not None
+        # The interface modules moved out of computor_backend into computor_types.
+        assert computor_types.organizations is not None
