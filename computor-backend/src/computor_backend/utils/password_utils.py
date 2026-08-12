@@ -69,8 +69,13 @@ class PasswordComplexityRequirements:
     Based on NIST SP 800-63B and OWASP ASVS guidelines.
     """
 
-    # Minimum length (NIST recommends 8+, we use 12 for better security)
+    # Minimum length (NIST SP 800-63B recommends 8+ when composition rules are
+    # not enforced, which is our case — see the REQUIRE_* flags below)
     MIN_LENGTH = 8
+
+    # Reject a password built from fewer than this many distinct characters.
+    # "AAAAAAAAAA1!" has 3, so a <= 2 threshold would wave it through.
+    MIN_DISTINCT_CHARACTERS = 5
 
     # Maximum length (prevent DoS via extremely long passwords)
     MAX_LENGTH = 128
@@ -194,14 +199,22 @@ def validate_password_strength(
                 code="PASSWORD_CONTAINS_USERNAME"
             )
 
-    # 6. Email similarity check
+    # 6. Email similarity check.
+    # Compare on alphanumerics only, and check each punctuation-separated part
+    # as well as the whole local part. Institutional addresses are usually
+    # `firstname.lastname@`, so a raw substring match on "john.doe" would miss
+    # the very passwords this rule exists to catch (e.g. "JohnDoe123!").
     if email:
-        email_parts = email.split('@')[0].lower()
-        if len(email_parts) >= 3 and email_parts in password_lower:
-            raise PasswordValidationError(
-                message="Password must not contain parts of your email address",
-                code="PASSWORD_CONTAINS_EMAIL"
-            )
+        local_part = email.split('@')[0].lower()
+        password_alnum = ''.join(c for c in password_lower if c.isalnum())
+        candidates = {re.sub(r'[^a-z0-9]', '', local_part)}
+        candidates.update(re.split(r'[^a-z0-9]+', local_part))
+        for candidate in candidates:
+            if len(candidate) >= 3 and candidate in password_alnum:
+                raise PasswordValidationError(
+                    message="Password must not contain parts of your email address",
+                    code="PASSWORD_CONTAINS_EMAIL"
+                )
 
     # 7. Custom forbidden words
     if custom_forbidden_words:
@@ -212,8 +225,8 @@ def validate_password_strength(
                     code="PASSWORD_CONTAINS_FORBIDDEN_WORD"
                 )
 
-    # 8. All the same character check
-    if len(set(password)) <= 2:
+    # 8. Character-variety check
+    if len(set(password)) < PasswordComplexityRequirements.MIN_DISTINCT_CHARACTERS:
         raise PasswordValidationError(
             message="Password must contain more variety of characters",
             code="PASSWORD_TOO_REPETITIVE"

@@ -1,13 +1,27 @@
 from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Optional
 
-
-    
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 from computor_types.course_content_kind import CourseContentKindGet, CourseContentKindList
+from computor_types.utils.color_validation import validate_color
 
-# Color validation moved to backend in Phase 4
-# from computor_types.utils.color_validation import is_valid_color, validate_color
+
+def _validate_color_field(v: Optional[str]) -> Optional[str]:
+    """Reject anything that is not a valid HTML/CSS color, and normalize it.
+
+    Shared by the create and update models so they cannot drift apart.
+    """
+    if v is None:
+        return None
+
+    normalized_color = validate_color(v)
+    if normalized_color is None:
+        raise ValueError(
+            f'Invalid color format: {v}. '
+            'Must be a valid HTML/CSS color (hex, rgb, hsl, or named color)'
+        )
+    return normalized_color
+
 
 class CourseContentTypeCreate(BaseModel):
     slug: str
@@ -19,18 +33,12 @@ class CourseContentTypeCreate(BaseModel):
     course_content_kind_id: str
 
     model_config = ConfigDict(from_attributes=True)
-    
-#    @field_validator
+
+    @field_validator('color')
     @classmethod
     def validate_color_field(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return None
-        
-##        normalized_color = validate_color(v)
-#        if normalized_color is None:
-            raise ValueError(f'Invalid color format: {v}. Must be a valid HTML/CSS color (hex, rgb, hsl, or named color)')
-        
-#        return normalized_color
+        return _validate_color_field(v)
+
 
 class CourseContentTypeGet(BaseEntityGet):
     id: str 
@@ -66,18 +74,12 @@ class CourseContentTypeUpdate(BaseModel):
     properties: Optional[dict] = None
 
     model_config = ConfigDict(from_attributes=True)
-    
-#    @field_validator
+
+    @field_validator('color')
     @classmethod
     def validate_color_field(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return None
-        
-##        normalized_color = validate_color(v)
-#        if normalized_color is None:
-            raise ValueError(f'Invalid color format: {v}. Must be a valid HTML/CSS color (hex, rgb, hsl, or named color)')
-        
-#        return normalized_color
+        return _validate_color_field(v)
+
 
 class CourseContentTypeQuery(ListQuery):
     id: Optional[str] = None

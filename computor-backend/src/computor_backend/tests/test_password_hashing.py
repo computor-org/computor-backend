@@ -130,45 +130,36 @@ class TestPasswordComplexity:
 
         assert "PASSWORD_TOO_LONG" in str(exc_info.value.code)
 
-    def test_password_no_uppercase(self):
-        """Test that password without uppercase is rejected."""
-        no_uppercase = "mysecure123!"
+    # Composition rules (must contain upper/lower/digit/special) are switched OFF
+    # on purpose: NIST SP 800-63B advises against them and calls for length plus
+    # a blocklist instead, which is what rules 3-8 implement. These assert the
+    # policy that is actually in force, so silently re-enabling a REQUIRE_* flag
+    # (or deleting the blocklist that replaced it) fails here.
+    @pytest.mark.parametrize("password,missing", [
+        ("mysecure123!x", "uppercase"),
+        ("MYSECURE123!X", "lowercase"),
+        ("MySecurePassword!", "digit"),
+        ("MySecurePassword123", "special character"),
+    ])
+    def test_composition_rules_are_not_enforced(self, password, missing):
+        """A password missing one character class is still accepted (NIST SP 800-63B)."""
+        assert PasswordComplexityRequirements.REQUIRE_UPPERCASE is False
+        assert PasswordComplexityRequirements.REQUIRE_LOWERCASE is False
+        assert PasswordComplexityRequirements.REQUIRE_DIGIT is False
+        assert PasswordComplexityRequirements.REQUIRE_SPECIAL is False
+
+        # Must not raise: length + blocklist carry the policy, not composition.
+        validate_password_strength(password)
+
+    def test_composition_rules_still_work_when_switched_on(self, monkeypatch):
+        """The REQUIRE_* machinery is intact should the policy ever be tightened."""
+        monkeypatch.setattr(PasswordComplexityRequirements, "REQUIRE_UPPERCASE", True)
 
         with pytest.raises(PasswordValidationError) as exc_info:
-            validate_password_strength(no_uppercase)
+            validate_password_strength("mysecure123!x")
 
         assert "COMPLEXITY_FAILED" in str(exc_info.value.code)
         assert "uppercase" in str(exc_info.value.message).lower()
-
-    def test_password_no_lowercase(self):
-        """Test that password without lowercase is rejected."""
-        no_lowercase = "MYSECURE123!"
-
-        with pytest.raises(PasswordValidationError) as exc_info:
-            validate_password_strength(no_lowercase)
-
-        assert "COMPLEXITY_FAILED" in str(exc_info.value.code)
-        assert "lowercase" in str(exc_info.value.message).lower()
-
-    def test_password_no_digit(self):
-        """Test that password without digit is rejected."""
-        no_digit = "MySecurePassword!"
-
-        with pytest.raises(PasswordValidationError) as exc_info:
-            validate_password_strength(no_digit)
-
-        assert "COMPLEXITY_FAILED" in str(exc_info.value.code)
-        assert "digit" in str(exc_info.value.message).lower()
-
-    def test_password_no_special_char(self):
-        """Test that password without special character is rejected."""
-        no_special = "MySecurePassword123"
-
-        with pytest.raises(PasswordValidationError) as exc_info:
-            validate_password_strength(no_special)
-
-        assert "COMPLEXITY_FAILED" in str(exc_info.value.code)
-        assert "special" in str(exc_info.value.message).lower()
 
     def test_password_common_rejected(self):
         """Test that common passwords are rejected."""
@@ -185,15 +176,17 @@ class TestPasswordComplexity:
 
     def test_password_contains_sequence(self):
         """Test that passwords with sequences are rejected."""
-        sequence_passwords = [
-            "Abcde12345!",
-            "Qwerty123!",
-        ]
-
-        for password in sequence_passwords:
+        # "Qwerty123!" is also on the common-password blocklist, which is checked
+        # first, so only assert the specific code for passwords that are ONLY a
+        # sequence. Both must be rejected either way.
+        for password in ["Abcde12345!", "Wxyzasdfg47!"]:
             with pytest.raises(PasswordValidationError) as exc_info:
                 validate_password_strength(password)
             assert "SEQUENCE" in str(exc_info.value.code)
+
+        for password in ["Qwerty123!"]:
+            with pytest.raises(PasswordValidationError):
+                validate_password_strength(password)
 
     def test_password_contains_username(self):
         """Test that password containing username is rejected."""
