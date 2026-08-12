@@ -1,6 +1,23 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
+
+// Same-tab writes are announced on this event; cross-tab ones arrive as `storage`.
+const STORE_EVENT = 'computor:persisted-course-date';
+
+function subscribe(onStoreChange: () => void): () => void {
+  window.addEventListener('storage', onStoreChange);
+  window.addEventListener(STORE_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener('storage', onStoreChange);
+    window.removeEventListener(STORE_EVENT, onStoreChange);
+  };
+}
+
+// No localStorage during SSR — must match the client's first paint.
+function getServerSnapshot(): string | null {
+  return null;
+}
 
 // `<input type="datetime-local">` works in the browser's local time and has no
 // timezone; convert its value to an ISO instant for storage.
@@ -34,19 +51,19 @@ export function usePersistedCourseDate(
   const perCourseKey = courseId ? `grading-${kind}:${courseId}` : null;
   const globalKey = `grading-${kind}:__last`;
 
-  const [iso, setIso] = useState<string | null>(null);
-
-  // Load on mount / when the course changes (client-only; localStorage is not
-  // available during SSR, so this can't run in a render-time initializer).
-  useEffect(() => {
-    if (!perCourseKey) return;
-    setIso(read(perCourseKey) ?? read(globalKey));
-  }, [perCourseKey, globalKey]);
+  // localStorage is an external mutable store, so subscribe to it rather than
+  // copying it into state from an effect. The separate server snapshot below
+  // keeps SSR returning null (storage does not exist there), which is what makes
+  // hydration match — a render-time read would differ between server and client.
+  const getSnapshot = useCallback(
+    () => (perCourseKey ? read(perCourseKey) ?? read(globalKey) : null),
+    [perCourseKey, globalKey],
+  );
+  const iso = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const set = useCallback(
     (localInput: string) => {
       const next = localInputToIso(localInput);
-      setIso(next);
       try {
         if (next) {
           if (perCourseKey) localStorage.setItem(perCourseKey, next);
@@ -57,6 +74,8 @@ export function usePersistedCourseDate(
       } catch {
         /* storage unavailable */
       }
+      // `storage` only fires in *other* tabs, so announce our own write too.
+      window.dispatchEvent(new Event(STORE_EVENT));
     },
     [perCourseKey, globalKey],
   );

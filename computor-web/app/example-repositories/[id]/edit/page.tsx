@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ExampleRepositoriesClient } from '@/src/generated/clients/ExampleRepositoriesClient';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -30,12 +30,15 @@ export default function ExampleRepositoryEditPage() {
     { enabled: canManage },
   );
 
-  // Seed the form once the repository loads.
-  useEffect(() => {
-    if (!repo) return;
+  // Seed the form once repo loads. Adjusting state during render (instead of in
+  // an effect) is React's documented way to derive state from changed data: it
+  // re-renders before committing, so there is no cascading render.
+  const [seeded, setSeeded] = useState(repo);
+  if (repo && repo !== seeded) {
+    setSeeded(repo);
     setName(repo.name || '');
     setDescription(repo.description || '');
-  }, [repo]);
+  }
 
   async function save() {
     setSaving(true);

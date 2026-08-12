@@ -135,6 +135,7 @@ test('fleet supports template selection and readiness-aware actions', async ({ p
     templates: ['vscode-workspace', 'bash-workspace'],
     build_images: true,
     image_tag: null,
+    no_cache: false, // the panel's "no cache" toggle, off unless ticked
   });
 });
 
