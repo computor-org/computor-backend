@@ -11,11 +11,13 @@ Key improvements over deprecated version:
 
 import os
 import json
+import hashlib
 import tempfile
 import subprocess
 import asyncio
 import shutil
 import logging
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List
 from temporalio import workflow, activity
@@ -42,8 +44,6 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # Storage and Caching Activities
 # ============================================================================
-
-VERSION_MARKER_FILENAME = ".example_version_id"
 
 # Retry budget for the terminal "write the Result row" PATCH. See
 # commit_test_results_activity — losing this call loses the whole test run.
@@ -114,39 +114,24 @@ def _save_example_files(target_path: str, files: Dict[str, Any]) -> None:
                 f.write(content)
 
 
-def _cached_version_matches(cache_path: str, expected_version_id: str) -> bool:
-    """Return True if cache_path is non-empty and its version marker matches.
+def _version_set_root(
+    target_base_dir: str,
+    example_version_id: str,
+    dependency_version_ids: List[str],
+) -> str:
+    """Directory that holds one immutable (main + dependencies) version set.
 
-    A missing marker is treated as a stale cache so legacy directories get
-    rewritten with the current version_id.
+    The key covers the dependency versions too: a dependency can be bumped
+    without the main example getting a new version, and that must produce a
+    new set rather than silently serving the old dependency.
     """
-    if not os.path.isdir(cache_path) or not os.listdir(cache_path):
-        return False
-    marker_path = os.path.join(cache_path, VERSION_MARKER_FILENAME)
-    if not os.path.isfile(marker_path):
-        return False
-    try:
-        with open(marker_path, "r") as f:
-            return f.read().strip() == str(expected_version_id)
-    except OSError:
-        return False
-
-
-def _cache_example(
-    cache_path: str,
-    version_id: str,
-    files: Dict[str, Any],
-) -> None:
-    """Wipe `cache_path` and rewrite it with `files`, then stamp the version.
-
-    Used to keep `/tmp/examples/<identifier>/` aligned with the requested
-    version — no stale content from an older example_version sticks around.
-    """
-    if os.path.isdir(cache_path):
-        shutil.rmtree(cache_path)
-    _save_example_files(cache_path, files)
-    with open(os.path.join(cache_path, VERSION_MARKER_FILENAME), "w") as f:
-        f.write(str(version_id))
+    key = str(example_version_id)
+    if dependency_version_ids:
+        dep_digest = hashlib.sha1(
+            ",".join(sorted(str(v) for v in dependency_version_ids)).encode()
+        ).hexdigest()[:12]
+        key = f"{key}-{dep_digest}"
+    return os.path.join(target_base_dir, "by-version", key)
 
 
 @activity.defn(name="fetch_example_version_with_dependencies")
@@ -158,16 +143,19 @@ async def fetch_example_version_with_dependencies(
     """
     Fetch an example version and all its dependencies from the API/MinIO.
 
-    Uses local caching to avoid re-downloading the same example version.
-    Each example is cached under its identifier with a version_id marker so
-    the testing engine can resolve sibling `../<identifier>/` imports while
-    still being able to detect a stale cache and refetch on version change.
+    Uses local caching to avoid re-writing the same example version. Every
+    version set lives in its own immutable root, so concurrent tests on the
+    worker can hold different versions of the same example at the same time —
+    the old scheme rewrote a shared `/tmp/examples/<identifier>/` in place,
+    and a version bump during another activity's read surfaced as a spurious
+    student test failure. A set is built in a temp dir and renamed into place
+    atomically; readers only ever see complete sets. Directory names inside a
+    set stay plain identifiers because the testing engine resolves sibling
+    `../<identifier>/` imports.
 
     Cache structure:
-        /tmp/examples/{main_identifier}/    <- main example files
-        /tmp/examples/{dep1_identifier}/    <- dependency 1 files
-        /tmp/examples/{dep2_identifier}/    <- dependency 2 files
-        Each directory contains a .example_version_id marker file.
+        /tmp/examples/by-version/{version_key}/{main_identifier}/  <- main files
+        /tmp/examples/by-version/{version_key}/{dep_identifier}/   <- per dependency
 
     Args:
         example_version_id: UUID of the ExampleVersion to fetch
@@ -207,48 +195,58 @@ async def fetch_example_version_with_dependencies(
                 f"Example version {example_version_id} response missing identifier"
             )
 
-        # Cache main example by identifier, refetching when the version marker
-        # does not match (or is missing on legacy cache entries).
-        cache_path = os.path.join(target_base_dir, main_identifier)
-        if _cached_version_matches(cache_path, example_version_id):
-            logger.info(
-                f"Main example {main_identifier} ({example_version_id}) already cached at {cache_path}"
-            )
+        dependencies = [
+            dep for dep in download_data.get("dependencies", [])
+            if dep.get("identifier") or dep.get("directory")
+        ]
+        for skipped in download_data.get("dependencies", []):
+            if skipped not in dependencies:
+                logger.warning(
+                    f"Skipping dependency without identifier: {skipped.get('version_id')}"
+                )
+
+        set_root = _version_set_root(
+            target_base_dir,
+            example_version_id,
+            [dep.get("version_id") for dep in dependencies],
+        )
+
+        if os.path.isdir(set_root):
+            # The rename below is atomic, so an existing set root is complete.
+            logger.info(f"Example version set already cached at {set_root}")
         else:
-            logger.info(
-                f"Caching main example {main_identifier} ({example_version_id}) at {cache_path}"
+            tmp_root = os.path.join(
+                target_base_dir, f".tmp-{example_version_id}-{uuid.uuid4().hex}"
             )
-            _cache_example(cache_path, example_version_id, download_data.get("files", {}))
-
-        # Cache dependencies by identifier — same scheme as the main example —
-        # so the reference run can resolve sibling `../<dep_identifier>/`
-        # imports out of the examples cache.
-        dependencies_info = []
-        for dep in download_data.get("dependencies", []):
-            dep_version_id = dep.get("version_id")
-            dep_identifier = dep.get("identifier") or dep.get("directory")
-            if not dep_identifier:
-                logger.warning(f"Skipping dependency without identifier: {dep_version_id}")
-                continue
-
-            dep_cache_path = os.path.join(target_base_dir, dep_identifier)
-
-            if _cached_version_matches(dep_cache_path, dep_version_id):
-                logger.info(
-                    f"Dependency {dep_identifier} ({dep_version_id}) already cached"
+            _save_example_files(
+                os.path.join(tmp_root, main_identifier), download_data.get("files", {})
+            )
+            for dep in dependencies:
+                dep_identifier = dep.get("identifier") or dep.get("directory")
+                _save_example_files(
+                    os.path.join(tmp_root, dep_identifier), dep.get("files", {})
                 )
-            else:
-                logger.info(
-                    f"Caching dependency {dep_identifier} ({dep_version_id}) at {dep_cache_path}"
-                )
-                _cache_example(dep_cache_path, dep_version_id, dep.get("files", {}))
+            os.makedirs(os.path.dirname(set_root), exist_ok=True)
+            try:
+                os.rename(tmp_root, set_root)
+                logger.info(f"Cached example version set at {set_root}")
+            except OSError:
+                # A concurrent activity built the same set first; use theirs.
+                shutil.rmtree(tmp_root, ignore_errors=True)
+                if not os.path.isdir(set_root):
+                    raise
+                logger.info(f"Example version set cached concurrently at {set_root}")
 
-            dependencies_info.append({
+        cache_path = os.path.join(set_root, main_identifier)
+        dependencies_info = [
+            {
                 "example_id": dep.get("example_id"),
-                "version_id": dep_version_id,
-                "identifier": dep_identifier,
-                "path": dep_cache_path,
-            })
+                "version_id": dep.get("version_id"),
+                "identifier": dep.get("identifier") or dep.get("directory"),
+                "path": os.path.join(set_root, dep.get("identifier") or dep.get("directory")),
+            }
+            for dep in dependencies
+        ]
 
         logger.info(f"Cached example version {example_version_id}: main at {cache_path}, "
                    f"dependencies: {[d['identifier'] for d in dependencies_info]}")
