@@ -1,0 +1,14 @@
+#!/bin/bash
+# Computor: stands in for the system web browser inside a workspace container
+# (computor-org/issues#312). MATLAB's `doc` resolves a mathworks.com URL and
+# then launches "the system browser" — which a container does not have. This
+# shim drops the URL where the Computor VS Code extension watches, and the
+# extension opens it in the student's real browser tab.
+#
+# MATLAB calls it as `computor-open [options] 'url' &`, so the URL is the
+# last argument.
+dir="${COMPUTOR_OPEN_URL_DIR:-/tmp/computor-open-urls}"
+mkdir -p "$dir" || exit 1
+url="${!#}"
+[ -n "$url" ] || exit 1
+printf '%s\n' "$url" > "$dir/url-$(date +%s%N).txt"

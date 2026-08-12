@@ -77,6 +77,10 @@ mkdir -p "$HOME/workspace"
 # turns off the MATLAB side and nothing else. See docs/figures.md.
 mkdir -p "$${COMPUTOR_FIGURES_DIR:-/tmp/computor-figures}"
 
+# Where MATLAB's `doc` drops URLs for the extension to open in a real browser
+# tab (computor-org/issues#312).
+mkdir -p "$${COMPUTOR_OPEN_URL_DIR:-/tmp/computor-open-urls}"
+
 # Configure and activate the Computor extension for this workspace.
 mkdir -p "$HOME/.computor"
 cat > "$HOME/.computor/config.json" <<COMPUTOR_EOF
