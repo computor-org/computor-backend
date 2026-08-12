@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional
 
 from temporalio import activity, workflow
 from temporalio.common import RetryPolicy
+from temporalio.exceptions import ActivityError
 
 from .registry import register_task
 from .temporal_base import BaseWorkflow, WorkflowResult
@@ -247,28 +248,45 @@ def build_workspace_image(
     try:
         client = docker_sdk.DockerClient(base_url="unix://" + settings.docker_socket_path)
 
-        # Build (tagged with the first tag), then apply the remaining tags to the
-        # same image id so every tag is byte-identical.
-        image, build_logs = client.images.build(
+        # Stream the build instead of images.build(), which blocks until the
+        # whole build is done: a cold MATLAB build runs longer than any sane
+        # activity timeout, and with no heartbeats Temporal once timed out a
+        # build at 15m00s that finished successfully at 15m03s — discarded the
+        # result and rebuilt the identical image. Heartbeating per output
+        # chunk keeps the activity provably alive, and the log shows progress
+        # while it happens instead of one dump at the end.
+        for chunk in client.api.build(
             path=build_dir,
             tag=f"{repo}:{push_tags[0]}",
             rm=True,
             buildargs=buildargs or None,
             nocache=no_cache,
-        )
-        for chunk in build_logs:
+            decode=True,
+        ):
+            activity.heartbeat()
+            if chunk.get("error"):
+                raise docker_sdk.errors.BuildError(chunk["error"], build_log=None)
             if "stream" in chunk:
                 line = chunk["stream"].strip()
                 if line:
                     logger.info(f"[build:{template_key}] {line}")
 
+        # The build applied the first tag; resolve the image through it and
+        # apply the remaining tags to the same id so every tag is identical.
+        image = client.images.get(f"{repo}:{push_tags[0]}")
         for extra in push_tags[1:]:
             image.tag(repo, tag=extra)
 
-        # Push every tag
+        # Push every tag, streaming for the same heartbeat reason — a multi-GB
+        # MATLAB layer push is minutes on its own.
         for t in push_tags:
-            push_output = client.images.push(repo, tag=t)
-            logger.info(f"Push output for {template_key} ({repo}:{t}): {push_output}")
+            for push_chunk in client.images.push(repo, tag=t, stream=True, decode=True):
+                activity.heartbeat()
+                if push_chunk.get("error"):
+                    raise RuntimeError(
+                        f"push failed for {repo}:{t}: {push_chunk['error']}"
+                    )
+            logger.info(f"Pushed {repo}:{t}")
 
         return {
             "success": True,
@@ -697,16 +715,26 @@ class BuildWorkspaceImagesWorkflow(BaseWorkflow):
         for key in template_keys:
             self._progress.update({"phase": "building", "current_template": key})
             _update_template_progress(self._progress, key, status="running", phase="building")
-            result = await workflow.execute_activity(
-                build_workspace_image,
-                args=[key, templates_dir, registry_host, image_tag, no_cache],
-                start_to_close_timeout=timedelta(minutes=15),
-                retry_policy=RetryPolicy(
-                    initial_interval=timedelta(seconds=5),
-                    backoff_coefficient=2.0,
-                    maximum_attempts=2,
-                ),
-            )
+            try:
+                result = await workflow.execute_activity(
+                    build_workspace_image,
+                    args=[key, templates_dir, registry_host, image_tag, no_cache],
+                    # 60 minutes: a cold MATLAB build on the prod host takes
+                    # over 15, and the old 15-minute cap once discarded a
+                    # build that succeeded at 15m03s. Liveness comes from the
+                    # heartbeat window, not from a tight deadline.
+                    start_to_close_timeout=timedelta(minutes=60),
+                    heartbeat_timeout=timedelta(minutes=10),
+                    retry_policy=RetryPolicy(
+                        initial_interval=timedelta(seconds=5),
+                        backoff_coefficient=2.0,
+                        maximum_attempts=2,
+                    ),
+                )
+            except ActivityError as e:
+                # A timed-out/exhausted build must fail THIS template, not
+                # unravel the whole workflow with the other templates unbuilt.
+                result = {"success": False, "template": key, "error": str(e)}
             results.append(result)
             ok = bool(result.get("success"))
             _update_template_progress(
@@ -842,16 +870,24 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
             for key in template_keys:
                 self._progress.update({"phase": "building", "current_template": key})
                 _update_template_progress(self._progress, key, status="running", phase="building")
-                result = await workflow.execute_activity(
-                    build_workspace_image,
-                    args=[key, templates_dir, registry_host, image_tag, no_cache],
-                    start_to_close_timeout=timedelta(minutes=15),
-                    retry_policy=RetryPolicy(
-                        initial_interval=timedelta(seconds=5),
-                        backoff_coefficient=2.0,
-                        maximum_attempts=2,
-                    ),
-                )
+                try:
+                    result = await workflow.execute_activity(
+                        build_workspace_image,
+                        args=[key, templates_dir, registry_host, image_tag, no_cache],
+                        # Same rationale as build_workspace_images: generous
+                        # deadline, liveness via heartbeats.
+                        start_to_close_timeout=timedelta(minutes=60),
+                        heartbeat_timeout=timedelta(minutes=10),
+                        retry_policy=RetryPolicy(
+                            initial_interval=timedelta(seconds=5),
+                            backoff_coefficient=2.0,
+                            maximum_attempts=2,
+                        ),
+                    )
+                except ActivityError as e:
+                    # Fail this template and keep going; the push loop below
+                    # already skips templates whose build failed.
+                    result = {"success": False, "template": key, "error": str(e)}
                 build_results[key] = result
                 if result.get("success"):
                     _update_template_progress(
