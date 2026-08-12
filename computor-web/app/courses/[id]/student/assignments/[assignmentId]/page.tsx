@@ -154,10 +154,11 @@ export default function AssignmentDetailPage() {
                 <span className="text-2xl font-bold">
                   {resultData.result === 'PASSED' ? '✓' : '✗'} {resultData.result}
                 </span>
+                {/* result_value is a 0..1 fraction (passed/total), not a percentage */}
                 <span className="text-3xl font-bold" style={{
-                  color: (resultData.result_value ?? 0) >= 50 ? '#10B981' : '#EF4444'
+                  color: (resultData.result_value ?? 0) >= 0.5 ? '#10B981' : '#EF4444'
                 }}>
-                  {(resultData.result_value || 0).toFixed(1)}%
+                  {((resultData.result_value || 0) * 100).toFixed(1)}%
                 </span>
               </div>
               <div className="flex items-center space-x-6 text-sm">
