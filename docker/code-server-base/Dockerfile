@@ -19,5 +19,12 @@ RUN /usr/lib/code-server/lib/node /tmp/patch-webview-host.js \
         /usr/lib/code-server/lib/vscode/out/vs/workbench/contrib/webview/browser/pre/index.html \
     && rm /tmp/patch-webview-host.js
 
+# Keep Safari's Cmd+Z-with-nothing-to-undo from reopening a closed tab and
+# leaving the workspace (computor-org/issues#313).
+COPY patch-workbench-keys.js /tmp/patch-workbench-keys.js
+RUN /usr/lib/code-server/lib/node /tmp/patch-workbench-keys.js \
+        /usr/lib/code-server/lib/vscode/out/vs/code/browser/workbench/workbench.js \
+    && rm /tmp/patch-workbench-keys.js
+
 # Restore the upstream image's user so this stays a drop-in replacement.
 USER 1000
