@@ -15,67 +15,78 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 # Import permission components from new system directly
-from computor_backend.permissions.principal import Principal
+from computor_backend.permissions.principal import Principal, build_claims
 from computor_backend.permissions.core import check_permissions, check_admin, check_course_permissions
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.database import get_db
 
 
 # ============================================================================
+# What these tests can honestly assert
+# ============================================================================
+#
+# The app is real; only auth and the database are overridden. That means the
+# permission layer genuinely runs, but every query returns Mock/empty results,
+# so outcomes must be read in classes rather than exact codes:
+#
+#   * Validation and persistence failures surface as 400 (VAL_001) via
+#     validation_exception_handler — NOT FastAPI's default 422.
+#   * A refusal from the permission layer arrives as 403, or as 404 (NF_001)
+#     where the CRUD path declines to confirm a row exists.
+#   * A create that gets past the permission layer still cannot persist against
+#     a Mock session, so it lands on 400 instead of 201.
+#
+# IMPORTANT: a 200 from a list endpoint proves the endpoint and permission layer
+# ran. It does NOT prove row-level filtering is correct — and filtering, not a
+# 403, is the actual access control for course-scoped data (see
+# CourseMemberPermissionHandler.build_query). Verifying that needs a live
+# database; these are wiring smoke tests, not an authorization proof.
+
+DENIED = [403, 404]               # permission layer refused
+REACHED_PERSISTENCE = [201, 400]  # allowed through; mock DB cannot persist
+LISTED = [200]                    # query built and executed (rows always empty)
+
+# Non-admin reads of scope-owned entities (organizations, course families) build
+# a real SQLAlchemy subquery and feed it to Column.in_(). A Mock session hands
+# back a Mock there, which SQLAlchemy rightly rejects, so those parametrizations
+# cannot run without a database. They previously "passed" only because the old
+# MockPrincipal had malformed claims that sent the handler down the trivial
+# branch — green for the wrong reason.
+NEEDS_REAL_DB = pytest.mark.skip(
+    reason="Scoped subquery composition needs a live database, not a Mock session."
+)
+
+
+# ============================================================================
 # Test Fixtures and Utilities
 # ============================================================================
 
-class MockPrincipal:
-    """Mock Principal for testing different user roles"""
-    
-    def __init__(
-        self,
-        user_id: str = None,
-        is_admin: bool = False,
-        roles: list = None,
-        course_roles: Dict[str, str] = None
-    ):
-        self.user_id = user_id or str(uuid4())
-        self.is_admin = is_admin
-        self.roles = roles or []
-        self.claims = self._build_claims(course_roles or {})
-        
-    def _build_claims(self, course_roles: Dict[str, str]):
-        """Build claims structure for course roles"""
-        claims = Mock()
-        claims.general = {}
-        claims.dependent = {}
-        
-        # Add course role claims
-        for course_id, role in course_roles.items():
-            if course_id not in claims.dependent:
-                claims.dependent[course_id] = set()
-            claims.dependent[course_id].add(role)
-            
-        return claims
-    
-    def permitted(self, resource: str, action: str, resource_id: str = None, course_role: str = None) -> bool:
-        """Check if action is permitted"""
-        # Admin can do everything
-        if self.is_admin:
-            return True
-            
-        # Check course-specific permissions
-        if resource_id and course_role:
-            course_claims = self.claims.dependent.get(resource_id, set())
-            return course_role in course_claims
-            
-        # Basic resource-action checks
-        if resource in self.claims.general:
-            return action in self.claims.general[resource]
-            
-        return False
-    
-    def get_user_id_or_throw(self):
-        """Get user ID or raise exception"""
-        if not self.user_id:
-            raise Exception("User ID not found")
-        return self.user_id
+def make_principal(
+    user_id: str = None,
+    is_admin: bool = False,
+    roles: list = None,
+    course_roles: Dict[str, str] = None,
+):
+    """Build a REAL Principal for a test user.
+
+    This used to be a hand-rolled ``MockPrincipal``, which drifted badly: it
+    lacked methods the handlers call (``get_scoped_ids_with_role``,
+    ``get_course_assignment_ceiling``) and, worse, stored course claims as
+    ``dependent[course_id] = {role}`` when the real shape is
+    ``dependent["course"][course_id] = {role}``. Both meant the tests exercised
+    a permission model that did not exist. Using the production Principal keeps
+    them honest and immune to that class of drift.
+    """
+    claim_values = [
+        ("permissions", f"course:{role}:{course_id}")
+        for course_id, role in (course_roles or {}).items()
+    ]
+    return Principal(
+        user_id=user_id or str(uuid4()),
+        is_admin=is_admin,
+        roles=roles or [],
+        claims=build_claims(claim_values),
+    )
 
 
 @pytest.fixture
@@ -113,36 +124,36 @@ def mock_db_session():
 def test_users():
     """Create test users with different roles"""
     return {
-        'admin': MockPrincipal(
+        'admin': make_principal(
             user_id='00000000-0000-0000-0000-000000000001',
             is_admin=True,
             roles=['system_admin']
         ),
-        'student': MockPrincipal(
+        'student': make_principal(
             user_id='00000000-0000-0000-0000-000000000002',
             is_admin=False,
             roles=['student'],
             course_roles={'course-123': '_student'}
         ),
-        'tutor': MockPrincipal(
+        'tutor': make_principal(
             user_id='00000000-0000-0000-0000-000000000003',
             is_admin=False,
             roles=['tutor'],
             course_roles={'course-123': '_tutor'}
         ),
-        'lecturer': MockPrincipal(
+        'lecturer': make_principal(
             user_id='00000000-0000-0000-0000-000000000004',
             is_admin=False,
             roles=['lecturer'],
             course_roles={'course-123': '_lecturer'}
         ),
-        'maintainer': MockPrincipal(
+        'maintainer': make_principal(
             user_id='00000000-0000-0000-0000-000000000005',
             is_admin=False,
             roles=['maintainer'],
             course_roles={'course-123': '_maintainer'}
         ),
-        'unauthorized': MockPrincipal(
+        'unauthorized': make_principal(
             user_id='00000000-0000-0000-0000-000000000006',
             is_admin=False,
             roles=[],
@@ -155,14 +166,14 @@ def test_users():
 # Test Application Setup
 # ============================================================================
 
-def create_test_app(mock_principal: MockPrincipal, mock_db: Session):
+def create_test_app(principal: Principal, mock_db: Session):
     """Create a test FastAPI application with mocked dependencies"""
     from computor_backend.server import app
     
     # Override authentication dependency
     def override_get_current_principal():
-        return mock_principal
-    
+        return principal
+
     # Override database dependency
     def override_get_db():
         yield mock_db
@@ -205,8 +216,8 @@ class TestOrganizationEndpoints:
     
     @pytest.mark.parametrize("user_type,expected_status", [
         ("admin", [200, 404]),
-        ("student", [200, 404]),  # Students can list organizations
-        ("unauthorized", [200, 403, 404]),  # May get empty list or forbidden
+        pytest.param("student", [200, 404], marks=NEEDS_REAL_DB),
+        pytest.param("unauthorized", [200, 403, 404], marks=NEEDS_REAL_DB),
     ])
     def test_list_organizations(self, test_users, mock_db_session, user_type, expected_status):
         """Test GET /organizations with different user roles"""
@@ -221,10 +232,10 @@ class TestOrganizationEndpoints:
             assert response.status_code == expected_status
     
     @pytest.mark.parametrize("user_type,expected_status", [
-        ("admin", [201, 422]),  # May succeed or fail validation
-        ("student", [403, 422]),  # Forbidden or validation error
-        ("lecturer", [403, 422]),
-        ("unauthorized", [403, 422]),
+        ("admin", REACHED_PERSISTENCE),
+        ("student", DENIED),
+        ("lecturer", DENIED),
+        ("unauthorized", DENIED),
     ])
     def test_create_organization(self, test_users, mock_db_session, user_type, expected_status):
         """Test POST /organizations with different user roles"""
@@ -232,9 +243,12 @@ class TestOrganizationEndpoints:
         app = create_test_app(user, mock_db_session)
         client = TestClient(app)
         
+        # Payload must be VALID, otherwise FastAPI answers 400 before the
+        # permission layer runs and the test proves nothing about authorization.
         org_data = {
-            "path": "test.org",
-            "organization_type": "university",
+            "path": "test_org",
+            "title": "Test Organization",  # required: non-user orgs must have one
+            "organization_type": "organization",
             "properties": {}
         }
         
@@ -264,11 +278,13 @@ class TestCourseEndpoints:
         assert response.status_code == expected_status
     
     @pytest.mark.parametrize("user_type,expected_status", [
-        ("admin", [201, 400, 422]),  # May succeed or fail validation
-        ("student", [403, 422]),     # Forbidden or validation error
-        ("lecturer", [403, 422]),
-        ("maintainer", [201, 400, 422]),  # Maintainers can create courses
-        ("unauthorized", [403, 422]),
+        ("admin", REACHED_PERSISTENCE),
+        ("student", DENIED),
+        ("lecturer", DENIED),
+        # A _maintainer role INSIDE course-123 does not authorize creating a new
+        # course: that is scoped to the course family / organization above it.
+        ("maintainer", DENIED),
+        ("unauthorized", DENIED),
     ])
     def test_create_course(self, test_users, mock_db_session, user_type, expected_status):
         """Test POST /courses with different user roles"""
@@ -278,6 +294,7 @@ class TestCourseEndpoints:
         
         course_data = {
             "path": "org.family.course",
+            "course_family_id": "family-123",
             "properties": {
                 "name": "Test Course",
                 "description": "A test course"
@@ -314,12 +331,12 @@ class TestCourseContentEndpoints:
             assert response.status_code == expected_status
     
     @pytest.mark.parametrize("user_type,expected_status", [
-        ("admin", [201, 400, 422]),
-        ("student", [403, 422]),  # Students cannot create content
-        ("tutor", [403, 422]),    # Tutors cannot create content
-        ("lecturer", [201, 400, 422]),  # Lecturers can create content
-        ("maintainer", [201, 400, 422]),
-        ("unauthorized", [403, 422]),
+        ("admin", REACHED_PERSISTENCE),
+        ("student", DENIED),
+        ("tutor", DENIED),
+        ("lecturer", REACHED_PERSISTENCE),
+        ("maintainer", REACHED_PERSISTENCE),
+        ("unauthorized", DENIED),
     ])
     def test_create_course_content(self, test_users, mock_db_session, user_type, expected_status):
         """Test POST /course-contents with different course roles"""
@@ -328,9 +345,10 @@ class TestCourseContentEndpoints:
         client = TestClient(app)
         
         content_data = {
+            "path": "assignment1",
             "course_id": "course-123",
+            "course_content_type_id": "type-123",
             "title": "Test Content",
-            "content_type": "assignment",
             "properties": {}
         }
         
@@ -345,12 +363,15 @@ class TestCourseMemberEndpoints:
     """Test course member management with role hierarchy"""
     
     @pytest.mark.parametrize("user_type,expected_status", [
-        ("admin", 200),
-        ("student", 403),  # Students cannot list members
-        ("tutor", 200),    # Tutors can list members
-        ("lecturer", 200),
-        ("maintainer", 200),
-        ("unauthorized", 403),
+        # Course-scoped reads are filtered, not refused: build_query narrows the
+        # query to the caller's own membership, so everyone gets 200 and the
+        # row set is the control. See the module header.
+        ("admin", LISTED),
+        ("student", LISTED),
+        ("tutor", LISTED),
+        ("lecturer", LISTED),
+        ("maintainer", LISTED),
+        ("unauthorized", LISTED),
     ])
     def test_list_course_members(self, test_users, mock_db_session, user_type, expected_status):
         """Test GET /course-members with different course roles"""
@@ -359,15 +380,17 @@ class TestCourseMemberEndpoints:
         client = TestClient(app)
         
         response = client.get("/course-members")
-        assert response.status_code == expected_status
-    
+        assert response.status_code in expected_status
+
     @pytest.mark.parametrize("user_type,expected_status", [
-        ("admin", 201),
-        ("student", 403),
-        ("tutor", 403),
-        ("lecturer", 403),
-        ("maintainer", 201),  # Only maintainers can add members
-        ("unauthorized", 403),
+        # CourseMemberPermissionHandler.ACTION_ROLE_MAP maps "create" to
+        # LECTURER, so lecturers and above get through to persistence.
+        ("admin", REACHED_PERSISTENCE),
+        ("student", DENIED),
+        ("tutor", DENIED),
+        ("lecturer", REACHED_PERSISTENCE),
+        ("maintainer", REACHED_PERSISTENCE),
+        ("unauthorized", DENIED),
     ])
     def test_add_course_member(self, test_users, mock_db_session, user_type, expected_status):
         """Test POST /course-members with different course roles"""
@@ -463,7 +486,7 @@ class TestPermissionIntegration:
             "path": "test.university.cs.101",
             "properties": {"name": "CS 101"}
         })
-        assert course_response.status_code == 201
+        assert course_response.status_code in REACHED_PERSISTENCE
         
         # Lecturer adds content
         lecturer = test_users['lecturer']
@@ -471,12 +494,13 @@ class TestPermissionIntegration:
         lecturer_client = TestClient(app)
         
         content_response = lecturer_client.post("/course-contents", json={
+            "path": "week1",
             "course_id": "course-123",
+            "course_content_type_id": "type-123",
             "title": "Week 1 Assignment",
-            "content_type": "assignment",
             "properties": {}
         })
-        assert content_response.status_code == 201
+        assert content_response.status_code in REACHED_PERSISTENCE
         
         # Student views content
         student = test_users['student']
@@ -490,7 +514,7 @@ class TestPermissionIntegration:
         modify_response = student_client.patch("/course-contents/content-123", json={
             "title": "Modified Title"
         })
-        assert modify_response.status_code == 403
+        assert modify_response.status_code in DENIED
 
 
 # ============================================================================
@@ -527,17 +551,24 @@ class TestNewPermissionSystem:
         app = create_test_app(tutor, mock_db_session)
         tutor_client = TestClient(app)
         assert tutor_client.get("/course-contents").status_code == 200
-        assert tutor_client.post("/course-contents", json={}).status_code == 403
+        # Body must be valid, or validation answers 400 before authorization runs.
+        tutor_content = tutor_client.post("/course-contents", json={
+            "path": "assignment1",
+            "course_id": "course-123",
+            "course_content_type_id": "type-123",
+        })
+        assert tutor_content.status_code in DENIED
         
         # Lecturer can create content
         lecturer = test_users['lecturer']
         app = create_test_app(lecturer, mock_db_session)
         lecturer_client = TestClient(app)
         assert lecturer_client.post("/course-contents", json={
+            "path": "assignment2",
             "course_id": "course-123",
+            "course_content_type_id": "type-123",
             "title": "Test",
-            "content_type": "assignment"
-        }).status_code == 201
+        }).status_code in REACHED_PERSISTENCE
 
 
 # ============================================================================
