@@ -987,6 +987,7 @@ async def update_test_result_endpoint(
         grade=update_data.grade,
         result_json=update_data.result_json,
         properties=update_data.properties,
+        started_at=update_data.started_at,
         finished_at=update_data.finished_at,
         permissions=permissions,
         db=db,

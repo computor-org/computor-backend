@@ -47,6 +47,7 @@
 | `refreshLocalTokenAuthRefreshLocalPost` | POST | `/auth/refresh/local` | `LocalTokenRefreshRequest` | `LocalTokenRefreshResponse` |
 | `ssoSuccessAuthSuccessGet` | GET | `/auth/success` | — | `void` |
 | `verifyCoderAccessAuthVerifyCoderAccessGet` | GET | `/auth/verify-coder-access` | — | `void` |
+| `verifyDocumentsAccessAuthVerifyDocumentsAccessGet` | GET | `/auth/verify-documents-access` | — | `void` |
 | `handleCallbackAuthProviderCallbackGet` | GET | `/auth/{provider}/callback` | — | `void` |
 | `initiateLoginAuthProviderLoginGet` | GET | `/auth/{provider}/login` | — | `void` |
 | `ssoLogoutAuthProviderLogoutGet` | GET | `/auth/{provider}/logout` | — | `void` |
@@ -117,7 +118,6 @@
 | `createCourseFamiliesCourseFamiliesPost` | POST | `/course-families` | `CourseFamilyCreate` | `CourseFamilyGet` |
 | `deleteCourseFamilyEndpointCourseFamiliesCourseFamilyIdDelete` | DELETE | `/course-families/{course_family_id}` | — | `CascadeDeleteResult` |
 | `deployCourseCourseFamiliesCourseFamilyIdDeployCoursePost` | POST | `/course-families/{course_family_id}/deploy-course` | `CourseDeployRequest` | `CourseDeployResult` |
-| `deleteCourseFamiliesCourseFamiliesIdDelete` | DELETE | `/course-families/{id}` | — | `void` |
 | `getCourseFamiliesCourseFamiliesIdGet` | GET | `/course-families/{id}` | — | `CourseFamilyGet` |
 | `updateCourseFamiliesCourseFamiliesIdPatch` | PATCH | `/course-families/{id}` | `CourseFamilyUpdate` | `CourseFamilyGet` |
 
@@ -215,7 +215,13 @@
 | `deleteCourseEndpointCoursesCourseIdDelete` | DELETE | `/courses/{course_id}` | — | `CascadeDeleteResult` |
 | `getCourseGitBindingEndpointCoursesCourseIdGitGet` | GET | `/courses/{course_id}/git` | — | `CourseGitBindingGet` |
 | `upsertCourseGitBindingEndpointCoursesCourseIdGitPut` | PUT | `/courses/{course_id}/git` | `CourseGitBindingUpsert` | `CourseGitBindingGet` |
-| `deleteCoursesCoursesIdDelete` | DELETE | `/courses/{id}` | — | `void` |
+| `listStudentWorkspacesEndpointCoursesCourseIdStudentWorkspacesGet` | GET | `/courses/{course_id}/student-workspaces` | — | `CourseStudentWorkspacesResponse` |
+| `provisionStudentWorkspacesEndpointCoursesCourseIdStudentWorkspacesProvisionPost` | POST | `/courses/{course_id}/student-workspaces/provision` | `StudentWorkspaceProvisionRequest` | `StudentWorkspaceProvisionResponse` |
+| `deleteStudentWorkspaceEndpointCoursesCourseIdStudentWorkspacesUsernameWorkspaceNameDelete` | DELETE | `/courses/{course_id}/student-workspaces/{username}/{workspace_name}` | — | `WorkspaceActionResponse` |
+| `downloadCourseTemplateCoursesCourseIdTemplateGet` | GET | `/courses/{course_id}/template` | — | `void` |
+| `getCourseWorkspaceSettingsEndpointCoursesCourseIdWorkspaceSettingsGet` | GET | `/courses/{course_id}/workspace-settings` | — | `CourseWorkspaceSettingsGet` |
+| `updateCourseWorkspaceSettingsEndpointCoursesCourseIdWorkspaceSettingsPut` | PUT | `/courses/{course_id}/workspace-settings` | `CourseWorkspaceSettingsUpdate` | `CourseWorkspaceSettingsGet` |
+| `applyCourseWorkspacePolicyEndpointCoursesCourseIdWorkspaceSettingsApplyPolicyPost` | POST | `/courses/{course_id}/workspace-settings/apply-policy` | — | `StudentWorkspaceProvisionResponse` |
 | `getCoursesCoursesIdGet` | GET | `/courses/{id}` | — | `CourseGet` |
 | `updateCoursesCoursesIdPatch` | PATCH | `/courses/{id}` | `CourseUpdate` | `CourseGet` |
 
@@ -267,6 +273,22 @@
 | `createVersionExamplesExampleIdVersionsPost` | POST | `/examples/{example_id}/versions` | `ExampleVersionCreate` | `ExampleVersionGet` |
 
 ## ExtensionsClient
+- Base path: `/extensions-getting-started`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `getGettingStartedUrlExtensionsGettingStartedGet` | GET | `/extensions-getting-started` | — | `string` |
+
+## ExtensionsClient
+- Base path: `/extensions-public`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `getPublicExtensionUrlExtensionsPublicGet` | GET | `/extensions-public` | — | `string` |
+
+## ExtensionsClient
 - Base path: `/extensions`
 - Note: custom operations discovered from OpenAPI schema
 
@@ -278,22 +300,6 @@
 | `listExtensionVersionsExtensionsExtensionIdentityVersionsGet` | GET | `/extensions/{extension_identity}/versions` | — | `ExtensionVersionListResponse` |
 | `publishExtensionVersionExtensionsExtensionIdentityVersionsPost` | POST | `/extensions/{extension_identity}/versions` | — | `ExtensionPublishResponse` |
 | `updateExtensionVersionExtensionsExtensionIdentityVersionsVersionPatch` | PATCH | `/extensions/{extension_identity}/versions/{version}` | `ExtensionVersionYankRequest` | `ExtensionVersionDetail` |
-
-## ExtensionsGettingStartedClient
-- Base path: `/extensions-getting-started`
-- Note: custom operations discovered from OpenAPI schema
-
-| TS Method | HTTP | Path | Request | Response |
-| --- | --- | --- | --- | --- |
-| `getGettingStartedUrlExtensionsGettingStartedGet` | GET | `/extensions-getting-started` | — | `string` |
-
-## ExtensionsPublicClient
-- Base path: `/extensions-public`
-- Note: custom operations discovered from OpenAPI schema
-
-| TS Method | HTTP | Path | Request | Response |
-| --- | --- | --- | --- | --- |
-| `getPublicExtensionUrlExtensionsPublicGet` | GET | `/extensions-public` | — | `string` |
 
 ## GitServersClient
 - Base path: `/git-servers`
@@ -372,6 +378,7 @@
 | `listMessagesMessagesGet` | GET | `/messages` | — | `MessageList[]` |
 | `createMessageMessagesPost` | POST | `/messages` | `MessageCreate` | `MessageGet` |
 | `listMentionableUsersEndpointMessagesMentionableUsersGet` | GET | `/messages/mentionable-users` | — | `MessageMentionRef[]` |
+| `markMessagesReadBulkMessagesReadsBulkPost` | POST | `/messages/reads/bulk` | `MessageReadBulk` | `MessageReadBulkResult` |
 | `deleteMessageMessagesIdDelete` | DELETE | `/messages/{id}` | — | `void` |
 | `getMessageMessagesIdGet` | GET | `/messages/{id}` | — | `MessageGet` |
 | `updateMessageMessagesIdPatch` | PATCH | `/messages/{id}` | `MessageUpdate` | `MessageGet` |
@@ -417,7 +424,6 @@
 | --- | --- | --- | --- | --- |
 | `listOrganizationsOrganizationsGet` | GET | `/organizations` | — | `OrganizationList[]` |
 | `createOrganizationsOrganizationsPost` | POST | `/organizations` | `OrganizationCreate` | `OrganizationGet` |
-| `deleteOrganizationsOrganizationsIdDelete` | DELETE | `/organizations/{id}` | — | `void` |
 | `getOrganizationsOrganizationsIdGet` | GET | `/organizations/{id}` | — | `OrganizationGet` |
 | `updateOrganizationsOrganizationsIdPatch` | PATCH | `/organizations/{id}` | `OrganizationUpdate` | `OrganizationGet` |
 | `routeOrganizationsOrganizationsIdArchivePatch` | PATCH | `/organizations/{id}/archive` | — | `void` |
@@ -614,6 +620,12 @@
 | `cancelScheduledMaintenanceSystemMaintenanceScheduleDelete` | DELETE | `/system/maintenance/schedule` | — | `void` |
 | `scheduleMaintenanceSystemMaintenanceSchedulePost` | POST | `/system/maintenance/schedule` | `MaintenanceSchedule` | `void` |
 | `getMaintenanceStatusSystemMaintenanceStatusGet` | GET | `/system/maintenance/status` | — | `MaintenanceStatusGet` |
+| `triggerUpdateSystemUpdatePost` | POST | `/system/update` | — | `SystemUpdateTriggerResponse` |
+| `checkForUpdateSystemUpdateCheckPost` | POST | `/system/update/check` | — | `SystemUpdateStatusGet` |
+| `resetUpdateStateSystemUpdateResetPost` | POST | `/system/update/reset` | — | `void` |
+| `cancelScheduledUpdateSystemUpdateScheduleDelete` | DELETE | `/system/update/schedule` | — | `void` |
+| `scheduleUpdateSystemUpdateSchedulePost` | POST | `/system/update/schedule` | `SystemUpdateScheduleRequest` | `SystemUpdateScheduleResponse` |
+| `getUpdateStatusSystemUpdateStatusGet` | GET | `/system/update/status` | — | `SystemUpdateStatusGet` |
 
 ## TasksClient
 - Base path: `/tasks`
@@ -676,7 +688,7 @@
 | `downloadTutorTestArtifactsTutorsTestsTestIdArtifactsDownloadGet` | GET | `/tutors/tests/{test_id}/artifacts/download` | — | `void` |
 | `uploadTutorTestArtifactsTutorsTestsTestIdArtifactsUploadPost` | POST | `/tutors/tests/{test_id}/artifacts/upload` | — | `void` |
 | `downloadTutorTestInputTutorsTestsTestIdInputDownloadGet` | GET | `/tutors/tests/{test_id}/input/download` | — | `void` |
-| `submitTutorTestResultsTutorsTestsTestIdResultsPost` | POST | `/tutors/tests/{test_id}/results` | `Record<string, unknown> & Record<string, unknown>` | `void` |
+| `submitTutorTestResultsTutorsTestsTestIdResultsPost` | POST | `/tutors/tests/{test_id}/results` | `TutorTestResultSubmit` | `void` |
 | `getTutorTestStatusEndpointTutorsTestsTestIdStatusGet` | GET | `/tutors/tests/{test_id}/status` | — | `TutorTestStatus` |
 
 ## UserClient
@@ -692,6 +704,7 @@
 | `registerGitlabManagedEndpointUserCoursesCourseIdRegisterGitlabPost` | POST | `/user/courses/{course_id}/register-gitlab` | `CourseMemberValidationRequest` | `CourseMemberRepositoryGet` |
 | `registerStudentRepositoryEndpointUserCoursesCourseIdRegisterRepositoryPost` | POST | `/user/courses/{course_id}/register-repository` | `CourseMemberRepositoryRegister` | `CourseMemberRepositoryGet` |
 | `getStudentRepositoryEndpointUserCoursesCourseIdRepositoryGet` | GET | `/user/courses/{course_id}/repository` | — | `CourseMemberRepositoryGet | null` |
+| `templateAccessEndpointUserCoursesCourseIdTemplateAccessPost` | POST | `/user/courses/{course_id}/template-access` | — | `TemplateAccessGet` |
 | `downloadTemplateArchiveEndpointUserCoursesCourseIdTemplateArchiveGet` | GET | `/user/courses/{course_id}/template/archive` | — | `void` |
 | `validateCurrentUserCourseUserCoursesCourseIdValidatePost` | POST | `/user/courses/{course_id}/validate` | `CourseMemberValidationRequest` | `CourseMemberReadinessStatus` |
 | `getCurrentUserScopesUserScopesGet` | GET | `/user/scopes` | — | `UserScopes` |

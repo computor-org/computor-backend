@@ -16,7 +16,7 @@ import subprocess
 import asyncio
 import shutil
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List
 from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
@@ -556,6 +556,7 @@ async def commit_test_results_activity(
     result_id: str,
     test_results: Dict[str, Any],
     api_config: Dict[str, Any],
+    started_at: Optional[datetime] = None,
 ) -> bool:
     """
     Commit test results to the API.
@@ -564,6 +565,7 @@ async def commit_test_results_activity(
         result_id: UUID of the Result record
         test_results: Test results dictionary
         api_config: API connection configuration (requires 'token' and 'url')
+        started_at: When test execution began on this worker, if known
 
     Returns:
         True if successful
@@ -586,6 +588,8 @@ async def commit_test_results_activity(
         status=status,
         result=test_results.get("result_value", 0.0),
         result_json=test_results,
+        started_at=started_at,
+        finished_at=datetime.now(timezone.utc),
     )
 
     # This PATCH is the only place a finished run becomes visible: the Result
@@ -662,6 +666,10 @@ async def run_complete_student_test_activity(
         Test results dictionary
     """
     logger.info(f"Starting complete student test for result {result_id}")
+
+    # Wall-clock is fine here: activities run outside the workflow sandbox, and
+    # this stamp records when THIS worker actually began, queue wait excluded.
+    started_at = datetime.now(timezone.utc)
 
     # Env-first API config: the worker's env overrides the workflow-passed value.
     from computor_backend.tasks.api_client import resolve_api_config
@@ -756,7 +764,7 @@ async def run_complete_student_test_activity(
 
             # Step 4: Commit results
             logger.info("Committing results to API")
-            await commit_test_results_activity(result_id, test_results, api_config)
+            await commit_test_results_activity(result_id, test_results, api_config, started_at)
 
             return test_results
 
@@ -775,6 +783,7 @@ async def run_complete_student_test_activity(
                         "result_value": 0.0,
                     },
                     api_config,
+                    started_at,
                 )
             except Exception:
                 # Best-effort failure-result POST; the original test failure is

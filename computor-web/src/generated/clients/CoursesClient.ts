@@ -3,7 +3,7 @@
  * Endpoint: /courses
  */
 
-import type { CascadeDeleteResult, CourseCreate, CourseGet, CourseGitBindingGet, CourseGitBindingUpsert, CourseList, CourseUpdate } from 'types/generated';
+import type { CascadeDeleteResult, CourseCreate, CourseGet, CourseGitBindingGet, CourseGitBindingUpsert, CourseList, CourseStudentWorkspacesResponse, CourseUpdate, CourseWorkspaceSettingsGet, CourseWorkspaceSettingsUpdate, StudentWorkspaceProvisionRequest, StudentWorkspaceProvisionResponse, WorkspaceActionResponse } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -85,13 +85,86 @@ export class CoursesClient extends BaseEndpointClient {
   }
 
   /**
-   * Delete Courses
+   * List Student Workspaces Endpoint
+   * Course members' workspaces on course-allowed templates (lecturer view).
    */
-  async deleteCoursesCoursesIdDelete({ id, userId }: { id: string | string; userId?: string | null }): Promise<void> {
+  async listStudentWorkspacesEndpointCoursesCourseIdStudentWorkspacesGet({ courseId, userId }: { courseId: string | string; userId?: string | null }): Promise<CourseStudentWorkspacesResponse> {
     const queryParams: Record<string, unknown> = {
       user_id: userId,
     };
-    return this.client.delete<void>(this.buildPath(id), { params: queryParams });
+    return this.client.get<CourseStudentWorkspacesResponse>(this.buildPath(courseId, 'student-workspaces'), { params: queryParams });
+  }
+
+  /**
+   * Provision Student Workspaces Endpoint
+   * Bulk-provision (throwaway) workspaces for selected course members.
+   */
+  async provisionStudentWorkspacesEndpointCoursesCourseIdStudentWorkspacesProvisionPost({ courseId, userId, body }: { courseId: string | string; userId?: string | null; body: StudentWorkspaceProvisionRequest }): Promise<StudentWorkspaceProvisionResponse> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.post<StudentWorkspaceProvisionResponse>(this.buildPath(courseId, 'student-workspaces', 'provision'), body, { params: queryParams });
+  }
+
+  /**
+   * Delete Student Workspace Endpoint
+   * Delete a member's throwaway workspace (lecturers: scratch-home only).
+   */
+  async deleteStudentWorkspaceEndpointCoursesCourseIdStudentWorkspacesUsernameWorkspaceNameDelete({ courseId, username, workspaceName, userId }: { courseId: string | string; username: string; workspaceName: string; userId?: string | null }): Promise<WorkspaceActionResponse> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.delete<WorkspaceActionResponse>(this.buildPath(courseId, 'student-workspaces', username, workspaceName), { params: queryParams });
+  }
+
+  /**
+   * Download the course template as a ZIP
+   * Download the current course template, flat or re-arranged hierarchically.
+   * Rate limit: 10 downloads per minute per user (429 once exhausted).
+   */
+  async downloadCourseTemplateCoursesCourseIdTemplateGet({ courseId, hierarchical, userId }: { courseId: string; hierarchical?: boolean; userId?: string | null }): Promise<void> {
+    const queryParams: Record<string, unknown> = {
+      hierarchical,
+      user_id: userId,
+    };
+    return this.client.get<void>(this.buildPath(courseId, 'template'), { params: queryParams });
+  }
+
+  /**
+   * Get Course Workspace Settings Endpoint
+   * Course workspace configuration (members read, managers get the picker).
+   */
+  async getCourseWorkspaceSettingsEndpointCoursesCourseIdWorkspaceSettingsGet({ courseId, userId }: { courseId: string | string; userId?: string | null }): Promise<CourseWorkspaceSettingsGet> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.get<CourseWorkspaceSettingsGet>(this.buildPath(courseId, 'workspace-settings'), { params: queryParams });
+  }
+
+  /**
+   * Update Course Workspace Settings Endpoint
+   * Replace the course's allowed templates and flags (workspace:manage).
+   */
+  async updateCourseWorkspaceSettingsEndpointCoursesCourseIdWorkspaceSettingsPut({ courseId, userId, body }: { courseId: string | string; userId?: string | null; body: CourseWorkspaceSettingsUpdate }): Promise<CourseWorkspaceSettingsGet> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.put<CourseWorkspaceSettingsGet>(this.buildPath(courseId, 'workspace-settings'), body, { params: queryParams });
+  }
+
+  /**
+   * Apply Course Workspace Policy Endpoint
+   * Push the course's current root/internet policy onto its RUNNING
+   * workspaces, restarting them (workspace:manage).
+   * Stopped workspaces are left alone and reported: they pick the policy up on
+   * their next start, which is cheaper and less surprising than starting a
+   * student's workspace in order to lock it down.
+   */
+  async applyCourseWorkspacePolicyEndpointCoursesCourseIdWorkspaceSettingsApplyPolicyPost({ courseId, userId }: { courseId: string | string; userId?: string | null }): Promise<StudentWorkspaceProvisionResponse> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.post<StudentWorkspaceProvisionResponse>(this.buildPath(courseId, 'workspace-settings', 'apply-policy'), { params: queryParams });
   }
 
   /**

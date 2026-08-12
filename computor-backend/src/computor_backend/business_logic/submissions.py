@@ -968,6 +968,7 @@ async def update_test_result(
     permissions: Principal,
     db: Session,
     cache: Cache | None = None,
+    started_at: Optional[datetime] = None,
 ) -> Result:
     """Update a test result (e.g., when test completes). Only the test runner or admin can update."""
 
@@ -998,6 +999,8 @@ async def update_test_result(
         updates['grade'] = grade
     if properties is not None:
         updates['properties'] = properties
+    if started_at is not None:
+        updates['started_at'] = started_at
     if finished_at is not None:
         updates['finished_at'] = finished_at
 

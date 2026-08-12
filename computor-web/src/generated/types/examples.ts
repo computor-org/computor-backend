@@ -13,20 +13,6 @@ import type { ForceLevel } from './common';
 
 
 /**
- * Validation result for example existence.
- */
-export interface ExampleValidationResult {
-  /** Example identifier that was checked */
-  identifier: string;
-  /** Whether the example exists */
-  exists: boolean;
-  /** Example ID if exists */
-  example_id?: string | null;
-  /** Error message if not exists */
-  message?: string | null;
-}
-
-/**
  * Create a new example repository.
  */
 export interface ExampleRepositoryCreate {
@@ -437,4 +423,18 @@ export interface ExampleBulkDeleteResult {
   examples?: ExampleDeletePreview[];
   /** Errors encountered during deletion */
   errors?: string[];
+}
+
+/**
+ * Validation result for example existence.
+ */
+export interface ExampleValidationResult {
+  /** Example identifier that was checked */
+  identifier: string;
+  /** Whether the example exists */
+  exists: boolean;
+  /** Example ID if exists */
+  example_id?: string | null;
+  /** Error message if not exists */
+  message?: string | null;
 }

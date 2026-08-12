@@ -40,9 +40,14 @@ export class TokensClient extends BaseEndpointClient {
 
   /**
    * Create Token Admin Endpoint
-   * Create an API token with a predefined value (admin-only).
-   * This endpoint is for initial deployment where tokens need to be known in advance.
-   * Requires admin permissions. Regular users should use the standard token creation endpoint.
+   * Create an API token with a predefined value.
+   * For initial deployment, where a token has to be known in advance (the
+   * worker container and the database must agree on the same value).
+   * **Permissions**: admin, or `_service_manager` when the target is a service
+   * account. It is NOT admin-only, despite what this docstring used to claim —
+   * a service manager can set an attacker-chosen predefined value on a service
+   * token, which is exactly why the scope ceiling in
+   * `business_logic.api_tokens.assert_may_grant_scopes` also applies here.
    */
   async createTokenAdminEndpointApiTokensAdminCreatePost({ userId, body }: { userId?: string | null; body: ApiTokenAdminCreate }): Promise<ApiTokenCreateResponse> {
     const queryParams: Record<string, unknown> = {
@@ -53,9 +58,11 @@ export class TokensClient extends BaseEndpointClient {
 
   /**
    * Update Token Admin Endpoint
-   * Update an API token (admin-only).
-   * This endpoint is primarily for updating token scopes after course creation during deployment.
-   * Requires admin permissions.
+   * Update an API token (name, description, scopes, expiry).
+   * Primarily for adjusting token scopes after course creation during deployment.
+   * **Permissions**: admin, or `_service_manager` for service-owned tokens
+   * (`ApiTokenPermissionHandler` narrows the query to those). Re-scoping is
+   * gated by the same ceiling as minting.
    */
   async updateTokenAdminEndpointApiTokensAdminTokenIdPatch({ tokenId, userId, body }: { tokenId: string; userId?: string | null; body: ApiTokenUpdate }): Promise<ApiTokenGet> {
     const queryParams: Record<string, unknown> = {

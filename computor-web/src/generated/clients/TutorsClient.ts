@@ -3,7 +3,7 @@
  * Endpoint: /tutors
  */
 
-import type { CourseContentStudentGet, CourseContentStudentList, CourseTutorGet, CourseTutorList, TutorCourseMemberGet, TutorCourseMemberList, TutorGradeCreate, TutorGradeResponse, TutorSubmissionGroupGet, TutorSubmissionGroupList, TutorTestArtifactList, TutorTestCreateResponse, TutorTestGet, TutorTestStatus } from 'types/generated';
+import type { CourseContentStudentGet, CourseContentStudentList, CourseTutorGet, CourseTutorList, TutorCourseMemberGet, TutorCourseMemberList, TutorGradeCreate, TutorGradeResponse, TutorSubmissionGroupGet, TutorSubmissionGroupList, TutorTestArtifactList, TutorTestCreateResponse, TutorTestGet, TutorTestResultSubmit, TutorTestStatus } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -250,6 +250,7 @@ export class TutorsClient extends BaseEndpointClient {
    * Upload test artifacts as a ZIP archive.
    * Used by the testing worker to upload generated artifacts (plots, figures,
    * debug output) after test execution.
+   * **Permissions**: service account (the test runner) or admin.
    */
   async uploadTutorTestArtifactsTutorsTestsTestIdArtifactsUploadPost({ testId }: { testId: string }): Promise<void> {
     return this.client.post<void>(this.buildPath('tests', testId, 'artifacts', 'upload'));
@@ -276,8 +277,9 @@ export class TutorsClient extends BaseEndpointClient {
    * Submit test results for a tutor test.
    * Used by the testing worker to report results after test execution.
    * Stores result.json in MinIO and updates Redis state.
+   * **Permissions**: service account (the test runner) or admin.
    */
-  async submitTutorTestResultsTutorsTestsTestIdResultsPost({ testId, body }: { testId: string; body: Record<string, unknown> & Record<string, unknown> }): Promise<void> {
+  async submitTutorTestResultsTutorsTestsTestIdResultsPost({ testId, body }: { testId: string; body: TutorTestResultSubmit }): Promise<void> {
     return this.client.post<void>(this.buildPath('tests', testId, 'results'), body);
   }
 

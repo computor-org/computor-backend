@@ -13,40 +13,6 @@ import type { TaskInfo } from './tasks';
 
 
 /**
- * A user with their workspace roles.
- */
-export interface WorkspaceRoleUser {
-  user_id: string;
-  email: string | null;
-  username: string | null;
-  given_name: string | null;
-  family_name: string | null;
-  roles?: string[];
-}
-
-/**
- * Request to assign a workspace role by email.
- */
-export interface WorkspaceRoleAssign {
-  email: string;
-  role_id: string;
-}
-
-/**
- * Request to provision a workspace.
- */
-export interface WorkspaceProvisionRequest {
-  /** Target user email. If omitted, provisions for the current user. */
-  email?: string | null;
-  /** Workspace template name. Validated against the templates available in Coder; omit for the server default. */
-  template?: string | null;
-  /** Custom workspace name. Defaults to a name derived from the template. */
-  workspace_name?: string | null;
-  /** Home volume mode: 'shared' (per-user home volume) or 'scratch' (throwaway per-workspace volume). Full provisioners only; self-provisioning always uses the template default (shared). */
-  home_mode?: string | null;
-}
-
-/**
  * Course-level narrowing of a template's root/internet policy.
  * 
  * ``None`` means "inherit the template" — a course can only ever take access
@@ -730,6 +696,40 @@ export interface WorkspaceCredentialRotationResponse {
   outcomes?: WorkspaceCredentialOutcome[];
   succeeded?: number;
   failed?: number;
+}
+
+/**
+ * A user with their workspace roles.
+ */
+export interface WorkspaceRoleUser {
+  user_id: string;
+  email: string | null;
+  username: string | null;
+  given_name: string | null;
+  family_name: string | null;
+  roles?: string[];
+}
+
+/**
+ * Request to assign a workspace role by email.
+ */
+export interface WorkspaceRoleAssign {
+  email: string;
+  role_id: string;
+}
+
+/**
+ * Request to provision a workspace.
+ */
+export interface WorkspaceProvisionRequest {
+  /** Target user email. If omitted, provisions for the current user. */
+  email?: string | null;
+  /** Workspace template name. Validated against the templates available in Coder; omit for the server default. */
+  template?: string | null;
+  /** Custom workspace name. Defaults to a name derived from the template. */
+  workspace_name?: string | null;
+  /** Home volume mode: 'shared' (per-user home volume) or 'scratch' (throwaway per-workspace volume). Full provisioners only; self-provisioning always uses the template default (shared). */
+  home_mode?: string | null;
 }
 
 
