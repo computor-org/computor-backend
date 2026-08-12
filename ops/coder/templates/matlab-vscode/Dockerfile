@@ -142,6 +142,17 @@ RUN printf '\n' >> /opt/matlab/R2025b/toolbox/local/matlabrc.m \
     && rm /tmp/matlabrc-figurewatch.m
 ENV COMPUTOR_FIGURES_DIR=/tmp/computor-figures
 
+# `doc` needs a browser the container does not have: computor-open stands in
+# for it and hands the URL to the Computor extension, which opens a real tab
+# (computor-org/issues#312). Same matlabrc append rules as figurewatch above.
+COPY doc/computor-open /usr/local/bin/computor-open
+COPY doc/matlabrc-docbrowser.m /tmp/matlabrc-docbrowser.m
+RUN chmod 755 /usr/local/bin/computor-open \
+    && printf '\n' >> /opt/matlab/R2025b/toolbox/local/matlabrc.m \
+    && cat /tmp/matlabrc-docbrowser.m >> /opt/matlab/R2025b/toolbox/local/matlabrc.m \
+    && rm /tmp/matlabrc-docbrowser.m
+ENV COMPUTOR_OPEN_URL_DIR=/tmp/computor-open-urls
+
 RUN chown -R coder:coder /home/coder
 
 USER coder
