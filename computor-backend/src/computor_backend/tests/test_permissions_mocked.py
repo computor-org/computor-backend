@@ -5,6 +5,8 @@ This test suite properly mocks all dependencies to avoid database connections
 and SQLAlchemy issues with mock objects.
 """
 
+import sys
+
 import pytest
 from uuid import uuid4
 from typing import Dict, Optional
@@ -154,25 +156,24 @@ def mock_check_permissions(monkeypatch):
         else:
             raise ForbiddenException(detail={"entity": "test", "action": action})
     
-    # Use monkeypatch to replace the function
+    # Patch the definition, then every `from ... import check_permissions` alias
+    # that already exists. Discovering the aliases beats naming modules: the call
+    # sites keep migrating (api/crud.py -> business_logic/crud.py, api/*.py ->
+    # business_logic/*.py), and a hardcoded list silently rots into an
+    # AttributeError the moment one of them moves.
     import computor_backend.permissions.core
-    monkeypatch.setattr(computor_backend.permissions.core, 'check_permissions', _mock_check_permissions)
-    
-    # Also patch it in any modules that have already imported it
-    import computor_backend.api.crud
-    monkeypatch.setattr(computor_backend.api.crud, 'check_permissions', _mock_check_permissions)
-    
-    import computor_backend.api.organizations
-    monkeypatch.setattr(computor_backend.api.organizations, 'check_permissions', _mock_check_permissions)
-    
-    import computor_backend.api.courses
-    monkeypatch.setattr(computor_backend.api.courses, 'check_permissions', _mock_check_permissions)
-    
-    # Also need to handle User endpoint which has special query builder logic
-    import computor_backend.api.user
-    if hasattr(computor_backend.api.user, 'check_permissions'):
-        monkeypatch.setattr(computor_backend.api.user, 'check_permissions', _mock_check_permissions)
-    
+    real = computor_backend.permissions.core.check_permissions  # capture before patching
+    monkeypatch.setattr(
+        computor_backend.permissions.core, 'check_permissions', _mock_check_permissions
+    )
+
+    for module in list(sys.modules.values()):
+        name = getattr(module, '__name__', '')
+        if not name.startswith('computor_backend.'):
+            continue
+        if getattr(module, 'check_permissions', None) in (real, _mock_check_permissions):
+            monkeypatch.setattr(module, 'check_permissions', _mock_check_permissions)
+
     return _mock_check_permissions
 
 
@@ -226,11 +227,14 @@ class TestOrganizationPermissions:
         ("lecturer", "GET", 200),
         ("unauthorized", "GET", 200),
         
-        # POST /organizations - only admin can create
-        ("admin", "POST", 422),  # 422 because we're not sending valid data
-        ("student", "POST", [403, 422]),  # May get 422 if validation happens first
-        ("lecturer", "POST", [403, 422]),  # May get 422 if validation happens first
-        ("unauthorized", "POST", [403, 422]),  # May get 422 if validation happens first
+        # POST /organizations - only admin can create.
+        # The payload is deliberately invalid, so validation answers first:
+        # validation_exception_handler maps RequestValidationError to 400
+        # (VAL_001) app-wide, not FastAPI's default 422.
+        ("admin", "POST", 400),
+        ("student", "POST", [403, 400]),
+        ("lecturer", "POST", [403, 400]),
+        ("unauthorized", "POST", [403, 400]),
     ])
     def test_organization_permissions(self, test_client_factory, user_type, method, expected_status):
         """Test organization endpoint with different users and methods"""
