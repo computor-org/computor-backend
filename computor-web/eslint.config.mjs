@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Codegen output (see ../generate.sh). Linting it is pure noise: the `any`s
+    // and empty object types come from the pydantic->TS generator, hand-fixing
+    // them is undone by the next run, and the source of truth is computor-types.
+    "src/generated/**",
   ]),
 ]);
 

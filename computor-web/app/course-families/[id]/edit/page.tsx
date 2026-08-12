@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -30,12 +30,15 @@ export default function CourseFamilyEditPage() {
     { enabled: canManage },
   );
 
-  // Seed the form once the course family loads.
-  useEffect(() => {
-    if (!family) return;
+  // Seed the form once family loads. Adjusting state during render (instead of in
+  // an effect) is React's documented way to derive state from changed data: it
+  // re-renders before committing, so there is no cascading render.
+  const [seeded, setSeeded] = useState(family);
+  if (family && family !== seeded) {
+    setSeeded(family);
     setTitle(family.title || '');
     setDescription(family.description || '');
-  }, [family]);
+  }
 
   async function save() {
     setSaving(true);

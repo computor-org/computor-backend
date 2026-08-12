@@ -12,10 +12,8 @@ from computor_backend.tasks.temporal_client import (
     close_temporal_client,
     get_task_queue_name,
     DEFAULT_TASK_QUEUE,
-    TEMPORAL_HOST,
-    TEMPORAL_PORT,
-    TEMPORAL_NAMESPACE,
 )
+from computor_backend.tasks.worker_settings import get_worker_settings
 
 
 class TestTemporalClient:
@@ -56,11 +54,12 @@ class TestTemporalClient:
             mock_connect.return_value = mock_client
             
             await get_temporal_client()
-            
+
             # Verify connection parameters
+            settings = get_worker_settings()
             mock_connect.assert_called_once_with(
-                target_host=f"{TEMPORAL_HOST}:{TEMPORAL_PORT}",
-                namespace=TEMPORAL_NAMESPACE,
+                target_host=f"{settings.temporal_host}:{settings.temporal_port}",
+                namespace=settings.temporal_namespace,
                 tls=None
             )
             
@@ -79,28 +78,23 @@ class TestTemporalClient:
             'TEMPORAL_TLS_KEY': 'test_key',
             'TEMPORAL_TLS_CA': 'test_ca'
         }):
-            # Reload module to pick up env vars
-            import importlib
-            importlib.reload(temporal_client)
-            
+            # Settings are read lazily and cached, so drop the cache rather than
+            # reloading the module (the config no longer lives at import time).
+            get_worker_settings.cache_clear()
+
             with patch('computor_backend.tasks.temporal_client.Client.connect') as mock_connect:
                 mock_client = MagicMock()
                 mock_connect.return_value = mock_client
-                
+
                 await temporal_client.get_temporal_client()
-                
+
                 # Verify TLS config was created
                 call_args = mock_connect.call_args
                 assert call_args[1]['tls'] is not None
-                
-        # Cleanup and reload without TLS
+
+        # Cleanup: drop the client and the TLS-flavoured settings cache.
         temporal_client._client = None
-        with patch.dict(os.environ, {
-            'TEMPORAL_TLS_CERT': '',
-            'TEMPORAL_TLS_KEY': '',
-            'TEMPORAL_TLS_CA': ''
-        }):
-            importlib.reload(temporal_client)
+        get_worker_settings.cache_clear()
 
     @pytest.mark.asyncio
     async def test_close_temporal_client(self):
@@ -142,20 +136,25 @@ class TestTemporalClient:
         result = get_task_queue_name(custom_queue)
         assert result == custom_queue
 
+    # Temporal config is no longer module-level constants in temporal_client:
+    # get_temporal_client() reads it lazily from WorkerSettings so env overrides
+    # in effect at connect time are honored. These assert the settings instead,
+    # clearing the lru_cache rather than reloading the module.
+
     def test_environment_variable_defaults(self):
         """Test that environment variables have correct defaults."""
-        # Test with no env vars set
         with patch.dict(os.environ, {}, clear=True):
-            import importlib
-            import computor_backend.tasks.temporal_client as tc
-            importlib.reload(tc)
-            
-            assert tc.TEMPORAL_HOST == 'localhost'
-            assert tc.TEMPORAL_PORT == 7233
-            assert tc.TEMPORAL_NAMESPACE == 'default'
-            assert tc.TEMPORAL_TLS_CERT is None
-            assert tc.TEMPORAL_TLS_KEY is None
-            assert tc.TEMPORAL_TLS_CA is None
+            get_worker_settings.cache_clear()
+            try:
+                settings = get_worker_settings()
+                assert settings.temporal_host == 'localhost'
+                assert settings.temporal_port == 7233
+                assert settings.temporal_namespace == 'default'
+                assert settings.temporal_tls_cert is None
+                assert settings.temporal_tls_key is None
+                assert settings.temporal_tls_ca is None
+            finally:
+                get_worker_settings.cache_clear()
 
     def test_environment_variable_overrides(self):
         """Test that environment variables can be overridden."""
@@ -164,13 +163,14 @@ class TestTemporalClient:
             'TEMPORAL_PORT': '8888',
             'TEMPORAL_NAMESPACE': 'custom-namespace'
         }):
-            import importlib
-            import computor_backend.tasks.temporal_client as tc
-            importlib.reload(tc)
-            
-            assert tc.TEMPORAL_HOST == 'custom-host'
-            assert tc.TEMPORAL_PORT == 8888
-            assert tc.TEMPORAL_NAMESPACE == 'custom-namespace'
+            get_worker_settings.cache_clear()
+            try:
+                settings = get_worker_settings()
+                assert settings.temporal_host == 'custom-host'
+                assert settings.temporal_port == 8888
+                assert settings.temporal_namespace == 'custom-namespace'
+            finally:
+                get_worker_settings.cache_clear()
 
     @pytest.mark.asyncio
     async def test_concurrent_client_creation(self):

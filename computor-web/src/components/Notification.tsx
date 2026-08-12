@@ -59,7 +59,12 @@ export default function Notification({ message, type, onClose, duration = 5000 }
   // every sibling a fresh onClose identity — depending on it would restart all
   // their timers, making them expire together instead of on their own clock).
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  // Refreshed after commit rather than during render (writing a ref while
+  // rendering is not safe under concurrent rendering). The only reader is the
+  // exit timer below, which fires EXIT_MS later — long after this has run.
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
   const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Start the exit transition, then actually unmount once it has played.

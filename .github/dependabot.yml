@@ -1,0 +1,85 @@
+# Dependabot configuration.
+#
+# IMPORTANT — how this interacts with security alerts:
+#   * Dependabot *alerts* (the Security tab) are always computed against the
+#     DEFAULT branch (`main`) and are not configurable here. A fix merged into a
+#     release branch therefore leaves its alerts open until that branch reaches
+#     `main`. That is expected, not a misconfiguration.
+#   * Setting `target-branch` (below) opts an ecosystem out of automated
+#     *security* PRs and gives us scheduled *version* PRs against the branch we
+#     actually develop on instead. Day-to-day work targets `release/2026.10`
+#     (never `main`), so version PRs are only useful there.
+#
+# When the release branch rolls over, update every `target-branch` below.
+
+version: 2
+updates:
+  - package-ecosystem: pip
+    directories:
+      - /computor-backend
+      - /computor-types
+      - /computor-client
+      - /computor-testing
+      - /integration-tests
+    target-branch: release/2026.10
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR per concern keeps review cheap; test tooling churns most.
+      python-test-tooling:
+        patterns: ["pytest*", "coverage*", "mypy", "ruff"]
+      python-runtime:
+        patterns: ["*"]
+        exclude-patterns: ["pytest*", "coverage*", "mypy", "ruff"]
+
+  - package-ecosystem: npm
+    directory: /computor-web
+    target-branch: release/2026.10
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # `next` drags sharp/postcss with it — never split those across PRs.
+      next:
+        patterns: ["next", "eslint-config-next", "@next/*", "sharp"]
+      web-dev-tooling:
+        dependency-type: development
+        exclude-patterns: ["next", "eslint-config-next", "@next/*"]
+      web-runtime:
+        dependency-type: production
+        exclude-patterns: ["next", "@next/*", "sharp"]
+
+  # Base-image tags. Covers every tracked Dockerfile: the deployed stack
+  # (/docker/*), the Coder workspace images, and the per-language test runners.
+  # NOTE: the MATLAB images are deliberately release-pinned (MATLAB_RELEASE /
+  # digest pins) — close, don't merge, PRs that try to float them.
+  - package-ecosystem: docker
+    directories:
+      - /docker/api
+      - /docker/base
+      - /docker/web
+      - /docker/updater
+      - /docker/temporal-worker
+      - /docker/temporal-worker-testing
+      - /docker/temporal-worker-coder
+      - /docker/temporal-worker-matlab
+      - /docker/testing-runtimes
+      - /docker/coder-runtime
+      - /docker/code-server-base
+      - /docker/matlab
+      - /ops/coder/templates/bash
+      - /ops/coder/templates/jupyter
+      - /ops/coder/templates/vscode
+      - /ops/coder/templates/ubuntu-desktop
+      - /ops/coder/templates/matlab-ui
+      - /ops/coder/templates/matlab-vscode
+      - /computor-testing
+      - /computor-testing/docker
+    target-branch: release/2026.10
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      docker-base-images:
+        patterns: ["*"]

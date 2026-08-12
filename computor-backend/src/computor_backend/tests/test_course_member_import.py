@@ -6,9 +6,24 @@ from sqlalchemy.orm import Session
 from computor_backend.model.auth import User, StudentProfile
 from computor_backend.model.course import Course, CourseFamily, CourseMember, CourseGroup
 from computor_backend.model.organization import Organization
-from computor_backend.business_logic.course_member_import import import_course_members
 from computor_backend.permissions.principal import Principal
-from computor_types.course_member_import import CourseMemberImportRow, ImportStatus
+from computor_types.course_member_import import CourseMemberImportRow
+
+# The bulk-import tests below are stale in three ways, so they are skipped rather
+# than deleted — the coverage is still wanted, it just has to be re-authored:
+#   1. `import_course_members(members=[...], update_existing=..., ...)` no longer
+#      exists. It was replaced by the per-member, async
+#      `business_logic.course_member_import.import_course_member(course_id,
+#      CourseMemberImportRequest, permissions, db)`, which returns a
+#      CourseMemberImportResponse instead of a total/success/errors tally.
+#   2. They request a `db` fixture; conftest provides `session`.
+#   3. They need a live postgres, so they are integration tests, not unit tests.
+# Importing the removed symbol at module scope used to abort collection for the
+# WHOLE suite, which is why this file needed `--ignore` to run anything.
+_STALE_BULK_API = pytest.mark.skip(
+    reason="Targets the removed bulk import_course_members API; needs re-authoring "
+           "against import_course_member + a live database."
+)
 
 
 # Sample XML content for testing
@@ -91,6 +106,7 @@ def admin_principal() -> Principal:
     return principal
 
 
+@_STALE_BULK_API
 def test_import_single_member(db: Session, test_course: Course, admin_principal: Principal):
     """Test importing a single course member."""
     members = [
@@ -133,6 +149,7 @@ def test_import_single_member(db: Session, test_course: Course, admin_principal:
     assert course_member.course_role_id == "_student"
 
 
+@_STALE_BULK_API
 def test_import_duplicate_member(db: Session, test_course: Course, admin_principal: Principal):
     """Test importing a member that already exists."""
     # Create existing user and course member
@@ -180,6 +197,7 @@ def test_import_duplicate_member(db: Session, test_course: Course, admin_princip
     assert result.success == 0
 
 
+@_STALE_BULK_API
 def test_import_with_group_creation(db: Session, test_course: Course, admin_principal: Principal):
     """Test importing members with auto-group creation."""
     members = [
@@ -223,6 +241,7 @@ def test_import_with_group_creation(db: Session, test_course: Course, admin_prin
     assert course_member.course_group_id == group.id
 
 
+@_STALE_BULK_API
 def test_import_invalid_email(db: Session, test_course: Course, admin_principal: Principal):
     """Test importing with missing email."""
     members = [

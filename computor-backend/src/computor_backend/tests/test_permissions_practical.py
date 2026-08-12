@@ -179,9 +179,9 @@ def create_test_client(user_type: str) -> TestClient:
     computor_backend.permissions.core.check_permissions = mock_check_permissions
     
     # Also patch it in API modules that may have imported it
-    import computor_backend.api.crud
-    if hasattr(computor_backend.api.crud, 'check_permissions'):
-        computor_backend.api.crud.check_permissions = mock_check_permissions
+    import computor_backend.business_logic.crud
+    if hasattr(computor_backend.business_logic.crud, 'check_permissions'):
+        computor_backend.business_logic.crud.check_permissions = mock_check_permissions
     
     import computor_backend.api.organizations
     if hasattr(computor_backend.api.organizations, 'check_permissions'):
@@ -249,12 +249,12 @@ class TestOrganizationPermissions:
         """Test organization endpoint with different users and methods"""
         # Store original check_permissions from all modules
         import computor_backend.permissions.core
-        import computor_backend.api.crud
+        import computor_backend.business_logic.crud
         import computor_backend.api.organizations
         
         originals = {
             'core': computor_backend.permissions.core.check_permissions,
-            'crud': getattr(computor_backend.api.crud, 'check_permissions', None),
+            'crud': getattr(computor_backend.business_logic.crud, 'check_permissions', None),
             'organizations': getattr(computor_backend.api.organizations, 'check_permissions', None),
         }
         
@@ -277,7 +277,7 @@ class TestOrganizationPermissions:
             # Restore original check_permissions
             computor_backend.permissions.core.check_permissions = originals['core']
             if originals['crud']:
-                computor_backend.api.crud.check_permissions = originals['crud']
+                computor_backend.business_logic.crud.check_permissions = originals['crud']
             if originals['organizations']:
                 computor_backend.api.organizations.check_permissions = originals['organizations']
 
@@ -294,12 +294,12 @@ class TestCoursePermissions:
     def test_list_courses(self, user_type, expected_can_list):
         """Test listing courses with different user roles"""
         import computor_backend.permissions.core
-        import computor_backend.api.crud
+        import computor_backend.business_logic.crud
         import computor_backend.api.courses
         
         originals = {
             'core': computor_backend.permissions.core.check_permissions,
-            'crud': getattr(computor_backend.api.crud, 'check_permissions', None),
+            'crud': getattr(computor_backend.business_logic.crud, 'check_permissions', None),
             'courses': getattr(computor_backend.api.courses, 'check_permissions', None),
         }
         
@@ -315,7 +315,7 @@ class TestCoursePermissions:
             app.dependency_overrides.clear()
             computor_backend.permissions.core.check_permissions = originals['core']
             if originals['crud']:
-                computor_backend.api.crud.check_permissions = originals['crud']
+                computor_backend.business_logic.crud.check_permissions = originals['crud']
             if originals['courses']:
                 computor_backend.api.courses.check_permissions = originals['courses']
     
@@ -411,12 +411,12 @@ class TestUserPermissions:
     def test_list_users(self, user_type, expected_status):
         """Test listing users with different roles"""
         import computor_backend.permissions.core
-        import computor_backend.api.crud
+        import computor_backend.business_logic.crud
         import computor_backend.api.user
         
         originals = {
             'core': computor_backend.permissions.core.check_permissions,
-            'crud': getattr(computor_backend.api.crud, 'check_permissions', None),
+            'crud': getattr(computor_backend.business_logic.crud, 'check_permissions', None),
             'user': getattr(computor_backend.api.user, 'check_permissions', None),
         }
         
@@ -429,7 +429,7 @@ class TestUserPermissions:
             app.dependency_overrides.clear()
             computor_backend.permissions.core.check_permissions = originals['core']
             if originals['crud']:
-                computor_backend.api.crud.check_permissions = originals['crud']
+                computor_backend.business_logic.crud.check_permissions = originals['crud']
             if originals['user']:
                 computor_backend.api.user.check_permissions = originals['user']
 
