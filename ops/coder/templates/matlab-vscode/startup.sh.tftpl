@@ -154,6 +154,9 @@ defaults = {
     "MATLAB.defaultEditor": False,
     "MATLAB.prewarmGraphics": False,
     "security.workspace.trust.enabled": False,
+    # Keep the empty aux group alive: closing the last file in a group must
+    # not collapse the two-column layout (computor-org/issues#286).
+    "workbench.editor.closeEmptyGroups": False,
     "workbench.editorAssociations": {
         "*.png": "computor.imagePreview",
         "*.jpg": "computor.imagePreview",
