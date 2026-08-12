@@ -174,17 +174,46 @@
       "type": "object"
     },
     "CourseExecutionBackendConfig": {
-      "description": "Configuration for course execution backend.",
+      "description": "Configuration for course execution backend.\n\nDeclare EITHER ``language`` (portable: \"this is octave code\", matched\nagainst any runner providing it) OR ``slug`` (a pin: \"run it on exactly\nthis registered service\"). ``slug`` was once required, which hardcoded one\ndeployment's service name into every example and made content\nnon-transferable between installations; it is now optional.",
       "properties": {
         "slug": {
-          "description": "Unique identifier for the execution backend",
-          "title": "Slug",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pin a specific registered execution backend by Service.slug",
+          "title": "Slug"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Language this example needs (python, octave, r, julia, c, cpp, fortran, document, matlab) \u2014 matched against a runner",
+          "title": "Language"
         },
         "version": {
-          "description": "Version of the execution backend (e.g., 'r2024b', 'v1.0')",
-          "title": "Version",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Language/backend version requirement (e.g. '3.13', 'r2024b')",
+          "title": "Version"
         },
         "settings": {
           "anyOf": [
@@ -201,10 +230,6 @@
           "title": "Settings"
         }
       },
-      "required": [
-        "slug",
-        "version"
-      ],
       "title": "CourseExecutionBackendConfig",
       "type": "object"
     },

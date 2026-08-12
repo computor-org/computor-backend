@@ -122,38 +122,6 @@ export interface AccountProvider {
   placeholder: string;
 }
 
-export interface UserRoleCreate {
-  user_id: string;
-  role_id: string;
-}
-
-export interface UserRoleGet {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  user_id: string;
-  role_id: string;
-}
-
-export interface UserRoleList {
-  user_id: string;
-  role_id: string;
-}
-
-export interface UserRoleUpdate {
-  role_id: string;
-}
-
-export interface UserRoleQuery {
-  skip?: number | null;
-  limit?: number | null;
-  user_id?: string | null;
-  role_id?: string | null;
-}
-
 /**
  * User manager request to reset a user's password (sets to NULL).
  */
@@ -162,6 +130,59 @@ export interface UserManagerResetPasswordRequest {
   user_id: string;
   /** User manager's own password for verification */
   manager_password: string;
+}
+
+export interface UserGroupCreate {
+  /** User ID */
+  user_id: string;
+  /** Group ID */
+  group_id: string;
+  /** Whether this is a transient membership */
+  transient?: boolean | null;
+}
+
+export interface UserGroupGet {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  /** User ID */
+  user_id: string;
+  /** Group ID */
+  group_id: string;
+  /** Whether this is transient membership */
+  transient?: boolean | null;
+}
+
+export interface UserGroupList {
+  /** Creation timestamp */
+  created_at?: string | null;
+  /** Update timestamp */
+  updated_at?: string | null;
+  /** User ID */
+  user_id: string;
+  /** Group ID */
+  group_id: string;
+  /** Whether this is transient membership */
+  transient?: boolean | null;
+}
+
+export interface UserGroupUpdate {
+  /** Whether this is transient membership */
+  transient?: boolean | null;
+}
+
+export interface UserGroupQuery {
+  skip?: number | null;
+  limit?: number | null;
+  /** Filter by user ID */
+  user_id?: string | null;
+  /** Filter by group ID */
+  group_id?: string | null;
+  /** Filter by transient status */
+  transient?: boolean | null;
 }
 
 export interface UserCreate {
@@ -301,55 +322,34 @@ export interface UserScopes {
   course?: Record<string, string[]>;
 }
 
-export interface UserGroupCreate {
-  /** User ID */
+export interface UserRoleCreate {
   user_id: string;
-  /** Group ID */
-  group_id: string;
-  /** Whether this is a transient membership */
-  transient?: boolean | null;
+  role_id: string;
 }
 
-export interface UserGroupGet {
+export interface UserRoleGet {
   /** Creation timestamp */
   created_at?: string | null;
   /** Update timestamp */
   updated_at?: string | null;
   created_by?: string | null;
   updated_by?: string | null;
-  /** User ID */
   user_id: string;
-  /** Group ID */
-  group_id: string;
-  /** Whether this is transient membership */
-  transient?: boolean | null;
+  role_id: string;
 }
 
-export interface UserGroupList {
-  /** Creation timestamp */
-  created_at?: string | null;
-  /** Update timestamp */
-  updated_at?: string | null;
-  /** User ID */
+export interface UserRoleList {
   user_id: string;
-  /** Group ID */
-  group_id: string;
-  /** Whether this is transient membership */
-  transient?: boolean | null;
+  role_id: string;
 }
 
-export interface UserGroupUpdate {
-  /** Whether this is transient membership */
-  transient?: boolean | null;
+export interface UserRoleUpdate {
+  role_id: string;
 }
 
-export interface UserGroupQuery {
+export interface UserRoleQuery {
   skip?: number | null;
   limit?: number | null;
-  /** Filter by user ID */
   user_id?: string | null;
-  /** Filter by group ID */
-  group_id?: string | null;
-  /** Filter by transient status */
-  transient?: boolean | null;
+  role_id?: string | null;
 }

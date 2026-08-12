@@ -31,6 +31,9 @@ export class CourseMemberCommentsClient extends BaseEndpointClient {
   /**
    * Create Comment
    * Create a comment for a course member.
+   * Returns the course member's **full refreshed comment list**, not the single
+   * created row — the VS Code tutor view re-renders straight from this response.
+   * The update and delete endpoints return the same refreshed list.
    */
   async createCommentCourseMemberCommentsPost({ userId, body }: { userId?: string | null; body: CommentCreate }): Promise<CourseMemberCommentList[]> {
     const queryParams: Record<string, unknown> = {
@@ -41,7 +44,7 @@ export class CourseMemberCommentsClient extends BaseEndpointClient {
 
   /**
    * Delete Comment
-   * Delete a course member comment.
+   * Delete a course member comment. Returns the full refreshed comment list.
    */
   async deleteCommentCourseMemberCommentsCourseMemberCommentIdDelete({ courseMemberCommentId, userId }: { courseMemberCommentId: string | string; userId?: string | null }): Promise<CourseMemberCommentList[]> {
     const queryParams: Record<string, unknown> = {
@@ -52,7 +55,7 @@ export class CourseMemberCommentsClient extends BaseEndpointClient {
 
   /**
    * Update Comment
-   * Update a course member comment.
+   * Update a course member comment. Returns the full refreshed comment list.
    */
   async updateCommentCourseMemberCommentsCourseMemberCommentIdPatch({ courseMemberCommentId, userId, body }: { courseMemberCommentId: string | string; userId?: string | null; body: CommentUpdate }): Promise<CourseMemberCommentList[]> {
     const queryParams: Record<string, unknown> = {

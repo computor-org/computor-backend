@@ -13,6 +13,190 @@ import type { GitLabPATCredentials } from './common';
 
 
 /**
+ * Query parameters for updating organization token.
+ */
+export interface OrganizationUpdateTokenQuery {
+  /** Token type (e.g., 'gitlab', 'github') */
+  type: string;
+}
+
+/**
+ * Payload for updating organization provider token.
+ */
+export interface OrganizationUpdateTokenUpdate {
+  /** Provider access token */
+  token: string;
+}
+
+export interface AuthConfig {
+}
+
+/**
+ * Request model for logout.
+ */
+export interface LogoutRequest {
+  /** Provider name for SSO logout (optional) */
+  provider?: string | null;
+}
+
+/**
+ * Response model after successful logout.
+ */
+export interface LogoutResponse {
+  /** Logout status message */
+  message: string;
+  /** Provider that was logged out from */
+  provider?: string | null;
+}
+
+/**
+ * Request model for refreshing local session token.
+ */
+export interface LocalTokenRefreshRequest {
+  /** Refresh token from initial authentication */
+  refresh_token: string;
+}
+
+/**
+ * Response model after successful token refresh.
+ */
+export interface LocalTokenRefreshResponse {
+  /** New Bearer access token */
+  access_token: string;
+  /** Token expiration time in seconds */
+  expires_in: number;
+  /** New refresh token if rotated */
+  refresh_token?: string | null;
+  /** Token type */
+  token_type?: string;
+}
+
+/**
+ * Information about an authentication provider.
+ */
+export interface ProviderInfo {
+  /** Provider name */
+  name: string;
+  /** Display name */
+  display_name: string;
+  /** Authentication type */
+  type: string;
+  /** Whether provider is enabled */
+  enabled: boolean;
+  /** Login URL if applicable */
+  login_url?: string | null;
+}
+
+/**
+ * Login request for SSO.
+ */
+export interface LoginRequest {
+  /** Provider name */
+  provider: string;
+  /** Redirect URI after login */
+  redirect_uri?: string | null;
+}
+
+/**
+ * User registration request.
+ */
+export interface UserRegistrationRequest {
+  /** Username */
+  username: string;
+  /** Email address */
+  email: string;
+  /** Password */
+  password: string;
+  /** First name */
+  given_name: string;
+  /** Last name */
+  family_name: string;
+  /** Authentication provider to register with */
+  provider?: string;
+  /** Send email verification */
+  send_verification_email?: boolean;
+}
+
+/**
+ * Response after successful user registration.
+ */
+export interface UserRegistrationResponse {
+  /** User ID in Computor */
+  user_id: string;
+  /** User ID in authentication provider */
+  provider_user_id: string;
+  /** Username */
+  username: string;
+  /** Email address */
+  email: string;
+  /** Success message */
+  message: string;
+}
+
+/**
+ * Token refresh request for SSO.
+ */
+export interface TokenRefreshRequest {
+  /** Refresh token from initial authentication; falls back to the ct_refresh_token cookie */
+  refresh_token?: string | null;
+  /** Authentication provider */
+  provider?: string;
+}
+
+/**
+ * Response after successful SSO token refresh.
+ */
+export interface TokenRefreshResponse {
+  /** New access token */
+  access_token: string;
+  /** Token expiration time in seconds */
+  expires_in?: number | null;
+  /** New refresh token if rotated */
+  refresh_token?: string | null;
+}
+
+/**
+ * Author information for a message.
+ */
+export interface MessageAuthor {
+  /** User ID of the author */
+  id: string;
+  /** Author's given name */
+  given_name?: string | null;
+  /** Author's family name */
+  family_name?: string | null;
+}
+
+/**
+ * Course member context for the message author (when message is in a course context).
+ */
+export interface MessageAuthorCourseMember {
+  /** Course member ID */
+  id: string;
+  /** Role of the author in the course (e.g., '_student', '_tutor', '_lecturer') */
+  course_role_id: string;
+  /** Course ID */
+  course_id: string;
+}
+
+export interface GradingAuthor {
+  /** Author's given name */
+  given_name?: string | null;
+  /** Author's family name */
+  family_name?: string | null;
+}
+
+/**
+ * Alternative authentication via external provider for password initialization.
+ */
+export interface ProviderAuthCredentials {
+  /** Authentication method */
+  method: "gitlab_pat";
+  /** Provider-specific credentials */
+  credentials: GitLabPATCredentials;
+}
+
+/**
  * DTO for creating a new API token.
  * 
  * The actual token value is generated server-side and returned once.
@@ -150,188 +334,4 @@ export interface ApiTokenQuery {
   expired?: boolean | null;
   /** Filter by required scopes (token must have all) */
   scopes?: string[] | null;
-}
-
-/**
- * Alternative authentication via external provider for password initialization.
- */
-export interface ProviderAuthCredentials {
-  /** Authentication method */
-  method: "gitlab_pat";
-  /** Provider-specific credentials */
-  credentials: GitLabPATCredentials;
-}
-
-/**
- * Query parameters for updating organization token.
- */
-export interface OrganizationUpdateTokenQuery {
-  /** Token type (e.g., 'gitlab', 'github') */
-  type: string;
-}
-
-/**
- * Payload for updating organization provider token.
- */
-export interface OrganizationUpdateTokenUpdate {
-  /** Provider access token */
-  token: string;
-}
-
-export interface GradingAuthor {
-  /** Author's given name */
-  given_name?: string | null;
-  /** Author's family name */
-  family_name?: string | null;
-}
-
-/**
- * Author information for a message.
- */
-export interface MessageAuthor {
-  /** User ID of the author */
-  id: string;
-  /** Author's given name */
-  given_name?: string | null;
-  /** Author's family name */
-  family_name?: string | null;
-}
-
-/**
- * Course member context for the message author (when message is in a course context).
- */
-export interface MessageAuthorCourseMember {
-  /** Course member ID */
-  id: string;
-  /** Role of the author in the course (e.g., '_student', '_tutor', '_lecturer') */
-  course_role_id: string;
-  /** Course ID */
-  course_id: string;
-}
-
-export interface AuthConfig {
-}
-
-/**
- * Request model for logout.
- */
-export interface LogoutRequest {
-  /** Provider name for SSO logout (optional) */
-  provider?: string | null;
-}
-
-/**
- * Response model after successful logout.
- */
-export interface LogoutResponse {
-  /** Logout status message */
-  message: string;
-  /** Provider that was logged out from */
-  provider?: string | null;
-}
-
-/**
- * Request model for refreshing local session token.
- */
-export interface LocalTokenRefreshRequest {
-  /** Refresh token from initial authentication */
-  refresh_token: string;
-}
-
-/**
- * Response model after successful token refresh.
- */
-export interface LocalTokenRefreshResponse {
-  /** New Bearer access token */
-  access_token: string;
-  /** Token expiration time in seconds */
-  expires_in: number;
-  /** New refresh token if rotated */
-  refresh_token?: string | null;
-  /** Token type */
-  token_type?: string;
-}
-
-/**
- * Information about an authentication provider.
- */
-export interface ProviderInfo {
-  /** Provider name */
-  name: string;
-  /** Display name */
-  display_name: string;
-  /** Authentication type */
-  type: string;
-  /** Whether provider is enabled */
-  enabled: boolean;
-  /** Login URL if applicable */
-  login_url?: string | null;
-}
-
-/**
- * Login request for SSO.
- */
-export interface LoginRequest {
-  /** Provider name */
-  provider: string;
-  /** Redirect URI after login */
-  redirect_uri?: string | null;
-}
-
-/**
- * User registration request.
- */
-export interface UserRegistrationRequest {
-  /** Username */
-  username: string;
-  /** Email address */
-  email: string;
-  /** Password */
-  password: string;
-  /** First name */
-  given_name: string;
-  /** Last name */
-  family_name: string;
-  /** Authentication provider to register with */
-  provider?: string;
-  /** Send email verification */
-  send_verification_email?: boolean;
-}
-
-/**
- * Response after successful user registration.
- */
-export interface UserRegistrationResponse {
-  /** User ID in Computor */
-  user_id: string;
-  /** User ID in authentication provider */
-  provider_user_id: string;
-  /** Username */
-  username: string;
-  /** Email address */
-  email: string;
-  /** Success message */
-  message: string;
-}
-
-/**
- * Token refresh request for SSO.
- */
-export interface TokenRefreshRequest {
-  /** Refresh token from initial authentication; falls back to the ct_refresh_token cookie */
-  refresh_token?: string | null;
-  /** Authentication provider */
-  provider?: string;
-}
-
-/**
- * Response after successful SSO token refresh.
- */
-export interface TokenRefreshResponse {
-  /** New access token */
-  access_token: string;
-  /** Token expiration time in seconds */
-  expires_in?: number | null;
-  /** New refresh token if rotated */
-  refresh_token?: string | null;
 }

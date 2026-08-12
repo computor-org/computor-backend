@@ -132,6 +132,29 @@ export class AuthenticationClient extends BaseEndpointClient {
   }
 
   /**
+   * Verify Documents Access
+   * Traefik ForwardAuth endpoint for the ``/docs`` static file server.
+   * The documents tree is served read-only by the ``static-server`` container,
+   * which has no authentication of its own. Without this gate anyone who could
+   * reach Traefik could read *and list* (``SHOW_LISTING``) the entire tree with
+   * no login at all.
+   * Read access is "any authenticated user" — deliberately the same policy
+   * ``GET /documents/list`` and ``GET /documents/files`` already enforce.
+   * Making the static path stricter than the API would protect nothing: the
+   * same bytes are reachable through the API by the same caller. Writes stay
+   * scope-checked in ``check_documents_write_permission``.
+   * Authentication is the platform-wide chain (``X-API-Token``, Bearer, or the
+   * ``ct_access_token`` cookie), so a browser already logged into the web UI on
+   * the same host passes without a prompt.
+   * Returns:
+   * - 204 No Content: authenticated — Traefik forwards the request
+   * - 401 Unauthorized: raised by ``get_current_principal``, returned to the client
+   */
+  async verifyDocumentsAccessAuthVerifyDocumentsAccessGet(): Promise<void> {
+    return this.client.get<void>(this.buildPath('verify-documents-access'));
+  }
+
+  /**
    * Handle Callback
    * Handle OAuth callback from provider.
    * Exchanges the authorization code for tokens and creates/updates user account.

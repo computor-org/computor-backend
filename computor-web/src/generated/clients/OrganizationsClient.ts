@@ -50,16 +50,6 @@ export class OrganizationsClient extends BaseEndpointClient {
   }
 
   /**
-   * Delete Organizations
-   */
-  async deleteOrganizationsOrganizationsIdDelete({ id, userId }: { id: string | string; userId?: string | null }): Promise<void> {
-    const queryParams: Record<string, unknown> = {
-      user_id: userId,
-    };
-    return this.client.delete<void>(this.buildPath(id), { params: queryParams });
-  }
-
-  /**
    * Get Organizations
    */
   async getOrganizationsOrganizationsIdGet({ id, userId }: { id: string | string; userId?: string | null }): Promise<OrganizationGet> {

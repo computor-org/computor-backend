@@ -39,26 +39,6 @@ export interface WorkerSettings {
   running_in_docker?: string | null;
 }
 
-export interface TestJob {
-  user_id: string;
-  course_member_id: string;
-  course_content_id: string;
-  testing_service_id: string;
-  testing_service_slug: string;
-  testing_service_type_path: string;
-  module: Repository;
-  reference?: Repository | null;
-}
-
-/**
- * Response with task ID for async operation.
- */
-export interface TaskResponse {
-  task_id: string;
-  status: string;
-  message: string;
-}
-
 /**
  * Task execution result container.
  */
@@ -130,6 +110,26 @@ export interface TaskTrackerEntry {
   entity_type?: string | null;
   entity_id?: string | null;
   description?: string | null;
+}
+
+export interface TestJob {
+  user_id: string;
+  course_member_id: string;
+  course_content_id: string;
+  testing_service_id: string;
+  testing_service_slug: string;
+  testing_service_type_path: string;
+  module: Repository;
+  reference?: Repository | null;
+}
+
+/**
+ * Response with task ID for async operation.
+ */
+export interface TaskResponse {
+  task_id: string;
+  status: string;
+  message: string;
 }
 
 

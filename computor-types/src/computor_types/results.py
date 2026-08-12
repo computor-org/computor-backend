@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Optional, List
 
@@ -59,6 +60,8 @@ class ResultGet(BaseEntityGet):
     version_identifier: str
     reference_version_identifier: Optional[str] = None
     status: TaskStatus
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
     # New: relationship to gradings
     grading_ids: Optional[List[str]] = []  # IDs of gradings that reference this result
     # New: artifact information
@@ -89,6 +92,8 @@ class ResultList(BaseEntityList):
     version_identifier: str
     reference_version_identifier: Optional[str] = None
     status: TaskStatus
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
     # Artifact information
     has_artifacts: bool = False  # Whether this result has associated artifacts
     artifact_count: int = 0  # Number of artifacts associated with this result
@@ -109,6 +114,8 @@ class ResultUpdate(BaseModel):
     status: Optional[TaskStatus | None] = None
     test_system_id: Optional[str] = None
     properties: Optional[dict | None] = None
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 

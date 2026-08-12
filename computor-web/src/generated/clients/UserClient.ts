@@ -3,7 +3,7 @@
  * Endpoint: /user
  */
 
-import type { CourseGitDescriptor, CourseMemberProviderAccountUpdate, CourseMemberReadinessStatus, CourseMemberRepositoryGet, CourseMemberRepositoryRegister, CourseMemberValidationRequest, StudentRepositoryProvisioned, UserGet, UserScopes } from 'types/generated';
+import type { CourseGitDescriptor, CourseMemberProviderAccountUpdate, CourseMemberReadinessStatus, CourseMemberRepositoryGet, CourseMemberRepositoryRegister, CourseMemberValidationRequest, StudentRepositoryProvisioned, TemplateAccessGet, UserGet, UserScopes } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -108,6 +108,23 @@ export class UserClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.get<CourseMemberRepositoryGet | null>(this.buildPath('courses', courseId, 'repository'), { params: queryParams });
+  }
+
+  /**
+   * Template Access Endpoint
+   * Mint a one-time READ-ONLY git credential for the course's template.
+   * Lets the current course member fetch the student-template over git — the
+   * extension uses it to seed an external repo with full history and to merge
+   * new template commits into the student's repo. The token is rotated on each
+   * call under its own name (never touching the provisioning clone token) and
+   * cannot push. `token` is null until the member's first git-server SSO login
+   * (re-call afterwards). Managed-Forgejo courses only.
+   */
+  async templateAccessEndpointUserCoursesCourseIdTemplateAccessPost({ courseId, userId }: { courseId: string | string; userId?: string | null }): Promise<TemplateAccessGet> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.post<TemplateAccessGet>(this.buildPath('courses', courseId, 'template-access'), { params: queryParams });
   }
 
   /**

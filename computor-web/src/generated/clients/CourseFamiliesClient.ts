@@ -71,16 +71,6 @@ export class CourseFamiliesClient extends BaseEndpointClient {
   }
 
   /**
-   * Delete Course-Families
-   */
-  async deleteCourseFamiliesCourseFamiliesIdDelete({ id, userId }: { id: string | string; userId?: string | null }): Promise<void> {
-    const queryParams: Record<string, unknown> = {
-      user_id: userId,
-    };
-    return this.client.delete<void>(this.buildPath(id), { params: queryParams });
-  }
-
-  /**
    * Get Course-Families
    */
   async getCourseFamiliesCourseFamiliesIdGet({ id, userId }: { id: string | string; userId?: string | null }): Promise<CourseFamilyGet> {
