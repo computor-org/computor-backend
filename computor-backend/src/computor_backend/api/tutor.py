@@ -45,6 +45,7 @@ from computor_types.tutor_submission_groups import (
 from computor_backend.business_logic.testing_orchestration import (
     build_testing_submission,
     resolve_task_queue,
+    service_config_payload,
     service_type_config_payload,
 )
 from computor_backend.business_logic.tutor import (
@@ -672,6 +673,7 @@ async def create_tutor_test(
         parameters={
             "test_id": test_id,
             "example_version_id": example_version_id,
+            "service_config": service_config_payload(service),
             "service_type_config": service_type_config_payload(service_type),
             "test_config": {
                 "testing_service_slug": service.slug,
