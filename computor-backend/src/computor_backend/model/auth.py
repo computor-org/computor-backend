@@ -40,20 +40,29 @@ class User(Base):
     workspace_app_key_version = Column(Integer, nullable=False, server_default=text("1"))
     workspace_app_key_rotated_at = Column(DateTime(timezone=True))
 
-    # Relationships
-    course_members = relationship("CourseMember", foreign_keys="CourseMember.user_id", back_populates="user", uselist=True, lazy="select")
+    # Relationships.
+    #
+    # The database owns the delete semantics for everything hanging off a user
+    # (ON DELETE CASCADE on the child FKs, RESTRICT on service). Without
+    # ``passive_deletes`` the ORM would instead load each child on
+    # ``db.delete(user)`` and null its NOT NULL user_id — every API user delete
+    # failed on the trigger-created profile row that every user has. The
+    # ``delete`` cascade keeps already-loaded children consistent with what the
+    # database does; ``service`` deliberately has no delete cascade so the DB
+    # RESTRICT keeps protecting service accounts.
+    course_members = relationship("CourseMember", foreign_keys="CourseMember.user_id", back_populates="user", uselist=True, lazy="select", cascade="all, delete", passive_deletes=True)
     # user can have multiple student_profiles (one per organization)
-    student_profiles = relationship("StudentProfile", foreign_keys="StudentProfile.user_id", back_populates="user", uselist=True, lazy="select")
-    accounts = relationship("Account", back_populates="user", uselist=True, lazy="select")
-    sessions = relationship("Session", back_populates="user", uselist=True, lazy="select")
-    profile = relationship("Profile", back_populates="user", uselist=False, lazy="select")
-    user_groups = relationship("UserGroup", back_populates="user", uselist=True, lazy="select")
-    user_roles = relationship("UserRole", back_populates="user", uselist=True, lazy="select")
-    organization = relationship("Organization", foreign_keys="Organization.user_id", uselist=False, lazy="select")
+    student_profiles = relationship("StudentProfile", foreign_keys="StudentProfile.user_id", back_populates="user", uselist=True, lazy="select", cascade="all, delete", passive_deletes=True)
+    accounts = relationship("Account", back_populates="user", uselist=True, lazy="select", cascade="all, delete", passive_deletes=True)
+    sessions = relationship("Session", back_populates="user", uselist=True, lazy="select", cascade="all, delete", passive_deletes=True)
+    profile = relationship("Profile", back_populates="user", uselist=False, lazy="select", cascade="all, delete", passive_deletes=True)
+    user_groups = relationship("UserGroup", back_populates="user", uselist=True, lazy="select", cascade="all, delete", passive_deletes=True)
+    user_roles = relationship("UserRole", back_populates="user", uselist=True, lazy="select", cascade="all, delete", passive_deletes=True)
+    organization = relationship("Organization", foreign_keys="Organization.user_id", uselist=False, lazy="select", cascade="all, delete", passive_deletes=True)
 
     # Service account relationships (added via migration 19266bf266e9)
-    service = relationship("Service", foreign_keys="Service.user_id", back_populates="user", uselist=False, lazy="select")
-    api_tokens = relationship("ApiToken", foreign_keys="ApiToken.user_id", back_populates="user", uselist=True, lazy="select")
+    service = relationship("Service", foreign_keys="Service.user_id", back_populates="user", uselist=False, lazy="select", passive_deletes=True)
+    api_tokens = relationship("ApiToken", foreign_keys="ApiToken.user_id", back_populates="user", uselist=True, lazy="select", cascade="all, delete", passive_deletes=True)
 
     # Self-referential relationships
     created_users = relationship("User", foreign_keys="User.created_by", remote_side=[id])
