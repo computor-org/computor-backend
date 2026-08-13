@@ -316,6 +316,11 @@ async def update_entity(
                 if column in entity_dict.keys() and entity_dict[column] is not None and isinstance(entity_dict[column], str):
                     entity_dict[column] = Ltree(entity_dict[column])
 
+        # Special validation for CourseContent type changes. Raised before the
+        # try block so it surfaces as itself, not as "Failed to update entity".
+        if db_type.__tablename__ == 'course_content' and 'course_content_type_id' in entity_dict:
+            _validate_course_content_type_change(db_item, entity_dict['course_content_type_id'], db)
+
         try:
             for key in entity_dict.keys():
                 attr = entity_dict.get(key)
@@ -345,6 +350,102 @@ async def update_entity(
         await post_update(db_item, old_db_item, db)
 
     return response_type(**db_item.__dict__)
+
+
+def _validate_course_content_type_change(db_item, new_type_id, db: Session):
+    """
+    Validate a PATCH that moves a course content onto another content type.
+
+    Rules (computor-org/issues#320):
+    1. The new type must exist in the content's own course.
+    2. A change across kinds (assignment ↔ unit) flips ``is_submittable`` via
+       the ORM listener and strands everything hanging off the content: a unit
+       turned assignment hides its children from every tree, an assignment
+       turned unit drops its deployment and submissions from all release and
+       grading views while the rows live on. So cross-kind changes are only
+       allowed while the content is empty: no descendants, no assigned
+       example, no submissions. Same-kind changes stay unrestricted.
+
+    Args:
+        db_item: CourseContent entity being updated
+        new_type_id: The requested course_content_type_id
+        db: Database session
+
+    Raises:
+        BadRequestException: If the type does not exist in the course, or the
+                             kind would change on a non-empty content
+    """
+    from computor_backend.model.course import (
+        CourseContent,
+        CourseContentKind,
+        CourseContentType,
+        SubmissionGroup,
+    )
+    from computor_backend.model.deployment import CourseContentDeployment
+
+    if new_type_id is None or str(new_type_id) == str(db_item.course_content_type_id):
+        return
+
+    new_type = db.query(CourseContentType).filter(
+        CourseContentType.id == str(new_type_id),
+        CourseContentType.course_id == str(db_item.course_id),
+    ).first()
+
+    if new_type is None:
+        raise BadRequestException(
+            detail="Content type does not exist in this course",
+            context={
+                "course_content_id": str(db_item.id),
+                "course_content_type_id": str(new_type_id),
+            },
+        )
+
+    if new_type.course_content_kind_id == db_item.course_content_kind_id:
+        return
+
+    new_kind = db.query(CourseContentKind).filter(
+        CourseContentKind.id == new_type.course_content_kind_id,
+    ).first()
+
+    # Direction-aware: only what the NEW kind cannot carry blocks the change.
+    # A content stranded on the wrong kind (the #320 damage) keeps its old
+    # cargo — e.g. a unit-kind row still holding a deployed deployment — and
+    # moving it back to the kind that cargo belongs to must stay possible.
+    blockers = []
+
+    if new_kind is not None and not new_kind.has_descendants:
+        has_children = db.query(CourseContent.id).filter(
+            CourseContent.course_id == db_item.course_id,
+            CourseContent.path.op('<@')(db_item.path),
+            CourseContent.id != db_item.id,
+        ).first() is not None
+        if has_children:
+            blockers.append("descendants")
+
+    if new_kind is not None and not new_kind.submittable:
+        has_deployment = db.query(CourseContentDeployment.id).filter(
+            CourseContentDeployment.course_content_id == db_item.id,
+            CourseContentDeployment.deployment_status != 'unassigned',
+        ).first() is not None
+        if has_deployment:
+            blockers.append("example deployment")
+
+        has_submissions = db.query(SubmissionGroup.id).filter(
+            SubmissionGroup.course_content_id == db_item.id,
+        ).first() is not None
+        if has_submissions:
+            blockers.append("submissions")
+
+    if blockers:
+        raise BadRequestException(
+            error_code="CONTENT_008",
+            context={
+                "course_content_id": str(db_item.id),
+                "current_kind": str(db_item.course_content_kind_id),
+                "new_kind": str(new_type.course_content_kind_id),
+                "blocked_by": blockers,
+            },
+        )
 
 
 def _validate_course_content_deletion(entity, db: Session):

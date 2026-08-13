@@ -775,6 +775,25 @@ errors:
       - "Use archive instead of delete to preserve student data"
       - "If deletion is truly required, archive or remove descendant submissions first"
 
+  - code: CONTENT_008
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Content Type Kind Change Blocked"
+    message:
+      plain: "Cannot change this content's type across kinds (assignment/unit) because the content is not empty. Pick a type of the same kind, or remove its children, example and submissions first."
+      markdown: "**Content Type Kind Change Blocked**\n\nThis content cannot switch between *assignment* and *unit* because it is not empty: a unit with children cannot become an assignment, and an assignment with an assigned example or student submissions cannot become a unit. Pick a content type of the same kind, or empty the content first."
+      html: "<strong>Content Type Kind Change Blocked</strong><p>This content cannot switch between <em>assignment</em> and <em>unit</em> because it is not empty: a unit with children cannot become an assignment, and an assignment with an assigned example or student submissions cannot become a unit. Pick a content type of the same kind, or empty the content first.</p>"
+    internal_description: "PATCH moved course_content.course_content_type_id to a type of a different course_content_kind while the content has descendants, a non-unassigned deployment, or submission groups"
+    affected_functions:
+      - "_validate_course_content_type_change"
+      - "update_entity"
+    common_causes:
+      - "Accidentally picking a unit type for an assignment (or vice versa) in the content type picker"
+    resolution_steps:
+      - "Choose a content type of the same kind as the current one"
+      - "If the kind change is intended, first remove children, unassign the example and make sure there are no submissions"
+
   # ============================================================================
   # VERSION MANAGEMENT ERRORS (400, 409)
   # ============================================================================

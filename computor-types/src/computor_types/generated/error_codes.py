@@ -44,6 +44,7 @@ class ErrorCode(str, Enum):
     CONTENT_005 = "CONTENT_005"  # Example Version Not Found
     CONTENT_006 = "CONTENT_006"  # Deletion Blocked by Student Submissions
     CONTENT_007 = "CONTENT_007"  # Deletion Blocked by Descendant Submissions
+    CONTENT_008 = "CONTENT_008"  # Content Type Kind Change Blocked
     VERSION_001 = "VERSION_001"  # Example Version Already Exists
     DEPLOY_001 = "DEPLOY_001"  # Assignment Not Released
     DEPLOY_002 = "DEPLOY_002"  # Deployment Not Found
@@ -135,6 +136,7 @@ ERROR_CATEGORIES = {
     ErrorCode.CONTENT_005: "not_found",
     ErrorCode.CONTENT_006: "validation",
     ErrorCode.CONTENT_007: "validation",
+    ErrorCode.CONTENT_008: "validation",
     ErrorCode.VERSION_001: "conflict",
     ErrorCode.DEPLOY_001: "not_found",
     ErrorCode.DEPLOY_002: "not_found",
