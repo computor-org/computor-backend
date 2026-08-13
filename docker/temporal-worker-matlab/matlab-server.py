@@ -5,6 +5,7 @@ import time
 import json
 import matlab
 import matlab.engine
+import signal
 import subprocess
 from threading import RLock, Thread
 from concurrent.futures import TimeoutError as FuturesTimeoutError
@@ -437,17 +438,30 @@ if __name__ == '__main__':
 
     # Pass command line arguments to the temporal worker
     # This allows docker-compose to specify --queues=testing-matlab
-    args = ' '.join(sys.argv[1:]) if len(sys.argv) > 1 else ''
-    cmd = f"python3.10 -m computor_backend.tasks.temporal_worker {args}"
-    print(f"Starting temporal worker with command: {cmd}", flush=True)
+    argv = ["python3.10", "-m", "computor_backend.tasks.temporal_worker", *sys.argv[1:]]
+    print(f"Starting temporal worker with command: {' '.join(argv)}", flush=True)
 
-    # Use Popen instead of run() to allow logs to flow through
-    # This way we can see worker startup and activity logs
-    import sys as pysys
-    subprocess.Popen(
-        cmd,
+    # Popen (not run()) so worker startup and activity logs flow through, and no
+    # shell=True: `sh -c` used to sit between this process and the worker, so a
+    # forwarded signal would have reached the shell instead of the worker.
+    worker = subprocess.Popen(
+        argv,
         cwd=os.path.abspath(os.path.expanduser("~")),
-        shell=True,
-        stdout=pysys.stdout,  # Forward stdout to container logs
-        stderr=pysys.stderr,  # Forward stderr to container logs
-    ).wait()  # Wait for worker to finish (blocks forever)
+        stdout=sys.stdout,  # Forward stdout to container logs
+        stderr=sys.stderr,  # Forward stderr to container logs
+    )
+
+    # Unlike the other worker images this script cannot exec the worker away —
+    # it owns the in-process MATLAB engine the worker talks to over Pyro — so it
+    # has to forward the stop signal by hand. Without this the worker never saw
+    # SIGTERM: tini killed this process on the spot and the worker died with the
+    # container mid-test. Test activities are deliberately never retried, so
+    # that destroyed the run instead of draining it.
+    def forward_shutdown(signum, _frame):
+        print(f"Received signal {signum}, forwarding to temporal worker", flush=True)
+        worker.send_signal(signum)
+
+    for stop_signal in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(stop_signal, forward_shutdown)
+
+    worker.wait()  # Wait for the worker to drain and exit
