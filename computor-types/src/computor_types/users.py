@@ -186,6 +186,48 @@ class UserBanRequest(BaseModel):
     )
 
 
+class UserConnectRequest(BaseModel):
+    """Request to absorb a pre-provisioned user into the addressed user.
+
+    The addressed user (path parameter) is the keeper — the real, logged-in
+    account. ``source_user_id`` names the pre-provisioned row (created by a
+    course roster import) that is absorbed and deleted. The operation is
+    refused unless the source user has never authenticated.
+    """
+    source_user_id: str = Field(..., description="Id of the pre-provisioned user to absorb; this row is deleted on success")
+    dry_run: bool = Field(False, description="Validate and return the merge plan without changing anything")
+
+
+class UserConnectCourseMove(BaseModel):
+    """One course membership affected by a user-connect operation."""
+    course_id: str = Field(..., description="Course the membership belongs to")
+    course_title: Optional[str] = Field(None, description="Course title, for display")
+    action: str = Field(..., description="'moved' (membership re-pointed to the keeper) or 'duplicate_removed' (keeper already enrolled; the source's empty membership was removed)")
+    group_carried_over: bool = Field(False, description="Whether the source membership's course group was copied onto the keeper's membership")
+
+
+class UserConnectProfileMove(BaseModel):
+    """One student profile affected by a user-connect operation."""
+    organization_id: str = Field(..., description="Organization the profile is scoped to")
+    organization_title: Optional[str] = Field(None, description="Organization title, for display")
+    student_email: Optional[str] = Field(None, description="Student email the keeper's profile carries after the merge (the imported address)")
+    action: str = Field(..., description="'moved' (profile re-pointed to the keeper) or 'merged' (keeper already had a profile for the organization; fields were merged into it)")
+
+
+class UserConnectResponse(BaseModel):
+    """Outcome (or dry-run plan) of connecting a pre-provisioned user to a real one."""
+    dry_run: bool = Field(..., description="True if nothing was changed and this is only the plan")
+    source_user_id: str = Field(..., description="The absorbed (pre-provisioned) user")
+    target_user_id: str = Field(..., description="The keeper the data was moved onto")
+    source_email: Optional[str] = Field(None, description="Email of the absorbed user (the imported address)")
+    course_memberships: List[UserConnectCourseMove] = Field(default_factory=list, description="Course memberships moved or resolved")
+    student_profiles: List[UserConnectProfileMove] = Field(default_factory=list, description="Student profiles moved or merged")
+    roles_merged: List[str] = Field(default_factory=list, description="System roles the keeper gained from the source user")
+    accounts_moved: int = Field(0, description="Manually linked provider accounts re-pointed to the keeper")
+    messages_repointed: int = Field(0, description="Messages addressed to or mentioning the source user re-pointed to the keeper")
+    source_deleted: bool = Field(False, description="Whether the source user row was deleted (always true on a non-dry-run success)")
+
+
 class UserPassword(BaseModel):
     """Password update request for user endpoints."""
     password: str = Field(..., description="New password")

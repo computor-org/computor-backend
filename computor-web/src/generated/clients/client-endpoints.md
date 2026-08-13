@@ -736,6 +736,7 @@
 | `routeUsersUsersIdArchivePatch` | PATCH | `/users/{id}/archive` | — | `void` |
 | `unarchiveUsersUsersIdUnarchivePatch` | PATCH | `/users/{id}/unarchive` | — | `void` |
 | `banUserUsersUserIdBanPatch` | PATCH | `/users/{user_id}/ban` | `UserBanRequest | null` (optional) | `UserGet` |
+| `connectUserUsersUserIdConnectPost` | POST | `/users/{user_id}/connect` | `UserConnectRequest` | `UserConnectResponse` |
 | `unbanUserUsersUserIdUnbanPatch` | PATCH | `/users/{user_id}/unban` | — | `UserGet` |
 
 ## WorkspacesClient
