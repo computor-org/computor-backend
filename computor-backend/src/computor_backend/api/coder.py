@@ -1029,10 +1029,12 @@ async def get_workspace_fleet_status(
             if is_running:
                 running_outdated += 1
                 actionable += 1
-            elif workspace.automatic_updates == "always":
-                scheduled += 1
             else:
-                actionable += 1
+                # Every start through the backend builds on the active version
+                # (see CoderClient._workspace_transition), so a stopped
+                # outdated workspace is already scheduled to update — the
+                # automatic_updates flag no longer gates that.
+                scheduled += 1
 
         if not template.active_version_id:
             rollout_state = "unavailable"
@@ -1233,9 +1235,10 @@ async def rollout_workspaces_endpoint(
 ) -> CoderAdminTaskResponse:
     """
     Roll every existing workspace onto its template's active version — running
-    ones are rebuilt now, stopped ones adopt it on their next start. Run this
-    after a template push to propagate a new workspace image/extension to the
-    whole fleet. Requires workspace:manage permission.
+    ones are rebuilt NOW, stopped ones adopt it on their next start. A push
+    already chains in the gentle variant (flags only), so this endpoint exists
+    to force-update workspaces that are currently running without waiting for
+    their owners to restart them. Requires workspace:manage permission.
     """
     _check_workspace_access(permissions, "manage")
     await _reject_conflicting_coder_task()

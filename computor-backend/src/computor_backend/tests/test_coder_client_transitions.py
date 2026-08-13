@@ -31,8 +31,13 @@ PREVIOUS_BUILD = {
 }
 
 
-def _client(build_params=None):
-    """A CoderClient with only the HTTP layer faked out."""
+def _client(build_params=None, active_version_id="tv-1"):
+    """A CoderClient with only the HTTP layer faked out.
+
+    The previous build sits on ``tv-1``; ``active_version_id`` is what the
+    template currently promotes — pass ``"tv-2"`` to model a workspace a
+    template push has left behind.
+    """
     client = CoderClient.__new__(CoderClient)
     client.settings = MagicMock(workspace_timeout=30)
     client.get_build_params = AsyncMock(
@@ -46,7 +51,8 @@ def _client(build_params=None):
         if method == "GET":
             resp.status_code = 200
             resp.json.return_value = {
-                "latest_build": {"id": "build-1", "template_version_id": "tv-1"}
+                "latest_build": {"id": "build-1", "template_version_id": "tv-1"},
+                "template_active_version_id": active_version_id,
             }
         else:
             posted["body"] = kwargs.get("json")
@@ -154,6 +160,52 @@ async def test_token_update_merges_extra_params_without_duplicates():
     assert sent["computor_auth_token"] == "ctp_new_token"
     assert sent["workspace_app_secret"] == "new-secret"
     assert sent["home_mode"] == "scratch"
+
+
+# --- active-version adoption on start ----------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_start_builds_on_the_active_version_when_outdated():
+    # The rollout regression: every start re-pinned the previous build's
+    # version, so a pushed template never reached an existing workspace no
+    # matter how often it was restarted.
+    client = _client(active_version_id="tv-2")
+    await client._workspace_transition("ws-1", "start")
+    assert client._posted["body"]["template_version_id"] == "tv-2"
+
+
+@pytest.mark.asyncio
+async def test_version_change_start_carries_the_parameters():
+    # A version-change build re-resolves parameters against the new version,
+    # so even a plain start must send the explicit list once the version
+    # moves — otherwise the auth token resets to "" and logs the extension out.
+    client = _client(active_version_id="tv-2")
+    await client._workspace_transition("ws-1", "start")
+    sent = _sent(client)
+    assert sent["computor_auth_token"] == "ctp_previous_token"
+    assert sent["home_mode"] == "scratch"
+    assert sent["workspace_app_secret"] == "old-secret"
+
+
+@pytest.mark.asyncio
+async def test_stop_keeps_the_version_it_was_built_with():
+    # Teardown must run the terraform that created the resources.
+    client = _client(active_version_id="tv-2")
+    await client._workspace_transition("ws-1", "stop")
+    assert client._posted["body"]["template_version_id"] == "tv-1"
+    assert "rich_parameter_values" not in client._posted["body"]
+
+
+@pytest.mark.asyncio
+async def test_current_workspace_start_stays_on_the_cheap_path():
+    # No version change, no policy, no overrides: Coder carries everything
+    # forward itself, exactly as before.
+    client = _client(active_version_id="tv-1")
+    await client._workspace_transition("ws-1", "start")
+    assert client._posted["body"]["template_version_id"] == "tv-1"
+    assert "rich_parameter_values" not in client._posted["body"]
+    client.get_build_params.assert_not_awaited()
 
 
 # --- fleet rollout ------------------------------------------------------------

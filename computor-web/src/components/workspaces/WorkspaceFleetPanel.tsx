@@ -42,9 +42,9 @@ function readiness(template: CoderTemplateFleetStatus): {
       return { label: 'Unavailable', color: 'gray', detail: 'No active template version' };
     case 'ready':
       return {
-        label: 'Ready to roll out',
+        label: 'Running outdated',
         color: 'yellow',
-        detail: `${template.actionable_count} workspace${template.actionable_count === 1 ? '' : 's'} can be updated`,
+        detail: `${template.actionable_count} running workspace${template.actionable_count === 1 ? '' : 's'} can be updated now`,
       };
     case 'scheduled_on_start':
       return {
@@ -179,10 +179,11 @@ export default function WorkspaceFleetPanel() {
         <div>
           <h2 className="text-lg font-semibold text-gray-900">Template updates</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Build and activate a new version for selected templates, then roll out only the
-            templates that have actionable outdated workspaces. Stopped workspaces update on
-            their next start. Only templates already deployed to Coder appear here — to deploy
-            one for the first time, use the{' '}
+            Build and activate a new version for selected templates. A push schedules the fleet
+            update by itself: every workspace adopts the new version on its next start. Update
+            running now additionally rebuilds workspaces that are up right now — that interrupts
+            whoever is working in them, so save it for fixes that cannot wait. Only templates
+            already deployed to Coder appear here — to deploy one for the first time, use the{' '}
             <Link href="/workspaces/admin?tab=templates" className="text-blue-600 hover:underline">
               Templates
             </Link>{' '}
@@ -231,9 +232,9 @@ export default function WorkspaceFleetPanel() {
             variant="secondary"
             onClick={() => runRollout(selectedReady.map((template) => template.name))}
             disabled={busy || selectedReady.length === 0}
-            title={selectedReady.length === 0 ? 'No selected template needs a rollout' : undefined}
+            title={selectedReady.length === 0 ? 'No selected template has running outdated workspaces' : undefined}
           >
-            Roll out ready ({selectedReady.length})
+            Update running now ({selectedReady.length})
           </Button>
         </div>
 
@@ -331,7 +332,7 @@ export default function WorkspaceFleetPanel() {
                           title={template.actionable_count === 0 ? state.detail : undefined}
                           onClick={() => runRollout([template.name])}
                         >
-                          Roll out
+                          Update running
                         </Button>
                       </div>
                     </Td>
