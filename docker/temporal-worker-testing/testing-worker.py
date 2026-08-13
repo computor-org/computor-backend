@@ -490,23 +490,28 @@ def main():
 
     # Pass command line arguments to the temporal worker
     # This allows docker-compose to specify --queues=testing
-    args = ' '.join(sys.argv[1:]) if len(sys.argv) > 1 else ''
-    cmd = f"python -m computor_backend.tasks.temporal_worker {args}"
-    print(f"  Command: {cmd}")
+    argv = [sys.executable, "-m", "computor_backend.tasks.temporal_worker", *sys.argv[1:]]
+    print(f"  Command: {' '.join(argv)}")
 
     print("\n" + "=" * 80)
     print("Worker Starting - Logs will follow")
     print("=" * 80 + "\n")
 
-    # Use Popen to allow logs to flow through
-    # Forward stdout/stderr so we can see worker activity in Docker logs
-    subprocess.Popen(
-        cmd,
-        cwd=os.path.abspath(os.path.expanduser("~")),
-        shell=True,
-        stdout=sys.stdout,
-        stderr=sys.stderr,
-    ).wait()  # Wait for worker to finish (blocks forever)
+    # Replace this process with the worker rather than spawning it as a child.
+    # This script is PID 1 in the container, and the kernel does not deliver a
+    # signal to PID 1 unless PID 1 explicitly handles it. This script handles
+    # none, so `docker stop` SIGTERM was silently dropped: the worker — a
+    # grandchild, behind a `sh -c` — never learned to drain, and Docker sat out
+    # the entire stop_grace_period (330s) before SIGKILLing a live test run.
+    # After the exec the worker itself is PID 1, so its own SIGTERM handler
+    # runs and in-flight activities drain, exactly as in the plain and coder
+    # worker images (which run the worker module as their CMD directly).
+    os.chdir(os.path.abspath(os.path.expanduser("~")))
+    # execv does not flush Python's buffers, and stdout is a pipe (block
+    # buffered) under Docker — everything printed above would be lost.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os.execv(argv[0], argv)
 
 
 if __name__ == '__main__':
