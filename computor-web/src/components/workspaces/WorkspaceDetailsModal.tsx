@@ -48,8 +48,19 @@ export default function WorkspaceDetailsModal({
                 <td className="py-2 text-gray-900">{ws.template_display_name || ws.template_name}</td>
               </tr>
               <tr>
-                <td className="py-2 font-medium text-gray-600 pr-4">Owner</td>
-                <td className="py-2 text-gray-900">{ws.owner_name}</td>
+                <td className="py-2 font-medium text-gray-600 pr-4 align-top">Owner</td>
+                {/*
+                  The Coder username is an encoding of the Computor user id, so
+                  it reads as noise; the backend resolves the person behind it.
+                  It still addresses the workspace in Coder's URLs, which is why
+                  a details view keeps it visible underneath.
+                */}
+                <td className="py-2 text-gray-900">
+                  {ws.owner_display_name || ws.owner_email || ws.owner_name}
+                  {(ws.owner_display_name || ws.owner_email) && ws.owner_name && (
+                    <div className="text-gray-500 font-mono text-xs">{ws.owner_name}</div>
+                  )}
+                </td>
               </tr>
               <tr>
                 <td className="py-2 font-medium text-gray-600 pr-4">ID</td>

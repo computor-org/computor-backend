@@ -28,8 +28,35 @@ const TERMINAL = new Set<TaskStatus>([
   TaskStatus.CANCELLED,
 ]);
 
-function ownerName(workspace: CoderWorkspace): string {
-  return workspace.owner_name || workspace.owner_id;
+/**
+ * Who a workspace belongs to, in the order a maintainer can actually read.
+ *
+ * Coder only knows owners by their encoded username (`u` + base32 of the
+ * Computor user id — `coder/naming.py`), which is unreadable; the backend
+ * resolves it for this view. The encoded name is still what addresses the
+ * workspace in Coder's own UI and URLs, so it stays reachable on hover rather
+ * than taking the line.
+ */
+function ownerLines(workspace: CoderWorkspace): { primary: string; secondary: string | null } {
+  const name = workspace.owner_display_name;
+  const email = workspace.owner_email;
+  const primary = name || email || workspace.owner_name || workspace.owner_id;
+  return { primary, secondary: name && email ? email : null };
+}
+
+/** Everything about a workspace the search box matches on. */
+function searchHaystack(workspace: CoderWorkspace): string {
+  return [
+    workspace.owner_display_name,
+    workspace.owner_email,
+    workspace.owner_name,
+    workspace.name,
+    workspace.template_display_name,
+    workspace.template_name,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
 }
 
 function readiness(template: CoderTemplateFleetStatus): {
@@ -64,6 +91,7 @@ export default function WorkspaceFleetPanel() {
   const [imageTag, setImageTag] = useState('');
   const [noCache, setNoCache] = useState(false);
   const [optimisticTask, setOptimisticTask] = useState<TaskInfo | null>(null);
+  const [query, setQuery] = useState('');
 
   const { data, loading, error, reload, refresh } = useResource(
     async () => {
@@ -101,6 +129,12 @@ export default function WorkspaceFleetPanel() {
     const active = activeVersionByTemplate.get(workspace.template_id);
     return Boolean(active && workspace.template_version_id && workspace.template_version_id !== active);
   }
+
+  const visibleWorkspaces = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return workspaces;
+    return workspaces.filter((workspace) => searchHaystack(workspace).includes(needle));
+  }, [workspaces, query]);
 
   function toggleTemplate(name: string) {
     setSelected((previous) => {
@@ -349,14 +383,25 @@ export default function WorkspaceFleetPanel() {
         </ScrollPanel>
       )}
 
-      <div className="shrink-0 flex items-center justify-between text-sm text-gray-600">
+      <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
         <span>
           Workspace details
-          {workspaces.some(isOutdated) && (
-            <span className="text-amber-700"> · {workspaces.filter(isOutdated).length} on an older version</span>
+          {query.trim() && <span> · {visibleWorkspaces.length} of {workspaces.length}</span>}
+          {visibleWorkspaces.some(isOutdated) && (
+            <span className="text-amber-700"> · {visibleWorkspaces.filter(isOutdated).length} on an older version</span>
           )}
         </span>
-        <Button size="xs" variant="ghost" onClick={() => reload()} disabled={loading}>Refresh</Button>
+        <div className="flex items-center gap-2">
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className={`${inputCls} w-72`}
+            placeholder="Filter by owner or template…"
+            aria-label="Filter workspaces"
+          />
+          <Button size="xs" variant="ghost" onClick={() => reload()} disabled={loading}>Refresh</Button>
+        </div>
       </div>
 
       {!loading && (
@@ -368,9 +413,25 @@ export default function WorkspaceFleetPanel() {
               </tr>
             </Thead>
             <Tbody>
-              {workspaces.map((workspace) => (
+              {visibleWorkspaces.map((workspace) => {
+                const owner = ownerLines(workspace);
+                return (
                 <Tr key={workspace.id} className="hover:bg-gray-50">
-                  <Td className="text-sm text-gray-900">{ownerName(workspace)}</Td>
+                  <Td title={workspace.owner_name ? `Coder user: ${workspace.owner_name}` : undefined}>
+                    {workspace.owner_user_id ? (
+                      <Link
+                        href={`/workspaces/admin/${workspace.owner_user_id}`}
+                        className="text-sm text-blue-600 hover:underline"
+                      >
+                        {owner.primary}
+                      </Link>
+                    ) : (
+                      <span className="text-sm text-gray-900">{owner.primary}</span>
+                    )}
+                    {owner.secondary && (
+                      <div className="text-xs text-gray-500">{owner.secondary}</div>
+                    )}
+                  </Td>
                   <Td className="text-sm text-gray-600">{workspace.name}</Td>
                   <Td className="text-sm text-gray-600">
                     {workspace.template_display_name || workspace.template_name || '—'}
@@ -392,9 +453,14 @@ export default function WorkspaceFleetPanel() {
                     />
                   </Td>
                 </Tr>
-              ))}
-              {workspaces.length === 0 && (
-                <Tr><Td colSpan={5} className="py-8 text-center text-sm text-gray-500">No workspaces.</Td></Tr>
+                );
+              })}
+              {visibleWorkspaces.length === 0 && (
+                <Tr>
+                  <Td colSpan={5} className="py-8 text-center text-sm text-gray-500">
+                    {workspaces.length === 0 ? 'No workspaces.' : 'No workspaces match the filter.'}
+                  </Td>
+                </Tr>
               )}
             </Tbody>
           </Table>

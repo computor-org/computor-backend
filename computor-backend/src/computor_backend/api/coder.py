@@ -48,6 +48,7 @@ from computor_types.coder import (
     CoderLoginRequest,
     CoderSessionResponse,
     CoderTemplateFleetStatus,
+    CoderWorkspace,
     ImageBuildRequest,
     ProvisionResult,
     TemplateCatalogEntry,
@@ -263,6 +264,45 @@ def _computor_user_for_coder_name(db: Session, username: str):
     except Exception:
         logger.warning(f"Could not resolve Coder username '{username}' to a user")
         return None
+
+
+def _resolve_workspace_owners(db: Session, workspaces: list[CoderWorkspace]) -> None:
+    """Fill in who each workspace belongs to, in place.
+
+    A Coder owner name is a lossless encoding of the Computor user id, so the
+    id itself costs nothing to recover and the names only need one batched
+    lookup for the whole fleet — the admin view polls, so this must not be a
+    query per row. Owners we did not create (Coder's own `admin`) decode to
+    None and keep their raw name, which is all the caller can show for them.
+    """
+    from computor_backend.model.auth import User
+
+    user_id_by_name = {
+        w.owner_name: decode_coder_username(w.owner_name)
+        for w in workspaces
+        if w.owner_name
+    }
+    ids = {uid for uid in user_id_by_name.values() if uid}
+    users = {}
+    if ids:
+        try:
+            users = {
+                str(u.id): u
+                for u in db.query(User).filter(User.id.in_(ids)).all()
+            }
+        except Exception as e:
+            logger.warning(f"Could not resolve workspace owners: {e}")
+            return
+
+    for workspace in workspaces:
+        user = users.get(user_id_by_name.get(workspace.owner_name) or "")
+        if user is None:
+            # No such user any more (or never ours): the raw Coder name is all
+            # there is to show, and it must not link anywhere.
+            continue
+        workspace.owner_user_id = str(user.id)
+        workspace.owner_display_name = get_user_fullname(user)
+        workspace.owner_email = user.email
 
 
 def _locked_variable_reasons() -> dict:
@@ -600,12 +640,18 @@ async def list_all_workspaces_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> WorkspaceListResponse:
     """List every workspace on the server, across all users. Requires
-    workspace:manage — the fleet view behind the admin rollout."""
+    workspace:manage — the fleet view behind the admin rollout.
+
+    Owners are resolved to Computor users here: Coder only knows them by the
+    encoded username, which is unreadable to the person running a rollout.
+    """
     _check_workspace_access(permissions, "manage")
     try:
         workspaces = await client.list_all_workspaces()
+        _resolve_workspace_owners(db, workspaces)
         return WorkspaceListResponse(workspaces=workspaces, count=len(workspaces))
     except Exception as e:
         raise _handle_coder_error(e) from e
@@ -668,7 +714,9 @@ async def get_workspace_details(
     """Get detailed information about a specific workspace."""
     _check_workspace_access_or_course_member(permissions, "access", db, username=username)
     try:
-        return await client.get_workspace(username, workspace_name)
+        details = await client.get_workspace(username, workspace_name)
+        _resolve_workspace_owners(db, [details.workspace])
+        return details
     except Exception as e:
         raise _handle_coder_error(e) from e
 

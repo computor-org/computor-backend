@@ -140,6 +140,20 @@ class CoderWorkspace(BaseModel):
     name: str = Field(..., description="Workspace name")
     owner_id: str = Field(..., description="Owner user ID")
     owner_name: Optional[str] = Field(None, description="Owner username")
+    owner_user_id: Optional[str] = Field(
+        None,
+        description="Computor user behind owner_name, which encodes it (coder/naming.py). "
+                    "Only populated by views that resolve owners, and None when there is "
+                    "no such user: Coder's own 'admin' account, or an owner since deleted.",
+    )
+    owner_display_name: Optional[str] = Field(
+        None,
+        description="Full name of the owner_user_id user; None when that user has no "
+                    "name set, so fall back to owner_email and then owner_name",
+    )
+    owner_email: Optional[str] = Field(
+        None, description="Email of the owner_user_id user"
+    )
     template_id: str = Field(..., description="Template ID")
     template_name: Optional[str] = Field(None, description="Raw template name (stable identifier, e.g. 'python-workspace')")
     template_display_name: Optional[str] = Field(None, description="Human-readable template display name")
