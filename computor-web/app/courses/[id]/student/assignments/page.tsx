@@ -200,12 +200,12 @@ export default function StudentCourseContentsPage() {
                       <Badge color="yellow">Not Submitted</Badge>
                     )}
 
-                    {/* Result */}
+                    {/* Result — result.result is a 0..1 fraction, not a percentage */}
                     {node.content.result ? (
                       <span className={`text-sm font-medium ${
-                        (node.content.result.result || 0) >= 50 ? 'text-green-600' : 'text-red-600'
+                        (node.content.result.result ?? 0) >= 0.5 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {(node.content.result.result || 0).toFixed(1)}%
+                        {((node.content.result.result ?? 0) * 100).toFixed(1)}%
                       </span>
                     ) : (
                       <span className="text-sm text-gray-400">No results</span>
