@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "error_count": 73,
+  "error_count": 74,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -428,6 +428,19 @@
         "plain": "Cannot delete this course content because descendant items have student submissions. Use archive instead.",
         "markdown": "**Deletion Blocked**\n\nThis course content cannot be deleted because it contains descendant items with student submissions. Use **archive** instead to hide the content while preserving student data.",
         "html": "<strong>Deletion Blocked</strong><p>This course content cannot be deleted because it contains descendant items with student submissions. Use <em>archive</em> instead to hide the content while preserving student data.</p>"
+      },
+      "retry_after": null
+    },
+    "CONTENT_008": {
+      "code": "CONTENT_008",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Content Type Kind Change Blocked",
+      "message": {
+        "plain": "Cannot change this content's type across kinds (assignment/unit) because the content is not empty. Pick a type of the same kind, or remove its children, example and submissions first.",
+        "markdown": "**Content Type Kind Change Blocked**\n\nThis content cannot switch between *assignment* and *unit* because it is not empty: a unit with children cannot become an assignment, and an assignment with an assigned example or student submissions cannot become a unit. Pick a content type of the same kind, or empty the content first.",
+        "html": "<strong>Content Type Kind Change Blocked</strong><p>This content cannot switch between <em>assignment</em> and <em>unit</em> because it is not empty: a unit with children cannot become an assignment, and an assignment with an assigned example or student submissions cannot become a unit. Pick a content type of the same kind, or empty the content first.</p>"
       },
       "retry_after": null
     },

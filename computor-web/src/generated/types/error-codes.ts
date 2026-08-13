@@ -93,6 +93,7 @@ export const ErrorCodes = {
   CONTENT_005: "CONTENT_005", // Example Version Not Found
   CONTENT_006: "CONTENT_006", // Deletion Blocked by Student Submissions
   CONTENT_007: "CONTENT_007", // Deletion Blocked by Descendant Submissions
+  CONTENT_008: "CONTENT_008", // Content Type Kind Change Blocked
   VERSION_001: "VERSION_001", // Example Version Already Exists
   DEPLOY_001: "DEPLOY_001", // Assignment Not Released
   DEPLOY_002: "DEPLOY_002", // Deployment Not Found
@@ -615,6 +616,20 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
       plain: "Cannot delete this course content because descendant items have student submissions. Use archive instead.",
       markdown: "**Deletion Blocked**\n\nThis course content cannot be deleted because it contains descendant items with student submissions. Use **archive** instead to hide the content while preserving student data.",
       html: "<strong>Deletion Blocked</strong><p>This course content cannot be deleted because it contains descendant items with student submissions. Use <em>archive</em> instead to hide the content while preserving student data.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: undefined,
+  },
+  CONTENT_008: {
+    code: "CONTENT_008",
+    httpStatus: 400,
+    category: ErrorCategory.VALIDATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Content Type Kind Change Blocked",
+    message: {
+      plain: "Cannot change this content's type across kinds (assignment/unit) because the content is not empty. Pick a type of the same kind, or remove its children, example and submissions first.",
+      markdown: "**Content Type Kind Change Blocked**\n\nThis content cannot switch between *assignment* and *unit* because it is not empty: a unit with children cannot become an assignment, and an assignment with an assigned example or student submissions cannot become a unit. Pick a content type of the same kind, or empty the content first.",
+      html: "<strong>Content Type Kind Change Blocked</strong><p>This content cannot switch between <em>assignment</em> and <em>unit</em> because it is not empty: a unit with children cannot become an assignment, and an assignment with an assigned example or student submissions cannot become a unit. Pick a content type of the same kind, or empty the content first.</p>",
     },
     retryAfter: undefined,
     documentationUrl: undefined,

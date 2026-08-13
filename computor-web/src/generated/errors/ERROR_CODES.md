@@ -1,7 +1,7 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Total errors:** 73
+**Total errors:** 74
 
 To regenerate: `bash generate_error_codes.sh`
 
@@ -1713,6 +1713,31 @@ Attempted to delete a course content whose Ltree descendants have SubmissionArti
 **Resolution Steps:**
 1. Use archive instead of delete to preserve student data
 2. If deletion is truly required, archive or remove descendant submissions first
+
+---
+
+### CONTENT_008 - Content Type Kind Change Blocked
+
+**HTTP Status:** `400`  
+**Severity:** `warning`  
+**Category:** `validation`  
+
+**Description:**  
+PATCH moved course_content.course_content_type_id to a type of a different course_content_kind while the content has descendants, a non-unassigned deployment, or submission groups
+
+**User Message:**  
+> Cannot change this content's type across kinds (assignment/unit) because the content is not empty. Pick a type of the same kind, or remove its children, example and submissions first.
+
+**Affected Functions:**
+- `_validate_course_content_type_change`
+- `update_entity`
+
+**Common Causes:**
+- Accidentally picking a unit type for an assignment (or vice versa) in the content type picker
+
+**Resolution Steps:**
+1. Choose a content type of the same kind as the current one
+2. If the kind change is intended, first remove children, unassign the example and make sure there are no submissions
 
 ---
 

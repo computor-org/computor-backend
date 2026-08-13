@@ -110,6 +110,10 @@ def select_contents_to_process(
     ).filter(
         CourseContent.course_id == course_id,
         CourseContent.archived_at.is_(None),
+        # Only submittable content: a unit can be left holding a deployment
+        # row by a past kind flip, and deploying a directory for a unit
+        # corrupts the student template (computor-org/issues#320).
+        CourseContent.is_submittable.is_(True),
         CourseContent.deployment.has()  # Has a deployment record
     ).order_by(CourseContent.path).all()
 
