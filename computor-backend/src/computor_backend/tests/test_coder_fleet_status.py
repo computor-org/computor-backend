@@ -22,7 +22,11 @@ def _admin() -> Principal:
 
 
 @pytest.mark.asyncio
-async def test_fleet_status_distinguishes_actionable_and_scheduled_workspaces():
+async def test_fleet_status_counts_running_as_actionable_and_stopped_as_scheduled():
+    """Every start through the backend builds on the active version, so a
+    stopped outdated workspace is scheduled no matter what its
+    automatic_updates flag says — only running ones need an admin to force
+    an update."""
     client = MagicMock()
     client.health_check = AsyncMock(return_value=(True, "2.29.4"))
     client.list_templates = AsyncMock(return_value=[
@@ -41,12 +45,12 @@ async def test_fleet_status_distinguishes_actionable_and_scheduled_workspaces():
             latest_build_status=WorkspaceBuildStatus.SUCCEEDED, automatic_updates="always",
         ),
         CoderWorkspace(
-            id="scheduled", name="scheduled", owner_id="u2", template_id="t1",
+            id="stopped-always", name="stopped-always", owner_id="u2", template_id="t1",
             template_version_id="v1", latest_build_transition="stop",
             latest_build_status=WorkspaceBuildStatus.STOPPED, automatic_updates="always",
         ),
         CoderWorkspace(
-            id="actionable", name="actionable", owner_id="u3", template_id="t1",
+            id="stopped-never", name="stopped-never", owner_id="u3", template_id="t1",
             template_version_id="v1", latest_build_transition="stop",
             latest_build_status=WorkspaceBuildStatus.STOPPED, automatic_updates="never",
         ),
@@ -60,8 +64,8 @@ async def test_fleet_status_distinguishes_actionable_and_scheduled_workspaces():
     assert vscode.current_count == 1
     assert vscode.outdated_count == 3
     assert vscode.running_outdated_count == 1
-    assert vscode.scheduled_on_start_count == 1
-    assert vscode.actionable_count == 2
+    assert vscode.scheduled_on_start_count == 2
+    assert vscode.actionable_count == 1
     assert vscode.rollout_state == "ready"
     assert response.templates[1].rollout_state == "unavailable"
 

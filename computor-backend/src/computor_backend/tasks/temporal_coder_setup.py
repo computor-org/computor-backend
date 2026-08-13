@@ -971,16 +971,20 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
             )
             self._progress["completed"] += 1
 
+        # Templates whose push actually produced a new active version this
+        # run — a skipped push (unchanged content) promoted nothing, a failed
+        # build never reached Coder.
+        pushed_ok = [
+            key for key, r in zip(template_keys, results)
+            if r.get("success") and not r.get("skipped") and r.get("stage") != "build"
+        ]
+
         # Step 3: prune superseded image versions, but only for templates this
         # run just re-pinned to its fresh tag. Never on build_images=False
         # (e.g. a rollback push pinning an older tag that pruning would treat
         # as stale). Best-effort — a cleanup failure must not fail the push.
         cleanup = None
         if build_images:
-            pushed_ok = [
-                key for key, r in zip(template_keys, results)
-                if r.get("success") and not r.get("skipped") and r.get("stage") != "build"
-            ]
             if pushed_ok:
                 try:
                     self._progress.update({"phase": "cleanup", "current_template": None})
@@ -993,19 +997,54 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
                 except Exception as e:
                     workflow.logger.warning(f"Image cleanup failed (non-fatal): {e}")
 
+        # Step 4: schedule fleet adoption of the versions just pushed — the
+        # gentle rollout (flags only, update_running=False): every workspace
+        # gets automatic_updates=always and picks the new version up on its
+        # next start; nobody's running workspace is rebuilt under them. The
+        # admin "roll out" button remains the force-update for running ones.
+        # Best-effort — the push itself succeeded, and the start path adopts
+        # the active version regardless of the flag, so a hiccup here only
+        # delays Coder-native autostart adoption; the fleet panel still shows
+        # any drift.
+        rollouts = []
+        for key in pushed_ok:
+            self._progress.update({"phase": "rolling_out", "current_template": key})
+            try:
+                rollouts.append(await workflow.execute_activity(
+                    rollout_template_workspaces,
+                    args=[key, templates_dir, False],
+                    start_to_close_timeout=timedelta(minutes=10),
+                    retry_policy=RetryPolicy(
+                        initial_interval=timedelta(seconds=5),
+                        backoff_coefficient=2.0,
+                        maximum_attempts=2,
+                    ),
+                ))
+            except Exception as e:
+                workflow.logger.warning(
+                    f"Post-push rollout failed for {key} (non-fatal): {e}"
+                )
+                rollouts.append({"success": False, "template": key, "error": str(e)})
+
         failed = [r for r in results if not r.get("success")]
         _finish_progress(self._progress, len(failed))
+        result_payload = {
+            "pushes": results,
+            "image_tag": image_tag,
+            "cleanup": cleanup,
+            "rollouts": rollouts,
+        }
         if failed:
             return WorkflowResult(
                 status="completed_with_errors",
-                result={"pushes": results, "image_tag": image_tag, "cleanup": cleanup},
+                result=result_payload,
                 error=f"{len(failed)} push(es) failed",
                 metadata={"workflow_type": "push_coder_templates"},
             )
 
         return WorkflowResult(
             status="completed",
-            result={"pushes": results, "image_tag": image_tag, "cleanup": cleanup},
+            result=result_payload,
             metadata={"workflow_type": "push_coder_templates"},
         )
 
@@ -1014,13 +1053,22 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
 async def rollout_template_workspaces(
     template_key: str,
     templates_dir: str,
+    update_running: bool = True,
 ) -> Dict[str, Any]:
     """Roll every workspace of one template onto its active version.
 
     Policy: enable automatic updates for every workspace (so stopped ones adopt
-    the active version on their next start), and additionally issue an immediate
-    update build for workspaces that are currently up. In-progress, stopped and
-    failed workspaces are left to auto-update rather than being force-started.
+    the active version on their next start — the backend start path resolves it
+    on every start build), and with ``update_running`` additionally issue an
+    immediate update build for workspaces that are currently up. In-progress,
+    stopped and failed workspaces are left to auto-update rather than being
+    force-started.
+
+    ``update_running=False`` is the gentle variant the push workflow chains in
+    after every successful push: it only sets the flags, so a workspace someone
+    is working in right now is never rebuilt under them — it updates on its
+    next natural stop/start. The admin "roll out" button keeps the default and
+    force-rebuilds running workspaces too.
     """
     from computor_backend.coder.client import CoderClient
 
@@ -1050,7 +1098,7 @@ async def rollout_template_workspaces(
             # deleted user) map to None and keep their existing credential.
             credentials_by_owner: dict[str, Optional[tuple[str, str]]] = {}
             owner_names = {w.owner_name for w in targets if w.owner_name}
-            if owner_names:
+            if update_running and owner_names:
                 from computor_backend.coder.service import (
                     workspace_app_credentials_for_owner,
                 )
@@ -1076,7 +1124,7 @@ async def rollout_template_workspaces(
 
                     status = w.latest_build_status.value if w.latest_build_status else ""
                     is_up = w.latest_build_transition == "start" and status in ("succeeded", "running")
-                    if is_up:
+                    if is_up and update_running:
                         if await client.update_workspace_to_version(
                             w.id,
                             version_id,

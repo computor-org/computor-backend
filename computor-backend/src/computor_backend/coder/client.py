@@ -817,6 +817,11 @@ class CoderClient:
         payload: dict[str, Any] = {
             "name": workspace_name,
             "template_id": template_id,
+            # Fleet policy: every workspace tracks its template's active
+            # version. Computor's own start path resolves that version itself
+            # (_workspace_transition); this flag makes Coder-initiated builds
+            # (autostart) agree, so no start path can resurrect a stale image.
+            "automatic_updates": "always",
         }
 
         # Add rich parameter values (per-workspace Terraform variables)
@@ -935,7 +940,8 @@ class CoderClient:
         param_overrides: Optional[dict[str, str]] = None,
     ) -> bool:
         """
-        Start a stopped workspace.
+        Start a stopped workspace on its template's active version (see
+        _workspace_transition — an outdated workspace updates as it starts).
 
         Args:
             username: User's username
@@ -1025,6 +1031,15 @@ class CoderClient:
         With neither (the default) the field is omitted entirely and Coder
         carries every value forward itself, which is what keeps an ordinary
         stop/start cheap and lossless.
+
+        A ``start`` always builds on the template's ACTIVE version, not the
+        version of the previous build. Users only ever start through this
+        path (web UI and extension both route here, never Coder's own UI), so
+        pinning the previous version would keep a workspace on a stale image
+        forever no matter how many template pushes happen — templates are
+        centrally managed and a workspace has no business staying behind. A
+        ``stop`` keeps the version it was built with: teardown must run the
+        terraform that created the resources.
         """
         # Get workspace to find template version
         resp = await self._request(
@@ -1035,17 +1050,27 @@ class CoderClient:
             return False
 
         workspace = resp.json()
-        template_version_id = workspace["latest_build"]["template_version_id"]
+        latest_build = workspace.get("latest_build") or {}
+        previous_version_id = latest_build.get("template_version_id")
+        template_version_id = previous_version_id
+        if transition == "start":
+            active_version_id = workspace.get("template_active_version_id")
+            if active_version_id:
+                template_version_id = active_version_id
 
         body: dict[str, Any] = {
             "template_version_id": template_version_id,
             "transition": transition,
         }
-        if policy or param_overrides:
+        # A version-change build re-resolves parameters against the new
+        # version, so Coder does NOT carry the previous build's values — an
+        # omitted list would reset the auth token to its "" default and
+        # de-authenticate the extension. Send the explicit list then too.
+        if policy or param_overrides or template_version_id != previous_version_id:
             # One read for everything: the immutable set AND the auth token,
             # which is mutable, absent from CARRIED_BUILD_PARAMS, and would be
             # reset to the template's "" default by the partial list below.
-            build_id = workspace["latest_build"].get("id")
+            build_id = latest_build.get("id")
             by_name = await self.get_build_params(build_id) if build_id else {}
             carried = {
                 name: by_name[name]
