@@ -12,6 +12,7 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 import Forbidden from '@/src/components/Forbidden';
 import SystemRoleCheckboxes from '@/src/components/SystemRoleCheckboxes';
+import ConnectUsersSection from '@/src/components/users/ConnectUsersSection';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import { UserRolesClient } from '@/src/generated/clients/UserRolesClient';
@@ -303,6 +304,16 @@ export default function UserDetailPage() {
                 )}
               </div>
             </section>
+
+            {/* Connect users (absorb a pre-provisioned roster import) */}
+            {!user.is_service && (
+              <ConnectUsersSection
+                key={user.id}
+                user={user}
+                hasBuiltinAccount={accounts.some((a) => a.builtin === true)}
+                onConnected={load}
+              />
+            )}
           </ScrollArea>
         ) : null}
 

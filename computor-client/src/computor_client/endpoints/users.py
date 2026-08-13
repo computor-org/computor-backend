@@ -10,6 +10,8 @@ from typing import Any, Dict, List, Optional, Union
 
 from computor_types.users import (
     UserBanRequest,
+    UserConnectRequest,
+    UserConnectResponse,
     UserCreate,
     UserGet,
     UserList,
@@ -119,6 +121,16 @@ class UsersClient:
         """Ban User"""
         response = await self._http.patch(f"/users/{quote_path(user_id)}/ban", json_data=data, params=kwargs)
         return UserGet.model_validate(response.json())
+
+    async def connect(
+        self,
+        user_id: str,
+        data: Union[UserConnectRequest, Dict[str, Any]],
+        **kwargs: Any,
+    ) -> UserConnectResponse:
+        """Connect User"""
+        response = await self._http.post(f"/users/{quote_path(user_id)}/connect", json_data=data, params=kwargs)
+        return UserConnectResponse.model_validate(response.json())
 
     async def update_unban(
         self,

@@ -289,6 +289,75 @@ export interface UserBanRequest {
 }
 
 /**
+ * Request to absorb a pre-provisioned user into the addressed user.
+ * 
+ * The addressed user (path parameter) is the keeper — the real, logged-in
+ * account. ``source_user_id`` names the pre-provisioned row (created by a
+ * course roster import) that is absorbed and deleted. The operation is
+ * refused unless the source user has never authenticated.
+ */
+export interface UserConnectRequest {
+  /** Id of the pre-provisioned user to absorb; this row is deleted on success */
+  source_user_id: string;
+  /** Validate and return the merge plan without changing anything */
+  dry_run?: boolean;
+}
+
+/**
+ * One course membership affected by a user-connect operation.
+ */
+export interface UserConnectCourseMove {
+  /** Course the membership belongs to */
+  course_id: string;
+  /** Course title, for display */
+  course_title?: string | null;
+  /** 'moved' (membership re-pointed to the keeper) or 'duplicate_removed' (keeper already enrolled; the source's empty membership was removed) */
+  action: string;
+  /** Whether the source membership's course group was copied onto the keeper's membership */
+  group_carried_over?: boolean;
+}
+
+/**
+ * One student profile affected by a user-connect operation.
+ */
+export interface UserConnectProfileMove {
+  /** Organization the profile is scoped to */
+  organization_id: string;
+  /** Organization title, for display */
+  organization_title?: string | null;
+  /** Student email the keeper's profile carries after the merge (the imported address) */
+  student_email?: string | null;
+  /** 'moved' (profile re-pointed to the keeper) or 'merged' (keeper already had a profile for the organization; fields were merged into it) */
+  action: string;
+}
+
+/**
+ * Outcome (or dry-run plan) of connecting a pre-provisioned user to a real one.
+ */
+export interface UserConnectResponse {
+  /** True if nothing was changed and this is only the plan */
+  dry_run: boolean;
+  /** The absorbed (pre-provisioned) user */
+  source_user_id: string;
+  /** The keeper the data was moved onto */
+  target_user_id: string;
+  /** Email of the absorbed user (the imported address) */
+  source_email?: string | null;
+  /** Course memberships moved or resolved */
+  course_memberships?: UserConnectCourseMove[];
+  /** Student profiles moved or merged */
+  student_profiles?: UserConnectProfileMove[];
+  /** System roles the keeper gained from the source user */
+  roles_merged?: string[];
+  /** Manually linked provider accounts re-pointed to the keeper */
+  accounts_moved?: number;
+  /** Messages addressed to or mentioning the source user re-pointed to the keeper */
+  messages_repointed?: number;
+  /** Whether the source user row was deleted (always true on a non-dry-run success) */
+  source_deleted?: boolean;
+}
+
+/**
  * Password update request for user endpoints.
  */
 export interface UserPassword {

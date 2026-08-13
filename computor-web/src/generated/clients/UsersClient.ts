@@ -3,7 +3,7 @@
  * Endpoint: /users
  */
 
-import type { UserBanRequest, UserCreate, UserGet, UserList, UserUpdate } from 'types/generated';
+import type { UserBanRequest, UserConnectRequest, UserConnectResponse, UserCreate, UserGet, UserList, UserUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -101,6 +101,18 @@ export class UsersClient extends BaseEndpointClient {
    */
   async banUserUsersUserIdBanPatch({ userId, body }: { userId: string; body?: UserBanRequest | null }): Promise<UserGet> {
     return this.client.patch<UserGet>(this.buildPath(userId, 'ban'), body);
+  }
+
+  /**
+   * Connect User
+   * Absorb a pre-provisioned user into this user (admin or _user_manager).
+   * ``user_id`` is the keeper — the real account. The request names the
+   * source user to absorb; that row is deleted on success. Refused (409)
+   * unless the source user has never authenticated. With ``dry_run`` the
+   * validated merge plan is returned and nothing changes.
+   */
+  async connectUserUsersUserIdConnectPost({ userId, body }: { userId: string; body: UserConnectRequest }): Promise<UserConnectResponse> {
+    return this.client.post<UserConnectResponse>(this.buildPath(userId, 'connect'), body);
   }
 
   /**
