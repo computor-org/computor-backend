@@ -157,7 +157,7 @@ class CourseContentInterface(CourseContentInterfaceBase, BackendEntityInterface)
         if params is None:
             # Default: exclude archived
             query = query.filter(CourseContent.archived_at.is_(None))
-            return query
+            return query.order_by(CourseContent.course_id, CourseContent.path)
 
         # archived=True shows only archived, otherwise exclude archived
         if params.archived is True:
@@ -183,4 +183,6 @@ class CourseContentInterface(CourseContentInterfaceBase, BackendEntityInterface)
         if params.example_version_id is not None:
             query = query.filter(CourseContent.example_version_id == params.example_version_id)
 
-        return query
+        # (course_id, path) is unique, so this is a total order and pagination
+        # stays stable across pages.
+        return query.order_by(CourseContent.course_id, CourseContent.path)

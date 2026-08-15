@@ -38,9 +38,14 @@ from computor_types.deployment import (
     DeploymentSummary,
 )
 from computor_backend.api.api_builder import CrudRouter
+from computor_backend.business_logic.course_content_move import (
+    apply_course_content_move,
+    validate_course_content_move,
+)
 from computor_backend.model.course import CourseContent, Course
 from computor_backend.model.deployment import CourseContentDeployment, DeploymentHistory
 from computor_backend.redis_cache import get_redis_client, get_cache
+from computor_backend.websocket import publish_course_content_updated
 from computor_backend.repositories import (
     CourseContentRepository,
     CourseContentDeploymentRepository,
@@ -577,123 +582,11 @@ async def move_course_content(
             context={"course_content_id": content_id}
         )
 
-    old_path = str(content.path)
     new_path = move_request.path
     course_id = str(content.course_id)
 
-    # Prevent moving an item into its own descendant
-    if new_path.startswith(old_path + '.'):
-        raise BadRequestException(
-            detail="Cannot move an item into its own descendant",
-            context={"old_path": old_path, "new_path": new_path}
-        )
-
-    # Validate path format
-    import re
-    if not re.match(r'^[a-z0-9_]+(\.[a-z0-9_]+)*$', new_path):
-        raise BadRequestException(
-            detail="Invalid path format. Path must consist of lowercase alphanumeric segments separated by dots",
-            context={"path": new_path}
-        )
-
-    # Check for path collisions before executing the move
-    if old_path != new_path:
-        # Check if the new path already exists for a different content
-        collision = db.query(CourseContent).filter(
-            CourseContent.course_id == content.course_id,
-            CourseContent.path == Ltree(new_path),
-            CourseContent.id != content_id
-        ).first()
-        if collision:
-            raise BadRequestException(
-                detail=f"Path '{new_path}' already exists in this course",
-                context={
-                    "new_path": new_path,
-                    "conflicting_content_id": str(collision.id),
-                    "conflicting_content_title": collision.title
-                }
-            )
-
-        # Check if any descendant paths would collide after the move
-        descendants = db.execute(
-            text("""
-                SELECT path FROM course_content
-                WHERE path <@ :old_path
-                  AND id != :content_id
-                  AND course_id = :course_id
-            """),
-            {"old_path": old_path, "content_id": content_id, "course_id": course_id}
-        ).fetchall()
-
-        if descendants:
-            old_depth = old_path.count('.') + 1
-            new_descendant_paths = []
-            for row in descendants:
-                desc_path = str(row[0])
-                relative = desc_path.split('.')[old_depth:]
-                new_desc_path = new_path + '.' + '.'.join(relative)
-                new_descendant_paths.append(new_desc_path)
-
-            if new_descendant_paths:
-                placeholders = ', '.join(f':p{i}' for i in range(len(new_descendant_paths)))
-                params = {f'p{i}': p for i, p in enumerate(new_descendant_paths)}
-                params['content_id'] = content_id
-                params['course_id'] = course_id
-                params['old_path'] = old_path
-
-                collision_count = db.execute(
-                    text(f"""
-                        SELECT COUNT(*) FROM course_content
-                        WHERE course_id = :course_id
-                          AND path::text IN ({placeholders})
-                          AND NOT path <@ :old_path
-                    """),
-                    params
-                ).scalar()
-
-                if collision_count > 0:
-                    raise BadRequestException(
-                        detail=f"Moving this item would cause {collision_count} path collision(s) among its children",
-                        context={"old_path": old_path, "new_path": new_path}
-                    )
-
-    # Use raw SQL for all updates to bypass SQLAlchemy Ltree change detection issues.
-    # Cascade descendants first, then update the item itself.
-    if old_path != new_path:
-        db.execute(
-            text("""
-                UPDATE course_content
-                SET path = :new_path || subpath(path, nlevel(:old_path)),
-                    updated_at = now()
-                WHERE path <@ :old_path
-                  AND id != :content_id
-                  AND course_id = :course_id
-            """),
-            {
-                "new_path": new_path,
-                "old_path": old_path,
-                "content_id": content_id,
-                "course_id": course_id,
-            }
-        )
-
-    # Update the item itself via raw SQL
-    db.execute(
-        text("""
-            UPDATE course_content
-            SET path = :new_path,
-                position = :position,
-                updated_at = now()
-            WHERE id = :content_id
-              AND course_id = :course_id
-        """),
-        {
-            "new_path": new_path,
-            "position": move_request.position,
-            "content_id": content_id,
-            "course_id": course_id,
-        }
-    )
+    validate_course_content_move(content, new_path, db)
+    apply_course_content_move(db, content, new_path, move_request.position)
 
     # Expire the ORM object so refresh picks up the raw SQL changes
     db.expire(content)
@@ -724,5 +617,9 @@ async def move_course_content(
         )
     except Exception:
         logger.warning("Failed to invalidate user view caches for course %s", course_id, exc_info=True)
+
+    # Tell every other connected client to re-read the tree; the moving client
+    # refreshes on its own once the response lands.
+    publish_course_content_updated(course_id, str(content.id), "reordered")
 
     return content
