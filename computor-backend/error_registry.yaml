@@ -794,6 +794,26 @@ errors:
       - "Choose a content type of the same kind as the current one"
       - "If the kind change is intended, first remove children, unassign the example and make sure there are no submissions"
 
+  - code: CONTENT_009
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Invalid Content Move"
+    message:
+      plain: "This content cannot be moved to that place in the course. Assignments can only live inside units (or at the course root), and a unit cannot be moved inside an assignment."
+      markdown: "**Invalid Content Move**\n\nThe target position does not fit the course structure: the parent must exist, it must be a kind that can hold children (a unit), and the moved content must be a kind that may sit inside a parent. Pick a unit as the target, or move the content to the course root."
+      html: "<strong>Invalid Content Move</strong><p>The target position does not fit the course structure: the parent must exist, it must be a kind that can hold children (a unit), and the moved content must be a kind that may sit inside a parent. Pick a unit as the target, or move the content to the course root.</p>"
+    internal_description: "PATCH /course-contents/{id}/move targeted a path whose parent is missing, whose parent kind has has_descendants=false, or moved a kind with has_ascendants=false below the root; mirrors trg_validate_course_content_hierarchy so the violation surfaces as a 400 instead of a database 500"
+    affected_functions:
+      - "validate_course_content_move"
+      - "move_course_content"
+    common_causes:
+      - "Dragging or moving an assignment onto another assignment instead of onto a unit"
+      - "Targeting a unit path that does not exist (or was renamed) in this course"
+    resolution_steps:
+      - "Move the content into a unit, or to the course root"
+      - "Refresh the course tree so the available units are up to date"
+
   # ============================================================================
   # VERSION MANAGEMENT ERRORS (400, 409)
   # ============================================================================

@@ -141,14 +141,21 @@ class CourseContentMoveRequest(BaseModel):
     """Request body for ``PATCH /course-contents/{content_id}/move``.
 
     A move is a path change plus a reposition; the backend cascades the new
-    path to all descendants in one transaction.
+    path to all descendants in one transaction. The target parent must exist
+    and must be a kind that can hold children, otherwise the move is refused
+    with ``CONTENT_009``.
     """
     path: str
     position: float
 
 class CourseContentUpdate(BaseModel):
-    """DTO for updating course content."""
-    path: Optional[str] = None
+    """DTO for updating course content.
+
+    Reordering a content among its siblings is a ``position``-only update.
+    ``path`` is deliberately absent: changing it here would rename the content
+    without cascading to its descendants and orphan every child, so path
+    changes go through ``PATCH /course-contents/{content_id}/move``.
+    """
     title: Optional[str] = None
     description: Optional[str] = None
     course_content_type_id: Optional[str] = None

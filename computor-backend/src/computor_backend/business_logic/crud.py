@@ -318,8 +318,20 @@ async def update_entity(
 
         # Special validation for CourseContent type changes. Raised before the
         # try block so it surfaces as itself, not as "Failed to update entity".
-        if db_type.__tablename__ == 'course_content' and 'course_content_type_id' in entity_dict:
-            _validate_course_content_type_change(db_item, entity_dict['course_content_type_id'], db)
+        if db_type.__tablename__ == 'course_content':
+            if 'course_content_type_id' in entity_dict:
+                _validate_course_content_type_change(db_item, entity_dict['course_content_type_id'], db)
+            # A path written here would not cascade to the descendants and would
+            # orphan every child (computor-org/issues#323). The DTO no longer
+            # carries path; this catches internal callers passing plain dicts.
+            if 'path' in entity_dict and str(entity_dict['path']) != str(db_item.path):
+                raise BadRequestException(
+                    detail=(
+                        "Course content path cannot be changed here; "
+                        "use PATCH /course-contents/{content_id}/move so descendants move along"
+                    ),
+                    context={"course_content_id": str(db_item.id), "path": str(entity_dict['path'])},
+                )
 
         try:
             for key in entity_dict.keys():
