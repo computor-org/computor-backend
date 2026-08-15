@@ -135,6 +135,7 @@ class CourseContentStudentGet(BaseEntityGet):
 class CourseContentStudentList(BaseModel):
     id: str
     title: Optional[str] = None
+    description: Optional[str] = None
     path: str
     course_id: str
     course_content_type_id: str

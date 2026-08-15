@@ -58,6 +58,7 @@ class CourseContentLecturerList(BaseModel):
     """DTO for lecturer list of course content with course repository info."""
     id: str
     title: Optional[str] = None
+    description: Optional[str] = None
     path: str
     course_id: str
     course_content_type_id: str

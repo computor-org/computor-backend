@@ -318,6 +318,7 @@ async def course_member_course_content_result_mapper(
     list_obj = CourseContentStudentList(
         id=course_content.id,
         title=course_content.title,
+        description=course_content.description,
         path=course_content.path,
         course_id=course_content.course_id,
         course_content_type_id=course_content.course_content_type_id,

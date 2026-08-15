@@ -14,6 +14,7 @@ class CourseTutorRepository(BaseModel):
 class CourseTutorGet(BaseModel):
     id: str
     title: Optional[str] = None
+    description: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
     path: str
@@ -30,6 +31,7 @@ class CourseTutorGet(BaseModel):
 class CourseTutorList(BaseModel):
     id: str
     title: Optional[str] = None
+    description: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
     path: str

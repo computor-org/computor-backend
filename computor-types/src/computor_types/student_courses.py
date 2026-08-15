@@ -14,6 +14,7 @@ from computor_types.course_content_types import CourseContentTypeGet
 class CourseStudentGet(BaseModel):
     id: str
     title: Optional[str] = None
+    description: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
     course_content_types: list[CourseContentTypeGet]
@@ -30,6 +31,7 @@ class CourseStudentGet(BaseModel):
 class CourseStudentList(BaseModel):
     id: str
     title: Optional[str] = None
+    description: Optional[str] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
     path: str
