@@ -37,7 +37,7 @@ from computor_backend.business_logic.crud import (
 from computor_backend.database import get_db
 from computor_backend.redis_cache import get_cache
 from computor_backend.cache import Cache
-from computor_types.messages import MentionableQuery, MessageCreate, MessageGet, MessageList, MessageMentionRef, MessageQuery, MessageReadBulk, MessageReadBulkResult, MessageThread, MessageUpdate
+from computor_types.messages import MentionableQuery, MessageCountsGet, MessageCreate, MessageGet, MessageList, MessageMentionRef, MessageQuery, MessageReadBulk, MessageReadBulkResult, MessageThread, MessageUpdate
 from computor_backend.interfaces.message import MessageInterface
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
@@ -60,6 +60,7 @@ from computor_backend.business_logic.messages import (
     mark_message_as_unread,
     mark_messages_as_read,
     message_audience_user_ids,
+    message_counts,
     sync_message_mentions,
     validate_message_mentions,
 )
@@ -174,6 +175,25 @@ async def list_mentionable_users_endpoint(
         MessageMentionRef(id=str(u.id), given_name=u.given_name, family_name=u.family_name)
         for u in users
     ]
+
+
+# Declared before ``GET /{id}`` for the same reason ``/mentionable-users``
+# is: the id parameter accepts arbitrary strings, so a later literal path
+# would be swallowed by it.
+@messages_router.get("/counts", response_model=MessageCountsGet)
+async def get_message_counts(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    """Aggregated message/unread counts per (scope, resolved course).
+
+    One row per scope-and-course cell over everything the caller may read
+    (the same permission filter as ``GET /messages``), so an inbox can
+    render counts at every tree level without paging messages. ``unread``
+    excludes the caller's own posts, matching the ``unread_message_count``
+    badges on the student/tutor dashboards.
+    """
+    return message_counts(permissions, db)
 
 
 @messages_router.get("/{id}", response_model=MessageGet)

@@ -5,9 +5,10 @@ re-exports the full public surface so existing ``from
 computor_backend.business_logic.messages import X`` call sites are unchanged.
 
 Layering (import DAG, no cycles):
-    audience, permissions, cache  -> leaves
+    audience, permissions, cache, counts  -> leaves
+    context       -> audience
     mentions      -> audience
-    read_status   -> mentions, cache
+    read_status   -> context, mentions, cache
     core          -> permissions, mentions, read_status
     lifecycle     -> (standalone)
 """
@@ -57,6 +58,8 @@ from .read_status import (
     mark_message_as_unread,
     mark_messages_as_read,
 )
+from .context import message_contexts_for
+from .counts import message_counts
 from .lifecycle import (
     soft_delete_message,
     update_message_with_audit,
@@ -93,6 +96,8 @@ __all__ = [
     "invalidate_course_dashboards",
     "_affected_course_ids_for_message",
     "_invalidate_message_cache",
+    "message_contexts_for",
+    "message_counts",
     "mark_author_as_reader",
     "get_message_with_read_status",
     "list_messages_with_read_status",
