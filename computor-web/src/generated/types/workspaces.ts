@@ -223,11 +223,11 @@ export interface CoderWorkspace {
   owner_id: string;
   /** Owner username */
   owner_name?: string | null;
-  /** Computor user id decoded from owner_name (see coder/naming.py). None for owners we did not create — Coder's own 'admin' account. Only populated by views that resolve owners. */
+  /** Computor user behind owner_name, which encodes it (coder/naming.py). Only populated by views that resolve owners, and None when there is no such user: Coder's own 'admin' account, or an owner since deleted. */
   owner_user_id?: string | null;
-  /** Full name of the Computor user behind owner_name; only populated by views that resolve owners, and None when the user has no name set */
+  /** Full name of the owner_user_id user; None when that user has no name set, so fall back to owner_email and then owner_name */
   owner_display_name?: string | null;
-  /** Email of the Computor user behind owner_name; only populated by views that resolve owners */
+  /** Email of the owner_user_id user */
   owner_email?: string | null;
   /** Template ID */
   template_id: string;

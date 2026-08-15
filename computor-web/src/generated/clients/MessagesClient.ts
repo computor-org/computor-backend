@@ -3,7 +3,7 @@
  * Endpoint: /messages
  */
 
-import type { MessageCreate, MessageGet, MessageList, MessageMentionRef, MessageReadBulk, MessageReadBulkResult, MessageThread, MessageUpdate } from 'types/generated';
+import type { MessageCountsGet, MessageCreate, MessageGet, MessageList, MessageMentionRef, MessageReadBulk, MessageReadBulkResult, MessageThread, MessageUpdate } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -71,6 +71,22 @@ export class MessagesClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.post<MessageGet>(this.basePath, body, { params: queryParams });
+  }
+
+  /**
+   * Get Message Counts
+   * Aggregated message/unread counts per (scope, resolved course).
+   * One row per scope-and-course cell over everything the caller may read
+   * (the same permission filter as ``GET /messages``), so an inbox can
+   * render counts at every tree level without paging messages. ``unread``
+   * excludes the caller's own posts, matching the ``unread_message_count``
+   * badges on the student/tutor dashboards.
+   */
+  async getMessageCountsMessagesCountsGet({ userId }: { userId?: string | null }): Promise<MessageCountsGet> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.get<MessageCountsGet>(this.buildPath('counts'), { params: queryParams });
   }
 
   /**

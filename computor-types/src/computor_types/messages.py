@@ -156,6 +156,47 @@ class MessageMentionRef(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MessageContextMember(BaseModel):
+    """A member of the submission group a message is attached to."""
+    course_member_id: str = Field(..., description="Course member ID of the group member")
+    user_id: Optional[str] = Field(None, description="User ID of the group member")
+    given_name: Optional[str] = Field(None, max_length=255, description="Member's given name")
+    family_name: Optional[str] = Field(None, max_length=255, description="Member's family name")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MessageContext(BaseModel):
+    """Human-readable placement of a message, resolved server-side.
+
+    A message row carries exactly one target id (the single-target
+    invariant), which is meaningless to a human — clients used to render
+    "Submission Group e86522aa". This object names the surroundings: the
+    course, the course content (for submission-group messages resolved via
+    the group's ``course_content_id``), the course group, and the
+    submission group's members. Populated on list/get for every message
+    that has a resolvable course; ``None`` for global / organization /
+    course_family / user-scoped messages.
+    """
+    course_id: Optional[str] = Field(None, description="Resolved course ID")
+    course_title: Optional[str] = Field(None, description="Resolved course title")
+    course_content_id: Optional[str] = Field(
+        None, description="Course content the message belongs to (direct or via submission group)"
+    )
+    course_content_title: Optional[str] = Field(None, description="Course content title")
+    course_content_path: Optional[str] = Field(None, description="Course content ltree path")
+    course_group_id: Optional[str] = Field(None, description="Course group the message targets")
+    course_group_title: Optional[str] = Field(None, description="Course group title")
+    submission_group_display_name: Optional[str] = Field(
+        None, description="Submission group team name, or the first member's full name"
+    )
+    submission_group_members: List[MessageContextMember] = Field(
+        default_factory=list, description="Members of the message's submission group"
+    )
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class MessageCreate(BaseModel):
     """A new message.
 
@@ -227,6 +268,9 @@ class MessageGet(BaseEntityGet):
     is_author: bool = Field(False, description="True if the requesting user is the message author")
     is_deleted: bool = Field(False, description="True if the message has been soft-deleted")
     deleted_by: Optional[str] = Field(None, description="Who deleted the message (author/moderator/admin)")
+    context: Optional[MessageContext] = Field(
+        None, description="Resolved human-readable placement (course/content/group names)"
+    )
 
     # Target fields (determines scope)
     organization_id: Optional[str] = None
@@ -275,6 +319,9 @@ class MessageList(BaseEntityList):
     is_author: bool = Field(False, description="True if the requesting user is the message author")
     is_deleted: bool = Field(False, description="True if the message has been soft-deleted")
     deleted_by: Optional[str] = Field(None, description="Who deleted the message (author/moderator/admin)")
+    context: Optional[MessageContext] = Field(
+        None, description="Resolved human-readable placement (course/content/group names)"
+    )
 
     # Target fields (determines scope)
     organization_id: Optional[str] = None
@@ -447,6 +494,32 @@ class MessageReadBulkResult(BaseModel):
     requested: int = Field(
         0, description="How many ids were submitted (after de-duplication)"
     )
+
+
+class MessageScopeCounts(BaseModel):
+    """Message totals for one ``(scope, course)`` cell.
+
+    ``course_id`` is the *resolved* course — for a submission-group or
+    course-content message that is the course reached through the target,
+    not a column on the message row itself. ``None`` for the scopes that
+    have no single course (global, organization, course_family, user).
+    """
+    scope: MessageScope
+    course_id: Optional[str] = Field(None, description="Resolved course, if the scope has one")
+    total: int = Field(0, description="Visible messages in this cell")
+    unread: int = Field(0, description="Visible messages not yet read by the caller (own posts excluded)")
+
+
+class MessageCountsGet(BaseModel):
+    """Response of ``GET /messages/counts``.
+
+    One aggregate query over the caller's full read visibility — the same
+    permission filter as ``GET /messages`` — so an inbox can render
+    message/unread badges at every level without paging any messages.
+    """
+    counts: List[MessageScopeCounts] = Field(default_factory=list)
+    total: int = Field(0, description="All visible messages")
+    unread: int = Field(0, description="All visible unread messages (own posts excluded)")
 
 
 class MessageThread(BaseModel):
