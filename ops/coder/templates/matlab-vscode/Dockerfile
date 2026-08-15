@@ -85,7 +85,12 @@ RUN set -eux; \
     chown -R coder:coder /home/coder /opt/matlab-home-seed /opt/code-server/extensions; \
     ln -s /home/coder /home/matlab
 
-ARG MATLAB_EXTENSION_VERSION=1.3.12
+# Extensions live in the image, not in the home volume, so a student's own
+# update is thrown away the moment the workspace container is recreated. The
+# version students get is therefore whatever is pinned here — bump it (and
+# rebuild) rather than letting them chase the update prompt forever
+# (computor-org/issues#330). Override per environment with MATLAB_EXTENSION_VERSION.
+ARG MATLAB_EXTENSION_VERSION=1.3.13
 RUN curl -fsSL \
       "https://github.com/mathworks/MATLAB-extension-for-vscode/releases/download/v${MATLAB_EXTENSION_VERSION}/language-matlab-${MATLAB_EXTENSION_VERSION}.vsix" \
       -o /tmp/language-matlab.vsix \

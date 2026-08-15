@@ -91,7 +91,9 @@ if [ ! -f "$SETTINGS_FILE" ]; then
     "*.webp": "computor.imagePreview",
     "*.svg": "computor.imagePreview"
   },
-  "workbench.editor.closeEmptyGroups": false
+  "workbench.editor.closeEmptyGroups": false,
+  "extensions.autoCheckUpdates": false,
+  "extensions.autoUpdate": false
 }
 SETTINGS_EOF
 else
@@ -119,6 +121,12 @@ wanted = {
     # Keep the empty aux group alive: closing the last file in a group must
     # not collapse the two-column layout (computor-org/issues#286).
     "workbench.editor.closeEmptyGroups": False,
+    # Extensions live in the image, not on the home volume, so an update a
+    # student installs is gone after the next restart and is then offered
+    # again — forever (computor-org/issues#330). Newer extensions ship by
+    # bumping the pins in the Dockerfile.
+    "extensions.autoCheckUpdates": False,
+    "extensions.autoUpdate": False,
 }
 
 try:

@@ -1,7 +1,7 @@
 {
     "coder_template_name": "matlab-vscode-workspace",
     "image_name": "computor-workspace-matlab-vscode",
-    "build_args_env": [],
+    "build_args_env": ["MATLAB_EXTENSION_VERSION"],
     "source_repos": [
         {
             "url": "https://github.com/computor-org/computor-vscode.git",

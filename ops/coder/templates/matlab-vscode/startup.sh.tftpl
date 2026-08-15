@@ -158,6 +158,16 @@ defaults = {
     "MATLAB.defaultEditor": False,
     "MATLAB.prewarmGraphics": False,
     "security.workspace.trust.enabled": False,
+    # Extension updates are a false affordance here. Extensions live in the
+    # image under /opt/code-server/extensions, which is not on the home volume,
+    # so every restart throws away whatever the student installed and puts the
+    # baked-in version back: the same update is offered again after every
+    # restart, forever (computor-org/issues#330). Newer extensions ship by
+    # bumping the pins in the Dockerfile. Add-if-missing rather than enforced —
+    # nobody has these keys yet, so it still reaches existing workspaces, and a
+    # student who deliberately turns updates back on keeps that choice.
+    "extensions.autoCheckUpdates": False,
+    "extensions.autoUpdate": False,
     # Keep the empty aux group alive: closing the last file in a group must
     # not collapse the two-column layout (computor-org/issues#286).
     "workbench.editor.closeEmptyGroups": False,
