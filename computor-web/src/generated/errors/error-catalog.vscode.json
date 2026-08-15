@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "error_count": 74,
+  "error_count": 75,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -441,6 +441,19 @@
         "plain": "Cannot change this content's type across kinds (assignment/unit) because the content is not empty. Pick a type of the same kind, or remove its children, example and submissions first.",
         "markdown": "**Content Type Kind Change Blocked**\n\nThis content cannot switch between *assignment* and *unit* because it is not empty: a unit with children cannot become an assignment, and an assignment with an assigned example or student submissions cannot become a unit. Pick a content type of the same kind, or empty the content first.",
         "html": "<strong>Content Type Kind Change Blocked</strong><p>This content cannot switch between <em>assignment</em> and <em>unit</em> because it is not empty: a unit with children cannot become an assignment, and an assignment with an assigned example or student submissions cannot become a unit. Pick a content type of the same kind, or empty the content first.</p>"
+      },
+      "retry_after": null
+    },
+    "CONTENT_009": {
+      "code": "CONTENT_009",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Invalid Content Move",
+      "message": {
+        "plain": "This content cannot be moved to that place in the course. Assignments can only live inside units (or at the course root), and a unit cannot be moved inside an assignment.",
+        "markdown": "**Invalid Content Move**\n\nThe target position does not fit the course structure: the parent must exist, it must be a kind that can hold children (a unit), and the moved content must be a kind that may sit inside a parent. Pick a unit as the target, or move the content to the course root.",
+        "html": "<strong>Invalid Content Move</strong><p>The target position does not fit the course structure: the parent must exist, it must be a kind that can hold children (a unit), and the moved content must be a kind that may sit inside a parent. Pick a unit as the target, or move the content to the course root.</p>"
       },
       "retry_after": null
     },

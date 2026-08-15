@@ -1,7 +1,7 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Total errors:** 74
+**Total errors:** 75
 
 To regenerate: `bash generate_error_codes.sh`
 
@@ -1738,6 +1738,32 @@ PATCH moved course_content.course_content_type_id to a type of a different cours
 **Resolution Steps:**
 1. Choose a content type of the same kind as the current one
 2. If the kind change is intended, first remove children, unassign the example and make sure there are no submissions
+
+---
+
+### CONTENT_009 - Invalid Content Move
+
+**HTTP Status:** `400`  
+**Severity:** `warning`  
+**Category:** `validation`  
+
+**Description:**  
+PATCH /course-contents/{id}/move targeted a path whose parent is missing, whose parent kind has has_descendants=false, or moved a kind with has_ascendants=false below the root; mirrors trg_validate_course_content_hierarchy so the violation surfaces as a 400 instead of a database 500
+
+**User Message:**  
+> This content cannot be moved to that place in the course. Assignments can only live inside units (or at the course root), and a unit cannot be moved inside an assignment.
+
+**Affected Functions:**
+- `validate_course_content_move`
+- `move_course_content`
+
+**Common Causes:**
+- Dragging or moving an assignment onto another assignment instead of onto a unit
+- Targeting a unit path that does not exist (or was renamed) in this course
+
+**Resolution Steps:**
+1. Move the content into a unit, or to the course root
+2. Refresh the course tree so the available units are up to date
 
 ---
 
