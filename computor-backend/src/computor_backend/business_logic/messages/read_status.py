@@ -14,6 +14,7 @@ from computor_types.messages import (
     MessageGet, MessageAuthor, MessageAuthorCourseMember, MessageMentionRef,
 )
 from .audience import course_ids_for_messages
+from .context import message_contexts_for
 from .mentions import _get_mentions_info
 from .cache import _invalidate_message_cache
 
@@ -92,11 +93,16 @@ def get_message_with_read_status(
     author_course_member = None
 
     mentions: List[MessageMentionRef] = []
+    context = None
     if db_message:
-        author_map, author_course_member_map = _get_author_info([db_message], db)
+        course_by_message = course_ids_for_messages([db_message], db)
+        author_map, author_course_member_map = _get_author_info(
+            [db_message], db, course_by_message
+        )
         author = author_map.get(str(message_id))
         author_course_member = author_course_member_map.get(str(message_id))
         mentions = _get_mentions_info([db_message], db).get(str(message_id), [])
+        context = message_contexts_for([db_message], db, course_by_message).get(str(message_id))
 
     return message.model_copy(update={
         "is_read": is_read,
@@ -106,18 +112,22 @@ def get_message_with_read_status(
         "author": author,
         "author_course_member": author_course_member,
         "mentions": mentions,
+        "context": context,
     })
 
 
 def _get_author_info(
     db_messages: List[Message],
     db: Session,
+    course_by_message: Optional[Dict[str, Optional[str]]] = None,
 ) -> Tuple[Dict[str, MessageAuthor], Dict[str, Optional[MessageAuthorCourseMember]]]:
     """Get author info for a batch of messages.
 
     Args:
         db_messages: List of Message model instances
         db: Database session
+        course_by_message: Precomputed ``course_ids_for_messages`` map, so a
+            caller enriching the same page several ways resolves courses once
 
     Returns:
         Tuple of (author_map, author_course_member_map)
@@ -156,7 +166,8 @@ def _get_author_info(
         str(msg.id): None for msg in db_messages
     }
 
-    course_by_message = course_ids_for_messages(db_messages, db)
+    if course_by_message is None:
+        course_by_message = course_ids_for_messages(db_messages, db)
 
     wanted = {
         (str(msg.author_id), str(course_by_message[str(msg.id)]))
@@ -244,9 +255,12 @@ def list_messages_with_read_status(
         for msg in db_messages
     }
 
-    # Get author info
-    author_map, author_course_member_map = _get_author_info(db_messages, db)
+    # Get author, mention and placement info; courses are resolved once for
+    # the whole page and shared by the enrichers that need them.
+    course_by_message = course_ids_for_messages(db_messages, db)
+    author_map, author_course_member_map = _get_author_info(db_messages, db, course_by_message)
     mentions_map = _get_mentions_info(db_messages, db)
+    context_map = message_contexts_for(db_messages, db, course_by_message)
 
     return [
         item.model_copy(update={
@@ -257,6 +271,7 @@ def list_messages_with_read_status(
             "author": author_map.get(item.id),
             "author_course_member": author_course_member_map.get(item.id),
             "mentions": mentions_map.get(item.id, []),
+            "context": context_map.get(item.id),
         })
         for item in items
     ]
