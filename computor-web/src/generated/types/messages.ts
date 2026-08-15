@@ -31,6 +31,53 @@ export interface MessageMentionRef {
 }
 
 /**
+ * A member of the submission group a message is attached to.
+ */
+export interface MessageContextMember {
+  /** Course member ID of the group member */
+  course_member_id: string;
+  /** User ID of the group member */
+  user_id?: string | null;
+  /** Member's given name */
+  given_name?: string | null;
+  /** Member's family name */
+  family_name?: string | null;
+}
+
+/**
+ * Human-readable placement of a message, resolved server-side.
+ * 
+ * A message row carries exactly one target id (the single-target
+ * invariant), which is meaningless to a human — clients used to render
+ * "Submission Group e86522aa". This object names the surroundings: the
+ * course, the course content (for submission-group messages resolved via
+ * the group's ``course_content_id``), the course group, and the
+ * submission group's members. Populated on list/get for every message
+ * that has a resolvable course; ``None`` for global / organization /
+ * course_family / user-scoped messages.
+ */
+export interface MessageContext {
+  /** Resolved course ID */
+  course_id?: string | null;
+  /** Resolved course title */
+  course_title?: string | null;
+  /** Course content the message belongs to (direct or via submission group) */
+  course_content_id?: string | null;
+  /** Course content title */
+  course_content_title?: string | null;
+  /** Course content ltree path */
+  course_content_path?: string | null;
+  /** Course group the message targets */
+  course_group_id?: string | null;
+  /** Course group title */
+  course_group_title?: string | null;
+  /** Submission group team name, or the first member's full name */
+  submission_group_display_name?: string | null;
+  /** Members of the message's submission group */
+  submission_group_members?: MessageContextMember[];
+}
+
+/**
  * A new message.
  * 
  * ``title`` is the human subject line, and whether it is required is
@@ -103,6 +150,8 @@ export interface MessageGet {
   is_deleted?: boolean;
   /** Who deleted the message (author/moderator/admin) */
   deleted_by?: string | null;
+  /** Resolved human-readable placement (course/content/group names) */
+  context?: MessageContext | null;
   organization_id?: string | null;
   course_family_id?: string | null;
   course_id?: string | null;
@@ -145,6 +194,8 @@ export interface MessageList {
   is_deleted?: boolean;
   /** Who deleted the message (author/moderator/admin) */
   deleted_by?: string | null;
+  /** Resolved human-readable placement (course/content/group names) */
+  context?: MessageContext | null;
   organization_id?: string | null;
   course_family_id?: string | null;
   course_id?: string | null;
@@ -277,6 +328,39 @@ export interface MessageReadBulkResult {
   marked?: number;
   /** How many ids were submitted (after de-duplication) */
   requested?: number;
+}
+
+/**
+ * Message totals for one ``(scope, course)`` cell.
+ * 
+ * ``course_id`` is the *resolved* course — for a submission-group or
+ * course-content message that is the course reached through the target,
+ * not a column on the message row itself. ``None`` for the scopes that
+ * have no single course (global, organization, course_family, user).
+ */
+export interface MessageScopeCounts {
+  scope: "global" | "organization" | "course_family" | "course" | "course_content" | "course_group" | "submission_group" | "course_member" | "user";
+  /** Resolved course, if the scope has one */
+  course_id?: string | null;
+  /** Visible messages in this cell */
+  total?: number;
+  /** Visible messages not yet read by the caller (own posts excluded) */
+  unread?: number;
+}
+
+/**
+ * Response of ``GET /messages/counts``.
+ * 
+ * One aggregate query over the caller's full read visibility — the same
+ * permission filter as ``GET /messages`` — so an inbox can render
+ * message/unread badges at every level without paging any messages.
+ */
+export interface MessageCountsGet {
+  counts?: MessageScopeCounts[];
+  /** All visible messages */
+  total?: number;
+  /** All visible unread messages (own posts excluded) */
+  unread?: number;
 }
 
 /**

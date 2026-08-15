@@ -377,6 +377,7 @@
 | --- | --- | --- | --- | --- |
 | `listMessagesMessagesGet` | GET | `/messages` | — | `MessageList[]` |
 | `createMessageMessagesPost` | POST | `/messages` | `MessageCreate` | `MessageGet` |
+| `getMessageCountsMessagesCountsGet` | GET | `/messages/counts` | — | `MessageCountsGet` |
 | `listMentionableUsersEndpointMessagesMentionableUsersGet` | GET | `/messages/mentionable-users` | — | `MessageMentionRef[]` |
 | `markMessagesReadBulkMessagesReadsBulkPost` | POST | `/messages/reads/bulk` | `MessageReadBulk` | `MessageReadBulkResult` |
 | `deleteMessageMessagesIdDelete` | DELETE | `/messages/{id}` | — | `void` |

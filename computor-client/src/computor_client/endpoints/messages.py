@@ -9,6 +9,7 @@ Run `bash generate.sh python-client` to regenerate.
 from typing import Any, Dict, List, Optional, Union
 
 from computor_types.messages import (
+    MessageCountsGet,
     MessageCreate,
     MessageGet,
     MessageList,
@@ -66,6 +67,14 @@ class MessagesClient:
         """Create Message"""
         response = await self._http.post("/messages", json_data=data, params=kwargs)
         return MessageGet.model_validate(response.json())
+
+    async def get_counts(
+        self,
+        **kwargs: Any,
+    ) -> MessageCountsGet:
+        """Get Message Counts"""
+        response = await self._http.get("/messages/counts", params=kwargs)
+        return MessageCountsGet.model_validate(response.json())
 
     async def list_mentionable_users(
         self,
