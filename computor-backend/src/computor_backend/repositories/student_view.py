@@ -180,6 +180,7 @@ class StudentViewRepository(ViewRepository):
             row_builder=lambda course: CourseStudentList(
                 id=course.id,
                 title=course.title,
+                description=course.description,
                 course_family_id=course.course_family_id,
                 organization_id=course.organization_id,
                 path=course.path,
@@ -205,6 +206,7 @@ class StudentViewRepository(ViewRepository):
             result = CourseStudentGet(
                 id=course.id,
                 title=course.title,
+                description=course.description,
                 course_family_id=course.course_family_id,
                 organization_id=course.organization_id,
                 course_content_types=course.course_content_types,

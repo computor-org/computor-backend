@@ -3735,6 +3735,7 @@ export interface GradedArtifactInfo {
 export interface TutorGradeResponse {
   id: string;
   title?: string | null;
+  description?: string | null;
   path: string;
   course_id: string;
   course_content_type_id: string;
