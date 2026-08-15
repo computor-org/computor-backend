@@ -256,7 +256,10 @@ def list_messages_with_filters(
 
     total = query.order_by(None).count()
 
-    paginated_query = query
+    # Newest first, id as tiebreaker. Without a total order, limit/offset
+    # leaves the row order to the planner, so consecutive pages could
+    # overlap or skip rows entirely.
+    paginated_query = query.order_by(Message.created_at.desc(), Message.id.desc())
     # ``ListQuery.limit`` has no ceiling, and every returned row is then run
     # through the author / read-status / mention enrichers. Cap it here
     # rather than globally, so one client asking for everything can't turn
