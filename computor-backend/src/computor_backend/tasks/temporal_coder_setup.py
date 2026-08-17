@@ -812,8 +812,8 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
         # from the workspace_template_settings rows), keyed by Coder template
         # name; resolved by the API at submit time so the worker needs no DB.
         per_template_variables = parameters.get("per_template_variables", {}) or {}
-        ttl_ms = parameters.get("ttl_ms", 14400000)  # 4 hour default
-        activity_bump_ms = parameters.get("activity_bump_ms", 14400000)
+        ttl_ms = parameters.get("ttl_ms", 3600000)  # 1 hour default
+        activity_bump_ms = parameters.get("activity_bump_ms", 3600000)
         # One immutable image tag for this run, shared by the build and the
         # template's pinned workspace_image. workflow.now() is replay-safe.
         #
