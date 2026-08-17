@@ -673,6 +673,33 @@ class CoderClient:
         )
         return resp.status_code == 200
 
+    async def update_workspace_ttl(
+        self,
+        workspace_id: str,
+        *,
+        ttl_ms: int,
+    ) -> bool:
+        """Set a workspace's auto-stop TTL (``PUT /workspaces/{id}/ttl``).
+
+        Coder copies the template's ``default_ttl_ms`` into the workspace once,
+        at creation, and never consults the template again — so template-level
+        TTL changes reach no existing workspace, and one created while its
+        template had no TTL keeps a null TTL and never auto-stops. This
+        endpoint is how the fleet is converged on the configured TTL (see
+        ``_workspace_transition``). The new TTL takes effect on the next start
+        build; the current build's deadline is untouched.
+
+        Returns:
+            True if Coder accepted the new TTL.
+        """
+        resp = await self._request(
+            "PUT",
+            f"/api/v2/workspaces/{workspace_id}/ttl",
+            json={"ttl_ms": ttl_ms},
+            ok=None,
+        )
+        return resp.status_code in (200, 204)
+
     @staticmethod
     def _parse_workspace_summary(ws: dict) -> CoderWorkspace:
         """Build a CoderWorkspace from a Coder /workspaces list entry."""
@@ -823,6 +850,12 @@ class CoderClient:
             # (autostart) agree, so no start path can resurrect a stale image.
             "automatic_updates": "always",
         }
+        # Coder snapshots the template's default_ttl_ms into the workspace at
+        # creation and never consults the template again. An omitted ttl_ms
+        # ties the workspace to whatever the template happened to carry at that
+        # moment — and a pre-TTL snapshot is a workspace that never auto-stops.
+        if self.settings.workspace_ttl_ms > 0:
+            payload["ttl_ms"] = self.settings.workspace_ttl_ms
 
         # Add rich parameter values (per-workspace Terraform variables)
         rich_params = []
@@ -1057,6 +1090,30 @@ class CoderClient:
             active_version_id = workspace.get("template_active_version_id")
             if active_version_id:
                 template_version_id = active_version_id
+            # The build's auto-stop deadline is computed from the WORKSPACE's
+            # ttl, which Coder snapshotted from the template at creation and
+            # never updates — a workspace created while its template had no
+            # TTL has a null ttl and never auto-stops, and a config change
+            # reaches nobody. Every start funnels through here (web UI and
+            # extension alike), so converge the workspace on the configured
+            # TTL before the build computes its deadline. Best-effort: a
+            # scheduling hiccup must not cost the user their start.
+            desired_ttl = self.settings.workspace_ttl_ms
+            if desired_ttl > 0 and workspace.get("ttl_ms") != desired_ttl:
+                try:
+                    if await self.update_workspace_ttl(workspace_id, ttl_ms=desired_ttl):
+                        logger.info(
+                            f"Converged workspace {workspace_id} auto-stop TTL "
+                            f"{workspace.get('ttl_ms')} -> {desired_ttl}ms"
+                        )
+                    else:
+                        logger.warning(
+                            f"Coder rejected auto-stop TTL update for workspace {workspace_id}"
+                        )
+                except Exception as exc:
+                    logger.warning(
+                        f"Could not update auto-stop TTL for workspace {workspace_id}: {exc}"
+                    )
 
         body: dict[str, Any] = {
             "template_version_id": template_version_id,

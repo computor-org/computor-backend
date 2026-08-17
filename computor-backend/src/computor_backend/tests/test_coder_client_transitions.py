@@ -10,7 +10,9 @@ it still wants. Two classes of value matter:
   but is reset to the template's ``""`` default just the same — which
   de-authenticates the VS Code extension inside the workspace.
 
-These tests pin both, plus the override precedence the rotation push relies on.
+These tests pin both, plus the override precedence the rotation push relies on,
+and the auto-stop TTL convergence the start path performs (see that section's
+comment for why Coder's creation-time TTL snapshot makes it necessary).
 """
 
 from unittest.mock import AsyncMock, MagicMock
@@ -31,15 +33,22 @@ PREVIOUS_BUILD = {
 }
 
 
-def _client(build_params=None, active_version_id="tv-1"):
+def _client(
+    build_params=None,
+    active_version_id="tv-1",
+    current_ttl_ms=3_600_000,
+    ttl_put_fails=False,
+):
     """A CoderClient with only the HTTP layer faked out.
 
     The previous build sits on ``tv-1``; ``active_version_id`` is what the
     template currently promotes — pass ``"tv-2"`` to model a workspace a
-    template push has left behind.
+    template push has left behind. ``current_ttl_ms`` is the workspace's
+    stored auto-stop TTL (``None`` models one created before the templates
+    carried a TTL — the never-auto-stops case).
     """
     client = CoderClient.__new__(CoderClient)
-    client.settings = MagicMock(workspace_timeout=30)
+    client.settings = MagicMock(workspace_timeout=30, workspace_ttl_ms=3_600_000)
     client.get_build_params = AsyncMock(
         return_value=dict(PREVIOUS_BUILD if build_params is None else build_params)
     )
@@ -53,7 +62,15 @@ def _client(build_params=None, active_version_id="tv-1"):
             resp.json.return_value = {
                 "latest_build": {"id": "build-1", "template_version_id": "tv-1"},
                 "template_active_version_id": active_version_id,
+                "ttl_ms": current_ttl_ms,
             }
+        elif method == "PUT":
+            if ttl_put_fails:
+                raise RuntimeError("coder unreachable")
+            posted.setdefault("ttl_puts", []).append(
+                {"path": path, "json": kwargs.get("json")}
+            )
+            resp.status_code = 200
         else:
             posted["body"] = kwargs.get("json")
             resp.status_code = 200
@@ -206,6 +223,85 @@ async def test_current_workspace_start_stays_on_the_cheap_path():
     assert client._posted["body"]["template_version_id"] == "tv-1"
     assert "rich_parameter_values" not in client._posted["body"]
     client.get_build_params.assert_not_awaited()
+
+
+# --- auto-stop TTL convergence on start ---------------------------------------
+#
+# Coder snapshots the template's default_ttl_ms into the workspace at creation
+# and never consults the template again: a workspace created while its template
+# carried no TTL has a null ttl and never auto-stops (the immortal-MATLAB-
+# workspace bug), and a config change reaches no existing workspace. The start
+# path converges every workspace on the configured TTL before the build
+# computes its deadline.
+
+
+@pytest.mark.asyncio
+async def test_start_backfills_a_missing_ttl_before_the_build():
+    client = _client(current_ttl_ms=None)
+    await client._workspace_transition("ws-1", "start")
+    assert client._posted["ttl_puts"] == [
+        {"path": "/api/v2/workspaces/ws-1/ttl", "json": {"ttl_ms": 3_600_000}}
+    ]
+    assert client._posted["body"]["transition"] == "start"
+
+
+@pytest.mark.asyncio
+async def test_start_converges_a_stale_ttl():
+    # Lowering the configured TTL must reach existing workspaces too, not just
+    # newly created ones — their snapshot is otherwise frozen forever.
+    client = _client(current_ttl_ms=14_400_000)
+    await client._workspace_transition("ws-1", "start")
+    assert client._posted["ttl_puts"][0]["json"] == {"ttl_ms": 3_600_000}
+
+
+@pytest.mark.asyncio
+async def test_start_leaves_a_matching_ttl_alone():
+    client = _client()
+    await client._workspace_transition("ws-1", "start")
+    assert "ttl_puts" not in client._posted
+
+
+@pytest.mark.asyncio
+async def test_stop_never_touches_the_ttl():
+    # The deadline is computed on start, so fixing scheduling on the stop path
+    # buys nothing — and must never stand between the user and a teardown.
+    client = _client(current_ttl_ms=None)
+    await client._workspace_transition("ws-1", "stop")
+    assert "ttl_puts" not in client._posted
+
+
+@pytest.mark.asyncio
+async def test_ttl_failure_does_not_block_the_start():
+    # Best-effort: a Coder hiccup on the scheduling call must not cost the
+    # user their workspace start.
+    client = _client(current_ttl_ms=None, ttl_put_fails=True)
+    assert await client._workspace_transition("ws-1", "start") is True
+    assert client._posted["body"]["transition"] == "start"
+
+
+@pytest.mark.asyncio
+async def test_create_workspace_states_the_ttl_itself():
+    # Relying on the template default reintroduces the creation-time snapshot
+    # race (workspace created before the template's TTL was pushed).
+    from computor_backend.coder.schemas import CoderWorkspaceCreate
+
+    client = _client()
+    client.get_template_id = AsyncMock(return_value="tpl-1")
+
+    async def fake_create(method, path, **kwargs):
+        client._posted["body"] = kwargs.get("json")
+        resp = MagicMock()
+        resp.status_code = 201
+        resp.json.return_value = {
+            "id": "ws-1", "name": "w1", "owner_id": "u1", "template_id": "tpl-1",
+        }
+        return resp
+
+    client._request = AsyncMock(side_effect=fake_create)
+    await client.create_workspace(
+        "u1", CoderWorkspaceCreate(name="w1", template="vscode-workspace")
+    )
+    assert client._posted["body"]["ttl_ms"] == 3_600_000
 
 
 # --- fleet rollout ------------------------------------------------------------

@@ -108,15 +108,16 @@ class CoderSettings(BaseSettings):
     # directly through Traefik, bypassing Coder's proxy), so the deadline is instead
     # bumped from the ForwardAuth hook — see keepalive.py.
     workspace_ttl_ms: int = Field(
-        default=14_400_000,  # 4 hours
+        default=3_600_000,  # 1 hour
         description="Initial auto-stop deadline for a started workspace "
-                    "(default_ttl_ms on the Coder template). This is the longest a "
-                    "workspace lives after start if it never receives any proxied "
-                    "request; active workspaces are kept alive past it via the "
-                    "ForwardAuth keepalive."
+                    "(default_ttl_ms on the Coder template, and converged onto every "
+                    "workspace as it starts — see CoderClient._workspace_transition). "
+                    "This is the longest a workspace lives after start if it never "
+                    "receives any proxied request; active workspaces are kept alive "
+                    "past it via the ForwardAuth keepalive."
     )
     workspace_activity_bump_ms: int = Field(
-        default=14_400_000,  # 4 hours
+        default=3_600_000,  # 1 hour
         description="How far into the future the ForwardAuth keepalive pushes a "
                     "workspace's auto-stop deadline on each authorized request. An "
                     "idle workspace is reclaimed this long after its last request. "
