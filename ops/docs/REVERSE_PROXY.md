@@ -59,7 +59,10 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/code.example.com/privkey.pem;
     ssl_protocols       TLSv1.2 TLSv1.3;
 
-    # Allow large git pushes over HTTP (Forgejo). Default is 1m → "413" on push.
+    # Allow large request bodies. EVERY upload passes through this vhost: git
+    # pushes to Forgejo AND all API uploads (example upload, student submissions).
+    # nginx's default is 1m — without this line, anything bigger dies at nginx
+    # with its stock HTML 413 page and never reaches the stack.
     client_max_body_size 512M;
 
     location / {
@@ -120,8 +123,31 @@ nginx -t && systemctl reload nginx
 | `X-Forwarded-Proto https` | TLS ends at nginx; downstream must know it was HTTPS or it builds `http://` callback URLs and drops Secure cookies. |
 | `X-Forwarded-Host` / `-Port` | Keycloak/Traefik reconstruct public URLs from these. |
 | `proxy_buffer_size 128k` (+ buffers) | Keycloak login responses carry large `Set-Cookie` headers; small buffers → 502. |
-| `client_max_body_size 512M` | `git push` over HTTPS to Forgejo; the 1 MB default rejects real pushes. |
+| `client_max_body_size 512M` | Every upload crosses this vhost: `git push` to Forgejo **and** API uploads (examples, submissions). The 1 MB default rejects them all with nginx's HTML 413 page. |
 | single `location /`, no path rewrite | Traefik owns `/api`, `/auth`, `/forgejo`, `/docs`; stripping paths breaks routing. |
+
+## Telling the two 413s apart
+
+Uploads cross two independent size limits; the response body tells you which one fired:
+
+- **nginx's stock HTML page** (`<h1>413 Request Entity Too Large</h1>` … `<center>nginx</center>`)
+  → this vhost is missing `client_max_body_size` (or it is too small). The request
+  never reached the stack. Fix in nginx, reload.
+- **JSON** `{"detail": {"error": "Request body too large. Maximum allowed size is …"}}`
+  → the request passed nginx and hit the backend's own limiter, capped by
+  `MINIO_MAX_UPLOAD_SIZE` in `.env` (bytes; 20 MiB in prod). Raise the env var and
+  restart the backend. Note: the example-upload JSON base64-encodes binary files
+  (~+33%), so a 20 MiB body cap fits roughly 15 MiB of actual example content.
+
+A quick unauthenticated probe distinguishes the layers without touching real data —
+any body that clears both limits earns a backend `400 VAL_001` (request validation),
+proving it traversed the full chain:
+
+```bash
+dd if=/dev/zero of=/tmp/probe bs=2M count=1
+curl -s -X POST https://<domain>/api/examples/upload \
+  -H "Content-Type: application/json" --data-binary @/tmp/probe -w "\n%{http_code}\n"
+```
 
 ## Checklist
 
@@ -132,7 +158,9 @@ nginx -t && systemctl reload nginx
 - [ ] `proxy_read_timeout` raised above the 60s default.
 - [ ] `X-Forwarded-Proto https` (+ Host/Port) headers set.
 - [ ] Keycloak proxy buffers raised.
-- [ ] `client_max_body_size` ≥ your largest expected git push (only if Forgejo is enabled).
+- [ ] `client_max_body_size 512M` present in every `server` block that serves the
+      stack (also the ones for alternate hostnames). NOT Forgejo-only: example and
+      submission uploads need it too — without it they 413 at nginx.
 - [ ] Port 8080 not reachable from outside the host (loopback bind, or firewalled).
 - [ ] `nginx -t` passes; reload done.
 
