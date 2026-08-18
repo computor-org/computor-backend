@@ -8,3 +8,11 @@
 /** Standard text-input / select / textarea styling used by every form field. */
 export const inputCls =
   'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent';
+
+/**
+ * File picker. The `file:` variants restyle the browser's own button, which no
+ * component layer can wrap — so the class string lives here rather than being
+ * copy-pasted into whichever page happens to accept an upload.
+ */
+export const fileInputCls =
+  'block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-blue-50 file:text-blue-700 file:text-sm file:font-medium hover:file:bg-blue-100';

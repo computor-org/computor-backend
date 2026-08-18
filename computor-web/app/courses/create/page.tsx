@@ -12,9 +12,11 @@ import { useSearchParam } from '@/src/hooks/useSearchParam';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
-import { inputCls } from '@/src/components/ui/tokens';
+import ConfirmDeployWarningsDialog from '@/src/components/courses/ConfirmDeployWarningsDialog';
+import DeploymentCheckReport, { type DeployCheckStatus } from '@/src/components/courses/DeploymentCheckReport';
+import { fileInputCls, inputCls } from '@/src/components/ui/tokens';
 import type { CourseFamilyList, CourseGitBindingUpsert } from '@/src/generated/types/courses';
-import type { GitServerGet } from '@/src/generated/types/common';
+import type { CourseDeployResult, GitServerGet } from '@/src/generated/types/common';
 import { displayName } from '@/src/utils/displayName';
 
 const coursesClient = new CoursesClient();
@@ -29,18 +31,16 @@ const MODE_LABELS: Record<string, string> = {
   download: 'Download — no git',
 };
 
-// Response of POST /course-families/{id}/deploy-course (validate or apply).
-interface DeployWarning { path?: string | null; example_identifier?: string | null; reason: string }
-interface DeploySummary { content_types: number; units: number; assignments: number; examples_assigned: number }
-interface DeployResult {
-  validated: boolean;
-  applied: boolean;
-  course_id?: string | null;
-  course_path: string;
-  course_title?: string | null;
-  summary: DeploySummary;
-  warnings: DeployWarning[];
-  errors: string[];
+/**
+ * Outcome of POST /course-families/{id}/deploy-course, tagged with the exact
+ * (family, file) it belongs to. The tag is what makes the automatic check
+ * race-free: a result is only ever shown next to the input that produced it, so
+ * a slow response for an old file cannot describe the current one.
+ */
+interface Check {
+  key: string;
+  result: CourseDeployResult | null;
+  failure: string | null;
 }
 
 function CreateInner() {
@@ -68,10 +68,31 @@ function CreateInner() {
   // Optional "upload a course_deployment.yaml" flow.
   const [fileName, setFileName] = useState('');
   const [fileText, setFileText] = useState('');
-  const [validating, setValidating] = useState(false);
-  const [check, setCheck] = useState<DeployResult | null>(null);
+  const [check, setCheck] = useState<Check | null>(null);
+  const [recheck, setRecheck] = useState(0);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [createdCourseId, setCreatedCourseId] = useState<string | null>(null);
   const hasFile = !!fileText;
+
+  // The file only means something relative to the family it is deployed into
+  // (the path-taken and content-type checks are family-scoped), so both go into
+  // the key: change either and the previous verdict stops applying. `recheck`
+  // lets the user retry after a transport failure.
+  const checkKey = hasFile && familyId ? `${recheck}:${familyId}:${fileText}` : '';
+  // Once the course exists the report describes what actually happened, so it
+  // stops tracking the form instead of falling back to "checking…".
+  const current = check && (!!createdCourseId || check.key === checkKey) ? check : null;
+  const status: DeployCheckStatus = createdCourseId
+    ? 'done'
+    : !familyId
+      ? 'waiting'
+      : !current
+        ? 'checking'
+        : current.failure
+          ? 'failed'
+          : 'done';
+  const errors = current?.result?.errors ?? [];
+  const warnings = current?.result?.warnings ?? [];
 
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
@@ -93,6 +114,38 @@ function CreateInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAuthenticated, canConfigureGit]);
 
+  // Check the file automatically, as soon as there is something to check. The
+  // user never has to ask what the upload will do — and, because a file that
+  // has not passed the check cannot be submitted, never creates a course from a
+  // file nobody looked at. `validate_only` touches no data server-side.
+  useEffect(() => {
+    if (!checkKey || createdCourseId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = (await courseFamiliesClient.deployCourseCourseFamiliesCourseFamilyIdDeployCoursePost({
+          courseFamilyId: familyId,
+          body: { yaml: fileText, validate_only: true },
+        })) as unknown as CourseDeployResult;
+        if (!cancelled) setCheck({ key: checkKey, result: res, failure: null });
+      } catch (e) {
+        if (!cancelled) {
+          setCheck({
+            key: checkKey,
+            result: null,
+            failure: e instanceof Error ? e.message : 'The file could not be checked.',
+          });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // fileText is part of checkKey; re-running on its identity alone would
+    // repeat the request for an unchanged file.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkKey]);
+
   const toggleMode = (m: string) => setModes((ms) => (ms.includes(m) ? ms.filter((x) => x !== m) : [...ms, m]));
 
   async function onPickFile(file: File | undefined) {
@@ -110,24 +163,6 @@ function CreateInner() {
       setFileText(text);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not read the file');
-    }
-  }
-
-  async function validate() {
-    if (!familyId || !fileText) return;
-    setValidating(true);
-    setError(null);
-    setCreatedCourseId(null);
-    try {
-      const res = (await courseFamiliesClient.deployCourseCourseFamiliesCourseFamilyIdDeployCoursePost({
-        courseFamilyId: familyId,
-        body: { yaml: fileText, validate_only: true },
-      })) as unknown as DeployResult;
-      setCheck(res);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Validation failed');
-    } finally {
-      setValidating(false);
     }
   }
 
@@ -168,6 +203,15 @@ function CreateInner() {
     }
   }
 
+  /** Submit — but never past unacknowledged warnings. */
+  function onSubmit() {
+    if (hasFile && warnings.length > 0 && !createdCourseId) {
+      setConfirmOpen(true);
+      return;
+    }
+    void save();
+  }
+
   async function save() {
     setSaving(true);
     setError(null);
@@ -176,7 +220,7 @@ function CreateInner() {
         const res = (await courseFamiliesClient.deployCourseCourseFamiliesCourseFamilyIdDeployCoursePost({
           courseFamilyId: familyId,
           body: { yaml: fileText, validate_only: false },
-        })) as unknown as DeployResult;
+        })) as unknown as CourseDeployResult;
         if (!res.course_id) throw new Error(res.errors?.join('; ') || 'Deploy failed');
         // Git comes from the uploaded file's `git:` block (applied server-side by
         // deploy-course). Do NOT also call configureGit here — that would clobber
@@ -185,10 +229,12 @@ function CreateInner() {
         await triggerDeploy(res.course_id);
         if (res.warnings?.length) {
           // The course was created, but something is off (e.g. a service slug
-          // didn't resolve, so assignments have no testing service). Surface the
-          // warnings instead of silently navigating away; the user can proceed.
-          setCheck(res);
+          // didn't resolve, so assignments have no testing service). Replace the
+          // pre-flight verdict with what actually happened instead of silently
+          // navigating away.
+          setCheck({ key: checkKey, result: res, failure: null });
           setCreatedCourseId(res.course_id);
+          setConfirmOpen(false);
           setSaving(false);
           return;
         }
@@ -209,6 +255,7 @@ function CreateInner() {
       router.push(`/courses/${course.id}`);
     } catch (e) {
       setSaving(false);
+      setConfirmOpen(false);
       setError(e instanceof Error ? e.message : 'Create failed');
     }
   }
@@ -217,7 +264,9 @@ function CreateInner() {
     return <Forbidden message="You do not have permission to create courses." />;
   }
 
-  const blocked = hasFile && (check?.errors?.length ?? 0) > 0;
+  // A file is only submittable once its automatic check came back clean of
+  // blocking errors — an unchecked or failed file would fail the apply anyway.
+  const blocked = hasFile && (status !== 'done' || errors.length > 0);
   const selectedServer = servers.find((s) => s.id === serverId);
 
   return (
@@ -231,7 +280,7 @@ function CreateInner() {
         disabled={!familyId || !!createdCourseId || (hasFile ? blocked : !path.trim())}
         submitLabel={createdCourseId ? 'Created ✓' : hasFile ? 'Create from file' : 'Create'}
         onCancel={() => router.push('/courses')}
-        onSubmit={save}
+        onSubmit={onSubmit}
       >
         <Field label="Course family" required hint="The lecture this course runs. Add it under Course Families first if it's missing.">
           <select value={familyId} onChange={(e) => setFamilyId(e.target.value)} className={inputCls}>
@@ -244,75 +293,24 @@ function CreateInner() {
 
         <Field
           label="Import from file (optional)"
-          hint="Upload a course_deployment.yaml to create the course with its content types and full content tree. Identity (path/title) comes from the file."
+          hint="Upload a course_deployment.yaml to create the course with its content types and full content tree. Identity (path/title) comes from the file, and it is checked automatically."
         >
           <input
             type="file"
             accept=".yaml,.yml,application/x-yaml,text/yaml"
             onChange={(e) => onPickFile(e.target.files?.[0])}
-            className="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:text-sm file:font-medium hover:file:bg-blue-100"
+            className={fileInputCls}
           />
           {hasFile && (
-            <div className="mt-2 space-y-2">
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-500 font-mono truncate">{fileName}</span>
-                <button
-                  type="button"
-                  onClick={validate}
-                  disabled={!familyId || validating}
-                  className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50"
-                >
-                  {validating ? 'Validating…' : 'Validate'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onPickFile(undefined)}
-                  className="px-3 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded-lg"
-                >
-                  Clear
-                </button>
-              </div>
-
-              {check && (
-                <div className="text-xs space-y-1 border border-gray-200 rounded-lg p-3 bg-gray-50">
-                  <div className="text-gray-700">
-                    <span className="font-medium">{check.course_title || check.course_path}</span>{' '}
-                    <span className="font-mono text-gray-500">({check.course_path})</span>
-                  </div>
-                  <div className="text-gray-500">
-                    {check.summary.content_types} content types · {check.summary.units} units ·{' '}
-                    {check.summary.assignments} assignments · {check.summary.examples_assigned} examples
-                  </div>
-                  {check.errors.length > 0 && (
-                    <ul className="text-red-600 list-disc pl-4">
-                      {check.errors.map((e, i) => <li key={i}>{e}</li>)}
-                    </ul>
-                  )}
-                  {check.warnings.length > 0 && (
-                    <ul className="text-amber-600 list-disc pl-4">
-                      {check.warnings.map((w, i) => (
-                        <li key={i}>{w.path ? `${w.path}: ` : ''}{w.reason}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {check.errors.length === 0 && !createdCourseId && (
-                    <div className="text-green-600">Looks good — ready to create.</div>
-                  )}
-                  {createdCourseId && (
-                    <div className="flex items-center gap-2 pt-1 text-green-700">
-                      <span>Course created{check.warnings.length > 0 ? ' with warnings (above)' : ''}.</span>
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/courses/${createdCourseId}`)}
-                        className="text-blue-600 underline"
-                      >
-                        Open course
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <DeploymentCheckReport
+              status={status}
+              result={current?.result ?? null}
+              failure={current?.failure}
+              createdCourseId={createdCourseId}
+              onClear={() => onPickFile(undefined)}
+              onRecheck={() => setRecheck((n) => n + 1)}
+              onOpenCourse={() => router.push(`/courses/${createdCourseId}`)}
+            />
           )}
         </Field>
 
@@ -393,6 +391,16 @@ function CreateInner() {
           </label>
         )}
       </FormPanel>
+
+      {confirmOpen && (
+        <ConfirmDeployWarningsDialog
+          warnings={warnings}
+          courseLabel={current?.result?.course_title || current?.result?.course_path || fileName}
+          submitting={saving}
+          onConfirm={() => void save()}
+          onCancel={() => setConfirmOpen(false)}
+        />
+      )}
     </AuthenticatedLayout>
   );
 }
