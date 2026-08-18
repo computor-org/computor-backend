@@ -589,6 +589,52 @@ def _maybe_heal_forgejo_collaborator(
         )
 
 
+def _maybe_heal_forgejo_template_reader(
+    rec: CourseMemberGitRepository,
+    binding: CourseGitBinding,
+    server: Optional[GitServer],
+    user_id: str,
+    db: Session,
+) -> None:
+    """Retry granting read on the course template when it failed at first
+    provision (the student had no Forgejo account yet).
+
+    ``provision_student_fork`` attempts this grant exactly once, at fork
+    creation, and records the outcome under ``properties.forgejo`` as
+    ``template_read_granted``. Nothing used to read that flag again, so a
+    failure there was permanent: the student's clone token authenticated fine
+    and then 403'd on the template forever, and template updates could never
+    be merged into their repository. No-op once the grant is recorded, or for
+    non-Forgejo repos. ``ensure_template_reader`` never downgrades an existing
+    grant, so this is safe for staff who hold admin on the template.
+    """
+    if rec.mode != "managed" or server is None or server.type != "forgejo":
+        return
+    props = rec.properties or {}
+    if (props.get("forgejo") or {}).get("template_read_granted"):
+        return
+    owner, _, t_repo = (binding.template_repo or "").partition("/")
+    if not owner or not t_repo:
+        return
+    handle = _ensure_forgejo_account(user_id, server, db)
+    if not handle:
+        return
+    client = get_provider_client_for_server(server)
+    if not hasattr(client, "ensure_template_reader"):
+        return
+    if client.ensure_template_reader(owner, t_repo, handle):
+        rec.properties = {
+            **props,
+            "forgejo": {**(props.get("forgejo") or {}), "template_read_granted": True},
+        }
+        rec.updated_by = user_id
+        db.commit()
+        logger.info(
+            "Healed Forgejo template read grant for course_member %s on %s/%s",
+            rec.course_member_id, owner, t_repo,
+        )
+
+
 def get_student_repository(
     course_id: UUID | str,
     permissions: Principal,
@@ -952,9 +998,10 @@ def provision_student_repository(
         raise BadRequestException(detail="No managed git server is bound to this course")
 
     # Idempotent: one working repo per course membership. On re-provision,
-    # self-heal a Forgejo write-collaborator that couldn't be granted the first
-    # time (member hadn't logged into Forgejo yet) and (re)grant staff access for
-    # _lecturer+ on the canonical template/reference repos.
+    # self-heal the Forgejo grants that couldn't be made the first time (member
+    # hadn't logged into Forgejo yet) — write on their own repo and read on the
+    # course template — and (re)grant staff access for _lecturer+ on the
+    # canonical template/reference repos.
     existing = (
         db.query(CourseMemberGitRepository)
         .filter(CourseMemberGitRepository.course_member_id == member.id)
@@ -962,7 +1009,10 @@ def provision_student_repository(
     )
     if existing is not None:
         _maybe_heal_forgejo_collaborator(existing, user_id, db)
+        # Staff first: they get admin on the template, and the read heal below
+        # then sees an existing collaborator and leaves it alone.
         _maybe_grant_forgejo_staff_access(member, binding, server, user_id, db)
+        _maybe_heal_forgejo_template_reader(existing, binding, server, user_id, db)
         _stamp_repo_on_submission_groups(member, db)
         return _provisioned_response(existing, user_id, db)
 
