@@ -55,6 +55,13 @@ class UserPermissionHandler(PermissionHandler):
         if action in ["list", "get"] and resource_id == principal.user_id:
             return True
 
+        # A user owns their own identity row and may edit it. *Which* fields
+        # a self-edit may touch is enforced by ``custom_permissions_user``
+        # (interfaces/user.py) — never ``email``, which is the join key for
+        # the SSO identity and the git-server handle.
+        if action == "update" and resource_id is not None and resource_id == principal.user_id:
+            return True
+
         return False
 
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
@@ -85,6 +92,13 @@ class UserPermissionHandler(PermissionHandler):
         # For list/get, users can see themselves and users in their courses (as tutor+)
         if action in ["list", "get"]:
             return UserPermissionQueryBuilder.filter_visible_users(principal.user_id, db)
+
+        # Self-service edit of one's own record (name on the profile page).
+        # Scoping the query to the principal's own row means an attempt to
+        # patch somebody else resolves to NotFound, matching how the rest of
+        # the permission layer filters rather than refuses.
+        if action == "update" and principal.user_id:
+            return db.query(self.entity).filter(self.entity.id == principal.user_id)
 
         raise ForbiddenException(detail=f"Insufficient permissions to {action} {self.resource_name}")
 
