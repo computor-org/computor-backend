@@ -262,7 +262,7 @@ export default function LecturerContentPage() {
                               : 'Hidden because a unit above this one, or the course, is hidden.'
                           }
                         >
-                          {hiddenHere ? 'Hidden' : 'Hidden above'}
+                          Invisible
                         </Badge>
                       )}
                       {type && (

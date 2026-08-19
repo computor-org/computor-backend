@@ -89,7 +89,7 @@ function TreeNodeRow({ node, defaultExpanded }: { node: TreeNode; defaultExpande
                 className="shrink-0 px-1.5 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-600 rounded"
                 title="Students cannot currently see this. It is still counted below."
               >
-                hidden
+                invisible
               </span>
             )}
           </div>
