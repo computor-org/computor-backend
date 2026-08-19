@@ -331,3 +331,23 @@ export interface WSCourseContentUpdated {
   /** ISO8601 timestamp of the event */
   timestamp: string;
 }
+
+/**
+ * Course-level settings changed.
+ * 
+ * Rides the existing ``course:{course_id}`` channel so no new subscription is
+ * needed. Carries no payload beyond the id: a client refetches the course,
+ * because a ``visible`` flip (issue #338) can move the entire content tree in
+ * or out of view rather than changing one row.
+ */
+export interface WSCourseUpdated {
+  type?: "course:updated";
+  /** Channel (course:{course_id}) */
+  channel: string;
+  /** ID of the course */
+  course_id: string;
+  /** Type of change: updated, visibility_changed */
+  change_type: string;
+  /** ISO8601 timestamp of the event */
+  timestamp: string;
+}

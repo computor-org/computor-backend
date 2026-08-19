@@ -96,6 +96,7 @@ def build_course_member_grading_response(
                 submittable=node["submittable"],
                 position=node["position"],
                 course_content_type_color=node["course_content_type_color"],
+                visible_effective=node.get("visible_effective", True),
                 max_assignments=node["max_assignments"],
                 submitted_assignments=node["submitted_assignments"],
                 progress_percentage=node["progress_percentage"],

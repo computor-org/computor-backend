@@ -344,3 +344,86 @@ def test_the_tutor_test_route_is_deliberately_not_guarded():
     from computor_backend.api import tutor
 
     assert "enforce_content_visible" not in inspect.getsource(tutor.create_tutor_test)
+
+
+# --------------------------------------------------------------------------
+# Grading: display only
+# --------------------------------------------------------------------------
+
+def _grading_inputs(visible):
+    """One unit with two submittable assignments, one of them submitted."""
+    path_info = {
+        "unit": {
+            "title": "Unit", "submittable": False, "position": 1.0,
+            "course_content_type_color": "#fff", "visible_effective": True,
+        },
+        "unit.a": {
+            "title": "A", "submittable": True, "position": 1.0,
+            "course_content_type_color": "#fff", "visible_effective": visible,
+        },
+        "unit.b": {
+            "title": "B", "submittable": True, "position": 2.0,
+            "course_content_type_color": "#fff", "visible_effective": True,
+        },
+    }
+    def row(path, depth, max_a, submitted):
+        return {
+            "path": path, "path_depth": depth,
+            "content_type_id": "ct-1", "content_type_slug": "assignment",
+            "content_type_title": "Assignment", "content_type_color": "#fff",
+            "max_assignments": max_a, "submitted_assignments": submitted,
+            "latest_submission_at": None, "graded_assignments": max_a,
+            "average_grading": 0.5, "grading_status": "not_reviewed",
+        }
+
+    # Nodes come from the db_stats rows (one per path prefix), not path_info.
+    db_stats = [
+        row("unit", 1, 2, 1),
+        row("unit.a", 2, 1, 1),
+        row("unit.b", 2, 1, 0),
+    ]
+    return db_stats, path_info
+
+
+def test_hidden_content_does_not_change_grading_totals():
+    """The decision recorded for #338, pinned.
+
+    The issue text says invisible content should not be counted in grading
+    summaries. That was resolved the other way on purpose: these endpoints are
+    lecturer-and-above, so staff see the real denominator, and the student
+    case is already handled because hidden rows never reach a student at all.
+    Without this test someone reads the issue in six months and "fixes" it.
+    """
+    from computor_backend.utils.grading_stats import process_hierarchical_stats
+
+    all_visible = process_hierarchical_stats(*_grading_inputs(visible=True))
+    one_hidden = process_hierarchical_stats(*_grading_inputs(visible=False))
+
+    for key in (
+        "total_max_assignments",
+        "total_submitted_assignments",
+        "overall_progress_percentage",
+        "overall_average_grading",
+    ):
+        assert all_visible[key] == one_hidden[key], f"{key} must not react to visibility"
+
+
+def test_the_grading_node_still_reports_the_hidden_flag():
+    """Excluded from the maths, but the UI must still be able to mark it."""
+    from computor_backend.utils.grading_stats import process_hierarchical_stats
+
+    stats = process_hierarchical_stats(*_grading_inputs(visible=False))
+    flags = {node["path"]: node["visible_effective"] for node in stats["nodes"]}
+    assert flags["unit.a"] is False
+    assert flags["unit"] is True
+
+
+def test_a_synthesised_path_with_no_content_row_defaults_to_visible():
+    """Path prefixes invented by the roll-up cannot have been hidden."""
+    from computor_backend.utils.grading_stats import process_hierarchical_stats
+
+    db_stats, path_info = _grading_inputs(visible=True)
+    del path_info["unit"]  # the prefix now has no course_content row
+    stats = process_hierarchical_stats(db_stats, path_info)
+    flags = {node["path"]: node["visible_effective"] for node in stats["nodes"]}
+    assert flags["unit"] is True

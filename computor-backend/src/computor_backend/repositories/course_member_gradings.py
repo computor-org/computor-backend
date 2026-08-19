@@ -26,6 +26,10 @@ from computor_backend.model.course import (
 )
 from computor_backend.model.artifact import SubmissionArtifact
 from computor_backend.model.auth import User
+from computor_backend.business_logic.content_visibility import (
+    load_course_visible,
+    resolve_visible,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +193,11 @@ class CourseMemberGradingsRepository:
 
         Includes title, course_content_kind_id, and submittable status.
 
+        Also carries ``visible_effective`` (issue #338), which is **display
+        data only**: grading is lecturer-and-above, so hidden content stays in
+        every count and average and this flag never filters anything. It exists
+        so the UI can mark a row as one students cannot currently see.
+
         Args:
             course_id: The course ID
 
@@ -200,6 +209,7 @@ class CourseMemberGradingsRepository:
                 CourseContent.path,
                 CourseContent.title,
                 CourseContent.position,
+                CourseContent.visible,
                 CourseContentKind.submittable,
                 CourseContentType.color.label("course_content_type_color"),
             )
@@ -211,12 +221,26 @@ class CourseMemberGradingsRepository:
             )
             .all()
         )
+
+        # Resolved locally from the rows already loaded: a node is hidden if it
+        # or any ancestor sets visible=false, or the course does. Note the
+        # overrides map is built from THESE rows, so an archived ancestor that
+        # was filtered out above cannot veto -- which is correct, archived
+        # content is already invisible to everyone by another rule.
+        overrides = {
+            str(r.path): r.visible for r in results if r.visible is not None
+        }
+        course_visible = load_course_visible(self.db, course_id)
+
         return {
             str(r.path): {
                 "title": r.title,
                 "submittable": r.submittable,
                 "position": r.position,
                 "course_content_type_color": r.course_content_type_color,
+                "visible_effective": resolve_visible(
+                    str(r.path), overrides, course_visible
+                ),
             }
             for r in results
         }
