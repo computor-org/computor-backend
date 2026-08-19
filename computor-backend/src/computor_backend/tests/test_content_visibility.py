@@ -1,0 +1,184 @@
+"""Guards on student visibility of course contents (issue #338).
+
+The rule under test is a veto, not a nearest-non-NULL fallback. The single
+most important case in this file is
+``test_true_on_a_child_does_not_override_a_hidden_ancestor``: if that ever goes
+green the other way round, the feature is broken in the exact way the design
+set out to avoid — a lecturer hides a unit and one child quietly stays live.
+"""
+import pytest
+
+from computor_backend.business_logic.content_visibility import (
+    ancestor_paths,
+    effective_visible_predicate,
+    filter_visible,
+    resolve_visible,
+)
+from computor_backend.model.course import Course, CourseContent
+
+
+class _Row:
+    """Stand-in for a loaded course-content row."""
+
+    def __init__(self, path, visible_effective=True):
+        self.path = path
+        self.visible_effective = visible_effective
+
+
+# --------------------------------------------------------------------------
+# ancestor_paths
+# --------------------------------------------------------------------------
+
+def test_ancestor_paths_includes_self():
+    """A node's own visible=False must veto it, so self is in the chain."""
+    assert ancestor_paths("a.b.c") == ["a", "a.b", "a.b.c"]
+
+
+def test_ancestor_paths_of_a_root_node():
+    assert ancestor_paths("a") == ["a"]
+
+
+# --------------------------------------------------------------------------
+# resolve_visible: NULL inherits
+# --------------------------------------------------------------------------
+
+def test_unset_everywhere_is_visible():
+    """NULL at every level is the default state of every existing course."""
+    assert resolve_visible("a.b.c", {}, None) is True
+
+
+def test_explicit_true_is_visible():
+    assert resolve_visible("a.b.c", {"a.b.c": True}, True) is True
+
+
+# --------------------------------------------------------------------------
+# resolve_visible: False vetoes
+# --------------------------------------------------------------------------
+
+def test_own_false_hides_the_node():
+    assert resolve_visible("a.b.c", {"a.b.c": False}, None) is False
+
+
+def test_parent_false_hides_the_descendant():
+    assert resolve_visible("a.b.c", {"a.b": False}, None) is False
+
+
+def test_root_unit_false_hides_the_whole_subtree():
+    overrides = {"a": False}
+    assert resolve_visible("a", overrides, None) is False
+    assert resolve_visible("a.b", overrides, None) is False
+    assert resolve_visible("a.b.c", overrides, None) is False
+
+
+def test_course_false_hides_everything():
+    """Setting visible=false on the course empties the whole student tree."""
+    assert resolve_visible("a.b.c", {}, False) is False
+    assert resolve_visible("a", {}, False) is False
+
+
+# --------------------------------------------------------------------------
+# resolve_visible: True never re-grants
+# --------------------------------------------------------------------------
+
+def test_true_on_a_child_does_not_override_a_hidden_ancestor():
+    """The defining case. A veto cannot be undone from below."""
+    assert resolve_visible("a.b.c", {"a.b": False, "a.b.c": True}, None) is False
+
+
+def test_true_on_a_content_does_not_override_a_hidden_course():
+    assert resolve_visible("a.b", {"a.b": True}, False) is False
+
+
+def test_true_on_the_course_does_not_override_a_hidden_content():
+    """Issue #338: 'a visible true at the course level does not affect it'."""
+    assert resolve_visible("a.b", {"a.b": False}, True) is False
+
+
+def test_intermediate_true_does_not_shield_a_deeper_false():
+    assert resolve_visible("a.b.c", {"a.b": True, "a.b.c": False}, None) is False
+
+
+# --------------------------------------------------------------------------
+# resolve_visible: siblings are independent
+# --------------------------------------------------------------------------
+
+def test_hiding_one_unit_leaves_its_siblings_alone():
+    overrides = {"a.b": False}
+    assert resolve_visible("a.b.one", overrides, None) is False
+    assert resolve_visible("a.c.one", overrides, None) is True
+    assert resolve_visible("a", overrides, None) is True
+
+
+def test_a_prefix_that_is_not_a_path_segment_does_not_match():
+    """'a.bb' is not a descendant of 'a.b' — string prefixes are not enough."""
+    assert resolve_visible("a.bb", {"a.b": False}, None) is True
+
+
+# --------------------------------------------------------------------------
+# filter_visible
+# --------------------------------------------------------------------------
+
+def test_filter_visible_drops_only_the_hidden_rows():
+    rows = [_Row("a", True), _Row("a.b", False), _Row("a.c", True)]
+    assert [r.path for r in filter_visible(rows)] == ["a", "a.c"]
+
+
+def test_filter_visible_defaults_to_keeping_unannotated_rows():
+    """A row that never went through annotation must not vanish silently."""
+
+    class _Bare:
+        path = "a"
+
+    assert filter_visible([_Bare()]) != []
+
+
+# --------------------------------------------------------------------------
+# effective_visible_predicate: the SQL half
+# --------------------------------------------------------------------------
+
+def _compiled(query):
+    from sqlalchemy.dialects import postgresql
+
+    return str(
+        query.compile(
+            dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}
+        )
+    )
+
+
+def test_predicate_correlates_to_the_outer_course_content():
+    from sqlalchemy import select
+
+    sql = _compiled(select(CourseContent.id).where(effective_visible_predicate()))
+    # The ancestor half must compare an alias against the outer row, not
+    # against itself.
+    assert "course_content.path <@ course_content_1.path" in sql
+    assert "course_content_1.visible IS false" in sql
+
+
+def test_predicate_keeps_its_own_course_when_course_is_joined_outside():
+    """The correlation trap this predicate is written to survive.
+
+    ``user_course_content_list_query`` and friends already join ``Course``.
+    Without an explicit ``correlate(CourseContent)``, SQLAlchemy would hoist
+    ``course`` out of the subquery and bind it to the outer join, silently
+    changing what the check means.
+    """
+    from sqlalchemy import select
+
+    query = (
+        select(CourseContent.id, Course.title)
+        .join(Course, Course.id == CourseContent.course_id)
+        .where(effective_visible_predicate())
+    )
+    sql = _compiled(query)
+    # Two independent FROM course occurrences: the outer join and the subquery.
+    assert sql.count("FROM course \n") + sql.count("FROM course\n") >= 1
+    assert "EXISTS (SELECT * \nFROM course \nWHERE course.id" in sql
+
+
+def test_predicate_uses_the_ltree_containment_operator():
+    """`<@` is what ix_course_content_path_gist exists to serve."""
+    from sqlalchemy import select
+
+    assert "<@" in _compiled(select(CourseContent.id).where(effective_visible_predicate()))
