@@ -53,6 +53,11 @@ from computor_backend.utils.encryption import decrypt_secret, encrypt_secret
 
 logger = logging.getLogger(__name__)
 
+# Where a student's Forgejo clone token lives on their OIDC account:
+# ``properties['forgejo_clone_tokens'][<git_server_id>] = <encrypted token>``.
+# Keyed by server because Forgejo issues one such token per user and instance.
+_CLONE_TOKEN_PROP = "forgejo_clone_tokens"
+
 
 # ---------------------------------------------------------------------------
 # GitLab credential helpers (per-course token on the binding)
@@ -541,18 +546,59 @@ def student_repo_name(template_repo: str, handle: str) -> str:
     return f"{base}-{handle}"
 
 
-def _resolve_oidc_handle(user_id: str, db: Session) -> Optional[str]:
-    """The student's Keycloak handle (``preferred_username``), stored on the OIDC
-    ``Account.properties['username']`` after SSO login. Used as the Forgejo
-    username and as the managed-GitLab student-repo slug."""
-    account = (
+def _oidc_account(user_id: str, db: Session) -> Optional[Account]:
+    """The user's OIDC account row — their SSO identity, and where the Forgejo
+    handle and clone token are recorded."""
+    return (
         db.query(Account)
         .filter(Account.user_id == user_id, Account.type == "oidc")
         .first()
     )
+
+
+def _resolve_oidc_handle(user_id: str, db: Session) -> Optional[str]:
+    """The student's Keycloak handle (``preferred_username``), stored on the OIDC
+    ``Account.properties['username']`` after SSO login. Used as the Forgejo
+    username and as the managed-GitLab student-repo slug."""
+    account = _oidc_account(user_id, db)
     if account and account.properties:
         return account.properties.get("username")
     return None
+
+
+def _stored_clone_token(user_id: str, server_id, db: Session) -> Optional[str]:
+    """The clone token remembered for this user and Forgejo server, if any.
+
+    ``None`` when nothing is stored or the ciphertext no longer decrypts (e.g.
+    ``TOKEN_SECRET`` was rotated) — the caller then mints a fresh one.
+    """
+    account = _oidc_account(user_id, db)
+    if account is None:
+        return None
+    stored = ((account.properties or {}).get(_CLONE_TOKEN_PROP) or {}).get(str(server_id))
+    if not stored:
+        return None
+    try:
+        return decrypt_secret(stored)
+    except Exception:
+        logger.warning(
+            "Stored Forgejo clone token for user %s on server %s does not decrypt; minting a fresh one",
+            user_id, server_id,
+        )
+        return None
+
+
+def _remember_clone_token(user_id: str, server_id, token: str, db: Session) -> None:
+    """Persist a minted clone token (encrypted, keyed by git server) so later
+    provision calls hand back the same one instead of rotating it away."""
+    account = _oidc_account(user_id, db)
+    if account is None:
+        return
+    props = account.properties or {}
+    tokens = {**(props.get(_CLONE_TOKEN_PROP) or {}), str(server_id): encrypt_secret(token)}
+    account.properties = {**props, _CLONE_TOKEN_PROP: tokens}
+    account.updated_by = user_id
+    db.commit()
 
 
 def _maybe_heal_forgejo_collaborator(
@@ -795,13 +841,21 @@ def _maybe_grant_forgejo_staff_access(
 
 
 def _provisioned_response(
-    rec: CourseMemberGitRepository, user_id: str, db: Session
+    rec: CourseMemberGitRepository, user_id: str, db: Session, rotate: bool = False
 ) -> StudentRepositoryProvisioned:
-    """Wrap a repo record with a freshly-minted one-time clone credential.
+    """Wrap a repo record with the student's clone credential.
 
-    For a managed-Forgejo repo we mint (rotating) a repo-scoped PAT for the
-    student so `git clone`/push authenticates. The token is never persisted and
-    is returned only here. Null until the student exists in Forgejo.
+    For a managed-Forgejo repo the student needs a repo-scoped PAT so
+    `git clone`/push authenticates. Forgejo issues ONE such token per user and
+    instance (rotation is keyed by token name) and reveals its secret only at
+    creation, so minting a new one silently invalidates the copy that every
+    already-cloned repo carries in its origin remote — provisioning a second
+    course used to break the first one's pushes (computor-org/issues#332).
+
+    So mint once, remember it encrypted on the user's OIDC account, and return
+    that same token afterwards. ``rotate`` forces a fresh mint — the client's
+    escape hatch for a token that stopped working (revoked server-side, or a
+    Forgejo that lost its state). Null until the student exists in Forgejo.
     """
     base = _member_repo_to_get(rec).model_dump()
     clone_token = None
@@ -814,11 +868,18 @@ def _provisioned_response(
         handle = _resolve_oidc_handle(user_id, db)
         creds = _forgejo_admin_basic_auth_for(server) if server is not None else None
         if server is not None and handle and creds:
-            client = get_provider_client_for_server(server)
-            if hasattr(client, "mint_user_clone_token"):
-                clone_token = client.mint_user_clone_token(handle, creds[0], creds[1])
-                if clone_token:
-                    clone_username = handle
+            if not rotate:
+                clone_token = _stored_clone_token(user_id, rec.git_server_id, db)
+            if not clone_token:
+                client = get_provider_client_for_server(server)
+                if hasattr(client, "mint_user_clone_token"):
+                    clone_token = client.mint_user_clone_token(handle, creds[0], creds[1])
+                    # Never remember a failed mint: the student has no Forgejo
+                    # account yet, and the next call must try again.
+                    if clone_token:
+                        _remember_clone_token(user_id, rec.git_server_id, clone_token, db)
+            if clone_token:
+                clone_username = handle
     return StudentRepositoryProvisioned(**base, clone_token=clone_token, clone_username=clone_username)
 
 
@@ -965,6 +1026,7 @@ def provision_student_repository(
     course_id: UUID | str,
     permissions: Principal,
     db: Session,
+    rotate: bool = False,
 ) -> StudentRepositoryProvisioned:
     """Babysat provisioning: fork the course's template into a repo for the
     calling student and record it. Idempotent.
@@ -972,6 +1034,9 @@ def provision_student_repository(
     Requires the course to offer the ``managed`` mode (system-hosted) with a
     materialized template. ``managed`` is provider-agnostic; the bound server's
     type picks the backend — Forgejo or GitLab.
+
+    ``rotate`` re-mints the managed-Forgejo clone token instead of returning the
+    stored one; see :func:`_provisioned_response`.
     """
     user_id = permissions.get_user_id()
     if not user_id:
@@ -1014,7 +1079,7 @@ def provision_student_repository(
         _maybe_grant_forgejo_staff_access(member, binding, server, user_id, db)
         _maybe_heal_forgejo_template_reader(existing, binding, server, user_id, db)
         _stamp_repo_on_submission_groups(member, db)
-        return _provisioned_response(existing, user_id, db)
+        return _provisioned_response(existing, user_id, db, rotate=rotate)
 
     if "managed" not in (binding.student_repo_modes or []):
         raise BadRequestException(detail="This course does not offer managed (system-hosted) repositories")
@@ -1034,7 +1099,7 @@ def provision_student_repository(
     # access to the canonical template + reference repos.
     _maybe_grant_forgejo_staff_access(member, binding, server, user_id, db)
     _stamp_repo_on_submission_groups(member, db)
-    return _provisioned_response(rec, user_id, db)
+    return _provisioned_response(rec, user_id, db, rotate=rotate)
 
 
 def get_template_access(

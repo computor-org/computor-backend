@@ -123,17 +123,20 @@ class CourseMemberRepositoryGet(BaseModel):
 
 
 class StudentRepositoryProvisioned(CourseMemberRepositoryGet):
-    """Provisioning result — the repo plus a **one-time** clone credential.
+    """Provisioning result — the repo plus its clone credential.
 
-    Returned only by `provision-repository`. `clone_token` is a fresh repo-scoped
-    Forgejo PAT minted (and rotated) on each call; it is NOT persisted and NOT
-    returned by `GET .../repository`. Authenticate git as:
+    Returned only by `provision-repository`, never by `GET .../repository`.
+    `clone_token` is a repo-scoped Forgejo PAT, minted on the first call and
+    returned unchanged afterwards — Forgejo keeps one token per user and
+    instance, so re-minting would invalidate the copy already embedded in the
+    student's existing clones. Call with `rotate=true` to force a fresh token
+    (and then update every clone's remote). Authenticate git as:
     `https://<clone_username>:<clone_token>@<host>/<owner>/<repo>.git`.
     `clone_token` is null until the student has logged into Forgejo once
     (re-call after their first login to obtain it).
     """
 
-    clone_token: Optional[str] = Field(None, description="One-time repo-scoped Forgejo PAT; store securely")
+    clone_token: Optional[str] = Field(None, description="Repo-scoped Forgejo PAT; store securely")
     clone_username: Optional[str] = Field(None, description="Forgejo username to pair with clone_token")
 
 
