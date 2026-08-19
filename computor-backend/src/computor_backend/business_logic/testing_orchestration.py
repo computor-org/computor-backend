@@ -15,9 +15,10 @@ import re
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import and_, func
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from computor_backend.business_logic.submission_limits import enforce_max_test_runs
 from computor_backend.exceptions import BadRequestException, NotFoundException
 from computor_backend.model.artifact import SubmissionArtifact
 from computor_backend.model.result import Result
@@ -110,40 +111,23 @@ def find_active_test(
     ).first()
 
 
-def enforce_max_test_runs(
-    artifact_id: UUID | str,
-    submission_group,
-    db: Session,
-    *,
-    error_code: Optional[str] = None,
-) -> None:
-    """Raise when the submission group's ``max_test_runs`` is exhausted."""
-    if submission_group.max_test_runs is None:
-        return
-
-    test_count = db.query(func.count(Result.id)).filter(
-        Result.submission_artifact_id == artifact_id
-    ).scalar()
-
-    if test_count >= submission_group.max_test_runs:
-        kwargs = {"error_code": error_code} if error_code else {}
-        raise BadRequestException(
-            detail=f"Maximum test runs ({submission_group.max_test_runs}) reached for this artifact",
-            **kwargs,
-        )
-
-
 def enforce_test_limits(
     artifact: SubmissionArtifact,
     course_member_id: UUID | str,
     submission_group,
+    course_content,
     db: Session,
+    *,
+    exempt: bool = False,
 ) -> None:
     """Hard-fail variant of the test-limitation rules.
 
     Used where an existing active test is always an error (test-result
     ingestion); ``create_test_run`` instead syncs the old run against
     Temporal and may return it idempotently.
+
+    The budget itself lives in ``business_logic.submission_limits`` so that
+    enforcement and the counts shown to students cannot drift apart.
     """
     if find_active_test(artifact.id, course_member_id, db):
         raise BadRequestException(
@@ -151,7 +135,7 @@ def enforce_test_limits(
                    "Multiple tests are not allowed unless the previous test crashed or was cancelled."
         )
 
-    enforce_max_test_runs(artifact.id, submission_group, db)
+    enforce_max_test_runs(db, submission_group, course_content, exempt=exempt)
 
 
 async def sync_result_status_from_temporal(
