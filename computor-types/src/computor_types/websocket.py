@@ -249,6 +249,21 @@ class WSCourseContentUpdated(WSEventBase):
     timestamp: str = Field(..., description="ISO8601 timestamp of the event")
 
 
+class WSCourseUpdated(WSEventBase):
+    """Course-level settings changed.
+
+    Rides the existing ``course:{course_id}`` channel so no new subscription is
+    needed. Carries no payload beyond the id: a client refetches the course,
+    because a ``visible`` flip (issue #338) can move the entire content tree in
+    or out of view rather than changing one row.
+    """
+    type: Literal["course:updated"] = "course:updated"
+    channel: str = Field(..., description="Channel (course:{course_id})")
+    course_id: str = Field(..., description="ID of the course")
+    change_type: str = Field(..., description="Type of change: updated, visibility_changed")
+    timestamp: str = Field(..., description="ISO8601 timestamp of the event")
+
+
 # =============================================================================
 # Union Types for Parsing
 # =============================================================================
@@ -285,6 +300,7 @@ ServerEvent = Union[
     WSDeploymentAssigned,
     WSDeploymentUnassigned,
     WSCourseContentUpdated,
+    WSCourseUpdated,
 ]
 
 

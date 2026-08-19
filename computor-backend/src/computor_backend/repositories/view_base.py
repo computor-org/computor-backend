@@ -423,6 +423,7 @@ class ViewRepository(ABC):
         params: Any,
         aggregate_user_id: str,
         base_related_ids: Optional[Dict[str, Any]] = None,
+        include_hidden: bool = False,
     ) -> List[Any]:
         """Shared tail for the student/tutor ``list_course_contents`` views.
 
@@ -436,13 +437,24 @@ class ViewRepository(ABC):
         from .view_mappers import course_member_course_content_result_mapper
         from .course_content_queries import CourseMemberCourseContentQueryResult
 
+        from ..business_logic.content_visibility import annotate_effective_visibility
+
         response_list: List[Any] = []
         for raw in raw_results:
             typed = CourseMemberCourseContentQueryResult.from_tuple(raw)
             response_list.append(await course_member_course_content_result_mapper(typed, self.db))
 
+        # Resolve visibility once for the whole set (issue #338). Students have
+        # already had their hidden rows filtered out in SQL, so this is a no-op
+        # for them; for a tutor or a lecturer it is what marks the rows their
+        # students cannot see. One small query, one pass -- deliberately not a
+        # per-row correlated subquery (cf. #121).
+        response_list = annotate_effective_visibility(self.db, response_list)
+
         # Units aggregate status from their descendant submittable contents.
-        response_list = self._aggregate_unit_statuses(response_list, aggregate_user_id)
+        response_list = self._aggregate_unit_statuses(
+            response_list, aggregate_user_id, include_hidden=include_hidden
+        )
 
         # Tag with the view's base ids plus each course_content (deployment
         # invalidation). ``or None`` preserves the prior behaviour of passing an
@@ -566,6 +578,7 @@ class ViewRepository(ABC):
         self,
         course_contents: List[Any],
         user_id: str,
+        include_hidden: bool = False,
     ) -> List[Any]:
         """
         Aggregate status and unreviewed_count for unit-like course contents from their descendants.
@@ -629,7 +642,9 @@ class ViewRepository(ABC):
             else:
                 # No descendants in result set - fall back to DB query
                 # This happens when filtering by path/id returns only the unit without descendants
-                aggregated = self._aggregate_single_unit_status_for_list(user_id, unit)
+                aggregated = self._aggregate_single_unit_status_for_list(
+                    user_id, unit, include_hidden=include_hidden
+                )
                 if isinstance(aggregated, tuple):
                     unit.status, unit.unreviewed_count = aggregated
                 else:
@@ -642,6 +657,7 @@ class ViewRepository(ABC):
         self,
         user_id: str,
         course_content: Any,
+        include_hidden: bool = False,
     ) -> tuple:
         """
         Aggregate status and unreviewed_count for a single unit from DB when descendants aren't in result set.
@@ -664,6 +680,8 @@ class ViewRepository(ABC):
         from computor_types.grading import GradingStatus
         from sqlalchemy import text
 
+        from ..business_logic.content_visibility import effective_visible_predicate
+
         unit_path = str(course_content.path)
 
         # Get all course contents for this user in the same course
@@ -671,6 +689,13 @@ class ViewRepository(ABC):
         query = user_course_content_list_query(user_id, self.db)
         query = query.filter(text("course_content.course_id = :course_id"))
         query = query.params(course_id=str(course_content.course_id))
+
+        # This fallback re-queries from scratch and therefore does NOT inherit
+        # the filtering the caller's list query already applied. Without this,
+        # a student's unit badge would aggregate descendants hidden from them
+        # (issue #338) -- the one place the read filter would otherwise leak.
+        if not include_hidden:
+            query = query.filter(effective_visible_predicate())
 
         all_contents = query.all()
 

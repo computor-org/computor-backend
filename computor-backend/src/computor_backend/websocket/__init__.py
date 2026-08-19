@@ -20,6 +20,7 @@ from computor_backend.websocket.event_publisher import (
     publish_deployment_assigned,
     publish_deployment_unassigned,
     publish_course_content_updated,
+    publish_course_updated,
 )
 
 __all__ = [
@@ -33,4 +34,5 @@ __all__ = [
     "publish_deployment_assigned",
     "publish_deployment_unassigned",
     "publish_course_content_updated",
+    "publish_course_updated",
 ]

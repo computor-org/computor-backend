@@ -261,3 +261,36 @@ def publish_course_content_updated(
         "change_type": change_type,
         "timestamp": _now_iso(),
     })
+
+
+def publish_course_updated(
+    course_id: str,
+    change_type: str = "updated",
+) -> None:
+    """
+    Broadcast a course-level mutation event.
+
+    Call AFTER db.commit() succeeds.
+
+    Course settings reach every student in the course: ``visible`` hides the
+    whole content tree (issue #338), and ``max_test_runs`` / ``max_submissions``
+    are course-wide budget defaults. Before this there was no course-level
+    event at all, so such an edit only reached clients when the 5-minute view
+    cache happened to expire.
+
+    Rides the same ``course:<id>`` channel clients already subscribe to for
+    content events, so no new subscription is needed.
+
+    Args:
+        course_id: Course UUID string
+        change_type: One of "updated", "visibility_changed"
+    """
+    _invalidate_cache_tags(f"course_id:{course_id}")
+
+    channel = f"course:{course_id}"
+    _publish_event(channel, "course:updated", {
+        "channel": channel,
+        "course_id": course_id,
+        "change_type": change_type,
+        "timestamp": _now_iso(),
+    })

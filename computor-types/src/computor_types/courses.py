@@ -36,6 +36,11 @@ class CourseCreate(BaseModel):
     # submission group value overrides both.
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
+    # Root of the content-visibility chain (issue #338). None inherits and
+    # means visible; False hides every course content in this course from
+    # students. Unlike the budgets above this is a veto, not a fallback: a
+    # course content cannot re-grant visibility the course denied.
+    visible: Optional[bool] = None
 
 class CourseGet(BaseEntityGet,CourseCreate):
     id: str
@@ -51,6 +56,11 @@ class CourseGet(BaseEntityGet,CourseCreate):
     # submission group value overrides both.
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
+    # Root of the content-visibility chain (issue #338). None inherits and
+    # means visible; False hides every course content in this course from
+    # students. Unlike the budgets above this is a veto, not a fallback: a
+    # course content cannot re-grant visibility the course denied.
+    visible: Optional[bool] = None
 
     course_family: Optional[CourseFamilyGet] = None
 
@@ -75,6 +85,11 @@ class CourseList(BaseModel):
     # submission group value overrides both.
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
+    # Root of the content-visibility chain (issue #338). None inherits and
+    # means visible; False hides every course content in this course from
+    # students. Unlike the budgets above this is a veto, not a fallback: a
+    # course content cannot re-grant visibility the course denied.
+    visible: Optional[bool] = None
 
     @field_validator('path', mode='before')
     @classmethod
@@ -92,6 +107,10 @@ class CourseUpdate(BaseModel):
     # submission group value overrides both.
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
+    # Tri-state (issue #338). The backend applies updates with
+    # ``model_dump(exclude_unset=True)``, so omitting the key leaves the course
+    # alone while sending an explicit ``null`` resets it to "inherit".
+    visible: Optional[bool] = None
 
 
 class CourseQuery(ListQuery):
@@ -106,6 +125,7 @@ class CourseQuery(ListQuery):
     full_path: Optional[str] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
+    visible: Optional[bool] = None
 
 
 class CourseInterface(EntityInterface):

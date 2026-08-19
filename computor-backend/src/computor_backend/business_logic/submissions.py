@@ -38,6 +38,7 @@ from computor_backend.permissions.course_access import (
     is_course_staff,
     require_submission_group_access,
 )
+from computor_backend.business_logic.content_visibility import enforce_content_visible
 from computor_backend.business_logic.submission_limits import enforce_max_submissions
 from computor_backend.cache import Cache
 from computor_backend.repositories.submission_artifact import SubmissionArtifactRepository
@@ -247,6 +248,15 @@ async def upload_submission_artifact(
 
     if not course_content.is_submittable:
         raise BadRequestException(detail="This course content does not accept submissions")
+
+    # A hidden assignment accepts no work from students (issue #338). Staff may
+    # still upload, which is how a lecturer rehearses an exam before releasing
+    # it. Existing artifacts are untouched either way.
+    enforce_content_visible(
+        db,
+        course_content,
+        exempt=is_course_staff(permissions, submission_group.course_id, db),
+    )
 
     # Resolve the testing service by the example's executionBackend slug (the FK is
     # only a cache and is often NULL when the service was registered after the
@@ -638,6 +648,9 @@ def update_artifact(
             # This is the path the editor actually takes: an artifact created
             # by a test run is marked submitted afterwards. It used to skip the
             # quota entirely, which is why submission limits never bit.
+            enforce_content_visible(
+                db, submission_group.course_content, exempt=staff
+            )
             enforce_max_submissions(
                 db, submission_group, submission_group.course_content, exempt=staff
             )

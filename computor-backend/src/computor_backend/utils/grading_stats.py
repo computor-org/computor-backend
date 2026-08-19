@@ -120,6 +120,9 @@ def _new_node(path: str, path_info: dict[str, Any]) -> dict[str, Any]:
     submittable = None
     position = None
     course_content_type_color = None
+    # Default True: a synthesised path prefix with no course_content row of its
+    # own is not something a lecturer can have hidden.
+    visible_effective = True
 
     info = path_info.get(path)
     if isinstance(info, dict):
@@ -127,6 +130,7 @@ def _new_node(path: str, path_info: dict[str, Any]) -> dict[str, Any]:
         submittable = info.get("submittable")
         position = info.get("position")
         course_content_type_color = info.get("course_content_type_color")
+        visible_effective = info.get("visible_effective", True)
     elif info is not None:
         title = info
 
@@ -136,6 +140,8 @@ def _new_node(path: str, path_info: dict[str, Any]) -> dict[str, Any]:
         "submittable": submittable,
         "position": position,
         "course_content_type_color": course_content_type_color,
+        # Display only -- never used to filter or to change a count (#338).
+        "visible_effective": visible_effective,
         "max_assignments": 0,
         "submitted_assignments": 0,
         "graded_assignments": 0,
@@ -201,6 +207,8 @@ def _node_stats(
         "submittable": node.get("submittable"),
         "position": node.get("position"),
         "course_content_type_color": node.get("course_content_type_color"),
+        # Passed straight through: the counts below deliberately ignore it.
+        "visible_effective": node.get("visible_effective", True),
         "max_assignments": node["max_assignments"],
         "submitted_assignments": node["submitted_assignments"],
         "progress_percentage": _percentage(

@@ -105,6 +105,12 @@ class CourseContentStudentGet(BaseEntityGet):
     # a submission group exists, instead of only after the first run.
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
+    # Resolved visibility (issue #338). Students never receive a hidden row at
+    # all -- the read filter drops it -- so for them this is always True. It is
+    # carried here for lecturers and tutors, who DO get hidden rows through
+    # this same view so they can rehearse an exam as a student, and whose tree
+    # greys the row instead of dropping it.
+    visible_effective: bool = True
     testing_service_id: Optional[str] = None
     unread_message_count: int = 0
     result: Optional[ResultStudentGet] = None
@@ -153,6 +159,12 @@ class CourseContentStudentList(BaseModel):
     # Effective budgets — see CourseContentStudentGet.
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
+    # Resolved visibility (issue #338). Students never receive a hidden row at
+    # all -- the read filter drops it -- so for them this is always True. It is
+    # carried here for lecturers and tutors, who DO get hidden rows through
+    # this same view so they can rehearse an exam as a student, and whose tree
+    # greys the row instead of dropping it.
+    visible_effective: bool = True
     testing_service_id: Optional[str] = None
 
     directory: Optional[str] = None

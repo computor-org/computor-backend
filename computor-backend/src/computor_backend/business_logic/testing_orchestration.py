@@ -18,6 +18,7 @@ from uuid import UUID
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from computor_backend.business_logic.content_visibility import enforce_content_visible
 from computor_backend.business_logic.submission_limits import enforce_max_test_runs
 from computor_backend.exceptions import BadRequestException, NotFoundException
 from computor_backend.model.artifact import SubmissionArtifact
@@ -134,6 +135,10 @@ def enforce_test_limits(
             detail="You have already run a test on this artifact. "
                    "Multiple tests are not allowed unless the previous test crashed or was cancelled."
         )
+
+    # Content hidden from students accepts no ingested results from them
+    # either (issue #338); staff are exempt on the same terms as the budget.
+    enforce_content_visible(db, course_content, exempt=exempt)
 
     enforce_max_test_runs(db, submission_group, course_content, exempt=exempt)
 

@@ -158,6 +158,13 @@ class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     max_test_runs = Column(Integer)
     max_submissions = Column(Integer)
 
+    # Root of the content-visibility chain. NULL means "visible"; False hides
+    # every course content in the course from students. Unlike the budgets
+    # above this is a *veto*, not a nearest-non-NULL fallback: a course content
+    # setting visible=True cannot re-grant what the course denied. See
+    # business_logic.content_visibility.
+    visible = Column(Boolean)
+
     # Relationships
     course_family = relationship('CourseFamily', back_populates='courses')
     organization = relationship('Organization', back_populates='courses')
@@ -232,6 +239,14 @@ class CourseContent(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     max_group_size = Column(Integer, nullable=True)
     max_test_runs = Column(Integer)
     max_submissions = Column(Integer)
+
+    # Student visibility, inherited down the ltree. NULL inherits from the
+    # parent content (and ultimately from ``Course.visible``); False hides this
+    # node and its whole subtree from students. True does NOT re-grant what an
+    # ancestor denied — the chain is ANDed, so a single False anywhere above
+    # wins. Staff keep seeing and acting on hidden content; only students lose
+    # access. See business_logic.content_visibility.
+    visible = Column(Boolean)
 
     # Testing service - which service should test this assignment
     testing_service_id = Column(

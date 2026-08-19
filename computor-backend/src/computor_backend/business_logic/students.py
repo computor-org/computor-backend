@@ -25,12 +25,18 @@ logger = logging.getLogger(__name__)
 async def get_student_course_content(
     course_content_id: UUID | str,
     user_id: str,
+    permissions: Optional[Principal] = None,
     cache: Optional[Cache] = None,
 ) -> CourseContentStudentGet:
-    """Get detailed course content for a student with caching via repository."""
+    """Get detailed course content for a student with caching via repository.
+
+    ``permissions`` is needed to tell a real student from a lecturer or tutor
+    walking the same view: staff keep seeing content hidden from students
+    (issue #338).
+    """
     repo = StudentViewRepository(cache=cache, user_id=user_id)
     try:
-        return await repo.get_course_content(user_id, course_content_id)
+        return await repo.get_course_content(user_id, course_content_id, permissions)
     finally:
         repo.close()
 
@@ -38,12 +44,13 @@ async def get_student_course_content(
 async def list_student_course_contents(
     user_id: str,
     params: CourseContentStudentQuery,
+    permissions: Optional[Principal] = None,
     cache: Optional[Cache] = None,
 ) -> List[CourseContentStudentList]:
     """List course contents for a student with caching via repository."""
     repo = StudentViewRepository(cache=cache, user_id=user_id)
     try:
-        return await repo.list_course_contents(user_id, params)
+        return await repo.list_course_contents(user_id, params, permissions)
     finally:
         repo.close()
 

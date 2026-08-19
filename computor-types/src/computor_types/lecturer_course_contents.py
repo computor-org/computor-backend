@@ -33,6 +33,12 @@ class CourseContentLecturerGet(BaseModel):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
+    # This node's own setting (None = inherit) and the value resolved against
+    # the whole ancestor chain plus the course (issue #338). Lecturers always
+    # receive hidden content; visible_effective is what tells the tree to grey
+    # it, and `visible` is what the toggle writes back.
+    visible: Optional[bool] = None
+    visible_effective: bool = True
     testing_service_id: Optional[str] = None
     is_submittable: bool = False
     has_deployment: Optional[bool] = None
@@ -67,6 +73,12 @@ class CourseContentLecturerList(BaseModel):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
+    # This node's own setting (None = inherit) and the value resolved against
+    # the whole ancestor chain plus the course (issue #338). Lecturers always
+    # receive hidden content; visible_effective is what tells the tree to grey
+    # it, and `visible` is what the toggle writes back.
+    visible: Optional[bool] = None
+    visible_effective: bool = True
     testing_service_id: Optional[str] = None
     is_submittable: bool = False
     archived_at: Optional[datetime] = None
@@ -101,6 +113,10 @@ class CourseContentLecturerQuery(ListQuery):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
+    # Tri-state on the *effective* visibility: True returns only content
+    # students can see, False only content hidden from them, None (the default)
+    # everything. Lecturers never lose rows unless they ask to.
+    visible: Optional[bool] = None
     testing_service_id: Optional[str] = None
     has_deployment: Optional[bool] = Field(
         None,

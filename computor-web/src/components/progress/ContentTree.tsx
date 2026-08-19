@@ -35,6 +35,8 @@ function TreeNodeRow({ node, defaultExpanded }: { node: TreeNode; defaultExpande
   const hasChildren = node.children.length > 0;
   const isAssignment = node.submittable === true;
   const indent = node.depth * 20;
+  // Hidden from students, here or by an ancestor (issue #338).
+  const hidden = node.visible_effective === false;
 
   const grade = isAssignment
     ? (node.grading != null ? Math.round(node.grading * 100) : null)
@@ -64,13 +66,32 @@ function TreeNodeRow({ node, defaultExpanded }: { node: TreeNode; defaultExpande
             )}
             {node.course_content_type_color && (
               <span
-                className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${hidden ? 'opacity-40' : ''}`}
                 style={{ backgroundColor: node.course_content_type_color }}
               />
             )}
-            <span className={`text-sm truncate ${isAssignment ? 'text-gray-700' : 'font-medium text-gray-900'}`}>
+            <span
+              className={`text-sm truncate ${
+                hidden
+                  ? 'text-gray-400'
+                  : isAssignment
+                    ? 'text-gray-700'
+                    : 'font-medium text-gray-900'
+              }`}
+            >
               {displayName(node)}
             </span>
+            {/* Marked, not excluded: the counts on this row deliberately still
+                include hidden content, because grading is staff-only and staff
+                should see the real denominator (issue #338). */}
+            {hidden && (
+              <span
+                className="shrink-0 px-1.5 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-600 rounded"
+                title="Students cannot currently see this. It is still counted below."
+              >
+                invisible
+              </span>
+            )}
           </div>
         </td>
 

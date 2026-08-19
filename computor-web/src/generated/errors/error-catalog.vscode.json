@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "error_count": 78,
+  "error_count": 79,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -675,6 +675,19 @@
         "plain": "A submission cannot be withdrawn. Ask a tutor if it was made in error.",
         "markdown": "**Submission Cannot Be Withdrawn**\n\nA submission cannot be withdrawn once made. Ask a tutor if it was made in error.",
         "html": "<strong>Submission Cannot Be Withdrawn</strong><p>A submission cannot be withdrawn. Ask a tutor if it was made in error.</p>"
+      },
+      "retry_after": null
+    },
+    "SUBMIT_012": {
+      "code": "SUBMIT_012",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Assignment Not Available",
+      "message": {
+        "plain": "This assignment is not currently available. Your lecturer has hidden it.",
+        "markdown": "**Assignment Not Available**\n\nThis assignment is not currently available because your lecturer has hidden it. Your existing work and submissions are untouched and will reappear if it is made visible again.",
+        "html": "<strong>Assignment Not Available</strong><p>This assignment is not currently available because your lecturer has hidden it. Your existing work and submissions are untouched and will reappear if it is made visible again.</p>"
       },
       "retry_after": null
     },

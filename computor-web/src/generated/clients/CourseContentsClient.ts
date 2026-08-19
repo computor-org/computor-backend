@@ -15,7 +15,7 @@ export class CourseContentsClient extends BaseEndpointClient {
   /**
    * List Course-Contents
    */
-  async listCourseContentsCourseContentsGet({ archived, courseContentTypeId, courseId, description, exampleVersionId, hasDeployment, id, limit, maxGroupSize, maxSubmissions, maxTestRuns, path, position, skip, testingServiceId, title, userId }: { archived?: boolean | null; courseContentTypeId?: string | null; courseId?: string | null; description?: string | null; exampleVersionId?: string | null; hasDeployment?: boolean | null; id?: string | null; limit?: number | null; maxGroupSize?: number | null; maxSubmissions?: number | null; maxTestRuns?: number | null; path?: string | null; position?: number | null; skip?: number | null; testingServiceId?: string | null; title?: string | null; userId?: string | null }): Promise<CourseContentList[]> {
+  async listCourseContentsCourseContentsGet({ archived, courseContentTypeId, courseId, description, exampleVersionId, hasDeployment, id, limit, maxGroupSize, maxSubmissions, maxTestRuns, path, position, skip, testingServiceId, title, userId, visible }: { archived?: boolean | null; courseContentTypeId?: string | null; courseId?: string | null; description?: string | null; exampleVersionId?: string | null; hasDeployment?: boolean | null; id?: string | null; limit?: number | null; maxGroupSize?: number | null; maxSubmissions?: number | null; maxTestRuns?: number | null; path?: string | null; position?: number | null; skip?: number | null; testingServiceId?: string | null; title?: string | null; userId?: string | null; visible?: boolean | null }): Promise<CourseContentList[]> {
     const queryParams: Record<string, unknown> = {
       archived,
       course_content_type_id: courseContentTypeId,
@@ -34,6 +34,7 @@ export class CourseContentsClient extends BaseEndpointClient {
       testing_service_id: testingServiceId,
       title,
       user_id: userId,
+      visible,
     };
     return this.client.get<CourseContentList[]>(this.basePath, { params: queryParams });
   }

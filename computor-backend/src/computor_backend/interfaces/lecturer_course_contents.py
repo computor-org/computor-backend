@@ -8,6 +8,9 @@ from computor_types.lecturer_course_contents import (
     CourseContentLecturerInterface as CourseContentLecturerInterfaceBase,
     CourseContentLecturerQuery,
 )
+from computor_backend.business_logic.content_visibility import (
+    effective_visible_predicate,
+)
 from computor_backend.interfaces.base import BackendEntityInterface
 from computor_backend.model.course import CourseContent
 from computor_types.custom_types import Ltree
@@ -33,6 +36,14 @@ class CourseContentLecturerInterface(CourseContentLecturerInterfaceBase, Backend
             query = query.filter(CourseContent.archived_at.is_not(None))
         elif params.archived is False:
             query = query.filter(CourseContent.archived_at.is_(None))
+
+        # Same tri-state shape for student visibility (issue #338). A lecturer
+        # never loses rows by default -- they are marked, not dropped -- so
+        # this only fires when explicitly asked for one side or the other.
+        if params.visible is True:
+            query = query.filter(effective_visible_predicate())
+        elif params.visible is False:
+            query = query.filter(~effective_visible_predicate())
 
         if params.id is not None:
             query = query.filter(CourseContent.id == params.id)

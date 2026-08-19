@@ -8,6 +8,9 @@ from computor_types.student_course_contents import (
     CourseContentStudentInterface as CourseContentStudentInterfaceBase,
     CourseContentStudentQuery,
 )
+from computor_backend.business_logic.content_visibility import (
+    effective_visible_predicate,
+)
 from computor_backend.interfaces.base import BackendEntityInterface
 from computor_backend.model.course import CourseContent
 from computor_types.custom_types import Ltree
@@ -21,10 +24,30 @@ class CourseContentStudentInterface(CourseContentStudentInterfaceBase, BackendEn
     cache_ttl = 300
 
     @staticmethod
-    def search(db: Session, query, params: Optional[CourseContentStudentQuery]):
-        """Apply search filters to course content query for students."""
+    def search(
+        db: Session,
+        query,
+        params: Optional[CourseContentStudentQuery],
+        *,
+        include_hidden: bool = False,
+    ):
+        """Apply search filters to course content query for students.
+
+        ``include_hidden`` is what separates a student from a staff member
+        looking at the same view. This one function serves both the student's
+        own tree and a tutor's view of a student (issue #338), and only the
+        former may lose rows -- so the caller decides rather than this function
+        guessing. It defaults to False so a caller that forgets errs on the
+        side of hiding.
+        """
         # Students never see archived content
         query = query.filter(CourseContent.archived_at.is_(None))
+
+        # ...nor content hidden by their lecturer, here or on any ancestor.
+        # Filtered in SQL rather than after the fact so the row never reaches
+        # a student's payload at all.
+        if not include_hidden:
+            query = query.filter(effective_visible_predicate())
 
         if params is None:
             return query

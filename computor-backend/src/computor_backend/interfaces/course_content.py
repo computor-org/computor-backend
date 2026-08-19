@@ -9,7 +9,11 @@ from computor_types.course_contents import (
     CourseContentQuery,
 )
 from computor_types.custom_types import Ltree
+from computor_backend.business_logic.content_visibility import (
+    effective_visible_predicate,
+)
 from computor_backend.interfaces.base import BackendEntityInterface, CacheTag
+from computor_backend.websocket import publish_course_content_updated
 from computor_backend.model.course import (
     CourseContent,
     CourseMember,
@@ -129,6 +133,39 @@ async def post_create_course_content(course_content: CourseContent, db: Session)
     )
 
 
+async def post_update_course_content(course_content, old_course_content, db):
+    """Tell subscribed clients a course content changed.
+
+    ``publish_course_content_updated`` existed but had exactly one call site
+    (the reorder endpoint), so a plain ``PATCH /course-contents/{id}`` reached
+    nobody: the VS Code trees already handle this event and were simply never
+    sent it, leaving edits to surface whenever the 5-minute view cache happened
+    to expire. Visibility (issue #338) makes that gap user-visible -- a
+    lecturer releasing an exam expects students to see it now -- so every
+    content update publishes.
+
+    A visibility change is called out separately because it can move a whole
+    subtree in or out of view, not just re-render one row. Clients refetch the
+    course either way, so no per-descendant fan-out is needed.
+    """
+    try:
+        change_type = "updated"
+        if getattr(old_course_content, "visible", None) != getattr(
+            course_content, "visible", None
+        ):
+            change_type = "visibility_changed"
+
+        publish_course_content_updated(
+            str(course_content.course_id), str(course_content.id), change_type
+        )
+    except Exception:
+        # Never fail a committed write because a broadcast could not go out.
+        logger.exception(
+            "Failed to publish update event for course content %s",
+            getattr(course_content, "id", None),
+        )
+
+
 class CourseContentInterface(CourseContentInterfaceBase, BackendEntityInterface):
     """Backend-specific CourseContent interface with model attached."""
 
@@ -136,6 +173,7 @@ class CourseContentInterface(CourseContentInterfaceBase, BackendEntityInterface)
     endpoint = "course-contents"
     cache_ttl = 300
     post_create = post_create_course_content
+    post_update = post_update_course_content
 
     @classmethod
     def cache_invalidation_tags(cls, entity):
@@ -169,6 +207,15 @@ class CourseContentInterface(CourseContentInterfaceBase, BackendEntityInterface)
             # Default: exclude archived
             query = query.filter(CourseContent.archived_at.is_(None))
             return query.order_by(CourseContent.course_id, CourseContent.path)
+
+        # Tri-state student visibility (issue #338). Applied in SQL because
+        # this endpoint paginates -- filtering after LIMIT/OFFSET would hand
+        # back short pages. None (the default) returns everything: this is a
+        # management endpoint, not a student one.
+        if params.visible is True:
+            query = query.filter(effective_visible_predicate())
+        elif params.visible is False:
+            query = query.filter(~effective_visible_predicate())
 
         # archived=True shows only archived, otherwise exclude archived
         if params.archived is True:

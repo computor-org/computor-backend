@@ -36,6 +36,7 @@ async def student_get_course_content_endpoint(
     return await get_student_course_content(
         course_content_id=course_content_id,
         user_id=permissions.get_user_id_or_throw(),
+        permissions=permissions,
         cache=cache,
     )
 
@@ -48,6 +49,7 @@ async def student_list_course_contents_endpoint(
     return await list_student_course_contents(
         user_id=permissions.get_user_id_or_throw(),
         params=params,
+        permissions=permissions,
         cache=cache,
     )
 

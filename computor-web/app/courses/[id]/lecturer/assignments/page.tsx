@@ -11,6 +11,13 @@ import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge, { BadgeColor } from '@/src/components/Badge';
 import { formatLimit } from '@/src/utils/limits';
+import Button, { ButtonLink } from '@/src/components/ui/Button';
+import {
+  hiddenRowCls,
+  hiddenRowMarkCls,
+  hiddenRowTitleCls,
+  rowTitleCls,
+} from '@/src/components/ui/tokens';
 import type { CourseGet, CourseContentLecturerList, CourseContentTypeList } from 'types/generated';
 import { displayName } from '@/src/utils/displayName';
 
@@ -97,6 +104,36 @@ export default function LecturerContentPage() {
       setReleaseMsg(e instanceof Error ? e.message : 'Release failed');
     } finally {
       setReleasing(null);
+    }
+  }
+
+  const [togglingVisibility, setTogglingVisibility] = useState<string | null>(null);
+
+  // Flip a content between "hidden" and "inherit" (issue #338). Going back to
+  // null rather than true is deliberate: true would pin the content visible
+  // against a future decision to hide the unit above it, which is almost never
+  // what a lecturer means by "show this again".
+  //
+  // This lives on the tree rather than only in the edit form because the
+  // workflow it serves is a fast flip at the start and end of an exam.
+  async function toggleVisibility(c: CourseContentLecturerList) {
+    setTogglingVisibility(c.id);
+    setReleaseMsg(null);
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/course-contents/${c.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visible: c.visible === false ? null : false }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.detail || err?.message || `Failed (${res.status})`);
+      }
+      reload();
+    } catch (e) {
+      setReleaseMsg(e instanceof Error ? e.message : 'Could not change visibility');
+    } finally {
+      setTogglingVisibility(null);
     }
   }
 
@@ -192,19 +229,42 @@ export default function LecturerContentPage() {
                 {active.map((c) => {
                   const type = c.course_content_type ?? typeMap[c.course_content_type_id];
                   const badge = deploymentBadge(c);
+                  // Hidden here, or hidden by a unit above / the course itself.
+                  const hidden = c.visible_effective === false;
+                  const hiddenHere = c.visible === false;
                   return (
-                    <div key={c.id} className="flex items-center gap-3 px-4 py-3">
+                    <div
+                      key={c.id}
+                      className={`flex items-center gap-3 px-4 py-3 ${hidden ? hiddenRowCls : ''}`}
+                    >
                       <div style={{ width: depthOf(c.path) * 18 }} className="shrink-0" />
                       <span
-                        className="shrink-0 h-2.5 w-2.5 rounded-full"
+                        className={`shrink-0 h-2.5 w-2.5 rounded-full ${hidden ? hiddenRowMarkCls : ''}`}
                         style={{ backgroundColor: type?.color || '#cbd5e1' }}
                         title={type?.title || type?.slug || 'content'}
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium text-gray-900 truncate">
+                        <div
+                          className={`text-sm font-medium truncate ${
+                            hidden ? hiddenRowTitleCls : rowTitleCls
+                          }`}
+                        >
                           {displayName(c)}
                         </div>
                       </div>
+                      {hidden && (
+                        <Badge
+                          color="gray"
+                          className="shrink-0"
+                          title={
+                            hiddenHere
+                              ? 'Students do not see this or anything under it.'
+                              : 'Hidden because a unit above this one, or the course, is hidden.'
+                          }
+                        >
+                          Invisible
+                        </Badge>
+                      )}
                       {type && (
                         <span className="shrink-0 px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded">
                           {type.slug}
@@ -234,6 +294,27 @@ export default function LecturerContentPage() {
                         >
                           update available
                         </span>
+                      )}
+                      {/* Only offered where the lecturer can actually change
+                          the outcome. A row hidden by an ancestor stays hidden
+                          whatever we set here, so it gets the badge and no
+                          control -- an inert toggle would be a lie. */}
+                      {(!hidden || hiddenHere) && (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          className="shrink-0"
+                          loading={togglingVisibility === c.id}
+                          loadingLabel="…"
+                          onClick={() => toggleVisibility(c)}
+                          title={
+                            hiddenHere
+                              ? 'Show this to students again'
+                              : 'Hide this from students, along with everything under it'
+                          }
+                        >
+                          {hiddenHere ? 'Show' : 'Hide'}
+                        </Button>
                       )}
                       {(() => {
                         const canReleaseOne = c.is_submittable && (c.has_deployment || !!c.deployment_status);
@@ -268,6 +349,14 @@ export default function LecturerContentPage() {
                       <Badge color={badge.color} className="shrink-0">
                         {badge.label}
                       </Badge>
+                      <ButtonLink
+                        href={`/courses/${courseId}/lecturer/assignments/${c.id}/edit`}
+                        variant="ghost"
+                        size="xs"
+                        className="shrink-0"
+                      >
+                        Edit
+                      </ButtonLink>
                     </div>
                   );
                 })}

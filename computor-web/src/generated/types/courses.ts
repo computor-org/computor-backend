@@ -67,6 +67,8 @@ export interface CourseContentLecturerGet {
   max_group_size?: number | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
+  visible?: boolean | null;
+  visible_effective?: boolean;
   testing_service_id?: string | null;
   is_submittable?: boolean;
   has_deployment?: boolean | null;
@@ -92,6 +94,8 @@ export interface CourseContentLecturerList {
   max_group_size?: number | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
+  visible?: boolean | null;
+  visible_effective?: boolean;
   testing_service_id?: string | null;
   is_submittable?: boolean;
   archived_at?: string | null;
@@ -119,6 +123,7 @@ export interface CourseContentLecturerQuery {
   max_group_size?: number | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
+  visible?: boolean | null;
   testing_service_id?: string | null;
   /** Filter by whether content has a deployment */
   has_deployment?: boolean | null;
@@ -368,6 +373,7 @@ export interface CourseContentCreate {
   max_group_size?: number | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
+  visible?: boolean | null;
 }
 
 /**
@@ -393,6 +399,8 @@ export interface CourseContentGet {
   max_group_size?: number | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
+  visible?: boolean | null;
+  visible_effective?: boolean;
   testing_service_id?: string | null;
   is_submittable?: boolean;
   has_deployment?: boolean | null;
@@ -419,6 +427,8 @@ export interface CourseContentList {
   max_group_size?: number | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
+  visible?: boolean | null;
+  visible_effective?: boolean;
   testing_service_id?: string | null;
   is_submittable?: boolean;
   course_content_type?: CourseContentTypeList | null;
@@ -460,6 +470,7 @@ export interface CourseContentUpdate {
   max_group_size?: number | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
+  visible?: boolean | null;
 }
 
 /**
@@ -479,6 +490,7 @@ export interface CourseContentQuery {
   max_group_size?: number | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
+  visible?: boolean | null;
   testing_service_id?: string | null;
   /** DEPRECATED: Filter by example version ID */
   example_version_id?: string | null;
@@ -680,6 +692,7 @@ export interface CourseContentStudentGet {
   submission_count: number;
   max_test_runs?: number | null;
   max_submissions?: number | null;
+  visible_effective?: boolean;
   testing_service_id?: string | null;
   unread_message_count?: number;
   result?: ResultStudentGet | null;
@@ -709,6 +722,7 @@ export interface CourseContentStudentList {
   submission_count: number;
   max_test_runs?: number | null;
   max_submissions?: number | null;
+  visible_effective?: boolean;
   testing_service_id?: string | null;
   directory?: string | null;
   color: string;
@@ -835,6 +849,8 @@ export interface CourseMemberGradingNode {
   position?: number | null;
   /** Color of the course content type (hex) */
   course_content_type_color?: string | null;
+  /** False when students cannot see this content (hidden here or by an ancestor). Does not affect any count on this node. */
+  visible_effective?: boolean;
   /** Breakdown of statistics by course_content_type */
   by_content_type?: ContentTypeGradingStats[];
   /** Total submittable course_contents at or under this path */
@@ -1271,6 +1287,7 @@ export interface CourseCreate {
   properties?: CourseProperties | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
+  visible?: boolean | null;
 }
 
 export interface CourseGet {
@@ -1283,6 +1300,7 @@ export interface CourseGet {
   properties?: CoursePropertiesGet | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
+  visible?: boolean | null;
   /** Creation timestamp */
   created_at?: string | null;
   /** Update timestamp */
@@ -1304,6 +1322,7 @@ export interface CourseList {
   properties?: CoursePropertiesGet | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
+  visible?: boolean | null;
 }
 
 export interface CourseUpdate {
@@ -1312,6 +1331,7 @@ export interface CourseUpdate {
   language_code?: string | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
+  visible?: boolean | null;
 }
 
 export interface CourseQuery {
@@ -1328,6 +1348,7 @@ export interface CourseQuery {
   full_path?: string | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
+  visible?: boolean | null;
 }
 
 /**

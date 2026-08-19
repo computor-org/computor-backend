@@ -1189,6 +1189,31 @@ errors:
       - "Ask a tutor to correct the submission"
     documentation_url: "/docs/testing#limits"
 
+  - code: SUBMIT_012
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Assignment Not Available"
+    message:
+      plain: "This assignment is not currently available. Your lecturer has hidden it."
+      markdown: "**Assignment Not Available**\n\nThis assignment is not currently available because your lecturer has hidden it. Your existing work and submissions are untouched and will reappear if it is made visible again."
+      html: "<strong>Assignment Not Available</strong><p>This assignment is not currently available because your lecturer has hidden it. Your existing work and submissions are untouched and will reappear if it is made visible again.</p>"
+    internal_description: "Effective visibility resolved to false for the course content (own flag or an ancestor's, or the course's). Staff are exempt."
+    affected_functions:
+      - "create_test_run"
+      - "upload_submission_artifact"
+      - "update_artifact"
+      - "create_test_result"
+      - "enforce_content_visible"
+    common_causes:
+      - "The lecturer hid the assignment, or a unit above it, after the student's tree was cached"
+      - "The whole course was hidden while an exam was being prepared"
+      - "The client acted on a stale tree that still listed the assignment"
+    resolution_steps:
+      - "Refresh the assignment tree; hidden content is removed from it"
+      - "Ask the lecturer when the assignment will be released"
+    documentation_url: "/docs/testing#visibility"
+
   # ============================================================================
   # TASK EXECUTION ERRORS (404, 500)
   # ============================================================================
