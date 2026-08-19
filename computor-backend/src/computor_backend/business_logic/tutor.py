@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from sqlalchemy.orm import Session, contains_eager, joinedload
 
+from computor_backend.business_logic.submission_limits import resolve_limits
 from computor_backend.exceptions import BadRequestException, ForbiddenException, NotFoundException
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.principal import Principal, allowed_course_role_ids
@@ -41,6 +42,22 @@ from computor_types.tutor_submission_groups import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _effective_max_test_runs(submission_group) -> Optional[int]:
+    """Test-run budget a tutor should see: group override, else inherited."""
+    max_test_runs, _ = resolve_limits(
+        submission_group.course_content, submission_group
+    )
+    return max_test_runs
+
+
+def _effective_max_submissions(submission_group) -> Optional[int]:
+    """Submission budget a tutor should see: group override, else inherited."""
+    _, max_submissions = resolve_limits(
+        submission_group.course_content, submission_group
+    )
+    return max_submissions
 
 
 async def get_tutor_course_content(
@@ -485,8 +502,8 @@ def get_tutor_submission_group(
         course_content_id=str(submission_group.course_content_id),
         display_name=display_name,
         max_group_size=submission_group.max_group_size,
-        max_submissions=submission_group.max_submissions,
-        max_test_runs=submission_group.max_test_runs,
+        max_submissions=_effective_max_submissions(submission_group),
+        max_test_runs=_effective_max_test_runs(submission_group),
         properties=submission_group.properties,
         members=members,
         member_count=len(members),
@@ -643,8 +660,8 @@ def list_tutor_submission_groups(
             course_content_id=str(submission_group.course_content_id),
             display_name=display_name,
             max_group_size=submission_group.max_group_size,
-            max_submissions=submission_group.max_submissions,
-            max_test_runs=submission_group.max_test_runs,
+            max_submissions=_effective_max_submissions(submission_group),
+            max_test_runs=_effective_max_test_runs(submission_group),
             member_count=member_count,
             submission_count=len(submitted_artifacts),
             latest_submission_at=latest_submission.created_at if latest_submission else None,

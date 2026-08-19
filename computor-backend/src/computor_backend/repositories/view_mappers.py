@@ -26,6 +26,7 @@ from computor_types.student_course_contents import (
     SubmissionGroupMemberBasic,
 )
 from computor_types.tasks import map_int_to_task_status
+from computor_backend.business_logic.submission_limits import resolve_limits
 from computor_backend.model.artifact import SubmissionGrade, SubmissionArtifact
 from computor_backend.model.course import CourseMember
 from computor_backend.repositories.course_content_queries import CourseMemberCourseContentQueryResult
@@ -194,6 +195,7 @@ def _build_submission_group_payloads(
     submission_status: Optional[str],
     submission_grading,
     submission_count: int,
+    max_submissions: Optional[int],
     unread: int,
     graded_by_course_member_payload: Optional[GradedByCourseMember],
     gradings_payload: List[SubmissionGroupGradingList],
@@ -234,7 +236,7 @@ def _build_submission_group_payloads(
         status=submission_status,
         grading=submission_grading,
         count=submission_count,
-        max_submissions=submission_group.max_submissions,
+        max_submissions=max_submissions,
         unread_message_count=unread,
         graded_by_course_member=graded_by_course_member_payload,
     )
@@ -303,12 +305,20 @@ async def course_member_course_content_result_mapper(
         if qr.latest_grade_status_int is not None else None
     )
 
+    # Effective budgets: submission group override -> course content -> course
+    # default. Reading the stored group columns directly is what stopped a
+    # lecturer's edit from ever reaching a student who had already started.
+    effective_max_test_runs, effective_max_submissions = resolve_limits(
+        course_content, submission_group
+    )
+
     submission_group_payload, submission_group_detail = _build_submission_group_payloads(
         submission_group,
         repository=repository,
         submission_status=submission_status,
         submission_grading=latest_grading_value,
         submission_count=qr.submission_count or 0,
+        max_submissions=effective_max_submissions,
         unread=unread,
         graded_by_course_member_payload=graded_by_course_member_payload,
         gradings_payload=gradings_payload,
@@ -329,7 +339,8 @@ async def course_member_course_content_result_mapper(
         course_content_type=CourseContentTypeList.model_validate(course_content.course_content_type),
         result_count=qr.result_count or 0,
         submission_count=qr.submission_count or 0,
-        max_test_runs=course_content.max_test_runs,
+        max_test_runs=effective_max_test_runs,
+        max_submissions=effective_max_submissions,
         testing_service_id=str(course_content.testing_service_id) if course_content.testing_service_id else None,
         directory=directory,
         color=course_content.course_content_type.color,

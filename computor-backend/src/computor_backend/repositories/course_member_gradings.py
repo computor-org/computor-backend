@@ -10,8 +10,10 @@ import logging
 from typing import Optional, Dict, List, Any
 from uuid import UUID
 
-from sqlalchemy import func, and_, text, literal
+from sqlalchemy import func, and_, bindparam, text, literal
 from sqlalchemy.orm import Session
+
+from computor_types.tasks import RETRYABLE_RESULT_STATUSES
 
 from computor_backend.model.course import (
     CourseContent,
@@ -794,8 +796,11 @@ class CourseMemberGradingsRepository:
                 cc.id as content_id,
                 cc.path,
                 cc.max_test_runs as cc_max_test_runs,
-                cc.max_submissions as cc_max_submissions
+                cc.max_submissions as cc_max_submissions,
+                c.max_test_runs as c_max_test_runs,
+                c.max_submissions as c_max_submissions
             FROM course_content cc
+            JOIN course c ON c.id = cc.course_id
             JOIN course_content_type cct ON cct.id = cc.course_content_type_id
             JOIN course_content_kind cck ON cck.id = cct.course_content_kind_id
             WHERE cc.course_id = :course_id
@@ -834,13 +839,21 @@ class CourseMemberGradingsRepository:
             ORDER BY sc.content_id, sg.graded_at DESC
         ),
         test_runs_counts AS (
-            -- Count test runs (all results, not just submitted)
+            -- Count the test runs that consume budget. Scoped to the
+            -- submission group (the budget is per group, so a teammate's run
+            -- counts too) and excluding retryable statuses, so this number
+            -- matches business_logic.submission_limits exactly. It used to be
+            -- per course member across all statuses, which is one of the three
+            -- scopes that produced counts like "5/2".
             SELECT
                 sc.content_id,
-                COUNT(r.id) as test_runs_count
+                COUNT(DISTINCT r.id) as test_runs_count
             FROM submittable_contents sc
-            LEFT JOIN result r ON r.course_content_id = sc.content_id
-                AND r.course_member_id = :course_member_id
+            JOIN member_submission_groups msg ON msg.course_content_id = sc.content_id
+            LEFT JOIN submission_artifact sa ON sa.submission_group_id = msg.submission_group_id
+            LEFT JOIN result r ON r.submission_artifact_id = sa.id
+                AND r.test_system_id IS NOT NULL
+                AND r.status NOT IN :retryable_statuses
             GROUP BY sc.content_id
         ),
         submissions_counts AS (
@@ -857,9 +870,10 @@ class CourseMemberGradingsRepository:
         SELECT
             sc.path::text as path,
             sc.content_id,
-            -- Limits: prefer submission_group override, fallback to course_content
-            COALESCE(msg.sg_max_test_runs, sc.cc_max_test_runs) as max_test_runs,
-            COALESCE(msg.sg_max_submissions, sc.cc_max_submissions) as max_submissions,
+            -- Limits: submission_group override, then course_content, then the
+            -- course-wide default (see submission_limits.resolve_limits)
+            COALESCE(msg.sg_max_test_runs, sc.cc_max_test_runs, sc.c_max_test_runs) as max_test_runs,
+            COALESCE(msg.sg_max_submissions, sc.cc_max_submissions, sc.c_max_submissions) as max_submissions,
             -- Latest result info
             lr.result_id,
             lr.result_grade,
@@ -880,11 +894,12 @@ class CourseMemberGradingsRepository:
         LEFT JOIN test_runs_counts trc ON trc.content_id = sc.content_id
         LEFT JOIN submissions_counts smc ON smc.content_id = sc.content_id
         LEFT JOIN latest_grades lg ON lg.content_id = sc.content_id
-        """)
+        """).bindparams(bindparam("retryable_statuses", expanding=True))
 
         results = self.db.execute(sql, {
             "course_member_id": str(course_member_id),
             "course_id": str(course_id),
+            "retryable_statuses": list(RETRYABLE_RESULT_STATUSES),
         }).fetchall()
 
         return {
