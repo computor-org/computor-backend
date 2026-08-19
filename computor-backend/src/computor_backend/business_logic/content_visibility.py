@@ -38,6 +38,7 @@ from sqlalchemy.orm import Session, aliased
 
 from computor_backend.exceptions import BadRequestException
 from computor_backend.model.course import Course, CourseContent
+from computor_types.custom_types import Ltree
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +199,12 @@ def is_content_visible(db: Session, course_content, course=None) -> bool:
 
     # Only the row's own ancestors matter, and (course_id, path) is unique, so
     # this rides the existing btree instead of needing the ltree GiST index.
-    paths = ancestor_paths(str(course_content.path))
+    #
+    # The paths MUST be wrapped in Ltree. sqlalchemy_utils' LtreeType bind
+    # processor reads ``value.path`` off whatever it is handed, so a plain
+    # ``str`` raises AttributeError inside statement execution rather than
+    # comparing as text.
+    paths = [Ltree(p) for p in ancestor_paths(str(course_content.path))]
     hidden = (
         db.query(CourseContent.id)
         .filter(

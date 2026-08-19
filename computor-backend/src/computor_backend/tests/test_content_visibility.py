@@ -235,11 +235,43 @@ def test_hiding_is_the_default_when_a_caller_forgets():
 # Enforcement on the test / submit paths
 # --------------------------------------------------------------------------
 
+def _bind_check(clauses):
+    """Push every literal in these clauses through its column's bind processor.
+
+    The reason this exists: comparing against ``CourseContent.path`` with a
+    plain ``str`` compiles perfectly happily and only explodes at execution,
+    because sqlalchemy_utils' LtreeType bind processor reads ``value.path`` off
+    whatever it is handed. ``literal_binds`` compilation does NOT run that
+    processor, so a compile-based assertion cannot see the bug. Running the
+    processor is the only check that reproduces it without a database.
+    """
+    from sqlalchemy.dialects import postgresql
+    from sqlalchemy.sql.elements import BinaryExpression, BindParameter
+
+    dialect = postgresql.dialect()
+    for clause in clauses:
+        if not isinstance(clause, BinaryExpression):
+            continue
+        column, right = clause.left, clause.right
+        proc = getattr(column, "type", None)
+        proc = proc.bind_processor(dialect) if proc is not None else None
+        if proc is None:
+            continue
+        values = []
+        if isinstance(right, BindParameter):
+            value = right.value
+            values = list(value) if isinstance(value, (list, tuple)) else [value]
+        for value in values:
+            if value is not None:
+                proc(value)
+
+
 class _FakeQuery:
     def __init__(self, scalar=None, first=None):
         self._scalar, self._first = scalar, first
 
-    def filter(self, *_args, **_kwargs):
+    def filter(self, *args, **_kwargs):
+        _bind_check(args)
         return self
 
     def scalar(self):
