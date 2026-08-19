@@ -31,6 +31,7 @@ class CourseCreate(BaseModel):
     course_family_id: str
     language_code: Optional[str] = None
     properties: Optional[CourseProperties] = None
+    is_public: bool = False
     # Course-wide defaults for the per-assignment test/submission budgets.
     # None means "no default"; a course content value overrides these, and a
     # submission group value overrides both.
@@ -70,6 +71,7 @@ class CourseList(BaseModel):
     path: str
     language_code: Optional[str] = None
     properties: Optional[CoursePropertiesGet] = None
+    is_public: bool = False
     # Course-wide defaults for the per-assignment test/submission budgets.
     # None means "no default"; a course content value overrides these, and a
     # submission group value overrides both.
@@ -87,6 +89,7 @@ class CourseUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     language_code: Optional[str] = None
+    is_public: Optional[bool] = None
     # Course-wide defaults for the per-assignment test/submission budgets.
     # None means "no default"; a course content value overrides these, and a
     # submission group value overrides both.

@@ -1269,6 +1269,7 @@ export interface CourseCreate {
   course_family_id: string;
   language_code?: string | null;
   properties?: CourseProperties | null;
+  is_public?: boolean;
   max_test_runs?: number | null;
   max_submissions?: number | null;
 }
@@ -1281,6 +1282,7 @@ export interface CourseGet {
   course_family_id: string;
   language_code?: string | null;
   properties?: CoursePropertiesGet | null;
+  is_public?: boolean;
   max_test_runs?: number | null;
   max_submissions?: number | null;
   /** Creation timestamp */
@@ -1302,6 +1304,7 @@ export interface CourseList {
   path: string;
   language_code?: string | null;
   properties?: CoursePropertiesGet | null;
+  is_public?: boolean;
   max_test_runs?: number | null;
   max_submissions?: number | null;
 }
@@ -1310,6 +1313,7 @@ export interface CourseUpdate {
   title?: string | null;
   description?: string | null;
   language_code?: string | null;
+  is_public?: boolean | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
 }

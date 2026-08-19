@@ -50,6 +50,7 @@ export default function CourseEditPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [language, setLanguage] = useState('');
+  const [isPublic, setIsPublic] = useState(false);
   // Course-wide budget defaults. Held as strings so an empty field can mean
   // "unlimited" rather than collapsing to 0.
   const [maxTestRuns, setMaxTestRuns] = useState('');
@@ -79,6 +80,7 @@ export default function CourseEditPage() {
       setTitle(c.title || '');
       setDescription(c.description || '');
       setLanguage(c.language_code || '');
+      setIsPublic(c.is_public ?? false);
       setMaxTestRuns(c.max_test_runs != null ? String(c.max_test_runs) : '');
       setMaxSubmissions(c.max_submissions != null ? String(c.max_submissions) : '');
       const srv = await gitServersClient.listGitServersEndpointGitServersGet({}).catch(() => [] as GitServerGet[]);
@@ -123,6 +125,7 @@ export default function CourseEditPage() {
           title: title.trim() || null,
           description: description.trim() || null,
           language_code: language.trim() || null,
+          is_public: isPublic,
           max_test_runs: parseLimit(maxTestRuns),
           max_submissions: parseLimit(maxSubmissions),
         },
@@ -241,6 +244,20 @@ export default function CourseEditPage() {
                     />
                   </Field>
                 </div>
+                <label className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={isPublic}
+                    onChange={(e) => setIsPublic(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>
+                    <span className="block font-medium text-gray-900">Make this course public</span>
+                    <span className="block text-xs text-gray-600">
+                      Anyone can discover it and authenticated users can self-subscribe as students. Course content remains protected until they join.
+                    </span>
+                  </span>
+                </label>
                 <div className="flex items-center gap-3">
                   <button onClick={saveGeneral} disabled={savingGeneral} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
                     {savingGeneral ? 'Saving…' : 'Save'}

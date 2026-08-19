@@ -151,6 +151,7 @@ class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     course_family_id = Column(ForeignKey('course_family.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     organization_id = Column(ForeignKey('organization.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     language_code = Column(String(2), ForeignKey('language.code', ondelete='SET NULL', onupdate='CASCADE'))
+    is_public = Column(Boolean, nullable=False, server_default=text("false"))
 
     # Course-wide defaults for the per-assignment budgets. NULL means "no
     # default"; a CourseContent value overrides these, and a SubmissionGroup

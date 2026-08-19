@@ -57,6 +57,7 @@ from computor_backend.api.tutor import tutor_router
 from computor_backend.api.lecturer import lecturer_router
 from computor_backend.api.organizations import organization_router
 from computor_backend.api.courses import course_router
+from computor_backend.api.public_courses import public_courses_router
 from computor_backend.api.course_families import course_family_router
 from computor_backend.api.user_roles import user_roles_router
 from computor_backend.api.role_claims import role_claim_router
@@ -442,6 +443,11 @@ CrudRouter(GroupInterface).register_routes(app)
 # GET /sessions/me is matched before the generic GET /sessions/{id} route.
 app.include_router(session_router, tags=["sessions"])
 CrudRouter(SessionInterface).register_routes(app)
+# Public course discovery must be registered before the authenticated CRUD
+# collection routes. The subscribe route has a distinct suffix and is safe to
+# register alongside the normal course resource routes.
+app.include_router(public_courses_router)
+
 # These three hand-declare a cascade-aware DELETE (see api/{courses,organizations,
 # course_families}.py), which shadows the generic one — skip it rather than
 # registering a second, unreachable route.
