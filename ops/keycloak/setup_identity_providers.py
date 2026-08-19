@@ -181,6 +181,13 @@ def upsert_provider(base, realm, token, entry):
 
 def _reconcile_mappers(base, realm, token, entry):
     """Create/update the claim->user mappers (username, email, names)."""
+    # Keycloak's built-in GitHub and GitLab providers already extract the
+    # provider profile into the brokered identity. The generic OIDC mapper
+    # factories are not compatible with every social-provider factory, so do
+    # not install OIDC mapper types on those providers.
+    if entry.get("providerId") in {"github", "gitlab"}:
+        return
+
     alias = entry["alias"]
     claim_map = entry.get(
         "mappers", {"email": "email", "givenName": "given_name", "familyName": "family_name"}

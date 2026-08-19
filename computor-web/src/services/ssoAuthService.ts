@@ -61,7 +61,7 @@ export class SSOAuthService implements ISSOAuthProvider {
    * Initiate SSO login by redirecting to the provider
    * Backend will set HttpOnly cookies after successful authentication
    */
-  initiateSSO(provider: string = 'keycloak'): void {
+  initiateSSO(provider: string = 'keycloak', registration = false): void {
     // Save current location to return after auth
     sessionStorage.setItem('auth_redirect', window.location.pathname);
 
@@ -69,11 +69,14 @@ export class SSOAuthService implements ISSOAuthProvider {
     const frontendCallbackUrl = `${window.location.origin}/auth/success`;
 
     // Redirect to SSO login with redirect_uri parameter
-    const params = new URLSearchParams({
-      redirect_uri: frontendCallbackUrl
-    });
+    const socialProvider = ['google', 'github', 'gitlab'].includes(provider) ? provider : null;
+    const params = new URLSearchParams({ redirect_uri: frontendCallbackUrl });
+    if (socialProvider) {
+      params.set('provider_hint', socialProvider);
+      params.set('registration', String(registration));
+    }
 
-    window.location.href = `${API_BASE_URL}/auth/${provider}/login?${params.toString()}`;
+    window.location.href = `${API_BASE_URL}/auth/${socialProvider ? 'keycloak' : provider}/login?${params.toString()}`;
   }
 
   /**

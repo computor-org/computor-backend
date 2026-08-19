@@ -1,5 +1,56 @@
 [
   {
+    "alias": "google",
+    "displayName": "Google",
+    "enabled": false,
+    "providerId": "oidc",
+    "discoveryUrl": "https://accounts.google.com/.well-known/openid-configuration",
+    "clientId": "CHANGE_ME_GOOGLE_CLIENT_ID",
+    "clientSecretEnv": "GOOGLE_OAUTH_CLIENT_SECRET",
+    "defaultScopes": "openid email profile",
+    "trustEmail": true,
+    "syncMode": "FORCE",
+    "mappers": {
+      "email": "email",
+      "givenName": "given_name",
+      "familyName": "family_name",
+      "username": "email"
+    }
+  },
+  {
+    "alias": "github",
+    "displayName": "GitHub",
+    "enabled": false,
+    "providerId": "github",
+    "clientId": "CHANGE_ME_GITHUB_CLIENT_ID",
+    "clientSecretEnv": "GITHUB_OAUTH_CLIENT_SECRET",
+    "defaultScopes": "user:email",
+    "trustEmail": true,
+    "syncMode": "FORCE",
+    "mappers": {
+      "email": "email",
+      "givenName": "name",
+      "username": "login"
+    }
+  },
+  {
+    "alias": "gitlab",
+    "displayName": "GitLab",
+    "enabled": false,
+    "providerId": "gitlab",
+    "clientId": "CHANGE_ME_GITLAB_CLIENT_ID",
+    "clientSecretEnv": "GITLAB_OAUTH_CLIENT_SECRET",
+    "defaultScopes": "openid profile email",
+    "trustEmail": true,
+    "syncMode": "FORCE",
+    "mappers": {
+      "email": "email",
+      "givenName": "given_name",
+      "familyName": "family_name",
+      "username": "username"
+    }
+  },
+  {
     "alias": "example-oidc",
     "displayName": "Example Institute SSO",
     "enabled": false,

@@ -93,6 +93,30 @@ CODER_ADMIN_API_SECRET=<set-in-.env>
 CODER_POSTGRES_USER=<set-in-.env>
 CODER_POSTGRES_PASSWORD=<set-in-.env>
 
+### Social self-registration (Optional)
+
+Google, GitHub, and GitLab registration is brokered by Keycloak. The backend
+does not receive upstream client secrets and the browser never gets them. Add
+only the providers that have been configured in the local, ignored
+`data/keycloak/identity-providers.json` file:
+
+```dotenv
+COMPUTOR_SOCIAL_LOGIN_PROVIDERS=google,github,gitlab
+GOOGLE_OAUTH_CLIENT_SECRET=<secret issued by Google>
+GITHUB_OAUTH_CLIENT_SECRET=<secret issued by GitHub>
+GITLAB_OAUTH_CLIENT_SECRET=<secret issued by GitLab>
+```
+
+The corresponding client IDs and provider settings live in the operator-managed
+Keycloak provider file, seeded from
+`data/keycloak/identity-providers.example.json`. Register each upstream OAuth
+client with Keycloak's broker callback URL:
+`https://<keycloak-public-host>/realms/<realm>/broker/<alias>/endpoint`.
+
+Social self-registration creates a Computor user without a global elevated
+role. Access to a course is granted separately by joining a course explicitly
+marked public, which creates only the course-scoped `_student` membership.
+
 # coder-registry has no auth — it is protected by docker-network isolation
 # instead (it does not join computor-network, so workspaces can't reach it
 # over TCP). See docker-compose.coder.yaml for details.

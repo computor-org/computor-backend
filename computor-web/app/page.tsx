@@ -96,6 +96,12 @@ export default function Home() {
           ) : (
             <div className="flex items-center space-x-3">
               <Link
+                href="/register"
+                className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors font-medium"
+              >
+                Create Account
+              </Link>
+              <Link
                 href="/login"
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
               >

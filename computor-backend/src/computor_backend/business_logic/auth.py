@@ -24,6 +24,7 @@ from computor_backend.redis_cache import get_redis_client
 from computor_backend.plugins.registry import get_plugin_registry
 from computor_backend.plugins import AuthStatus
 from computor_backend.auth.keycloak_admin import KeycloakAdminClient, KeycloakUser
+from computor_backend.auth.social import should_bootstrap_admin
 from computor_types.auth import (
     LocalTokenRefreshRequest,
     LocalTokenRefreshResponse,
@@ -411,6 +412,7 @@ async def handle_sso_callback(
     # Find or create user account (wrap blocking DB operations)
     def _find_or_create_account():
         nonlocal user_info, provider, registry
+        is_registration = bool(state_data.get("registration"))
 
         account = (
             db.query(Account)
@@ -425,6 +427,11 @@ async def handle_sso_callback(
         is_new_user = False
 
         if account:
+            if is_registration:
+                raise ForbiddenException(
+                    detail="An account already exists; use the sign-in flow instead"
+                )
+
             # Existing account - get user
             user = account.user
 
@@ -500,6 +507,10 @@ async def handle_sso_callback(
                 )
                 db.add(user)
                 db.flush()
+            elif is_registration:
+                raise ForbiddenException(
+                    detail="An account already exists for this email; use the sign-in flow instead"
+                )
 
             # Create account
             account = Account(
@@ -525,8 +536,10 @@ async def handle_sso_callback(
         # Additive only: membership grants _admin, but we never revoke — admin
         # can also be granted manually in the computor DB, which stays authoritative.
         groups = user_info.groups or []
-        is_kc_admin = any(g.strip("/").split("/")[-1] == "administrators" for g in groups)
-        if is_kc_admin:
+        if should_bootstrap_admin(
+            groups=groups,
+            registration=bool(state_data.get("registration")),
+        ):
             from computor_backend.model.role import UserRole
             existing_admin = (
                 db.query(UserRole)

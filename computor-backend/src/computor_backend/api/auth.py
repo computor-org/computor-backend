@@ -20,6 +20,11 @@ from sqlalchemy.orm import Session
 
 from computor_backend.coder.keepalive import bump_workspace_activity
 from computor_backend.coder.naming import coder_username_matches_user
+from computor_backend.auth.social import (
+    add_keycloak_identity_provider_hint,
+    enabled_social_providers,
+    social_provider,
+)
 from computor_backend.database import get_db
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.exceptions import (
@@ -71,6 +76,22 @@ async def list_providers() -> List[ProviderInfo]:
                 enabled=True,
                 login_url=f"/auth/{plugin_name}/login"
             ))
+
+    # Google, GitHub, and GitLab are brokered through the enabled Keycloak
+    # plugin. Secrets stay in Keycloak/server configuration; the browser only
+    # receives a redirect URL and never sees an upstream client secret.
+    if "keycloak" in registry.get_enabled_plugins():
+        for social in enabled_social_providers():
+            providers.append(ProviderInfo(
+                name=social["name"],
+                display_name=social["display_name"],
+                type="oidc",
+                enabled=True,
+                login_url=(
+                    "/auth/keycloak/login?"
+                    + urlencode({"provider_hint": social["name"]})
+                ),
+            ))
     
     return providers
 
@@ -78,6 +99,8 @@ async def list_providers() -> List[ProviderInfo]:
 async def initiate_login(
     provider: str,
     redirect_uri: Optional[str] = Query(None, description="Redirect URI after authentication"),
+    provider_hint: Optional[str] = Query(None, description="Configured Keycloak broker provider"),
+    registration: bool = Query(False, description="Use the student-only self-registration flow"),
     request: Request = None
 ) -> RedirectResponse:
     """
@@ -90,6 +113,18 @@ async def initiate_login(
     # Check if provider exists and is enabled
     if provider not in registry.get_enabled_plugins():
         raise NotFoundException(detail=f"Authentication provider not found or not enabled: {provider}")
+
+    social = None
+    if provider_hint:
+        if provider != "keycloak":
+            raise NotFoundException(detail="Social providers must use Keycloak brokering")
+        social = social_provider(provider_hint)
+        if social is None:
+            raise NotFoundException(detail="Authentication provider not configured")
+    if registration and social is None:
+        raise BadRequestException(
+            detail="Self-registration is available only through a configured social provider"
+        )
 
     # If the plugin is enabled but not yet loaded (e.g. Keycloak wasn't ready at startup), try now
     if registry.get_plugin(provider) is None:
@@ -110,6 +145,9 @@ async def initiate_login(
         "redirect_uri": redirect_uri or str(request.url_for("sso_success")),
         "timestamp": str(request.headers.get("date", ""))
     }
+    if social:
+        state_data["social_provider"] = social["name"]
+        state_data["registration"] = registration
     await redis_client.set(
         f"sso_state:{state}",
         json.dumps(state_data),
@@ -131,6 +169,9 @@ async def initiate_login(
     try:
         # Get login URL from provider
         login_url = registry.get_login_url(provider, callback_url, state)
+
+        if social:
+            login_url = add_keycloak_identity_provider_hint(login_url, social["alias"])
         
         # Redirect to provider login
         return RedirectResponse(url=login_url, status_code=302)
