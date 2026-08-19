@@ -431,8 +431,8 @@ def create_submission_groups(session, courses, course_contents, course_members):
                 submission_group = SubmissionGroup(
                     display_name=None,  # Will be computed from member name
                     max_group_size=assignment.max_group_size or 1,
-                    max_test_runs=assignment.max_test_runs,
-                    max_submissions=assignment.max_submissions,
+                    # Budgets stay NULL so seeded data exercises the same
+                    # inherit-from-course-content path as real provisioning.
                     course_id=course.id,
                     course_content_id=assignment.id,
                     created_by=student_member.user_id

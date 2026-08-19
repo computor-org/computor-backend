@@ -223,13 +223,14 @@ def _create_submission_group_for_member(
     # For team assignments (max_group_size > 1), properties remain empty {}
     # Team repositories will be created separately through team formation workflow
 
-    # Create submission group
+    # Create submission group. The two budget columns are deliberately left
+    # NULL: they are a per-group *override*, and the effective limit is
+    # resolved live from the course content (and the course default) so that a
+    # lecturer editing a limit reaches students who already started.
     submission_group = SubmissionGroup(
         course_content_id=course_content.id,
         course_id=course_member.course_id,
         max_group_size=max_group_size,
-        max_test_runs=course_content.max_test_runs,
-        max_submissions=course_content.max_submissions,
         display_name=display_name,
         properties=properties
     )

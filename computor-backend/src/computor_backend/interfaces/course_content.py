@@ -98,12 +98,15 @@ async def post_create_course_content(course_content: CourseContent, db: Session)
             if not display_name:
                 display_name = course_member.user.email
 
-        # Create submission group
+        # Create submission group. Budget columns stay NULL — see the note in
+        # repositories/submission_group_provisioning.py; they are an override,
+        # not a snapshot. (This site also used to drop max_submissions
+        # entirely, so two students on one assignment could end up with
+        # different stored limits.)
         submission_group = SubmissionGroup(
             course_content_id=course_content.id,
             course_id=course_content.course_id,
             max_group_size=resolved_max_group_size,
-            max_test_runs=course_content.max_test_runs,
             display_name=display_name,
             properties={}
         )
@@ -136,10 +139,18 @@ class CourseContentInterface(CourseContentInterfaceBase, BackendEntityInterface)
 
     @classmethod
     def cache_invalidation_tags(cls, entity):
-        """Lecturer dashboards key on a ``lecturer_view:<course_id>`` tag."""
+        """Course-content edits must reach every cached view of it.
+
+        Lecturer dashboards key on ``lecturer_view:<course_id>``; the student
+        and tutor views cache under their own tags with a 300 s TTL. Omitting
+        the latter two meant an edited test/submission limit stayed invisible
+        to students until something else happened to invalidate their view.
+        """
         yield from super().cache_invalidation_tags(entity)
         if entity.course_id is not None:
             yield CacheTag.for_entity("lecturer_view", entity.course_id)
+            yield CacheTag.for_entity("student_view", entity.course_id)
+            yield CacheTag.for_entity("tutor_view", entity.course_id)
 
     @staticmethod
     def search(db: Session, query, params: Optional[CourseContentQuery]):
