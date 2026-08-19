@@ -13,6 +13,7 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
 import { Field } from '@/src/components/FormPanel';
 import { inputCls } from '@/src/components/ui/tokens';
+import VisibilitySelect, { type VisibilityValue } from '@/src/components/courses/VisibilitySelect';
 import type { CourseGet, CourseGitBindingGet, CourseGitBindingUpsert, GitServerGet } from 'types/generated';
 import { displayName } from '@/src/utils/displayName';
 
@@ -54,6 +55,8 @@ export default function CourseEditPage() {
   // "unlimited" rather than collapsing to 0.
   const [maxTestRuns, setMaxTestRuns] = useState('');
   const [maxSubmissions, setMaxSubmissions] = useState('');
+  // Tri-state: null inherits (= visible), false hides the whole content tree.
+  const [visible, setVisible] = useState<VisibilityValue>(null);
   const [savingGeneral, setSavingGeneral] = useState(false);
   const [generalMsg, setGeneralMsg] = useState<string | null>(null);
 
@@ -81,6 +84,7 @@ export default function CourseEditPage() {
       setLanguage(c.language_code || '');
       setMaxTestRuns(c.max_test_runs != null ? String(c.max_test_runs) : '');
       setMaxSubmissions(c.max_submissions != null ? String(c.max_submissions) : '');
+      setVisible(c.visible ?? null);
       const srv = await gitServersClient.listGitServersEndpointGitServersGet({}).catch(() => [] as GitServerGet[]);
       setServers(srv);
       // The binding endpoint 404s when a course has none yet — treat as null.
@@ -125,6 +129,7 @@ export default function CourseEditPage() {
           language_code: language.trim() || null,
           max_test_runs: parseLimit(maxTestRuns),
           max_submissions: parseLimit(maxSubmissions),
+          visible,
         },
       });
       setCourse(updated);
@@ -241,6 +246,16 @@ export default function CourseEditPage() {
                     />
                   </Field>
                 </div>
+                <Field
+                  label="Student visibility"
+                  hint="Hiding the course hides every unit and assignment in it. Units and assignments can also be hidden individually."
+                >
+                  <VisibilitySelect
+                    scope="course"
+                    value={visible}
+                    onChange={setVisible}
+                  />
+                </Field>
                 <div className="flex items-center gap-3">
                   <button onClick={saveGeneral} disabled={savingGeneral} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
                     {savingGeneral ? 'Saving…' : 'Save'}

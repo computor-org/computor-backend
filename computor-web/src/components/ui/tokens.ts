@@ -16,3 +16,18 @@ export const inputCls =
  */
 export const fileInputCls =
   'block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-blue-50 file:text-blue-700 file:text-sm file:font-medium hover:file:bg-blue-100';
+
+/**
+ * Rows for content hidden from students (issue #338).
+ *
+ * A lecturer keeps seeing every hidden unit and assignment -- only students
+ * lose them -- so these rows are dimmed rather than removed. The `muted` tone
+ * from the design spec covers chips, but a whole dimmed *row* has no component
+ * of its own yet; these strings keep the palette utilities inside the
+ * component layer until one exists.
+ */
+export const hiddenRowCls = 'bg-gray-50';
+export const hiddenRowTitleCls = 'text-gray-400';
+export const rowTitleCls = 'text-gray-900';
+/** Dot / icon alongside a dimmed row. */
+export const hiddenRowMarkCls = 'opacity-40';
