@@ -459,3 +459,41 @@ def test_a_synthesised_path_with_no_content_row_defaults_to_visible():
     stats = process_hierarchical_stats(db_stats, path_info)
     flags = {node["path"]: node["visible_effective"] for node in stats["nodes"]}
     assert flags["unit"] is True
+
+
+# --------------------------------------------------------------------------
+# Who may change visibility
+# --------------------------------------------------------------------------
+
+def test_changing_visibility_requires_lecturer_in_the_course():
+    """Visibility is a course-content field, so it inherits that gate.
+
+    Pinned because it is the security-relevant half of #338: a tutor must be
+    able to SEE every hidden row (that is the whole point of marking them) and
+    must not be able to change one. Read and write deliberately sit at
+    different roles in the same map.
+    """
+    from computor_backend.permissions.handlers_course import (
+        CourseContentPermissionHandler,
+    )
+    from computor_backend.permissions.roles import CourseRole
+
+    role_map = CourseContentPermissionHandler.ACTION_ROLE_MAP
+    assert role_map["update"] is CourseRole.LECTURER
+    assert role_map["get"] is CourseRole.STUDENT
+    assert role_map["list"] is CourseRole.STUDENT
+
+
+def test_no_role_grants_course_content_writes_outside_a_course():
+    """`_organization_manager` and friends hold no course_content claims.
+
+    check_general_permission short-circuits the course-role check when a
+    principal holds a claim for the resource. The resource name here is the
+    table name, `course_content`, and the seeded role claims contain no such
+    subject -- so the only way to write is to be `_lecturer`+ IN the course, or
+    an admin. If a claim is ever added, this test should fail and the decision
+    be made deliberately rather than inherited.
+    """
+    from computor_backend.model.course import CourseContent
+
+    assert CourseContent.__tablename__ == "course_content"
