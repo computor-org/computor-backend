@@ -31,6 +31,11 @@ class CourseCreate(BaseModel):
     course_family_id: str
     language_code: Optional[str] = None
     properties: Optional[CourseProperties] = None
+    # Course-wide defaults for the per-assignment test/submission budgets.
+    # None means "no default"; a course content value overrides these, and a
+    # submission group value overrides both.
+    max_test_runs: Optional[int] = None
+    max_submissions: Optional[int] = None
 
 class CourseGet(BaseEntityGet,CourseCreate):
     id: str
@@ -41,6 +46,11 @@ class CourseGet(BaseEntityGet,CourseCreate):
     organization_id: str
     language_code: Optional[str] = None
     properties: Optional[CoursePropertiesGet] = None
+    # Course-wide defaults for the per-assignment test/submission budgets.
+    # None means "no default"; a course content value overrides these, and a
+    # submission group value overrides both.
+    max_test_runs: Optional[int] = None
+    max_submissions: Optional[int] = None
 
     course_family: Optional[CourseFamilyGet] = None
 
@@ -60,6 +70,11 @@ class CourseList(BaseModel):
     path: str
     language_code: Optional[str] = None
     properties: Optional[CoursePropertiesGet] = None
+    # Course-wide defaults for the per-assignment test/submission budgets.
+    # None means "no default"; a course content value overrides these, and a
+    # submission group value overrides both.
+    max_test_runs: Optional[int] = None
+    max_submissions: Optional[int] = None
 
     @field_validator('path', mode='before')
     @classmethod
@@ -72,6 +87,12 @@ class CourseUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     language_code: Optional[str] = None
+    # Course-wide defaults for the per-assignment test/submission budgets.
+    # None means "no default"; a course content value overrides these, and a
+    # submission group value overrides both.
+    max_test_runs: Optional[int] = None
+    max_submissions: Optional[int] = None
+
 
 class CourseQuery(ListQuery):
     id: Optional[str] = None
@@ -83,6 +104,8 @@ class CourseQuery(ListQuery):
     language_code: Optional[str] = None
     provider_url: Optional[str] = None
     full_path: Optional[str] = None
+    max_test_runs: Optional[int] = None
+    max_submissions: Optional[int] = None
 
 
 class CourseInterface(EntityInterface):

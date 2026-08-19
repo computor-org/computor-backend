@@ -19,7 +19,11 @@ class SubmissionGroupCreate(BaseModel):
     properties: Optional[SubmissionGroupProperties] = None
     display_name: Optional[str] = None  # Team name (optional, auto-computed if not provided)
     max_group_size: int = 1
+    # Per-group budget overrides. None means "inherit" (course content, then
+    # course default) -- NOT "unlimited". Set one to grant a single student or
+    # team extra attempts.
     max_submissions: Optional[int] = None
+    max_test_runs: Optional[int] = None
     course_content_id: str
     status: Optional[str] = None
 
@@ -37,6 +41,7 @@ class SubmissionGroupList(BaseModel):
     display_name: Optional[str] = None  # Team name or auto-computed from first member
     max_group_size: int
     max_submissions: Optional[int] = None
+    max_test_runs: Optional[int] = None
     course_id: str
     course_content_id: str
     status: Optional[str] = None  # Deprecated - use latest grading status
@@ -49,6 +54,7 @@ class SubmissionGroupUpdate(BaseModel):
     display_name: Optional[str] = None  # Update team name
     max_group_size: Optional[int] = None
     max_submissions: Optional[int] = None
+    max_test_runs: Optional[int] = None
     status: Optional[str] = None
 
 class SubmissionGroupQuery(ListQuery):
@@ -56,6 +62,7 @@ class SubmissionGroupQuery(ListQuery):
     display_name: Optional[str] = None  # Filter by team name
     max_group_size: Optional[int] = None
     max_submissions: Optional[int] = None
+    max_test_runs: Optional[int] = None
     course_id: Optional[str] = None
     course_content_id: Optional[str] = None
     properties: Optional[SubmissionGroupProperties] = None
