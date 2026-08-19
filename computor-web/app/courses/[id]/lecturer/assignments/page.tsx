@@ -10,6 +10,7 @@ import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPa
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge, { BadgeColor } from '@/src/components/Badge';
+import { formatLimit } from '@/src/utils/limits';
 import type { CourseGet, CourseContentLecturerList, CourseContentTypeList } from 'types/generated';
 import { displayName } from '@/src/utils/displayName';
 
@@ -213,6 +214,18 @@ export default function LecturerContentPage() {
                         <span className="shrink-0 px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-600 rounded">
                           submittable
                         </span>
+                      )}
+                      {c.is_submittable && (c.max_test_runs != null || c.max_submissions != null) && (
+                        <Badge
+                          color="purple"
+                          className="shrink-0"
+                          title={
+                            `Test runs: ${formatLimit(c.max_test_runs)} · ` +
+                            `Submissions: ${formatLimit(c.max_submissions)}`
+                          }
+                        >
+                          {formatLimit(c.max_test_runs)}T / {formatLimit(c.max_submissions)}S
+                        </Badge>
                       )}
                       {c.deployment?.has_newer_version && (
                         <span
