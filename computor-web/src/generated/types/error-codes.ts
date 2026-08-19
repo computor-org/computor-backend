@@ -112,6 +112,7 @@ export const ErrorCodes = {
   SUBMIT_009: "SUBMIT_009", // Maximum Submissions Reached
   SUBMIT_010: "SUBMIT_010", // Test and Submission Limits Exhausted
   SUBMIT_011: "SUBMIT_011", // Submission Cannot Be Withdrawn
+  SUBMIT_012: "SUBMIT_012", // Assignment Not Available
   TASK_001: "TASK_001", // Task Not Found
   TASK_002: "TASK_002", // Task Submission Failed
   TASK_003: "TASK_003", // Unsupported Execution Backend
@@ -889,6 +890,20 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
     },
     retryAfter: undefined,
     documentationUrl: "/docs/testing#limits",
+  },
+  SUBMIT_012: {
+    code: "SUBMIT_012",
+    httpStatus: 400,
+    category: ErrorCategory.VALIDATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Assignment Not Available",
+    message: {
+      plain: "This assignment is not currently available. Your lecturer has hidden it.",
+      markdown: "**Assignment Not Available**\n\nThis assignment is not currently available because your lecturer has hidden it. Your existing work and submissions are untouched and will reappear if it is made visible again.",
+      html: "<strong>Assignment Not Available</strong><p>This assignment is not currently available because your lecturer has hidden it. Your existing work and submissions are untouched and will reappear if it is made visible again.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/testing#visibility",
   },
   TASK_001: {
     code: "TASK_001",

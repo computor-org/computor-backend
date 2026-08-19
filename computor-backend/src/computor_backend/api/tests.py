@@ -17,6 +17,7 @@ from computor_backend.permissions.course_access import (
     is_course_staff,
     require_submission_group_access,
 )
+from computor_backend.business_logic.content_visibility import enforce_content_visible
 from computor_backend.business_logic.submission_limits import (
     enforce_max_submissions,
     enforce_max_test_runs,
@@ -202,8 +203,14 @@ async def create_test_run(
             detail="Assignment not configured"
         )
 
-    # Lecturers and tutors are not subject to student budgets.
+    # Lecturers and tutors are not subject to student budgets, and they may
+    # test content that is hidden from students -- rehearsing an exam before
+    # releasing it is the point of the feature (issue #338), not a loophole.
     exempt = is_course_staff(permissions, submission_group.course_id, db)
+
+    # A hidden assignment cannot be tested. Checked before the budget so a
+    # student gets "not available" rather than a confusing quota message.
+    enforce_content_visible(db, course_content, exempt=exempt)
 
     # Test budget. A run that is part of a submission may overrun it, but only
     # by spending a submission: when the test budget is gone and a submission

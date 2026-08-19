@@ -229,3 +229,118 @@ def test_hiding_is_the_default_when_a_caller_forgets():
     ).parameters["include_hidden"]
     assert param.default is False
     assert param.kind is inspect.Parameter.KEYWORD_ONLY
+
+
+# --------------------------------------------------------------------------
+# Enforcement on the test / submit paths
+# --------------------------------------------------------------------------
+
+class _FakeQuery:
+    def __init__(self, scalar=None, first=None):
+        self._scalar, self._first = scalar, first
+
+    def filter(self, *_args, **_kwargs):
+        return self
+
+    def scalar(self):
+        return self._scalar
+
+    def first(self):
+        return self._first
+
+
+class _FakeDb:
+    """Answers exactly the two reads is_content_visible performs."""
+
+    def __init__(self, course_visible=None, hidden_ancestor=False):
+        self.course_visible = course_visible
+        self.hidden_ancestor = hidden_ancestor
+        self.queries = 0
+
+    def query(self, *entities):
+        self.queries += 1
+        # First read is Course.visible; second looks for a hiding ancestor.
+        if self.queries == 1:
+            return _FakeQuery(scalar=self.course_visible)
+        return _FakeQuery(first="a-hidden-ancestor" if self.hidden_ancestor else None)
+
+
+class _Content:
+    def __init__(self, path="a.b", course_id="course-1"):
+        self.path = path
+        self.course_id = course_id
+        self.id = "content-1"
+
+
+def test_enforce_passes_for_visible_content():
+    from computor_backend.business_logic.content_visibility import (
+        enforce_content_visible,
+    )
+
+    enforce_content_visible(_FakeDb(), _Content())  # must not raise
+
+
+def test_enforce_raises_submit_012_for_hidden_content():
+    from computor_backend.business_logic.content_visibility import (
+        enforce_content_visible,
+    )
+    from computor_backend.exceptions import BadRequestException
+
+    with pytest.raises(BadRequestException) as exc:
+        enforce_content_visible(_FakeDb(hidden_ancestor=True), _Content())
+    assert exc.value.error_code == "SUBMIT_012"
+
+
+def test_enforce_raises_when_the_whole_course_is_hidden():
+    from computor_backend.business_logic.content_visibility import (
+        enforce_content_visible,
+    )
+    from computor_backend.exceptions import BadRequestException
+
+    with pytest.raises(BadRequestException):
+        enforce_content_visible(_FakeDb(course_visible=False), _Content())
+
+
+def test_staff_are_exempt_and_the_check_is_not_even_run():
+    """Staff testing hidden content is the point of the feature.
+
+    Asserting no query is issued also pins that `exempt` short-circuits before
+    any DB work, matching enforce_max_test_runs.
+    """
+    from computor_backend.business_logic.content_visibility import (
+        enforce_content_visible,
+    )
+
+    db = _FakeDb(hidden_ancestor=True)
+    enforce_content_visible(db, _Content(), exempt=True)  # must not raise
+    assert db.queries == 0
+
+
+def test_the_guard_is_wired_into_every_student_entry_point():
+    """Four routes reach testing or submission; all four must be guarded.
+
+    A new route added without a guard is the realistic regression here, so
+    this asserts on the call sites rather than on behaviour alone.
+    """
+    import inspect
+
+    from computor_backend.api import tests as tests_api
+    from computor_backend.business_logic import submissions, testing_orchestration
+
+    assert "enforce_content_visible" in inspect.getsource(tests_api.create_test_run)
+    assert "enforce_content_visible" in inspect.getsource(
+        submissions.upload_submission_artifact
+    )
+    assert "enforce_content_visible" in inspect.getsource(submissions.update_artifact)
+    assert "enforce_content_visible" in inspect.getsource(
+        testing_orchestration.enforce_test_limits
+    )
+
+
+def test_the_tutor_test_route_is_deliberately_not_guarded():
+    """Staff must be able to test hidden content; pin that this stays true."""
+    import inspect
+
+    from computor_backend.api import tutor
+
+    assert "enforce_content_visible" not in inspect.getsource(tutor.create_tutor_test)

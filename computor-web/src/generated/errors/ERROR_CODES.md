@@ -1,7 +1,7 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Total errors:** 78
+**Total errors:** 79
 
 To regenerate: `bash generate_error_codes.sh`
 
@@ -2088,6 +2088,37 @@ Submit-intent test requested with both budgets exhausted
 **Resolution Steps:**
 1. Review your previous results and submissions
 2. Contact instructor for additional attempts
+
+---
+
+### SUBMIT_012 - Assignment Not Available
+
+**HTTP Status:** `400`  
+**Severity:** `warning`  
+**Category:** `validation`  
+**Documentation:** [/docs/testing#visibility](/docs/testing#visibility)  
+
+**Description:**  
+Effective visibility resolved to false for the course content (own flag or an ancestor's, or the course's). Staff are exempt.
+
+**User Message:**  
+> This assignment is not currently available. Your lecturer has hidden it.
+
+**Affected Functions:**
+- `create_test_run`
+- `upload_submission_artifact`
+- `update_artifact`
+- `create_test_result`
+- `enforce_content_visible`
+
+**Common Causes:**
+- The lecturer hid the assignment, or a unit above it, after the student's tree was cached
+- The whole course was hidden while an exam was being prepared
+- The client acted on a stale tree that still listed the assignment
+
+**Resolution Steps:**
+1. Refresh the assignment tree; hidden content is removed from it
+2. Ask the lecturer when the assignment will be released
 
 ---
 
