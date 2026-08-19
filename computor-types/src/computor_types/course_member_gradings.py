@@ -85,6 +85,18 @@ class CourseMemberGradingNode(BaseModel):
         description="Color of the course content type (hex)"
     )
 
+    # Display only (issue #338). Grading is lecturer-and-above, so hidden
+    # content stays in every total and average here -- staff see reality. This
+    # flag exists purely so the UI can mark the row as one students cannot
+    # currently see. Deliberately NOT used as a filter anywhere.
+    visible_effective: bool = Field(
+        True,
+        description=(
+            "False when students cannot see this content (hidden here or by an "
+            "ancestor). Does not affect any count on this node."
+        )
+    )
+
     # Per course_content_type aggregation
     by_content_type: List[ContentTypeGradingStats] = Field(
         default_factory=list,

@@ -42,6 +42,11 @@ class CourseContentCreate(BaseModel):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
+    # Student visibility, inherited down the tree (issue #338). None inherits
+    # from the parent content and ultimately from the course; False hides this
+    # node and its whole subtree from students. True does NOT re-grant what an
+    # ancestor denied.
+    visible: Optional[bool] = None
     # Note: testing_service_id is no longer client-settable. It's derived
     # from the assigned example version's executionBackend declaration
     # (resolved at upload, propagated by the deployment API). Setting it
@@ -67,6 +72,12 @@ class CourseContentGet(BaseEntityGet):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
+    # This node's own setting; None means inherit. See CourseContentCreate.
+    visible: Optional[bool] = None
+    # Resolved against the whole ancestor chain and the course. False means a
+    # student cannot see this content, whether it was hidden here or above.
+    # Staff still receive the row -- this is what tells the UI to grey it.
+    visible_effective: bool = True
     testing_service_id: Optional[str] = None
     is_submittable: bool = False  # From model's column_property
     has_deployment: Optional[bool] = None  # From model's @property
@@ -109,6 +120,9 @@ class CourseContentList(BaseModel):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
+    # See CourseContentGet for the difference between these two.
+    visible: Optional[bool] = None
+    visible_effective: bool = True
     testing_service_id: Optional[str] = None
     is_submittable: bool = False  # Add this field to list view
     
@@ -165,6 +179,10 @@ class CourseContentUpdate(BaseModel):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
+    # Tri-state (issue #338). Updates are applied with
+    # ``model_dump(exclude_unset=True)``, so omitting the key leaves the row
+    # alone while sending an explicit ``null`` resets it to "inherit".
+    visible: Optional[bool] = None
     # Note: testing_service_id is no longer client-settable. It's derived
     # from the assigned example version's executionBackend declaration.
     # See CourseContentCreate for rationale.
@@ -184,6 +202,9 @@ class CourseContentQuery(ListQuery):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
+    # Tri-state filter on the *effective* visibility, mirroring `archived`:
+    # True returns only hidden content, False only visible, None everything.
+    visible: Optional[bool] = None
     testing_service_id: Optional[str] = None
     example_version_id: Optional[str] = Field(
         None,

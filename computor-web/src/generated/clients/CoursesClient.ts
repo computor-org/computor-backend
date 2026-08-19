@@ -15,7 +15,7 @@ export class CoursesClient extends BaseEndpointClient {
   /**
    * List Courses
    */
-  async listCoursesCoursesGet({ courseFamilyId, description, fullPath, id, languageCode, limit, maxSubmissions, maxTestRuns, organizationId, path, providerUrl, skip, title, userId }: { courseFamilyId?: string | null; description?: string | null; fullPath?: string | null; id?: string | null; languageCode?: string | null; limit?: number | null; maxSubmissions?: number | null; maxTestRuns?: number | null; organizationId?: string | null; path?: string | null; providerUrl?: string | null; skip?: number | null; title?: string | null; userId?: string | null }): Promise<CourseList[]> {
+  async listCoursesCoursesGet({ courseFamilyId, description, fullPath, id, languageCode, limit, maxSubmissions, maxTestRuns, organizationId, path, providerUrl, skip, title, userId, visible }: { courseFamilyId?: string | null; description?: string | null; fullPath?: string | null; id?: string | null; languageCode?: string | null; limit?: number | null; maxSubmissions?: number | null; maxTestRuns?: number | null; organizationId?: string | null; path?: string | null; providerUrl?: string | null; skip?: number | null; title?: string | null; userId?: string | null; visible?: boolean | null }): Promise<CourseList[]> {
     const queryParams: Record<string, unknown> = {
       course_family_id: courseFamilyId,
       description,
@@ -31,6 +31,7 @@ export class CoursesClient extends BaseEndpointClient {
       skip,
       title,
       user_id: userId,
+      visible,
     };
     return this.client.get<CourseList[]>(this.basePath, { params: queryParams });
   }

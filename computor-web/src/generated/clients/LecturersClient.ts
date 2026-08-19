@@ -16,7 +16,7 @@ export class LecturersClient extends BaseEndpointClient {
    * Lecturer List Course Contents Endpoint
    * List course contents with course repository information.
    */
-  async lecturerListCourseContentsEndpointLecturersCourseContentsGet({ archived, ascendants, courseContentTypeId, courseId, descendants, directory, hasDeployment, id, limit, maxGroupSize, maxSubmissions, maxTestRuns, nlevel, path, position, project, providerUrl, skip, testingServiceId, title }: { archived?: boolean | null; ascendants?: string | null; courseContentTypeId?: string | null; courseId?: string | null; descendants?: string | null; directory?: string | null; hasDeployment?: boolean | null; id?: string | null; limit?: number | null; maxGroupSize?: number | null; maxSubmissions?: number | null; maxTestRuns?: number | null; nlevel?: number | null; path?: string | null; position?: number | null; project?: string | null; providerUrl?: string | null; skip?: number | null; testingServiceId?: string | null; title?: string | null }): Promise<CourseContentLecturerList[]> {
+  async lecturerListCourseContentsEndpointLecturersCourseContentsGet({ archived, ascendants, courseContentTypeId, courseId, descendants, directory, hasDeployment, id, limit, maxGroupSize, maxSubmissions, maxTestRuns, nlevel, path, position, project, providerUrl, skip, testingServiceId, title, visible }: { archived?: boolean | null; ascendants?: string | null; courseContentTypeId?: string | null; courseId?: string | null; descendants?: string | null; directory?: string | null; hasDeployment?: boolean | null; id?: string | null; limit?: number | null; maxGroupSize?: number | null; maxSubmissions?: number | null; maxTestRuns?: number | null; nlevel?: number | null; path?: string | null; position?: number | null; project?: string | null; providerUrl?: string | null; skip?: number | null; testingServiceId?: string | null; title?: string | null; visible?: boolean | null }): Promise<CourseContentLecturerList[]> {
     const queryParams: Record<string, unknown> = {
       archived,
       ascendants,
@@ -38,6 +38,7 @@ export class LecturersClient extends BaseEndpointClient {
       skip,
       testing_service_id: testingServiceId,
       title,
+      visible,
     };
     return this.client.get<CourseContentLecturerList[]>(this.buildPath('course-contents'), { params: queryParams });
   }
@@ -171,7 +172,7 @@ export class LecturersClient extends BaseEndpointClient {
    * Lecturer List Courses Endpoint
    * List courses accessible to lecturers.
    */
-  async lecturerListCoursesEndpointLecturersCoursesGet({ courseFamilyId, description, fullPath, id, languageCode, limit, maxSubmissions, maxTestRuns, organizationId, path, providerUrl, skip, title }: { courseFamilyId?: string | null; description?: string | null; fullPath?: string | null; id?: string | null; languageCode?: string | null; limit?: number | null; maxSubmissions?: number | null; maxTestRuns?: number | null; organizationId?: string | null; path?: string | null; providerUrl?: string | null; skip?: number | null; title?: string | null }): Promise<CourseList[]> {
+  async lecturerListCoursesEndpointLecturersCoursesGet({ courseFamilyId, description, fullPath, id, languageCode, limit, maxSubmissions, maxTestRuns, organizationId, path, providerUrl, skip, title, visible }: { courseFamilyId?: string | null; description?: string | null; fullPath?: string | null; id?: string | null; languageCode?: string | null; limit?: number | null; maxSubmissions?: number | null; maxTestRuns?: number | null; organizationId?: string | null; path?: string | null; providerUrl?: string | null; skip?: number | null; title?: string | null; visible?: boolean | null }): Promise<CourseList[]> {
     const queryParams: Record<string, unknown> = {
       course_family_id: courseFamilyId,
       description,
@@ -186,6 +187,7 @@ export class LecturersClient extends BaseEndpointClient {
       provider_url: providerUrl,
       skip,
       title,
+      visible,
     };
     return this.client.get<CourseList[]>(this.buildPath('courses'), { params: queryParams });
   }
