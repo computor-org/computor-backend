@@ -5,6 +5,7 @@ import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { formatUsage } from '@/src/utils/limits';
 import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
@@ -122,23 +123,21 @@ export default function AssignmentDetailPage() {
         )}
 
         {/* Assignment Info */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white rounded-lg border border-gray-200 p-4">
             <dt className="text-sm font-medium text-gray-500">Max Group Size</dt>
             <dd className="mt-1 text-2xl font-semibold text-gray-900">{assignment.max_group_size || 1}</dd>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <dt className="text-sm font-medium text-gray-500">Results</dt>
-            <dd className="mt-1 text-2xl font-semibold text-gray-900">{assignment.result_count}</dd>
+            <dt className="text-sm font-medium text-gray-500">Test Runs</dt>
+            <dd className="mt-1 text-2xl font-semibold text-gray-900">
+              {formatUsage(assignment.result_count, assignment.max_test_runs)}
+            </dd>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4">
             <dt className="text-sm font-medium text-gray-500">Submissions</dt>
-            <dd className="mt-1 text-2xl font-semibold text-gray-900">{assignment.submission_count}</dd>
-          </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <dt className="text-sm font-medium text-gray-500">Max Test Runs</dt>
             <dd className="mt-1 text-2xl font-semibold text-gray-900">
-              {assignment.max_test_runs || 'Unlimited'}
+              {formatUsage(assignment.submission_count, assignment.max_submissions)}
             </dd>
           </div>
         </div>

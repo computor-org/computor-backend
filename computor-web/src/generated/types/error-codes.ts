@@ -109,6 +109,9 @@ export const ErrorCodes = {
   SUBMIT_006: "SUBMIT_006", // Version Identifier Required
   SUBMIT_007: "SUBMIT_007", // Test Identifier Required
   SUBMIT_008: "SUBMIT_008", // Artifact Already Tested
+  SUBMIT_009: "SUBMIT_009", // Maximum Submissions Reached
+  SUBMIT_010: "SUBMIT_010", // Test and Submission Limits Exhausted
+  SUBMIT_011: "SUBMIT_011", // Submission Cannot Be Withdrawn
   TASK_001: "TASK_001", // Task Not Found
   TASK_002: "TASK_002", // Task Submission Failed
   TASK_003: "TASK_003", // Unsupported Execution Backend
@@ -782,9 +785,9 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
     severity: ErrorSeverity.WARNING,
     title: "Maximum Test Runs Exceeded",
     message: {
-      plain: "You have reached the maximum number of test runs for this submission.",
-      markdown: "**Maximum Test Runs Exceeded**\n\nYou have reached the maximum number of test runs allowed for this submission.",
-      html: "<strong>Maximum Test Runs Exceeded</strong><p>You have reached the maximum number of test runs allowed.</p>",
+      plain: "You have used all the test runs allowed for this assignment.",
+      markdown: "**Maximum Test Runs Exceeded**\n\nYou have used all the test runs allowed for this assignment. The budget covers the whole assignment, not a single upload.",
+      html: "<strong>Maximum Test Runs Exceeded</strong><p>You have used all the test runs allowed for this assignment.</p>",
     },
     retryAfter: undefined,
     documentationUrl: "/docs/testing#limits",
@@ -844,6 +847,48 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
     },
     retryAfter: undefined,
     documentationUrl: "/docs/testing#duplicate-tests",
+  },
+  SUBMIT_009: {
+    code: "SUBMIT_009",
+    httpStatus: 400,
+    category: ErrorCategory.VALIDATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Maximum Submissions Reached",
+    message: {
+      plain: "You have used all the submissions allowed for this assignment.",
+      markdown: "**Maximum Submissions Reached**\n\nYou have used all the submissions allowed for this assignment.",
+      html: "<strong>Maximum Submissions Reached</strong><p>You have used all the submissions allowed for this assignment.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/testing#limits",
+  },
+  SUBMIT_010: {
+    code: "SUBMIT_010",
+    httpStatus: 400,
+    category: ErrorCategory.VALIDATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Test and Submission Limits Exhausted",
+    message: {
+      plain: "You have no test runs and no submissions left for this assignment.",
+      markdown: "**Test and Submission Limits Exhausted**\n\nYou have no test runs and no submissions left for this assignment. A submission normally still runs its test even when the test budget is spent, but that requires a submission to be available.",
+      html: "<strong>Test and Submission Limits Exhausted</strong><p>You have no test runs and no submissions left for this assignment.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/testing#limits",
+  },
+  SUBMIT_011: {
+    code: "SUBMIT_011",
+    httpStatus: 403,
+    category: ErrorCategory.AUTHORIZATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Submission Cannot Be Withdrawn",
+    message: {
+      plain: "A submission cannot be withdrawn. Ask a tutor if it was made in error.",
+      markdown: "**Submission Cannot Be Withdrawn**\n\nA submission cannot be withdrawn once made. Ask a tutor if it was made in error.",
+      html: "<strong>Submission Cannot Be Withdrawn</strong><p>A submission cannot be withdrawn. Ask a tutor if it was made in error.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/testing#limits",
   },
   TASK_001: {
     code: "TASK_001",

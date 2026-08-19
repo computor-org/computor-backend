@@ -79,6 +79,35 @@ def get_course_member_or_403(
     return member
 
 
+def is_course_staff(
+    permissions: Principal,
+    course_id: UUID | str,
+    db: Session,
+) -> bool:
+    """Whether the caller acts on this course as tutor-and-above.
+
+    The non-raising counterpart to the ladders above, for places that need to
+    *vary* behaviour rather than deny it — currently the test-run and
+    submission budgets, which apply to students only.
+    """
+    if permissions.is_admin:
+        return True
+
+    user_id = permissions.get_user_id()
+    if not user_id:
+        return False
+
+    return (
+        check_course_permissions(permissions, CourseMember, CourseRole.TUTOR, db)
+        .filter(
+            CourseMember.course_id == course_id,
+            CourseMember.user_id == user_id,
+        )
+        .first()
+        is not None
+    )
+
+
 def require_submission_group_access(
     permissions: Principal,
     submission_group_id: UUID | str,

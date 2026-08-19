@@ -152,6 +152,12 @@ class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     organization_id = Column(ForeignKey('organization.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     language_code = Column(String(2), ForeignKey('language.code', ondelete='SET NULL', onupdate='CASCADE'))
 
+    # Course-wide defaults for the per-assignment budgets. NULL means "no
+    # default"; a CourseContent value overrides these, and a SubmissionGroup
+    # value overrides both. See business_logic.submission_limits.resolve_limits.
+    max_test_runs = Column(Integer)
+    max_submissions = Column(Integer)
+
     # Relationships
     course_family = relationship('CourseFamily', back_populates='courses')
     organization = relationship('Organization', back_populates='courses')

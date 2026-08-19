@@ -679,6 +679,7 @@ export interface CourseContentStudentGet {
   result_count: number;
   submission_count: number;
   max_test_runs?: number | null;
+  max_submissions?: number | null;
   testing_service_id?: string | null;
   unread_message_count?: number;
   result?: ResultStudentGet | null;
@@ -707,6 +708,7 @@ export interface CourseContentStudentList {
   result_count: number;
   submission_count: number;
   max_test_runs?: number | null;
+  max_submissions?: number | null;
   testing_service_id?: string | null;
   directory?: string | null;
   color: string;
@@ -1267,6 +1269,8 @@ export interface CourseCreate {
   course_family_id: string;
   language_code?: string | null;
   properties?: CourseProperties | null;
+  max_test_runs?: number | null;
+  max_submissions?: number | null;
 }
 
 export interface CourseGet {
@@ -1277,6 +1281,8 @@ export interface CourseGet {
   course_family_id: string;
   language_code?: string | null;
   properties?: CoursePropertiesGet | null;
+  max_test_runs?: number | null;
+  max_submissions?: number | null;
   /** Creation timestamp */
   created_at?: string | null;
   /** Update timestamp */
@@ -1296,12 +1302,16 @@ export interface CourseList {
   path: string;
   language_code?: string | null;
   properties?: CoursePropertiesGet | null;
+  max_test_runs?: number | null;
+  max_submissions?: number | null;
 }
 
 export interface CourseUpdate {
   title?: string | null;
   description?: string | null;
   language_code?: string | null;
+  max_test_runs?: number | null;
+  max_submissions?: number | null;
 }
 
 export interface CourseQuery {
@@ -1316,6 +1326,8 @@ export interface CourseQuery {
   language_code?: string | null;
   provider_url?: string | null;
   full_path?: string | null;
+  max_test_runs?: number | null;
+  max_submissions?: number | null;
 }
 
 /**

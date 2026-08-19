@@ -35,8 +35,10 @@ from computor_backend.model.course import (
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.course_access import (
     get_course_member_or_403,
+    is_course_staff,
     require_submission_group_access,
 )
+from computor_backend.business_logic.submission_limits import enforce_max_submissions
 from computor_backend.cache import Cache
 from computor_backend.repositories.submission_artifact import SubmissionArtifactRepository
 from computor_backend.repositories.submission_grade_repo import SubmissionGradeRepository
@@ -296,15 +298,15 @@ async def upload_submission_artifact(
     # the upload so an unchanged re-submit is detected by the existing dedup.
     manual_version_identifier = trimmed_version or _canonical_zip_hash(file_content)
 
-    # Check submission quota limits (if configured)
-    if submission_group.max_submissions is not None:
-        submitted_count = (
-            db.query(func.count(SubmissionArtifact.id))
-            .filter(SubmissionArtifact.submission_group_id == submission_group.id)
-            .scalar()
+    # Submission quota. Only an official submission spends it — a test-only
+    # upload (submit=False) must not, and previously did.
+    if submit:
+        enforce_max_submissions(
+            db,
+            submission_group,
+            course_content,
+            exempt=is_course_staff(permissions, submission_group.course_id, db),
         )
-        if submitted_count >= submission_group.max_submissions:
-            raise BadRequestException(detail="Submission limit reached for this group")
 
     # Read file for validation and unzip for storage
     file_size = len(file_content)
@@ -573,6 +575,7 @@ def check_artifact_access(
     """Check if user has access to a submission artifact."""
     artifact = db.query(SubmissionArtifact).options(
         joinedload(SubmissionArtifact.submission_group)
+        .joinedload(SubmissionGroup.course_content)
     ).filter(
         SubmissionArtifact.id == artifact_id
     ).first()
@@ -627,7 +630,25 @@ def update_artifact(
     artifact = check_artifact_access(artifact_id, permissions, db, action="update", require_tutor=True)
 
     updates = {}
-    if submit is not None:
+    if submit is not None and submit != artifact.submit:
+        submission_group = artifact.submission_group
+        staff = is_course_staff(permissions, submission_group.course_id, db)
+
+        if submit:
+            # This is the path the editor actually takes: an artifact created
+            # by a test run is marked submitted afterwards. It used to skip the
+            # quota entirely, which is why submission limits never bit.
+            enforce_max_submissions(
+                db, submission_group, submission_group.course_content, exempt=staff
+            )
+        elif not staff:
+            # Un-submitting would refund the quota and make any submission
+            # budget meaningless, so it stays a staff-only correction.
+            raise ForbiddenException(
+                detail="A submission cannot be withdrawn. Ask a tutor if it was made in error.",
+                error_code="SUBMIT_011",
+            )
+
         updates['submit'] = submit
     if properties is not None:
         updates['properties'] = properties
@@ -891,10 +912,15 @@ async def create_test_result(
     # Get the artifact
     artifact = db.query(SubmissionArtifact).options(
         joinedload(SubmissionArtifact.submission_group)
+        .joinedload(SubmissionGroup.course_content)
     ).filter(SubmissionArtifact.id == artifact_id).first()
 
     if not artifact:
         raise NotFoundException(detail="Submission artifact not found")
+
+    course_content: CourseContent = artifact.submission_group.course_content
+    if not course_content:
+        raise NotFoundException(detail="Course content not found for submission group")
 
     # Check if user has permission to run tests (students can test their own,
     # tutors/instructors can test any). Denial here means the caller is not in
@@ -927,7 +953,14 @@ async def create_test_result(
     # Check test limitations (prevent multiple successful tests by same member)
     from computor_backend.business_logic.testing_orchestration import enforce_test_limits
 
-    enforce_test_limits(artifact, course_member_id, artifact.submission_group, db)
+    enforce_test_limits(
+        artifact,
+        course_member_id,
+        artifact.submission_group,
+        course_content,
+        db,
+        exempt=is_course_staff(permissions, artifact.submission_group.course_id, db),
+    )
 
     # Create the test result (use authenticated user's course member id)
     from computor_types.tasks import map_task_status_to_int
@@ -936,6 +969,11 @@ async def create_test_result(
     result = Result(
         submission_artifact_id=artifact_id,
         course_member_id=course_member.id,  # Use authenticated user's course member ID
+        # These three are NOT NULL and were previously omitted, so this insert
+        # could never succeed.
+        submission_group_id=artifact.submission_group_id,
+        course_content_id=course_content.id,
+        course_content_type_id=course_content.course_content_type_id,
         testing_service_id=testing_service_id,
         test_system_id=test_system_id,
         status=map_task_status_to_int(status),

@@ -283,6 +283,7 @@ export interface SubmissionGroupCreate {
   display_name?: string | null;
   max_group_size?: number;
   max_submissions?: number | null;
+  max_test_runs?: number | null;
   course_content_id: string;
   status?: string | null;
 }
@@ -292,6 +293,7 @@ export interface SubmissionGroupGet {
   display_name?: string | null;
   max_group_size?: number;
   max_submissions?: number | null;
+  max_test_runs?: number | null;
   course_content_id: string;
   status?: string | null;
   /** Creation timestamp */
@@ -311,6 +313,7 @@ export interface SubmissionGroupList {
   display_name?: string | null;
   max_group_size: number;
   max_submissions?: number | null;
+  max_test_runs?: number | null;
   course_id: string;
   course_content_id: string;
   status?: string | null;
@@ -322,6 +325,7 @@ export interface SubmissionGroupUpdate {
   display_name?: string | null;
   max_group_size?: number | null;
   max_submissions?: number | null;
+  max_test_runs?: number | null;
   status?: string | null;
 }
 
@@ -332,6 +336,7 @@ export interface SubmissionGroupQuery {
   display_name?: string | null;
   max_group_size?: number | null;
   max_submissions?: number | null;
+  max_test_runs?: number | null;
   course_id?: string | null;
   course_content_id?: string | null;
   properties?: SubmissionGroupProperties | null;
@@ -356,6 +361,7 @@ export interface SubmissionGroupWithGrading {
   display_name?: string | null;
   max_group_size?: number;
   max_submissions?: number | null;
+  max_test_runs?: number | null;
   course_content_id: string;
   status?: string | null;
   /** Creation timestamp */
@@ -3747,6 +3753,7 @@ export interface TutorGradeResponse {
   result_count: number;
   submission_count: number;
   max_test_runs?: number | null;
+  max_submissions?: number | null;
   testing_service_id?: string | null;
   directory?: string | null;
   color: string;

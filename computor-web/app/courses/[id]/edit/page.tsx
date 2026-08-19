@@ -19,6 +19,14 @@ import { displayName } from '@/src/utils/displayName';
 const coursesClient = new CoursesClient();
 const gitServersClient = new GitServersClient();
 
+/** Blank (or unparseable) means "no course-wide default", i.e. unlimited. */
+const parseLimit = (value: string): number | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+};
+
 const ALL_MODES = ['managed', 'external', 'download'];
 const MODE_LABELS: Record<string, string> = {
   managed: 'Managed — we host it',
@@ -42,6 +50,10 @@ export default function CourseEditPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [language, setLanguage] = useState('');
+  // Course-wide budget defaults. Held as strings so an empty field can mean
+  // "unlimited" rather than collapsing to 0.
+  const [maxTestRuns, setMaxTestRuns] = useState('');
+  const [maxSubmissions, setMaxSubmissions] = useState('');
   const [savingGeneral, setSavingGeneral] = useState(false);
   const [generalMsg, setGeneralMsg] = useState<string | null>(null);
 
@@ -67,6 +79,8 @@ export default function CourseEditPage() {
       setTitle(c.title || '');
       setDescription(c.description || '');
       setLanguage(c.language_code || '');
+      setMaxTestRuns(c.max_test_runs != null ? String(c.max_test_runs) : '');
+      setMaxSubmissions(c.max_submissions != null ? String(c.max_submissions) : '');
       const srv = await gitServersClient.listGitServersEndpointGitServersGet({}).catch(() => [] as GitServerGet[]);
       setServers(srv);
       // The binding endpoint 404s when a course has none yet — treat as null.
@@ -109,6 +123,8 @@ export default function CourseEditPage() {
           title: title.trim() || null,
           description: description.trim() || null,
           language_code: language.trim() || null,
+          max_test_runs: parseLimit(maxTestRuns),
+          max_submissions: parseLimit(maxSubmissions),
         },
       });
       setCourse(updated);
@@ -197,6 +213,32 @@ export default function CourseEditPage() {
                   </Field>
                   <Field label="Path (immutable)">
                     <input value={course?.path || ''} readOnly className={`${inputCls} bg-gray-50 text-gray-500`} />
+                  </Field>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field
+                    label="Default max test runs"
+                    hint="Applies to assignments that set no limit of their own. Empty = unlimited."
+                  >
+                    <input
+                      inputMode="numeric"
+                      value={maxTestRuns}
+                      onChange={(e) => setMaxTestRuns(e.target.value)}
+                      placeholder="unlimited"
+                      className={inputCls}
+                    />
+                  </Field>
+                  <Field
+                    label="Default max submissions"
+                    hint="Applies to assignments that set no limit of their own. Empty = unlimited."
+                  >
+                    <input
+                      inputMode="numeric"
+                      value={maxSubmissions}
+                      onChange={(e) => setMaxSubmissions(e.target.value)}
+                      placeholder="unlimited"
+                      className={inputCls}
+                    />
                   </Field>
                 </div>
                 <div className="flex items-center gap-3">

@@ -13,12 +13,19 @@ from computor_backend.exceptions import BadRequestException, NotFoundException, 
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_course_permissions
-from computor_backend.permissions.course_access import require_submission_group_access
+from computor_backend.permissions.course_access import (
+    is_course_staff,
+    require_submission_group_access,
+)
+from computor_backend.business_logic.submission_limits import (
+    enforce_max_submissions,
+    enforce_max_test_runs,
+    has_test_budget,
+)
 from computor_backend.business_logic.testing_orchestration import (
     IN_PROGRESS_STATUSES,
     RETRYABLE_STATUSES,
     build_testing_submission,
-    enforce_max_test_runs,
     find_active_test,
     resolve_artifact_for_test,
     resolve_task_queue,
@@ -33,6 +40,7 @@ from computor_backend.cache import Cache
 from computor_backend.repositories import (
     ServiceTypeRepository,
     CourseContentDeploymentRepository,
+    SubmissionArtifactRepository,
 )
 from computor_types.results import ResultCreate, ResultList
 from computor_types.repositories import Repository
@@ -182,10 +190,8 @@ async def create_test_run(
                        "Multiple tests are not allowed unless the previous test crashed or was cancelled."
             )
 
-    # Check max test runs limit for the submission group
-    enforce_max_test_runs(artifact.id, submission_group, db, error_code="SUBMIT_004")
-
-    # Get course content (assignment)
+    # Get course content (assignment). Fetched before the budget check because
+    # the effective limits inherit submission group -> course content -> course.
     course_content = db.query(CourseContent).filter(
         CourseContent.id == submission_group.course_content_id
     ).first()
@@ -195,6 +201,41 @@ async def create_test_run(
             error_code="SUBMIT_005",
             detail="Assignment not configured"
         )
+
+    # Lecturers and tutors are not subject to student budgets.
+    exempt = is_course_staff(permissions, submission_group.course_id, db)
+
+    # Test budget. A run that is part of a submission may overrun it, but only
+    # by spending a submission: when the test budget is gone and a submission
+    # is still available, the submission is consumed here so the run can go
+    # ahead. This is the only permitted overrun, and it is bounded by
+    # max_submissions because ``submit`` is monotonic for students.
+    if (
+        not exempt
+        and test_create.submit
+        and not has_test_budget(db, submission_group, course_content)
+    ):
+        if artifact.submit:
+            # An already-submitted artifact must not buy a second free test.
+            raise BadRequestException(
+                error_code="SUBMIT_004",
+                detail="Maximum test runs reached for this assignment"
+            )
+
+        enforce_max_submissions(
+            db, submission_group, course_content,
+            error_code="SUBMIT_010",
+        )
+        SubmissionArtifactRepository(db, repo_cache).update_entity(
+            artifact, {"submit": True}
+        )
+        logger.info(
+            "Test budget exhausted for submission group %s; consumed one submission "
+            "so artifact %s could run the test for its submission",
+            submission_group.id, artifact.id,
+        )
+    else:
+        enforce_max_test_runs(db, submission_group, course_content, exempt=exempt)
 
     # Resolve the testing service: cached FK, else by the example's executionBackend
     # slug (self-healing). Lets a content/example exist before the service is

@@ -28,6 +28,7 @@ from computor_backend.model.result import Result
 from computor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
 from computor_backend.model.auth import User
 from computor_backend.model.message import Message, MessageRead
+from computor_types.tasks import RETRYABLE_RESULT_STATUSES
 
 
 def latest_result_subquery(
@@ -144,17 +145,22 @@ def results_count_subquery(
         func.count(case((Result.test_system_id.isnot(None), 1))).label("total_results_count"),
     ).join(SubmissionArtifact, SubmissionArtifact.id == Result.submission_artifact_id)
 
+    # Joined through the artifact rather than Result.submission_group_id: that
+    # column is nullable and not populated on every insert path.
     if user_id is not None:
-        query = query.join(SubmissionGroup, SubmissionGroup.id == Result.submission_group_id) \
+        query = query.join(SubmissionGroup, SubmissionGroup.id == SubmissionArtifact.submission_group_id) \
             .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id) \
             .join(CourseMember, CourseMember.id == SubmissionGroupMember.course_member_id) \
             .filter(CourseMember.user_id == user_id)
     elif course_member_id is not None:
-        query = query.join(SubmissionGroup, SubmissionGroup.id == Result.submission_group_id) \
+        query = query.join(SubmissionGroup, SubmissionGroup.id == SubmissionArtifact.submission_group_id) \
             .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id) \
             .filter(SubmissionGroupMember.course_member_id == course_member_id)
 
-    query = query.filter(Result.status == 0)
+    # Must match business_logic.submission_limits.count_consumed_test_runs
+    # exactly: this number is shown as the numerator against the limit that
+    # module enforces. Counting only FINISHED here is what produced "5/2".
+    query = query.filter(Result.status.notin_(RETRYABLE_RESULT_STATUSES))
 
     if course_content_id is not None:
         query = query.filter(Result.course_content_id == course_content_id)

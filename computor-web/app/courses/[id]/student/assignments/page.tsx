@@ -13,6 +13,7 @@ import EmptyState from '@/src/components/EmptyState';
 import Badge from '@/src/components/Badge';
 import type { CourseContentStudentList } from 'types/generated';
 import { lastSegment } from '@/src/utils/ltree';
+import { formatUsageCompact } from '@/src/utils/limits';
 import { humanizeSegment } from '@/src/utils/displayName';
 
 // NOTE: this page keeps its own tree builder (below) rather than the shared
@@ -211,14 +212,18 @@ export default function StudentCourseContentsPage() {
                       <span className="text-sm text-gray-400">No results</span>
                     )}
 
-                    {/* Test Runs */}
+                    {/* Test Runs — with the cap, so a student sees "0/2 tests"
+                        from the start rather than discovering the limit on the
+                        run that gets refused */}
                     <span className="text-sm text-gray-500">
-                      {node.content.result_count} test{node.content.result_count !== 1 ? 's' : ''}
+                      {formatUsageCompact(node.content.result_count, node.content.max_test_runs)}
+                      {' '}test{node.content.result_count !== 1 ? 's' : ''}
                     </span>
 
                     {/* Submissions */}
                     <span className="text-sm text-gray-500">
-                      {node.content.submission_count} submission{node.content.submission_count !== 1 ? 's' : ''}
+                      {formatUsageCompact(node.content.submission_count, node.content.max_submissions)}
+                      {' '}submission{node.content.submission_count !== 1 ? 's' : ''}
                     </span>
 
                     {/* View Button */}

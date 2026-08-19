@@ -100,7 +100,11 @@ class CourseContentStudentGet(BaseEntityGet):
     course_content_type: CourseContentTypeGet
     result_count: int
     submission_count: int
+    # Effective budgets (group override -> course content -> course default).
+    # None means unlimited. Carried here so the client can render "0/2" before
+    # a submission group exists, instead of only after the first run.
     max_test_runs: Optional[int] = None
+    max_submissions: Optional[int] = None
     testing_service_id: Optional[str] = None
     unread_message_count: int = 0
     result: Optional[ResultStudentGet] = None
@@ -146,7 +150,9 @@ class CourseContentStudentList(BaseModel):
     course_content_type: CourseContentTypeList
     result_count: int
     submission_count: int
+    # Effective budgets — see CourseContentStudentGet.
     max_test_runs: Optional[int] = None
+    max_submissions: Optional[int] = None
     testing_service_id: Optional[str] = None
 
     directory: Optional[str] = None

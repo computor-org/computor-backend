@@ -1030,18 +1030,19 @@ errors:
     severity: warning
     title: "Maximum Test Runs Exceeded"
     message:
-      plain: "You have reached the maximum number of test runs for this submission."
-      markdown: "**Maximum Test Runs Exceeded**\n\nYou have reached the maximum number of test runs allowed for this submission."
-      html: "<strong>Maximum Test Runs Exceeded</strong><p>You have reached the maximum number of test runs allowed.</p>"
-    internal_description: "Submission group max_test_runs limit reached"
+      plain: "You have used all the test runs allowed for this assignment."
+      markdown: "**Maximum Test Runs Exceeded**\n\nYou have used all the test runs allowed for this assignment. The budget covers the whole assignment, not a single upload."
+      html: "<strong>Maximum Test Runs Exceeded</strong><p>You have used all the test runs allowed for this assignment.</p>"
+    internal_description: "Effective max_test_runs reached for the submission group"
     affected_functions:
       - "create_test_run"
-      - "check_test_limit"
+      - "enforce_max_test_runs"
     common_causes:
       - "Test limit configured on assignment"
       - "Too many test attempts"
     resolution_steps:
       - "Review previous test results"
+      - "Submit if you still have a submission left — a submission always runs its test"
       - "Contact instructor for additional test runs"
     documentation_url: "/docs/testing#limits"
 
@@ -1128,6 +1129,65 @@ errors:
       - "Submit a new version if you need to test again"
       - "Contact instructor if test needs to be reset"
     documentation_url: "/docs/testing#duplicate-tests"
+
+  - code: SUBMIT_009
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Maximum Submissions Reached"
+    message:
+      plain: "You have used all the submissions allowed for this assignment."
+      markdown: "**Maximum Submissions Reached**\n\nYou have used all the submissions allowed for this assignment."
+      html: "<strong>Maximum Submissions Reached</strong><p>You have used all the submissions allowed for this assignment.</p>"
+    internal_description: "Effective max_submissions reached for the submission group"
+    affected_functions:
+      - "upload_submission_artifact"
+      - "update_artifact"
+      - "enforce_max_submissions"
+    common_causes:
+      - "Submission limit configured on assignment"
+      - "All submissions already used"
+    resolution_steps:
+      - "Review what you have already submitted"
+      - "Contact instructor for an additional submission"
+    documentation_url: "/docs/testing#limits"
+
+  - code: SUBMIT_010
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Test and Submission Limits Exhausted"
+    message:
+      plain: "You have no test runs and no submissions left for this assignment."
+      markdown: "**Test and Submission Limits Exhausted**\n\nYou have no test runs and no submissions left for this assignment. A submission normally still runs its test even when the test budget is spent, but that requires a submission to be available."
+      html: "<strong>Test and Submission Limits Exhausted</strong><p>You have no test runs and no submissions left for this assignment.</p>"
+    internal_description: "Submit-intent test requested with both budgets exhausted"
+    affected_functions:
+      - "create_test_run"
+    common_causes:
+      - "Both limits configured and fully used"
+    resolution_steps:
+      - "Review your previous results and submissions"
+      - "Contact instructor for additional attempts"
+    documentation_url: "/docs/testing#limits"
+
+  - code: SUBMIT_011
+    http_status: 403
+    category: authorization
+    severity: warning
+    title: "Submission Cannot Be Withdrawn"
+    message:
+      plain: "A submission cannot be withdrawn. Ask a tutor if it was made in error."
+      markdown: "**Submission Cannot Be Withdrawn**\n\nA submission cannot be withdrawn once made. Ask a tutor if it was made in error."
+      html: "<strong>Submission Cannot Be Withdrawn</strong><p>A submission cannot be withdrawn. Ask a tutor if it was made in error.</p>"
+    internal_description: "Student attempted to set submission_artifact.submit from True back to False"
+    affected_functions:
+      - "update_artifact"
+    common_causes:
+      - "Student tried to un-submit to regain submission quota"
+    resolution_steps:
+      - "Ask a tutor to correct the submission"
+    documentation_url: "/docs/testing#limits"
 
   # ============================================================================
   # TASK EXECUTION ERRORS (404, 500)

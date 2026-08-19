@@ -60,6 +60,9 @@ class ErrorCode(str, Enum):
     SUBMIT_006 = "SUBMIT_006"  # Version Identifier Required
     SUBMIT_007 = "SUBMIT_007"  # Test Identifier Required
     SUBMIT_008 = "SUBMIT_008"  # Artifact Already Tested
+    SUBMIT_009 = "SUBMIT_009"  # Maximum Submissions Reached
+    SUBMIT_010 = "SUBMIT_010"  # Test and Submission Limits Exhausted
+    SUBMIT_011 = "SUBMIT_011"  # Submission Cannot Be Withdrawn
     TASK_001 = "TASK_001"  # Task Not Found
     TASK_002 = "TASK_002"  # Task Submission Failed
     TASK_003 = "TASK_003"  # Unsupported Execution Backend
@@ -153,6 +156,9 @@ ERROR_CATEGORIES = {
     ErrorCode.SUBMIT_006: "validation",
     ErrorCode.SUBMIT_007: "validation",
     ErrorCode.SUBMIT_008: "validation",
+    ErrorCode.SUBMIT_009: "validation",
+    ErrorCode.SUBMIT_010: "validation",
+    ErrorCode.SUBMIT_011: "authorization",
     ErrorCode.TASK_001: "not_found",
     ErrorCode.TASK_002: "internal",
     ErrorCode.TASK_003: "validation",

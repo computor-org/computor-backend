@@ -171,7 +171,7 @@ export class LecturersClient extends BaseEndpointClient {
    * Lecturer List Courses Endpoint
    * List courses accessible to lecturers.
    */
-  async lecturerListCoursesEndpointLecturersCoursesGet({ courseFamilyId, description, fullPath, id, languageCode, limit, organizationId, path, providerUrl, skip, title }: { courseFamilyId?: string | null; description?: string | null; fullPath?: string | null; id?: string | null; languageCode?: string | null; limit?: number | null; organizationId?: string | null; path?: string | null; providerUrl?: string | null; skip?: number | null; title?: string | null }): Promise<CourseList[]> {
+  async lecturerListCoursesEndpointLecturersCoursesGet({ courseFamilyId, description, fullPath, id, languageCode, limit, maxSubmissions, maxTestRuns, organizationId, path, providerUrl, skip, title }: { courseFamilyId?: string | null; description?: string | null; fullPath?: string | null; id?: string | null; languageCode?: string | null; limit?: number | null; maxSubmissions?: number | null; maxTestRuns?: number | null; organizationId?: string | null; path?: string | null; providerUrl?: string | null; skip?: number | null; title?: string | null }): Promise<CourseList[]> {
     const queryParams: Record<string, unknown> = {
       course_family_id: courseFamilyId,
       description,
@@ -179,6 +179,8 @@ export class LecturersClient extends BaseEndpointClient {
       id,
       language_code: languageCode,
       limit,
+      max_submissions: maxSubmissions,
+      max_test_runs: maxTestRuns,
       organization_id: organizationId,
       path,
       provider_url: providerUrl,
