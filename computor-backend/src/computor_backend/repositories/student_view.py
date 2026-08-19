@@ -18,7 +18,9 @@ from ..repositories.course_content_queries import (
     user_course_content_list_query
 )
 from ..permissions.core import check_course_permissions
+from ..permissions.course_access import is_course_staff
 from ..permissions.principal import Principal
+from ..business_logic.content_visibility import is_content_visible
 from computor_types.student_course_contents import (
     CourseContentStudentGet,
     CourseContentStudentList,
@@ -31,7 +33,8 @@ from computor_types.student_courses import (
     CourseStudentQuery,
 )
 from computor_backend.interfaces.student_courses import CourseStudentInterface
-from ..model.course import Course
+from ..model.course import Course, CourseContent
+from ..exceptions import NotFoundException
 from computor_backend.permissions.roles import CourseRole
 
 
@@ -49,10 +52,53 @@ class StudentViewRepository(ViewRepository):
         """Students get 5-minute cache TTL."""
         return 300  # 5 minutes
 
+    def _may_see_hidden(
+        self,
+        permissions: Optional[Principal],
+        course_id: UUID | str | None,
+    ) -> bool:
+        """Whether this caller keeps content hidden from students (issue #338).
+
+        A lecturer or tutor who is also enrolled walks this very view to
+        rehearse an exam as a student, so they must still receive the hidden
+        rows -- marked, not dropped. Everyone else loses them.
+
+        Without a principal or a course to scope the check to, the answer is
+        no: the safe default is to hide.
+        """
+        if permissions is None or course_id is None:
+            return False
+        return is_course_staff(permissions, course_id, self.db)
+
+    def _guard_hidden_content(
+        self,
+        result,
+        permissions: Optional[Principal],
+    ) -> None:
+        """404 a single course content the caller is not allowed to see.
+
+        The list path filters in SQL; this is its single-row counterpart, for
+        ``GET /students/course-contents/{id}`` which never goes through
+        ``search()``. ``visible_effective`` is set either way so a staff caller
+        gets the row marked rather than dropped.
+        """
+        content = self.db.query(CourseContent).filter(
+            CourseContent.id == result.id
+        ).first()
+        if content is None:
+            return
+
+        visible = is_content_visible(self.db, content)
+        result.visible_effective = visible
+
+        if not visible and not self._may_see_hidden(permissions, result.course_id):
+            raise NotFoundException()
+
     async def get_course_content(
         self,
         user_id: str,
         course_content_id: UUID | str,
+        permissions: Optional[Principal] = None,
     ) -> CourseContentStudentGet:
         """
         Get detailed course content for a student with caching.
@@ -60,6 +106,7 @@ class StudentViewRepository(ViewRepository):
         Args:
             user_id: Student user ID
             course_content_id: Course content ID
+            permissions: Caller principal; staff still get hidden content.
 
         Returns:
             Detailed course content with submission/result data
@@ -81,9 +128,19 @@ class StudentViewRepository(ViewRepository):
         course_contents_result = user_course_content_query(user_id, course_content_id, self.db)
         result = await course_member_course_content_result_mapper(course_contents_result, self.db, detailed=True)
 
+        # This path bypasses CourseContentStudentInterface.search entirely, so
+        # it needs its own visibility guard (issue #338). 404 rather than 403:
+        # a student should not learn that a hidden assignment exists.
+        if result is not None:
+            self._guard_hidden_content(result, permissions)
+
         # Aggregate status and unreviewed_count for unit-like course contents (non-submittable)
         if result and result.submission_group is None:
-            status, unreviewed_count = self._aggregate_single_unit_status_for_list(user_id, result)
+            status, unreviewed_count = self._aggregate_single_unit_status_for_list(
+                user_id,
+                result,
+                include_hidden=self._may_see_hidden(permissions, result.course_id),
+            )
             result.status = status
             result.unreviewed_count = unreviewed_count
 
@@ -119,6 +176,7 @@ class StudentViewRepository(ViewRepository):
         self,
         user_id: str,
         params: CourseContentStudentQuery,
+        permissions: Optional[Principal] = None,
     ) -> List[CourseContentStudentList]:
         """
         List course contents for a student with caching.
@@ -126,6 +184,9 @@ class StudentViewRepository(ViewRepository):
         Args:
             user_id: Student user ID
             params: Query parameters (filters, pagination, etc.)
+            permissions: Caller principal, used only to decide whether hidden
+                content is returned (issue #338). Staff keep it, students do
+                not. Cache entries are keyed per user, so the two never mix.
 
         Returns:
             List of course contents with submission/result data
@@ -143,9 +204,13 @@ class StudentViewRepository(ViewRepository):
         from computor_backend.repositories.submission_group_provisioning import provision_submission_groups_for_user
         provision_submission_groups_for_user(user_id, params.course_id, self.db)
 
+        include_hidden = self._may_see_hidden(permissions, params.course_id)
+
         # Query from DB using existing query function
         query = user_course_content_list_query(user_id, self.db)
-        course_contents_results = CourseContentStudentInterface.search(self.db, query, params).all()
+        course_contents_results = CourseContentStudentInterface.search(
+            self.db, query, params, include_hidden=include_hidden
+        ).all()
 
         return await self._finalize_course_contents_view(
             course_contents_results,
@@ -154,6 +219,7 @@ class StudentViewRepository(ViewRepository):
             params=params,
             aggregate_user_id=user_id,
             base_related_ids={'student_view': str(params.course_id)} if params.course_id else None,
+            include_hidden=include_hidden,
         )
 
     def list_courses(

@@ -14,6 +14,10 @@ from .course import CourseRepository
 from ..permissions.core import check_course_permissions
 from ..permissions.principal import Principal
 from ..exceptions import NotFoundException
+from ..business_logic.content_visibility import (
+    annotate_effective_visibility,
+    is_content_visible,
+)
 from computor_types.courses import CourseList, CourseQuery
 from computor_backend.interfaces.course import CourseInterface
 from computor_types.lecturer_course_contents import (
@@ -173,6 +177,8 @@ class LecturerViewRepository(ViewRepository):
         # Build response with course repository info
         response_dict = {
             **course_content.__dict__,
+            # Lecturers keep hidden content; the flag marks it (issue #338).
+            "visible_effective": is_content_visible(self.db, course_content, course),
             "repository": {
                 "url": course.properties.get("gitlab", {}).get("url") if course.properties else None,
                 "full_path": course.properties.get("gitlab", {}).get("full_path") if course.properties else None
@@ -236,6 +242,10 @@ class LecturerViewRepository(ViewRepository):
         # Apply search filters
         course_contents = CourseContentLecturerInterface.search(self.db, query, params)
 
+        # Lecturers keep every row; this is what tells the tree which ones
+        # students cannot currently see (issue #338).
+        course_contents = annotate_effective_visibility(self.db, course_contents)
+
         # Batch-compute has_newer_version for all deployments
         newer_version_map = self._compute_has_newer_version_batch(course_contents)
 
@@ -285,6 +295,7 @@ class LecturerViewRepository(ViewRepository):
                 **course_content.__dict__,
                 "has_deployment": course_content.has_deployment,
                 "deployment_status": course_content.deployment_status,
+                "visible_effective": getattr(course_content, "visible_effective", True),
                 "deployment": deployment_dto,
                 "repository": {
                     "url": gitlab_props.get("url") if isinstance(gitlab_props, dict) else None,

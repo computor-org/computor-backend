@@ -19,6 +19,7 @@ from ..repositories.course_content_queries import (
 from ..permissions.core import check_course_permissions
 from ..permissions.principal import Principal
 from ..exceptions import ForbiddenException
+from ..business_logic.content_visibility import annotate_effective_visibility
 from computor_types.student_courses import CourseStudentQuery
 from computor_backend.interfaces.student_courses import CourseStudentInterface
 from computor_types.student_course_contents import CourseContentStudentQuery
@@ -85,6 +86,11 @@ class TutorViewRepository(ViewRepository):
         )
         result = await course_member_course_content_result_mapper(course_contents_result, self.db, detailed=True)
 
+        # Tutors always receive content hidden from students; the flag is what
+        # lets their UI mark it (issue #338). No filtering here on purpose.
+        if result is not None:
+            annotate_effective_visibility(self.db, [result])
+
         # Cache result
         if result:
             # CRITICAL: Tag with submission_group_id for proper invalidation
@@ -149,7 +155,12 @@ class TutorViewRepository(ViewRepository):
 
         # Query from DB
         query = course_member_course_content_list_query(course_member_id, self.db, reader_user_id=reader_user_id)
-        course_contents_results = CourseContentStudentInterface.search(self.db, query, params).all()
+        # Tutors and lecturers keep content that is hidden from students
+        # (issue #338); the tree marks it instead of dropping it. The
+        # permission check above already established the caller is staff.
+        course_contents_results = CourseContentStudentInterface.search(
+            self.db, query, params, include_hidden=True
+        ).all()
 
         return await self._finalize_course_contents_view(
             course_contents_results,
@@ -161,6 +172,7 @@ class TutorViewRepository(ViewRepository):
                 'course_member_id': str(course_member_id),
                 'tutor_view': str(course_member.course_id),
             },
+            include_hidden=True,
         )
 
     def get_course(

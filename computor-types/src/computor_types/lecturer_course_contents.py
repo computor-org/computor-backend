@@ -113,8 +113,9 @@ class CourseContentLecturerQuery(ListQuery):
     max_group_size: Optional[int] = None
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
-    # Tri-state on the *effective* visibility, mirroring `archived` above:
-    # True returns only hidden content, False only visible, None everything.
+    # Tri-state on the *effective* visibility: True returns only content
+    # students can see, False only content hidden from them, None (the default)
+    # everything. Lecturers never lose rows unless they ask to.
     visible: Optional[bool] = None
     testing_service_id: Optional[str] = None
     has_deployment: Optional[bool] = Field(

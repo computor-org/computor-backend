@@ -9,6 +9,9 @@ from computor_types.course_contents import (
     CourseContentQuery,
 )
 from computor_types.custom_types import Ltree
+from computor_backend.business_logic.content_visibility import (
+    effective_visible_predicate,
+)
 from computor_backend.interfaces.base import BackendEntityInterface, CacheTag
 from computor_backend.model.course import (
     CourseContent,
@@ -169,6 +172,15 @@ class CourseContentInterface(CourseContentInterfaceBase, BackendEntityInterface)
             # Default: exclude archived
             query = query.filter(CourseContent.archived_at.is_(None))
             return query.order_by(CourseContent.course_id, CourseContent.path)
+
+        # Tri-state student visibility (issue #338). Applied in SQL because
+        # this endpoint paginates -- filtering after LIMIT/OFFSET would hand
+        # back short pages. None (the default) returns everything: this is a
+        # management endpoint, not a student one.
+        if params.visible is True:
+            query = query.filter(effective_visible_predicate())
+        elif params.visible is False:
+            query = query.filter(~effective_visible_predicate())
 
         # archived=True shows only archived, otherwise exclude archived
         if params.archived is True:

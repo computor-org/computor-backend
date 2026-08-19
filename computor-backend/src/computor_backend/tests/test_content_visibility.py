@@ -182,3 +182,50 @@ def test_predicate_uses_the_ltree_containment_operator():
     from sqlalchemy import select
 
     assert "<@" in _compiled(select(CourseContent.id).where(effective_visible_predicate()))
+
+
+# --------------------------------------------------------------------------
+# The read filter: who loses rows and who does not
+# --------------------------------------------------------------------------
+
+def _student_search_sql(include_hidden):
+    from sqlalchemy.orm import Session
+
+    from computor_backend.interfaces.student_course_contents import (
+        CourseContentStudentInterface,
+    )
+
+    session = Session()
+    query = session.query(CourseContent)
+    filtered = CourseContentStudentInterface.search(
+        session, query, None, include_hidden=include_hidden
+    )
+    return _compiled(filtered.statement)
+
+
+def test_student_search_filters_hidden_content():
+    sql = _student_search_sql(include_hidden=False)
+    assert "<@" in sql, "the ancestor veto must reach the student's SQL"
+    assert "archived_at IS NULL" in sql, "the archived filter must survive"
+
+
+def test_staff_search_keeps_hidden_content():
+    """A tutor viewing a student, or a lecturer rehearsing as one, keeps rows."""
+    sql = _student_search_sql(include_hidden=True)
+    assert "<@" not in sql
+    assert "archived_at IS NULL" in sql, "archived is still filtered for everyone"
+
+
+def test_hiding_is_the_default_when_a_caller_forgets():
+    """A caller that omits the flag must err towards hiding, never leaking."""
+    import inspect
+
+    from computor_backend.interfaces.student_course_contents import (
+        CourseContentStudentInterface,
+    )
+
+    param = inspect.signature(
+        CourseContentStudentInterface.search
+    ).parameters["include_hidden"]
+    assert param.default is False
+    assert param.kind is inspect.Parameter.KEYWORD_ONLY

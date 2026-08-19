@@ -119,13 +119,16 @@ def load_course_visible(db: Session, course_id) -> Optional[bool]:
 def annotate_effective_visibility(
     db: Session,
     rows: Iterable,
-    course_id=None,
 ) -> list:
     """Set ``visible_effective`` on every row of a loaded course-content set.
 
-    One small query for the overrides plus one pass over the rows — no
-    per-row subquery. For the student/tutor/lecturer list views, which load
-    their contents unpaginated and then map them to DTOs.
+    Two small queries per distinct course plus one pass over the rows — no
+    per-row correlated subquery, which is the shape #121 removed from this
+    table for exactly this reason. For the student/tutor/lecturer list views,
+    which load their contents unpaginated and then map them to DTOs.
+
+    Rows may span several courses (the lecturer list does when unfiltered), so
+    they are grouped by ``course_id`` rather than assuming one course.
 
     Rows are returned unchanged apart from the added attribute, so this is safe
     to call on ORM objects, query result rows and DTOs alike.
@@ -134,24 +137,22 @@ def annotate_effective_visibility(
     if not rows:
         return rows
 
-    if course_id is None:
-        course_id = getattr(rows[0], "course_id", None)
-    if course_id is None:
-        logger.warning(
-            "annotate_effective_visibility called without a course_id; "
-            "defaulting every row to visible"
-        )
-        for row in rows:
-            _set_visible_effective(row, True)
-        return rows
-
-    overrides = load_visibility_overrides(db, course_id)
-    course_visible = load_course_visible(db, course_id)
-
+    by_course: Dict[str, list] = {}
     for row in rows:
-        _set_visible_effective(
-            row, resolve_visible(str(row.path), overrides, course_visible)
-        )
+        course_id = getattr(row, "course_id", None)
+        if course_id is None:
+            # Nothing to resolve against; leave it visible rather than guess.
+            _set_visible_effective(row, True)
+            continue
+        by_course.setdefault(str(course_id), []).append(row)
+
+    for course_id, course_rows in by_course.items():
+        overrides = load_visibility_overrides(db, course_id)
+        course_visible = load_course_visible(db, course_id)
+        for row in course_rows:
+            _set_visible_effective(
+                row, resolve_visible(str(row.path), overrides, course_visible)
+            )
     return rows
 
 
