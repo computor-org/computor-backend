@@ -173,18 +173,26 @@ async def get_student_repository_endpoint(
 async def provision_student_repository_endpoint(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
+    rotate: bool = False,
     db: Session = Depends(get_db),
 ):
     """Babysat Forgejo provisioning for the current student.
 
     Forks the course's student-template into the student's own repository and
     records it. Idempotent — returns the existing repo if already provisioned.
-    Also returns a **one-time** repo-scoped Forgejo clone token (`clone_token` +
-    `clone_username`) so `git clone`/push authenticates; it is rotated on each
-    call and never returned by `GET .../repository`. Requires the course to be
-    bound to a managed Forgejo server offering the ``forgejo`` mode.
+    Also returns the repo-scoped Forgejo clone token (`clone_token` +
+    `clone_username`) so `git clone`/push authenticates; it is never returned by
+    `GET .../repository`. Requires the course to be bound to a managed Forgejo
+    server offering the ``forgejo`` mode.
+
+    The token is minted once and returned unchanged on later calls: Forgejo
+    keeps one token per user and instance, so re-minting would break the copy
+    stored in every repo the student has already cloned. Pass `rotate=true` to
+    force a fresh one — the escape hatch when the credential stopped working —
+    which invalidates the previous token, so the client must then update the
+    remotes of all its clones on that server.
     """
-    return provision_student_repository(course_id, permissions, db)
+    return provision_student_repository(course_id, permissions, db, rotate=rotate)
 
 
 @user_router.post(
