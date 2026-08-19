@@ -1,7 +1,7 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Total errors:** 75
+**Total errors:** 78
 
 To regenerate: `bash generate_error_codes.sh`
 
@@ -411,6 +411,30 @@ Endpoint requires User.is_service=True; called with a regular human user.
 
 **Resolution Steps:**
 1. Use the service-account user_id when calling this endpoint
+
+---
+
+### SUBMIT_011 - Submission Cannot Be Withdrawn
+
+**HTTP Status:** `403`  
+**Severity:** `warning`  
+**Category:** `authorization`  
+**Documentation:** [/docs/testing#limits](/docs/testing#limits)  
+
+**Description:**  
+Student attempted to set submission_artifact.submit from True back to False
+
+**User Message:**  
+> A submission cannot be withdrawn. Ask a tutor if it was made in error.
+
+**Affected Functions:**
+- `update_artifact`
+
+**Common Causes:**
+- Student tried to un-submit to regain submission quota
+
+**Resolution Steps:**
+1. Ask a tutor to correct the submission
 
 ---
 
@@ -1886,14 +1910,14 @@ Duplicate test attempt while existing test still running
 **Documentation:** [/docs/testing#limits](/docs/testing#limits)  
 
 **Description:**  
-Submission group max_test_runs limit reached
+Effective max_test_runs reached for the submission group
 
 **User Message:**  
-> You have reached the maximum number of test runs for this submission.
+> You have used all the test runs allowed for this assignment.
 
 **Affected Functions:**
 - `create_test_run`
-- `check_test_limit`
+- `enforce_max_test_runs`
 
 **Common Causes:**
 - Test limit configured on assignment
@@ -1901,7 +1925,8 @@ Submission group max_test_runs limit reached
 
 **Resolution Steps:**
 1. Review previous test results
-2. Contact instructor for additional test runs
+2. Submit if you still have a submission left — a submission always runs its test
+3. Contact instructor for additional test runs
 
 ---
 
@@ -2010,6 +2035,59 @@ User attempted to test an artifact that already has a successful test result
 1. Review your previous test results
 2. Submit a new version if you need to test again
 3. Contact instructor if test needs to be reset
+
+---
+
+### SUBMIT_009 - Maximum Submissions Reached
+
+**HTTP Status:** `400`  
+**Severity:** `warning`  
+**Category:** `validation`  
+**Documentation:** [/docs/testing#limits](/docs/testing#limits)  
+
+**Description:**  
+Effective max_submissions reached for the submission group
+
+**User Message:**  
+> You have used all the submissions allowed for this assignment.
+
+**Affected Functions:**
+- `upload_submission_artifact`
+- `update_artifact`
+- `enforce_max_submissions`
+
+**Common Causes:**
+- Submission limit configured on assignment
+- All submissions already used
+
+**Resolution Steps:**
+1. Review what you have already submitted
+2. Contact instructor for an additional submission
+
+---
+
+### SUBMIT_010 - Test and Submission Limits Exhausted
+
+**HTTP Status:** `400`  
+**Severity:** `warning`  
+**Category:** `validation`  
+**Documentation:** [/docs/testing#limits](/docs/testing#limits)  
+
+**Description:**  
+Submit-intent test requested with both budgets exhausted
+
+**User Message:**  
+> You have no test runs and no submissions left for this assignment.
+
+**Affected Functions:**
+- `create_test_run`
+
+**Common Causes:**
+- Both limits configured and fully used
+
+**Resolution Steps:**
+1. Review your previous results and submissions
+2. Contact instructor for additional attempts
 
 ---
 

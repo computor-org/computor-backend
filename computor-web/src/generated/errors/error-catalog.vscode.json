@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "error_count": 75,
+  "error_count": 78,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -581,9 +581,9 @@
       "severity": "warning",
       "title": "Maximum Test Runs Exceeded",
       "message": {
-        "plain": "You have reached the maximum number of test runs for this submission.",
-        "markdown": "**Maximum Test Runs Exceeded**\n\nYou have reached the maximum number of test runs allowed for this submission.",
-        "html": "<strong>Maximum Test Runs Exceeded</strong><p>You have reached the maximum number of test runs allowed.</p>"
+        "plain": "You have used all the test runs allowed for this assignment.",
+        "markdown": "**Maximum Test Runs Exceeded**\n\nYou have used all the test runs allowed for this assignment. The budget covers the whole assignment, not a single upload.",
+        "html": "<strong>Maximum Test Runs Exceeded</strong><p>You have used all the test runs allowed for this assignment.</p>"
       },
       "retry_after": null
     },
@@ -636,6 +636,45 @@
         "plain": "You have already tested this artifact. Multiple tests are not allowed unless the previous test crashed or was cancelled.",
         "markdown": "**Artifact Already Tested**\n\nYou have already successfully tested this artifact. Multiple tests are not allowed unless the previous test crashed or was cancelled.",
         "html": "<strong>Artifact Already Tested</strong><p>You have already tested this artifact. Multiple tests are not allowed unless the previous test crashed or was cancelled.</p>"
+      },
+      "retry_after": null
+    },
+    "SUBMIT_009": {
+      "code": "SUBMIT_009",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Maximum Submissions Reached",
+      "message": {
+        "plain": "You have used all the submissions allowed for this assignment.",
+        "markdown": "**Maximum Submissions Reached**\n\nYou have used all the submissions allowed for this assignment.",
+        "html": "<strong>Maximum Submissions Reached</strong><p>You have used all the submissions allowed for this assignment.</p>"
+      },
+      "retry_after": null
+    },
+    "SUBMIT_010": {
+      "code": "SUBMIT_010",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Test and Submission Limits Exhausted",
+      "message": {
+        "plain": "You have no test runs and no submissions left for this assignment.",
+        "markdown": "**Test and Submission Limits Exhausted**\n\nYou have no test runs and no submissions left for this assignment. A submission normally still runs its test even when the test budget is spent, but that requires a submission to be available.",
+        "html": "<strong>Test and Submission Limits Exhausted</strong><p>You have no test runs and no submissions left for this assignment.</p>"
+      },
+      "retry_after": null
+    },
+    "SUBMIT_011": {
+      "code": "SUBMIT_011",
+      "http_status": 403,
+      "category": "authorization",
+      "severity": "warning",
+      "title": "Submission Cannot Be Withdrawn",
+      "message": {
+        "plain": "A submission cannot be withdrawn. Ask a tutor if it was made in error.",
+        "markdown": "**Submission Cannot Be Withdrawn**\n\nA submission cannot be withdrawn once made. Ask a tutor if it was made in error.",
+        "html": "<strong>Submission Cannot Be Withdrawn</strong><p>A submission cannot be withdrawn. Ask a tutor if it was made in error.</p>"
       },
       "retry_after": null
     },

@@ -15,7 +15,7 @@ export class SubmissionGroupsClient extends BaseEndpointClient {
   /**
    * List Submission-Groups
    */
-  async listSubmissionGroupsSubmissionGroupsGet({ courseContentId, courseId, displayName, id, limit, maxGroupSize, maxSubmissions, skip, status, userId }: { courseContentId?: string | null; courseId?: string | null; displayName?: string | null; id?: string | null; limit?: number | null; maxGroupSize?: number | null; maxSubmissions?: number | null; skip?: number | null; status?: string | null; userId?: string | null }): Promise<SubmissionGroupList[]> {
+  async listSubmissionGroupsSubmissionGroupsGet({ courseContentId, courseId, displayName, id, limit, maxGroupSize, maxSubmissions, maxTestRuns, skip, status, userId }: { courseContentId?: string | null; courseId?: string | null; displayName?: string | null; id?: string | null; limit?: number | null; maxGroupSize?: number | null; maxSubmissions?: number | null; maxTestRuns?: number | null; skip?: number | null; status?: string | null; userId?: string | null }): Promise<SubmissionGroupList[]> {
     const queryParams: Record<string, unknown> = {
       course_content_id: courseContentId,
       course_id: courseId,
@@ -24,6 +24,7 @@ export class SubmissionGroupsClient extends BaseEndpointClient {
       limit,
       max_group_size: maxGroupSize,
       max_submissions: maxSubmissions,
+      max_test_runs: maxTestRuns,
       skip,
       status,
       user_id: userId,
