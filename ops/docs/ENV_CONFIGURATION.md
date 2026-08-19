@@ -120,6 +120,28 @@ compose` to exit at parse time:
 - When coder is enabled: `CODER_POSTGRES_USER`, `CODER_POSTGRES_PASSWORD`,
   `CODER_ADMIN_EMAIL`, `CODER_ADMIN_PASSWORD`
 
+### GitHub Issue Reporting (Optional)
+
+The authenticated `POST /issue-reports` endpoint lets Computor clients submit a
+problem without receiving GitHub credentials. The backend creates the issue in
+the configured private repository and stores an attached screenshot as a file
+there before linking it from the issue.
+
+```bash
+GITHUB_ISSUE_REPORT_ENABLED=true
+GITHUB_ISSUE_REPORT_TOKEN=<server-side-fine-grained-token>
+GITHUB_ISSUE_REPORT_REPOSITORY=computor-org/issues
+GITHUB_ISSUE_REPORT_BRANCH=main
+GITHUB_ISSUE_REPORT_LABELS=Testing
+```
+
+Create the token on GitHub as a fine-grained personal access token restricted to
+`computor-org/issues` with `Issues: Read and write` and `Contents: Read and
+write`. Keep it only in the deployment secret environment; never add it to a
+client configuration or a repository file. Restart the backend after changing
+the environment. Leave `GITHUB_ISSUE_REPORT_ENABLED=false` until the token is
+present and tested.
+
 ## How It Works
 
 ### Loading Order
