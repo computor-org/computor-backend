@@ -20,14 +20,14 @@ export default function ProgressBar({
 
   return (
     <div className="flex items-center gap-2">
-      <div className={`flex-1 ${h} bg-gray-200 rounded-full overflow-hidden`}>
+      <div className={`flex-1 ${h} bg-sunken rounded-full overflow-hidden`}>
         <div
           className={`${h} rounded-full transition-all duration-300`}
           style={{ width: `${pct}%`, backgroundColor: color }}
         />
       </div>
       {showLabel && (
-        <span className="text-xs font-medium text-gray-600 w-10 text-right">{pct}%</span>
+        <span className="text-xs font-medium text-muted w-10 text-right">{pct}%</span>
       )}
     </div>
   );

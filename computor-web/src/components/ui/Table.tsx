@@ -19,10 +19,10 @@ function cx(base: string, extra?: string): string {
   return extra ? `${base} ${extra}` : base;
 }
 
-const TABLE_CLS = 'min-w-full divide-y divide-gray-200';
-const THEAD_CLS = 'bg-gray-50 sticky top-0 z-10';
-const TBODY_CLS = 'divide-y divide-gray-100';
-const TH_CLS = 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+const TABLE_CLS = 'min-w-full divide-y divide-rule';
+const THEAD_CLS = 'bg-canvas sticky top-0 z-10';
+const TBODY_CLS = 'divide-y divide-rule-soft';
+const TH_CLS = 'px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider';
 const TD_CLS = 'px-4 py-3';
 
 export function Table({ className, ...rest }: TableHTMLAttributes<HTMLTableElement>) {

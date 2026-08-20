@@ -220,18 +220,18 @@ export default function UpdatesPage() {
         <ScrollArea>
           {/* Loading skeleton */}
           {loading && !view && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
-              <div className="h-6 bg-gray-200 rounded w-1/4 mb-4" />
-              <div className="h-4 bg-gray-200 rounded w-1/2" />
+            <div className="bg-surface rounded-lg border border-rule p-6 animate-pulse">
+              <div className="h-6 bg-sunken rounded w-1/4 mb-4" />
+              <div className="h-4 bg-sunken rounded w-1/2" />
             </div>
           )}
 
           {view && (
             <>
               {/* Version card */}
-              <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+              <div className="bg-surface rounded-lg shadow border border-rule p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900">Version</h2>
+                  <h2 className="text-lg font-semibold text-fg">Version</h2>
                   {view.update_available ? (
                     <Badge color="yellow" pill>Update available</Badge>
                   ) : view.remote_commit ? (
@@ -240,8 +240,8 @@ export default function UpdatesPage() {
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-gray-600 w-36">Running commit:</span>
-                    <code className="text-sm font-mono text-gray-900">{shortCommit(view.running_commit)}</code>
+                    <span className="text-sm font-medium text-muted w-36">Running commit:</span>
+                    <code className="text-sm font-mono text-fg">{shortCommit(view.running_commit)}</code>
                     {view.running_commit !== 'unknown' && (
                       <button
                         onClick={() => handleCopyCommit(view.running_commit)}
@@ -253,16 +253,16 @@ export default function UpdatesPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-gray-600 w-36">Running branch:</span>
-                    <span className="text-sm text-gray-900">{view.running_branch}</span>
+                    <span className="text-sm font-medium text-muted w-36">Running branch:</span>
+                    <span className="text-sm text-fg">{view.running_branch}</span>
                   </div>
                 </div>
               </div>
 
               {/* Remote card */}
-              <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+              <div className="bg-surface rounded-lg shadow border border-rule p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900">Tracked Repository</h2>
+                  <h2 className="text-lg font-semibold text-fg">Tracked Repository</h2>
                   <button
                     onClick={handleCheckNow}
                     disabled={checking || !view.repo_url}
@@ -273,20 +273,20 @@ export default function UpdatesPage() {
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-gray-600 w-36">Repository:</span>
-                    <span className="text-sm text-gray-900 break-all">
-                      {view.repo_url || <span className="text-gray-400">SYSTEM_REPO_URL not configured</span>}
+                    <span className="text-sm font-medium text-muted w-36">Repository:</span>
+                    <span className="text-sm text-fg break-all">
+                      {view.repo_url || <span className="text-subtle">SYSTEM_REPO_URL not configured</span>}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-gray-600 w-36">Tracked branch:</span>
-                    <span className="text-sm text-gray-900">{view.tracked_branch}</span>
+                    <span className="text-sm font-medium text-muted w-36">Tracked branch:</span>
+                    <span className="text-sm text-fg">{view.tracked_branch}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-gray-600 w-36">Latest commit:</span>
-                    <code className="text-sm font-mono text-gray-900">{shortCommit(view.remote_commit)}</code>
+                    <span className="text-sm font-medium text-muted w-36">Latest commit:</span>
+                    <code className="text-sm font-mono text-fg">{shortCommit(view.remote_commit)}</code>
                     {view.remote_checked_at && (
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-muted">
                         checked {new Date(view.remote_checked_at).toLocaleString()}
                       </span>
                     )}
@@ -302,8 +302,8 @@ export default function UpdatesPage() {
               </div>
 
               {/* Scheduled update */}
-              <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Scheduled Update</h2>
+              <div className="bg-surface rounded-lg shadow border border-rule p-6">
+                <h2 className="text-lg font-semibold text-fg mb-4">Scheduled Update</h2>
                 {view.last_schedule_result &&
                   ['missed', 'skipped_lock'].includes(view.last_schedule_result.outcome ?? '') &&
                   dismissedResult !== view.last_schedule_result.resolved_at && (
@@ -328,7 +328,7 @@ export default function UpdatesPage() {
                   )}
                 {view.schedule ? (
                   <div className="flex items-center gap-4">
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted">
                       An update is scheduled for{' '}
                       <strong>{new Date(view.schedule.scheduled_at).toLocaleString()}</strong>
                       {view.schedule.scheduled_by_name && <> by {view.schedule.scheduled_by_name}</>}.
@@ -346,7 +346,7 @@ export default function UpdatesPage() {
                   <form onSubmit={handleSchedule} className="space-y-3">
                     <div className="flex flex-wrap items-end gap-4">
                       <div className="flex-1 min-w-[200px] max-w-xs">
-                        <label htmlFor="update-schedule-date" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="update-schedule-date" className="block text-sm font-medium text-body mb-1">
                           Date & Time
                         </label>
                         <input
@@ -354,19 +354,19 @@ export default function UpdatesPage() {
                           type="datetime-local"
                           value={scheduleDate}
                           onChange={(e) => setScheduleDate(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          className="w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                           required
                         />
                       </div>
                       <button
                         type="submit"
                         disabled={!!updateDisabledReason || scheduling || !scheduleDate}
-                        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                        className="px-4 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                       >
                         {scheduling ? 'Scheduling…' : 'Schedule Update'}
                       </button>
                     </div>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted">
                       {updateDisabledReason ??
                         'At the scheduled time the system enters maintenance, updates to the latest commit on the tracked branch, and rolls back automatically if the update fails. Users get countdown notifications beforehand.'}
                     </p>
@@ -376,9 +376,9 @@ export default function UpdatesPage() {
 
               {/* Last update run */}
               {state && state.status !== 'idle' && (
-                <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+                <div className="bg-surface rounded-lg shadow border border-rule p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold text-gray-900">
+                    <h2 className="text-lg font-semibold text-fg">
                       {runInProgress ? 'Update in Progress' : 'Last Update'}
                     </h2>
                     {state.status === 'success' && <Badge color="green" pill>Success</Badge>}
@@ -389,30 +389,30 @@ export default function UpdatesPage() {
                   <div className="space-y-3">
                     {runInProgress && state.phase && (
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-gray-600 w-36">Phase:</span>
-                        <span className="text-sm text-gray-900">
+                        <span className="text-sm font-medium text-muted w-36">Phase:</span>
+                        <span className="text-sm text-fg">
                           {PHASE_LABELS[state.phase] || state.phase}…
                         </span>
                       </div>
                     )}
                     {state.from_commit && (
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-gray-600 w-36">From → to:</span>
-                        <code className="text-sm font-mono text-gray-900">
+                        <span className="text-sm font-medium text-muted w-36">From → to:</span>
+                        <code className="text-sm font-mono text-fg">
                           {shortCommit(state.from_commit)} → {shortCommit(state.to_commit)}
                         </code>
                       </div>
                     )}
                     {state.requested_by && (
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-gray-600 w-36">Requested by:</span>
-                        <span className="text-sm text-gray-900">{state.requested_by_name || state.requested_by}</span>
+                        <span className="text-sm font-medium text-muted w-36">Requested by:</span>
+                        <span className="text-sm text-fg">{state.requested_by_name || state.requested_by}</span>
                       </div>
                     )}
                     {state.finished_at && (
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-gray-600 w-36">Finished:</span>
-                        <span className="text-sm text-gray-900">{new Date(state.finished_at).toLocaleString()}</span>
+                        <span className="text-sm font-medium text-muted w-36">Finished:</span>
+                        <span className="text-sm text-fg">{new Date(state.finished_at).toLocaleString()}</span>
                       </div>
                     )}
                     {state.error && (
@@ -427,7 +427,7 @@ export default function UpdatesPage() {
                         </p>
                         <button
                           onClick={() => window.location.reload()}
-                          className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors shrink-0"
+                          className="px-3 py-1.5 text-sm font-medium text-on-accent bg-green-600 rounded-lg hover:bg-green-700 transition-colors shrink-0"
                         >
                           Reload page
                         </button>
@@ -438,21 +438,21 @@ export default function UpdatesPage() {
               )}
 
               {/* Actions */}
-              <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Actions</h2>
+              <div className="bg-surface rounded-lg shadow border border-rule p-6">
+                <h2 className="text-lg font-semibold text-fg mb-4">Actions</h2>
                 <button
                   onClick={() => setShowUpdateConfirm(true)}
                   disabled={!!updateDisabledReason || triggering || !view.update_available}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-on-accent bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
                 >
                   {triggering ? 'Requesting…' : 'Update now'}
                 </button>
                 {updateDisabledReason ? (
-                  <p className="text-sm text-gray-500 mt-2">{updateDisabledReason}</p>
+                  <p className="text-sm text-muted mt-2">{updateDisabledReason}</p>
                 ) : !view.update_available ? (
-                  <p className="text-sm text-gray-500 mt-2">The system is already up to date.</p>
+                  <p className="text-sm text-muted mt-2">The system is already up to date.</p>
                 ) : (
-                  <p className="text-sm text-gray-500 mt-2">
+                  <p className="text-sm text-muted mt-2">
                     Updates to <code className="font-mono">{shortCommit(view.remote_commit)}</code> on{' '}
                     <code className="font-mono">{view.tracked_branch}</code>.
                   </p>
@@ -460,9 +460,9 @@ export default function UpdatesPage() {
               </div>
 
               {/* Info */}
-              <div className="bg-gray-50 rounded-lg border border-gray-200 p-6">
-                <h2 className="text-sm font-semibold text-gray-900 mb-3">How Self-Update Works</h2>
-                <ul className="text-sm text-gray-600 space-y-2">
+              <div className="bg-canvas rounded-lg border border-rule p-6">
+                <h2 className="text-sm font-semibold text-fg mb-3">How Self-Update Works</h2>
+                <ul className="text-sm text-muted space-y-2">
                   <li>
                     <strong>Downtime:</strong> the update builds the new images first, then serves a static
                     maintenance page while services restart — expect a few minutes of downtime.
@@ -477,9 +477,9 @@ export default function UpdatesPage() {
                   </li>
                   <li>
                     <strong>Configuration:</strong> the tracked repository and branch come from{' '}
-                    <code className="px-1.5 py-0.5 bg-gray-200 rounded text-xs font-mono">SYSTEM_REPO_URL</code> /{' '}
-                    <code className="px-1.5 py-0.5 bg-gray-200 rounded text-xs font-mono">SYSTEM_REPO_BRANCH</code> in{' '}
-                    <code className="px-1.5 py-0.5 bg-gray-200 rounded text-xs font-mono">.env</code>; your .env is
+                    <code className="px-1.5 py-0.5 bg-sunken rounded text-xs font-mono">SYSTEM_REPO_URL</code> /{' '}
+                    <code className="px-1.5 py-0.5 bg-sunken rounded text-xs font-mono">SYSTEM_REPO_BRANCH</code> in{' '}
+                    <code className="px-1.5 py-0.5 bg-sunken rounded text-xs font-mono">.env</code>; your .env is
                     never modified by an update.
                   </li>
                 </ul>

@@ -21,19 +21,19 @@ export default function PublicCourseField({
   disabled?: boolean;
 }) {
   return (
-    <label className="flex items-start gap-3 text-sm text-gray-700">
+    <label className="flex items-start gap-3 text-sm text-body">
       <input
         type="checkbox"
         checked={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+        className="mt-0.5 h-4 w-4 rounded border-rule-strong text-blue-600 focus:ring-blue-500 disabled:opacity-50"
       />
       <span>
-        <span className="block font-medium text-gray-900">
+        <span className="block font-medium text-fg">
           List this course for self-registration
         </span>
-        <span className="block text-xs text-gray-600">
+        <span className="block text-xs text-muted">
           Every signed-in user — not only your students — sees it in the course catalog and can
           join themselves as a student. Course content stays hidden until they join. Turning this
           off stops new registrations but keeps everyone who already joined.

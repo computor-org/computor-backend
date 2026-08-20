@@ -44,11 +44,11 @@ export default function GitServerDetailPage() {
         <PageHeader
           breadcrumbs={[{ label: 'Git servers', href: '/admin/git-servers' }, { label: server?.name || server?.base_url || 'Git Server' }]}
           title={server?.name || server?.base_url || 'Git Server'}
-          subtitle={server && <span className="font-mono text-sm text-gray-500">{server.type} · {server.base_url}</span>}
+          subtitle={server && <span className="font-mono text-sm text-muted">{server.type} · {server.base_url}</span>}
           actions={
             server ? (
               <>
-                <Link href={`/admin/git-servers/${server.id}/edit`} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Edit</Link>
+                <Link href={`/admin/git-servers/${server.id}/edit`} className="px-3 py-2 text-sm font-medium text-body border border-rule-strong rounded-lg hover:bg-canvas">Edit</Link>
                 <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
               </>
             ) : undefined
@@ -61,15 +61,15 @@ export default function GitServerDetailPage() {
           <ListLoading>Loading…</ListLoading>
         ) : server ? (
           <ScrollArea>
-            <div className="bg-white border border-gray-200 rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-              <div><dt className="text-gray-500">Managed</dt><dd className="text-gray-900">{server.managed ? 'Yes — Computor operates it' : 'No (external)'}</dd></div>
-              <div><dt className="text-gray-500">Service token</dt><dd className="text-gray-900">{server.has_token ? 'Set (encrypted)' : 'None'}</dd></div>
+            <div className="bg-surface border border-rule rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              <div><dt className="text-muted">Managed</dt><dd className="text-fg">{server.managed ? 'Yes — Computor operates it' : 'No (external)'}</dd></div>
+              <div><dt className="text-muted">Service token</dt><dd className="text-fg">{server.has_token ? 'Set (encrypted)' : 'None'}</dd></div>
               {server.created_at && (
-                <div><dt className="text-gray-500">Registered</dt><dd className="text-gray-900">{new Date(server.created_at).toLocaleString()}</dd></div>
+                <div><dt className="text-muted">Registered</dt><dd className="text-fg">{new Date(server.created_at).toLocaleString()}</dd></div>
               )}
             </div>
             {server.managed && (
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-subtle">
                 Managed Forgejo instances are auto-registered at startup. Removing one is blocked while any course binding still references it.
               </p>
             )}

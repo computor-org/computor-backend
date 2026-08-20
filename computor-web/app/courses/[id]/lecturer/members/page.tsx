@@ -147,7 +147,7 @@ export default function CourseMembersPage() {
           actions={
             <Link
               href={`/courses/${courseId}/lecturer/members/add`}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 text-on-accent rounded-lg text-sm font-medium hover:bg-blue-700"
             >
               Add members
             </Link>
@@ -179,13 +179,13 @@ export default function CourseMembersPage() {
                     ? roleOptions
                     : [...roleOptions, m.course_role_id];
                   return (
-                    <tr key={m.id} className="hover:bg-gray-50">
+                    <tr key={m.id} className="hover:bg-canvas">
                       <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900 text-sm">
+                        <div className="font-medium text-fg text-sm">
                           {memberName(m)}
-                          {isSelf && <span className="ml-2 text-xs text-gray-400">(you)</span>}
+                          {isSelf && <span className="ml-2 text-xs text-subtle">(you)</span>}
                         </div>
-                        <div className="text-xs text-gray-500">{m.user?.email ?? '—'}</div>
+                        <div className="text-xs text-muted">{m.user?.email ?? '—'}</div>
                       </td>
                       <td className="px-4 py-3">
                         {manageable ? (
@@ -193,7 +193,7 @@ export default function CourseMembersPage() {
                             value={m.course_role_id}
                             disabled={savingId === m.id}
                             onChange={(e) => changeRole(m, e.target.value)}
-                            className="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                            className="px-2 py-1 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
                           >
                             {options.map((r) => (
                               <option key={r} value={r}>
@@ -211,7 +211,7 @@ export default function CourseMembersPage() {
                             value={m.course_group_id ?? ''}
                             disabled={savingId === m.id}
                             onChange={(e) => changeGroup(m, e.target.value)}
-                            className="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                            className="px-2 py-1 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
                           >
                             <option value="">— no group —</option>
                             {groups.map((g) => (
@@ -221,7 +221,7 @@ export default function CourseMembersPage() {
                             ))}
                           </select>
                         ) : (
-                          <span className="text-sm text-gray-600">
+                          <span className="text-sm text-muted">
                             {m.course_group_id ? groupName.get(m.course_group_id) ?? '—' : '—'}
                           </span>
                         )}
@@ -241,7 +241,7 @@ export default function CourseMembersPage() {
                 })}
                 {members.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">
+                    <td colSpan={4} className="px-4 py-8 text-center text-sm text-muted">
                       No members on this page.
                     </td>
                   </tr>
@@ -254,19 +254,19 @@ export default function CourseMembersPage() {
         {/* Pager — pinned below the scrolling list. Total count isn't exposed
             via the client, so Next is enabled whenever a full page came back. */}
         <div className="shrink-0 flex items-center justify-between">
-          <span className="text-sm text-gray-500">Page {page + 1}</span>
+          <span className="text-sm text-muted">Page {page + 1}</span>
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0 || loading}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              className="px-3 py-1.5 text-sm border border-rule-strong rounded-lg hover:bg-canvas disabled:opacity-50"
             >
               Previous
             </button>
             <button
               onClick={() => setPage((p) => p + 1)}
               disabled={!hasNext || loading}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              className="px-3 py-1.5 text-sm border border-rule-strong rounded-lg hover:bg-canvas disabled:opacity-50"
             >
               Next
             </button>

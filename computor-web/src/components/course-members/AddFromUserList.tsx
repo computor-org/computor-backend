@@ -121,7 +121,7 @@ export default function AddFromUserList({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-muted">
         You can only see users your permissions allow. Users already in the course are hidden — pick a
         role and add them. Students must be assigned to a group.
       </p>
@@ -142,17 +142,17 @@ export default function AddFromUserList({
         placeholder="Search by name or email…"
         value={searchInput}
         onChange={(e) => setSearchInput(e.target.value)}
-        className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        className="w-full max-w-md px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
       />
 
       <ErrorBanner>{usersError}</ErrorBanner>
 
       {usersLoading ? (
-        <div className="text-gray-500 py-8 text-center">Loading users…</div>
+        <div className="text-muted py-8 text-center">Loading users…</div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="bg-surface border border-rule rounded-lg overflow-hidden">
           <Table>
-            <thead className="bg-gray-50">
+            <thead className="bg-canvas">
               <tr>
                 <Th>User</Th>
                 <Th>Role</Th>
@@ -164,10 +164,10 @@ export default function AddFromUserList({
               {visibleUsers.map((u) => {
                 const isAdded = added.has(u.id);
                 return (
-                  <tr key={u.id} className="hover:bg-gray-50">
+                  <tr key={u.id} className="hover:bg-canvas">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900 text-sm">{userName(u)}</div>
-                      <div className="text-xs text-gray-500">{u.email ?? '—'}</div>
+                      <div className="font-medium text-fg text-sm">{userName(u)}</div>
+                      <div className="text-xs text-muted">{u.email ?? '—'}</div>
                       {rowError[u.id] && (
                         <div className="text-xs text-red-600 mt-1">{rowError[u.id]}</div>
                       )}
@@ -207,7 +207,7 @@ export default function AddFromUserList({
               })}
               {visibleUsers.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-500">
+                  <td colSpan={4} className="px-4 py-8 text-center text-sm text-muted">
                     No users to add.
                   </td>
                 </tr>
@@ -218,7 +218,7 @@ export default function AddFromUserList({
       )}
 
       <div className="flex items-center justify-between">
-        <span className="text-sm text-gray-500">Page {page + 1}</span>
+        <span className="text-sm text-muted">Page {page + 1}</span>
         <div className="flex gap-2">
           <Button
             variant="secondary"

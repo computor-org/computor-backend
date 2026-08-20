@@ -125,7 +125,7 @@ function UploadInner() {
               <button
                 type="button"
                 onClick={() => router.push('/examples')}
-                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+                className="px-4 py-2 text-sm text-muted hover:bg-sunken rounded-lg"
               >
                 {allDone ? 'Done' : 'Cancel'}
               </button>
@@ -133,7 +133,7 @@ function UploadInner() {
                 type="button"
                 onClick={runUpload}
                 disabled={uploading || rows.length === 0 || !dirsValid || !repoId || allDone}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
                 {uploading ? 'Uploading…' : `Upload ${rows.length || ''}`}
               </button>
@@ -145,11 +145,11 @@ function UploadInner() {
 
         <ScrollArea>
           <div className="max-w-2xl">
-            <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+            <div className="bg-surface border border-rule rounded-lg p-6 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Repository</label>
+                <label className="block text-xs font-medium text-body mb-1">Repository</label>
                 {repos.length === 0 ? (
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted">
                     No uploadable (MinIO/S3) repository.{' '}
                     <Link href="/example-repositories/create" className="text-blue-600 hover:underline">Create one first</Link>.
                   </p>
@@ -157,7 +157,7 @@ function UploadInner() {
                   <select
                     value={repoId}
                     onChange={(e) => setRepoId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">— select a repository —</option>
                     {repos.map((r) => (
@@ -168,33 +168,33 @@ function UploadInner() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Zip file</label>
+                <label className="block text-xs font-medium text-body mb-1">Zip file</label>
                 <input
                   type="file"
                   accept=".zip,application/zip"
                   onChange={(e) => onPickZip(e.target.files?.[0])}
-                  className="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:text-sm file:font-medium hover:file:bg-blue-100"
+                  className="block w-full text-sm text-muted file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:text-sm file:font-medium hover:file:bg-blue-100"
                 />
               </div>
 
-              {parsing && <div className="text-sm text-gray-500">Reading zip…</div>}
+              {parsing && <div className="text-sm text-muted">Reading zip…</div>}
               <ErrorBanner>{parseError}</ErrorBanner>
 
               {rows.length > 0 && (
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-gray-500">Discovered {rows.length} example{rows.length > 1 ? 's' : ''}</div>
+                  <div className="text-xs font-medium text-muted">Discovered {rows.length} example{rows.length > 1 ? 's' : ''}</div>
                   {rows.map((r, i) => (
-                    <div key={i} className="flex items-center gap-3 border border-gray-200 rounded-lg px-3 py-2">
+                    <div key={i} className="flex items-center gap-3 border border-rule rounded-lg px-3 py-2">
                       <input
                         value={r.directory}
                         disabled={uploading || r.status === 'ok'}
                         onChange={(e) => setRows((rs) => rs.map((x, idx) => (idx === i ? { ...x, directory: e.target.value } : x)))}
-                        className={`flex-1 px-2 py-1 border rounded text-sm font-mono ${DIR_OK.test(r.directory) ? 'border-gray-300' : 'border-red-400'}`}
+                        className={`flex-1 px-2 py-1 border rounded text-sm font-mono ${DIR_OK.test(r.directory) ? 'border-rule-strong' : 'border-red-400'}`}
                       />
-                      <span className="text-xs text-gray-400 shrink-0">{r.fileCount} files</span>
+                      <span className="text-xs text-subtle shrink-0">{r.fileCount} files</span>
                       <span
                         className={`text-xs shrink-0 w-40 truncate text-right ${
-                          r.status === 'ok' ? 'text-green-600' : r.status === 'error' ? 'text-red-600' : r.status === 'uploading' ? 'text-amber-600' : 'text-gray-400'
+                          r.status === 'ok' ? 'text-green-600' : r.status === 'error' ? 'text-red-600' : r.status === 'uploading' ? 'text-amber-600' : 'text-subtle'
                         }`}
                         title={r.message}
                       >

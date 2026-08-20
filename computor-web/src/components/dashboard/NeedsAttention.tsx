@@ -78,12 +78,12 @@ export default function NeedsAttention({ items, limit = 8 }: { items: AttentionI
 
   return (
     <Panel padding="none">
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-rule-soft">
         {shown.map(({ content, reason, courseTitle }) => (
           <Link
             key={content.id}
             href={`/courses/${content.course_id}/student/assignments/${content.id}`}
-            className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-3 px-4 py-3 hover:bg-canvas transition-colors"
           >
             <span
               className="shrink-0 h-2.5 w-2.5 rounded-full"
@@ -91,8 +91,8 @@ export default function NeedsAttention({ items, limit = 8 }: { items: AttentionI
               aria-hidden="true"
             />
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-gray-900 truncate">{displayName(content)}</div>
-              <div className="text-xs text-gray-500 truncate">{courseTitle}</div>
+              <div className="text-sm font-medium text-fg truncate">{displayName(content)}</div>
+              <div className="text-xs text-muted truncate">{courseTitle}</div>
             </div>
             <Badge tone={REASON[reason].tone} className="shrink-0">
               {REASON[reason].label}
@@ -101,7 +101,7 @@ export default function NeedsAttention({ items, limit = 8 }: { items: AttentionI
         ))}
       </div>
       {items.length > shown.length && (
-        <p className="px-4 py-2.5 text-xs text-gray-500 border-t border-gray-100">
+        <p className="px-4 py-2.5 text-xs text-muted border-t border-rule-soft">
           and {items.length - shown.length} more
         </p>
       )}

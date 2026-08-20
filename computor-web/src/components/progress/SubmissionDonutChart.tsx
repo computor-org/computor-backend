@@ -27,8 +27,8 @@ export default function SubmissionDonutChart({ byContentType, totalMax, totalSub
   if (data.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-5">
-      <h3 className="text-sm font-semibold text-gray-900 mb-4">Submissions by Type</h3>
+    <div className="bg-surface rounded-lg border border-rule p-5">
+      <h3 className="text-sm font-semibold text-fg mb-4">Submissions by Type</h3>
       <div className="h-52">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -67,10 +67,10 @@ export default function SubmissionDonutChart({ byContentType, totalMax, totalSub
                 className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
                 style={{ backgroundColor: ct.course_content_type_color || '#6366f1' }}
               />
-              <span className="text-gray-700 truncate">
+              <span className="text-body truncate">
                 {ct.course_content_type_title || ct.course_content_type_slug}
               </span>
-              <span className="text-gray-400 ml-auto flex-shrink-0">
+              <span className="text-subtle ml-auto flex-shrink-0">
                 {ct.submitted_assignments}/{ct.max_assignments} ({pct}%)
               </span>
             </div>

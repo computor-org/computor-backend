@@ -82,12 +82,12 @@ export default function NewWorkspaceForm({
   };
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
-      <h3 className="text-sm font-semibold text-gray-900">New workspace with a custom name</h3>
+    <div className="rounded-lg border border-rule bg-surface p-4">
+      <h3 className="text-sm font-semibold text-fg">New workspace with a custom name</h3>
       <ErrorBanner>{error}</ErrorBanner>
       <div className="mt-3 flex flex-wrap items-end gap-3">
         <label className="min-w-[14rem] flex-1">
-          <span className="mb-1 block text-xs font-medium text-gray-700">Type</span>
+          <span className="mb-1 block text-xs font-medium text-body">Type</span>
           <select
             value={template}
             onChange={(e) => setTemplate(e.target.value)}
@@ -101,8 +101,8 @@ export default function NewWorkspaceForm({
           </select>
         </label>
         <label className="min-w-[14rem] flex-1">
-          <span className="mb-1 block text-xs font-medium text-gray-700">
-            Name <span className="font-normal text-gray-400">(optional)</span>
+          <span className="mb-1 block text-xs font-medium text-body">
+            Name <span className="font-normal text-subtle">(optional)</span>
           </span>
           <input
             type="text"
@@ -122,7 +122,7 @@ export default function NewWorkspaceForm({
           </Button>
         </div>
       </div>
-      <p className="mt-2 text-xs text-gray-500">
+      <p className="mt-2 text-xs text-muted">
         Lowercase letters, digits and hyphens. Defaults to a name derived from the type
         {template ? ` ("${derivedWorkspaceName(template)}")` : ''}.
       </p>

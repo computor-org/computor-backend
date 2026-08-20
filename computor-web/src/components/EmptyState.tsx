@@ -30,19 +30,19 @@ export default function EmptyState({
 }) {
   if (compact) {
     return (
-      <div className="w-full bg-gray-50 rounded-lg border border-dashed border-gray-300 p-6 text-center">
-        <p className="text-sm text-gray-500">{title}</p>
-        {description && <p className="mt-1 text-xs text-gray-400">{description}</p>}
+      <div className="w-full bg-canvas rounded-lg border border-dashed border-rule-strong p-6 text-center">
+        <p className="text-sm text-muted">{title}</p>
+        {description && <p className="mt-1 text-xs text-subtle">{description}</p>}
         {action && <div className="mt-3">{action}</div>}
       </div>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-      {icon && <div className="mx-auto h-12 w-12 text-gray-400 [&>svg]:h-12 [&>svg]:w-12">{icon}</div>}
-      <h3 className="mt-4 text-lg font-medium text-gray-900">{title}</h3>
-      {description && <p className="mt-2 text-sm text-gray-500">{description}</p>}
+    <div className="mx-auto w-full max-w-2xl bg-canvas rounded-lg border-2 border-dashed border-rule-strong p-12 text-center">
+      {icon && <div className="mx-auto h-12 w-12 text-subtle [&>svg]:h-12 [&>svg]:w-12">{icon}</div>}
+      <h3 className="mt-4 text-lg font-medium text-fg">{title}</h3>
+      {description && <p className="mt-2 text-sm text-muted">{description}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   );

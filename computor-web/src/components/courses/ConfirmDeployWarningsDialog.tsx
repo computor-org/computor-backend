@@ -35,8 +35,8 @@ export default function ConfirmDeployWarningsDialog({
       maxWidth="max-w-lg"
     >
       <div className="px-6 pt-2 pb-6 space-y-3">
-        <p className="text-sm text-gray-600">
-          <span className="font-medium text-gray-900">{courseLabel}</span> will be created, but{' '}
+        <p className="text-sm text-muted">
+          <span className="font-medium text-fg">{courseLabel}</span> will be created, but{' '}
           {n === 1 ? 'this part is' : 'these parts are'} incomplete. Affected assignments end up
           without an example or without a testing service, so students can’t work on them until you
           fix that by hand.
@@ -46,12 +46,12 @@ export default function ConfirmDeployWarningsDialog({
             <li key={i}>{warningText(w)}</li>
           ))}
         </ul>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-muted">
           Correcting the file and uploading it again is usually far less work than repairing the
           course afterwards.
         </p>
       </div>
-      <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end gap-2">
+      <div className="px-6 py-4 bg-canvas rounded-b-lg flex justify-end gap-2">
         <Button variant="secondary" onClick={onCancel} disabled={submitting}>
           Cancel — I’ll fix the file
         </Button>

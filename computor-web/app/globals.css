@@ -1,9 +1,43 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/*
+ * Semantic colour tokens.
+ *
+ * Pages had been naming Tailwind's palette directly — text-gray-500 for every
+ * secondary line, border-gray-200 for every panel edge — which put the app's
+ * colour decisions in ~1000 places across 70 files. Naming the ROLE instead puts
+ * them here, which is the prerequisite the design spec sets for dark mode: the
+ * theme block below redefines these eleven values and the whole app follows.
+ *
+ * Light values are the exact greys they replace, so this layer is a rename and
+ * changes nothing on screen.
+ */
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Foreground, strongest to faintest. */
+  --c-fg: #111827;        /* gray-900 — titles, primary values */
+  --c-body: #374151;      /* gray-700 — running text */
+  --c-muted: #6b7280;     /* gray-500 — labels, secondary lines */
+  --c-subtle: #9ca3af;    /* gray-400 — hints, timestamps */
+  --c-faint: #d1d5db;     /* gray-300 — separators in text, disabled glyphs */
+
+  /* Surfaces. */
+  --c-surface: #ffffff;   /* cards and panels */
+  --c-canvas: #f9fafb;    /* the page behind them (gray-50) */
+  --c-sunken: #f3f4f6;    /* a well inside a card (gray-100) */
+
+  /* Lines. */
+  --c-rule: #e5e7eb;      /* gray-200 — panel and table borders */
+  --c-rule-soft: #f3f4f6; /* gray-100 — row separators */
+  --c-rule-strong: #d1d5db; /* gray-300 — input borders */
+
+  /* Text ON a filled accent/danger button. Stays near-white in both themes —
+     the fill darkens rather than lightening, so this must not follow --c-fg. */
+  --c-on-accent: #ffffff;
+
   color-scheme: light;
   /* Recolors every native checkbox, radio and range to the brand blue that
      Button's primary variant uses, while keeping the platform's own focus ring,
@@ -15,6 +49,23 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  /* Registered so Tailwind generates text-fg, bg-surface, border-rule, … .
+     `inline` keeps them pointing at the custom properties above rather than
+     inlining today's hex, which is what lets a theme block swap them. */
+  --color-fg: var(--c-fg);
+  --color-body: var(--c-body);
+  --color-muted: var(--c-muted);
+  --color-subtle: var(--c-subtle);
+  --color-faint: var(--c-faint);
+  --color-surface: var(--c-surface);
+  --color-canvas: var(--c-canvas);
+  --color-sunken: var(--c-sunken);
+  --color-rule: var(--c-rule);
+  --color-rule-soft: var(--c-rule-soft);
+  --color-rule-strong: var(--c-rule-strong);
+  --color-on-accent: var(--c-on-accent);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

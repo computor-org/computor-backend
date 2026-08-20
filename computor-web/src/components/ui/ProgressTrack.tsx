@@ -61,7 +61,7 @@ export default function ProgressTrack({
       aria-valuemax={100}
       aria-valuenow={pct}
       aria-label={label}
-      className={`${SIZE_CLS[size]} w-full overflow-hidden rounded-full bg-gray-200 ${className}`}
+      className={`${SIZE_CLS[size]} w-full overflow-hidden rounded-full bg-sunken ${className}`}
     >
       <div
         className={`${SIZE_CLS[size]} overflow-hidden rounded-full transition-[width] duration-500 ease-out ${FILL_CLS[tone]}`}
@@ -70,7 +70,7 @@ export default function ProgressTrack({
         {active && (
           // Sits inside the fill and is clipped by it, so the sweep travels the
           // filled portion only — the empty remainder stays honestly empty.
-          <div className="h-full w-1/4 rounded-full bg-white/40 progress-sweep" />
+          <div className="h-full w-1/4 rounded-full bg-surface/40 progress-sweep" />
         )}
       </div>
     </div>

@@ -58,7 +58,7 @@ export default function NotificationsPage() {
           <ListLoading>Loading…</ListLoading>
         ) : messages.length === 0 ? (
           <ScrollArea>
-            <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">
+            <div className="text-muted border border-dashed border-rule-strong rounded-lg p-8 text-center">
               No notifications.
             </div>
           </ScrollArea>
@@ -69,16 +69,16 @@ export default function NotificationsPage() {
               return (
                 <div
                   key={m.id}
-                  className={`bg-white border border-gray-200 border-l-4 ${levelAccent(m.level)} rounded-lg p-4 ${isNew ? 'ring-1 ring-blue-100' : ''}`}
+                  className={`bg-surface border border-rule border-l-4 ${levelAccent(m.level)} rounded-lg p-4 ${isNew ? 'ring-1 ring-blue-100' : ''}`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      {m.title && <div className="text-sm font-semibold text-gray-900">{m.title}</div>}
-                      <div className="text-sm text-gray-700 whitespace-pre-wrap">{m.content}</div>
+                      {m.title && <div className="text-sm font-semibold text-fg">{m.title}</div>}
+                      <div className="text-sm text-body whitespace-pre-wrap">{m.content}</div>
                     </div>
                     {isNew && <Badge color="blue" className="shrink-0 mt-0.5">new</Badge>}
                   </div>
-                  <div className="mt-2 text-xs text-gray-400">
+                  <div className="mt-2 text-xs text-subtle">
                     {authorName(m)} · {fmtWhen(m.created_at)}
                   </div>
                 </div>

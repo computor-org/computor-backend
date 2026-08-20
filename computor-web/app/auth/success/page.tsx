@@ -41,19 +41,19 @@ export default function AuthSuccessPage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-canvas">
       <div className="text-center">
         {error ? (
           <>
             <p className="text-red-600 font-medium mb-3">{error}</p>
-            <a href="/login" className="px-4 py-2 bg-gray-900 text-white rounded hover:bg-gray-800 inline-block">
+            <a href="/login" className="px-4 py-2 bg-gray-900 text-on-accent rounded hover:bg-gray-800 inline-block">
               Back to login
             </a>
           </>
         ) : (
           <>
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
-            <p className="mt-4 text-gray-600">Completing sign-in…</p>
+            <p className="mt-4 text-muted">Completing sign-in…</p>
           </>
         )}
       </div>

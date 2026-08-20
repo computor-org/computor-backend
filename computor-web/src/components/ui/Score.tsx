@@ -22,7 +22,7 @@ export default function Score({
   className?: string;
 }) {
   if (value == null) {
-    return <span className={`text-sm text-gray-400 tabular-nums ${className}`}>&mdash;</span>;
+    return <span className={`text-sm text-subtle tabular-nums ${className}`}>&mdash;</span>;
   }
   const passing = value >= passAt;
   return (

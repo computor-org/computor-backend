@@ -122,22 +122,22 @@ export default function ConsentPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-muted">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4">
+    <div className="min-h-screen bg-canvas py-10 px-4">
       <div className="max-w-3xl mx-auto space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Data Processing &amp; Privacy</h1>
+          <h1 className="text-3xl font-bold text-fg">Data Processing &amp; Privacy</h1>
           {status?.required_version && (
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-muted">
               Privacy notice version <span className="font-mono">{status.required_version}</span>
             </p>
           )}
@@ -160,9 +160,9 @@ export default function ConsentPage() {
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow border border-gray-200 p-6 space-y-4">
-          <h2 className="text-xl font-semibold text-gray-900">How we process your data</h2>
-          <p className="text-gray-700">
+        <div className="bg-surface rounded-lg shadow border border-rule p-6 space-y-4">
+          <h2 className="text-xl font-semibold text-fg">How we process your data</h2>
+          <p className="text-body">
             We process your personal data to deliver the courses (Lehrveranstaltungen) in which
             this platform is used — for example your name, e-mail address, course enrollments and
             submissions. The details are described in the privacy notice below.
@@ -177,9 +177,9 @@ export default function ConsentPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow border border-gray-200 p-6 space-y-4">
+        <div className="bg-surface rounded-lg shadow border border-rule p-6 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Privacy notice</h2>
+            <h2 className="text-xl font-semibold text-fg">Privacy notice</h2>
             {policy?.languages && policy.languages.length > 1 && (
               <div className="flex gap-2">
                 {policy.languages.map((lang) => (
@@ -188,8 +188,8 @@ export default function ConsentPage() {
                     onClick={() => handleLanguageChange(lang)}
                     className={`px-3 py-1 text-sm rounded-md border ${
                       policy.lang === lang
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                        ? 'bg-blue-600 text-on-accent border-blue-600'
+                        : 'bg-surface text-body border-rule-strong hover:bg-canvas'
                     }`}
                   >
                     {lang.toUpperCase()}
@@ -199,39 +199,39 @@ export default function ConsentPage() {
             )}
           </div>
           {policy ? (
-            <div className="max-h-96 overflow-y-auto scroll-slim border border-gray-200 rounded-lg p-4">
+            <div className="max-h-96 overflow-y-auto scroll-slim border border-rule rounded-lg p-4">
               <div className="prose prose-slate max-w-none">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{policy.content}</ReactMarkdown>
               </div>
             </div>
           ) : (
-            <p className="text-gray-600">The privacy notice could not be loaded.</p>
+            <p className="text-muted">The privacy notice could not be loaded.</p>
           )}
         </div>
 
         {!(reviewMode && status?.has_consented) && (
-          <div className="bg-white rounded-lg shadow border border-gray-200 p-6 space-y-4">
+          <div className="bg-surface rounded-lg shadow border border-rule p-6 space-y-4">
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
                 checked={accepted}
                 onChange={(e) => setAccepted(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="mt-1 h-4 w-4 rounded border-rule-strong text-blue-600 focus:ring-blue-500"
               />
-              <span className="text-gray-700">
+              <span className="text-body">
                 I have read the privacy notice (version{' '}
                 <span className="font-mono">{status?.required_version}</span>) and agree to the
                 processing of my personal data as described in it.
               </span>
             </label>
             <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted">
                 You can withdraw your consent at any time in Settings.
               </p>
               <button
                 onClick={handleSubmit}
                 disabled={!accepted || submitting}
-                className="px-6 py-2 rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                className="px-6 py-2 rounded-lg font-medium bg-blue-600 text-on-accent hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 {submitting ? 'Saving...' : 'Agree and continue'}
               </button>

@@ -20,7 +20,7 @@ const TONE_CLS: Record<Tone, string> = {
   warning: 'bg-amber-50 border-amber-200 text-amber-900',
   error: 'bg-red-50 border-red-200 text-red-700',
   info: 'bg-blue-50 border-blue-200 text-blue-800',
-  muted: 'bg-gray-50 border-gray-200 text-gray-700',
+  muted: 'bg-canvas border-rule text-body',
 };
 
 export default function Notice({

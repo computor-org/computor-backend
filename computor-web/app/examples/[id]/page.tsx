@@ -56,11 +56,11 @@ export default function ExampleDetailPage() {
         <PageHeader
           breadcrumbs={[{ label: 'Examples', href: '/examples' }, { label: example?.title || example?.directory || 'Example' }]}
           title={example?.title || example?.directory || 'Example'}
-          subtitle={example && <span className="font-mono text-sm text-gray-400">{example.identifier}</span>}
+          subtitle={example && <span className="font-mono text-sm text-subtle">{example.identifier}</span>}
           actions={
             example && canManageExamples ? (
               <>
-                <Link href={uploadHref} className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Upload new version</Link>
+                <Link href={uploadHref} className="px-3 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700">Upload new version</Link>
                 <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
               </>
             ) : undefined
@@ -73,29 +73,29 @@ export default function ExampleDetailPage() {
           <ListLoading>Loading…</ListLoading>
         ) : example ? (
           <ScrollArea>
-            <div className="bg-white border border-gray-200 rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+            <div className="bg-surface border border-rule rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <div>
-                <dt className="text-gray-500">Directory</dt>
-                <dd className="text-gray-900 font-mono">{example.directory}</dd>
+                <dt className="text-muted">Directory</dt>
+                <dd className="text-fg font-mono">{example.directory}</dd>
               </div>
               <div>
-                <dt className="text-gray-500">Repository</dt>
-                <dd className="text-gray-900">
+                <dt className="text-muted">Repository</dt>
+                <dd className="text-fg">
                   {repoId ? <Link href={`/example-repositories/${repoId}`} className="text-blue-600 hover:underline">View repository</Link> : '—'}
                 </dd>
               </div>
               {example.description && (
                 <div className="sm:col-span-2">
-                  <dt className="text-gray-500">Description</dt>
-                  <dd className="text-gray-900">{example.description}</dd>
+                  <dt className="text-muted">Description</dt>
+                  <dd className="text-fg">{example.description}</dd>
                 </div>
               )}
               {(example.tags || []).length > 0 && (
                 <div className="sm:col-span-2">
-                  <dt className="text-gray-500">Tags</dt>
+                  <dt className="text-muted">Tags</dt>
                   <dd className="flex flex-wrap gap-1.5 mt-1">
                     {(example.tags || []).map((t) => (
-                      <span key={t} className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">{t}</span>
+                      <span key={t} className="px-2 py-0.5 text-xs bg-sunken text-muted rounded">{t}</span>
                     ))}
                   </dd>
                 </div>
@@ -103,18 +103,18 @@ export default function ExampleDetailPage() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-3">
-                Versions <span className="text-gray-400 font-normal">({versions.length})</span>
+              <h2 className="text-xl font-semibold text-fg mb-3">
+                Versions <span className="text-subtle font-normal">({versions.length})</span>
               </h2>
               {versions.length === 0 ? (
-                <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-6 text-center">No versions.</div>
+                <div className="text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">No versions.</div>
               ) : (
-                <div className="bg-white border border-gray-200 rounded-lg divide-y">
+                <div className="bg-surface border border-rule rounded-lg divide-y">
                   {versions.map((v) => (
                     <div key={v.id} className="flex items-center justify-between px-4 py-3">
-                      <div className="font-mono text-sm text-gray-900">v{v.version_tag}</div>
-                      <div className="text-sm text-gray-500 truncate flex-1 px-4">{v.title || ''}</div>
-                      <div className="text-xs text-gray-400">{v.created_at ? new Date(v.created_at).toLocaleDateString() : ''}</div>
+                      <div className="font-mono text-sm text-fg">v{v.version_tag}</div>
+                      <div className="text-sm text-muted truncate flex-1 px-4">{v.title || ''}</div>
+                      <div className="text-xs text-subtle">{v.created_at ? new Date(v.created_at).toLocaleDateString() : ''}</div>
                     </div>
                   ))}
                 </div>

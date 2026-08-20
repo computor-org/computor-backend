@@ -80,10 +80,10 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg">
-      <div className="px-6 py-4 border-b border-gray-100">
-        <h2 className="text-base font-semibold text-gray-900">Course memberships</h2>
-        <p className="text-sm text-gray-500 mt-0.5">
+    <div className="bg-surface border border-rule rounded-lg">
+      <div className="px-6 py-4 border-b border-rule-soft">
+        <h2 className="text-base font-semibold text-fg">Course memberships</h2>
+        <p className="text-sm text-muted mt-0.5">
           Enrolling this service in a course grants it that course role&apos;s permissions — the way an
           agent gets access to a specific course. No git repository is provisioned for it.
         </p>
@@ -102,7 +102,7 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
           className="flex flex-wrap items-end gap-3 mb-5"
         >
           <div className="flex-1 min-w-[14rem]">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Course</label>
+            <label className="block text-xs font-medium text-body mb-1">Course</label>
             <select className={inputCls} value={courseId} onChange={(e) => setCourseId(e.target.value)}>
               <option value="">Select a course…</option>
               {available.map((c) => (
@@ -111,7 +111,7 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
+            <label className="block text-xs font-medium text-body mb-1">Role</label>
             <select className={inputCls} value={roleId} onChange={(e) => setRoleId(e.target.value)}>
               {COURSE_ROLES.map((r) => (
                 <option key={r} value={r}>{COURSE_ROLE_LABEL[r] ?? r}</option>
@@ -121,25 +121,25 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
           <button
             type="submit"
             disabled={saving || !courseId}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="px-4 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
             {saving ? 'Adding…' : 'Add to course'}
           </button>
         </form>
 
         {loading ? (
-          <div className="text-sm text-gray-500">Loading…</div>
+          <div className="text-sm text-muted">Loading…</div>
         ) : members.length === 0 ? (
-          <div className="text-sm text-gray-500 border border-dashed border-gray-300 rounded-lg p-6 text-center">
+          <div className="text-sm text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">
             Not enrolled in any course.
           </div>
         ) : (
-          <div className="border border-gray-200 rounded-lg divide-y">
+          <div className="border border-rule rounded-lg divide-y">
             {members.map((m) => (
               <div key={m.id} className="flex items-center justify-between px-4 py-3 gap-4">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-gray-900 truncate">{courseLabel(m.course_id)}</div>
-                  <div className="text-xs text-gray-500">{COURSE_ROLE_LABEL[m.course_role_id] ?? m.course_role_id}</div>
+                  <div className="text-sm font-medium text-fg truncate">{courseLabel(m.course_id)}</div>
+                  <div className="text-xs text-muted">{COURSE_ROLE_LABEL[m.course_role_id] ?? m.course_role_id}</div>
                 </div>
                 <button
                   onClick={() => setConfirmRemove(m)}

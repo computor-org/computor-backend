@@ -30,7 +30,7 @@ const coderClient = new CoderClient();
 function SectionHeading({ title, href, linkLabel }: { title: string; href?: string; linkLabel?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 mb-3">
-      <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+      <h2 className="text-lg font-semibold text-fg">{title}</h2>
       {href && (
         <Link href={href} className="text-sm text-blue-600 hover:underline shrink-0">
           {linkLabel ?? 'View all'}
@@ -126,21 +126,21 @@ export default function DashboardPage() {
               <section>
                 <SectionHeading title="Announcements" href="/notifications" />
                 <Panel padding="none">
-                  <div className="divide-y divide-gray-100">
+                  <div className="divide-y divide-rule-soft">
                     {announcements.map((m) => (
                       <Link
                         key={m.id}
                         href="/notifications"
-                        className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+                        className="flex items-start gap-3 px-4 py-3 hover:bg-canvas transition-colors"
                       >
                         <Badge tone="info" className="shrink-0 mt-0.5">
                           New
                         </Badge>
                         <div className="min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate">
+                          <div className="text-sm font-medium text-fg truncate">
                             {m.title || 'Announcement'}
                           </div>
-                          <div className="text-xs text-gray-500 line-clamp-2">{m.content}</div>
+                          <div className="text-xs text-muted line-clamp-2">{m.content}</div>
                         </div>
                       </Link>
                     ))}
@@ -183,12 +183,12 @@ export default function DashboardPage() {
               <section>
                 <SectionHeading title="Your workspaces" href="/workspaces" />
                 <Panel padding="none">
-                  <div className="divide-y divide-gray-100">
+                  <div className="divide-y divide-rule-soft">
                     {runningWorkspaces.map((ws) => (
                       <div key={ws.id} className="flex items-center gap-3 px-4 py-3">
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium text-gray-900 truncate">{ws.name}</div>
-                          <div className="text-xs text-gray-500 truncate">{ws.template_name}</div>
+                          <div className="text-sm font-medium text-fg truncate">{ws.name}</div>
+                          <div className="text-xs text-muted truncate">{ws.template_name}</div>
                         </div>
                         <WorkspaceStatusBadge
                           status={ws.latest_build_status}

@@ -83,9 +83,9 @@ export default function GitServerEditPage() {
             <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
           </Field>
           <Field label="Type & URL (immutable)">
-            <input value={`${server?.type ?? ''} · ${server?.base_url ?? ''}`} readOnly className={`${inputCls} bg-gray-50 text-gray-500`} />
+            <input value={`${server?.type ?? ''} · ${server?.base_url ?? ''}`} readOnly className={`${inputCls} bg-canvas text-muted`} />
           </Field>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
+          <label className="flex items-center gap-2 text-sm text-body">
             <input type="checkbox" checked={managed} onChange={(e) => setManaged(e.target.checked)} />
             Managed (Computor operates it and holds a service token)
           </label>

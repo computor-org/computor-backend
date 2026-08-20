@@ -39,12 +39,12 @@ export default function Avatar({
   const sizeCls = SIZES[size];
   if (avatarImage) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={avatarImage} alt={name ?? 'avatar'} className={`${sizeCls} rounded-full object-cover bg-gray-100`} />;
+    return <img src={avatarImage} alt={name ?? 'avatar'} className={`${sizeCls} rounded-full object-cover bg-sunken`} />;
   }
   const bg = rgbIntToHex(avatarColor);
   return (
     <div
-      className={`${sizeCls} rounded-full flex items-center justify-center text-white font-medium shrink-0 ${bg ? '' : 'bg-blue-600'}`}
+      className={`${sizeCls} rounded-full flex items-center justify-center text-on-accent font-medium shrink-0 ${bg ? '' : 'bg-blue-600'}`}
       style={bg ? { backgroundColor: bg } : undefined}
     >
       {initials(name, fallback)}

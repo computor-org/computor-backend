@@ -3,7 +3,7 @@
 import type { CourseGroupList } from 'types/generated';
 
 const CELL_CLS =
-  'px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50';
+  'px-2 py-1 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50';
 
 /** Course-group `<select>` (with a "no group" option) for the user-list flow. */
 export default function GroupSelect({

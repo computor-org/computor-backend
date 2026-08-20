@@ -61,7 +61,7 @@ export default function AddCourseMembersPage() {
 
   const tabClass = (active: boolean) =>
     `py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-      active ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+      active ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted hover:text-body'
     }`;
 
   return (
@@ -74,7 +74,7 @@ export default function AddCourseMembersPage() {
         />
 
         {/* Tabs: the two add flows are mutually exclusive, so show one at a time. */}
-        <div className="border-b border-gray-200">
+        <div className="border-b border-rule">
           <nav className="flex gap-6">
             <button type="button" onClick={() => setTab('list')} className={tabClass(tab === 'list')}>
               From user list

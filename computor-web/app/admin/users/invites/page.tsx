@@ -125,7 +125,7 @@ export default function InvitesPage() {
           actions={
             <button
               onClick={() => setCreateModal(m => ({ ...m, open: true }))}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-blue-600 text-on-accent rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
             >
               + New Invite
             </button>
@@ -146,25 +146,25 @@ export default function InvitesPage() {
                   <Th>Expires</Th>
                   <Th>Roles</Th>
                   <Th>Status</Th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">Actions</th>
                 </tr>
               </Thead>
               <Tbody>
                 {invites.map(inv => (
                   <tr key={inv.id}>
                     <td className="px-4 py-3">
-                      <div className="text-sm font-medium text-gray-900">{inv.note || <span className="text-gray-400 italic">No note</span>}</div>
-                      {inv.email && <div className="text-xs text-gray-500">Restricted to: {inv.email}</div>}
+                      <div className="text-sm font-medium text-fg">{inv.note || <span className="text-subtle italic">No note</span>}</div>
+                      {inv.email && <div className="text-xs text-muted">Restricted to: {inv.email}</div>}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{inv.use_count} / {inv.max_uses}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{new Date(inv.expires_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 text-sm text-muted">{inv.use_count} / {inv.max_uses}</td>
+                    <td className="px-4 py-3 text-sm text-muted">{new Date(inv.expires_at).toLocaleDateString()}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
                         {inv.roles && inv.roles.length > 0
                           ? inv.roles.map(r => (
                               <Badge key={r} color="blue">{roleLabel(r)}</Badge>
                             ))
-                          : <span className="text-xs text-gray-400">None</span>
+                          : <span className="text-xs text-subtle">None</span>
                         }
                       </div>
                     </td>
@@ -191,7 +191,7 @@ export default function InvitesPage() {
                 ))}
                 {invites.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">No invite links yet. Create one to get started.</td>
+                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted">No invite links yet. Create one to get started.</td>
                   </tr>
                 )}
               </Tbody>
@@ -209,53 +209,53 @@ export default function InvitesPage() {
               )}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Restrict to email <span className="text-gray-400 font-normal">(optional — leave empty to allow any email)</span>
+                  <label className="block text-xs font-medium text-body mb-1">
+                    Restrict to email <span className="text-subtle font-normal">(optional — leave empty to allow any email)</span>
                   </label>
                   <input
                     type="email"
                     placeholder="student@example.com"
                     value={createModal.email}
                     onChange={e => setCreateModal(m => ({ ...m, email: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Expires in (days)</label>
+                    <label className="block text-xs font-medium text-body mb-1">Expires in (days)</label>
                     <input
                       type="number"
                       min={1}
                       max={365}
                       value={createModal.expiresInDays}
                       onChange={e => setCreateModal(m => ({ ...m, expiresInDays: parseInt(e.target.value) || 7 }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Max uses</label>
+                    <label className="block text-xs font-medium text-body mb-1">Max uses</label>
                     <input
                       type="number"
                       min={1}
                       max={100}
                       value={createModal.maxUses}
                       onChange={e => setCreateModal(m => ({ ...m, maxUses: parseInt(e.target.value) || 1 }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Note <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <label className="block text-xs font-medium text-body mb-1">Note <span className="text-subtle font-normal">(optional)</span></label>
                   <input
                     type="text"
                     placeholder="e.g. WS2024 students"
                     value={createModal.note}
                     onChange={e => setCreateModal(m => ({ ...m, note: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-2">Auto-assign roles on acceptance</label>
+                  <label className="block text-xs font-medium text-body mb-2">Auto-assign roles on acceptance</label>
                   <SystemRoleCheckboxes
                     selected={createModal.roles}
                     onToggle={roleId => setCreateModal(m => ({
@@ -266,17 +266,17 @@ export default function InvitesPage() {
                 </div>
               </div>
             </div>
-            <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end gap-2">
+            <div className="px-6 py-4 bg-canvas rounded-b-lg flex justify-end gap-2">
               <button
                 onClick={() => setCreateModal(m => ({ ...m, open: false, error: null }))}
-                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+                className="px-4 py-2 text-sm text-muted hover:bg-sunken rounded-lg"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreate}
                 disabled={createModal.saving}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm bg-blue-600 text-on-accent rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
                 {createModal.saving ? 'Creating…' : 'Create Invite'}
               </button>

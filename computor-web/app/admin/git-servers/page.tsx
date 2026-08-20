@@ -33,7 +33,7 @@ export default function GitServersPage() {
           title="Git servers"
           subtitle="The registry of git instances courses can bind to. Managed instances hold a service token used for babysat student-repo provisioning."
           actions={
-            <Link href="/admin/git-servers/create" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+            <Link href="/admin/git-servers/create" className="px-4 py-2 bg-blue-600 text-on-accent rounded-lg text-sm font-medium hover:bg-blue-700">
               Register Server
             </Link>
           }
@@ -44,21 +44,21 @@ export default function GitServersPage() {
         {loading ? (
           <ListLoading>Loading…</ListLoading>
         ) : servers.length === 0 ? (
-          <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">
+          <div className="text-muted border border-dashed border-rule-strong rounded-lg p-8 text-center">
             No git servers registered yet — register one (e.g. your Forgejo) to enable babysat provisioning.
           </div>
         ) : (
           <ScrollArea spacing="rows">
             {servers.map((s) => (
-              <Link key={s.id} href={`/admin/git-servers/${s.id}`} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-sm transition-all">
+              <Link key={s.id} href={`/admin/git-servers/${s.id}`} className="flex items-center justify-between bg-surface border border-rule rounded-lg p-4 hover:border-blue-500 hover:shadow-sm transition-all">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-gray-900 truncate">{s.name || s.base_url}</div>
-                  <div className="text-xs text-gray-500">{s.type} · {s.base_url}</div>
+                  <div className="text-sm font-medium text-fg truncate">{s.name || s.base_url}</div>
+                  <div className="text-xs text-muted">{s.type} · {s.base_url}</div>
                 </div>
                 <div className="flex items-center gap-3 ml-4">
                   {s.managed && <Badge color="green">managed</Badge>}
                   <Badge color={s.has_token ? 'blue' : 'gray'}>{s.has_token ? 'token set' : 'no token'}</Badge>
-                  <span className="text-gray-300">›</span>
+                  <span className="text-faint">›</span>
                 </div>
               </Link>
             ))}

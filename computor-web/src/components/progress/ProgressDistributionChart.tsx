@@ -20,8 +20,8 @@ export default function ProgressDistributionChart({ students }: ProgressDistribu
   }));
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-5">
-      <h3 className="text-sm font-semibold text-gray-900 mb-4">Progress Distribution</h3>
+    <div className="bg-surface rounded-lg border border-rule p-5">
+      <h3 className="text-sm font-semibold text-fg mb-4">Progress Distribution</h3>
       <div className="h-52">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>

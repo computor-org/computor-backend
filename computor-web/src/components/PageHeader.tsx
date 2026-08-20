@@ -23,8 +23,8 @@ export default function PageHeader({
       <Breadcrumbs items={breadcrumbs} />
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
-          {subtitle != null && <div className="mt-1 text-gray-600">{subtitle}</div>}
+          <h1 className="text-3xl font-bold text-fg">{title}</h1>
+          {subtitle != null && <div className="mt-1 text-muted">{subtitle}</div>}
         </div>
         {actions != null && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
       </div>

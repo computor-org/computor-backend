@@ -28,11 +28,11 @@ export default function SectionCard({
   return (
     <Panel className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        <h2 className="text-lg font-semibold text-fg">{title}</h2>
         {action}
       </div>
       {note && (
-        <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded p-2.5">{note}</p>
+        <p className="text-xs text-muted bg-canvas border border-rule rounded p-2.5">{note}</p>
       )}
       {children}
     </Panel>
@@ -42,10 +42,10 @@ export default function SectionCard({
 /** Muted status text shown beside a section's save button. */
 export function SectionStatus({ children }: { children: ReactNode }) {
   if (!children) return null;
-  return <span className="text-sm text-gray-500">{children}</span>;
+  return <span className="text-sm text-muted">{children}</span>;
 }
 
 /** Muted explanatory line inside a section body. */
 export function SectionHint({ children }: { children: ReactNode }) {
-  return <p className="text-sm text-gray-500">{children}</p>;
+  return <p className="text-sm text-muted">{children}</p>;
 }

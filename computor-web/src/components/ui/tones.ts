@@ -18,7 +18,7 @@ export const TONE_CHIP_CLS: Record<Tone, string> = {
   warning: 'bg-yellow-100 text-yellow-800',
   error: 'bg-red-100 text-red-800',
   info: 'bg-blue-100 text-blue-800',
-  muted: 'bg-gray-100 text-gray-700',
+  muted: 'bg-sunken text-body',
 };
 
 /** Foreground only, for a number or a word sitting on a plain panel. */
@@ -27,5 +27,5 @@ export const TONE_TEXT_CLS: Record<Tone, string> = {
   warning: 'text-amber-700',
   error: 'text-red-700',
   info: 'text-blue-700',
-  muted: 'text-gray-900',
+  muted: 'text-fg',
 };

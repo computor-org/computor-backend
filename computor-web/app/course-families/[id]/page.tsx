@@ -50,11 +50,11 @@ export default function CourseFamilyDetailPage() {
           actions={
             <>
               {mayCreateCourse && (
-                <Link href={`/courses/create?familyId=${familyId}`} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">New course</Link>
+                <Link href={`/courses/create?familyId=${familyId}`} className="px-3 py-2 bg-blue-600 text-on-accent rounded-lg text-sm font-medium hover:bg-blue-700">New course</Link>
               )}
               {family && canManage && (
                 <>
-                  <Link href={`/course-families/${familyId}/edit`} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Edit</Link>
+                  <Link href={`/course-families/${familyId}/edit`} className="px-3 py-2 text-sm font-medium text-body border border-rule-strong rounded-lg hover:bg-canvas">Edit</Link>
                   <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
                 </>
               )}
@@ -69,24 +69,24 @@ export default function CourseFamilyDetailPage() {
         ) : (
           <ScrollArea>
             {family?.description && (
-              <div className="bg-white border border-gray-200 rounded-lg p-5">
-                <p className="text-gray-700">{family.description}</p>
+              <div className="bg-surface border border-rule rounded-lg p-5">
+                <p className="text-body">{family.description}</p>
               </div>
             )}
 
-            <h2 className="text-xl font-semibold text-gray-900">
-              Courses <span className="text-gray-400 font-normal">({courses.length})</span>
+            <h2 className="text-xl font-semibold text-fg">
+              Courses <span className="text-subtle font-normal">({courses.length})</span>
             </h2>
             {courses.length === 0 ? (
-              <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">No courses in this family yet.</div>
+              <div className="text-muted border border-dashed border-rule-strong rounded-lg p-8 text-center">No courses in this family yet.</div>
             ) : (
-              <div className="bg-white border border-gray-200 rounded-lg divide-y">
+              <div className="bg-surface border border-rule rounded-lg divide-y">
                 {courses.map((c) => (
-                  <Link key={c.id} href={`/courses/${c.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
+                  <Link key={c.id} href={`/courses/${c.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-canvas">
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-gray-900 truncate">{displayName(c, 'Untitled Course')}</div>
+                      <div className="text-sm font-medium text-fg truncate">{displayName(c, 'Untitled Course')}</div>
                     </div>
-                    <span className="text-gray-300">›</span>
+                    <span className="text-faint">›</span>
                   </Link>
                 ))}
               </div>

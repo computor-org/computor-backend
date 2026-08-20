@@ -36,7 +36,7 @@ const CLAIM_COLORS: Record<string, string> = {
 
 function claimColor(value: string) {
   const resource = value.split(':')[0];
-  return CLAIM_COLORS[resource] ?? 'bg-gray-100 text-gray-700';
+  return CLAIM_COLORS[resource] ?? 'bg-sunken text-body';
 }
 
 function ClaimChip({ claim }: { claim: RoleClaimList }) {
@@ -221,20 +221,20 @@ export default function RolesPage() {
           subtitle={`${roles.length} roles`}
         />
 
-        <div className="flex-1 min-h-0 flex overflow-hidden rounded-lg border border-gray-200 bg-white">
+        <div className="flex-1 min-h-0 flex overflow-hidden rounded-lg border border-rule bg-surface">
 
         {/* Left panel — role list */}
-        <div className="w-72 shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col">
+        <div className="w-72 shrink-0 border-r border-rule bg-canvas flex flex-col">
           <div className="flex-1 overflow-y-auto scroll-slim">
             {rolesLoading ? (
-              <div className="p-4 text-sm text-gray-400">Loading…</div>
+              <div className="p-4 text-sm text-subtle">Loading…</div>
             ) : rolesError ? (
               <div className="p-4 text-sm text-red-500">{rolesError}</div>
             ) : (
               <>
                 {/* Builtin roles */}
                 <div className="px-3 pt-3 pb-1">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">System</p>
+                  <p className="text-xs font-semibold text-subtle uppercase tracking-wider">System</p>
                 </div>
                 {roles.filter(r => r.builtin).map(r => (
                   <RoleRow key={r.id} role={r} selected={r.id === selectedRoleId} onClick={() => handleSelectRole(r.id)} />
@@ -244,7 +244,7 @@ export default function RolesPage() {
                 {roles.some(r => !r.builtin) && (
                   <>
                     <div className="px-3 pt-4 pb-1">
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Custom</p>
+                      <p className="text-xs font-semibold text-subtle uppercase tracking-wider">Custom</p>
                     </div>
                     {roles.filter(r => !r.builtin).map(r => (
                       <RoleRow key={r.id} role={r} selected={r.id === selectedRoleId} onClick={() => handleSelectRole(r.id)} />
@@ -259,11 +259,11 @@ export default function RolesPage() {
         {/* Right panel — role detail */}
         <div className="flex-1 overflow-y-auto scroll-slim">
           {!selectedRoleId ? (
-            <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+            <div className="flex items-center justify-center h-full text-subtle text-sm">
               Select a role to view its claims and members
             </div>
           ) : detailLoading ? (
-            <div className="p-8 text-gray-400 text-sm">Loading…</div>
+            <div className="p-8 text-subtle text-sm">Loading…</div>
           ) : detailError ? (
             <div className="p-8 text-red-500 text-sm">{detailError}</div>
           ) : roleDetail ? (
@@ -272,30 +272,30 @@ export default function RolesPage() {
               {/* Role header */}
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <h2 className="text-xl font-semibold text-gray-900">{roleDetail.title ?? roleDetail.id}</h2>
+                  <h2 className="text-xl font-semibold text-fg">{roleDetail.title ?? roleDetail.id}</h2>
                   <RoleBadge role={roleDetail} />
                   {roleDetail.builtin && (
-                    <span className="text-xs text-gray-400 italic">built-in</span>
+                    <span className="text-xs text-subtle italic">built-in</span>
                   )}
                 </div>
                 {roleDetail.description && (
-                  <p className="text-sm text-gray-600">{roleDetail.description}</p>
+                  <p className="text-sm text-muted">{roleDetail.description}</p>
                 )}
               </div>
 
               {/* Claims */}
               <section>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                <h3 className="text-sm font-semibold text-body mb-3">
                   Claims
-                  <span className="ml-2 text-xs font-normal text-gray-400">({claims.length} total — read-only)</span>
+                  <span className="ml-2 text-xs font-normal text-subtle">({claims.length} total — read-only)</span>
                 </h3>
                 {claims.length === 0 ? (
-                  <p className="text-sm text-gray-400 italic">No claims defined for this role.</p>
+                  <p className="text-sm text-subtle italic">No claims defined for this role.</p>
                 ) : (
                   <div className="space-y-3">
                     {Object.entries(claimsByType).sort().map(([type, typeClaims]) => (
                       <div key={type}>
-                        <p className="text-xs text-gray-400 mb-1.5">{type}</p>
+                        <p className="text-xs text-subtle mb-1.5">{type}</p>
                         <div className="flex flex-wrap gap-1.5">
                           {typeClaims
                             .slice()
@@ -312,23 +312,23 @@ export default function RolesPage() {
 
               {/* Members */}
               <section>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                <h3 className="text-sm font-semibold text-body mb-3">
                   Members
-                  <span className="ml-2 text-xs font-normal text-gray-400">({members.length})</span>
+                  <span className="ml-2 text-xs font-normal text-subtle">({members.length})</span>
                 </h3>
 
                 {members.length === 0 ? (
-                  <p className="text-sm text-gray-400 italic mb-3">No users have this role.</p>
+                  <p className="text-sm text-subtle italic mb-3">No users have this role.</p>
                 ) : (
                   <div className="mb-4 space-y-1">
                     {members.map(m => {
                       const u = userMap.get(m.user_id);
                       const canRemove = isAdmin || roleDetail.id !== '_admin';
                       return (
-                        <div key={m.user_id} className="flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg">
+                        <div key={m.user_id} className="flex items-center justify-between px-3 py-2 bg-surface border border-rule rounded-lg">
                           <div>
-                            <span className="text-sm font-medium text-gray-900">{u?.email ?? m.user_id}</span>
-                            {u?.given_name && <span className="ml-2 text-xs text-gray-400">{u.given_name} {u.family_name}</span>}
+                            <span className="text-sm font-medium text-fg">{u?.email ?? m.user_id}</span>
+                            {u?.given_name && <span className="ml-2 text-xs text-subtle">{u.given_name} {u.family_name}</span>}
                           </div>
                           {canRemove && (
                             <button
@@ -347,24 +347,24 @@ export default function RolesPage() {
                 {/* Add member — blocked for _admin role for non-admins */}
                 {(isAdmin || roleDetail.id !== '_admin') && (
                   <div className="relative">
-                    <p className="text-xs font-medium text-gray-600 mb-1.5">Add user to role</p>
+                    <p className="text-xs font-medium text-muted mb-1.5">Add user to role</p>
                     <input
                       type="text"
                       placeholder="Search by email or name…"
                       value={addSearch}
                       onChange={e => { setAddSearch(e.target.value); setAddUserId(''); }}
-                      className="w-full max-w-sm px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full max-w-sm px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                     {addSearch && addCandidates.length > 0 && !addUserId && (
-                      <div className="absolute z-10 mt-1 w-full max-w-sm bg-white border border-gray-200 rounded-lg shadow-lg">
+                      <div className="absolute z-10 mt-1 w-full max-w-sm bg-surface border border-rule rounded-lg shadow-lg">
                         {addCandidates.map(u => (
                           <button
                             key={u.id}
                             onClick={() => { setAddUserId(u.id); setAddSearch(u.email ?? u.id); }}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center justify-between"
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-canvas flex items-center justify-between"
                           >
-                            <span className="font-medium text-gray-900">{u.email}</span>
-                            <span className="text-xs text-gray-400">{u.given_name} {u.family_name}</span>
+                            <span className="font-medium text-fg">{u.email}</span>
+                            <span className="text-xs text-subtle">{u.given_name} {u.family_name}</span>
                           </button>
                         ))}
                       </div>
@@ -373,18 +373,18 @@ export default function RolesPage() {
                       <button
                         onClick={handleAddMember}
                         disabled={addingMember}
-                        className="mt-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                        className="mt-2 px-4 py-2 text-sm bg-blue-600 text-on-accent rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                       >
                         {addingMember ? 'Adding…' : 'Add'}
                       </button>
                     )}
                     {addSearch && addCandidates.length === 0 && !addUserId && pickerQuery === addSearch.trim() && (
-                      <p className="mt-1 text-xs text-gray-400">No matching users found.</p>
+                      <p className="mt-1 text-xs text-subtle">No matching users found.</p>
                     )}
                   </div>
                 )}
                 {!isAdmin && roleDetail.id === '_admin' && (
-                  <p className="text-xs text-gray-400 italic">Only admins can modify _admin role membership.</p>
+                  <p className="text-xs text-subtle italic">Only admins can modify _admin role membership.</p>
                 )}
               </section>
 
@@ -411,11 +411,11 @@ function RoleRow({ role, selected, onClick }: { role: RoleList; selected: boolea
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left px-3 py-2.5 flex items-start gap-2 transition-colors ${selected ? 'bg-blue-50 border-r-2 border-blue-500' : 'hover:bg-gray-100'}`}
+      className={`w-full text-left px-3 py-2.5 flex items-start gap-2 transition-colors ${selected ? 'bg-blue-50 border-r-2 border-blue-500' : 'hover:bg-sunken'}`}
     >
       <div className="min-w-0">
-        <div className="text-xs font-mono font-medium text-gray-800 truncate">{role.id}</div>
-        {role.title && <div className="text-xs text-gray-500 truncate mt-0.5">{role.title}</div>}
+        <div className="text-xs font-mono font-medium text-fg truncate">{role.id}</div>
+        {role.title && <div className="text-xs text-muted truncate mt-0.5">{role.title}</div>}
       </div>
     </button>
   );

@@ -27,7 +27,7 @@ const onServer = () => false;
  */
 export default function Modal({
   title,
-  titleClassName = 'text-lg font-semibold text-gray-900',
+  titleClassName = 'text-lg font-semibold text-fg',
   onClose,
   children,
   maxWidth = 'max-w-md',
@@ -104,7 +104,7 @@ export default function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`relative bg-white rounded-lg shadow-xl w-full mx-4 ${maxWidth}`}
+        className={`relative bg-surface rounded-lg shadow-xl w-full mx-4 ${maxWidth}`}
       >
         <h2 id={titleId} className={`${titleClassName} px-6 pt-6`}>
           {title}

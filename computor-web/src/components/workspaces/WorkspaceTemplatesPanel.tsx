@@ -150,7 +150,7 @@ export default function WorkspaceTemplatesPanel() {
       <ErrorBanner>{error}</ErrorBanner>
 
       <div className="shrink-0 space-y-2">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted">
           Every workspace template this deployment ships. A template is offered to users once it
           is <span className="font-medium">deployed</span> (its image is built and pushed to
           Coder) and <span className="font-medium">enabled</span>; disabling one hides it from
@@ -173,10 +173,10 @@ export default function WorkspaceTemplatesPanel() {
       */}
       {nothingDeployed && !activeTask && (
         <div className="shrink-0 rounded-lg border border-blue-200 bg-blue-50 p-4">
-          <h3 className="text-sm font-semibold text-gray-900">
+          <h3 className="text-sm font-semibold text-fg">
             No workspace templates are deployed yet
           </h3>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 text-sm text-muted">
             Pick the ones this deployment should offer and deploy them — each builds a
             container image, which takes a few minutes and a few gigabytes, so it is worth
             choosing only what you need. You can come back and deploy more at any time.
@@ -214,7 +214,7 @@ export default function WorkspaceTemplatesPanel() {
             Deploy all ({deployable.length})
           </Button>
           {activeTask && (
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-muted">
               A build is already running — wait for it to finish.
             </span>
           )}
@@ -261,7 +261,7 @@ export default function WorkspaceTemplatesPanel() {
                 const state = availability(template);
                 const dimmed = !template.deployed || !template.enabled;
                 return (
-                  <Tr key={template.name} className={`hover:bg-gray-50 ${dimmed ? 'opacity-70' : ''}`}>
+                  <Tr key={template.name} className={`hover:bg-canvas ${dimmed ? 'opacity-70' : ''}`}>
                     <Td>
                       {/* Only undeployed templates are deploy targets, so only
                           they are selectable — the rest have no action here. */}
@@ -278,12 +278,12 @@ export default function WorkspaceTemplatesPanel() {
                       <div className="flex items-start gap-3">
                         <TemplateIcon template={template} size="sm" />
                         <div className="min-w-0">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-fg">
                             {template.display_name || template.name}
                           </div>
-                          <div className="text-xs text-gray-500">{template.name}</div>
+                          <div className="text-xs text-muted">{template.name}</div>
                           {template.description && (
-                            <div className="text-xs text-gray-400 mt-0.5 max-w-md">
+                            <div className="text-xs text-subtle mt-0.5 max-w-md">
                               {template.description}
                             </div>
                           )}
@@ -299,7 +299,7 @@ export default function WorkspaceTemplatesPanel() {
                           </Badge>
                         )}
                         {!template.dir_name && (
-                          <span className="text-xs text-gray-400">no template directory</span>
+                          <span className="text-xs text-subtle">no template directory</span>
                         )}
                       </div>
                     </Td>
@@ -319,21 +319,21 @@ export default function WorkspaceTemplatesPanel() {
                         />
                       ) : (
                         <span
-                          className="text-sm text-gray-400"
+                          className="text-sm text-subtle"
                           title="Deploy the template before it can be offered to users"
                         >
                           —
                         </span>
                       )}
                     </Td>
-                    <Td className="text-sm text-gray-700">{template.workspace_count}</Td>
-                    <Td className="text-sm text-gray-700">
+                    <Td className="text-sm text-body">{template.workspace_count}</Td>
+                    <Td className="text-sm text-body">
                       {settings?.memory_mb ? `${settings.memory_mb} MiB` : 'Unlimited'}
                     </Td>
-                    <Td className="text-sm text-gray-700">
+                    <Td className="text-sm text-body">
                       {settings?.cpu_shares ? settings.cpu_shares : 'Default'}
                     </Td>
-                    <Td className="text-sm text-gray-700">
+                    <Td className="text-sm text-body">
                       {template.running_workspace_count} / {settings?.max_running_workspaces ?? '∞'}
                     </Td>
                     <Td>
@@ -368,7 +368,7 @@ export default function WorkspaceTemplatesPanel() {
               })}
               {templates.length === 0 && (
                 <Tr>
-                  <Td colSpan={9} className="py-8 text-center text-sm text-gray-500">
+                  <Td colSpan={9} className="py-8 text-center text-sm text-muted">
                     No templates.
                   </Td>
                 </Tr>

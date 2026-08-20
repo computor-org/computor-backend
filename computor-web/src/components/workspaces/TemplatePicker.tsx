@@ -35,7 +35,7 @@ export default function TemplatePicker({
 
   if (templates.length === 0) {
     return (
-      <div className="text-sm text-gray-500 space-y-1">
+      <div className="text-sm text-muted space-y-1">
         <p>No templates available — Coder may still be initializing.</p>
         {emptyHint}
       </div>
@@ -84,16 +84,16 @@ export default function TemplatePicker({
             className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
               selected
                 ? 'border-blue-600 ring-1 ring-blue-600 bg-blue-50/50'
-                : 'border-gray-200 bg-white hover:border-gray-300'
+                : 'border-rule bg-surface hover:border-rule-strong'
             }`}
           >
             <TemplateIcon template={t} />
             <span className="min-w-0">
-              <span className="block text-sm font-semibold text-gray-900">
+              <span className="block text-sm font-semibold text-fg">
                 {t.display_name || t.name}
               </span>
               {t.description && (
-                <span className="mt-0.5 block text-xs text-gray-500">{t.description}</span>
+                <span className="mt-0.5 block text-xs text-muted">{t.description}</span>
               )}
             </span>
           </button>

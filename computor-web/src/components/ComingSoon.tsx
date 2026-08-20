@@ -34,7 +34,7 @@ export default function ComingSoon({
       <div className="min-h-[60vh] flex items-center justify-center p-6">
         <div className="max-w-md w-full text-center space-y-4">
           <div className="flex justify-center" aria-hidden="true">
-            <svg className="h-16 w-16 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-16 w-16 text-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -45,9 +45,9 @@ export default function ComingSoon({
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Coming soon</p>
-            <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-            {message && <p className="text-gray-600">{message}</p>}
+            <p className="text-xs font-medium uppercase tracking-wider text-subtle">Coming soon</p>
+            <h1 className="text-2xl font-bold text-fg">{title}</h1>
+            {message && <p className="text-muted">{message}</p>}
           </div>
 
           {children}

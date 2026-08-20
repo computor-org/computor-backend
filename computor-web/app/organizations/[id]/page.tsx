@@ -47,11 +47,11 @@ export default function OrganizationDetailPage() {
         <PageHeader
           breadcrumbs={[{ label: 'Organizations', href: '/organizations' }, { label: orgName }]}
           title={orgName}
-          subtitle={org && <span className="text-sm text-gray-500">{org.organization_type}</span>}
+          subtitle={org && <span className="text-sm text-muted">{org.organization_type}</span>}
           actions={
             org && canManage ? (
               <>
-                <Link href={`/organizations/${org.id}/edit`} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Edit</Link>
+                <Link href={`/organizations/${org.id}/edit`} className="px-3 py-2 text-sm font-medium text-body border border-rule-strong rounded-lg hover:bg-canvas">Edit</Link>
                 <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
               </>
             ) : undefined
@@ -65,30 +65,30 @@ export default function OrganizationDetailPage() {
         ) : org ? (
           <ScrollArea>
             {org.description && (
-              <div className="bg-white border border-gray-200 rounded-lg p-5">
-                <p className="text-gray-700">{org.description}</p>
+              <div className="bg-surface border border-rule rounded-lg p-5">
+                <p className="text-body">{org.description}</p>
               </div>
             )}
 
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xl font-semibold text-gray-900">
-                  Course Families <span className="text-gray-400 font-normal">({families.length})</span>
+                <h2 className="text-xl font-semibold text-fg">
+                  Course Families <span className="text-subtle font-normal">({families.length})</span>
                 </h2>
                 {canCreateCourseFamily(orgId) && (
                   <Link href={`/course-families/create?organization_id=${orgId}`} className="text-sm text-blue-600 hover:underline">New course family</Link>
                 )}
               </div>
               {families.length === 0 ? (
-                <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">No course families yet.</div>
+                <div className="text-muted border border-dashed border-rule-strong rounded-lg p-8 text-center">No course families yet.</div>
               ) : (
-                <div className="bg-white border border-gray-200 rounded-lg divide-y">
+                <div className="bg-surface border border-rule rounded-lg divide-y">
                   {families.map((f) => (
-                    <Link key={f.id} href={`/course-families/${f.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
+                    <Link key={f.id} href={`/course-families/${f.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-canvas">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-gray-900 truncate">{displayName(f, 'Untitled Course Family')}</div>
+                        <div className="text-sm font-medium text-fg truncate">{displayName(f, 'Untitled Course Family')}</div>
                       </div>
-                      <span className="text-gray-300">›</span>
+                      <span className="text-faint">›</span>
                     </Link>
                   ))}
                 </div>

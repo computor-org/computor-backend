@@ -34,7 +34,7 @@ export default function CourseCard({
   const body = (
     <>
       <div className="flex items-start justify-between mb-4 gap-2">
-        <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
+        <h3 className="text-lg font-semibold text-fg line-clamp-2">
           {displayName(course, 'Untitled Course')}
         </h3>
         {badge ?? (role && <Badge color="blue" className="shrink-0">{role}</Badge>)}
@@ -42,11 +42,11 @@ export default function CourseCard({
 
       <div className="space-y-2 mb-4 flex-grow">
         {course.description && (
-          <p className="text-sm leading-6 text-gray-600 line-clamp-3">{course.description}</p>
+          <p className="text-sm leading-6 text-muted line-clamp-3">{course.description}</p>
         )}
         {course.language_code && (
-          <div className="flex items-center text-sm text-gray-600">
-            <svg className="h-4 w-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="flex items-center text-sm text-muted">
+            <svg className="h-4 w-4 mr-2 text-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
             </svg>
             <span className="uppercase">{course.language_code}</span>
@@ -57,7 +57,7 @@ export default function CourseCard({
   );
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-all h-full flex flex-col">
+    <div className="bg-surface rounded-lg border border-rule p-6 hover:shadow-lg transition-all h-full flex flex-col">
       {href ? (
         // The launch buttons live OUTSIDE the Link: nesting them in the anchor
         // would both be invalid HTML and still navigate the card on an icon click.
@@ -73,7 +73,7 @@ export default function CourseCard({
       {role && <CourseWorkspaceLaunchButtons courseId={course.id} compact className="mb-4" />}
 
       {footer && (
-        <div className="flex items-center justify-end pt-4 border-t border-gray-200 mt-auto gap-3">
+        <div className="flex items-center justify-end pt-4 border-t border-rule mt-auto gap-3">
           {footer}
         </div>
       )}
@@ -99,10 +99,10 @@ export function ViewCourseLink({ courseId }: { courseId: string }) {
 /** Skeleton tile shown while a grid of cards is loading. */
 export function CourseCardSkeleton() {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
-      <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
-      <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
-      <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+    <div className="bg-surface rounded-lg border border-rule p-6 animate-pulse">
+      <div className="h-6 bg-sunken rounded w-3/4 mb-4"></div>
+      <div className="h-4 bg-sunken rounded w-full mb-2"></div>
+      <div className="h-4 bg-sunken rounded w-2/3"></div>
     </div>
   );
 }

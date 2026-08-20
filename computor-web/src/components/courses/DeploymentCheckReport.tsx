@@ -19,7 +19,7 @@ export function warningText(w: CourseDeployWarning): string {
 }
 
 const BOX = 'mt-2 rounded-md border p-3 text-xs space-y-1';
-const NEUTRAL = 'border-gray-200 bg-gray-50';
+const NEUTRAL = 'border-rule bg-canvas';
 
 /**
  * Verdict of the automatic validate pass, shown under the file field. It is the
@@ -81,7 +81,7 @@ function Verdict({
 }): ReactNode {
   if (status === 'waiting') {
     return (
-      <div className={`${BOX} ${NEUTRAL} text-gray-500`}>
+      <div className={`${BOX} ${NEUTRAL} text-muted`}>
         Select a course family above — the file is then checked automatically.
       </div>
     );
@@ -89,7 +89,7 @@ function Verdict({
 
   if (status === 'checking') {
     return (
-      <div className={`${BOX} ${NEUTRAL} flex items-center gap-2 text-gray-500`}>
+      <div className={`${BOX} ${NEUTRAL} flex items-center gap-2 text-muted`}>
         <Spinner size="sm" label="Checking the file" />
         Checking the file…
       </div>
@@ -125,11 +125,11 @@ function Verdict({
 
   return (
     <div className={`${BOX} ${tone}`}>
-      <div className="text-gray-700">
+      <div className="text-body">
         <span className="font-medium">{result.course_title || result.course_path}</span>{' '}
-        <span className="font-mono text-gray-500">({result.course_path})</span>
+        <span className="font-mono text-muted">({result.course_path})</span>
       </div>
-      <div className="text-gray-500">
+      <div className="text-muted">
         {s.content_types ?? 0} content types · {s.units ?? 0} units · {s.assignments ?? 0} assignments ·{' '}
         {s.examples_assigned ?? 0} examples
       </div>

@@ -26,13 +26,13 @@ export default function TemplateTaskProgress({ task }: { task: TaskInfo }) {
     || progress?.operation_status === 'completed';
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3" aria-live="polite">
+    <div className="rounded-lg border border-rule bg-canvas p-4 space-y-3" aria-live="polite">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-medium text-gray-900">
+          <p className="text-sm font-medium text-fg">
             {taskLabel(task.task_name)} · {phaseLabel(progress?.phase)}
           </p>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-xs text-muted mt-0.5">
             {completed} / {total} templates
             {progress?.image_tag ? ` · ${progress.image_tag}` : ''}
             {task.duration ? ` · ${task.duration}` : ''}
@@ -49,13 +49,13 @@ export default function TemplateTaskProgress({ task }: { task: TaskInfo }) {
         twice, in the same colour.
       */}
       {templates.length > 0 && (
-        <ul role="list" className="divide-y divide-gray-200 rounded-md border border-gray-200 bg-white">
+        <ul role="list" className="divide-y divide-rule rounded-md border border-rule bg-surface">
           {templates.map((template) => {
             const stage = templateTaskStage(template, task.task_name);
             return (
               <li key={template.key} className="px-3 py-2.5">
                 <div className="flex items-center gap-3">
-                  <span className="w-40 shrink-0 truncate text-sm text-gray-800" title={template.name}>
+                  <span className="w-40 shrink-0 truncate text-sm text-fg" title={template.name}>
                     {template.display_name || template.name}
                   </span>
                   <div className="flex-1 min-w-0">
@@ -79,7 +79,7 @@ export default function TemplateTaskProgress({ task }: { task: TaskInfo }) {
                     className={`w-40 shrink-0 text-right text-xs ${
                       stage.tone === 'red' ? 'text-red-700'
                       : stage.tone === 'green' ? 'text-green-700'
-                      : 'text-gray-500'
+                      : 'text-muted'
                     }`}
                   >
                     {stage.label}
@@ -92,7 +92,7 @@ export default function TemplateTaskProgress({ task }: { task: TaskInfo }) {
                   extensions used to ship unnoticed.
                 */}
                 {template.source_revisions && Object.keys(template.source_revisions).length > 0 && (
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-muted">
                     {Object.entries(template.source_revisions).map(([arg, sha]) => (
                       <span key={arg} className="mr-3 font-mono" title={`${arg}=${sha}`}>
                         {sha.slice(0, 10)}

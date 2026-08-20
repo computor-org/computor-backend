@@ -330,8 +330,8 @@ function CreateInner() {
         )}
 
         {hasFile && canConfigureGit && (
-          <div className="border-t border-gray-200 pt-4">
-            <p className="text-xs text-gray-500">
+          <div className="border-t border-rule pt-4">
+            <p className="text-xs text-muted">
               Git is configured by the uploaded file&apos;s <code className="font-mono">git:</code> block
               (or left unbound if it has none — you can set it later on the course&apos;s edit page).
             </p>
@@ -339,8 +339,8 @@ function CreateInner() {
         )}
 
         {!hasFile && canConfigureGit && servers.length > 0 && (
-          <div className="border-t border-gray-200 pt-4 space-y-3">
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <div className="border-t border-rule pt-4 space-y-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-body">
               <input type="checkbox" checked={gitEnabled} onChange={(e) => setGitEnabled(e.target.checked)} />
               Set up git now
             </label>
@@ -372,21 +372,21 @@ function CreateInner() {
                 <Field label="Student-repo modes">
                   <div className="flex flex-wrap gap-3">
                     {ALL_MODES.map((m) => (
-                      <label key={m} className="flex items-center gap-1.5 text-sm text-gray-700">
+                      <label key={m} className="flex items-center gap-1.5 text-sm text-body">
                         <input type="checkbox" checked={modes.includes(m)} onChange={() => toggleMode(m)} />
                         {MODE_LABELS[m] ?? m}
                       </label>
                     ))}
                   </div>
                 </Field>
-                <p className="text-xs text-gray-400">For a managed server (Forgejo or GitLab) the course template repo is created automatically.</p>
+                <p className="text-xs text-subtle">For a managed server (Forgejo or GitLab) the course template repo is created automatically.</p>
               </>
             )}
           </div>
         )}
 
         {canConfigureGit && (
-          <label className="flex items-center gap-2 border-t border-gray-200 pt-4 text-sm text-gray-700">
+          <label className="flex items-center gap-2 border-t border-rule pt-4 text-sm text-body">
             <input type="checkbox" checked={deployNow} onChange={(e) => setDeployNow(e.target.checked)} />
             Deploy assignments now — push them into the template repo once the course is created
           </label>

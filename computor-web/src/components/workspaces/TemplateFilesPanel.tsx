@@ -80,11 +80,11 @@ export default function TemplateFilesPanel({ templateName }: { templateName: str
     <>
       <ErrorBanner>{error}</ErrorBanner>
 
-      <div className="shrink-0 bg-white rounded-lg border border-gray-200 p-5 space-y-4">
+      <div className="shrink-0 bg-surface rounded-lg border border-rule p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Template files</h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <h2 className="text-lg font-semibold text-fg">Template files</h2>
+            <p className="text-sm text-muted mt-1">
               Raw editing of the deployed Terraform files. Saved .tf files are syntax-checked;
               the real gate stays the terraform plan run by the next template push.
             </p>
@@ -115,7 +115,7 @@ export default function TemplateFilesPanel({ templateName }: { templateName: str
               {isDirty(file.name) && <span className="text-amber-600 ml-1">•</span>}
             </Button>
           ))}
-          {files.length === 0 && <p className="text-sm text-gray-500">No editable files.</p>}
+          {files.length === 0 && <p className="text-sm text-muted">No editable files.</p>}
         </div>
 
         {currentFile && (
@@ -156,7 +156,7 @@ export default function TemplateFilesPanel({ templateName }: { templateName: str
               Discard changes
             </Button>
           )}
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-muted">
             Changes take effect after the next template push (Fleet tab).
           </span>
         </div>

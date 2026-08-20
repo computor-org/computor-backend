@@ -20,7 +20,7 @@ import type { CourseMemberGradingsList } from 'types/generated';
 
 // Charts pull in recharts (~large) — load them only when this view renders
 // instead of shipping the library in the shared bundle.
-const chartLoading = () => <div className="h-64 bg-gray-100 rounded animate-pulse" />;
+const chartLoading = () => <div className="h-64 bg-sunken rounded animate-pulse" />;
 const ProgressDistributionChart = dynamic(() => import('./ProgressDistributionChart'), {
   ssr: false,
   loading: chartLoading,
@@ -136,7 +136,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
   });
 
   const sortIcon = (key: SortKey) => {
-    if (sortKey !== key) return <span className="text-gray-300 ml-1">&#8597;</span>;
+    if (sortKey !== key) return <span className="text-faint ml-1">&#8597;</span>;
     return <span className="text-blue-500 ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>;
   };
 
@@ -159,12 +159,12 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
           <div className="space-y-4">
             <div className="grid grid-cols-5 gap-4">
               {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-20 bg-gray-100 rounded-lg animate-pulse" />
+                <div key={i} className="h-20 bg-sunken rounded-lg animate-pulse" />
               ))}
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="h-64 bg-gray-100 rounded-lg animate-pulse" />
-              <div className="h-64 bg-gray-100 rounded-lg animate-pulse" />
+              <div className="h-64 bg-sunken rounded-lg animate-pulse" />
+              <div className="h-64 bg-sunken rounded-lg animate-pulse" />
             </div>
           </div>
         )}
@@ -186,8 +186,8 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
 
             {/* Student Table */}
             <Panel padding="none">
-              <Toolbar className="px-4 py-3 border-b border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900">
+              <Toolbar className="px-4 py-3 border-b border-rule">
+                <h3 className="text-sm font-semibold text-fg">
                   Students ({filtered.length}
                   {filtered.length !== students.length ? ` / ${students.length}` : ''})
                 </h3>
@@ -234,7 +234,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
                   <Tbody>
                     {sorted.length === 0 ? (
                       <tr>
-                        <Td colSpan={5} className="py-8 text-center text-gray-500">
+                        <Td colSpan={5} className="py-8 text-center text-muted">
                           {searchQuery ? 'No students match your search' : 'No student data available'}
                         </Td>
                       </tr>
@@ -255,9 +255,9 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
                             {/* Name */}
                             <Td className="py-2.5">
                               <div>
-                                <span className="text-gray-900 font-medium">{name}</span>
+                                <span className="text-fg font-medium">{name}</span>
                                 {s.student_id && (
-                                  <span className="ml-2 text-xs text-gray-400 font-mono">{s.student_id}</span>
+                                  <span className="ml-2 text-xs text-subtle font-mono">{s.student_id}</span>
                                 )}
                               </div>
                             </Td>
@@ -266,7 +266,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
                             <Td className="py-2.5">
                               <div className="flex items-center gap-2">
                                 <ProgressBar value={s.overall_progress_percentage} size="sm" />
-                                <span className="text-xs font-medium text-gray-600 w-10 text-right">
+                                <span className="text-xs font-medium text-muted w-10 text-right">
                                   {Math.round(s.overall_progress_percentage)}%
                                 </span>
                               </div>
@@ -285,7 +285,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
                                       className="inline-block w-2 h-2 rounded-full flex-shrink-0"
                                       style={{ backgroundColor: ct.course_content_type_color || '#6366f1' }}
                                     />
-                                    <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                    <div className="w-12 h-1.5 bg-sunken rounded-full overflow-hidden">
                                       <div
                                         className="h-1.5 rounded-full"
                                         style={{
@@ -300,7 +300,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
                             </Td>
 
                             {/* Grade */}
-                            <Td className="py-2.5 text-xs font-medium text-gray-700">{gradeDisplay}</Td>
+                            <Td className="py-2.5 text-xs font-medium text-body">{gradeDisplay}</Td>
 
                             {/* Last Active */}
                             <Td className="py-2.5">
@@ -308,7 +308,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
                                 <span
                                   className={`inline-block w-2 h-2 rounded-full ${activityDotColor(s.latest_submission_at)}`}
                                 />
-                                <span className="text-xs text-gray-600">{relativeDate(s.latest_submission_at)}</span>
+                                <span className="text-xs text-muted">{relativeDate(s.latest_submission_at)}</span>
                               </div>
                             </Td>
                           </tr>

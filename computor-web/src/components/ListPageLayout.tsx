@@ -115,7 +115,7 @@ export function ScrollPanel({
 }) {
   return (
     <ScrollArea
-      className={`overflow-x-auto rounded-lg border border-gray-200 bg-white ${className}`}
+      className={`overflow-x-auto rounded-lg border border-rule bg-surface ${className}`}
       gutter={false}
     >
       {children}
@@ -125,7 +125,7 @@ export function ScrollPanel({
 
 /** Centered, borderless placeholder that occupies the scroll body while loading. */
 export function ListLoading({ children = 'Loading…' }: { children?: ReactNode }) {
-  return <div className="flex-1 min-h-0 flex items-center justify-center text-gray-500">{children}</div>;
+  return <div className="flex-1 min-h-0 flex items-center justify-center text-muted">{children}</div>;
 }
 
 /**

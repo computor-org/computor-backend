@@ -100,7 +100,7 @@ export default function OrganizationEditPage() {
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className={inputCls} />
           </Field>
           <Field label="Path (immutable)" hint="The hierarchical path is fixed after creation.">
-            <input value={org?.path || ''} readOnly className={`${inputCls} bg-gray-50 text-gray-500`} />
+            <input value={org?.path || ''} readOnly className={`${inputCls} bg-canvas text-muted`} />
           </Field>
         </FormPanel>
       )}

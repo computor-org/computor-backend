@@ -135,19 +135,19 @@ export default function MaintenancePage() {
         <ScrollArea>
         {/* Loading */}
         {loading && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
-            <div className="h-6 bg-gray-200 rounded w-1/4 mb-4" />
-            <div className="h-4 bg-gray-200 rounded w-1/2" />
+          <div className="bg-surface rounded-lg border border-rule p-6 animate-pulse">
+            <div className="h-6 bg-sunken rounded w-1/4 mb-4" />
+            <div className="h-4 bg-sunken rounded w-1/2" />
           </div>
         )}
 
         {/* Status Card */}
         {!loading && status && (
-          <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Current Status</h2>
+          <div className="bg-surface rounded-lg shadow border border-rule p-6">
+            <h2 className="text-lg font-semibold text-fg mb-4">Current Status</h2>
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-gray-600">Status:</span>
+                <span className="text-sm font-medium text-muted">Status:</span>
                 {status.active ? (
                   <Badge color="yellow" pill>Active</Badge>
                 ) : (
@@ -158,19 +158,19 @@ export default function MaintenancePage() {
               {status.active && (
                 <>
                   <div className="flex items-start gap-3">
-                    <span className="text-sm font-medium text-gray-600">Message:</span>
-                    <span className="text-sm text-gray-900">{status.message}</span>
+                    <span className="text-sm font-medium text-muted">Message:</span>
+                    <span className="text-sm text-fg">{status.message}</span>
                   </div>
                   {status.activated_at && (
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-gray-600">Activated at:</span>
-                      <span className="text-sm text-gray-900">{new Date(status.activated_at).toLocaleString()}</span>
+                      <span className="text-sm font-medium text-muted">Activated at:</span>
+                      <span className="text-sm text-fg">{new Date(status.activated_at).toLocaleString()}</span>
                     </div>
                   )}
                   {status.activated_by && (
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-gray-600">Activated by:</span>
-                      <span className="text-sm text-gray-900">{status.activated_by_name || status.activated_by}</span>
+                      <span className="text-sm font-medium text-muted">Activated by:</span>
+                      <span className="text-sm text-fg">{status.activated_by_name || status.activated_by}</span>
                     </div>
                   )}
                 </>
@@ -198,26 +198,26 @@ export default function MaintenancePage() {
 
         {/* Actions */}
         {!loading && status && (
-          <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Actions</h2>
+          <div className="bg-surface rounded-lg shadow border border-rule p-6">
+            <h2 className="text-lg font-semibold text-fg mb-4">Actions</h2>
             <div className="space-y-6">
               {/* Activate / Deactivate */}
               {status.active ? (
                 <div>
-                  <p className="text-sm text-gray-600 mb-3">
+                  <p className="text-sm text-muted mb-3">
                     Maintenance mode is currently active. Non-admin users cannot perform write operations.
                   </p>
                   <button
                     onClick={() => setShowDeactivateConfirm(true)}
                     disabled={deactivating}
-                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                    className="px-4 py-2 text-sm font-medium text-on-accent bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
                   >
                     {deactivating ? 'Deactivating...' : 'Deactivate Maintenance'}
                   </button>
                 </div>
               ) : (
                 <div>
-                  <label htmlFor="activate-message" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="activate-message" className="block text-sm font-medium text-body mb-1">
                     Maintenance Message
                   </label>
                   <textarea
@@ -225,13 +225,13 @@ export default function MaintenancePage() {
                     value={activateMessage}
                     onChange={(e) => setActivateMessage(e.target.value)}
                     rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm mb-3"
+                    className="w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm mb-3"
                     placeholder="Message shown to users during maintenance..."
                   />
                   <button
                     onClick={() => setShowActivateConfirm(true)}
                     disabled={activating}
-                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                    className="px-4 py-2 text-sm font-medium text-on-accent bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
                   >
                     {activating ? 'Activating...' : 'Activate Maintenance'}
                   </button>
@@ -239,14 +239,14 @@ export default function MaintenancePage() {
               )}
 
               {/* Divider */}
-              <hr className="border-gray-200" />
+              <hr className="border-rule" />
 
               {/* Schedule */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Schedule Maintenance</h3>
+                <h3 className="text-sm font-semibold text-fg mb-3">Schedule Maintenance</h3>
                 {status.scheduled_at ? (
                   <div className="flex items-center gap-4">
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted">
                       Maintenance is scheduled for {new Date(status.scheduled_at).toLocaleString()}.
                     </p>
                     <button
@@ -261,7 +261,7 @@ export default function MaintenancePage() {
                   <form onSubmit={handleSchedule} className="space-y-3">
                     <div className="flex flex-wrap gap-4">
                       <div className="flex-1 min-w-[200px]">
-                        <label htmlFor="schedule-date" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="schedule-date" className="block text-sm font-medium text-body mb-1">
                           Date & Time
                         </label>
                         <input
@@ -269,12 +269,12 @@ export default function MaintenancePage() {
                           type="datetime-local"
                           value={scheduleDate}
                           onChange={(e) => setScheduleDate(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          className="w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                           required
                         />
                       </div>
                       <div className="flex-1 min-w-[200px]">
-                        <label htmlFor="schedule-message" className="block text-sm font-medium text-gray-700 mb-1">
+                        <label htmlFor="schedule-message" className="block text-sm font-medium text-body mb-1">
                           Message
                         </label>
                         <input
@@ -282,7 +282,7 @@ export default function MaintenancePage() {
                           type="text"
                           value={scheduleMessage}
                           onChange={(e) => setScheduleMessage(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          className="w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                           placeholder="Schedule message..."
                         />
                       </div>
@@ -290,7 +290,7 @@ export default function MaintenancePage() {
                     <button
                       type="submit"
                       disabled={scheduling}
-                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                      className="px-4 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                     >
                       {scheduling ? 'Scheduling...' : 'Schedule Maintenance'}
                     </button>
@@ -302,9 +302,9 @@ export default function MaintenancePage() {
         )}
 
         {/* Info Section */}
-        <div className="bg-gray-50 rounded-lg border border-gray-200 p-6">
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">How Maintenance Mode Works</h2>
-          <ul className="text-sm text-gray-600 space-y-2">
+        <div className="bg-canvas rounded-lg border border-rule p-6">
+          <h2 className="text-sm font-semibold text-fg mb-3">How Maintenance Mode Works</h2>
+          <ul className="text-sm text-muted space-y-2">
             <li>
               <strong>API-Level Maintenance:</strong> Blocks POST, PUT, PATCH, DELETE requests for non-admin users. GET requests remain available for read-only access.
             </li>
@@ -315,7 +315,7 @@ export default function MaintenancePage() {
               <strong>WebSocket Notification:</strong> All connected users are notified via WebSocket when maintenance is activated, deactivated, scheduled, or cancelled.
             </li>
             <li>
-              <strong>Full Infrastructure Maintenance:</strong> For complete shutdowns (stopping Docker containers), use the <code className="px-1.5 py-0.5 bg-gray-200 rounded text-xs font-mono">./maintenance.sh</code> script on the server. This serves a static maintenance page via Traefik.
+              <strong>Full Infrastructure Maintenance:</strong> For complete shutdowns (stopping Docker containers), use the <code className="px-1.5 py-0.5 bg-sunken rounded text-xs font-mono">./maintenance.sh</code> script on the server. This serves a static maintenance page via Traefik.
             </li>
           </ul>
         </div>

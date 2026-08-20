@@ -84,7 +84,7 @@ export default function CourseFamilyEditPage() {
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className={inputCls} />
           </Field>
           <Field label="Path (immutable)" hint="The hierarchical path is fixed after creation.">
-            <input value={family?.path || ''} readOnly className={`${inputCls} bg-gray-50 text-gray-500`} />
+            <input value={family?.path || ''} readOnly className={`${inputCls} bg-canvas text-muted`} />
           </Field>
         </FormPanel>
       )}

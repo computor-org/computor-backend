@@ -82,7 +82,7 @@ export default function ExampleRepositoryEditPage() {
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={inputCls} />
           </Field>
           <Field label="Storage (immutable)" hint="Source type and URL are fixed once a repository exists.">
-            <input value={`${repo?.source_type ?? ''} · ${repo?.source_url ?? ''}`} readOnly className={`${inputCls} bg-gray-50 text-gray-500`} />
+            <input value={`${repo?.source_type ?? ''} · ${repo?.source_url ?? ''}`} readOnly className={`${inputCls} bg-canvas text-muted`} />
           </Field>
         </FormPanel>
       )}

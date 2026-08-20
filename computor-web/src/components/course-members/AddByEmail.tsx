@@ -71,9 +71,9 @@ export default function AddByEmail({
         e.preventDefault();
         importByEmail();
       }}
-      className="bg-white border border-gray-200 rounded-lg p-6 space-y-4 max-w-lg"
+      className="bg-surface border border-rule rounded-lg p-6 space-y-4 max-w-lg"
     >
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-muted">
         Adds the user with this email, creating the account if it does not exist yet. Use this for people
         not yet in the system.
       </p>

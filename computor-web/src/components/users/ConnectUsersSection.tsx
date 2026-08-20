@@ -164,11 +164,11 @@ export default function ConnectUsersSection({
     !(plan?.messages_repointed ?? 0);
 
   return (
-    <section className="bg-white border border-gray-200 rounded-md p-6 space-y-3">
-      <h2 className="text-lg font-semibold text-gray-900">
+    <section className="bg-surface border border-rule rounded-md p-6 space-y-3">
+      <h2 className="text-lg font-semibold text-fg">
         {hasBuiltinAccount ? 'Absorb a pre-provisioned user' : 'Connect into an existing account'}
       </h2>
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-muted">
         {hasBuiltinAccount
           ? 'Pick a pre-provisioned user (imported from a course roster, never logged in) to absorb into ' +
             'this account. Their course memberships, student profiles and roles move here, then the ' +
@@ -186,29 +186,29 @@ export default function ConnectUsersSection({
         busy={checking || executing}
         pickLabel={hasBuiltinAccount ? 'Absorb' : 'Connect'}
       />
-      {checking && <p className="text-sm text-gray-500">Checking what would move…</p>}
+      {checking && <p className="text-sm text-muted">Checking what would move…</p>}
 
       {plan && picked && keeper && source && (
         <Modal title="Connect users" onClose={closeDialog} maxWidth="max-w-lg">
           <div className="px-6 pt-2 pb-6 space-y-4">
-            <p className="text-sm text-gray-600">
-              <span className="font-medium text-gray-900">{userDisplayName(source)}</span>
-              {source.email ? <span className="text-gray-500"> ({source.email})</span> : null} will be
-              absorbed into <span className="font-medium text-gray-900">{userDisplayName(keeper)}</span>
-              {keeper.email ? <span className="text-gray-500"> ({keeper.email})</span> : null}.
+            <p className="text-sm text-muted">
+              <span className="font-medium text-fg">{userDisplayName(source)}</span>
+              {source.email ? <span className="text-muted"> ({source.email})</span> : null} will be
+              absorbed into <span className="font-medium text-fg">{userDisplayName(keeper)}</span>
+              {keeper.email ? <span className="text-muted"> ({keeper.email})</span> : null}.
             </p>
 
             <div className="max-h-80 overflow-y-auto space-y-4 text-sm">
               {courseMoves.length > 0 && (
                 <div>
-                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-1">
                     Course memberships
                   </h3>
                   <ul className="space-y-1">
                     {courseMoves.map((m) => (
                       <li key={m.course_id}>
-                        <span className="font-medium text-gray-900">{m.course_title ?? m.course_id}</span>
-                        <span className="text-gray-600"> — {courseMoveText(m)}</span>
+                        <span className="font-medium text-fg">{m.course_title ?? m.course_id}</span>
+                        <span className="text-muted"> — {courseMoveText(m)}</span>
                       </li>
                     ))}
                   </ul>
@@ -217,16 +217,16 @@ export default function ConnectUsersSection({
 
               {profileMoves.length > 0 && (
                 <div>
-                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-1">
                     Student profiles
                   </h3>
                   <ul className="space-y-1">
                     {profileMoves.map((p) => (
                       <li key={p.organization_id}>
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-fg">
                           {p.organization_title ?? p.organization_id}
                         </span>
-                        <span className="text-gray-600"> — {profileMoveText(p)}</span>
+                        <span className="text-muted"> — {profileMoveText(p)}</span>
                       </li>
                     ))}
                   </ul>
@@ -235,28 +235,28 @@ export default function ConnectUsersSection({
 
               {rolesMerged.length > 0 && (
                 <div>
-                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-1">
                     Roles gained by the keeper
                   </h3>
-                  <p className="text-gray-600">{rolesMerged.join(', ')}</p>
+                  <p className="text-muted">{rolesMerged.join(', ')}</p>
                 </div>
               )}
 
               {(plan.accounts_moved ?? 0) > 0 && (
-                <p className="text-gray-600">
+                <p className="text-muted">
                   {plan.accounts_moved} linked account{plan.accounts_moved === 1 ? '' : 's'} move to the
                   keeper.
                 </p>
               )}
               {(plan.messages_repointed ?? 0) > 0 && (
-                <p className="text-gray-600">
+                <p className="text-muted">
                   {plan.messages_repointed} message reference
                   {plan.messages_repointed === 1 ? '' : 's'} will be re-pointed.
                 </p>
               )}
 
               {planEmpty && (
-                <p className="text-gray-600">
+                <p className="text-muted">
                   Nothing to move — the imported user carries no course data. Connecting simply deletes
                   it.
                 </p>

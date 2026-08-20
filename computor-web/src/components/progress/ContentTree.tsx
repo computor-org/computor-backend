@@ -53,7 +53,7 @@ function TreeNodeRow({ row }: { row: ContentTreeRow<CourseMemberGradingNode> }) 
 
   return (
     <>
-      <tr className="hover:bg-gray-50 border-b border-gray-100">
+      <tr className="hover:bg-canvas border-b border-rule-soft">
         {/* Title */}
         <td className="py-2 pr-2" style={{ paddingLeft: `${indent + 8}px` }}>
           <div className="flex items-center gap-1.5">
@@ -62,7 +62,7 @@ function TreeNodeRow({ row }: { row: ContentTreeRow<CourseMemberGradingNode> }) 
                 onClick={toggle}
                 aria-expanded={expanded}
                 aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
-                className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 flex-shrink-0"
+                className="w-5 h-5 flex items-center justify-center text-subtle hover:text-muted flex-shrink-0"
               >
                 <svg className={`h-3.5 w-3.5 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -80,10 +80,10 @@ function TreeNodeRow({ row }: { row: ContentTreeRow<CourseMemberGradingNode> }) 
             <span
               className={`text-sm truncate ${
                 hidden
-                  ? 'text-gray-400'
+                  ? 'text-subtle'
                   : isAssignment
-                    ? 'text-gray-700'
-                    : 'font-medium text-gray-900'
+                    ? 'text-body'
+                    : 'font-medium text-fg'
               }`}
             >
               {label}
@@ -93,7 +93,7 @@ function TreeNodeRow({ row }: { row: ContentTreeRow<CourseMemberGradingNode> }) 
                 should see the real denominator (issue #338). */}
             {hidden && (
               <span
-                className="shrink-0 px-1.5 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-600 rounded"
+                className="shrink-0 px-1.5 py-0.5 text-[11px] font-medium bg-sunken text-muted rounded"
                 title="Students cannot currently see this. It is still counted below."
               >
                 invisible
@@ -106,26 +106,26 @@ function TreeNodeRow({ row }: { row: ContentTreeRow<CourseMemberGradingNode> }) 
         <td className="py-2 px-2 w-28">
           {!isAssignment && (
             <div className="flex items-center gap-1.5">
-              <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              <div className="flex-1 h-1.5 bg-sunken rounded-full overflow-hidden">
                 <div
                   className="h-1.5 rounded-full bg-blue-500"
                   style={{ width: `${Math.min(node.progress_percentage, 100)}%` }}
                 />
               </div>
-              <span className="text-xs text-gray-500 w-8 text-right">{Math.round(node.progress_percentage)}%</span>
+              <span className="text-xs text-muted w-8 text-right">{Math.round(node.progress_percentage)}%</span>
             </div>
           )}
         </td>
 
         {/* Tests */}
-        <td className="py-2 px-2 text-xs text-gray-500 text-center w-16">
+        <td className="py-2 px-2 text-xs text-muted text-center w-16">
           {isAssignment && node.max_test_runs != null
             ? `${node.test_runs_count ?? 0}/${node.max_test_runs}`
             : '-'}
         </td>
 
         {/* Submissions */}
-        <td className="py-2 px-2 text-xs text-gray-500 text-center w-16">
+        <td className="py-2 px-2 text-xs text-muted text-center w-16">
           {isAssignment && node.max_submissions != null
             ? `${node.submissions_count ?? 0}/${node.max_submissions}`
             : '-'}
@@ -134,14 +134,14 @@ function TreeNodeRow({ row }: { row: ContentTreeRow<CourseMemberGradingNode> }) 
         {/* Result */}
         <td className="py-2 px-2 text-xs text-center w-16">
           {resultGrade != null ? (
-            <span className="text-gray-700">{resultGrade}%</span>
+            <span className="text-body">{resultGrade}%</span>
           ) : '-'}
         </td>
 
         {/* Grade */}
         <td className="py-2 px-2 text-xs text-center w-16">
           {grade != null ? (
-            <span className="font-medium text-gray-900">{grade}%</span>
+            <span className="font-medium text-fg">{grade}%</span>
           ) : '-'}
         </td>
 
@@ -150,7 +150,7 @@ function TreeNodeRow({ row }: { row: ContentTreeRow<CourseMemberGradingNode> }) 
           {isAssignment && node.status ? (
             <div className="flex items-center gap-1.5" title={statusLabel(node.status)}>
               <span className={`inline-block w-2 h-2 rounded-full ${statusColor(node.status)}`} />
-              <span className="text-xs text-gray-600 truncate">{statusLabel(node.status)}</span>
+              <span className="text-xs text-muted truncate">{statusLabel(node.status)}</span>
             </div>
           ) : null}
         </td>
@@ -166,7 +166,7 @@ export default function ContentTree({ nodes }: ContentTreeProps) {
 
   if (rows.length === 0) {
     return (
-      <div className="text-center py-8 text-sm text-gray-500">
+      <div className="text-center py-8 text-sm text-muted">
         No course content available.
       </div>
     );
@@ -174,13 +174,13 @@ export default function ContentTree({ nodes }: ContentTreeProps) {
 
   return (
     <Panel padding="none" className="overflow-hidden">
-      <div className="px-5 py-3 border-b border-gray-200">
-        <h3 className="text-sm font-semibold text-gray-900">Course content progress</h3>
+      <div className="px-5 py-3 border-b border-rule">
+        <h3 className="text-sm font-semibold text-fg">Course content progress</h3>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500">
+            <tr className="bg-canvas border-b border-rule text-xs font-medium text-muted">
               <th className="text-left py-2 px-2 pl-3">Content</th>
               <th className="text-left py-2 px-2 w-28">Progress</th>
               <th className="text-center py-2 px-2 w-16">Tests</th>

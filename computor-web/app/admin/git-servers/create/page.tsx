@@ -76,7 +76,7 @@ export default function GitServerCreatePage() {
         <Field label="Name">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Our Forgejo" className={inputCls} />
         </Field>
-        <label className="flex items-center gap-2 text-sm text-gray-700">
+        <label className="flex items-center gap-2 text-sm text-body">
           <input type="checkbox" checked={managed} onChange={(e) => setManaged(e.target.checked)} />
           Managed (Computor operates it and holds a service token)
         </label>

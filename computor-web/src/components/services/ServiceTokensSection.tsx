@@ -81,10 +81,10 @@ export default function ServiceTokensSection({
   const activeTokens = tokens.filter((t) => !t.revoked_at);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg">
-      <div className="px-6 py-4 border-b border-gray-100">
-        <h2 className="text-base font-semibold text-gray-900">API Tokens</h2>
-        <p className="text-sm text-gray-500 mt-0.5">
+    <div className="bg-surface border border-rule rounded-lg">
+      <div className="px-6 py-4 border-b border-rule-soft">
+        <h2 className="text-base font-semibold text-fg">API Tokens</h2>
+        <p className="text-sm text-muted mt-0.5">
           How this service authenticates. Set the value as <code className="font-mono text-xs">API_TOKEN</code> on
           the worker, sent as the <code className="font-mono text-xs">X-API-Token</code> header.
         </p>
@@ -114,7 +114,7 @@ export default function ServiceTokensSection({
               Token created — copy it now. You won’t be able to see it again.
             </p>
             <div className="mt-2 flex items-center gap-2">
-              <code className="flex-1 font-mono text-xs bg-white border border-green-200 rounded px-2 py-1.5 break-all">
+              <code className="flex-1 font-mono text-xs bg-surface border border-green-200 rounded px-2 py-1.5 break-all">
                 {createdToken.token}
               </code>
               <button
@@ -122,13 +122,13 @@ export default function ServiceTokensSection({
                   navigator.clipboard?.writeText(createdToken.token);
                   setCopied(true);
                 }}
-                className="px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700 whitespace-nowrap"
+                className="px-3 py-1.5 text-xs font-medium bg-green-600 text-on-accent rounded hover:bg-green-700 whitespace-nowrap"
               >
                 {copied ? 'Copied' : 'Copy'}
               </button>
               <button
                 onClick={() => setCreatedToken(null)}
-                className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded"
+                className="px-3 py-1.5 text-xs text-muted hover:bg-sunken rounded"
               >
                 Dismiss
               </button>
@@ -150,7 +150,7 @@ export default function ServiceTokensSection({
           className="flex flex-wrap items-end gap-3 mb-5"
         >
           <div className="flex-1 min-w-[12rem]">
-            <label className="block text-xs font-medium text-gray-700 mb-1">Token name</label>
+            <label className="block text-xs font-medium text-body mb-1">Token name</label>
             <input
               className={inputCls}
               value={newName}
@@ -159,31 +159,31 @@ export default function ServiceTokensSection({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Expires (optional)</label>
+            <label className="block text-xs font-medium text-body mb-1">Expires (optional)</label>
             <input type="date" className={inputCls} value={newExpiry} onChange={(e) => setNewExpiry(e.target.value)} />
           </div>
           <button
             type="submit"
             disabled={creating || !newName.trim()}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="px-4 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
             {creating ? 'Creating…' : 'Create token'}
           </button>
         </form>
 
         {loading ? (
-          <div className="text-sm text-gray-500">Loading…</div>
+          <div className="text-sm text-muted">Loading…</div>
         ) : activeTokens.length === 0 ? (
-          <div className="text-sm text-gray-500 border border-dashed border-gray-300 rounded-lg p-6 text-center">
+          <div className="text-sm text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">
             No active tokens — this service cannot authenticate yet.
           </div>
         ) : (
-          <div className="border border-gray-200 rounded-lg divide-y">
+          <div className="border border-rule rounded-lg divide-y">
             {activeTokens.map((t) => (
               <div key={t.id} className="flex items-center justify-between px-4 py-3 gap-4">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-gray-900 truncate">{t.name}</div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-sm font-medium text-fg truncate">{t.name}</div>
+                  <div className="text-xs text-muted">
                     <span className="font-mono">{t.token_prefix}…</span> · {t.scopes.length} scope(s) ·{' '}
                     {t.expires_at ? `expires ${fmtDate(t.expires_at)}` : 'no expiry'} ·{' '}
                     {t.last_used_at ? `last used ${fmtDate(t.last_used_at)}` : 'never used'}

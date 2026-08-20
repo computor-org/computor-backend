@@ -110,7 +110,7 @@ export default function LecturerTemplatesPage() {
           <ListLoading />
         ) : (
           <ScrollArea>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted">
               Download the released student template as a ZIP. Both layouts contain the same files — only the
               directory structure differs. Newly assigned examples appear here once they are released.
             </p>
@@ -121,22 +121,22 @@ export default function LecturerTemplatesPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {LAYOUTS.map((l) => (
-                <div key={l.id} className="p-5 bg-white border border-gray-200 rounded-lg flex flex-col gap-3">
+                <div key={l.id} className="p-5 bg-surface border border-rule rounded-lg flex flex-col gap-3">
                   <div className="flex items-start gap-4">
                     <svg className="h-8 w-8 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={l.icon} />
                     </svg>
                     <div>
-                      <h3 className="font-semibold text-gray-900">{l.title}</h3>
-                      <p className="text-sm text-gray-500 mt-0.5">{l.desc}</p>
+                      <h3 className="font-semibold text-fg">{l.title}</h3>
+                      <p className="text-sm text-muted mt-0.5">{l.desc}</p>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500">{l.detail}</p>
+                  <p className="text-xs text-muted">{l.detail}</p>
                   <button
                     type="button"
                     onClick={() => download(l.id)}
                     disabled={downloading !== null}
-                    className="self-start mt-auto px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    className="self-start mt-auto px-3 py-1.5 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                   >
                     {downloading === l.id ? 'Preparing…' : 'Download ZIP'}
                   </button>

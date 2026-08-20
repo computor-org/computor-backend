@@ -86,7 +86,7 @@ export default function VisibilitySelect({
       )}
 
       {value === false && (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-muted">
           Students will not see this in their assignment tree and cannot test or
           submit. Their files, existing tests and submissions are untouched and
           reappear when you make it visible again.
