@@ -26,7 +26,18 @@ export interface NavItem {
 // Always-visible navigation (every authenticated user sees their courses).
 // The catalog sits here rather than behind a permission: it is how a user with
 // no memberships at all finds their first course (issue #213).
+//
+// Dashboard leads because it is where signing in already lands you — it just had
+// no entry here, so the only ways back to it were the top-bar logo and the
+// sidebar's user name, neither of which looks like navigation.
 export const coursesNavigation: NavItem[] = [
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    path: '/dashboard',
+    icon: 'dashboard',
+    ownPage: true,
+  },
   {
     id: 'courses',
     label: 'Courses',
