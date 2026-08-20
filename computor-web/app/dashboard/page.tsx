@@ -32,7 +32,7 @@ function SectionHeading({ title, href, linkLabel }: { title: string; href?: stri
     <div className="flex items-baseline justify-between gap-3 mb-3">
       <h2 className="text-lg font-semibold text-fg">{title}</h2>
       {href && (
-        <Link href={href} className="text-sm text-blue-600 hover:underline shrink-0">
+        <Link href={href} className="text-sm text-accent-text hover:underline shrink-0">
           {linkLabel ?? 'View all'}
         </Link>
       )}

@@ -15,9 +15,9 @@ function getUrgency(minutesRemaining: number): UrgencyLevel {
 }
 
 const urgencyStyles: Record<UrgencyLevel, { bg: string; border: string; icon: string; text: string; dismiss: string }> = {
-  low:    { bg: 'bg-blue-50',  border: 'border-blue-200',  icon: 'text-blue-600',  text: 'text-blue-800',  dismiss: 'text-blue-400 hover:text-blue-600' },
-  medium: { bg: 'bg-amber-50', border: 'border-amber-200', icon: 'text-amber-600', text: 'text-amber-800', dismiss: 'text-amber-400 hover:text-amber-600' },
-  high:   { bg: 'bg-red-50',   border: 'border-red-200',   icon: 'text-red-600',   text: 'text-red-800',   dismiss: '' },
+  low:    { bg: 'bg-accent-wash',  border: 'border-accent-line',  icon: 'text-accent-text',  text: 'text-accent-text',  dismiss: 'text-blue-400 hover:text-accent-text' },
+  medium: { bg: 'bg-warn-wash', border: 'border-warn-line', icon: 'text-warn-text', text: 'text-warn-text', dismiss: 'text-amber-400 hover:text-warn-text' },
+  high:   { bg: 'bg-danger-wash',   border: 'border-danger-line',   icon: 'text-danger-text',   text: 'text-danger-text',   dismiss: '' },
 };
 
 function formatCountdown(minutes: number): string {
@@ -79,12 +79,12 @@ export default function MaintenanceBanner() {
   // Active maintenance — amber banner, not dismissible
   if (status.active) {
     return (
-      <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 print:hidden">
+      <div className="bg-warn-wash border-b border-warn-line px-4 py-2 print:hidden">
         <div className="flex items-center gap-2">
-          <svg className="h-4 w-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-4 w-4 text-warn-text shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
-          <p className="text-sm text-amber-800">
+          <p className="text-sm text-warn-text">
             <span className="font-medium">Maintenance Mode Active</span>
             {status.message && <> — {status.message}</>}
           </p>

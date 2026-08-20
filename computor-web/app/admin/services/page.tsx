@@ -39,7 +39,7 @@ export default function ServicesPage() {
           title="Service accounts"
           subtitle="Machine identities — testing systems, integrations and AI agents. Each one is a user that cannot log in, authenticating only with an API token."
           actions={
-            <Link href="/admin/services/create" className="px-4 py-2 bg-blue-600 text-on-accent rounded-lg text-sm font-medium hover:bg-blue-700">
+            <Link href="/admin/services/create" className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover">
               New Service
             </Link>
           }
@@ -72,7 +72,7 @@ export default function ServicesPage() {
                   return (
                     <Tr key={s.id}>
                       <Td>
-                        <Link href={`/admin/services/${s.id}`} className="font-medium text-blue-600 hover:underline">
+                        <Link href={`/admin/services/${s.id}`} className="font-medium text-accent-text hover:underline">
                           {s.name}
                         </Link>
                         {s.description && <div className="text-xs text-muted">{s.description}</div>}

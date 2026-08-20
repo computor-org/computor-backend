@@ -169,7 +169,7 @@ export default function SettingsPage() {
                   href={accountConsoleUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-on-accent rounded-lg text-sm font-medium hover:bg-blue-700"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover"
                 >
                   Open account console
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -189,17 +189,17 @@ export default function SettingsPage() {
                 personal token is never weaker than the account. Users assume
                 the opposite; say it where the token is minted.
               */}
-              <div className="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <div className="mb-5 rounded-lg border border-warn-line bg-warn-wash p-3 text-sm text-warn-text">
                 <strong className="font-medium">A token acts with your full permissions.</strong>{' '}
                 Scopes only add permissions — they never remove any. Anyone holding one of these tokens
                 can do anything you can.
               </div>
 
               {createdToken && (
-                <div className="mb-5 rounded-lg border border-green-300 bg-green-50 p-4">
-                  <p className="text-sm font-medium text-green-800">Token created — copy it now. You won’t be able to see it again.</p>
+                <div className="mb-5 rounded-lg border border-green-300 bg-success-wash p-4">
+                  <p className="text-sm font-medium text-success-text">Token created — copy it now. You won’t be able to see it again.</p>
                   <div className="mt-2 flex items-center gap-2">
-                    <code className="flex-1 font-mono text-xs bg-surface border border-green-200 rounded px-2 py-1.5 break-all">{createdToken.token}</code>
+                    <code className="flex-1 font-mono text-xs bg-surface border border-success-line rounded px-2 py-1.5 break-all">{createdToken.token}</code>
                     <button
                       onClick={() => {
                         navigator.clipboard?.writeText(createdToken.token);
@@ -233,7 +233,7 @@ export default function SettingsPage() {
                 <button
                   type="submit"
                   disabled={creating || !newName.trim()}
-                  className="px-4 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
                 >
                   {creating ? 'Creating…' : 'Create token'}
                 </button>
@@ -267,7 +267,7 @@ export default function SettingsPage() {
                             },
                           })
                         }
-                        className="text-sm text-red-600 hover:underline whitespace-nowrap"
+                        className="text-sm text-danger-text hover:underline whitespace-nowrap"
                       >
                         Revoke
                       </button>
@@ -312,7 +312,7 @@ export default function SettingsPage() {
                               },
                             })
                           }
-                          className="text-sm text-red-600 hover:underline whitespace-nowrap"
+                          className="text-sm text-danger-text hover:underline whitespace-nowrap"
                         >
                           Unlink
                         </button>
@@ -342,7 +342,7 @@ export default function SettingsPage() {
                     {consentStatus.has_consented && consentStatus.granted_at ? (
                       <p>Consent given on {new Date(consentStatus.granted_at).toLocaleString()}.</p>
                     ) : (
-                      <p className="text-amber-700">You have not consented to the current privacy notice.</p>
+                      <p className="text-warn-text">You have not consented to the current privacy notice.</p>
                     )}
                   </div>
 
@@ -363,7 +363,7 @@ export default function SettingsPage() {
                           <button
                             onClick={handleWithdraw}
                             disabled={withdrawing}
-                            className="px-4 py-2 rounded-lg bg-red-600 text-on-accent hover:bg-red-700 disabled:bg-gray-300 text-sm font-medium"
+                            className="px-4 py-2 rounded-lg bg-danger text-on-accent hover:bg-danger-hover disabled:bg-gray-300 text-sm font-medium"
                           >
                             {withdrawing ? 'Withdrawing…' : 'Yes, withdraw'}
                           </button>
@@ -378,7 +378,7 @@ export default function SettingsPage() {
                       ) : (
                         <button
                           onClick={() => setConfirmWithdraw(true)}
-                          className="px-4 py-2 rounded-lg border border-red-300 text-red-700 hover:bg-red-50 text-sm font-medium"
+                          className="px-4 py-2 rounded-lg border border-danger-line text-danger-text hover:bg-danger-wash text-sm font-medium"
                         >
                           Withdraw consent
                         </button>

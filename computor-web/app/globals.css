@@ -38,6 +38,35 @@
      the fill darkens rather than lightening, so this must not follow --c-fg. */
   --c-on-accent: #ffffff;
 
+  /*
+   * Semantic tones (design spec §2). Four roles, each in three registers:
+   * a solid FILL for buttons, readable TEXT for a link or a figure, and a
+   * tinted WASH (plus its border) for a chip or an inline notice.
+   *
+   * The wash is the one that cannot survive a theme flip as a raw palette
+   * class: bg-blue-50 is a near-white block, which on a dark ground is a hole
+   * in the page rather than a tint.
+   */
+  --c-accent: #2563eb;         /* blue-600 */
+  --c-accent-hover: #1d4ed8;   /* blue-700 */
+  --c-accent-text: #2563eb;
+  --c-accent-wash: #eff6ff;    /* blue-50 */
+  --c-accent-line: #3b82f6;    /* blue-500 */
+
+  --c-danger: #dc2626;         /* red-600 */
+  --c-danger-hover: #b91c1c;   /* red-700 */
+  --c-danger-text: #b91c1c;
+  --c-danger-wash: #fef2f2;    /* red-50 */
+  --c-danger-line: #fecaca;    /* red-200 */
+
+  --c-warn-text: #92400e;      /* amber-800 */
+  --c-warn-wash: #fffbeb;      /* amber-50 */
+  --c-warn-line: #fde68a;      /* amber-200 */
+
+  --c-success-text: #15803d;   /* green-700 */
+  --c-success-wash: #f0fdf4;   /* green-50 */
+  --c-success-line: #bbf7d0;   /* green-200 */
+
   color-scheme: light;
   /* Recolors every native checkbox, radio and range to the brand blue that
      Button's primary variant uses, while keeping the platform's own focus ring,
@@ -65,6 +94,22 @@
   --color-rule-soft: var(--c-rule-soft);
   --color-rule-strong: var(--c-rule-strong);
   --color-on-accent: var(--c-on-accent);
+  --color-accent: var(--c-accent);
+  --color-accent-hover: var(--c-accent-hover);
+  --color-accent-text: var(--c-accent-text);
+  --color-accent-wash: var(--c-accent-wash);
+  --color-accent-line: var(--c-accent-line);
+  --color-danger: var(--c-danger);
+  --color-danger-hover: var(--c-danger-hover);
+  --color-danger-text: var(--c-danger-text);
+  --color-danger-wash: var(--c-danger-wash);
+  --color-danger-line: var(--c-danger-line);
+  --color-warn-text: var(--c-warn-text);
+  --color-warn-wash: var(--c-warn-wash);
+  --color-warn-line: var(--c-warn-line);
+  --color-success-text: var(--c-success-text);
+  --color-success-wash: var(--c-success-wash);
+  --color-success-line: var(--c-success-line);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);

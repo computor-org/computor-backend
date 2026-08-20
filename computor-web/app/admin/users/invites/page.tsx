@@ -125,7 +125,7 @@ export default function InvitesPage() {
           actions={
             <button
               onClick={() => setCreateModal(m => ({ ...m, open: true }))}
-              className="px-4 py-2 bg-blue-600 text-on-accent rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover transition-colors"
             >
               + New Invite
             </button>
@@ -173,14 +173,14 @@ export default function InvitesPage() {
                       <div className="flex justify-end gap-1">
                         <button
                           onClick={() => handleCopy(inv.id, inv.token)}
-                          className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          className="px-2 py-1 text-xs text-accent-text hover:bg-accent-wash rounded transition-colors"
                         >
                           {copiedId === inv.id ? 'Copied!' : 'Copy Link'}
                         </button>
                         {!inv.revoked_at && (
                           <button
                             onClick={() => setRevokeConfirm(inv.id)}
-                            className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
+                            className="px-2 py-1 text-xs text-danger-text hover:bg-danger-wash rounded transition-colors"
                           >
                             Revoke
                           </button>
@@ -217,7 +217,7 @@ export default function InvitesPage() {
                     placeholder="student@example.com"
                     value={createModal.email}
                     onChange={e => setCreateModal(m => ({ ...m, email: e.target.value }))}
-                    className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -229,7 +229,7 @@ export default function InvitesPage() {
                       max={365}
                       value={createModal.expiresInDays}
                       onChange={e => setCreateModal(m => ({ ...m, expiresInDays: parseInt(e.target.value) || 7 }))}
-                      className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line"
                     />
                   </div>
                   <div>
@@ -240,7 +240,7 @@ export default function InvitesPage() {
                       max={100}
                       value={createModal.maxUses}
                       onChange={e => setCreateModal(m => ({ ...m, maxUses: parseInt(e.target.value) || 1 }))}
-                      className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line"
                     />
                   </div>
                 </div>
@@ -251,7 +251,7 @@ export default function InvitesPage() {
                     placeholder="e.g. WS2024 students"
                     value={createModal.note}
                     onChange={e => setCreateModal(m => ({ ...m, note: e.target.value }))}
-                    className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line"
                   />
                 </div>
                 <div>
@@ -276,7 +276,7 @@ export default function InvitesPage() {
               <button
                 onClick={handleCreate}
                 disabled={createModal.saving}
-                className="px-4 py-2 text-sm bg-blue-600 text-on-accent rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm bg-accent text-on-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
               >
                 {createModal.saving ? 'Creating…' : 'Create Invite'}
               </button>

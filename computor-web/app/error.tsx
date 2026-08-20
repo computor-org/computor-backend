@@ -17,7 +17,7 @@ export default function ErrorPage({
     <div className="min-h-screen flex items-center justify-center bg-canvas p-6">
       <div className="max-w-md w-full bg-surface rounded-lg border border-rule p-8 text-center">
         <svg
-          className="mx-auto h-12 w-12 text-red-400"
+          className="mx-auto h-12 w-12 text-danger-text"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -40,7 +40,7 @@ export default function ErrorPage({
         <div className="mt-6 flex items-center justify-center gap-3">
           <button
             onClick={reset}
-            className="px-4 py-2 bg-blue-600 text-on-accent rounded-lg text-sm font-medium hover:bg-blue-700"
+            className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover"
           >
             Try again
           </button>

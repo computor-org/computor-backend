@@ -61,7 +61,7 @@ export default function AddCourseMembersPage() {
 
   const tabClass = (active: boolean) =>
     `py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-      active ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted hover:text-body'
+      active ? 'border-accent text-accent-text' : 'border-transparent text-muted hover:text-body'
     }`;
 
   return (

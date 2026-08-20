@@ -219,7 +219,7 @@ export default function UserDetailPage() {
             </p>
             <Button
               variant="secondary"
-              className="text-red-700 border-red-300 hover:bg-red-50"
+              className="text-danger-text border-danger-line hover:bg-danger-wash"
               onClick={() => setRotateOpen(true)}
             >
               Rotate app credential

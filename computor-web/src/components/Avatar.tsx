@@ -44,7 +44,7 @@ export default function Avatar({
   const bg = rgbIntToHex(avatarColor);
   return (
     <div
-      className={`${sizeCls} rounded-full flex items-center justify-center text-on-accent font-medium shrink-0 ${bg ? '' : 'bg-blue-600'}`}
+      className={`${sizeCls} rounded-full flex items-center justify-center text-on-accent font-medium shrink-0 ${bg ? '' : 'bg-accent'}`}
       style={bg ? { backgroundColor: bg } : undefined}
     >
       {initials(name, fallback)}

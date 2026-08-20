@@ -97,7 +97,7 @@ export default function ServiceTokensSection({
           minted is the only thing that stops someone treating an empty scope
           list as "harmless".
         */}
-        <div className="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="mb-5 rounded-lg border border-warn-line bg-warn-wash p-3 text-sm text-warn-text">
           <strong className="font-medium">Scopes only add permissions — they never remove any.</strong>{' '}
           A token acts with the full permissions of its account. A service account holds no roles,
           so its scopes are its entire authority; a token on a human account would carry all of that
@@ -105,16 +105,16 @@ export default function ServiceTokensSection({
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+          <div className="mb-4 rounded-lg border border-danger-line bg-danger-wash px-3 py-2 text-sm text-danger-text">{error}</div>
         )}
 
         {createdToken && (
-          <div className="mb-5 rounded-lg border border-green-300 bg-green-50 p-4">
-            <p className="text-sm font-medium text-green-800">
+          <div className="mb-5 rounded-lg border border-green-300 bg-success-wash p-4">
+            <p className="text-sm font-medium text-success-text">
               Token created — copy it now. You won’t be able to see it again.
             </p>
             <div className="mt-2 flex items-center gap-2">
-              <code className="flex-1 font-mono text-xs bg-surface border border-green-200 rounded px-2 py-1.5 break-all">
+              <code className="flex-1 font-mono text-xs bg-surface border border-success-line rounded px-2 py-1.5 break-all">
                 {createdToken.token}
               </code>
               <button
@@ -134,7 +134,7 @@ export default function ServiceTokensSection({
               </button>
             </div>
             {createdToken.scopes.length > 0 && (
-              <p className="mt-2 text-xs text-green-800">
+              <p className="mt-2 text-xs text-success-text">
                 Granted {createdToken.scopes.length} default scope(s) for this service type:{' '}
                 <span className="font-mono">{createdToken.scopes.join(', ')}</span>
               </p>
@@ -165,7 +165,7 @@ export default function ServiceTokensSection({
           <button
             type="submit"
             disabled={creating || !newName.trim()}
-            className="px-4 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
           >
             {creating ? 'Creating…' : 'Create token'}
           </button>
@@ -191,7 +191,7 @@ export default function ServiceTokensSection({
                 </div>
                 <button
                   onClick={() => setConfirmRevoke(t)}
-                  className="text-sm text-red-600 hover:underline whitespace-nowrap"
+                  className="text-sm text-danger-text hover:underline whitespace-nowrap"
                 >
                   Revoke
                 </button>

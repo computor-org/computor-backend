@@ -46,7 +46,7 @@ export default function NotFound({
           <div className="pt-4">
             <Link
               href={backLink}
-              className="inline-flex items-center px-6 py-3 bg-blue-600 text-on-accent rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              className="inline-flex items-center px-6 py-3 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-colors font-medium"
             >
               <svg
                 className="h-5 w-5 mr-2"

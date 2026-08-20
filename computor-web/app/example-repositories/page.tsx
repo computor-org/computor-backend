@@ -34,7 +34,7 @@ export default function ExampleRepositoriesPage() {
           subtitle="Storage backends that hold examples. Upload examples into a MinIO repository."
           actions={
             canManageExamples ? (
-              <Link href="/example-repositories/create" className="px-4 py-2 bg-blue-600 text-on-accent rounded-lg text-sm font-medium hover:bg-blue-700">
+              <Link href="/example-repositories/create" className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover">
                 New repository
               </Link>
             ) : undefined

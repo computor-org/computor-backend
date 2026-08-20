@@ -77,8 +77,8 @@ export default function TemplateTaskProgress({ task }: { task: TaskInfo }) {
                   </div>
                   <span
                     className={`w-40 shrink-0 text-right text-xs ${
-                      stage.tone === 'red' ? 'text-red-700'
-                      : stage.tone === 'green' ? 'text-green-700'
+                      stage.tone === 'red' ? 'text-danger-text'
+                      : stage.tone === 'green' ? 'text-success-text'
                       : 'text-muted'
                     }`}
                   >
@@ -101,7 +101,7 @@ export default function TemplateTaskProgress({ task }: { task: TaskInfo }) {
                   </p>
                 )}
                 {template.error && (
-                  <p className="mt-1 text-xs text-red-700 break-words">{template.error}</p>
+                  <p className="mt-1 text-xs text-danger-text break-words">{template.error}</p>
                 )}
               </li>
             );
@@ -109,7 +109,7 @@ export default function TemplateTaskProgress({ task }: { task: TaskInfo }) {
         </ul>
       )}
 
-      {task.error && <p className="text-sm text-red-700">{task.error}</p>}
+      {task.error && <p className="text-sm text-danger-text">{task.error}</p>}
     </div>
   );
 }

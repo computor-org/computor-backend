@@ -19,7 +19,7 @@ const consentClient = new ConsentClient();
 type LangRow = { lang: string; text: string; filename?: string };
 
 const inputCls =
-  'w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm';
+  'w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-accent-line focus:border-accent-line text-sm';
 
 function fmtDate(s?: string | null): string {
   return s ? new Date(s).toLocaleString() : '—';
@@ -116,9 +116,9 @@ export default function PrivacyNoticesPage() {
     return (
       <AuthenticatedLayout>
         <div className="p-6">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-            <h2 className="text-lg font-semibold text-red-800">Access Denied</h2>
-            <p className="text-sm text-red-600 mt-2">Admin privileges are required to manage privacy notices.</p>
+          <div className="bg-danger-wash border border-danger-line rounded-lg p-6 text-center">
+            <h2 className="text-lg font-semibold text-danger-text">Access Denied</h2>
+            <p className="text-sm text-danger-text mt-2">Admin privileges are required to manage privacy notices.</p>
           </div>
         </div>
       </AuthenticatedLayout>
@@ -138,9 +138,9 @@ export default function PrivacyNoticesPage() {
 
         <ScrollArea>
           {/* Warning */}
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-            <h2 className="text-sm font-semibold text-amber-900 mb-1">Before you publish</h2>
-            <ul className="text-sm text-amber-800 space-y-1 list-disc list-inside">
+          <div className="bg-warn-wash border border-warn-line rounded-lg p-4">
+            <h2 className="text-sm font-semibold text-warn-text mb-1">Before you publish</h2>
+            <ul className="text-sm text-warn-text space-y-1 list-disc list-inside">
               <li>Versions are <strong>append-only</strong> — a version can be published once. Bump the version for any change.</li>
               <li>Publishing with an effective date of now <strong>re-gates every user</strong> who hasn’t consented to the new version.</li>
               <li>The VS Code extension has no consent handling yet — unconsented users will get errors there.</li>
@@ -212,13 +212,13 @@ export default function PrivacyNoticesPage() {
                 <div key={i} className="border border-rule rounded-lg p-3">
                   <div className="flex flex-wrap items-center gap-3 mb-2">
                     <input
-                      className="w-28 px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      className="w-28 px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-accent-line focus:border-accent-line text-sm"
                       value={l.lang}
                       onChange={(e) => setLangCode(i, e.target.value)}
                       placeholder="lang (en)"
                       aria-label="Language code"
                     />
-                    <label className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 cursor-pointer">
+                    <label className="px-3 py-2 text-sm font-medium text-accent-text bg-accent-wash rounded-lg hover:bg-accent-wash cursor-pointer">
                       {l.filename ? `Replace ${l.filename}` : 'Upload .md'}
                       <input type="file" accept=".md,.markdown,text/markdown" className="hidden" onChange={(e) => onPickFile(i, e)} />
                     </label>
@@ -226,14 +226,14 @@ export default function PrivacyNoticesPage() {
                       <button
                         type="button"
                         onClick={() => removeLang(i)}
-                        className="ml-auto text-sm text-red-600 hover:underline"
+                        className="ml-auto text-sm text-danger-text hover:underline"
                       >
                         Remove
                       </button>
                     )}
                   </div>
                   <textarea
-                    className="w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-mono"
+                    className="w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-accent-line focus:border-accent-line text-sm font-mono"
                     rows={8}
                     value={l.text}
                     onChange={(e) => setLangText(i, e.target.value)}
@@ -244,7 +244,7 @@ export default function PrivacyNoticesPage() {
             </div>
 
             <div className="mt-3 flex items-center gap-4">
-              <button type="button" onClick={addLang} className="text-sm text-blue-600 hover:underline">
+              <button type="button" onClick={addLang} className="text-sm text-accent-text hover:underline">
                 + Add language
               </button>
             </div>
@@ -254,7 +254,7 @@ export default function PrivacyNoticesPage() {
                 type="button"
                 onClick={onClickPublish}
                 disabled={publishing || !!validationError}
-                className="px-4 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors"
               >
                 {publishing ? 'Publishing…' : 'Publish version'}
               </button>

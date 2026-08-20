@@ -15,10 +15,10 @@ interface NotificationProps {
 const EXIT_MS = 300;
 
 const typeStyles: Record<NotificationType, { bg: string; icon: string; text: string }> = {
-  success: { bg: 'bg-green-50 border-green-200', icon: 'text-green-500', text: 'text-green-800' },
-  error: { bg: 'bg-red-50 border-red-200', icon: 'text-red-500', text: 'text-red-800' },
-  warning: { bg: 'bg-yellow-50 border-yellow-200', icon: 'text-yellow-500', text: 'text-yellow-800' },
-  info: { bg: 'bg-blue-50 border-blue-200', icon: 'text-blue-500', text: 'text-blue-800' },
+  success: { bg: 'bg-success-wash border-success-line', icon: 'text-green-500', text: 'text-success-text' },
+  error: { bg: 'bg-danger-wash border-danger-line', icon: 'text-danger-text', text: 'text-danger-text' },
+  warning: { bg: 'bg-warn-wash border-warn-line', icon: 'text-yellow-500', text: 'text-warn-text' },
+  info: { bg: 'bg-accent-wash border-accent-line', icon: 'text-accent-text', text: 'text-accent-text' },
 };
 
 const typeIcons: Record<NotificationType, React.ReactElement> = {

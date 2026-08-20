@@ -120,7 +120,7 @@ export default function ImportFromFile({
           if (f) handleFile(f);
           e.target.value = '';
         }}
-        className="block text-sm text-muted file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-on-accent hover:file:bg-blue-700"
+        className="block text-sm text-muted file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-medium file:text-on-accent hover:file:bg-accent-hover"
       />
 
       <ErrorBanner>{fileError}</ErrorBanner>
@@ -169,15 +169,15 @@ export default function ImportFromFile({
                           value={rowGroupFile[i] ?? ''}
                           onChange={(e) => setRowGroupFile((p) => ({ ...p, [i]: e.target.value }))}
                           placeholder="—"
-                          className="w-32 px-2 py-1 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-32 px-2 py-1 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
                         />
                       </td>
                       <td className="px-4 py-3 text-sm">
                         {res ? (
                           res.ok ? (
-                            <span className="text-green-700">Added ✓</span>
+                            <span className="text-success-text">Added ✓</span>
                           ) : (
-                            <span className="text-red-600" title={res.message}>Failed</span>
+                            <span className="text-danger-text" title={res.message}>Failed</span>
                           )
                         ) : (
                           <span className="text-subtle">—</span>

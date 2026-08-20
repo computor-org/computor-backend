@@ -86,7 +86,7 @@ export function ViewCourseLink({ courseId }: { courseId: string }) {
   return (
     <Link
       href={`/courses/${courseId}`}
-      className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center"
+      className="text-sm text-accent-text hover:text-accent-text font-medium flex items-center"
     >
       View Course
       <svg className="ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

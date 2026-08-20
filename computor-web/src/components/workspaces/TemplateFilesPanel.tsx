@@ -112,7 +112,7 @@ export default function TemplateFilesPanel({ templateName }: { templateName: str
               onClick={() => setActiveFile(file.name)}
             >
               {file.name}
-              {isDirty(file.name) && <span className="text-amber-600 ml-1">•</span>}
+              {isDirty(file.name) && <span className="text-warn-text ml-1">•</span>}
             </Button>
           ))}
           {files.length === 0 && <p className="text-sm text-muted">No editable files.</p>}

@@ -52,7 +52,7 @@ export default function OrganizationDetailPage() {
             org && canManage ? (
               <>
                 <Link href={`/organizations/${org.id}/edit`} className="px-3 py-2 text-sm font-medium text-body border border-rule-strong rounded-lg hover:bg-canvas">Edit</Link>
-                <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
+                <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-danger-text border border-danger-line rounded-lg hover:bg-danger-wash">Delete</button>
               </>
             ) : undefined
           }
@@ -76,7 +76,7 @@ export default function OrganizationDetailPage() {
                   Course Families <span className="text-subtle font-normal">({families.length})</span>
                 </h2>
                 {canCreateCourseFamily(orgId) && (
-                  <Link href={`/course-families/create?organization_id=${orgId}`} className="text-sm text-blue-600 hover:underline">New course family</Link>
+                  <Link href={`/course-families/create?organization_id=${orgId}`} className="text-sm text-accent-text hover:underline">New course family</Link>
                 )}
               </div>
               {families.length === 0 ? (

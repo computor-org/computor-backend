@@ -111,9 +111,9 @@ export default function MaintenancePage() {
     return (
       <AuthenticatedLayout>
         <div className="p-6">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-            <h2 className="text-lg font-semibold text-red-800">Access Denied</h2>
-            <p className="text-sm text-red-600 mt-2">Admin privileges are required to access this page.</p>
+          <div className="bg-danger-wash border border-danger-line rounded-lg p-6 text-center">
+            <h2 className="text-lg font-semibold text-danger-text">Access Denied</h2>
+            <p className="text-sm text-danger-text mt-2">Admin privileges are required to access this page.</p>
           </div>
         </div>
       </AuthenticatedLayout>
@@ -177,18 +177,18 @@ export default function MaintenancePage() {
               )}
 
               {status.scheduled_at && (
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="mt-4 p-3 bg-accent-wash border border-accent-line rounded-lg">
                   <div className="flex items-center gap-2 mb-1">
-                    <svg className="h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-4 w-4 text-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span className="text-sm font-medium text-blue-800">Scheduled Maintenance</span>
+                    <span className="text-sm font-medium text-accent-text">Scheduled Maintenance</span>
                   </div>
-                  <p className="text-sm text-blue-700">
+                  <p className="text-sm text-accent-text">
                     Planned for: {new Date(status.scheduled_at).toLocaleString()}
                   </p>
                   {status.scheduled_by && (
-                    <p className="text-xs text-blue-600 mt-1">Scheduled by: {status.scheduled_by_name || status.scheduled_by}</p>
+                    <p className="text-xs text-accent-text mt-1">Scheduled by: {status.scheduled_by_name || status.scheduled_by}</p>
                   )}
                 </div>
               )}
@@ -225,13 +225,13 @@ export default function MaintenancePage() {
                     value={activateMessage}
                     onChange={(e) => setActivateMessage(e.target.value)}
                     rows={2}
-                    className="w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm mb-3"
+                    className="w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-accent-line focus:border-accent-line text-sm mb-3"
                     placeholder="Message shown to users during maintenance..."
                   />
                   <button
                     onClick={() => setShowActivateConfirm(true)}
                     disabled={activating}
-                    className="px-4 py-2 text-sm font-medium text-on-accent bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                    className="px-4 py-2 text-sm font-medium text-on-accent bg-danger rounded-lg hover:bg-danger-hover disabled:opacity-50 transition-colors"
                   >
                     {activating ? 'Activating...' : 'Activate Maintenance'}
                   </button>
@@ -252,7 +252,7 @@ export default function MaintenancePage() {
                     <button
                       onClick={() => setShowCancelConfirm(true)}
                       disabled={cancelling}
-                      className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors"
+                      className="px-4 py-2 text-sm font-medium text-danger-text bg-danger-wash rounded-lg hover:bg-danger-wash disabled:opacity-50 transition-colors"
                     >
                       {cancelling ? 'Cancelling...' : 'Cancel Schedule'}
                     </button>
@@ -269,7 +269,7 @@ export default function MaintenancePage() {
                           type="datetime-local"
                           value={scheduleDate}
                           onChange={(e) => setScheduleDate(e.target.value)}
-                          className="w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          className="w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-accent-line focus:border-accent-line text-sm"
                           required
                         />
                       </div>
@@ -282,7 +282,7 @@ export default function MaintenancePage() {
                           type="text"
                           value={scheduleMessage}
                           onChange={(e) => setScheduleMessage(e.target.value)}
-                          className="w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          className="w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-accent-line focus:border-accent-line text-sm"
                           placeholder="Schedule message..."
                         />
                       </div>
@@ -290,7 +290,7 @@ export default function MaintenancePage() {
                     <button
                       type="submit"
                       disabled={scheduling}
-                      className="px-4 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                      className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors"
                     >
                       {scheduling ? 'Scheduling...' : 'Schedule Maintenance'}
                     </button>

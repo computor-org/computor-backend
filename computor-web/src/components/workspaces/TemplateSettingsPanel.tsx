@@ -328,7 +328,7 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
                     ],
                   })
                 }
-                className="w-full text-left rounded border border-rule px-3 py-2 hover:border-blue-400 hover:bg-blue-50"
+                className="w-full text-left rounded border border-rule px-3 py-2 hover:border-accent-line hover:bg-accent-wash"
               >
                 <span className="text-sm font-mono text-fg">+ {variable.name}</span>
                 <span className="text-xs text-muted ml-2">

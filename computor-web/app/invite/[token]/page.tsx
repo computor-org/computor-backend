@@ -103,7 +103,7 @@ export default function InvitePage() {
           </p>
           <button
             onClick={() => loginWithSSO('keycloak')}
-            className="w-full py-2.5 px-4 bg-blue-600 text-on-accent text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            className="w-full py-2.5 px-4 bg-accent text-on-accent text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors"
           >
             Continue to sign in
           </button>
@@ -125,7 +125,7 @@ export default function InvitePage() {
           <p className="text-sm text-muted mb-2">You&apos;ve been invited to join Computor.</p>
 
           {/* Invite metadata */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6 text-xs text-blue-800 space-y-1">
+          <div className="bg-accent-wash border border-accent-line rounded-lg p-3 mb-6 text-xs text-accent-text space-y-1">
             <div>Expires: <strong>{formatDate(invite.expires_at)}</strong></div>
             {invite.email && <div>This invite is restricted to <strong>{invite.email}</strong></div>}
             {invite.roles && invite.roles.length > 0 && (
@@ -138,7 +138,7 @@ export default function InvitePage() {
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-8 pt-0 space-y-4">
           {submitError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{submitError}</div>
+            <div className="p-3 bg-danger-wash border border-danger-line rounded-lg text-sm text-danger-text">{submitError}</div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
@@ -149,7 +149,7 @@ export default function InvitePage() {
                 required
                 value={form.givenName}
                 onChange={e => setForm(f => ({ ...f, givenName: e.target.value }))}
-                className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
               />
             </div>
             <div>
@@ -159,7 +159,7 @@ export default function InvitePage() {
                 required
                 value={form.familyName}
                 onChange={e => setForm(f => ({ ...f, familyName: e.target.value }))}
-                className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
               />
             </div>
           </div>
@@ -172,7 +172,7 @@ export default function InvitePage() {
               value={form.email}
               readOnly={!!invite.email}
               onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-              className={`w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${invite.email ? 'bg-canvas cursor-not-allowed' : ''}`}
+              className={`w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent ${invite.email ? 'bg-canvas cursor-not-allowed' : ''}`}
             />
             {invite.email && <p className="mt-1 text-xs text-muted">Email is fixed by the invite restriction.</p>}
           </div>
@@ -185,7 +185,7 @@ export default function InvitePage() {
               minLength={8}
               value={form.password}
               onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-              className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
             />
           </div>
 
@@ -196,14 +196,14 @@ export default function InvitePage() {
               required
               value={form.confirmPassword}
               onChange={e => setForm(f => ({ ...f, confirmPassword: e.target.value }))}
-              className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
             />
           </div>
 
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-2.5 px-4 bg-blue-600 text-on-accent text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 mt-2"
+            className="w-full py-2.5 px-4 bg-accent text-on-accent text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-50 mt-2"
           >
             {submitting ? 'Creating account…' : 'Create account'}
           </button>

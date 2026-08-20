@@ -263,7 +263,7 @@ export default function ConnectUsersSection({
               )}
             </div>
 
-            <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+            <div className="p-3 bg-danger-wash border border-danger-line rounded-md text-sm text-danger-text">
               <span className="font-semibold">
                 The user {userDisplayName(source)}
                 {source.email ? ` (${source.email})` : ''} will be permanently deleted.

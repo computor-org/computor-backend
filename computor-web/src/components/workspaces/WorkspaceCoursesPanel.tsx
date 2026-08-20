@@ -65,7 +65,7 @@ export default function WorkspaceCoursesPanel() {
                   </Td>
                   <Td>
                     {course.lecturer_provision_enabled ? (
-                      <span className="inline-flex items-center rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                      <span className="inline-flex items-center rounded bg-success-wash px-2 py-0.5 text-xs font-medium text-success-text">
                         Enabled
                       </span>
                     ) : (

@@ -75,7 +75,7 @@ export default function WorkspaceVolumesPanel() {
           {data ? ` ${formatSize(data.total_bytes)} in total.` : ''}
         </p>
         {data?.unresolved && (
-          <p className="mt-2 text-sm text-amber-700">
+          <p className="mt-2 text-sm text-warn-text">
             Coder is unreachable, so owners could not be resolved. Nothing is marked as an orphan —
             a missing owner here would only mean the lookup failed.
           </p>
@@ -96,7 +96,7 @@ export default function WorkspaceVolumesPanel() {
           </thead>
           <tbody className="divide-y divide-rule-soft">
             {volumes.map((volume) => (
-              <tr key={volume.name} className={volume.orphaned ? 'bg-amber-50/40' : undefined}>
+              <tr key={volume.name} className={volume.orphaned ? 'bg-warn-wash/40' : undefined}>
                 <td className="px-4 py-2 font-mono text-xs text-body">{volume.name}</td>
                 <td className="px-4 py-2">{volume.kind}</td>
                 <td className="px-4 py-2">{owner(volume)}</td>
@@ -105,13 +105,13 @@ export default function WorkspaceVolumesPanel() {
                 </td>
                 <td className="px-4 py-2">
                   {volume.in_use && (
-                    <span className="inline-flex items-center rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                    <span className="inline-flex items-center rounded bg-accent-wash px-2 py-0.5 text-xs font-medium text-accent-text">
                       In use
                     </span>
                   )}
                   {volume.orphaned && (
                     <span
-                      className="ml-1 inline-flex items-center rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
+                      className="ml-1 inline-flex items-center rounded bg-warn-wash px-2 py-0.5 text-xs font-medium text-warn-text"
                       title="The user or workspace this volume was created for no longer exists."
                     >
                       Orphaned

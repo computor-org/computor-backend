@@ -124,7 +124,7 @@ export default function ConsentPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-canvas">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto"></div>
           <p className="mt-4 text-muted">Loading...</p>
         </div>
       </div>
@@ -144,14 +144,14 @@ export default function ConsentPage() {
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-800">{error}</p>
+          <div className="bg-danger-wash border border-danger-line rounded-lg p-4">
+            <p className="text-sm text-danger-text">{error}</p>
           </div>
         )}
 
         {reviewMode && status?.has_consented && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <p className="text-sm text-green-800">
+          <div className="bg-success-wash border border-success-line rounded-lg p-4">
+            <p className="text-sm text-success-text">
               You accepted this privacy notice
               {status.granted_at ? ` on ${new Date(status.granted_at).toLocaleString()}` : ''}. You
               can withdraw your consent at any time in{' '}
@@ -167,7 +167,7 @@ export default function ConsentPage() {
             this platform is used — for example your name, e-mail address, course enrollments and
             submissions. The details are described in the privacy notice below.
           </p>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="bg-accent-wash border border-accent-line rounded-lg p-4">
             <p className="text-sm text-blue-900">
               <span className="font-semibold">Cookies:</span> this platform only uses strictly
               necessary cookies for authentication (single sign-on session). These are required
@@ -188,7 +188,7 @@ export default function ConsentPage() {
                     onClick={() => handleLanguageChange(lang)}
                     className={`px-3 py-1 text-sm rounded-md border ${
                       policy.lang === lang
-                        ? 'bg-blue-600 text-on-accent border-blue-600'
+                        ? 'bg-accent text-on-accent border-accent'
                         : 'bg-surface text-body border-rule-strong hover:bg-canvas'
                     }`}
                   >
@@ -216,7 +216,7 @@ export default function ConsentPage() {
                 type="checkbox"
                 checked={accepted}
                 onChange={(e) => setAccepted(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-rule-strong text-blue-600 focus:ring-blue-500"
+                className="mt-1 h-4 w-4 rounded border-rule-strong text-accent-text focus:ring-accent-line"
               />
               <span className="text-body">
                 I have read the privacy notice (version{' '}
@@ -231,7 +231,7 @@ export default function ConsentPage() {
               <button
                 onClick={handleSubmit}
                 disabled={!accepted || submitting}
-                className="px-6 py-2 rounded-lg font-medium bg-blue-600 text-on-accent hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                className="px-6 py-2 rounded-lg font-medium bg-accent text-on-accent hover:bg-accent-hover disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
                 {submitting ? 'Saving...' : 'Agree and continue'}
               </button>

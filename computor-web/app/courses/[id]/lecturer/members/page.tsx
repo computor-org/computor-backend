@@ -147,7 +147,7 @@ export default function CourseMembersPage() {
           actions={
             <Link
               href={`/courses/${courseId}/lecturer/members/add`}
-              className="px-4 py-2 bg-blue-600 text-on-accent rounded-lg text-sm font-medium hover:bg-blue-700"
+              className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover"
             >
               Add members
             </Link>
@@ -193,7 +193,7 @@ export default function CourseMembersPage() {
                             value={m.course_role_id}
                             disabled={savingId === m.id}
                             onChange={(e) => changeRole(m, e.target.value)}
-                            className="px-2 py-1 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                            className="px-2 py-1 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent disabled:opacity-50"
                           >
                             {options.map((r) => (
                               <option key={r} value={r}>
@@ -211,7 +211,7 @@ export default function CourseMembersPage() {
                             value={m.course_group_id ?? ''}
                             disabled={savingId === m.id}
                             onChange={(e) => changeGroup(m, e.target.value)}
-                            className="px-2 py-1 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                            className="px-2 py-1 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent disabled:opacity-50"
                           >
                             <option value="">— no group —</option>
                             {groups.map((g) => (
@@ -230,7 +230,7 @@ export default function CourseMembersPage() {
                         {manageable && (
                           <button
                             onClick={() => setToRemove(m)}
-                            className="text-sm text-red-600 hover:underline"
+                            className="text-sm text-danger-text hover:underline"
                           >
                             Remove
                           </button>

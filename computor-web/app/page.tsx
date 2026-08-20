@@ -82,13 +82,13 @@ export default function Home() {
             <div className="flex items-center space-x-4">
               <Link
                 href="/dashboard"
-                className="px-4 py-2 text-blue-600 hover:text-blue-700 transition-colors font-medium"
+                className="px-4 py-2 text-accent-text hover:text-accent-text transition-colors font-medium"
               >
                 Dashboard
               </Link>
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 bg-surface text-red-600 border-2 border-red-600 rounded-lg hover:bg-red-50 transition-colors font-medium"
+                className="px-4 py-2 bg-surface text-danger-text border-2 border-red-600 rounded-lg hover:bg-danger-wash transition-colors font-medium"
               >
                 Sign Out
               </button>
@@ -97,7 +97,7 @@ export default function Home() {
             <div className="flex items-center space-x-3">
               <Link
                 href="/login"
-                className="px-4 py-2 bg-blue-600 text-on-accent rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                className="px-4 py-2 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-colors font-medium"
               >
                 Sign In
               </Link>
@@ -113,7 +113,7 @@ export default function Home() {
           <div className="space-y-4">
             <h2 className="text-5xl md:text-6xl font-bold text-fg">
               Learn Programming with{' '}
-              <span className="text-blue-600">Computor</span>
+              <span className="text-accent-text">Computor</span>
             </h2>
             <p className="text-xl text-muted max-w-2xl mx-auto">
               A comprehensive educational platform for programming courses, assignments, and automated testing.
@@ -124,7 +124,7 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             {extensionUrl ? (
               <button
-                className="px-8 py-4 bg-blue-600 text-on-accent rounded-lg hover:bg-blue-700 transition-all transform hover:scale-105 font-semibold text-lg shadow-lg flex items-center space-x-2"
+                className="px-8 py-4 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-all transform hover:scale-105 font-semibold text-lg shadow-lg flex items-center space-x-2"
                 onClick={handleDownload}
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -136,7 +136,7 @@ export default function Home() {
             {gettingStartedUrl ? (
               <button
                 onClick={handleGettingStarted}
-                className="px-8 py-4 bg-surface text-blue-600 rounded-lg border-2 border-blue-600 hover:bg-blue-50 transition-all font-semibold text-lg"
+                className="px-8 py-4 bg-surface text-accent-text rounded-lg border-2 border-accent hover:bg-accent-wash transition-all font-semibold text-lg"
               >
                 Get Started →
               </button>
@@ -146,7 +146,7 @@ export default function Home() {
           {/* VS Code Extension Card */}
           <div className="mt-16 bg-surface rounded-2xl shadow-xl p-8 border border-rule">
             <div className="flex items-center justify-center space-x-3 mb-4">
-              <svg className="h-10 w-10 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-10 w-10 text-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
               </svg>
               <h3 className="text-2xl font-bold text-fg">
@@ -157,16 +157,16 @@ export default function Home() {
               Code directly in VS Code with our powerful extension. Submit assignments, run tests, and get instant feedback - all without leaving your editor.
             </p>
             <div className="flex flex-wrap gap-4 justify-center">
-              <div className="px-4 py-2 bg-blue-50 rounded-lg text-blue-700 font-medium">
+              <div className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium">
                 ✓ Instant Testing
               </div>
-              <div className="px-4 py-2 bg-blue-50 rounded-lg text-blue-700 font-medium">
+              <div className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium">
                 ✓ Auto Submission
               </div>
-              <div className="px-4 py-2 bg-blue-50 rounded-lg text-blue-700 font-medium">
+              <div className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium">
                 ✓ Live Feedback
               </div>
-              <div className="px-4 py-2 bg-blue-50 rounded-lg text-blue-700 font-medium">
+              <div className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium">
                 ✓ Git Integration
               </div>
             </div>
@@ -175,7 +175,7 @@ export default function Home() {
           {/* Features Grid */}
           <div className="grid md:grid-cols-3 gap-8 mt-16">
             <div className="bg-surface rounded-xl shadow-lg p-6 border border-rule">
-              <svg className="h-12 w-12 text-blue-600 mb-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-12 w-12 text-accent-text mb-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
               <h3 className="text-xl font-bold text-fg mb-2">
@@ -186,7 +186,7 @@ export default function Home() {
               </p>
             </div>
             <div className="bg-surface rounded-xl shadow-lg p-6 border border-rule">
-              <svg className="h-12 w-12 text-blue-600 mb-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-12 w-12 text-accent-text mb-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
               </svg>
               <h3 className="text-xl font-bold text-fg mb-2">
@@ -197,7 +197,7 @@ export default function Home() {
               </p>
             </div>
             <div className="bg-surface rounded-xl shadow-lg p-6 border border-rule">
-              <svg className="h-12 w-12 text-blue-600 mb-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-12 w-12 text-accent-text mb-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
               </svg>
               <h3 className="text-xl font-bold text-fg mb-2">

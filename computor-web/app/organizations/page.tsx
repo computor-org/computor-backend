@@ -39,7 +39,7 @@ export default function OrganizationsPage() {
           subtitle="The top of the hierarchy: organizations contain course families."
           actions={
             canCreateOrganization ? (
-              <Link href="/organizations/create" className="px-4 py-2 bg-blue-600 text-on-accent rounded-lg text-sm font-medium hover:bg-blue-700">
+              <Link href="/organizations/create" className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover">
                 New Organization
               </Link>
             ) : undefined
@@ -57,12 +57,12 @@ export default function OrganizationsPage() {
         ) : (
           <ScrollArea spacing="rows">
             {orgs.map((o) => (
-              <div key={o.id} className="flex items-center justify-between gap-4 bg-surface border border-rule rounded-lg p-4 hover:border-blue-500 hover:shadow-sm transition-all">
+              <div key={o.id} className="flex items-center justify-between gap-4 bg-surface border border-rule rounded-lg p-4 hover:border-accent-line hover:shadow-sm transition-all">
                 <Link href={`/organizations/${o.id}`} className="min-w-0 group flex-1">
-                  <div className="text-sm font-medium text-fg truncate group-hover:text-blue-600">{displayName(o, 'Untitled Organization')}</div>
+                  <div className="text-sm font-medium text-fg truncate group-hover:text-accent-text">{displayName(o, 'Untitled Organization')}</div>
                   <div className="text-xs text-muted">{o.organization_type}</div>
                 </Link>
-                <Link href={`/course-families?organization_id=${o.id}`} className="text-sm text-blue-600 hover:underline whitespace-nowrap">
+                <Link href={`/course-families?organization_id=${o.id}`} className="text-sm text-accent-text hover:underline whitespace-nowrap">
                   {familyCounts[o.id] ?? 0} course {(familyCounts[o.id] ?? 0) === 1 ? 'family' : 'families'} →
                 </Link>
               </div>

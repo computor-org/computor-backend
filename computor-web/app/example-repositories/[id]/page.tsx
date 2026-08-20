@@ -59,10 +59,10 @@ export default function ExampleRepositoryDetailPage() {
             repo && canManageExamples ? (
               <>
                 {uploadable && (
-                  <Link href={`/examples/upload?repository=${repo.id}`} className="px-3 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700">Upload examples</Link>
+                  <Link href={`/examples/upload?repository=${repo.id}`} className="px-3 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover">Upload examples</Link>
                 )}
                 <Link href={`/example-repositories/${repo.id}/edit`} className="px-3 py-2 text-sm font-medium text-body border border-rule-strong rounded-lg hover:bg-canvas">Edit</Link>
-                <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
+                <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-danger-text border border-danger-line rounded-lg hover:bg-danger-wash">Delete</button>
               </>
             ) : undefined
           }

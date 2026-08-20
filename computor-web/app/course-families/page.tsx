@@ -49,7 +49,7 @@ export default function CourseFamiliesPage() {
           subtitle="A course family groups related courses within an organization."
           actions={
             canCreateCourseFamily() ? (
-              <Link href="/course-families/create" className="px-4 py-2 bg-blue-600 text-on-accent rounded-lg text-sm font-medium hover:bg-blue-700">
+              <Link href="/course-families/create" className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover">
                 New Course Family
               </Link>
             ) : undefined
@@ -65,7 +65,7 @@ export default function CourseFamiliesPage() {
         ) : (
           <ScrollArea spacing="rows">
             {families.map((f) => (
-              <Link key={f.id} href={`/course-families/${f.id}`} className="block bg-surface border border-rule rounded-lg p-4 hover:border-blue-500 hover:shadow-sm transition-all">
+              <Link key={f.id} href={`/course-families/${f.id}`} className="block bg-surface border border-rule rounded-lg p-4 hover:border-accent-line hover:shadow-sm transition-all">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-sm font-medium text-fg">{displayName(f, 'Untitled Course Family')}</div>
                   <span className="shrink-0 text-xs text-muted">

@@ -116,14 +116,14 @@ export default function LecturerTemplatesPage() {
             </p>
 
             {failure && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">{failure}</div>
+              <div className="p-3 bg-danger-wash border border-danger-line rounded text-sm text-danger-text">{failure}</div>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {LAYOUTS.map((l) => (
                 <div key={l.id} className="p-5 bg-surface border border-rule rounded-lg flex flex-col gap-3">
                   <div className="flex items-start gap-4">
-                    <svg className="h-8 w-8 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-8 w-8 text-accent-text shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={l.icon} />
                     </svg>
                     <div>
@@ -136,7 +136,7 @@ export default function LecturerTemplatesPage() {
                     type="button"
                     onClick={() => download(l.id)}
                     disabled={downloading !== null}
-                    className="self-start mt-auto px-3 py-1.5 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    className="self-start mt-auto px-3 py-1.5 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
                   >
                     {downloading === l.id ? 'Preparing…' : 'Download ZIP'}
                   </button>

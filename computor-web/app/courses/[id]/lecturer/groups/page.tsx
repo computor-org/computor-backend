@@ -86,7 +86,7 @@ export default function CourseGroupsPage() {
           actions={
             <Link
               href={`/courses/${courseId}/lecturer/groups/create`}
-              className="px-4 py-2 bg-blue-600 text-on-accent rounded-lg text-sm font-medium hover:bg-blue-700"
+              className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover"
             >
               New group
             </Link>
@@ -115,7 +115,7 @@ export default function CourseGroupsPage() {
                       <td className="px-4 py-3">
                         <Link
                           href={`/courses/${courseId}/lecturer/groups/${g.id}/edit`}
-                          className="font-medium text-fg text-sm hover:text-blue-600"
+                          className="font-medium text-fg text-sm hover:text-accent-text"
                         >
                           {g.title || 'Untitled group'}
                         </Link>
@@ -124,14 +124,14 @@ export default function CourseGroupsPage() {
                       <td className="px-4 py-3 text-right space-x-4">
                         <Link
                           href={`/courses/${courseId}/lecturer/groups/${g.id}/edit`}
-                          className="text-sm text-blue-600 hover:underline"
+                          className="text-sm text-accent-text hover:underline"
                         >
                           Edit
                         </Link>
                         {count === 0 ? (
                           <button
                             onClick={() => setToDelete(g)}
-                            className="text-sm text-red-600 hover:underline"
+                            className="text-sm text-danger-text hover:underline"
                           >
                             Delete
                           </button>

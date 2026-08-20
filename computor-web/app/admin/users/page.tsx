@@ -61,7 +61,7 @@ export default function UsersPage() {
           breadcrumbs={[{ label: 'Users' }]}
           title="Users"
           actions={
-            <Link href="/admin/users/create" className="px-4 py-2 bg-blue-600 text-on-accent rounded-lg text-sm font-medium hover:bg-blue-700">
+            <Link href="/admin/users/create" className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover">
               New User
             </Link>
           }
@@ -75,7 +75,7 @@ export default function UsersPage() {
             placeholder="Search by email or name…"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className="w-full max-w-md px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full max-w-md px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
           />
           <label className="flex items-center gap-2 text-sm text-muted cursor-pointer select-none whitespace-nowrap">
             <input
@@ -109,7 +109,7 @@ export default function UsersPage() {
                   <tr key={u.id} className={`hover:bg-canvas ${u.archived_at ? 'opacity-50' : ''}`}>
                     <td className="px-4 py-3">
                       <Link href={`/admin/users/${u.id}`} className="block group">
-                        <div className="font-medium text-fg text-sm group-hover:text-blue-600">{u.email ?? '—'}</div>
+                        <div className="font-medium text-fg text-sm group-hover:text-accent-text">{u.email ?? '—'}</div>
                         <div className="text-xs text-muted">{u.given_name} {u.family_name}</div>
                       </Link>
                     </td>
@@ -121,7 +121,7 @@ export default function UsersPage() {
                     </td>
                     <td className="px-4 py-3 text-xs text-muted">{u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
                     <td className="px-4 py-3 text-right">
-                      <Link href={`/admin/users/${u.id}`} className="text-sm text-blue-600 hover:underline">Manage →</Link>
+                      <Link href={`/admin/users/${u.id}`} className="text-sm text-accent-text hover:underline">Manage →</Link>
                     </td>
                   </tr>
                 ))}

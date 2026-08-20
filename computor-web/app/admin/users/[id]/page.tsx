@@ -203,7 +203,7 @@ export default function UserDetailPage() {
               <div>
                 <dt className="text-muted">Status</dt>
                 <dd className="text-fg">
-                  {user.banned_at ? <span className="text-red-700 font-medium">Banned</span> : user.archived_at ? 'Archived' : 'Active'}
+                  {user.banned_at ? <span className="text-danger-text font-medium">Banned</span> : user.archived_at ? 'Archived' : 'Active'}
                 </dd>
               </div>
               <div><dt className="text-muted">Created</dt><dd className="text-fg">{user.created_at ? new Date(user.created_at).toLocaleString() : '—'}</dd></div>
@@ -214,11 +214,11 @@ export default function UserDetailPage() {
               <h2 className="text-lg font-semibold text-fg">Access control</h2>
               {user.banned_at ? (
                 <div className="space-y-2 text-sm">
-                  <p className="text-red-700 font-medium">
+                  <p className="text-danger-text font-medium">
                     Banned on {new Date(user.banned_at).toLocaleString()}. This user cannot authenticate.
                   </p>
                   {user.ban_reason ? <p className="text-muted">Reason: {user.ban_reason}</p> : null}
-                  <button onClick={() => setShowUnbanConfirm(true)} className="px-4 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700">
+                  <button onClick={() => setShowUnbanConfirm(true)} className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover">
                     Unban user
                   </button>
                 </div>
@@ -230,9 +230,9 @@ export default function UserDetailPage() {
                     onChange={(e) => setBanReason(e.target.value)}
                     placeholder="Reason (optional)"
                     maxLength={1024}
-                    className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line"
                   />
-                  <button onClick={() => setShowBanConfirm(true)} className="px-4 py-2 text-sm font-medium text-on-accent bg-red-600 rounded-lg hover:bg-red-700">
+                  <button onClick={() => setShowBanConfirm(true)} className="px-4 py-2 text-sm font-medium text-on-accent bg-danger rounded-lg hover:bg-danger-hover">
                     Ban user
                   </button>
                 </div>
@@ -243,7 +243,7 @@ export default function UserDetailPage() {
             <section className="bg-surface border border-rule rounded-lg p-6 space-y-3">
               <h2 className="text-lg font-semibold text-fg">System roles</h2>
               <SystemRoleCheckboxes selected={roles} onToggle={toggleRole} disabled={savingRoles} />
-              <button onClick={saveRoles} disabled={savingRoles} className="px-4 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              <button onClick={saveRoles} disabled={savingRoles} className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50">
                 {savingRoles ? 'Saving…' : 'Save roles'}
               </button>
             </section>
@@ -264,7 +264,7 @@ export default function UserDetailPage() {
                           <span className="mx-2 text-faint">·</span>
                           <span className="text-muted">{acc.provider_account_id}</span>
                         </div>
-                        <button onClick={() => setRemoveAccountId(acc.id)} className="text-xs text-red-500 hover:text-red-700">Remove</button>
+                        <button onClick={() => setRemoveAccountId(acc.id)} className="text-xs text-danger-text hover:text-danger-text">Remove</button>
                       </div>
                     );
                   })}
@@ -286,15 +286,15 @@ export default function UserDetailPage() {
                       <div className="space-y-2">
                         <div>
                           <label className="block text-xs font-medium text-body mb-1">Provider URL</label>
-                          <input value={providerUrl} onChange={(e) => setProviderUrl(e.target.value)} placeholder="gitlab.com" className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500" autoFocus />
+                          <input value={providerUrl} onChange={(e) => setProviderUrl(e.target.value)} placeholder="gitlab.com" className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line" autoFocus />
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-body mb-1">{prov.field_label}</label>
-                          <input value={accountId} onChange={(e) => setAccountId(e.target.value)} placeholder={prov.placeholder} className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                          <input value={accountId} onChange={(e) => setAccountId(e.target.value)} placeholder={prov.placeholder} className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line" />
                         </div>
                         <div className="flex justify-end gap-2">
                           <button onClick={() => setAddProvider(null)} className="px-3 py-2 text-sm text-muted hover:bg-sunken rounded-lg">Cancel</button>
-                          <button onClick={addAccount} disabled={savingAccount || !providerUrl.trim() || !accountId.trim()} className="px-3 py-2 text-sm bg-blue-600 text-on-accent rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                          <button onClick={addAccount} disabled={savingAccount || !providerUrl.trim() || !accountId.trim()} className="px-3 py-2 text-sm bg-accent text-on-accent rounded-lg hover:bg-accent-hover disabled:opacity-50">
                             {savingAccount ? 'Linking…' : 'Link account'}
                           </button>
                         </div>

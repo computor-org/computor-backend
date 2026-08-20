@@ -79,7 +79,7 @@ export default function VisibilitySelect({
       </select>
 
       {overriddenFromAbove && (
-        <p className="text-xs text-amber-700">
+        <p className="text-xs text-warn-text">
           Currently hidden anyway: a unit above this one, or the course itself,
           is hidden. Setting this to visible will not override that.
         </p>

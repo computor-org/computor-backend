@@ -158,7 +158,7 @@ export default function WorkspaceTemplatesPanel() {
           limits and Terraform variables apply at the next build; seat quotas apply immediately.
         </p>
         {data && !data.catalog.templates_dir_available && (
-          <p className="text-sm text-amber-700">
+          <p className="text-sm text-warn-text">
             The templates directory is not readable from the backend
             (CODER_TEMPLATES_DIR), so only templates already in Coder are listed — nothing new
             can be deployed from here.
@@ -172,7 +172,7 @@ export default function WorkspaceTemplatesPanel() {
         rather than leaving a table of "Not deployed" rows to be interpreted.
       */}
       {nothingDeployed && !activeTask && (
-        <div className="shrink-0 rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <div className="shrink-0 rounded-lg border border-accent-line bg-accent-wash p-4">
           <h3 className="text-sm font-semibold text-fg">
             No workspace templates are deployed yet
           </h3>

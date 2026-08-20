@@ -181,7 +181,7 @@ export default function WorkspaceUsersPanel() {
               type="checkbox"
               checked={assignProvision}
               onChange={(e) => setAssignProvision(e.target.checked)}
-              className="rounded border-rule-strong text-blue-600 focus:ring-blue-500"
+              className="rounded border-rule-strong text-accent-text focus:ring-accent-line"
             />
             Provision workspace
           </label>
@@ -260,7 +260,7 @@ export default function WorkspaceUsersPanel() {
                               {role}
                               <button
                                 onClick={() => setRemoveTarget({ userId: u.user_id, roleId: role, email: u.email || '' })}
-                                className="text-blue-400 hover:text-red-500 ml-1"
+                                className="text-blue-400 hover:text-danger-text ml-1"
                                 title="Remove role"
                               >
                                 &times;
@@ -301,7 +301,7 @@ export default function WorkspaceUsersPanel() {
                       <Td>
                         <Link
                           href={`/workspaces/admin/${u.user_id}`}
-                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                          className="text-sm text-accent-text hover:text-accent-text font-medium"
                         >
                           Manage
                         </Link>

@@ -213,12 +213,12 @@ function LecturerWorkspacesContent() {
       ) : (
         <ScrollArea>
           {!provisionAllowed ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <div className="rounded-lg border border-warn-line bg-warn-wash p-4 text-sm text-warn-text">
               Lecturer provisioning is not enabled for this course. A workspace maintainer can
               enable it in the workspace administration area.
             </div>
           ) : templates.length === 0 ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <div className="rounded-lg border border-warn-line bg-warn-wash p-4 text-sm text-warn-text">
               This course has no workspace templates yet. A workspace maintainer can assign
               templates in the workspace administration area.
             </div>
@@ -309,7 +309,7 @@ function LecturerWorkspacesContent() {
                     ))}
                   </select>
                   {selectedTemplate && !selectedIsDeployable && (
-                    <p className="mt-1 text-xs text-amber-700">
+                    <p className="mt-1 text-xs text-warn-text">
                       This workspace type is not set up on this server yet, so nothing can be
                       provisioned onto it. A workspace maintainer deploys it under workspace
                       administration.
@@ -409,11 +409,11 @@ function LecturerWorkspacesContent() {
                           <Td className="text-xs">
                             {outcome ? (
                               outcome.success ? (
-                                <span className="text-green-700">
+                                <span className="text-success-text">
                                   Provisioned {outcome.workspace_name}
                                 </span>
                               ) : (
-                                <span className="text-red-700">{outcome.error}</span>
+                                <span className="text-danger-text">{outcome.error}</span>
                               )
                             ) : (
                               <span className="text-subtle">—</span>
@@ -485,7 +485,7 @@ function LecturerWorkspacesContent() {
                         </Td>
                         <Td>
                           {scratch ? (
-                            <span className="inline-flex items-center rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                            <span className="inline-flex items-center rounded bg-warn-wash px-2 py-0.5 text-xs font-medium text-warn-text">
                               Throwaway
                             </span>
                           ) : (

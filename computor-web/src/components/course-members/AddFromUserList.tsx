@@ -126,11 +126,11 @@ export default function AddFromUserList({
         role and add them. Students must be assigned to a group.
       </p>
       {groups.length === 0 && (
-        <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+        <p className="text-sm text-warn-text bg-warn-wash border border-warn-line rounded-lg px-3 py-2">
           This course has no groups yet, so students cannot be added.{' '}
           <Link
             href={`/courses/${courseId}/lecturer/groups/create`}
-            className="font-medium text-amber-800 underline hover:no-underline"
+            className="font-medium text-warn-text underline hover:no-underline"
           >
             Create a group
           </Link>{' '}
@@ -142,7 +142,7 @@ export default function AddFromUserList({
         placeholder="Search by name or email…"
         value={searchInput}
         onChange={(e) => setSearchInput(e.target.value)}
-        className="w-full max-w-md px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        className="w-full max-w-md px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
       />
 
       <ErrorBanner>{usersError}</ErrorBanner>
@@ -169,7 +169,7 @@ export default function AddFromUserList({
                       <div className="font-medium text-fg text-sm">{userName(u)}</div>
                       <div className="text-xs text-muted">{u.email ?? '—'}</div>
                       {rowError[u.id] && (
-                        <div className="text-xs text-red-600 mt-1">{rowError[u.id]}</div>
+                        <div className="text-xs text-danger-text mt-1">{rowError[u.id]}</div>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -190,7 +190,7 @@ export default function AddFromUserList({
                     </td>
                     <td className="px-4 py-3 text-right">
                       {isAdded ? (
-                        <span className="text-sm text-green-700">Added ✓</span>
+                        <span className="text-sm text-success-text">Added ✓</span>
                       ) : (
                         <Button
                           size="sm"

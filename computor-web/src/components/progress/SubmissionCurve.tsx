@@ -157,7 +157,7 @@ export default function SubmissionCurve({
         Cumulative assignments submitted ({windowed.length}/{total})
         {startValid && <span> · from start date</span>}
         {dueValid && lateCount > 0 && (
-          <span className="text-red-500"> · {lateCount} after due date</span>
+          <span className="text-danger-text"> · {lateCount} after due date</span>
         )}
       </figcaption>
     </figure>

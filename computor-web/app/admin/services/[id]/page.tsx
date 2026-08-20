@@ -88,7 +88,7 @@ export default function ServiceDetailPage() {
                 </Link>
                 <button
                   onClick={() => setConfirmArchive(true)}
-                  className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
+                  className="px-3 py-2 text-sm font-medium text-danger-text border border-danger-line rounded-lg hover:bg-danger-wash"
                 >
                   Archive
                 </button>
@@ -104,12 +104,12 @@ export default function ServiceDetailPage() {
         ) : service ? (
           <ScrollArea>
             {archiveError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <div className="rounded-lg border border-danger-line bg-danger-wash p-4 text-sm text-danger-text">
                 <p>{archiveError}</p>
                 {needsForce && (
                   <button
                     onClick={() => void doArchive(true)}
-                    className="mt-3 px-3 py-1.5 text-xs font-medium text-on-accent bg-red-600 rounded hover:bg-red-700"
+                    className="mt-3 px-3 py-1.5 text-xs font-medium text-on-accent bg-danger rounded hover:bg-danger-hover"
                   >
                     Archive anyway
                   </button>
@@ -127,7 +127,7 @@ export default function ServiceDetailPage() {
                 <dd className="text-fg">
                   {lastSeenLabel(service.last_seen_at)}
                   {!service.last_seen_at && (
-                    <span className="ml-2 text-xs text-amber-700">worker has never checked in</span>
+                    <span className="ml-2 text-xs text-warn-text">worker has never checked in</span>
                   )}
                 </dd>
               </div>

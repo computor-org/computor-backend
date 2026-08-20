@@ -85,14 +85,14 @@ export default function Sidebar() {
               href={linkHref}
               className={`flex-1 flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
                 isExactActive
-                  ? 'bg-blue-50 text-blue-600'
+                  ? 'bg-accent-wash text-accent-text'
                   : isChildActive
-                  ? 'bg-blue-50/50 text-blue-600'
+                  ? 'bg-accent-wash/50 text-accent-text'
                   : 'text-body hover:bg-sunken'
               }`}
               title={collapsed ? navItem.label : undefined}
             >
-              <span className={isExactActive || isChildActive ? 'text-blue-600' : 'text-muted'}>
+              <span className={isExactActive || isChildActive ? 'text-accent-text' : 'text-muted'}>
                 {icons[navItem.icon]}
               </span>
               {!collapsed && (
@@ -125,7 +125,7 @@ export default function Sidebar() {
                     href={subItem.path}
                     className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
                       isSubActive
-                        ? 'bg-blue-50 text-blue-600 font-medium'
+                        ? 'bg-accent-wash text-accent-text font-medium'
                         : 'text-muted hover:bg-sunken'
                     }`}
                   >
@@ -174,12 +174,12 @@ export default function Sidebar() {
           href={`/courses/${currentCourseId}`}
           className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors mb-1 ${
             pathname === `/courses/${currentCourseId}`
-              ? 'bg-blue-50 text-blue-600'
+              ? 'bg-accent-wash text-accent-text'
               : 'text-body hover:bg-sunken'
           }`}
           title={collapsed ? 'Overview' : undefined}
         >
-          <span className={pathname === `/courses/${currentCourseId}` ? 'text-blue-600' : 'text-muted'}>
+          <span className={pathname === `/courses/${currentCourseId}` ? 'text-accent-text' : 'text-muted'}>
             {icons.overview}
           </span>
           {!collapsed && <span className="text-sm font-medium">Overview</span>}

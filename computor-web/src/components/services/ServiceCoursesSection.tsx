@@ -91,7 +91,7 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
 
       <div className="p-6">
         {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+          <div className="mb-4 rounded-lg border border-danger-line bg-danger-wash px-3 py-2 text-sm text-danger-text">{error}</div>
         )}
 
         <form
@@ -121,7 +121,7 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
           <button
             type="submit"
             disabled={saving || !courseId}
-            className="px-4 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
           >
             {saving ? 'Adding…' : 'Add to course'}
           </button>
@@ -143,7 +143,7 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
                 </div>
                 <button
                   onClick={() => setConfirmRemove(m)}
-                  className="text-sm text-red-600 hover:underline whitespace-nowrap"
+                  className="text-sm text-danger-text hover:underline whitespace-nowrap"
                 >
                   Remove
                 </button>

@@ -31,7 +31,7 @@ export default function Breadcrumbs({ items }: { items: Crumb[] }) {
               )}
               <li className="min-w-0">
                 {item.href && !last ? (
-                  <Link href={item.href} className="hover:text-blue-600 transition-colors">
+                  <Link href={item.href} className="hover:text-accent-text transition-colors">
                     {item.label}
                   </Link>
                 ) : (

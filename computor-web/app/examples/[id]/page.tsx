@@ -60,8 +60,8 @@ export default function ExampleDetailPage() {
           actions={
             example && canManageExamples ? (
               <>
-                <Link href={uploadHref} className="px-3 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700">Upload new version</Link>
-                <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
+                <Link href={uploadHref} className="px-3 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover">Upload new version</Link>
+                <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-danger-text border border-danger-line rounded-lg hover:bg-danger-wash">Delete</button>
               </>
             ) : undefined
           }
@@ -81,7 +81,7 @@ export default function ExampleDetailPage() {
               <div>
                 <dt className="text-muted">Repository</dt>
                 <dd className="text-fg">
-                  {repoId ? <Link href={`/example-repositories/${repoId}`} className="text-blue-600 hover:underline">View repository</Link> : '—'}
+                  {repoId ? <Link href={`/example-repositories/${repoId}`} className="text-accent-text hover:underline">View repository</Link> : '—'}
                 </dd>
               </div>
               {example.description && (

@@ -50,12 +50,12 @@ export default function CourseFamilyDetailPage() {
           actions={
             <>
               {mayCreateCourse && (
-                <Link href={`/courses/create?familyId=${familyId}`} className="px-3 py-2 bg-blue-600 text-on-accent rounded-lg text-sm font-medium hover:bg-blue-700">New course</Link>
+                <Link href={`/courses/create?familyId=${familyId}`} className="px-3 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover">New course</Link>
               )}
               {family && canManage && (
                 <>
                   <Link href={`/course-families/${familyId}/edit`} className="px-3 py-2 text-sm font-medium text-body border border-rule-strong rounded-lg hover:bg-canvas">Edit</Link>
-                  <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
+                  <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-danger-text border border-danger-line rounded-lg hover:bg-danger-wash">Delete</button>
                 </>
               )}
             </>

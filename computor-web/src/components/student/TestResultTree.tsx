@@ -80,7 +80,7 @@ export default function TestResultTree({ tests }: { tests: TestResult[] }) {
                         {/* The message is only worth the space when it explains
                             a failure; on a pass it repeats the badge. */}
                         {subtest.resultMessage && !subPassed && (
-                          <p className="text-xs text-red-600 mt-1">{subtest.resultMessage}</p>
+                          <p className="text-xs text-danger-text mt-1">{subtest.resultMessage}</p>
                         )}
                       </div>
                       <Badge tone={subPassed ? 'success' : 'error'} className="shrink-0">

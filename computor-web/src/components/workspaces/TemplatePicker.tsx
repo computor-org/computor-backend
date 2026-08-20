@@ -81,9 +81,9 @@ export default function TemplatePicker({
             // would be unreachable by keyboard entirely.
             tabIndex={selected || (selectedIndex === -1 && index === 0) ? 0 : -1}
             onClick={() => onChange(t.name)}
-            className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+            className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-line focus-visible:ring-offset-2 ${
               selected
-                ? 'border-blue-600 ring-1 ring-blue-600 bg-blue-50/50'
+                ? 'border-accent ring-1 ring-blue-600 bg-accent-wash/50'
                 : 'border-rule bg-surface hover:border-rule-strong'
             }`}
           >

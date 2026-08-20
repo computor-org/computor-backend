@@ -137,7 +137,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
 
   const sortIcon = (key: SortKey) => {
     if (sortKey !== key) return <span className="text-faint ml-1">&#8597;</span>;
-    return <span className="text-blue-500 ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>;
+    return <span className="text-accent-text ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>;
   };
 
   return (
@@ -249,7 +249,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
                         return (
                           <tr
                             key={s.course_member_id}
-                            className="hover:bg-blue-50/50 cursor-pointer transition-colors"
+                            className="hover:bg-accent-wash/50 cursor-pointer transition-colors"
                             onClick={() => router.push(`/courses/${courseId}/lecturer/grading/${s.course_member_id}`)}
                           >
                             {/* Name */}

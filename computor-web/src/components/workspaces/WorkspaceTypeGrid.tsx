@@ -47,7 +47,7 @@ export default function WorkspaceTypeGrid({
             Nothing is deployed automatically — pick which ones this deployment offers under{' '}
             <Link
               href="/workspaces/admin?tab=templates"
-              className="text-blue-600 hover:underline"
+              className="text-accent-text hover:underline"
             >
               Administration → Templates
             </Link>

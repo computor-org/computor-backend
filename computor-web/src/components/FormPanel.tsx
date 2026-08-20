@@ -33,7 +33,7 @@ export function Field({
     <div>
       <label htmlFor={htmlFor} className="block text-xs font-medium text-body mb-1">
         {label}
-        {required && <span className="text-red-500"> *</span>}
+        {required && <span className="text-danger-text"> *</span>}
       </label>
       {control}
       {hint && <p className="mt-1 text-xs text-subtle">{hint}</p>}

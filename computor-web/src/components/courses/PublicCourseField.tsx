@@ -27,7 +27,7 @@ export default function PublicCourseField({
         checked={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 rounded border-rule-strong text-blue-600 focus:ring-blue-500 disabled:opacity-50"
+        className="mt-0.5 h-4 w-4 rounded border-rule-strong text-accent-text focus:ring-accent-line disabled:opacity-50"
       />
       <span>
         <span className="block font-medium text-fg">

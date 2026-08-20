@@ -213,7 +213,7 @@ export default function CoursePage() {
                 {myRepo.web_url &&
                   repoRow(
                     'Web',
-                    <a href={myRepo.web_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                    <a href={myRepo.web_url} target="_blank" rel="noreferrer" className="text-accent-text hover:underline">
                       {myRepo.web_url}
                     </a>,
                   )}
@@ -228,7 +228,7 @@ export default function CoursePage() {
             <button
               onClick={ensureGitAccess}
               disabled={ensuring}
-              className="mt-4 px-4 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="mt-4 px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
             >
               {ensuring ? 'Working…' : myRepo ? 'Repair git access' : 'Ensure git access'}
             </button>
@@ -237,14 +237,14 @@ export default function CoursePage() {
               {canManage ? ' — as staff this also grants access to the template and reference repos.' : '.'}
             </p>
             {provisioned?.clone_token && (
-              <div className="mt-3 p-3 rounded border border-amber-200 bg-amber-50 text-sm text-amber-900">
+              <div className="mt-3 p-3 rounded border border-warn-line bg-warn-wash text-sm text-warn-text">
                 <p className="font-medium">One-time clone credential — copy it now, it won&apos;t be shown again.</p>
                 <p className="mt-1">
-                  <span className="text-amber-700">Username:</span>{' '}
+                  <span className="text-warn-text">Username:</span>{' '}
                   <span className="font-mono">{provisioned.clone_username}</span>
                 </p>
                 <p>
-                  <span className="text-amber-700">Token:</span>{' '}
+                  <span className="text-warn-text">Token:</span>{' '}
                   <span className="font-mono break-all">{provisioned.clone_token}</span>
                 </p>
               </div>
@@ -279,13 +279,13 @@ export default function CoursePage() {
                     <dd className="mt-1">
                       {gitBinding.locked ? (
                         <span
-                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800"
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-warn-wash text-warn-text"
                           title={gitBinding.lock_reason ?? undefined}
                         >
                           Locked
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-success-wash text-success-text">
                           Editable
                         </span>
                       )}
@@ -300,7 +300,7 @@ export default function CoursePage() {
                             href={gitBinding.template_url}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-blue-600 hover:underline"
+                            className="text-accent-text hover:underline"
                           >
                             {gitBinding.template_url}
                           </a>

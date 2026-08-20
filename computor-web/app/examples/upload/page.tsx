@@ -133,7 +133,7 @@ function UploadInner() {
                 type="button"
                 onClick={runUpload}
                 disabled={uploading || rows.length === 0 || !dirsValid || !repoId || allDone}
-                className="px-4 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
               >
                 {uploading ? 'Uploading…' : `Upload ${rows.length || ''}`}
               </button>
@@ -151,13 +151,13 @@ function UploadInner() {
                 {repos.length === 0 ? (
                   <p className="text-sm text-muted">
                     No uploadable (MinIO/S3) repository.{' '}
-                    <Link href="/example-repositories/create" className="text-blue-600 hover:underline">Create one first</Link>.
+                    <Link href="/example-repositories/create" className="text-accent-text hover:underline">Create one first</Link>.
                   </p>
                 ) : (
                   <select
                     value={repoId}
                     onChange={(e) => setRepoId(e.target.value)}
-                    className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line"
                   >
                     <option value="">— select a repository —</option>
                     {repos.map((r) => (
@@ -173,7 +173,7 @@ function UploadInner() {
                   type="file"
                   accept=".zip,application/zip"
                   onChange={(e) => onPickZip(e.target.files?.[0])}
-                  className="block w-full text-sm text-muted file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:text-sm file:font-medium hover:file:bg-blue-100"
+                  className="block w-full text-sm text-muted file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-accent-wash file:text-accent-text file:text-sm file:font-medium hover:file:bg-accent-wash"
                 />
               </div>
 
@@ -194,7 +194,7 @@ function UploadInner() {
                       <span className="text-xs text-subtle shrink-0">{r.fileCount} files</span>
                       <span
                         className={`text-xs shrink-0 w-40 truncate text-right ${
-                          r.status === 'ok' ? 'text-green-600' : r.status === 'error' ? 'text-red-600' : r.status === 'uploading' ? 'text-amber-600' : 'text-subtle'
+                          r.status === 'ok' ? 'text-success-text' : r.status === 'error' ? 'text-danger-text' : r.status === 'uploading' ? 'text-warn-text' : 'text-subtle'
                         }`}
                         title={r.message}
                       >
@@ -203,7 +203,7 @@ function UploadInner() {
                     </div>
                   ))}
                   {!dirsValid && (
-                    <p className="text-xs text-red-600">Directory names may only contain letters, numbers, dots, dashes and underscores.</p>
+                    <p className="text-xs text-danger-text">Directory names may only contain letters, numbers, dots, dashes and underscores.</p>
                   )}
                 </div>
               )}

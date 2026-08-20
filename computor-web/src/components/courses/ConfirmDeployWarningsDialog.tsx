@@ -30,7 +30,7 @@ export default function ConfirmDeployWarningsDialog({
   return (
     <Modal
       title={`Create this course despite ${n} ${n === 1 ? 'issue' : 'issues'}?`}
-      titleClassName="text-lg font-semibold text-amber-700"
+      titleClassName="text-lg font-semibold text-warn-text"
       onClose={submitting ? () => {} : onCancel}
       maxWidth="max-w-lg"
     >
@@ -41,7 +41,7 @@ export default function ConfirmDeployWarningsDialog({
           without an example or without a testing service, so students can’t work on them until you
           fix that by hand.
         </p>
-        <ul className="list-disc pl-5 space-y-1 max-h-64 overflow-y-auto text-sm text-amber-700">
+        <ul className="list-disc pl-5 space-y-1 max-h-64 overflow-y-auto text-sm text-warn-text">
           {warnings.map((w, i) => (
             <li key={i}>{warningText(w)}</li>
           ))}

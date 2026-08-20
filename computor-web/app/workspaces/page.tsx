@@ -192,7 +192,7 @@ export default function WorkspacesPage() {
           {busyCount > 0 && (
             <>
               <span className="text-faint">·</span>
-              <span className="text-blue-700">
+              <span className="text-accent-text">
                 {busyCount} {busyCount === 1 ? 'workspace is' : 'workspaces are'} still working
               </span>
             </>

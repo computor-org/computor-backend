@@ -80,7 +80,7 @@ export default function AddByEmail({
 
       <ErrorBanner>{importError}</ErrorBanner>
       {importMsg && (
-        <div className="p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700">{importMsg}</div>
+        <div className="p-3 bg-success-wash border border-success-line rounded text-sm text-success-text">{importMsg}</div>
       )}
 
       <Field label="Email" required>

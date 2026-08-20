@@ -129,12 +129,12 @@ export default function ProfilePage() {
           actions={
             user ? (
               <div className="flex items-center gap-3">
-                {saved && <span className="text-sm text-green-600">Saved</span>}
+                {saved && <span className="text-sm text-success-text">Saved</span>}
                 <button
                   type="submit"
                   form="profile-form"
                   disabled={saving}
-                  className="px-4 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
                 >
                   {saving ? 'Saving…' : 'Save changes'}
                 </button>
@@ -159,7 +159,7 @@ export default function ProfilePage() {
                 <div className="text-sm text-muted truncate">{user.email}</div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {(authUser?.systemRoles ?? []).map((r) => (
-                    <span key={r} className="px-2 py-0.5 text-xs rounded bg-blue-50 text-blue-700">{roleLabel(r)}</span>
+                    <span key={r} className="px-2 py-0.5 text-xs rounded bg-accent-wash text-accent-text">{roleLabel(r)}</span>
                   ))}
                   {user.created_at && (
                     <span className="px-2 py-0.5 text-xs rounded bg-sunken text-muted">

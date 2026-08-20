@@ -33,7 +33,7 @@ export default function GitServersPage() {
           title="Git servers"
           subtitle="The registry of git instances courses can bind to. Managed instances hold a service token used for babysat student-repo provisioning."
           actions={
-            <Link href="/admin/git-servers/create" className="px-4 py-2 bg-blue-600 text-on-accent rounded-lg text-sm font-medium hover:bg-blue-700">
+            <Link href="/admin/git-servers/create" className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover">
               Register Server
             </Link>
           }
@@ -50,7 +50,7 @@ export default function GitServersPage() {
         ) : (
           <ScrollArea spacing="rows">
             {servers.map((s) => (
-              <Link key={s.id} href={`/admin/git-servers/${s.id}`} className="flex items-center justify-between bg-surface border border-rule rounded-lg p-4 hover:border-blue-500 hover:shadow-sm transition-all">
+              <Link key={s.id} href={`/admin/git-servers/${s.id}`} className="flex items-center justify-between bg-surface border border-rule rounded-lg p-4 hover:border-accent-line hover:shadow-sm transition-all">
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-fg truncate">{s.name || s.base_url}</div>
                   <div className="text-xs text-muted">{s.type} · {s.base_url}</div>

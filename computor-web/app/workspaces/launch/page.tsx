@@ -184,7 +184,7 @@ function LaunchWorkspace() {
       <p className="text-muted">{errorMessage}</p>
       <div className="flex items-center justify-center gap-3 pt-2">
         {hasTarget && <Button onClick={() => window.location.reload()}>Retry</Button>}
-        <Link href="/workspaces" className="text-sm text-blue-600 hover:underline">
+        <Link href="/workspaces" className="text-sm text-accent-text hover:underline">
           Back to workspaces
         </Link>
       </div>

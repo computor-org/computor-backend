@@ -165,9 +165,9 @@ export default function UpdatesPage() {
     return (
       <AuthenticatedLayout>
         <div className="p-6">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-            <h2 className="text-lg font-semibold text-red-800">Access Denied</h2>
-            <p className="text-sm text-red-600 mt-2">Admin privileges are required to access this page.</p>
+          <div className="bg-danger-wash border border-danger-line rounded-lg p-6 text-center">
+            <h2 className="text-lg font-semibold text-danger-text">Access Denied</h2>
+            <p className="text-sm text-danger-text mt-2">Admin privileges are required to access this page.</p>
           </div>
         </div>
       </AuthenticatedLayout>
@@ -196,17 +196,17 @@ export default function UpdatesPage() {
 
         {/* API down during an update is expected — show progress, not an error */}
         {showDowntimePanel ? (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <div className="bg-accent-wash border border-accent-line rounded-lg p-4 mb-4">
             <div className="flex items-center gap-3">
-              <svg className="h-5 w-5 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+              <svg className="h-5 w-5 text-accent-text animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
               <div>
-                <p className="text-sm font-medium text-blue-800">
+                <p className="text-sm font-medium text-accent-text">
                   Update in progress — the system is restarting
                 </p>
-                <p className="text-sm text-blue-700">
+                <p className="text-sm text-accent-text">
                   {(state?.phase && PHASE_LABELS[state.phase]) || 'Working'}… This page will resume
                   automatically when the API is back. Do not close this tab.
                 </p>
@@ -245,7 +245,7 @@ export default function UpdatesPage() {
                     {view.running_commit !== 'unknown' && (
                       <button
                         onClick={() => handleCopyCommit(view.running_commit)}
-                        className="text-xs text-blue-600 hover:text-blue-800"
+                        className="text-xs text-accent-text hover:text-accent-text"
                         title={view.running_commit}
                       >
                         copy full hash
@@ -266,7 +266,7 @@ export default function UpdatesPage() {
                   <button
                     onClick={handleCheckNow}
                     disabled={checking || !view.repo_url}
-                    className="px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium text-accent-text bg-accent-wash rounded-lg hover:bg-accent-wash disabled:opacity-50 transition-colors"
                   >
                     {checking ? 'Checking…' : 'Check now'}
                   </button>
@@ -292,8 +292,8 @@ export default function UpdatesPage() {
                     )}
                   </div>
                   {view.remote_error && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <p className="text-sm text-red-700">
+                    <div className="p-3 bg-danger-wash border border-danger-line rounded-lg">
+                      <p className="text-sm text-danger-text">
                         <strong>Update check failed:</strong> {view.remote_error}
                       </p>
                     </div>
@@ -307,8 +307,8 @@ export default function UpdatesPage() {
                 {view.last_schedule_result &&
                   ['missed', 'skipped_lock'].includes(view.last_schedule_result.outcome ?? '') &&
                   dismissedResult !== view.last_schedule_result.resolved_at && (
-                    <div className="p-3 mb-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start justify-between gap-3">
-                      <p className="text-sm text-yellow-800">
+                    <div className="p-3 mb-4 bg-warn-wash border border-warn-line rounded-lg flex items-start justify-between gap-3">
+                      <p className="text-sm text-warn-text">
                         <strong>
                           The update scheduled for{' '}
                           {view.last_schedule_result.scheduled_at
@@ -320,7 +320,7 @@ export default function UpdatesPage() {
                       </p>
                       <button
                         onClick={() => setDismissedResult(view.last_schedule_result?.resolved_at ?? '')}
-                        className="text-xs text-yellow-700 hover:text-yellow-900 shrink-0"
+                        className="text-xs text-warn-text hover:text-warn-text shrink-0"
                       >
                         Dismiss
                       </button>
@@ -337,7 +337,7 @@ export default function UpdatesPage() {
                     <button
                       onClick={() => setShowCancelScheduleConfirm(true)}
                       disabled={cancellingSchedule}
-                      className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 transition-colors shrink-0"
+                      className="px-4 py-2 text-sm font-medium text-danger-text bg-danger-wash rounded-lg hover:bg-danger-wash disabled:opacity-50 transition-colors shrink-0"
                     >
                       {cancellingSchedule ? 'Cancelling…' : 'Cancel Schedule'}
                     </button>
@@ -354,14 +354,14 @@ export default function UpdatesPage() {
                           type="datetime-local"
                           value={scheduleDate}
                           onChange={(e) => setScheduleDate(e.target.value)}
-                          className="w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          className="w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-accent-line focus:border-accent-line text-sm"
                           required
                         />
                       </div>
                       <button
                         type="submit"
                         disabled={!!updateDisabledReason || scheduling || !scheduleDate}
-                        className="px-4 py-2 text-sm font-medium text-on-accent bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                        className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors"
                       >
                         {scheduling ? 'Scheduling…' : 'Schedule Update'}
                       </button>
@@ -416,13 +416,13 @@ export default function UpdatesPage() {
                       </div>
                     )}
                     {state.error && (
-                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                        <p className="text-sm text-red-700 whitespace-pre-wrap">{state.error}</p>
+                      <div className="p-3 bg-danger-wash border border-danger-line rounded-lg">
+                        <p className="text-sm text-danger-text whitespace-pre-wrap">{state.error}</p>
                       </div>
                     )}
                     {state.status === 'success' && (
-                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between gap-3">
-                        <p className="text-sm text-green-700">
+                      <div className="p-3 bg-success-wash border border-success-line rounded-lg flex items-center justify-between gap-3">
+                        <p className="text-sm text-success-text">
                           The system was updated. Reload to load the new frontend version.
                         </p>
                         <button
@@ -443,7 +443,7 @@ export default function UpdatesPage() {
                 <button
                   onClick={() => setShowUpdateConfirm(true)}
                   disabled={!!updateDisabledReason || triggering || !view.update_available}
-                  className="px-4 py-2 text-sm font-medium text-on-accent bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-on-accent bg-danger rounded-lg hover:bg-danger-hover disabled:opacity-50 transition-colors"
                 >
                   {triggering ? 'Requesting…' : 'Update now'}
                 </button>

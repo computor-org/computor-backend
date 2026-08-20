@@ -70,7 +70,7 @@ export default function WorkspaceDetailsModal({
                 <tr>
                   <td className="py-2 font-medium text-muted pr-4">Access URL</td>
                   <td className="py-2">
-                    <a href={details.access_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs break-all">
+                    <a href={details.access_url} target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline text-xs break-all">
                       {details.access_url}
                     </a>
                   </td>
@@ -80,7 +80,7 @@ export default function WorkspaceDetailsModal({
                 <tr>
                   <td className="py-2 font-medium text-muted pr-4">Editor URL</td>
                   <td className="py-2">
-                    <a href={details.code_server_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs break-all">
+                    <a href={details.code_server_url} target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline text-xs break-all">
                       {details.code_server_url}
                     </a>
                   </td>

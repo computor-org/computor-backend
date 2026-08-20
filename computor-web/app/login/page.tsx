@@ -26,11 +26,11 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-canvas">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto" />
         <p className="mt-4 text-muted">Redirecting to sign-in…</p>
         <button
           onClick={() => loginWithSSO('keycloak')}
-          className="mt-4 text-sm text-blue-600 hover:underline"
+          className="mt-4 text-sm text-accent-text hover:underline"
         >
           Click here if you are not redirected automatically
         </button>

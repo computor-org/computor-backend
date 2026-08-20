@@ -218,7 +218,7 @@ export default function WorkspaceFleetPanel() {
             running now additionally rebuilds workspaces that are up right now — that interrupts
             whoever is working in them, so save it for fixes that cannot wait. Only templates
             already deployed to Coder appear here — to deploy one for the first time, use the{' '}
-            <Link href="/workspaces/admin?tab=templates" className="text-blue-600 hover:underline">
+            <Link href="/workspaces/admin?tab=templates" className="text-accent-text hover:underline">
               Templates
             </Link>{' '}
             tab.
@@ -388,7 +388,7 @@ export default function WorkspaceFleetPanel() {
           Workspace details
           {query.trim() && <span> · {visibleWorkspaces.length} of {workspaces.length}</span>}
           {visibleWorkspaces.some(isOutdated) && (
-            <span className="text-amber-700"> · {visibleWorkspaces.filter(isOutdated).length} on an older version</span>
+            <span className="text-warn-text"> · {visibleWorkspaces.filter(isOutdated).length} on an older version</span>
           )}
         </span>
         <div className="flex items-center gap-2">
@@ -421,7 +421,7 @@ export default function WorkspaceFleetPanel() {
                     {workspace.owner_user_id ? (
                       <Link
                         href={`/workspaces/admin/${workspace.owner_user_id}`}
-                        className="text-sm text-blue-600 hover:underline"
+                        className="text-sm text-accent-text hover:underline"
                       >
                         {owner.primary}
                       </Link>

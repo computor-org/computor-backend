@@ -12,12 +12,12 @@ export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'dangerGhost' |
 export type ButtonSize = 'xs' | 'sm' | 'md';
 
 const VARIANT_CLS: Record<ButtonVariant, string> = {
-  primary: 'bg-blue-600 text-on-accent hover:bg-blue-700',
+  primary: 'bg-accent text-on-accent hover:bg-accent-hover',
   secondary: 'border border-rule-strong text-body bg-surface hover:bg-canvas',
-  danger: 'bg-red-600 text-on-accent hover:bg-red-700',
+  danger: 'bg-danger text-on-accent hover:bg-danger-hover',
   // Low-emphasis destructive action (e.g. Delete in a table row) — red text
   // without the solid fill that would shout from every row.
-  dangerGhost: 'text-red-600 hover:bg-red-50',
+  dangerGhost: 'text-danger-text hover:bg-danger-wash',
   ghost: 'text-muted hover:bg-sunken',
 };
 

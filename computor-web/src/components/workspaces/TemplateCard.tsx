@@ -56,7 +56,7 @@ export default function TemplateCard({
       aria-label={usable ? undefined : `${label} — ${availabilityLabel(option)}`}
       className={`flex w-full items-center gap-3 rounded-lg border p-3 pr-4 text-left transition-colors ${
         usable
-          ? 'border-rule bg-surface hover:border-blue-400 hover:bg-blue-50 focus-visible:ring-2 focus-visible:ring-blue-500'
+          ? 'border-rule bg-surface hover:border-accent-line hover:bg-accent-wash focus-visible:ring-2 focus-visible:ring-accent-line'
           : 'cursor-not-allowed border-rule bg-canvas opacity-60'
       } ${busy ? 'animate-pulse' : ''} ${className}`}
     >
@@ -65,7 +65,7 @@ export default function TemplateCard({
         <span className="block truncate text-sm font-semibold text-fg">{label}</span>
         <span
           className={`block truncate text-xs ${
-            stage?.tone === 'red' ? 'text-red-700' : 'text-muted'
+            stage?.tone === 'red' ? 'text-danger-text' : 'text-muted'
           }`}
         >
           {usable ? actionLabel : availabilityLabel(option)}

@@ -25,13 +25,13 @@ const usersClient = new UsersClient();
 const CLAIM_COLORS: Record<string, string> = {
   user: 'bg-purple-100 text-purple-800',
   account: 'bg-indigo-100 text-indigo-800',
-  role: 'bg-red-100 text-red-800',
-  user_role: 'bg-red-100 text-red-800',
-  role_claim: 'bg-red-100 text-red-800',
+  role: 'bg-danger-wash text-danger-text',
+  user_role: 'bg-danger-wash text-danger-text',
+  role_claim: 'bg-danger-wash text-danger-text',
   workspace: 'bg-teal-100 text-teal-800',
-  course: 'bg-blue-100 text-blue-800',
-  organization: 'bg-orange-100 text-orange-800',
-  course_family: 'bg-yellow-100 text-yellow-800',
+  course: 'bg-accent-wash text-accent-text',
+  organization: 'bg-warn-wash text-warn-text',
+  course_family: 'bg-warn-wash text-warn-text',
 };
 
 function claimColor(value: string) {
@@ -52,7 +52,7 @@ function ClaimChip({ claim }: { claim: RoleClaimList }) {
 
 function RoleBadge({ role }: { role: RoleList | RoleGet }) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${role.builtin ? 'bg-slate-200 text-slate-700' : 'bg-green-100 text-green-800'}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${role.builtin ? 'bg-slate-200 text-slate-700' : 'bg-success-wash text-success-text'}`}>
       {role.id}
     </span>
   );
@@ -229,7 +229,7 @@ export default function RolesPage() {
             {rolesLoading ? (
               <div className="p-4 text-sm text-subtle">Loading…</div>
             ) : rolesError ? (
-              <div className="p-4 text-sm text-red-500">{rolesError}</div>
+              <div className="p-4 text-sm text-danger-text">{rolesError}</div>
             ) : (
               <>
                 {/* Builtin roles */}
@@ -265,7 +265,7 @@ export default function RolesPage() {
           ) : detailLoading ? (
             <div className="p-8 text-subtle text-sm">Loading…</div>
           ) : detailError ? (
-            <div className="p-8 text-red-500 text-sm">{detailError}</div>
+            <div className="p-8 text-danger-text text-sm">{detailError}</div>
           ) : roleDetail ? (
             <div className="p-6 space-y-8 max-w-3xl">
 
@@ -333,7 +333,7 @@ export default function RolesPage() {
                           {canRemove && (
                             <button
                               onClick={() => setRemoveConfirm({ userId: m.user_id, email: u?.email ?? m.user_id })}
-                              className="text-xs text-red-500 hover:text-red-700 transition-colors ml-4"
+                              className="text-xs text-danger-text hover:text-danger-text transition-colors ml-4"
                             >
                               Remove
                             </button>
@@ -353,7 +353,7 @@ export default function RolesPage() {
                       placeholder="Search by email or name…"
                       value={addSearch}
                       onChange={e => { setAddSearch(e.target.value); setAddUserId(''); }}
-                      className="w-full max-w-sm px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full max-w-sm px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
                     />
                     {addSearch && addCandidates.length > 0 && !addUserId && (
                       <div className="absolute z-10 mt-1 w-full max-w-sm bg-surface border border-rule rounded-lg shadow-lg">
@@ -373,7 +373,7 @@ export default function RolesPage() {
                       <button
                         onClick={handleAddMember}
                         disabled={addingMember}
-                        className="mt-2 px-4 py-2 text-sm bg-blue-600 text-on-accent rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                        className="mt-2 px-4 py-2 text-sm bg-accent text-on-accent rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors"
                       >
                         {addingMember ? 'Adding…' : 'Add'}
                       </button>
@@ -411,7 +411,7 @@ function RoleRow({ role, selected, onClick }: { role: RoleList; selected: boolea
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left px-3 py-2.5 flex items-start gap-2 transition-colors ${selected ? 'bg-blue-50 border-r-2 border-blue-500' : 'hover:bg-sunken'}`}
+      className={`w-full text-left px-3 py-2.5 flex items-start gap-2 transition-colors ${selected ? 'bg-accent-wash border-r-2 border-accent-line' : 'hover:bg-sunken'}`}
     >
       <div className="min-w-0">
         <div className="text-xs font-mono font-medium text-fg truncate">{role.id}</div>

@@ -190,7 +190,7 @@ function CourseWorkspaceConfigContent() {
                       onClick={() => toggle(item.name)}
                       className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-colors ${
                         checked
-                          ? 'border-blue-600 ring-1 ring-blue-600 bg-blue-50/50'
+                          ? 'border-accent ring-1 ring-blue-600 bg-accent-wash/50'
                           : 'border-rule bg-surface hover:border-rule-strong'
                       }`}
                     >
@@ -204,7 +204,7 @@ function CourseWorkspaceConfigContent() {
                           <span className="mt-0.5 block text-xs text-muted">{item.description}</span>
                         )}
                         {item.globallyDisabled && (
-                          <span className="mt-1 inline-flex items-center rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                          <span className="mt-1 inline-flex items-center rounded bg-warn-wash px-2 py-0.5 text-xs font-medium text-warn-text">
                             Globally disabled
                           </span>
                         )}
