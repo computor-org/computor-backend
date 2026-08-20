@@ -1685,6 +1685,27 @@ errors:
   # DATABASE ERRORS (500, 503)
   # ============================================================================
 
+  - code: EXT_007
+    http_status: 503
+    category: external_service
+    severity: error
+    title: "Issue Reporting Unavailable"
+    message:
+      plain: "Problem reporting is not available on this deployment."
+      markdown: "**Issue Reporting Unavailable**\n\nProblem reporting is not available on this deployment. Please contact your administrator."
+      html: "<strong>Issue Reporting Unavailable</strong><p>Problem reporting is not available on this deployment. Please contact your administrator.</p>"
+    retry_after: 300
+    internal_description: "The configured GitHub issue tracker failed its startup probe: unreachable, token rejected, issue tracker disabled, or the repository is private with no GITHUB_ISSUE_REPORT_TOKEN set. The backend re-probes on a TTL, so a repaired configuration recovers without a restart."
+    affected_functions: []
+    common_causes:
+      - "GITHUB_ISSUE_REPORT_TOKEN missing, expired, or lacking access to the repository"
+      - "GITHUB_ISSUE_REPORT_REPOSITORY points at a private or nonexistent repository"
+      - "The repository has its issue tracker disabled"
+      - "GitHub is unreachable from the backend"
+    resolution_steps:
+      - "Check the [STARTUP] issue reporting line in the backend log for the exact reason"
+      - "Fix GITHUB_ISSUE_REPORT_REPOSITORY / GITHUB_ISSUE_REPORT_TOKEN in .env"
+      - "Wait for the re-probe TTL or restart the backend"
   - code: DB_001
     http_status: 503
     category: database

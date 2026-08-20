@@ -84,6 +84,7 @@ class ErrorCode(str, Enum):
     EXT_004 = "EXT_004"  # Temporal Service Unavailable
     EXT_005 = "EXT_005"  # Task Queue Unavailable
     EXT_006 = "EXT_006"  # Service Unavailable
+    EXT_007 = "EXT_007"  # Issue Reporting Unavailable
     DB_001 = "DB_001"  # Database Connection Failed
     DB_002 = "DB_002"  # Database Query Failed
     DB_003 = "DB_003"  # Transaction Failed
@@ -181,6 +182,7 @@ ERROR_CATEGORIES = {
     ErrorCode.EXT_004: "external_service",
     ErrorCode.EXT_005: "external_service",
     ErrorCode.EXT_006: "external_service",
+    ErrorCode.EXT_007: "external_service",
     ErrorCode.DB_001: "database",
     ErrorCode.DB_002: "database",
     ErrorCode.DB_003: "database",

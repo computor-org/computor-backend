@@ -1,7 +1,7 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Total errors:** 79
+**Total errors:** 80
 
 To regenerate: `bash generate_error_codes.sh`
 
@@ -877,6 +877,32 @@ Generic 503 fallback when the specific upstream service is unknown or not yet ca
 **Resolution Steps:**
 1. Inspect server logs for the underlying cause
 2. Retry the request after a short backoff
+
+---
+
+### EXT_007 - Issue Reporting Unavailable
+
+**HTTP Status:** `503`  
+**Severity:** `error`  
+**Category:** `external_service`  
+**Retry After:** 300 seconds  
+
+**Description:**  
+The configured GitHub issue tracker failed its startup probe: unreachable, token rejected, issue tracker disabled, or the repository is private with no GITHUB_ISSUE_REPORT_TOKEN set. The backend re-probes on a TTL, so a repaired configuration recovers without a restart.
+
+**User Message:**  
+> Problem reporting is not available on this deployment.
+
+**Common Causes:**
+- GITHUB_ISSUE_REPORT_TOKEN missing, expired, or lacking access to the repository
+- GITHUB_ISSUE_REPORT_REPOSITORY points at a private or nonexistent repository
+- The repository has its issue tracker disabled
+- GitHub is unreachable from the backend
+
+**Resolution Steps:**
+1. Check the [STARTUP] issue reporting line in the backend log for the exact reason
+2. Fix GITHUB_ISSUE_REPORT_REPOSITORY / GITHUB_ISSUE_REPORT_TOKEN in .env
+3. Wait for the re-probe TTL or restart the backend
 
 ---
 
