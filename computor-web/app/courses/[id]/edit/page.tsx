@@ -17,7 +17,6 @@ import SectionCard, { SectionHint, SectionStatus } from '@/src/components/Sectio
 import DescriptionList from '@/src/components/DescriptionList';
 import Button from '@/src/components/ui/Button';
 import Badge from '@/src/components/Badge';
-import PublicCourseField from '@/src/components/courses/PublicCourseField';
 import VisibilitySelect, { type VisibilityValue } from '@/src/components/courses/VisibilitySelect';
 import type { CourseGet, CourseGitBindingGet, CourseGitBindingUpsert, GitServerGet } from 'types/generated';
 import { displayName } from '@/src/utils/displayName';
@@ -56,7 +55,6 @@ export default function CourseEditPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [language, setLanguage] = useState('');
-  const [isPublic, setIsPublic] = useState(false);
   // Course-wide budget defaults. Held as strings so an empty field can mean
   // "unlimited" rather than collapsing to 0.
   const [maxTestRuns, setMaxTestRuns] = useState('');
@@ -88,7 +86,6 @@ export default function CourseEditPage() {
       setTitle(c.title || '');
       setDescription(c.description || '');
       setLanguage(c.language_code || '');
-      setIsPublic(c.public ?? false);
       setMaxTestRuns(c.max_test_runs != null ? String(c.max_test_runs) : '');
       setMaxSubmissions(c.max_submissions != null ? String(c.max_submissions) : '');
       setVisible(c.visible ?? null);
@@ -134,7 +131,6 @@ export default function CourseEditPage() {
           title: title.trim() || null,
           description: description.trim() || null,
           language_code: language.trim() || null,
-          public: isPublic,
           max_test_runs: parseLimit(maxTestRuns),
           max_submissions: parseLimit(maxSubmissions),
           visible,
@@ -262,12 +258,6 @@ export default function CourseEditPage() {
                     value={visible}
                     onChange={setVisible}
                   />
-                </Field>
-                <Field
-                  label="Self-registration"
-                  hint="Independent of student visibility above: that hides course content from members, this decides who may become one."
-                >
-                  <PublicCourseField value={isPublic} onChange={setIsPublic} />
                 </Field>
                 <div className="flex items-center gap-3">
                   <Button onClick={saveGeneral} loading={savingGeneral} loadingLabel="Saving…">
