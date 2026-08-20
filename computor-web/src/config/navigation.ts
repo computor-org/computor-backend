@@ -123,47 +123,60 @@ export const userMgmtNavigation: NavItem[] = [
   },
 ];
 
+/**
+ * The tutor view is not built yet.
+ *
+ * The backend hands out the `tutor` view to `_tutor` *and every role above it*
+ * (see COURSE_ROLE_VIEW_MAP in business_logic/users.py), so leaving the entry in
+ * meant every lecturer, maintainer and owner had a nav item that dead-ended on a
+ * "Coming Soon" page wearing the 404 illustration. Hidden here rather than
+ * deleted so switching it back on is this one line; the routes still exist and
+ * answer honestly if someone has the URL.
+ */
+const TUTOR_VIEW_ENABLED = false;
+
 // Navigation structure for view-based navigation (when in course context)
-export const getViewNavigation = (courseId: string): NavItem[] => [
-  {
-    id: 'student-view',
-    view: 'student',
-    label: 'Student',
-    path: `/courses/${courseId}/student`,
-    icon: 'student',
-    ownPage: true,
-    subItems: [
-      { id: 'student-assignments', label: 'Assignments', path: `/courses/${courseId}/student/assignments` },
-    ],
-  },
-  {
-    id: 'tutor-view',
-    view: 'tutor',
-    label: 'Tutor',
-    path: `/courses/${courseId}/tutor`,
-    icon: 'tutor',
-    ownPage: true,
-    // The Tutor landing IS the student progress overview; no sub-pages yet
-    // (submissions/grading are still stubs).
-  },
-  {
-    id: 'lecturer-view',
-    view: 'lecturer',
-    label: 'Lecturer',
-    path: `/courses/${courseId}/lecturer`,
-    icon: 'lecturer',
-    // No ownPage: /courses/[id]/lecturer only redirects to the first sub-item,
-    // so the sidebar link hops there directly.
-    subItems: [
-      { id: 'lecturer-grading', label: 'Grading', path: `/courses/${courseId}/lecturer/grading` },
-      { id: 'lecturer-members', label: 'Course Members', path: `/courses/${courseId}/lecturer/members` },
-      { id: 'lecturer-groups', label: 'Course Groups', path: `/courses/${courseId}/lecturer/groups` },
-      { id: 'lecturer-assignments', label: 'Assignments', path: `/courses/${courseId}/lecturer/assignments` },
-      { id: 'lecturer-templates', label: 'Templates', path: `/courses/${courseId}/lecturer/templates` },
-      { id: 'lecturer-workspaces', label: 'Workspaces', path: `/courses/${courseId}/lecturer/workspaces` },
-    ],
-  },
-];
+export const getViewNavigation = (courseId: string): NavItem[] =>
+  [
+    {
+      id: 'student-view',
+      view: 'student',
+      label: 'Student',
+      path: `/courses/${courseId}/student`,
+      icon: 'student',
+      ownPage: true,
+      subItems: [
+        { id: 'student-assignments', label: 'Assignments', path: `/courses/${courseId}/student/assignments` },
+      ],
+    },
+    {
+      id: 'tutor-view',
+      view: 'tutor',
+      label: 'Tutor',
+      path: `/courses/${courseId}/tutor`,
+      icon: 'tutor',
+      ownPage: true,
+      // Filtered out below until the view exists. Its sub-pages (submissions,
+      // grading) are stubs too, which is why it has none listed here.
+    },
+    {
+      id: 'lecturer-view',
+      view: 'lecturer',
+      label: 'Lecturer',
+      path: `/courses/${courseId}/lecturer`,
+      icon: 'lecturer',
+      // No ownPage: /courses/[id]/lecturer only redirects to the first sub-item,
+      // so the sidebar link hops there directly.
+      subItems: [
+        { id: 'lecturer-grading', label: 'Grading', path: `/courses/${courseId}/lecturer/grading` },
+        { id: 'lecturer-members', label: 'Course Members', path: `/courses/${courseId}/lecturer/members` },
+        { id: 'lecturer-groups', label: 'Course Groups', path: `/courses/${courseId}/lecturer/groups` },
+        { id: 'lecturer-assignments', label: 'Assignments', path: `/courses/${courseId}/lecturer/assignments` },
+        { id: 'lecturer-templates', label: 'Templates', path: `/courses/${courseId}/lecturer/templates` },
+        { id: 'lecturer-workspaces', label: 'Workspaces', path: `/courses/${courseId}/lecturer/workspaces` },
+      ],
+    },
+  ].filter((item) => TUTOR_VIEW_ENABLED || item.view !== 'tutor');
 
 /** Is `pathname` on this item's own path or anywhere beneath it? */
 export function pathMatches(itemPath: string, pathname: string): boolean {
