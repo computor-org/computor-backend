@@ -43,13 +43,20 @@ export class UserClient extends BaseEndpointClient {
    * Babysat Forgejo provisioning for the current student.
    * Forks the course's student-template into the student's own repository and
    * records it. Idempotent — returns the existing repo if already provisioned.
-   * Also returns a **one-time** repo-scoped Forgejo clone token (`clone_token` +
-   * `clone_username`) so `git clone`/push authenticates; it is rotated on each
-   * call and never returned by `GET .../repository`. Requires the course to be
-   * bound to a managed Forgejo server offering the ``forgejo`` mode.
+   * Also returns the repo-scoped Forgejo clone token (`clone_token` +
+   * `clone_username`) so `git clone`/push authenticates; it is never returned by
+   * `GET .../repository`. Requires the course to be bound to a managed Forgejo
+   * server offering the ``forgejo`` mode.
+   * The token is minted once and returned unchanged on later calls: Forgejo
+   * keeps one token per user and instance, so re-minting would break the copy
+   * stored in every repo the student has already cloned. Pass `rotate=true` to
+   * force a fresh one — the escape hatch when the credential stopped working —
+   * which invalidates the previous token, so the client must then update the
+   * remotes of all its clones on that server.
    */
-  async provisionStudentRepositoryEndpointUserCoursesCourseIdProvisionRepositoryPost({ courseId, userId }: { courseId: string | string; userId?: string | null }): Promise<StudentRepositoryProvisioned> {
+  async provisionStudentRepositoryEndpointUserCoursesCourseIdProvisionRepositoryPost({ courseId, rotate, userId }: { courseId: string | string; rotate?: boolean; userId?: string | null }): Promise<StudentRepositoryProvisioned> {
     const queryParams: Record<string, unknown> = {
+      rotate,
       user_id: userId,
     };
     return this.client.post<StudentRepositoryProvisioned>(this.buildPath('courses', courseId, 'provision-repository'), { params: queryParams });

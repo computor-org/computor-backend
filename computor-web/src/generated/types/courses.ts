@@ -1143,11 +1143,14 @@ export interface CourseMemberRepositoryGet {
 }
 
 /**
- * Provisioning result — the repo plus a **one-time** clone credential.
+ * Provisioning result — the repo plus its clone credential.
  * 
- * Returned only by `provision-repository`. `clone_token` is a fresh repo-scoped
- * Forgejo PAT minted (and rotated) on each call; it is NOT persisted and NOT
- * returned by `GET .../repository`. Authenticate git as:
+ * Returned only by `provision-repository`, never by `GET .../repository`.
+ * `clone_token` is a repo-scoped Forgejo PAT, minted on the first call and
+ * returned unchanged afterwards — Forgejo keeps one token per user and
+ * instance, so re-minting would invalidate the copy already embedded in the
+ * student's existing clones. Call with `rotate=true` to force a fresh token
+ * (and then update every clone's remote). Authenticate git as:
  * `https://<clone_username>:<clone_token>@<host>/<owner>/<repo>.git`.
  * `clone_token` is null until the student has logged into Forgejo once
  * (re-call after their first login to obtain it).
@@ -1164,7 +1167,7 @@ export interface StudentRepositoryProvisioned {
   http_url?: string | null;
   ssh_url?: string | null;
   web_url?: string | null;
-  /** One-time repo-scoped Forgejo PAT; store securely */
+  /** Repo-scoped Forgejo PAT; store securely */
   clone_token?: string | null;
   /** Forgejo username to pair with clone_token */
   clone_username?: string | null;
