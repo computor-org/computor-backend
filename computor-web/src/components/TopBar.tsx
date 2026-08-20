@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useCourse } from '@/src/contexts/CourseContext';
 import Avatar from './Avatar';
 
 export default function TopBar() {
@@ -14,7 +15,8 @@ export default function TopBar() {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [courseTitle, setCourseTitle] = useState<string | null>(null);
+  const { courseId: currentCourseId, course } = useCourse();
+  const courseTitle = course ? course.title || 'Untitled Course' : null;
   const [avatar, setAvatar] = useState<{ color: number | null; image: string | null }>({ color: null, image: null });
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -59,32 +61,6 @@ export default function TopBar() {
       cancelled = true;
     };
   }, [user]);
-
-  // Detect a course context — only a real course id (UUID), so static segments
-  // like /courses/create don't get fetched as a bogus course (→ backend VAL_001).
-  const courseMatch = pathname.match(/^\/courses\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
-  const currentCourseId = courseMatch ? courseMatch[1] : null;
-
-  // Fetch course title when in course context. No synchronous reset on leave —
-  // the title is gated on currentCourseId at render, so a stale value can't show.
-  useEffect(() => {
-    if (!user || !currentCourseId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const response = await apiFetch(`${API_BASE_URL}/courses/${currentCourseId}`);
-        if (!cancelled && response.ok) {
-          const data = await response.json();
-          setCourseTitle(data.title || 'Untitled Course');
-        }
-      } catch (error) {
-        console.error('Failed to fetch course title:', error);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [currentCourseId, user]);
 
   // Close menu when clicking outside
   useEffect(() => {
