@@ -135,7 +135,12 @@ export const userMgmtNavigation: NavItem[] = [
  */
 const TUTOR_VIEW_ENABLED = false;
 
-// Navigation structure for view-based navigation (when in course context)
+// Navigation structure for view-based navigation (when in course context).
+//
+// The lecturer sub-items are ordered by workflow, not by role seniority:
+// authoring (Assignments, Templates) is what a lecturer opens a course to do at
+// the start of a semester, and it used to sit below three roster-management
+// pages with Grading — the analytics view — as the section's landing page.
 export const getViewNavigation = (courseId: string): NavItem[] =>
   [
     {
@@ -168,11 +173,11 @@ export const getViewNavigation = (courseId: string): NavItem[] =>
       // No ownPage: /courses/[id]/lecturer only redirects to the first sub-item,
       // so the sidebar link hops there directly.
       subItems: [
+        { id: 'lecturer-assignments', label: 'Assignments', path: `/courses/${courseId}/lecturer/assignments` },
+        { id: 'lecturer-templates', label: 'Templates', path: `/courses/${courseId}/lecturer/templates` },
         { id: 'lecturer-grading', label: 'Grading', path: `/courses/${courseId}/lecturer/grading` },
         { id: 'lecturer-members', label: 'Course Members', path: `/courses/${courseId}/lecturer/members` },
         { id: 'lecturer-groups', label: 'Course Groups', path: `/courses/${courseId}/lecturer/groups` },
-        { id: 'lecturer-assignments', label: 'Assignments', path: `/courses/${courseId}/lecturer/assignments` },
-        { id: 'lecturer-templates', label: 'Templates', path: `/courses/${courseId}/lecturer/templates` },
         { id: 'lecturer-workspaces', label: 'Workspaces', path: `/courses/${courseId}/lecturer/workspaces` },
       ],
     },
