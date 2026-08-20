@@ -60,7 +60,7 @@ function WorkspaceAdminContent() {
       {tab === 'users' ? (
         <WorkspaceUsersPanel />
       ) : tab === 'fleet' ? (
-        <ScrollArea className="space-y-6">
+        <ScrollArea>
           <WorkspaceFleetPanel />
         </ScrollArea>
       ) : tab === 'templates' ? (

@@ -60,7 +60,7 @@ export default function GitServerDetailPage() {
         {loading ? (
           <ListLoading>Loading…</ListLoading>
         ) : server ? (
-          <ScrollArea className="space-y-6">
+          <ScrollArea>
             <div className="bg-white border border-gray-200 rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
               <div><dt className="text-gray-500">Managed</dt><dd className="text-gray-900">{server.managed ? 'Yes — Computor operates it' : 'No (external)'}</dd></div>
               <div><dt className="text-gray-500">Service token</dt><dd className="text-gray-900">{server.has_token ? 'Set (encrypted)' : 'None'}</dd></div>

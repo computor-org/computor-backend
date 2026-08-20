@@ -102,7 +102,7 @@ export default function ServiceDetailPage() {
         {loading ? (
           <ListLoading>Loading…</ListLoading>
         ) : service ? (
-          <ScrollArea className="space-y-6">
+          <ScrollArea>
             {archiveError && (
               <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 <p>{archiveError}</p>

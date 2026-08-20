@@ -109,7 +109,7 @@ export default function LecturerTemplatesPage() {
         {loading ? (
           <ListLoading />
         ) : (
-          <ScrollArea className="space-y-6">
+          <ScrollArea>
             <p className="text-sm text-gray-500">
               Download the released student template as a ZIP. Both layouts contain the same files — only the
               directory structure differs. Newly assigned examples appear here once they are released.

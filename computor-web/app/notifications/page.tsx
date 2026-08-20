@@ -63,7 +63,7 @@ export default function NotificationsPage() {
             </div>
           </ScrollArea>
         ) : (
-          <ScrollArea className="space-y-3">
+          <ScrollArea spacing="rows">
             {messages.map((m) => {
               const isNew = seenUnread.has(m.id);
               return (

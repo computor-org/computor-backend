@@ -160,7 +160,7 @@ export default function StudentProgressPage() {
             }
           />
 
-          <ScrollArea className="space-y-6 print:overflow-visible">
+          <ScrollArea className="print:overflow-visible">
           {/* Loading */}
           {loading && (
             <div className="space-y-4">

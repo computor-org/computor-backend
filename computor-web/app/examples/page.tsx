@@ -77,7 +77,7 @@ export default function ExamplesPage() {
             {examples.length === 0 ? 'No examples yet. Upload a zip of one or more examples to get started.' : 'No examples in this repository.'}
           </div>
         ) : (
-          <ScrollArea className="space-y-3">
+          <ScrollArea spacing="rows">
             {visible.map((ex) => (
               <Link key={ex.id} href={`/examples/${ex.id}`} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-sm transition-all">
                 <div className="min-w-0">

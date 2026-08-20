@@ -67,7 +67,7 @@ export default function CourseFamilyDetailPage() {
         {loading ? (
           <ListLoading>Loading…</ListLoading>
         ) : (
-          <ScrollArea className="space-y-6">
+          <ScrollArea>
             {family?.description && (
               <div className="bg-white border border-gray-200 rounded-lg p-5">
                 <p className="text-gray-700">{family.description}</p>

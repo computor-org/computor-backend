@@ -44,7 +44,7 @@ function TemplateAdminContent() {
         onSelect={(id) => router.replace(id === 'settings' ? pathname : `${pathname}?tab=${id}`)}
       />
 
-      <ScrollArea className="space-y-6">
+      <ScrollArea>
         {tab === 'settings' ? (
           <TemplateSettingsPanel templateName={templateName} />
         ) : (

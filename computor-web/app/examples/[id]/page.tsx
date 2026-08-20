@@ -72,7 +72,7 @@ export default function ExampleDetailPage() {
         {loading ? (
           <ListLoading>Loading…</ListLoading>
         ) : example ? (
-          <ScrollArea className="space-y-6">
+          <ScrollArea>
             <div className="bg-white border border-gray-200 rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <div>
                 <dt className="text-gray-500">Directory</dt>

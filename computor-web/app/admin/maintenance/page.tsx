@@ -132,7 +132,7 @@ export default function MaintenancePage() {
         {/* Error */}
         <ErrorBanner>{error}</ErrorBanner>
 
-        <ScrollArea className="space-y-6">
+        <ScrollArea>
         {/* Loading */}
         {loading && (
           <div className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">

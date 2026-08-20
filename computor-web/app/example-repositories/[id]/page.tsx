@@ -73,7 +73,7 @@ export default function ExampleRepositoryDetailPage() {
         {loading ? (
           <ListLoading>Loading…</ListLoading>
         ) : repo ? (
-          <ScrollArea className="space-y-6">
+          <ScrollArea>
             {repo.description && (
               <div className="bg-white border border-gray-200 rounded-lg p-5">
                 <p className="text-gray-700">{repo.description}</p>

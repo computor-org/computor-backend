@@ -211,7 +211,7 @@ function LecturerWorkspacesContent() {
       {loading ? (
         <ListLoading>Loading…</ListLoading>
       ) : (
-        <ScrollArea className="space-y-6">
+        <ScrollArea>
           {!provisionAllowed ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
               Lecturer provisioning is not enabled for this course. A workspace maintainer can

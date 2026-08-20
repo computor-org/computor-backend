@@ -54,25 +54,42 @@ export default function ListPageLayout({
 /**
  * Borderless region that grows to fill the layout and scrolls internally — the
  * body for pages whose content isn't a single table (e.g. a stack of cards).
- * Pass `space-y-*` via className for inter-child spacing.
+ *
+ * `spacing` names what the children ARE, not how many pixels sit between them.
+ * Pages used to pass `space-y-*` themselves and picked 12px, 16px, 24px and
+ * 32px for the same job, so moving between two pages of the same kind changed
+ * the page's rhythm under you. There are two rhythms and this owns both.
  *
  * `scroll-slim` gives the thumb its inset so it never touches the content, and
  * `scroll-gutter` reserves its width so the content doesn't shift sideways when
  * the list crosses the fold. Bordered bodies opt out of the gutter — see
  * <ScrollPanel>.
  */
+export type ScrollAreaSpacing = 'sections' | 'rows' | 'none';
+
+const SPACING_CLS: Record<ScrollAreaSpacing, string> = {
+  /** Titled blocks — cards, panels, a summary strip above a list. */
+  sections: 'space-y-6',
+  /** A stack of peer rows or small cards that read as one list. */
+  rows: 'space-y-3',
+  /** The body is a grid, or a single child that owns its own spacing. */
+  none: '',
+};
+
 export function ScrollArea({
+  spacing = 'sections',
   className = '',
   gutter = true,
   children,
 }: {
+  spacing?: ScrollAreaSpacing;
   className?: string;
   gutter?: boolean;
   children: ReactNode;
 }) {
   return (
     <div
-      className={`flex-1 min-h-0 overflow-y-auto scroll-slim scroll-fade ${gutter ? 'scroll-gutter' : ''} ${className}`}
+      className={`flex-1 min-h-0 overflow-y-auto scroll-slim scroll-fade ${gutter ? 'scroll-gutter' : ''} ${SPACING_CLS[spacing]} ${className}`}
     >
       {children}
     </div>

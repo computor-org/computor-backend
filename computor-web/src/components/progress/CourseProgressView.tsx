@@ -153,7 +153,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
         }
       />
 
-      <ScrollArea className="space-y-6">
+      <ScrollArea>
         {/* Loading */}
         {loading && (
           <div className="space-y-4">

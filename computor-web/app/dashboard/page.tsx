@@ -121,7 +121,7 @@ export default function DashboardPage() {
         {loading ? (
           <ListLoading />
         ) : (
-          <ScrollArea className="space-y-8">
+          <ScrollArea>
             {announcements.length > 0 && (
               <section>
                 <SectionHeading title="Announcements" href="/notifications" />

@@ -162,7 +162,7 @@ function CourseWorkspaceConfigContent() {
       {loading ? (
         <ListLoading>Loading configuration…</ListLoading>
       ) : (
-        <ScrollArea className="space-y-6">
+        <ScrollArea>
           <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-4">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Allowed templates</h2>

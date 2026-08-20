@@ -144,7 +144,7 @@ export default function LecturerContentPage() {
         {loading ? (
           <ListLoading />
         ) : (
-          <ScrollArea className="space-y-6">
+          <ScrollArea>
             {/* Summary — the at-a-glance deployment signal */}
             <StatGrid columns={5}>
               <StatCard label="Contents" value={active.length} />

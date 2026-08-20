@@ -142,7 +142,7 @@ export default function CoursePage() {
           }
         />
 
-        <ScrollArea className="space-y-8">
+        <ScrollArea>
         {/* About — description + the few facts worth showing (no identifiers). */}
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">About</h2>

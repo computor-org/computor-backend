@@ -44,7 +44,7 @@ export default function CoursesPage() {
 
         {/* Loading State */}
         {loading && (
-          <ScrollArea className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 content-start">
+          <ScrollArea spacing="none" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 content-start">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <CourseCardSkeleton key={i} />
             ))}
@@ -67,7 +67,7 @@ export default function CoursesPage() {
 
         {/* Courses Grid */}
         {!loading && !error && courses.length > 0 && (
-          <ScrollArea className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 content-start">
+          <ScrollArea spacing="none" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 content-start">
             {courses.map((course) => (
               <CourseCard
                 key={course.id}

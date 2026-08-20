@@ -217,7 +217,7 @@ export default function UpdatesPage() {
           <ErrorBanner>{error}</ErrorBanner>
         )}
 
-        <ScrollArea className="space-y-6">
+        <ScrollArea>
           {/* Loading skeleton */}
           {loading && !view && (
             <div className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">

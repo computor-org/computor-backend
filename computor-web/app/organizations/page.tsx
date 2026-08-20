@@ -55,7 +55,7 @@ export default function OrganizationsPage() {
             No organizations yet{canCreateOrganization ? ' — create one to get started.' : '.'}
           </div>
         ) : (
-          <ScrollArea className="space-y-3">
+          <ScrollArea spacing="rows">
             {orgs.map((o) => (
               <div key={o.id} className="flex items-center justify-between gap-4 bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-sm transition-all">
                 <Link href={`/organizations/${o.id}`} className="min-w-0 group flex-1">

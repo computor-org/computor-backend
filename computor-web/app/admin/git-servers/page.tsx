@@ -48,7 +48,7 @@ export default function GitServersPage() {
             No git servers registered yet — register one (e.g. your Forgejo) to enable babysat provisioning.
           </div>
         ) : (
-          <ScrollArea className="space-y-3">
+          <ScrollArea spacing="rows">
             {servers.map((s) => (
               <Link key={s.id} href={`/admin/git-servers/${s.id}`} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-sm transition-all">
                 <div className="min-w-0">

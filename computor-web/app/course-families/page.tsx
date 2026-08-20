@@ -63,7 +63,7 @@ export default function CourseFamiliesPage() {
         ) : families.length === 0 ? (
           <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">No course families yet.</div>
         ) : (
-          <ScrollArea className="space-y-3">
+          <ScrollArea spacing="rows">
             {families.map((f) => (
               <Link key={f.id} href={`/course-families/${f.id}`} className="block bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-sm transition-all">
                 <div className="flex items-center justify-between gap-2">
