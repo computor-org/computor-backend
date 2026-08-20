@@ -183,6 +183,20 @@ async def startup_logic():
         else:
             print("[STARTUP] API_ADMIN_EMAIL/API_ADMIN_PASSWORD not set — skipping admin provisioning")
 
+        # A git server refuses to create a second account for an address it
+        # already knows. When the bootstrap admin shares its email with the git
+        # server's own admin, the platform admin therefore never gets a git
+        # account, and every repo/team/token grant for it fails. Cheap to check,
+        # invisible to diagnose after the fact.
+        git_admin_email = (os.environ.get("FORGEJO_ADMIN_EMAIL") or "").strip().lower()
+        if git_admin_email and git_admin_email == (admin_email or "").strip().lower():
+            print(
+                f"[STARTUP] WARNING: API_ADMIN_EMAIL and FORGEJO_ADMIN_EMAIL are both "
+                f"'{git_admin_email}'. The git server already owns that address, so the "
+                "platform admin cannot be given a git account. Set them to different "
+                "addresses."
+            )
+
         # Register this deployment's redirect URIs on the Keycloak client so
         # Keycloak accepts both (a) the login callback and (b) the post-logout
         # redirect back to the app root. X-Forwarded-Proto from nginx gives the

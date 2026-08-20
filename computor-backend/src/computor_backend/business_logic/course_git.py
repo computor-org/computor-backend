@@ -739,16 +739,35 @@ def _ensure_forgejo_account(user_id: str, server: GitServer, db: Session) -> Opt
 
     Best-effort: needs the user's OIDC handle (set at computor SSO login) and our
     managed-server admin credentials; if either is missing we just return the
-    handle (or None) and let the downstream grant self-heal."""
+    handle (or None) and let the downstream grant self-heal.
+
+    Returns None — "this user has no git identity, skip the grants" — for the
+    deployment's bootstrap administrator (which can never have one, see
+    ``utils/bootstrap_admin.py``) and when the account provably could not be
+    created. Every caller already treats a missing handle as "nothing to do",
+    which is exactly right: grants against a name the git server does not know
+    only produce an endless stream of 422/404 warnings."""
     handle = _resolve_oidc_handle(user_id, db)
     if not handle:
+        return None
+    from computor_backend.model.auth import User
+    from computor_backend.utils.bootstrap_admin import is_bootstrap_admin
+
+    user = db.query(User).filter(User.id == user_id).first()
+    # The bootstrap admin has no usable git-server identity by construction (see
+    # utils/bootstrap_admin.py); treat it like a member who has none yet so every
+    # caller's existing "no handle" branch skips the grants quietly. Checked
+    # before the credentials branch below: it holds for any git server, not just
+    # the one we have admin credentials for.
+    if is_bootstrap_admin(user):
+        logger.info(
+            "Skipping Forgejo account/grants for the bootstrap administrator (%s)",
+            handle,
+        )
         return None
     creds = _forgejo_admin_basic_auth_for(server)
     if not creds:
         return handle
-    from computor_backend.model.auth import User
-
-    user = db.query(User).filter(User.id == user_id).first()
     email = (user.email if user else None) or f"{handle}@users.noreply.local"
     full_name = (
         " ".join(filter(None, [getattr(user, "given_name", None), getattr(user, "family_name", None)]))
@@ -758,7 +777,11 @@ def _ensure_forgejo_account(user_id: str, server: GitServer, db: Session) -> Opt
     client = get_provider_client_for_server(server)
     if hasattr(client, "ensure_user"):
         try:
-            client.ensure_user(handle, email, full_name, creds[0], creds[1])
+            if not client.ensure_user(handle, email, full_name, creds[0], creds[1]):
+                # The account does not exist and could not be created (the
+                # provider logged why). Granting against a name Forgejo does not
+                # know only produces a stream of 422/404 warnings, so skip.
+                return None
         except Exception as exc:  # best-effort — don't block provisioning
             logger.warning("Could not ensure Forgejo account for %s: %s", handle, exc)
     return handle
@@ -1049,6 +1072,18 @@ def provision_student_repository(
     )
     if member is None:
         raise NotFoundException(error_code="GIT_002", detail="You are not a member of this course")
+
+    # The bootstrap administrator is infrastructure, not a person: it can never
+    # hold a working git-server identity (utils/bootstrap_admin.py), so say so
+    # once instead of retrying grants that fail forever.
+    from computor_backend.utils.bootstrap_admin import user_is_bootstrap_admin
+
+    if user_is_bootstrap_admin(user_id, db):
+        raise BadRequestException(
+            detail="The bootstrap administrator cannot be provisioned a repository. "
+                   "Use a personal account for course work; administration does not "
+                   "require course membership."
+        )
 
     binding = (
         db.query(CourseGitBinding)

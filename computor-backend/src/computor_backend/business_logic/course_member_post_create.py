@@ -200,6 +200,18 @@ async def course_member_post_create(
     # legacy workflow must NOT fire for them. Un-migrated courses (org-level
     # GitLab, no binding) keep the existing behaviour until migrated.
     from computor_backend.business_logic.course_git import course_uses_course_level_git
+    from computor_backend.utils.bootstrap_admin import user_is_bootstrap_admin
+
+    # The bootstrap administrator gets no repository on either git model: its
+    # handle has no account on the git server and never can have one (see
+    # utils/bootstrap_admin.py). The course-level path refuses this in
+    # provision_student_repository; refuse the eager legacy path here.
+    if user_is_bootstrap_admin(course_member.user_id, db):
+        logger.info(
+            "Skipping repository provisioning for the bootstrap administrator "
+            "(course member %s)", course_member.id,
+        )
+        return None
 
     if course_uses_course_level_git(db, course_member.course_id):
         logger.info(

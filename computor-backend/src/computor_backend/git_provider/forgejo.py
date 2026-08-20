@@ -497,14 +497,32 @@ class ForgejoProviderClient:
         auth = (admin_username, admin_password)
         with httpx.Client(base_url=self._url, auth=auth, timeout=30.0) as client:
             r = client.post(f"{_BASE}/admin/users", json=payload)
-        if r.status_code in (200, 201):
-            logger.info("Forgejo: created account %s", username)
+            if r.status_code in (200, 201):
+                logger.info("Forgejo: created account %s", username)
+                return True
+            # A 422 covers BOTH the benign case ("user already exists" — the
+            # desired end state) and failures that create nothing, above all
+            # "e-mail already in use" when another account already holds this
+            # address. Treating them alike made a never-created account look
+            # provisioned, and every later grant for that name then failed
+            # forever — 422 on collaborators, 404 on team members and tokens —
+            # with nothing in the logs saying why. Ask Forgejo instead of
+            # guessing from the status code.
+            exists = (
+                r.status_code == 422
+                and client.get(f"{_BASE}/users/{username}").status_code == 200
+            )
+            message = ""
+            try:
+                message = (r.json() or {}).get("message", "")
+            except ValueError:
+                message = (r.text or "")[:200]
+        if exists:
             return True
-        if r.status_code == 422:
-            # Already exists (duplicate username/email) — the desired end state.
-            return True
-        logger.warning(
-            "Forgejo: could not ensure account %s (status %s)", username, r.status_code
+        logger.error(
+            "Forgejo: account %s was NOT created (status %s): %s — every repo, team "
+            "and token grant for this user will fail until this is resolved",
+            username, r.status_code, message or "no message",
         )
         return False
 
