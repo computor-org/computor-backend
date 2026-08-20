@@ -1,13 +1,15 @@
 'use client';
 
-import Image from 'next/image';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useCourse } from '@/src/contexts/CourseContext';
+import { MessagesClient } from '@/src/generated/clients/MessagesClient';
 import Avatar from './Avatar';
+
+const messagesClient = new MessagesClient();
 
 export default function TopBar() {
   const router = useRouter();
@@ -22,15 +24,20 @@ export default function TopBar() {
 
   // Unread global announcements drive the bell badge. Re-fetched on navigation,
   // so the count clears after /notifications opens (which marks them read).
+  //
+  // /messages/counts returns the number; the previous version fetched up to 50
+  // message rows and measured the array, so a 51st unread announcement did not
+  // move the badge and every navigation pulled a page of message bodies to
+  // render a single integer.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await apiFetch(`${API_BASE_URL}/messages?scope=global&unread=true&limit=50`);
-        if (!cancelled && res.ok) {
-          const data = await res.json();
-          setUnreadCount(Array.isArray(data) ? data.length : 0);
+        const counts = await messagesClient.getMessageCountsMessagesCountsGet({});
+        if (!cancelled) {
+          const global = (counts.counts ?? []).find((c) => c.scope === 'global');
+          setUnreadCount(global?.unread ?? 0);
         }
       } catch {
         /* leave the count as-is */
@@ -86,20 +93,26 @@ export default function TopBar() {
     // positioned, and the profile dropdown below relies on it to paint over the
     // sticky <thead> in list tables.
     <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-40 print:hidden">
-      {/* Logo / Title */}
-      <Link href="/dashboard" className="flex items-center space-x-3 hover:opacity-80 transition-opacity cursor-pointer">
-        <Image src="/computor_logo.png" alt="Computor" width={32} height={32} className="h-8 w-8" />
-        <h1 className="text-xl font-bold text-gray-900">Computor</h1>
-      </Link>
-
-      {/* Right Side - Course Title & User Menu */}
-      <div className="flex items-center space-x-4">
+      {/*
+        Where the app's logo and wordmark used to sit. Both are in the sidebar
+        footer, and the user's name was here as well as in the sidebar header —
+        three restatements of identity above a page header that then repeats the
+        course name in its breadcrumb. What belongs here is the one thing the
+        sidebar cannot show: which course you are currently inside.
+      */}
+      <div className="min-w-0">
         {currentCourseId && courseTitle && (
-          <>
-            <h2 className="text-lg font-medium text-gray-700">{courseTitle}</h2>
-            <div className="h-6 w-px bg-gray-300"></div>
-          </>
+          <Link
+            href={`/courses/${currentCourseId}`}
+            className="text-lg font-medium text-gray-700 hover:text-gray-900 transition-colors truncate block"
+          >
+            {courseTitle}
+          </Link>
         )}
+      </div>
+
+      {/* Right Side - Notifications & User Menu */}
+      <div className="flex items-center gap-2 shrink-0">
         {/* Notifications — global announcements */}
         <button
           onClick={() => router.push('/notifications')}
@@ -123,7 +136,7 @@ export default function TopBar() {
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             aria-label="User menu"
-            className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            className="flex items-center gap-1.5 p-2 rounded-lg hover:bg-gray-100 transition-colors"
           >
             {/* Avatar */}
             <Avatar
@@ -133,12 +146,6 @@ export default function TopBar() {
               avatarColor={avatar.color}
               avatarImage={avatar.image}
             />
-            {/* User Info */}
-            <div className="hidden md:block text-left">
-              <p className="text-sm font-medium text-gray-900">
-                {user?.givenName} {user?.familyName}
-              </p>
-            </div>
             {/* Chevron */}
             <svg
               className={`h-4 w-4 text-gray-500 transition-transform ${menuOpen ? 'rotate-180' : ''}`}
