@@ -124,7 +124,7 @@ export default function ProfilePage() {
       <ListPageLayout width="narrow">
         <PageHeader
           breadcrumbs={[{ label: 'My Profile' }]}
-          title="My Profile"
+          title="My profile"
           subtitle="Your identity and public profile across Computor."
           actions={
             user ? (

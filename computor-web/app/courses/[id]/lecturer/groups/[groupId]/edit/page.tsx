@@ -26,7 +26,7 @@ export default function CourseGroupEditPage() {
   const canManage = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
 
   const [title, setTitle] = useState('');
-  const crumbs = useCourseCrumbs(courseId, { label: 'Course Groups', href: `/courses/${courseId}/lecturer/groups` }, title || 'Group');
+  const crumbs = useCourseCrumbs(courseId, { label: 'Course groups', href: `/courses/${courseId}/lecturer/groups` }, title || 'Group');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);

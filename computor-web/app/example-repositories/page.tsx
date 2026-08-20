@@ -29,8 +29,8 @@ export default function ExampleRepositoriesPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Example Repositories' }]}
-          title="Example Repositories"
+          breadcrumbs={[{ label: 'Example repositories' }]}
+          title="Example repositories"
           subtitle="Storage backends that hold examples. Upload examples into a MinIO repository."
           actions={
             canManageExamples ? (

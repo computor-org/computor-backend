@@ -34,7 +34,7 @@ export default function CoursesPage() {
               <ButtonLink href="/courses/catalog" variant="secondary">
                 Browse catalog
               </ButtonLink>
-              {canCreateCourse() && <ButtonLink href="/courses/create">New Course</ButtonLink>}
+              {canCreateCourse() && <ButtonLink href="/courses/create">New course</ButtonLink>}
             </>
           }
         />

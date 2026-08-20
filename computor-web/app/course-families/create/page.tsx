@@ -72,8 +72,8 @@ function CreateInner() {
   return (
     <AuthenticatedLayout>
       <FormPanel
-        breadcrumbs={[{ label: 'Course Families', href: '/course-families' }, { label: 'New' }]}
-        title="New Course Family"
+        breadcrumbs={[{ label: 'Course families', href: '/course-families' }, { label: 'New' }]}
+        title="New course family"
         description="A course family is a lecture — a lecture type such as 'Introduction to Programming'. Each time it runs in a term, you add a course (one instance) under it."
         error={error}
         submitting={saving}

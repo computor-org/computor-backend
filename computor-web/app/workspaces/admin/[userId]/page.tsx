@@ -120,7 +120,7 @@ export default function UserDetailPage() {
             { label: 'Administration', href: '/workspaces/admin' },
             { label: 'User Detail' },
           ]}
-          title="User Detail"
+          title="User detail"
           actions={
             user && (
               <div className="flex items-center gap-2">

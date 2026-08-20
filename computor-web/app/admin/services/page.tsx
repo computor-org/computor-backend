@@ -36,7 +36,7 @@ export default function ServicesPage() {
       <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Services' }]}
-          title="Service Accounts"
+          title="Service accounts"
           subtitle="Machine identities — testing systems, integrations and AI agents. Each one is a user that cannot log in, authenticating only with an API token."
           actions={
             <Link href="/admin/services/create" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">

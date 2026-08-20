@@ -129,8 +129,8 @@ export default function PrivacyNoticesPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Privacy Notices' }]}
-          title="Privacy Notices"
+          breadcrumbs={[{ label: 'Privacy notices' }]}
+          title="Privacy notices"
           subtitle="Publish and review the GDPR consent policy versions that back the consent gate."
         />
 

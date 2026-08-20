@@ -64,7 +64,7 @@ export default function ExampleRepositoryEditPage() {
       ) : (
         <FormPanel
           breadcrumbs={[
-            { label: 'Example Repositories', href: '/example-repositories' },
+            { label: 'Example repositories', href: '/example-repositories' },
             { label: repo?.name || 'Repository', href: `/example-repositories/${repoId}` },
             { label: 'Edit' },
           ]}

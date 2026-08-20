@@ -74,7 +74,7 @@ export default function ServiceCreatePage() {
     <AuthenticatedLayout>
       <FormPanel
         breadcrumbs={[{ label: 'Services', href: '/admin/services' }, { label: 'New' }]}
-        title="New Service Account"
+        title="New service account"
         description="Creates a non-human user that authenticates with an API token. Mint the token on the next screen."
         error={error}
         submitting={saving}

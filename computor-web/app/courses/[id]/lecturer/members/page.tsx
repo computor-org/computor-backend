@@ -37,7 +37,7 @@ function memberName(m: CourseMemberList): string {
 
 export default function CourseMembersPage() {
   const courseId = useParams().id as string;
-  const crumbs = useCourseCrumbs(courseId, 'Course Members');
+  const crumbs = useCourseCrumbs(courseId, 'Course members');
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const { isAdmin, isOrganizationManager, courseRoles, courseHasAtLeast } = usePermissions();
 
@@ -142,7 +142,7 @@ export default function CourseMembersPage() {
       <ListPageLayout>
         <PageHeader
           breadcrumbs={crumbs}
-          title="Course Members"
+          title="Course members"
           subtitle="Manage who belongs to this course and their roles."
           actions={
             <Link

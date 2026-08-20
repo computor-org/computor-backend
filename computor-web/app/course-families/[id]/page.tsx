@@ -45,12 +45,12 @@ export default function CourseFamilyDetailPage() {
     <AuthenticatedLayout>
       <ListPageLayout width="narrow">
         <PageHeader
-          breadcrumbs={[{ label: 'Course Families', href: '/course-families' }, { label: familyName }]}
+          breadcrumbs={[{ label: 'Course families', href: '/course-families' }, { label: familyName }]}
           title={familyName}
           actions={
             <>
               {mayCreateCourse && (
-                <Link href={`/courses/create?familyId=${familyId}`} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">New Course</Link>
+                <Link href={`/courses/create?familyId=${familyId}`} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">New course</Link>
               )}
               {family && canManage && (
                 <>

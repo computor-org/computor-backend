@@ -15,7 +15,7 @@ const groupsClient = new CourseGroupsClient();
 
 export default function CourseGroupCreatePage() {
   const courseId = useParams().id as string;
-  const crumbs = useCourseCrumbs(courseId, { label: 'Course Groups', href: `/courses/${courseId}/lecturer/groups` }, 'New');
+  const crumbs = useCourseCrumbs(courseId, { label: 'Course groups', href: `/courses/${courseId}/lecturer/groups` }, 'New');
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();

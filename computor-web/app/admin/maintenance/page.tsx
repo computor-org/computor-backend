@@ -125,7 +125,7 @@ export default function MaintenancePage() {
       <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Maintenance' }]}
-          title="Maintenance Mode"
+          title="Maintenance mode"
           subtitle="Manage system maintenance state and schedule future maintenance windows."
         />
 

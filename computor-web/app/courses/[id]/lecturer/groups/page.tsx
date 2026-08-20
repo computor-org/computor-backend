@@ -23,7 +23,7 @@ const membersClient = new CourseMembersClient();
 
 export default function CourseGroupsPage() {
   const courseId = useParams().id as string;
-  const crumbs = useCourseCrumbs(courseId, 'Course Groups');
+  const crumbs = useCourseCrumbs(courseId, 'Course groups');
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
 
@@ -81,7 +81,7 @@ export default function CourseGroupsPage() {
       <ListPageLayout>
         <PageHeader
           breadcrumbs={crumbs}
-          title="Course Groups"
+          title="Course groups"
           subtitle="Groups (lab sections, tutorial cohorts) students are assigned to. Every student must belong to a group."
           actions={
             <Link

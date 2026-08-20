@@ -119,8 +119,8 @@ export default function InvitesPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Users', href: '/admin/users' }, { label: 'Invite Links' }]}
-          title="Invite Links"
+          breadcrumbs={[{ label: 'Users', href: '/admin/users' }, { label: 'Invite links' }]}
+          title="Invite links"
           subtitle="Create one-time links to onboard new users without GitLab PAT"
           actions={
             <button
@@ -202,7 +202,7 @@ export default function InvitesPage() {
 
       {/* Create Modal */}
       {createModal.open && (
-        <Modal title="New Invite Link" onClose={() => setCreateModal(m => ({ ...m, open: false, error: null }))}>
+        <Modal title="New invite link" onClose={() => setCreateModal(m => ({ ...m, open: false, error: null }))}>
             <div className="p-6 pt-4">
               {createModal.error && (
                 <div className="mb-3"><ErrorBanner>{createModal.error}</ErrorBanner></div>

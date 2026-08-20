@@ -44,8 +44,8 @@ export default function CourseFamiliesPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Course Families' }]}
-          title="Course Families"
+          breadcrumbs={[{ label: 'Course families' }]}
+          title="Course families"
           subtitle="A course family groups related courses within an organization."
           actions={
             canCreateCourseFamily() ? (

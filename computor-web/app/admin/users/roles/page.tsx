@@ -217,7 +217,7 @@ export default function RolesPage() {
       <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Users', href: '/admin/users' }, { label: 'Roles' }]}
-          title="Roles & Claims"
+          title="Roles & claims"
           subtitle={`${roles.length} roles`}
         />
 

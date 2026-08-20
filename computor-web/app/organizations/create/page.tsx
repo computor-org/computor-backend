@@ -54,7 +54,7 @@ export default function OrganizationCreatePage() {
     <AuthenticatedLayout>
       <FormPanel
         breadcrumbs={[{ label: 'Organizations', href: '/organizations' }, { label: 'New' }]}
-        title="New Organization"
+        title="New organization"
         description="An organization is a faculty or institute — the top of the hierarchy. It owns the course families (lectures) taught under it."
         error={error}
         submitting={saving}

@@ -23,7 +23,7 @@ type AddTab = 'list' | 'email' | 'file';
 
 export default function AddCourseMembersPage() {
   const courseId = useParams().id as string;
-  const crumbs = useCourseCrumbs(courseId, { label: 'Course Members', href: `/courses/${courseId}/lecturer/members` }, 'Add');
+  const crumbs = useCourseCrumbs(courseId, { label: 'Course members', href: `/courses/${courseId}/lecturer/members` }, 'Add');
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin, isOrganizationManager, courseRoles, courseHasAtLeast } = usePermissions();
 

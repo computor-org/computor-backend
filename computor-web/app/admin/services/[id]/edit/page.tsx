@@ -86,7 +86,7 @@ export default function ServiceEditPage() {
           { label: service?.name || 'Service', href: `/admin/services/${serviceId}` },
           { label: 'Edit' },
         ]}
-        title="Edit Service Account"
+        title="Edit service account"
         description="Slug and service type are immutable — both are join keys other records already point at."
         error={error}
         submitting={saving || loading}

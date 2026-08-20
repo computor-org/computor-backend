@@ -190,7 +190,7 @@ export default function UpdatesPage() {
       <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Updates' }]}
-          title="System Updates"
+          title="System updates"
           subtitle="Compare the running version with the tracked repository branch and run one-click updates."
         />
 
@@ -500,7 +500,7 @@ export default function UpdatesPage() {
 
         <ConfirmDialog
           open={showUpdateConfirm}
-          title="Update the System"
+          title="Update the system"
           message="The entire system — including this page — will go offline for several minutes while the update runs. If the new version fails its health check, the previous version is restored automatically. Start the update?"
           confirmLabel="Update now"
           variant="danger"

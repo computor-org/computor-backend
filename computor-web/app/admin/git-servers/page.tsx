@@ -29,8 +29,8 @@ export default function GitServersPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Git Servers' }]}
-          title="Git Servers"
+          breadcrumbs={[{ label: 'Git servers' }]}
+          title="Git servers"
           subtitle="The registry of git instances courses can bind to. Managed instances hold a service token used for babysat student-repo provisioning."
           actions={
             <Link href="/admin/git-servers/create" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">

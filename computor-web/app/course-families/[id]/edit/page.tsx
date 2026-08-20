@@ -67,7 +67,7 @@ export default function CourseFamilyEditPage() {
       ) : (
         <FormPanel
           breadcrumbs={[
-            { label: 'Course Families', href: '/course-families' },
+            { label: 'Course families', href: '/course-families' },
             { label: family?.title || family?.path || 'Course Family', href: `/course-families/${familyId}` },
             { label: 'Edit' },
           ]}

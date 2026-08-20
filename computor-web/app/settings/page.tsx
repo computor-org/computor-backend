@@ -181,7 +181,7 @@ export default function SettingsPage() {
 
             {/* API Tokens */}
             <Section
-              title="API Tokens"
+              title="API tokens"
               description="Personal access tokens for the CLI, VS Code extension and scripts. Treat them like passwords."
             >
               {/*

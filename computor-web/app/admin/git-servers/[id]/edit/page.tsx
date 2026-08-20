@@ -69,7 +69,7 @@ export default function GitServerEditPage() {
       ) : (
         <FormPanel
           breadcrumbs={[
-            { label: 'Git Servers', href: '/admin/git-servers' },
+            { label: 'Git servers', href: '/admin/git-servers' },
             { label: server?.name || server?.base_url || 'Git Server', href: `/admin/git-servers/${serverId}` },
             { label: 'Edit' },
           ]}

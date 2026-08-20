@@ -34,7 +34,7 @@ function WorkspaceAdminContent() {
     <ListPageLayout>
       <PageHeader
         breadcrumbs={[{ label: 'Workspaces', href: '/workspaces' }, { label: 'Administration' }]}
-        title="Workspace Administration"
+        title="Workspace administration"
         subtitle="Workspace roles, per-user access, which templates are available, and fleet-wide image rollouts"
       />
 
