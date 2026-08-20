@@ -637,3 +637,87 @@ def test_a_missing_report_is_a_404():
         )
 
     assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# A screenshot that cannot be stored must not take the report down with it
+# ---------------------------------------------------------------------------
+
+
+class _RefusesScreenshots(_GitHubClient):
+    """GitHub with Issues: write but not Contents: write."""
+
+    async def put(self, url, headers=None, json=None):
+        self.calls.append({"method": "PUT", "url": url})
+        return _Response({"message": "Resource not accessible by personal access token"}, 403)
+
+
+@pytest.mark.asyncio
+async def test_a_rejected_screenshot_still_files_the_report():
+    calls: list[dict] = []
+    session = _Session()
+    with configured(), patch.object(
+        issue_reports.httpx, "AsyncClient", lambda **kwargs: _RefusesScreenshots(calls)
+    ):
+        result = await issue_reports.submit_issue_report(
+            IssueReportCreate(description="something broke"),
+            Principal(user_id="user-1"),
+            session,
+            _Screenshot(),
+        )
+
+    # The report survived; only the image did not.
+    assert result.issue_number == 123
+    assert result.screenshot_attached is False
+    assert session.report.issue_number == 123
+    body = calls[-1]["json"]["body"]
+    assert "could not be stored" in body
+
+
+@pytest.mark.asyncio
+async def test_a_rejected_screenshot_does_not_disable_the_feature():
+    """Contents access is not what reporting needs; only Issues access is."""
+    with configured(), patch.object(
+        issue_reports.httpx, "AsyncClient", lambda **kwargs: _RefusesScreenshots([])
+    ):
+        issue_health._record(True, "", "private", True)
+        await issue_reports.submit_issue_report(
+            IssueReportCreate(description="something broke"),
+            Principal(user_id="user-1"),
+            _Session(),
+            _Screenshot(),
+        )
+        assert issue_health.current_health().available
+
+
+@pytest.mark.asyncio
+async def test_an_unusable_attachment_is_still_the_reporters_problem():
+    """Type and size are rejected before anything is sent, so they still raise."""
+
+    class _TextFile(_Screenshot):
+        content_type = "text/plain"
+
+    calls: list[dict] = []
+    with configured(), patch.object(
+        issue_reports.httpx, "AsyncClient", lambda **kwargs: _GitHubClient(calls)
+    ), pytest.raises(issue_reports.IssueReportSubmissionError, match="Screenshot"):
+        await issue_reports.submit_issue_report(
+            IssueReportCreate(description="broken"),
+            Principal(user_id="user-1"),
+            _Session(),
+            _TextFile(),
+        )
+
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_the_probe_flags_a_token_that_cannot_store_screenshots():
+    with configured(), github_says(
+        payload={"private": True, "has_issues": True, "permissions": {"push": False}}
+    ):
+        health = await issue_health.probe_issue_reporting()
+
+    assert health.available
+    assert not health.can_store_screenshots
+    assert "Contents: Read and write" in issue_health.describe(health)

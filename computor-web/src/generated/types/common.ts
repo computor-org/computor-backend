@@ -50,6 +50,8 @@ export interface IssueReportCreated {
   issue_number: number;
   /** Link to the created issue; null when the tracker is private. */
   issue_url?: any | null;
+  /** Whether an attached screenshot actually made it into the issue. False when none was sent, or when storing it failed and the report was filed without it. */
+  screenshot_attached?: boolean;
 }
 
 /**

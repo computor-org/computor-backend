@@ -95,12 +95,14 @@ def _error_detail(response: httpx.Response) -> str:
         return response.text
 
 
-async def _upload_screenshot(
-    client: httpx.AsyncClient,
-    settings: IssueReportSettings,
-    report_id: str,
-    screenshot: UploadFile,
-) -> str:
+async def _read_screenshot(
+    settings: IssueReportSettings, screenshot: UploadFile
+) -> tuple[bytes, str]:
+    """Validate the attachment and read it.
+
+    These two failures are the reporter's to fix, so they are raised before
+    anything is sent anywhere.
+    """
     extension = _SCREENSHOT_TYPES.get((screenshot.content_type or "").lower())
     if extension is None:
         raise IssueReportSubmissionError("Screenshot must be PNG, JPEG, GIF, or WebP")
@@ -108,27 +110,54 @@ async def _upload_screenshot(
     contents = await screenshot.read(settings.max_screenshot_bytes + 1)
     if len(contents) > settings.max_screenshot_bytes:
         raise IssueReportSubmissionError("Screenshot is larger than the configured upload limit")
+    return contents, extension
 
+
+async def _store_screenshot(
+    client: httpx.AsyncClient,
+    settings: IssueReportSettings,
+    report_id: str,
+    contents: bytes,
+    extension: str,
+) -> str | None:
+    """Commit the screenshot into the tracker repository, or give up on it.
+
+    Returns ``None`` when GitHub refuses — most often a token holding
+    ``Issues: write`` but not ``Contents: write``, since the attachment goes in
+    through the contents API. Losing the whole report over an image the reporter
+    cannot re-send is far worse than filing it without one, so this never
+    raises: the report goes through and the issue says the screenshot is missing.
+    """
     path = f"issue-reports/{report_id}/screenshot{extension}"
     endpoint = (
         f"{settings.api_base}/repos/{settings.reference.full_name}"
         f"/contents/{quote(path, safe='/')}"
     )
-    response = await client.put(
-        endpoint,
-        headers=_github_headers(settings.token.strip()),
-        json={
-            "message": f"Add screenshot for user report {report_id}",
-            "content": base64.b64encode(contents).decode("ascii"),
-            "branch": settings.branch.strip() or "main",
-        },
-    )
-    if response.status_code not in (200, 201):
-        raise IssueReportSubmissionError(
-            f"GitHub rejected the screenshot ({response.status_code}): {_error_detail(response)}"
+    try:
+        response = await client.put(
+            endpoint,
+            headers=_github_headers(settings.token.strip()),
+            json={
+                "message": f"Add screenshot for user report {report_id}",
+                "content": base64.b64encode(contents).decode("ascii"),
+                "branch": settings.branch.strip() or "main",
+            },
         )
+    except httpx.HTTPError as exc:
+        logger.warning("Screenshot upload failed for report %s: %s", report_id, exc)
+        return None
+
+    if response.status_code not in (200, 201):
+        logger.warning(
+            "GitHub rejected the screenshot for report %s (%s): %s. "
+            "A fine-grained token needs Contents: Read and write to store attachments.",
+            report_id,
+            response.status_code,
+            _error_detail(response),
+        )
+        return None
     payload = response.json()
-    return str(payload.get("content", {}).get("html_url", ""))
+    return str(payload.get("content", {}).get("html_url", "")) or None
 
 
 def _issue_title(payload: IssueReportCreate) -> str:
@@ -141,6 +170,7 @@ def _issue_body(
     payload: IssueReportCreate,
     report_id: str,
     screenshot_url: str | None,
+    screenshot_submitted: bool = False,
 ) -> str:
     """Render the issue.
 
@@ -175,6 +205,15 @@ def _issue_body(
     ]
     if screenshot_url:
         lines.extend(["", "## Screenshot", f"[Open screenshot]({screenshot_url})"])
+    elif screenshot_submitted:
+        lines.extend(
+            [
+                "",
+                "## Screenshot",
+                "The reporter attached a screenshot, but it could not be stored. "
+                "Ask them to send it another way.",
+            ]
+        )
     lines.extend(
         [
             "",
@@ -208,17 +247,19 @@ async def submit_issue_report(
     db.refresh(record)
     report_id = str(record.id)
 
+    attachment = await _read_screenshot(settings, screenshot) if screenshot is not None else None
+
     async with httpx.AsyncClient(timeout=30.0) as client:
         screenshot_url = None
-        if screenshot is not None:
-            screenshot_url = await _upload_screenshot(client, settings, report_id, screenshot)
+        if attachment is not None:
+            screenshot_url = await _store_screenshot(client, settings, report_id, *attachment)
 
         response = await client.post(
             f"{settings.api_base}/repos/{repository}/issues",
             headers=_github_headers(token),
             json={
                 "title": _issue_title(payload),
-                "body": _issue_body(payload, report_id, screenshot_url),
+                "body": _issue_body(payload, report_id, screenshot_url, attachment is not None),
                 "labels": settings.label_list,
             },
         )
@@ -247,4 +288,5 @@ async def submit_issue_report(
         report_id=report_id,
         issue_number=issue_number,
         issue_url=issue_url if current_health().is_public else None,
+        screenshot_attached=screenshot_url is not None,
     )

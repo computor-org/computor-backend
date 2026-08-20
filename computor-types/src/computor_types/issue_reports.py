@@ -35,6 +35,12 @@ class IssueReportCreated(BaseModel):
         default=None,
         description="Link to the created issue; null when the tracker is private.",
     )
+    screenshot_attached: bool = Field(
+        default=False,
+        description="Whether an attached screenshot actually made it into the issue. "
+        "False when none was sent, or when storing it failed and the report was "
+        "filed without it.",
+    )
 
 
 class IssueReportGet(BaseModel):

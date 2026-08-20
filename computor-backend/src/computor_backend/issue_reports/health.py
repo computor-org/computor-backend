@@ -41,6 +41,11 @@ class IssueReportingHealth:
     reason: str = "not configured"
     visibility: Optional[str] = None
     checked_at: Optional[float] = None
+    # Whether the token may write repository contents. Screenshots are stored
+    # through the contents API, so without this they are refused — but reports
+    # themselves still work, which is why this never makes the feature
+    # unavailable, only warned about.
+    can_store_screenshots: bool = False
 
     @property
     def is_public(self) -> bool:
@@ -74,13 +79,19 @@ def mark_unhealthy(reason: str) -> None:
     logger.warning("Issue reporting marked unavailable: %s", reason)
 
 
-def _record(available: bool, reason: str, visibility: Optional[str]) -> IssueReportingHealth:
+def _record(
+    available: bool,
+    reason: str,
+    visibility: Optional[str],
+    can_store_screenshots: bool = False,
+) -> IssueReportingHealth:
     global _state
     _state = IssueReportingHealth(
         available=available,
         reason=reason,
         visibility=visibility,
         checked_at=time.monotonic(),
+        can_store_screenshots=can_store_screenshots,
     )
     return _state
 
@@ -153,7 +164,10 @@ async def probe_issue_reporting() -> IssueReportingHealth:
             f"{reference.full_name} is private — set GITHUB_ISSUE_REPORT_TOKEN",
             visibility,
         )
-    return _record(True, "", visibility)
+    # ``push`` is what a fine-grained token's Contents: write grants, and it is
+    # what the screenshot upload needs. Reporting works without it.
+    can_store = bool((payload.get("permissions") or {}).get("push"))
+    return _record(True, "", visibility, can_store)
 
 
 async def ensure_probed() -> IssueReportingHealth:
@@ -183,5 +197,10 @@ def describe(health: IssueReportingHealth) -> str:
         summary = f"issue reporting enabled for {target} ({health.visibility})"
         if health.is_public and settings.has_token:
             summary += " — the repository is public, so the token is unused and clients link to it directly"
+        elif not health.can_store_screenshots:
+            summary += (
+                " — but the token cannot write repository contents, so attached screenshots "
+                "will be dropped; add Contents: Read and write to keep them"
+            )
         return summary
     return f"issue reporting disabled for {target}: {health.reason}"
