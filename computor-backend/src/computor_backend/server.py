@@ -257,6 +257,17 @@ async def startup_logic():
     except Exception as e:
         print(f"[STARTUP] Bootstrap services seeding failed (non-fatal): {e}")
 
+    # Verify the configured GitHub issue tracker is reachable and learn whether
+    # it is public or private. Best-effort: an unhealthy verdict only disables
+    # the feature (503 + `enabled: false` in /instance-info), never startup.
+    from computor_backend.issue_reports.config import get_issue_report_settings
+    from computor_backend.issue_reports.health import describe, probe_issue_reporting
+    if get_issue_report_settings().configured:
+        try:
+            print(f"[STARTUP] {describe(await probe_issue_reporting())}")
+        except Exception as e:
+            print(f"[STARTUP] Issue reporting probe failed (non-fatal): {e}")
+
     # Publish privacy notices from data/consent/* idempotently (write-once), so a
     # fresh system comes up with its consent notice already in force. Awaited
     # directly (not off-thread): publishing uploads Markdown to MinIO via async
