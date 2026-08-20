@@ -31,3 +31,6 @@ export const hiddenRowTitleCls = 'text-gray-400';
 export const rowTitleCls = 'text-gray-900';
 /** Dot / icon alongside a dimmed row. */
 export const hiddenRowMarkCls = 'opacity-40';
+
+/** An input showing a value the user cannot change (e.g. an immutable path). */
+export const readOnlyInputCls = `${inputCls} bg-gray-50 text-gray-500`;
