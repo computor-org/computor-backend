@@ -175,16 +175,17 @@ sweeping reformat PR.
 Both checkers below report the current numbers with `--all`; these were
 re-measured on 2026-08-20.
 
-**Web** (`node computor-web/scripts/check-styling.mjs --all`, 74 files in `app/`)
-- **1,155** palette-utility occurrences in `app/**` that should be components
-  (a further 666 sit legitimately inside `src/components/**`).
-- **77** raw `<button>` in `app/**`; only 9 files import `Button`.
-- `PageHeader` reaches 40 of 70 pages; a header scaffold (`PageHeader` **or**
-  `FormPanel`) reaches 56 of 70. Create/edit is the healthy half — 16 of 18 of
-  those routes already go through `FormPanel`.
-- `EmptyState` is used on 4 pages against 15 hand-rolled dashed-border empties.
-- Three separate ltree tree renderers draw the same course content hierarchy at
-  three different indents.
+**Web** (`node computor-web/scripts/check-styling.mjs --all`, 75 files in `app/`)
+- **1,044** palette-utility occurrences in `app/**` that should be components
+  (the component layer's own ~700 are legitimate).
+- **71** raw `<button>` in `app/**`.
+- A header scaffold (`PageHeader` / `FormPanel` / `DetailPanel`) reaches **59 of
+  71** pages. The remaining 12 are correct as they are and should NOT be
+  "fixed": four sit outside the app shell (the public landing page, login,
+  auth/success, the invite acceptance page), three are redirect stubs, three are
+  `ComingSoon` states, one is a thin wrapper whose child owns the header, and one
+  (`workspaces/launch`) is deliberately standalone with a comment saying why.
+  Count adoption against the 59, not against 71.
 - `Badge` still takes literal color names (`green`, `purple`) — migrate its API to
   tones, keeping the color names as deprecated aliases until callers are moved.
 - `src/components/ui/tokens.ts` holds exactly one string (`inputCls`); the rest of
