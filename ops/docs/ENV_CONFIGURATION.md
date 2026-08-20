@@ -122,25 +122,51 @@ compose` to exit at parse time:
 
 ### GitHub Issue Reporting (Optional)
 
-The authenticated `POST /issue-reports` endpoint lets Computor clients submit a
-problem without receiving GitHub credentials. The backend creates the issue in
-the configured private repository and stores an attached screenshot as a file
-there before linking it from the issue.
+Lets users report a problem from the VS Code extension without leaving it. Off
+unless configured: with no repository set the API answers 404 and clients hide
+their entry point.
+
+There are two kinds of tracker and the difference is the repository's
+visibility, which the backend reads from GitHub at startup — it is never guessed
+from configuration.
+
+**Private repository** — the maintainer board users must not reach. The backend
+holds a token and files the issue for them; the reporter gets a report id back,
+never a link:
 
 ```bash
-GITHUB_ISSUE_REPORT_ENABLED=true
-GITHUB_ISSUE_REPORT_TOKEN=<server-side-fine-grained-token>
 GITHUB_ISSUE_REPORT_REPOSITORY=computor-org/issues
-GITHUB_ISSUE_REPORT_BRANCH=main
+GITHUB_ISSUE_REPORT_TOKEN=<server-side-fine-grained-token>
 GITHUB_ISSUE_REPORT_LABELS=Testing
 ```
 
 Create the token on GitHub as a fine-grained personal access token restricted to
-`computor-org/issues` with `Issues: Read and write` and `Contents: Read and
-write`. Keep it only in the deployment secret environment; never add it to a
-client configuration or a repository file. Restart the backend after changing
-the environment. Leave `GITHUB_ISSUE_REPORT_ENABLED=false` until the token is
-present and tested.
+that repository, with `Issues: Read and write` — plus `Contents: Read and write`
+if reports carry screenshots, which are committed into the repository and linked
+from the issue. Keep it only in the deployment secret environment; never in a
+client configuration or a repository file.
+
+**Public repository** — no token, and none would help: GitHub has no anonymous
+issue creation, so the backend cannot file on anyone's behalf. Clients open the
+issues page and the user files it with their own GitHub account:
+
+```bash
+GITHUB_ISSUE_REPORT_REPOSITORY=computor-org/computor-backend
+```
+
+Pointing at a private repository *without* a token disables the feature, and the
+backend says so in its startup log.
+
+`GITHUB_ISSUE_REPORT_REPOSITORY` accepts `owner/name` or any GitHub issues URL,
+including GitHub Enterprise hosts (the API base is derived; override it with
+`GITHUB_ISSUE_REPORT_API_URL` only for an install that does not serve `/api/v3`).
+
+Each user may send one report per `GITHUB_ISSUE_REPORT_RATE_LIMIT_SECONDS`
+(default 300); `GITHUB_ISSUE_REPORT_RATE_LIMIT_COUNT=0` removes the limit.
+
+Restart the backend after changing any of this. A *failing* configuration is
+re-probed every five minutes, so repairing a token recovers without a restart;
+enabling the feature for the first time does not.
 
 ## How It Works
 
