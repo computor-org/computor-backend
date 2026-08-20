@@ -1,45 +1,24 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { formatUsage } from '@/src/utils/limits';
 import { useResource } from '@/src/hooks/useResource';
+import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
-import ErrorBanner from '@/src/components/ErrorBanner';
+import DetailPanel from '@/src/components/DetailPanel';
+import SectionCard from '@/src/components/SectionCard';
+import EmptyState from '@/src/components/EmptyState';
+import Badge from '@/src/components/Badge';
+import Panel from '@/src/components/ui/Panel';
+import Score from '@/src/components/ui/Score';
+import StatGrid, { StatCard } from '@/src/components/ui/StatGrid';
+import TestResultTree from '@/src/components/student/TestResultTree';
+import type { TestRunResult } from '@/src/components/student/TestResultTree';
+import { displayName } from '@/src/utils/displayName';
 import type { CourseContentStudentGet } from 'types/generated';
-
-/** Shape of the tester's result_json payload (not covered by generated types). */
-interface TestSummary {
-  passed: number;
-  failed: number;
-  skipped: number;
-  total: number;
-}
-
-interface SubtestResult {
-  name?: string;
-  result?: string;
-  resultMessage?: string;
-}
-
-interface TestResult {
-  name?: string;
-  type?: string;
-  result?: string;
-  summary: TestSummary;
-  tests?: SubtestResult[];
-}
-
-interface TestRunResult {
-  result?: string;
-  result_value?: number;
-  summary: TestSummary;
-  tests?: TestResult[];
-}
 
 export default function AssignmentDetailPage() {
   const params = useParams();
@@ -52,188 +31,81 @@ export default function AssignmentDetailPage() {
     return (await response.json()) as CourseContentStudentGet;
   }, [assignmentId]);
 
-  if (loading) {
-    return (
-      <AuthenticatedLayout>
-        <ListPageLayout>
-          <ListLoading />
-        </ListPageLayout>
-      </AuthenticatedLayout>
-    );
-  }
+  const name = displayName(assignment, 'Assignment');
+  const crumbs = useCourseCrumbs(
+    courseId,
+    { label: 'Assignments', href: `/courses/${courseId}/student/assignments` },
+    name,
+  );
 
-  if (error || !assignment) {
-    return (
-      <AuthenticatedLayout>
-        <div className="p-6">
-          <ErrorBanner>{error || 'Assignment not found'}</ErrorBanner>
-        </div>
-      </AuthenticatedLayout>
-    );
-  }
-
-  const resultData = assignment.result?.result_json as TestRunResult | undefined;
+  const resultData = assignment?.result?.result_json as TestRunResult | undefined;
 
   return (
     <AuthenticatedLayout>
-      <ListPageLayout>
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <div className="flex items-center space-x-3 mb-2">
-              <Link
-                href={`/courses/${courseId}/student/assignments`}
-                className="text-sm text-blue-600 hover:text-blue-700"
-              >
-                ← Back to Assignments
-              </Link>
-            </div>
-            <div className="flex items-center space-x-3">
-              <span
-                className="w-6 h-6 rounded-sm flex-shrink-0"
-                style={{ backgroundColor: assignment.color || '#3B82F6' }}
-              ></span>
-              <h1 className="text-3xl font-bold text-gray-900">{assignment.title}</h1>
-            </div>
-          </div>
+      <DetailPanel
+        breadcrumbs={crumbs}
+        title={name}
+        loading={loading}
+        error={error || (!loading && !assignment ? 'Assignment not found' : null)}
+        subtitle={
+          assignment && (
+            <Badge tone={assignment.submitted ? 'success' : 'warning'}>
+              {assignment.submitted ? 'Submitted' : 'Not submitted'}
+            </Badge>
+          )
+        }
+      >
+        {assignment && (
+          <>
+            <StatGrid columns={3}>
+              <StatCard label="Max group size" value={assignment.max_group_size || 1} />
+              <StatCard
+                label="Test runs"
+                value={formatUsage(assignment.result_count, assignment.max_test_runs)}
+              />
+              <StatCard
+                label="Submissions"
+                value={formatUsage(assignment.submission_count, assignment.max_submissions)}
+              />
+            </StatGrid>
 
-          {/* Submission Status Badge */}
-          {assignment.submitted ? (
-            <span className="px-4 py-2 text-sm font-medium bg-green-100 text-green-700 rounded-lg">
-              ✓ Submitted
-            </span>
-          ) : (
-            <span className="px-4 py-2 text-sm font-medium bg-yellow-100 text-yellow-700 rounded-lg">
-              Not Submitted
-            </span>
-          )}
-        </div>
-
-        <ScrollArea className="space-y-6">
-        {/* Description */}
-        {assignment.description && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Description</h2>
-            <div className="prose prose-slate prose-lg max-w-none">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {assignment.description}
-              </ReactMarkdown>
-            </div>
-          </div>
-        )}
-
-        {/* Assignment Info */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <dt className="text-sm font-medium text-gray-500">Max Group Size</dt>
-            <dd className="mt-1 text-2xl font-semibold text-gray-900">{assignment.max_group_size || 1}</dd>
-          </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <dt className="text-sm font-medium text-gray-500">Test Runs</dt>
-            <dd className="mt-1 text-2xl font-semibold text-gray-900">
-              {formatUsage(assignment.result_count, assignment.max_test_runs)}
-            </dd>
-          </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <dt className="text-sm font-medium text-gray-500">Submissions</dt>
-            <dd className="mt-1 text-2xl font-semibold text-gray-900">
-              {formatUsage(assignment.submission_count, assignment.max_submissions)}
-            </dd>
-          </div>
-        </div>
-
-        {/* Latest Test Result */}
-        {assignment.result && resultData && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Latest Test Result</h2>
-
-            {/* Summary */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-2xl font-bold">
-                  {resultData.result === 'PASSED' ? '✓' : '✗'} {resultData.result}
-                </span>
-                {/* result_value is a 0..1 fraction (passed/total), not a percentage */}
-                <span className="text-3xl font-bold" style={{
-                  color: (resultData.result_value ?? 0) >= 0.5 ? '#10B981' : '#EF4444'
-                }}>
-                  {((resultData.result_value || 0) * 100).toFixed(1)}%
-                </span>
-              </div>
-              <div className="flex items-center space-x-6 text-sm">
-                <span className="text-green-600">✓ {resultData.summary.passed} passed</span>
-                <span className="text-red-600">✗ {resultData.summary.failed} failed</span>
-                {resultData.summary.skipped > 0 && (
-                  <span className="text-yellow-600">⊘ {resultData.summary.skipped} skipped</span>
-                )}
-                <span className="text-gray-600">Total: {resultData.summary.total}</span>
-              </div>
-            </div>
-
-            {/* Test Details */}
-            <div className="space-y-4">
-              {resultData.tests?.map((test, idx) => (
-                <div key={idx} className="border border-gray-200 rounded-lg">
-                  <div className="p-4 bg-gray-50 border-b border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <span className="text-xl">
-                          {test.result === 'PASSED' ? '✓' : '✗'}
-                        </span>
-                        <div>
-                          <h3 className="font-medium text-gray-900">{test.name}</h3>
-                          <p className="text-xs text-gray-500">{test.type}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className={`text-sm font-medium ${
-                          test.result === 'PASSED' ? 'text-green-600' : 'text-red-600'
-                        }`}>
-                          {test.result}
-                        </span>
-                        <p className="text-xs text-gray-500">
-                          {test.summary.passed}/{test.summary.total} passed
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Sub-tests */}
-                  {test.tests && test.tests.length > 0 && (
-                    <div className="p-4 space-y-2">
-                      {test.tests.map((subtest, subIdx) => (
-                        <div
-                          key={subIdx}
-                          className="flex items-start justify-between py-2 border-b last:border-b-0 border-gray-100"
-                        >
-                          <div className="flex items-start space-x-2">
-                            <span className="text-sm mt-0.5">
-                              {subtest.result === 'PASSED' ? '✓' : '✗'}
-                            </span>
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">{subtest.name}</p>
-                              {subtest.resultMessage && subtest.result !== 'PASSED' && (
-                                <p className="text-xs text-red-600 mt-1">{subtest.resultMessage}</p>
-                              )}
-                            </div>
-                          </div>
-                          <span className={`text-xs font-medium ${
-                            subtest.result === 'PASSED' ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {subtest.result}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+            {assignment.description && (
+              <SectionCard title="Description">
+                <div className="prose prose-slate max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{assignment.description}</ReactMarkdown>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              </SectionCard>
+            )}
 
-        </ScrollArea>
-      </ListPageLayout>
+            <SectionCard
+              title="Latest test result"
+              action={resultData && <Score value={resultData.result_value ?? 0} decimals={1} />}
+            >
+              {resultData ? (
+                <>
+                  <Panel padding="compact" className="bg-gray-50">
+                    <div className="flex flex-wrap items-center gap-4 text-sm">
+                      <Badge tone={resultData.result === 'PASSED' ? 'success' : 'error'}>
+                        {resultData.result ?? 'UNKNOWN'}
+                      </Badge>
+                      <span className="text-gray-600">
+                        {resultData.summary.passed} passed · {resultData.summary.failed} failed
+                        {resultData.summary.skipped > 0 && ` · ${resultData.summary.skipped} skipped`}
+                        {' · '}
+                        {resultData.summary.total} total
+                      </span>
+                    </div>
+                  </Panel>
+
+                  <TestResultTree tests={resultData.tests ?? []} />
+                </>
+              ) : (
+                <EmptyState compact title="No test run yet." description="Run the tests to see results here." />
+              )}
+            </SectionCard>
+          </>
+        )}
+      </DetailPanel>
     </AuthenticatedLayout>
   );
 }
