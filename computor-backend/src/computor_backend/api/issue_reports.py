@@ -27,6 +27,7 @@ from computor_backend.exceptions import (
     BadRequestException,
     EndpointNotFoundException,
     IssueReportingUnavailableException,
+    RateLimitException,
 )
 from computor_backend.issue_reports.config import get_issue_report_settings
 from computor_backend.issue_reports.health import ensure_probed
@@ -37,6 +38,7 @@ from computor_backend.issue_reports.service import (
 )
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
+from computor_backend.redis_cache import get_redis_client
 from computor_types.issue_reports import IssueReportCreate, IssueReportCreated
 
 router = APIRouter()
@@ -63,6 +65,41 @@ async def require_issue_reporting() -> None:
         )
 
 
+async def _enforce_rate_limit(user_id: str, cache) -> None:
+    """Spend one report from this user's budget, or refuse.
+
+    Fixed window per user, Redis-backed so it holds across workers — the same
+    shape as the template-download limiter in ``api/courses.py``. Fails open:
+    this keeps one frustrated user from filling the maintainers' tracker, it is
+    not a security control. ``GITHUB_ISSUE_REPORT_RATE_LIMIT_COUNT=0`` disables it.
+    """
+    settings = get_issue_report_settings()
+    limit = settings.rate_limit_count
+    window = settings.rate_limit_seconds
+    if limit <= 0 or window <= 0:
+        return
+
+    key = f"rate_limit:issue_report:{user_id}"
+    try:
+        count = await cache.incr(key)
+        if count == 1:
+            await cache.expire(key, window)
+        if count <= limit:
+            return
+        # Report what is left of the current window, not the whole window, so a
+        # client waiting on Retry-After does not wait longer than it must.
+        remaining = await cache.ttl(key)
+    except Exception as exc:
+        logger.error("Issue report rate limit check failed: %s", exc)
+        return
+
+    raise RateLimitException(
+        detail="You have already sent a problem report. Please wait before sending another.",
+        retry_after=remaining if isinstance(remaining, int) and remaining > 0 else window,
+        context={"limit": limit, "window_seconds": window},
+    )
+
+
 @router.post(
     "",
     response_model=IssueReportCreated,
@@ -73,6 +110,7 @@ async def create_issue_report(
     description: Annotated[str, Form()],
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db),
+    cache=Depends(get_redis_client),
     title: Annotated[str | None, Form()] = None,
     expected: Annotated[str | None, Form()] = None,
     steps: Annotated[str | None, Form()] = None,
@@ -80,6 +118,8 @@ async def create_issue_report(
     screenshot: Annotated[UploadFile | None, File()] = None,
 ) -> IssueReportCreated:
     """Create a GitHub issue without exposing GitHub credentials to clients."""
+    await _enforce_rate_limit(permissions.get_user_id_or_throw(), cache)
+
     try:
         parsed_context = json.loads(context)
     except (TypeError, JSONDecodeError) as exc:
