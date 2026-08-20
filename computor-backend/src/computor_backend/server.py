@@ -69,6 +69,7 @@ from computor_backend.api.submissions import submissions_router
 from computor_backend.api.examples import examples_router
 from computor_backend.api.extensions import extensions_router
 from computor_backend.api.course_member_comments import router as course_member_comments_router
+from computor_backend.api.issue_reports import router as issue_reports_router
 from computor_backend.api.messages import messages_router
 from computor_backend.api.services import services_router
 from computor_backend.api.api_tokens import api_tokens_router
@@ -255,6 +256,17 @@ async def startup_logic():
         await asyncio.to_thread(ensure_bootstrap_services)
     except Exception as e:
         print(f"[STARTUP] Bootstrap services seeding failed (non-fatal): {e}")
+
+    # Verify the configured GitHub issue tracker is reachable and learn whether
+    # it is public or private. Best-effort: an unhealthy verdict only disables
+    # the feature (503 + `enabled: false` in /instance-info), never startup.
+    from computor_backend.issue_reports.config import get_issue_report_settings
+    from computor_backend.issue_reports.health import describe, probe_issue_reporting
+    if get_issue_report_settings().configured:
+        try:
+            print(f"[STARTUP] {describe(await probe_issue_reporting())}")
+        except Exception as e:
+            print(f"[STARTUP] Issue reporting probe failed (non-fatal): {e}")
 
     # Publish privacy notices from data/consent/* idempotently (write-once), so a
     # fresh system comes up with its consent notice already in force. Awaited
@@ -674,6 +686,13 @@ app.include_router(
     prefix="/course-member-comments",
     tags=["course member comments"],
     dependencies=[Depends(get_current_principal)]
+)
+
+app.include_router(
+    issue_reports_router,
+    prefix="/issue-reports",
+    tags=["issue reports"],
+    dependencies=[Depends(get_current_principal)],
 )
 
 app.include_router(

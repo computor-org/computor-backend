@@ -133,6 +133,7 @@ export const ErrorCodes = {
   EXT_004: "EXT_004", // Temporal Service Unavailable
   EXT_005: "EXT_005", // Task Queue Unavailable
   EXT_006: "EXT_006", // Service Unavailable
+  EXT_007: "EXT_007", // Issue Reporting Unavailable
   DB_001: "DB_001", // Database Connection Failed
   DB_002: "DB_002", // Database Query Failed
   DB_003: "DB_003", // Transaction Failed
@@ -1183,6 +1184,20 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
       html: "<strong>Service Unavailable</strong><p>An external service is temporarily unavailable. Please try again later.</p>",
     },
     retryAfter: 60,
+    documentationUrl: undefined,
+  },
+  EXT_007: {
+    code: "EXT_007",
+    httpStatus: 503,
+    category: ErrorCategory.EXTERNAL_SERVICE,
+    severity: ErrorSeverity.ERROR,
+    title: "Issue Reporting Unavailable",
+    message: {
+      plain: "Problem reporting is not available on this deployment.",
+      markdown: "**Issue Reporting Unavailable**\n\nProblem reporting is not available on this deployment. Please contact your administrator.",
+      html: "<strong>Issue Reporting Unavailable</strong><p>Problem reporting is not available on this deployment. Please contact your administrator.</p>",
+    },
+    retryAfter: 300,
     documentationUrl: undefined,
   },
   DB_001: {

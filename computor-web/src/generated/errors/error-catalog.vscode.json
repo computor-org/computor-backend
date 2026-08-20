@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "error_count": 79,
+  "error_count": 80,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -950,6 +950,19 @@
         "html": "<strong>Service Unavailable</strong><p>An external service is temporarily unavailable. Please try again later.</p>"
       },
       "retry_after": 60
+    },
+    "EXT_007": {
+      "code": "EXT_007",
+      "http_status": 503,
+      "category": "external_service",
+      "severity": "error",
+      "title": "Issue Reporting Unavailable",
+      "message": {
+        "plain": "Problem reporting is not available on this deployment.",
+        "markdown": "**Issue Reporting Unavailable**\n\nProblem reporting is not available on this deployment. Please contact your administrator.",
+        "html": "<strong>Issue Reporting Unavailable</strong><p>Problem reporting is not available on this deployment. Please contact your administrator.</p>"
+      },
+      "retry_after": 300
     },
     "DB_001": {
       "code": "DB_001",

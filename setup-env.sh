@@ -159,6 +159,7 @@ ENABLE_CODER=false
 ENABLE_FORGEJO=false
 ENABLE_TESTING_WORKER=true  # --auto sets up a testing worker by default
 ENABLE_UPDATE=false
+ENABLE_ISSUE_REPORTS=false
 SYSTEM_REPO_BRANCH_DEFAULT="main"
 
 # Interactive mode
@@ -219,6 +220,21 @@ if [ "$AUTO_MODE" != true ]; then
     read -p "Enable self-update (admin UI checks the tracked branch for new commits)? (y/N): " enable_update
     if [ "$enable_update" = "y" ] || [ "$enable_update" = "Y" ]; then
         ENABLE_UPDATE=true
+    fi
+    echo
+
+    # Issue reporting. Off unless asked for: setting a repository is what turns
+    # the feature on, so --auto must never fill one in.
+    echo -e "${GREEN}7. Issue Reporting:${NC}"
+    read -p "Let users report problems to a GitHub issue tracker? (y/N): " enable_issues
+    if [ "$enable_issues" = "y" ] || [ "$enable_issues" = "Y" ]; then
+        ENABLE_ISSUE_REPORTS=true
+        ISSUE_REPORT_REPOSITORY=$(prompt_value "GitHub repository receiving the reports (owner/name or issues URL)" "" false)
+        echo -e "  ${YELLOW}A private repository needs a token with Issues: Read and write.${NC}"
+        echo -e "  ${YELLOW}A public one needs none — users are sent to it directly.${NC}"
+        ISSUE_REPORT_TOKEN=$(prompt_value "Repository token (leave empty if the repository is public)" "" true)
+        ISSUE_REPORT_LABELS=$(prompt_value "Labels for created issues (comma-separated, optional)" "" false)
+        ISSUE_REPORT_RATE_SECONDS=$(prompt_value "Seconds a user must wait between reports" "300" false)
     fi
     echo
 fi
@@ -476,6 +492,20 @@ if [ "$SKIP_COMMON" != true ]; then
         echo -e "  ${GREEN}✓${NC} Self-update configured (tracking ${YELLOW}${SYSTEM_REPO_BRANCH}${NC})"
         if [ "$ENVIRONMENT" != "prod" ]; then
             echo -e "    ${YELLOW}Note:${NC} the update check works in dev, but running an update needs prod."
+        fi
+    fi
+
+    if [ "$ENABLE_ISSUE_REPORTS" = true ]; then
+        set_env_var GITHUB_ISSUE_REPORT_REPOSITORY "$ISSUE_REPORT_REPOSITORY"
+        set_env_var GITHUB_ISSUE_REPORT_TOKEN "$ISSUE_REPORT_TOKEN"
+        set_env_var GITHUB_ISSUE_REPORT_LABELS "$ISSUE_REPORT_LABELS"
+        set_env_var GITHUB_ISSUE_REPORT_RATE_LIMIT_SECONDS "$ISSUE_REPORT_RATE_SECONDS"
+
+        if [ -n "$ISSUE_REPORT_TOKEN" ]; then
+            echo -e "  ${GREEN}✓${NC} Issue reporting configured (${YELLOW}${ISSUE_REPORT_REPOSITORY}${NC}, submitted by the backend)"
+        else
+            echo -e "  ${GREEN}✓${NC} Issue reporting configured (${YELLOW}${ISSUE_REPORT_REPOSITORY}${NC}, users file issues themselves)"
+            echo -e "    ${YELLOW}Note:${NC} without a token the repository must be public, or the backend will disable the feature at startup."
         fi
     fi
 

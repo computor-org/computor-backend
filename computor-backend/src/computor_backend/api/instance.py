@@ -13,10 +13,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from computor_backend.git_server.config import get_git_server_settings
+from computor_backend.issue_reports.config import get_issue_report_settings
+from computor_backend.issue_reports.health import current_health
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.settings import settings
-from computor_types.instance import InstanceInfoGet
+from computor_types.instance import InstanceInfoGet, IssueReportingInfo
 
 instance_router = APIRouter()
 
@@ -30,6 +32,23 @@ def _normalize_url(value: str | None) -> str | None:
     if "://" not in url:
         url = f"https://{url}"
     return url
+
+
+def _issue_reporting() -> IssueReportingInfo:
+    """Report the deployment's problem-reporting capability.
+
+    This is what lets a client hide its entry point instead of discovering the
+    endpoint's 404 or 503 by trial. The repository name is deliberately absent:
+    a private board is one users must not be pointed at, so only a *public*
+    tracker's URL is ever disclosed.
+    """
+    health = current_health()
+    settings_ = get_issue_report_settings()
+    return IssueReportingInfo(
+        enabled=health.available,
+        visibility=health.visibility,
+        issues_url=settings_.issues_url if health.available and health.is_public else None,
+    )
 
 
 @instance_router.get("/instance-info", response_model=InstanceInfoGet, tags=["instance"])
@@ -49,4 +68,8 @@ async def get_instance_info(
         else None
     )
 
-    return InstanceInfoGet(web_url=web_url, forgejo_url=forgejo_url)
+    return InstanceInfoGet(
+        web_url=web_url,
+        forgejo_url=forgejo_url,
+        issue_reporting=_issue_reporting(),
+    )

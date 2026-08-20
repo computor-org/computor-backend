@@ -608,6 +608,26 @@ class NotImplementedException(ComputorException):
         self.status_code = status.HTTP_501_NOT_IMPLEMENTED
 
 
+class IssueReportingUnavailableException(ComputorException):
+    """Raised when this deployment cannot submit a user problem report.
+
+    Either the configured GitHub repository is unreachable, its token was
+    rejected, or the repository is private with no token set. The startup probe
+    (``issue_reports/health.py``) decides; the endpoint answers 503 rather than
+    forwarding a raw GitHub error to the user.
+    """
+
+    def __init__(
+        self,
+        error_code: str = "EXT_007",
+        detail: ExceptionDetail = None,
+        headers: Optional[Dict[str, str]] = None,
+        **kwargs,
+    ):
+        super().__init__(error_code=error_code, detail=detail, headers=headers, **kwargs)
+        self.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+
 # ============================================================================
 # GENERIC SERVICE UNAVAILABLE (503)
 # ============================================================================

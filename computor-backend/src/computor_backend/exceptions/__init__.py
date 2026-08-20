@@ -66,6 +66,7 @@ from computor_backend.exceptions.exceptions import (
     NotImplementedException,
 
     # Legacy/deprecated
+    IssueReportingUnavailableException,
     ServiceUnavailableException,
 )
 
@@ -140,6 +141,7 @@ __all__ = [
     "NotImplementedException",
 
     # Legacy
+    "IssueReportingUnavailableException",
     "ServiceUnavailableException",
 
     # Registry

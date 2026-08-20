@@ -22,6 +22,66 @@ import type { TaskStatus } from './tasks';
 
 
 
+/**
+ * Text and client context for a user-submitted issue report.
+ */
+export interface IssueReportCreate {
+  title?: string | null;
+  description: string;
+  expected?: string | null;
+  steps?: string | null;
+  context?: Record<string, unknown>;
+}
+
+/**
+ * Receipt handed back to the reporter after a report is filed.
+ * 
+ * ``issue_url`` is populated only when the tracker is a *public* repository.
+ * A private tracker is a maintainer board users are deliberately kept out of —
+ * the whole reason the token lives in the backend — so linking a reporter into
+ * it would undo that. They get an identifier to quote instead. For the same
+ * reason there is no screenshot URL: an uploaded screenshot is stored inside
+ * that same private repository.
+ */
+export interface IssueReportCreated {
+  /** Opaque identifier for this report, safe to show the reporter. */
+  report_id: string;
+  /** Issue number in the configured tracker. */
+  issue_number: number;
+  /** Link to the created issue; null when the tracker is private. */
+  issue_url?: any | null;
+  /** Whether an attached screenshot actually made it into the issue. False when none was sent, or when storing it failed and the report was filed without it. */
+  screenshot_attached?: boolean;
+}
+
+/**
+ * Who filed a report — the half deliberately absent from the GitHub issue.
+ * 
+ * Admin-only. The issue itself names nobody, so this lookup is the only way
+ * back from a report id to a person, and asking for it is an act a maintainer
+ * performs knowingly rather than a detail they stumble over in the tracker.
+ */
+export interface IssueReportGet {
+  /** Report id, as quoted in the issue body. */
+  id: string;
+  /** Reporter; null once the account has been deleted. */
+  user_id?: string | null;
+  /** Reporter's email, resolved at read time. */
+  user_email?: string | null;
+  /** Reporter's given name. */
+  given_name?: string | null;
+  /** Reporter's family name. */
+  family_name?: string | null;
+  /** Tracker the report was filed in. */
+  repository: string;
+  /** Issue number; null if the submission never reached GitHub. */
+  issue_number?: number | null;
+  /** Link to the created issue. */
+  issue_url?: string | null;
+  /** When the report was submitted. */
+  submitted_at: string;
+}
+
 export interface StudentProfileCreate {
   student_id?: string | null;
   student_email?: string | null;
@@ -1707,6 +1767,28 @@ export interface CascadeDeleteResult {
 }
 
 /**
+ * Whether this deployment accepts user problem reports, and how.
+ * 
+ * There are only two kinds of issue tracker. A **public** repository needs no
+ * token — GitHub forbids anonymous issue creation, so the backend cannot file
+ * on the user's behalf and the client opens ``issues_url`` instead, where the
+ * user files it with their own GitHub account. A **private** repository is a
+ * maintainer board users must not reach; the backend holds a token and files
+ * for them, and no link is ever handed back.
+ * 
+ * ``visibility`` is read from GitHub by the startup probe, never guessed from
+ * configuration.
+ */
+export interface IssueReportingInfo {
+  /** Whether to offer a reporting entry point at all. False when the deployment has no tracker configured or its probe is failing. */
+  enabled: boolean;
+  /** Visibility of the configured repository; null while unknown. */
+  visibility?: "public" | "private" | null;
+  /** GitHub issues page to open directly. Set only for a public repository — a private board is never linked to a reporter. */
+  issues_url?: string | null;
+}
+
+/**
  * Public navigation URLs for this Computor instance.
  */
 export interface InstanceInfoGet {
@@ -1714,6 +1796,8 @@ export interface InstanceInfoGet {
   web_url?: string | null;
   /** Public base URL of the managed Forgejo git server; null if no managed Forgejo is configured. */
   forgejo_url?: string | null;
+  /** Problem-reporting capability of this deployment. */
+  issue_reporting?: IssueReportingInfo | null;
 }
 
 /**
@@ -4318,4 +4402,4 @@ export type ErrorCategory = "authentication" | "authorization" | "validation" | 
 
 export type GradingStatus = 0 | 1 | 2 | 3;
 
-export type ErrorCode = "AUTH_001" | "AUTH_002" | "AUTH_003" | "AUTH_004" | "AUTH_005" | "AUTHZ_001" | "AUTHZ_002" | "AUTHZ_003" | "AUTHZ_004" | "AUTHZ_005" | "AUTHZ_006" | "AUTHZ_010" | "VAL_001" | "VAL_002" | "VAL_003" | "VAL_004" | "NF_001" | "NF_002" | "NF_003" | "NF_004" | "NF_010" | "CONFLICT_001" | "CONFLICT_002" | "RATE_001" | "RATE_002" | "RATE_003" | "CONTENT_001" | "CONTENT_002" | "CONTENT_003" | "CONTENT_004" | "CONTENT_005" | "CONTENT_006" | "CONTENT_007" | "CONTENT_008" | "CONTENT_009" | "VERSION_001" | "DEPLOY_001" | "DEPLOY_002" | "DEPLOY_003" | "DEPLOY_004" | "DEPLOY_005" | "SUBMIT_001" | "SUBMIT_002" | "SUBMIT_003" | "SUBMIT_004" | "SUBMIT_005" | "SUBMIT_006" | "SUBMIT_007" | "SUBMIT_008" | "SUBMIT_009" | "SUBMIT_010" | "SUBMIT_011" | "SUBMIT_012" | "TASK_001" | "TASK_002" | "TASK_003" | "TASK_004" | "GITLAB_001" | "GITLAB_002" | "GITLAB_003" | "GITLAB_004" | "GITLAB_005" | "GITLAB_006" | "GITLAB_007" | "GITLAB_008" | "GIT_001" | "GIT_002" | "EXT_001" | "EXT_002" | "EXT_003" | "EXT_004" | "EXT_005" | "EXT_006" | "DB_001" | "DB_002" | "DB_003" | "INT_001" | "INT_002" | "NIMPL_001";
+export type ErrorCode = "AUTH_001" | "AUTH_002" | "AUTH_003" | "AUTH_004" | "AUTH_005" | "AUTHZ_001" | "AUTHZ_002" | "AUTHZ_003" | "AUTHZ_004" | "AUTHZ_005" | "AUTHZ_006" | "AUTHZ_010" | "VAL_001" | "VAL_002" | "VAL_003" | "VAL_004" | "NF_001" | "NF_002" | "NF_003" | "NF_004" | "NF_010" | "CONFLICT_001" | "CONFLICT_002" | "RATE_001" | "RATE_002" | "RATE_003" | "CONTENT_001" | "CONTENT_002" | "CONTENT_003" | "CONTENT_004" | "CONTENT_005" | "CONTENT_006" | "CONTENT_007" | "CONTENT_008" | "CONTENT_009" | "VERSION_001" | "DEPLOY_001" | "DEPLOY_002" | "DEPLOY_003" | "DEPLOY_004" | "DEPLOY_005" | "SUBMIT_001" | "SUBMIT_002" | "SUBMIT_003" | "SUBMIT_004" | "SUBMIT_005" | "SUBMIT_006" | "SUBMIT_007" | "SUBMIT_008" | "SUBMIT_009" | "SUBMIT_010" | "SUBMIT_011" | "SUBMIT_012" | "TASK_001" | "TASK_002" | "TASK_003" | "TASK_004" | "GITLAB_001" | "GITLAB_002" | "GITLAB_003" | "GITLAB_004" | "GITLAB_005" | "GITLAB_006" | "GITLAB_007" | "GITLAB_008" | "GIT_001" | "GIT_002" | "EXT_001" | "EXT_002" | "EXT_003" | "EXT_004" | "EXT_005" | "EXT_006" | "EXT_007" | "DB_001" | "DB_002" | "DB_003" | "INT_001" | "INT_002" | "NIMPL_001";
