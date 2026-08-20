@@ -30,6 +30,7 @@ from .service import Service, ServiceType, ApiToken
 from .invite import InviteLink
 from .git_server import GitServer, CourseGitBinding, CourseMemberGitRepository
 from .consent import PolicyVersion, UserConsent
+from .issue_report import IssueReport
 from .workspace import WorkspaceTemplateSettings, CourseWorkspaceTemplate, CourseWorkspaceSettings
 
 # Import all models to ensure relationships are properly set up
@@ -51,6 +52,7 @@ from . import (
     invite,
     git_server,
     consent,
+    issue_report,
     workspace,
 )
 
@@ -127,6 +129,8 @@ __all__ = [
     # GDPR consent
     'PolicyVersion',
     'UserConsent',
+    # Problem reports
+    'IssueReport',
     # Coder workspace template settings
     'WorkspaceTemplateSettings',
     # Course-scoped workspace configuration
