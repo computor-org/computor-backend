@@ -371,7 +371,6 @@ async def course_member_course_content_result_mapper(
         created_at=course_content.created_at,
         updated_at=course_content.updated_at,
         archived_at=course_content.archived_at,
-        description=course_content.description,
         course_content_type=CourseContentTypeGet.model_validate(course_content.course_content_type),
         submission_group=submission_group_detail,
         result=result_payload,
