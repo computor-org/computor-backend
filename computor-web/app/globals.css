@@ -127,6 +127,123 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/*
+ * Dark theme.
+ *
+ * One block, because every colour in the app now resolves through the tokens
+ * above. This is what the palette sweep bought: no page needs a `dark:` variant,
+ * and none should get one — a per-page variant is how you end up with a
+ * half-dark app.
+ *
+ * Three states, not two. An explicit choice stamps data-theme on <html>; the
+ * default "system" setting stamps nothing, so only prefers-color-scheme
+ * separates light from dark there. The media query is guarded so an explicit
+ * light choice still beats a dark OS, and the attribute selector repeats the
+ * values so an explicit dark choice beats a light OS.
+ *
+ * Not an inversion: the greys are re-picked so that contrast holds (text-muted
+ * has to stay legible on --c-surface, which is now a raised dark grey rather
+ * than white), and the washes become deep tints rather than pale ones — a
+ * lightened wash on a dark ground reads as a hole in the page.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+  --background: #0d1017;
+  --foreground: #e8ebf2;
+
+  --c-fg: #e8ebf2;
+  --c-body: #c3cad8;
+  --c-muted: #949db1;
+  --c-subtle: #6f7889;
+  --c-faint: #4a5468;
+
+  --c-surface: #161b26;
+  --c-canvas: #0d1017;
+  --c-sunken: #1e2431;
+
+  --c-rule: #2a3140;
+  --c-rule-soft: #212734;
+  --c-rule-strong: #3a4356;
+
+  --c-on-accent: #ffffff;
+
+  --c-accent: #2563eb;
+  --c-accent-hover: #3b82f6;
+  --c-accent-text: #93b8ff;
+  --c-accent-wash: #16233c;
+  --c-accent-line: #3b6fd4;
+
+  --c-danger: #dc2626;
+  --c-danger-hover: #ef4444;
+  --c-danger-text: #f6a3a3;
+  --c-danger-wash: #2c1618;
+  --c-danger-line: #5e2a2c;
+
+  --c-warn-text: #e8bd7a;
+  --c-warn-wash: #2a1f0f;
+  --c-warn-line: #5a441f;
+
+  --c-success-text: #86d9a4;
+  --c-success-wash: #10261a;
+  --c-success-line: #24523a;
+  --c-success: #16a34a;
+  --c-success-hover: #22c55e;
+
+  --c-inverse: #e8ebf2;
+  --c-inverse-hover: #c3cad8;
+
+  color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --background: #0d1017;
+  --foreground: #e8ebf2;
+
+  --c-fg: #e8ebf2;
+  --c-body: #c3cad8;
+  --c-muted: #949db1;
+  --c-subtle: #6f7889;
+  --c-faint: #4a5468;
+
+  --c-surface: #161b26;
+  --c-canvas: #0d1017;
+  --c-sunken: #1e2431;
+
+  --c-rule: #2a3140;
+  --c-rule-soft: #212734;
+  --c-rule-strong: #3a4356;
+
+  --c-on-accent: #ffffff;
+
+  --c-accent: #2563eb;
+  --c-accent-hover: #3b82f6;
+  --c-accent-text: #93b8ff;
+  --c-accent-wash: #16233c;
+  --c-accent-line: #3b6fd4;
+
+  --c-danger: #dc2626;
+  --c-danger-hover: #ef4444;
+  --c-danger-text: #f6a3a3;
+  --c-danger-wash: #2c1618;
+  --c-danger-line: #5e2a2c;
+
+  --c-warn-text: #e8bd7a;
+  --c-warn-wash: #2a1f0f;
+  --c-warn-line: #5a441f;
+
+  --c-success-text: #86d9a4;
+  --c-success-wash: #10261a;
+  --c-success-line: #24523a;
+  --c-success: #16a34a;
+  --c-success-hover: #22c55e;
+
+  --c-inverse: #e8ebf2;
+  --c-inverse-hover: #c3cad8;
+
+  color-scheme: dark;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

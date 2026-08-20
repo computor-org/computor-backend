@@ -11,6 +11,7 @@ import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
+import ThemePicker from '@/src/components/ThemePicker';
 import { inputCls } from '@/src/components/ui/tokens';
 import type { ApiTokenGet, ApiTokenCreateResponse, AccountList } from 'types/generated';
 import type { ConsentStatusGet } from '@/src/generated/types/common';
@@ -162,6 +163,13 @@ export default function SettingsPage() {
 
         <ScrollArea>
           <div className="space-y-6">
+            <Section
+              title="Appearance"
+              description="How Computor looks on this device. Not synced across devices."
+            >
+              <ThemePicker />
+            </Section>
+
             {/* Account & Security — only shown when the account console is configured */}
             {accountConsoleUrl && (
               <Section title="Account & Security" description="Password, email, two-factor authentication and active sessions are managed by your login provider.">
