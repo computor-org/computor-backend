@@ -16,6 +16,7 @@ import { deploymentBadge } from '@/src/utils/deployment';
 import { formatLimit } from '@/src/utils/limits';
 import Button, { ButtonLink } from '@/src/components/ui/Button';
 import Toolbar from '@/src/components/ui/Toolbar';
+import Notice from '@/src/components/ui/Notice';
 import StatGrid, { StatCard } from '@/src/components/ui/StatGrid';
 import TreeRow, { TreeRows } from '@/src/components/ui/TreeRow';
 import type { CourseContentLecturerList, CourseContentTypeList } from 'types/generated';
@@ -154,9 +155,9 @@ export default function LecturerContentPage() {
             </StatGrid>
 
             {outdated > 0 && (
-              <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded p-3">
+              <Notice tone="warning">
                 {outdated} deployed content(s) have a newer example version available.
-              </p>
+              </Notice>
             )}
 
             <Toolbar end={releaseMsg && <span className="text-sm text-gray-500">{releaseMsg}</span>}>
