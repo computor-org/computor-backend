@@ -245,20 +245,49 @@ def test_registration_uses_the_oldest_group_not_the_alphabetical_first(world, db
 
     Ordering groups by title drops self-registered strangers into whatever
     real teaching group happens to sort first.
+
+    created_at is set explicitly rather than relying on insertion order:
+    Postgres now() is fixed for the whole transaction, so two groups added in
+    one transaction share a server-default timestamp to the microsecond and
+    the ordering falls through to the random uuid tie-break.
     """
+    from datetime import datetime, timedelta, timezone
+
     course = world["course"](public=True)
     caller = world["user"]("joiner")
 
-    first = CourseGroup(title="Zeta cohort", course_id=course.id)
-    db.add(first)
-    db.flush()
-    second = CourseGroup(title="Alpha cohort", course_id=course.id)
-    db.add(second)
+    base = datetime.now(timezone.utc)
+    older = CourseGroup(
+        title="Zeta cohort", course_id=course.id, created_at=base - timedelta(days=2)
+    )
+    db.add(older)
+    newer = CourseGroup(
+        title="Alpha cohort", course_id=course.id, created_at=base - timedelta(days=1)
+    )
+    db.add(newer)
     db.flush()
 
     group = resolve_registration_group(course, _principal(caller), db)
 
-    assert group.id == first.id, "must be the oldest group, not the alphabetical first"
+    assert group.id == older.id, "must be the oldest group, not the alphabetical first"
+
+
+def test_group_choice_is_stable_when_timestamps_tie(world, db):
+    """Groups created in one batch share a created_at (transaction-scoped
+    now()), so the winner is arbitrary — but it must be the SAME one every
+    time, or self-registered students would scatter across the batch."""
+    course = world["course"](public=True)
+    caller = world["user"]("joiner")
+
+    for title in ("Group A", "Group B", "Group C"):
+        db.add(CourseGroup(title=title, course_id=course.id))
+    db.flush()
+
+    picks = {
+        str(resolve_registration_group(course, _principal(caller), db).id)
+        for _ in range(5)
+    }
+    assert len(picks) == 1
 
 
 def test_registration_creates_a_default_group_when_the_course_has_none(world, db):

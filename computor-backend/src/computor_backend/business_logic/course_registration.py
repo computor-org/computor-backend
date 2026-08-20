@@ -126,10 +126,16 @@ def resolve_registration_group(
 ) -> CourseGroup:
     """The group a self-registered student joins.
 
-    The course's first group, meaning the oldest — the one the lecturer made
-    first — not the alphabetically first, which would drop strangers into
-    whatever real teaching group happens to sort earliest. A course with no
-    groups at all gets one named ``default``.
+    The course's first group by creation order, not the alphabetically first —
+    ordering by title would drop strangers into whatever real teaching group
+    happens to sort earliest ("Group A"). A course with no groups at all gets
+    one named ``default``.
+
+    ``id`` breaks ties because Postgres ``now()`` is fixed for a transaction,
+    so groups created in one batch share a ``created_at`` to the microsecond.
+    The tie-break is then arbitrary but *stable*, which is the property that
+    actually matters: every self-registering student in a given course lands
+    in the same group rather than being scattered across the batch.
 
     Mirrors ``course_member_import._get_or_create_course_group``; not reused,
     because that helper looks a group up *by title* and this one takes
