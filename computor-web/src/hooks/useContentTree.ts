@@ -35,6 +35,8 @@ export interface ContentTreeRow<T> {
   label: string;
   hasChildren: boolean;
   expanded: boolean;
+  /** Flip this row's expanded state. No-op on a leaf. */
+  toggle: () => void;
   /** Direct children, for a "3 assignments" summary on a unit row. */
   childCount: number;
   /** Everything beneath, at any depth. */
@@ -96,6 +98,11 @@ export function useContentTree<T extends { path: string; position?: number | nul
     [overrides, collapseBelowDepth],
   );
 
+  const toggle = useCallback(
+    (path: string) => setOverrides((prev) => ({ ...prev, [path]: !isExpanded(path) })),
+    [isExpanded],
+  );
+
   const rows = useMemo(() => {
     const out: ContentTreeRow<T>[] = [];
 
@@ -113,6 +120,7 @@ export function useContentTree<T extends { path: string; position?: number | nul
           label: displayName(node.__item ?? { path: node.path }),
           hasChildren: node.children.length > 0,
           expanded,
+          toggle: () => toggle(node.path),
           childCount: node.children.length,
           descendantCount: countDescendants(node),
         });
@@ -122,12 +130,7 @@ export function useContentTree<T extends { path: string; position?: number | nul
 
     walk(roots);
     return out;
-  }, [roots, isExpanded]);
-
-  const toggle = useCallback(
-    (path: string) => setOverrides((prev) => ({ ...prev, [path]: !isExpanded(path) })),
-    [isExpanded],
-  );
+  }, [roots, isExpanded, toggle]);
 
   const setAllExpanded = useCallback(
     (expanded: boolean) => {

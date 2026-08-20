@@ -1,27 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
-import { depthOf } from '@/src/utils/ltree';
 import { useResource } from '@/src/hooks/useResource';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
+import { useContentTree } from '@/src/hooks/useContentTree';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
+import EmptyState from '@/src/components/EmptyState';
 import Badge from '@/src/components/Badge';
 import { deploymentBadge } from '@/src/utils/deployment';
 import { formatLimit } from '@/src/utils/limits';
 import Button, { ButtonLink } from '@/src/components/ui/Button';
-import {
-  hiddenRowCls,
-  hiddenRowMarkCls,
-  hiddenRowTitleCls,
-  rowTitleCls,
-} from '@/src/components/ui/tokens';
+import Toolbar from '@/src/components/ui/Toolbar';
+import StatGrid, { StatCard } from '@/src/components/ui/StatGrid';
+import TreeRow, { TreeRows } from '@/src/components/ui/TreeRow';
 import type { CourseContentLecturerList, CourseContentTypeList } from 'types/generated';
-import { displayName } from '@/src/utils/displayName';
 
 export default function LecturerContentPage() {
   const courseId = useParams().id as string;
@@ -38,10 +35,9 @@ export default function LecturerContentPage() {
     ]);
     let contents: CourseContentLecturerList[] = [];
     if (ccRes.ok) {
+      // Order is useContentTree's job now — it nests by path and sorts siblings
+      // by position, so sorting here as well would only be a second opinion.
       contents = await ccRes.json();
-      // Tree order: lexicographic by ltree path keeps each parent directly
-      // above its descendants; position orders siblings within a level.
-      contents.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : a.position - b.position));
     }
     let typeMap: Record<string, CourseContentTypeList> = {};
     if (ctRes.ok) {
@@ -51,7 +47,7 @@ export default function LecturerContentPage() {
     return { contents, typeMap };
   }, [courseId]);
 
-  const contents = data?.contents ?? [];
+  const contents = useMemo(() => data?.contents ?? [], [data]);
   const typeMap = data?.typeMap ?? {};
 
   const [releasing, setReleasing] = useState<string | null>(null);
@@ -116,7 +112,7 @@ export default function LecturerContentPage() {
     }
   }
 
-  const active = contents.filter((c) => !c.archived_at);
+  const active = useMemo(() => contents.filter((c) => !c.archived_at), [contents]);
   const archivedCount = contents.length - active.length;
   const submittable = active.filter((c) => c.is_submittable).length;
   const outdated = active.filter((c) => c.deployment?.has_newer_version).length;
@@ -126,6 +122,9 @@ export default function LecturerContentPage() {
     failed: active.filter((c) => c.deployment_status === 'failed').length,
     none: active.filter((c) => !c.deployment_status && !c.has_deployment).length,
   };
+
+  // One tree, one indent, one expand model — shared with the student view.
+  const { rows, setAllExpanded } = useContentTree(active, {});
 
   // A unit's nested submittable contents that have an example assigned (only those
   // can be released).
@@ -146,86 +145,86 @@ export default function LecturerContentPage() {
         ) : (
           <ScrollArea className="space-y-6">
             {/* Summary — the at-a-glance deployment signal */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {[
-                { label: 'Contents', value: active.length, cls: 'text-gray-900' },
-                { label: 'Assignments', value: submittable, cls: 'text-blue-700' },
-                { label: 'Deployed', value: counts.deployed, cls: 'text-green-700' },
-                { label: 'Pending', value: counts.pending, cls: 'text-amber-700' },
-                { label: 'Failed / none', value: counts.failed + counts.none, cls: 'text-red-700' },
-              ].map((s) => (
-                <div key={s.label} className="bg-white border border-gray-200 rounded-lg p-4">
-                  <div className={`text-2xl font-bold ${s.cls}`}>{s.value}</div>
-                  <div className="text-xs text-gray-500 mt-1">{s.label}</div>
-                </div>
-              ))}
-            </div>
+            <StatGrid columns={5}>
+              <StatCard label="Contents" value={active.length} />
+              <StatCard label="Assignments" value={submittable} tone="info" />
+              <StatCard label="Deployed" value={counts.deployed} tone="success" />
+              <StatCard label="Pending" value={counts.pending} tone="warning" />
+              <StatCard label="Failed / none" value={counts.failed + counts.none} tone="error" />
+            </StatGrid>
 
             {outdated > 0 && (
-              <div className="p-3 bg-orange-50 border border-orange-200 rounded text-sm text-orange-800">
+              <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded p-3">
                 {outdated} deployed content(s) have a newer example version available.
-              </div>
+              </p>
             )}
 
-            {/* Release toolbar */}
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
+            <Toolbar end={releaseMsg && <span className="text-sm text-gray-500">{releaseMsg}</span>}>
+              <Button
                 onClick={() => release('all')}
+                size="sm"
                 disabled={releasing !== null || counts.pending + counts.failed === 0}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                loading={releasing === 'all'}
+                loadingLabel="Releasing…"
                 title="Deploy every pending/failed assignment into the template repo"
               >
-                {releasing === 'all' ? 'Releasing…' : `Release all pending (${counts.pending + counts.failed})`}
-              </button>
-              <button
-                type="button"
+                Release all pending ({counts.pending + counts.failed})
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => release('all-force', undefined, true)}
                 disabled={releasing !== null || counts.deployed + counts.pending + counts.failed === 0}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                loading={releasing === 'all-force'}
+                loadingLabel="Re-releasing…"
                 title="Re-deploy ALL assignments (including already-deployed) — fills both the template and reference repos"
               >
-                {releasing === 'all-force' ? 'Re-releasing…' : 'Re-release all (force)'}
-              </button>
-              {releaseMsg && <span className="text-sm text-gray-500">{releaseMsg}</span>}
-            </div>
+                Re-release all (force)
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setAllExpanded(false)}>
+                Collapse all
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setAllExpanded(true)}>
+                Expand all
+              </Button>
+            </Toolbar>
 
             {/* Content tree with deployment badges */}
             {active.length === 0 ? (
-              <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">
-                No course contents yet. Add units and assignments to this course.
-              </div>
+              <EmptyState
+                title="No course contents yet"
+                description="Units and assignments arrive by uploading a course deployment file."
+              />
             ) : (
-              <div className="bg-white border border-gray-200 rounded-lg divide-y">
-                {active.map((c) => {
+              <TreeRows>
+                {rows.map(({ key, item, depth, label, expanded, hasChildren, toggle }) => {
+                  // Nothing is synthesised for the lecturer list — the endpoint
+                  // returns the units themselves — so every row has an item.
+                  if (!item) return null;
+                  const c = item;
                   const type = c.course_content_type ?? typeMap[c.course_content_type_id];
                   const badge = deploymentBadge(c);
                   // Hidden here, or hidden by a unit above / the course itself.
                   const hidden = c.visible_effective === false;
                   const hiddenHere = c.visible === false;
+                  const canReleaseOne = c.is_submittable && (c.has_deployment || !!c.deployment_status);
+                  const unitKids = c.is_submittable ? [] : releasableDescendants(c);
+
                   return (
-                    <div
-                      key={c.id}
-                      className={`flex items-center gap-3 px-4 py-3 ${hidden ? hiddenRowCls : ''}`}
+                    <TreeRow
+                      key={key}
+                      depth={depth}
+                      expandable={hasChildren}
+                      expanded={expanded}
+                      onToggle={toggle}
+                      markerColor={type?.color}
+                      markerTitle={type?.title || type?.slug || 'content'}
+                      label={label}
+                      hidden={hidden}
                     >
-                      <div style={{ width: depthOf(c.path) * 18 }} className="shrink-0" />
-                      <span
-                        className={`shrink-0 h-2.5 w-2.5 rounded-full ${hidden ? hiddenRowMarkCls : ''}`}
-                        style={{ backgroundColor: type?.color || '#cbd5e1' }}
-                        title={type?.title || type?.slug || 'content'}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div
-                          className={`text-sm font-medium truncate ${
-                            hidden ? hiddenRowTitleCls : rowTitleCls
-                          }`}
-                        >
-                          {displayName(c)}
-                        </div>
-                      </div>
                       {hidden && (
                         <Badge
-                          color="gray"
+                          tone="muted"
                           className="shrink-0"
                           title={
                             hiddenHere
@@ -237,18 +236,13 @@ export default function LecturerContentPage() {
                         </Badge>
                       )}
                       {type && (
-                        <span className="shrink-0 px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded">
+                        <Badge tone="muted" className="shrink-0">
                           {type.slug}
-                        </span>
-                      )}
-                      {c.is_submittable && (
-                        <span className="shrink-0 px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-600 rounded">
-                          submittable
-                        </span>
+                        </Badge>
                       )}
                       {c.is_submittable && (c.max_test_runs != null || c.max_submissions != null) && (
                         <Badge
-                          color="purple"
+                          tone="info"
                           className="shrink-0"
                           title={
                             `Test runs: ${formatLimit(c.max_test_runs)} · ` +
@@ -259,12 +253,9 @@ export default function LecturerContentPage() {
                         </Badge>
                       )}
                       {c.deployment?.has_newer_version && (
-                        <span
-                          className="shrink-0 px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700 rounded"
-                          title="A newer example version is available"
-                        >
+                        <Badge tone="warning" className="shrink-0" title="A newer example version is available">
                           update available
-                        </span>
+                        </Badge>
                       )}
                       {/* Only offered where the lecturer can actually change
                           the outcome. A row hidden by an ancestor stays hidden
@@ -287,36 +278,33 @@ export default function LecturerContentPage() {
                           {hiddenHere ? 'Show' : 'Hide'}
                         </Button>
                       )}
-                      {(() => {
-                        const canReleaseOne = c.is_submittable && (c.has_deployment || !!c.deployment_status);
-                        const unitKids = c.is_submittable ? [] : releasableDescendants(c);
-                        if (canReleaseOne) {
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => release(c.id, [c.id])}
-                              disabled={releasing !== null}
-                              className="shrink-0 px-2 py-0.5 text-xs font-medium text-blue-700 bg-blue-50 rounded hover:bg-blue-100 disabled:opacity-50"
-                            >
-                              {releasing === c.id ? '…' : 'Release'}
-                            </button>
-                          );
-                        }
-                        if (unitKids.length > 0) {
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => release(c.id, unitKids.map((k) => k.id))}
-                              disabled={releasing !== null}
-                              className="shrink-0 px-2 py-0.5 text-xs font-medium text-blue-700 bg-blue-50 rounded hover:bg-blue-100 disabled:opacity-50"
-                              title={`Release ${unitKids.length} assignment(s) in this unit`}
-                            >
-                              {releasing === c.id ? '…' : `Release unit (${unitKids.length})`}
-                            </button>
-                          );
-                        }
-                        return null;
-                      })()}
+                      {canReleaseOne && (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          className="shrink-0"
+                          onClick={() => release(c.id, [c.id])}
+                          disabled={releasing !== null}
+                          loading={releasing === c.id}
+                          loadingLabel="…"
+                        >
+                          Release
+                        </Button>
+                      )}
+                      {!canReleaseOne && unitKids.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          className="shrink-0"
+                          onClick={() => release(c.id, unitKids.map((k) => k.id))}
+                          disabled={releasing !== null}
+                          loading={releasing === c.id}
+                          loadingLabel="…"
+                          title={`Release ${unitKids.length} assignment(s) in this unit`}
+                        >
+                          Release unit ({unitKids.length})
+                        </Button>
+                      )}
                       <Badge tone={badge.tone} className="shrink-0">
                         {badge.label}
                       </Badge>
@@ -328,10 +316,10 @@ export default function LecturerContentPage() {
                       >
                         Open
                       </ButtonLink>
-                    </div>
+                    </TreeRow>
                   );
                 })}
-              </div>
+              </TreeRows>
             )}
 
             {archivedCount > 0 && (
