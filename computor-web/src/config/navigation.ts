@@ -24,12 +24,19 @@ export interface NavItem {
 }
 
 // Always-visible navigation (every authenticated user sees their courses).
+// The catalog sits here rather than behind a permission: it is how a user with
+// no memberships at all finds their first course (issue #213).
 export const coursesNavigation: NavItem[] = [
   {
     id: 'courses',
     label: 'Courses',
     path: '/courses',
     icon: 'courses',
+    ownPage: true,
+    subItems: [
+      { id: 'courses-mine', label: 'My Courses', path: '/courses' },
+      { id: 'courses-catalog', label: 'Catalog', path: '/courses/catalog' },
+    ],
   },
 ];
 

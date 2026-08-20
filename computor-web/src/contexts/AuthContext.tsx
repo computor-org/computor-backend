@@ -19,6 +19,16 @@ interface AuthContextType {
   loginWithSSO: (provider?: string) => void;
   logout: () => Promise<void>;
   refreshSession: () => Promise<AuthResponse>;
+  /**
+   * Re-pull /user/views and /user/scopes.
+   *
+   * Both are projections of the per-token Principal the backend caches for
+   * AUTH_CACHE_TTL, so a role the user just gained is invisible to client-side
+   * gating until either that cache is dropped or this runs. Call it after a
+   * mutation that changes the current user's own roles — self-registering in a
+   * public course is the one that exists today.
+   */
+  refreshPermissions: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -172,6 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loginWithSSO,
     logout,
     refreshSession,
+    refreshPermissions: loadPermissions,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
