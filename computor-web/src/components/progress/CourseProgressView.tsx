@@ -7,8 +7,13 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
-import StatCards from './StatCards';
 import ProgressBar from './ProgressBar';
+import ProgressStatCards from './ProgressStatCards';
+import Button from '@/src/components/ui/Button';
+import Toolbar from '@/src/components/ui/Toolbar';
+import Panel from '@/src/components/ui/Panel';
+import { Table, Thead, Tbody, Th, Td } from '@/src/components/ui/Table';
+import { inputCls } from '@/src/components/ui/tokens';
 import { CourseMemberGradingsClient } from '@/src/generated/clients/CourseMemberGradingsClient';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import type { CourseMemberGradingsList } from 'types/generated';
@@ -142,13 +147,9 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
         title="Grading"
         subtitle="Overview of student progress and grading"
         actions={
-          <button
-            onClick={fetchData}
-            disabled={loading}
-            className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-          >
+          <Button variant="secondary" onClick={fetchData} disabled={loading}>
             Refresh
-          </button>
+          </Button>
         }
       />
 
@@ -175,7 +176,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
         {!loading && !error && (
           <>
             {/* Stat Cards */}
-            <StatCards students={students} />
+            <ProgressStatCards students={students} />
 
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -184,8 +185,8 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
             </div>
 
             {/* Student Table */}
-            <div className="bg-white rounded-lg border border-gray-200">
-              <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+            <Panel padding="none">
+              <Toolbar className="px-4 py-3 border-b border-gray-200">
                 <h3 className="text-sm font-semibold text-gray-900">
                   Students ({filtered.length}
                   {filtered.length !== students.length ? ` / ${students.length}` : ''})
@@ -194,47 +195,48 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-64 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Search students..."
+                  className={`${inputCls} ml-auto w-64`}
+                  placeholder="Search students…"
+                  aria-label="Search students"
                 />
-              </div>
+              </Toolbar>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th
-                        className="text-left px-4 py-2.5 font-medium text-gray-600 cursor-pointer select-none"
+                <Table>
+                  <Thead>
+                    <tr>
+                      <Th
+                        className="cursor-pointer select-none normal-case tracking-normal text-sm"
                         onClick={() => handleSort('name')}
                       >
                         Student {sortIcon('name')}
-                      </th>
-                      <th
-                        className="text-left px-4 py-2.5 font-medium text-gray-600 cursor-pointer select-none w-48"
+                      </Th>
+                      <Th
+                        className="cursor-pointer select-none w-48 normal-case tracking-normal text-sm"
                         onClick={() => handleSort('progress')}
                       >
                         Progress {sortIcon('progress')}
-                      </th>
-                      <th className="text-left px-4 py-2.5 font-medium text-gray-600">By Type</th>
-                      <th
-                        className="text-left px-4 py-2.5 font-medium text-gray-600 cursor-pointer select-none w-20"
+                      </Th>
+                      <Th className="normal-case tracking-normal text-sm">By type</Th>
+                      <Th
+                        className="cursor-pointer select-none w-20 normal-case tracking-normal text-sm"
                         onClick={() => handleSort('grade')}
                       >
                         Grade {sortIcon('grade')}
-                      </th>
-                      <th
-                        className="text-left px-4 py-2.5 font-medium text-gray-600 cursor-pointer select-none w-28"
+                      </Th>
+                      <Th
+                        className="cursor-pointer select-none w-28 normal-case tracking-normal text-sm"
                         onClick={() => handleSort('lastActive')}
                       >
-                        Last Active {sortIcon('lastActive')}
-                      </th>
+                        Last active {sortIcon('lastActive')}
+                      </Th>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  </Thead>
+                  <Tbody>
                     {sorted.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                        <Td colSpan={5} className="py-8 text-center text-gray-500">
                           {searchQuery ? 'No students match your search' : 'No student data available'}
-                        </td>
+                        </Td>
                       </tr>
                     ) : (
                       sorted.map((s) => {
@@ -251,27 +253,27 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
                             onClick={() => router.push(`/courses/${courseId}/lecturer/grading/${s.course_member_id}`)}
                           >
                             {/* Name */}
-                            <td className="px-4 py-2.5">
+                            <Td className="py-2.5">
                               <div>
                                 <span className="text-gray-900 font-medium">{name}</span>
                                 {s.student_id && (
                                   <span className="ml-2 text-xs text-gray-400 font-mono">{s.student_id}</span>
                                 )}
                               </div>
-                            </td>
+                            </Td>
 
                             {/* Progress */}
-                            <td className="px-4 py-2.5">
+                            <Td className="py-2.5">
                               <div className="flex items-center gap-2">
                                 <ProgressBar value={s.overall_progress_percentage} size="sm" />
                                 <span className="text-xs font-medium text-gray-600 w-10 text-right">
                                   {Math.round(s.overall_progress_percentage)}%
                                 </span>
                               </div>
-                            </td>
+                            </Td>
 
                             {/* By Type */}
-                            <td className="px-4 py-2.5">
+                            <Td className="py-2.5">
                               <div className="flex items-center gap-1.5">
                                 {(s.by_content_type || []).map((ct) => (
                                   <div
@@ -295,28 +297,28 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
                                   </div>
                                 ))}
                               </div>
-                            </td>
+                            </Td>
 
                             {/* Grade */}
-                            <td className="px-4 py-2.5 text-xs font-medium text-gray-700">{gradeDisplay}</td>
+                            <Td className="py-2.5 text-xs font-medium text-gray-700">{gradeDisplay}</Td>
 
                             {/* Last Active */}
-                            <td className="px-4 py-2.5">
+                            <Td className="py-2.5">
                               <div className="flex items-center gap-1.5">
                                 <span
                                   className={`inline-block w-2 h-2 rounded-full ${activityDotColor(s.latest_submission_at)}`}
                                 />
                                 <span className="text-xs text-gray-600">{relativeDate(s.latest_submission_at)}</span>
                               </div>
-                            </td>
+                            </Td>
                           </tr>
                         );
                       })
                     )}
-                  </tbody>
-                </table>
+                  </Tbody>
+                </Table>
               </div>
-            </div>
+            </Panel>
           </>
         )}
       </ScrollArea>

@@ -5,7 +5,9 @@ import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
-import Breadcrumbs from '@/src/components/Breadcrumbs';
+import PageHeader from '@/src/components/PageHeader';
+import Button from '@/src/components/ui/Button';
+import { inputCls } from '@/src/components/ui/tokens';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import { useResource } from '@/src/hooks/useResource';
 import { CourseMemberGradingsClient } from '@/src/generated/clients/CourseMemberGradingsClient';
@@ -100,26 +102,29 @@ export default function StudentProgressPage() {
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
+        {/*
+          PageHeader rather than DetailPanel: #printable-report has to wrap the
+          header AND the body so both land on paper, and DetailPanel owns its own
+          layout down to the scroll container. The header shape — trail, title,
+          actions — is the same either way.
+        */}
         <div id="printable-report" className="contents">
-          {/* Header */}
-          <div>
-            <div className="print:hidden">
-              <Breadcrumbs items={crumbs} />
-            </div>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {loading ? 'Student Progress' : studentName}
-                </h1>
-                {data?.student_id && (
-                  <p className="text-sm text-gray-500 font-mono mt-0.5">Matr. {data.student_id}</p>
-                )}
-                {data && (
-                  <p className="text-xs text-gray-400 mt-1">
+          <PageHeader
+            breadcrumbs={crumbs}
+            title={loading ? 'Student progress' : studentName}
+            subtitle={
+              data && (
+                <div className="space-y-0.5">
+                  {data.student_id && (
+                    <p className="text-sm text-gray-500 font-mono">Matr. {data.student_id}</p>
+                  )}
+                  <p className="text-xs text-gray-400">
                     Last active: {relativeDate(data.latest_submission_at)}
                   </p>
-                )}
-              </div>
+                </div>
+              )
+            }
+            actions={
               <div className="flex items-end gap-2 print:hidden">
                 <div className="flex flex-col gap-1">
                   <label htmlFor="start-date" className="text-xs font-medium text-gray-600">
@@ -130,7 +135,7 @@ export default function StudentProgressPage() {
                     type="datetime-local"
                     value={isoToLocalInput(startDate)}
                     onChange={(e) => onStartDateChange(e.target.value)}
-                    className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className={inputCls}
                   />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -142,25 +147,18 @@ export default function StudentProgressPage() {
                     type="datetime-local"
                     value={isoToLocalInput(dueDate)}
                     onChange={(e) => onDueDateChange(e.target.value)}
-                    className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className={inputCls}
                   />
                 </div>
-                <button
-                  onClick={() => window.print()}
-                  className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                >
+                <Button variant="secondary" onClick={() => window.print()}>
                   Print
-                </button>
-                <button
-                  onClick={() => reload()}
-                  disabled={loading}
-                  className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-                >
+                </Button>
+                <Button variant="secondary" onClick={() => reload()} disabled={loading}>
                   Refresh
-                </button>
+                </Button>
               </div>
-            </div>
-          </div>
+            }
+          />
 
           <ScrollArea className="space-y-6 print:overflow-visible">
           {/* Loading */}
