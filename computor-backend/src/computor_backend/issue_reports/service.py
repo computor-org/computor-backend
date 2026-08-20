@@ -13,7 +13,7 @@ from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
 from computor_backend.issue_reports.config import IssueReportSettings, get_issue_report_settings
-from computor_backend.issue_reports.health import mark_unhealthy
+from computor_backend.issue_reports.health import current_health, mark_unhealthy
 from computor_backend.model.auth import User
 from computor_backend.permissions.principal import Principal
 from computor_types.issue_reports import IssueReportCreate, IssueReportCreated
@@ -207,8 +207,11 @@ async def submit_issue_report(
             )
 
     issue = response.json()
+    # Only a public tracker may be linked back to the reporter; a private one is
+    # the maintainer board they are meant not to reach.
+    is_public = current_health().is_public
     return IssueReportCreated(
+        report_id=report_id,
         issue_number=int(issue["number"]),
-        issue_url=issue["html_url"],
-        screenshot_url=screenshot_url or None,
+        issue_url=issue["html_url"] if is_public else None,
     )

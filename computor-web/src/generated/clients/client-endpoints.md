@@ -342,6 +342,14 @@
 | `getInvitePublicInvitesTokenGet` | GET | `/invites/{token}` | — | `InviteLinkPublic` |
 | `acceptInviteInvitesTokenAcceptPost` | POST | `/invites/{token}/accept` | `InviteAccept` | `Record<string, unknown> & Record<string, unknown>` |
 
+## IssueReportsClient
+- Base path: `/issue-reports`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `createIssueReportIssueReportsPost` | POST | `/issue-reports` | — | `IssueReportCreated` |
+
 ## LanguagesClient
 - Base path: `/languages`
 - Note: custom operations discovered from OpenAPI schema

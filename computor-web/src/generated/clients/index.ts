@@ -31,6 +31,7 @@ export * from './GitServersClient';
 export * from './GroupsClient';
 export * from './InstanceClient';
 export * from './InvitesClient';
+export * from './IssueReportsClient';
 export * from './LanguagesClient';
 export * from './LecturersClient';
 export * from './MessagesClient';
