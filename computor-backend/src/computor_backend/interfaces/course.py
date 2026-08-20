@@ -85,5 +85,11 @@ class CourseInterface(CourseInterfaceBase, BackendEntityInterface):
             query = query.filter(Course.organization_id == params.organization_id)
         if params.language_code is not None:
             query = query.filter(Course.language_code == params.language_code)
+        # Both of these were declared on CourseQuery (and generated into the
+        # clients) without a clause here, so the filters were silently ignored.
+        if params.visible is not None:
+            query = query.filter(Course.visible.is_(params.visible))
+        if params.public is not None:
+            query = query.filter(Course.public.is_(params.public))
 
         return query
