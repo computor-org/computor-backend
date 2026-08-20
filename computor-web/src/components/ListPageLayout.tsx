@@ -110,3 +110,28 @@ export function ScrollPanel({
 export function ListLoading({ children = 'Loading…' }: { children?: ReactNode }) {
   return <div className="flex-1 min-h-0 flex items-center justify-center text-gray-500">{children}</div>;
 }
+
+/**
+ * The whole page, while it has nothing to show yet.
+ *
+ * For the moment before a form or a detail page has its data — where pages had
+ * been returning a bare `<div className="p-6">Loading…</div>`. That sits at the
+ * top-left of an empty viewport, then the real page replaces it with a header
+ * 24px lower, so every edit page visibly jumped on load. This occupies the same
+ * scaffold the page is about to use, so nothing moves.
+ *
+ * Default `narrow` matches FormPanel; pass `wide` ahead of a table or grid.
+ */
+export function PageLoading({
+  width = 'narrow',
+  children,
+}: {
+  width?: 'wide' | 'narrow';
+  children?: ReactNode;
+}) {
+  return (
+    <ListPageLayout width={width}>
+      <ListLoading>{children}</ListLoading>
+    </ListPageLayout>
+  );
+}

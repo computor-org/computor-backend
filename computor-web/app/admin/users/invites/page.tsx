@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import ListPageLayout, { ScrollPanel, ListLoading } from '@/src/components/ListPageLayout';
+import ListPageLayout, { ScrollPanel, ListLoading, PageLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
@@ -71,7 +71,7 @@ export default function InvitesPage() {
   );
   const invites = data ?? [];
 
-  if (authLoading) return <AuthenticatedLayout><div className="p-8 text-gray-500">Loading…</div></AuthenticatedLayout>;
+  if (authLoading) return <AuthenticatedLayout><PageLoading width="wide" /></AuthenticatedLayout>;
   if (!isAuthenticated || !isUserManager) {
     return <Forbidden message="Requires admin or _user_manager role." backLink="/dashboard" backText="Back to Dashboard" />;
   }
