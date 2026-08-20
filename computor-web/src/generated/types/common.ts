@@ -1737,6 +1737,28 @@ export interface CascadeDeleteResult {
 }
 
 /**
+ * Whether this deployment accepts user problem reports, and how.
+ * 
+ * There are only two kinds of issue tracker. A **public** repository needs no
+ * token — GitHub forbids anonymous issue creation, so the backend cannot file
+ * on the user's behalf and the client opens ``issues_url`` instead, where the
+ * user files it with their own GitHub account. A **private** repository is a
+ * maintainer board users must not reach; the backend holds a token and files
+ * for them, and no link is ever handed back.
+ * 
+ * ``visibility`` is read from GitHub by the startup probe, never guessed from
+ * configuration.
+ */
+export interface IssueReportingInfo {
+  /** Whether to offer a reporting entry point at all. False when the deployment has no tracker configured or its probe is failing. */
+  enabled: boolean;
+  /** Visibility of the configured repository; null while unknown. */
+  visibility?: "public" | "private" | null;
+  /** GitHub issues page to open directly. Set only for a public repository — a private board is never linked to a reporter. */
+  issues_url?: string | null;
+}
+
+/**
  * Public navigation URLs for this Computor instance.
  */
 export interface InstanceInfoGet {
@@ -1744,6 +1766,8 @@ export interface InstanceInfoGet {
   web_url?: string | null;
   /** Public base URL of the managed Forgejo git server; null if no managed Forgejo is configured. */
   forgejo_url?: string | null;
+  /** Problem-reporting capability of this deployment. */
+  issue_reporting?: IssueReportingInfo | null;
 }
 
 /**
