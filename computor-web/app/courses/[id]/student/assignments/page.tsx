@@ -1,257 +1,54 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useResource } from '@/src/hooks/useResource';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
+import { useContentTree } from '@/src/hooks/useContentTree';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import EmptyState from '@/src/components/EmptyState';
 import Badge from '@/src/components/Badge';
-import type { CourseContentStudentList } from 'types/generated';
-import { lastSegment } from '@/src/utils/ltree';
+import Button, { ButtonLink } from '@/src/components/ui/Button';
+import Score from '@/src/components/ui/Score';
+import Toolbar from '@/src/components/ui/Toolbar';
+import TreeRow, { TreeRows } from '@/src/components/ui/TreeRow';
 import { formatUsageCompact } from '@/src/utils/limits';
-import { humanizeSegment } from '@/src/utils/displayName';
+import type { CourseContentStudentList } from 'types/generated';
 
-// NOTE: this page keeps its own tree builder (below) rather than the shared
-// utils/ltree buildTree because it SYNTHESISES missing container nodes from the
-// path segments (a bare assignment at a.b.c renders under synthetic a / a.b
-// units) and uses a label/content node shape — the shared buildTree only nests
-// items that are actually present. It shares the ltree path primitives.
-interface TreeNode {
-  label: string;
-  path: string;
-  fullPath: string;
-  children: TreeNode[];
-  content?: CourseContentStudentList;
-  isLeaf: boolean;
-}
-
+/**
+ * A student's view of the course content tree.
+ *
+ * Same data and same shape as the lecturer's Assignments page, drawn by the same
+ * hook and the same row: they had been two unrelated implementations, disagreeing
+ * on indent, marker, row height, separator and what starts expanded, so the two
+ * roles saw what looked like two different products of the same course.
+ *
+ * What legitimately differs is the row's right-hand side — a student gets status,
+ * score and their remaining budget; a lecturer gets deployment and release
+ * controls — and that is all that differs now.
+ */
 export default function StudentCourseContentsPage() {
   const courseId = useParams().id as string;
   const crumbs = useCourseCrumbs(courseId, 'Assignments');
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
   const { data, loading, error } = useResource(async () => {
     const response = await apiFetch(`${API_BASE_URL}/students/course-contents?course_id=${courseId}`);
     if (!response.ok) throw new Error('Failed to fetch course contents');
     return (await response.json()) as CourseContentStudentList[];
   }, [courseId]);
-  const courseContents = data ?? [];
+  const courseContents = useMemo(() => data ?? [], [data]);
 
-  // Build tree structure from Ltree paths
-  const buildTree = (contents: CourseContentStudentList[]): TreeNode[] => {
-    const root: TreeNode[] = [];
-    const nodeMap = new Map<string, TreeNode>();
+  // synthesiseContainers: a student is served the assignments they can see, so a
+  // unit that is itself hidden leaves its children with no parent row. Inventing
+  // the container keeps the structure legible instead of flattening the tree.
+  const { rows, setAllExpanded } = useContentTree(courseContents, { synthesiseContainers: true });
 
-    // First pass: Build the tree structure from Ltree paths
-    contents.forEach((content) => {
-      const pathParts = content.path.split('.');
-      let currentPath = '';
-
-      pathParts.forEach((part, index) => {
-        const previousPath = currentPath;
-        currentPath = currentPath ? `${currentPath}.${part}` : part;
-        const isLeaf = index === pathParts.length - 1;
-
-        if (!nodeMap.has(currentPath)) {
-          const node: TreeNode = {
-            // Synthetic containers have no content row of their own, so their
-            // only available name is the humanised path segment.
-            label: humanizeSegment(lastSegment(currentPath)),
-            path: part,
-            fullPath: currentPath,
-            children: [],
-            content: isLeaf ? content : undefined,
-            isLeaf,
-          };
-
-          nodeMap.set(currentPath, node);
-
-          if (previousPath && nodeMap.has(previousPath)) {
-            nodeMap.get(previousPath)!.children.push(node);
-          } else {
-            root.push(node);
-          }
-        } else if (isLeaf) {
-          // Update leaf node with content
-          const node = nodeMap.get(currentPath)!;
-          node.content = content;
-          node.isLeaf = true;
-        }
-      });
-    });
-
-    // Second pass: Sort children by position at each level
-    const sortChildren = (nodes: TreeNode[]) => {
-      nodes.sort((a, b) => {
-        const posA = a.content?.position ?? 0;
-        const posB = b.content?.position ?? 0;
-        return posA - posB;
-      });
-
-      nodes.forEach(node => {
-        if (node.children.length > 0) {
-          sortChildren(node.children);
-        }
-      });
-    };
-
-    sortChildren(root);
-
-    return root;
-  };
-
-  const toggleNode = (path: string) => {
-    setExpandedNodes((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(path)) {
-        newSet.delete(path);
-      } else {
-        newSet.add(path);
-      }
-      return newSet;
-    });
-  };
-
-  const renderTree = (nodes: TreeNode[], level: number = 0): React.ReactNode => {
-    return nodes.map((node) => {
-      const isExpanded = expandedNodes.has(node.fullPath);
-      const hasChildren = node.children.length > 0;
-      const paddingLeft = level * 24;
-      const contentKind = node.content?.course_content_kind_id;
-      const isUnit = contentKind === 'unit' || !node.isLeaf;
-      const isAssignment = contentKind === 'assignment';
-
-      return (
-        <div key={node.fullPath}>
-          {/* Node */}
-          <div
-            className={`flex items-center py-2 px-4 hover:bg-gray-50 cursor-pointer border-b border-gray-100 ${
-              node.isLeaf ? '' : 'font-medium'
-            }`}
-            style={{ paddingLeft: `${paddingLeft + 16}px` }}
-            onClick={() => hasChildren && toggleNode(node.fullPath)}
-          >
-            {/* Expand/Collapse Icon */}
-            {hasChildren && (
-              <svg
-                className={`h-4 w-4 mr-2 text-gray-500 transition-transform ${
-                  isExpanded ? 'rotate-90' : ''
-                }`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            )}
-
-            {/* Content Kind Icon with Color */}
-            {isUnit ? (
-              // Circle for units
-              <span
-                className="w-4 h-4 rounded-full mr-2 flex-shrink-0"
-                style={{ backgroundColor: node.content?.color || '#6B7280' }}
-              ></span>
-            ) : isAssignment ? (
-              // Rounded square for assignments
-              <span
-                className="w-4 h-4 rounded-sm mr-2 flex-shrink-0"
-                style={{ backgroundColor: node.content?.color || '#3B82F6' }}
-              ></span>
-            ) : (
-              // Default folder icon for non-leaf nodes without content
-              <svg className="h-5 w-5 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
-            )}
-
-            {/* Label */}
-            <span className="flex-1">
-              {node.content?.title || node.label}
-            </span>
-
-            {/* Content Info - Different for units vs assignments */}
-            {node.content && (
-              <div className="flex items-center space-x-4 ml-4">
-                {isUnit ? (
-                  // Unit Info
-                  <>
-                    <span className="text-sm text-gray-500">
-                      {node.children.filter(c => c.content?.course_content_kind_id === 'assignment').length} assignments
-                    </span>
-                    <Link
-                      href={`/courses/${courseId}/student/assignments/${node.content.id}`}
-                      className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      View
-                    </Link>
-                  </>
-                ) : isAssignment ? (
-                  // Assignment Info
-                  <>
-                    {/* Submission Status */}
-                    {node.content.submitted ? (
-                      <Badge color="green">Submitted</Badge>
-                    ) : (
-                      <Badge color="yellow">Not Submitted</Badge>
-                    )}
-
-                    {/* Result — result.result is a 0..1 fraction, not a percentage */}
-                    {node.content.result ? (
-                      <span className={`text-sm font-medium ${
-                        (node.content.result.result ?? 0) >= 0.5 ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {((node.content.result.result ?? 0) * 100).toFixed(1)}%
-                      </span>
-                    ) : (
-                      <span className="text-sm text-gray-400">No results</span>
-                    )}
-
-                    {/* Test Runs — with the cap, so a student sees "0/2 tests"
-                        from the start rather than discovering the limit on the
-                        run that gets refused */}
-                    <span className="text-sm text-gray-500">
-                      {formatUsageCompact(node.content.result_count, node.content.max_test_runs)}
-                      {' '}test{node.content.result_count !== 1 ? 's' : ''}
-                    </span>
-
-                    {/* Submissions */}
-                    <span className="text-sm text-gray-500">
-                      {formatUsageCompact(node.content.submission_count, node.content.max_submissions)}
-                      {' '}submission{node.content.submission_count !== 1 ? 's' : ''}
-                    </span>
-
-                    {/* View Button */}
-                    <Link
-                      href={`/courses/${courseId}/student/assignments/${node.content.id}`}
-                      className="px-3 py-1 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      View
-                    </Link>
-                  </>
-                ) : null}
-              </div>
-            )}
-          </div>
-
-          {/* Children */}
-          {hasChildren && isExpanded && (
-            <div>{renderTree(node.children, level + 1)}</div>
-          )}
-        </div>
-      );
-    });
-  };
-
-  const tree = buildTree(courseContents);
+  const units = courseContents.filter((c) => c.course_content_kind_id === 'unit').length;
+  const assignments = courseContents.filter((c) => c.course_content_kind_id === 'assignment').length;
 
   return (
     <AuthenticatedLayout>
@@ -259,14 +56,7 @@ export default function StudentCourseContentsPage() {
         <PageHeader
           breadcrumbs={crumbs}
           title="Assignments"
-          subtitle={
-            loading ? undefined : (
-              <>
-                {courseContents.filter(c => c.course_content_kind_id === 'unit').length} units ·{' '}
-                {courseContents.filter(c => c.course_content_kind_id === 'assignment').length} assignments
-              </>
-            )
-          }
+          subtitle={loading ? undefined : `${units} units · ${assignments} assignments`}
         />
 
         <ErrorBanner>{error}</ErrorBanner>
@@ -274,13 +64,8 @@ export default function StudentCourseContentsPage() {
         {loading ? (
           <ListLoading />
         ) : (
-          <ScrollArea>
-            {/* Tree View */}
-            {tree.length > 0 ? (
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                {renderTree(tree)}
-              </div>
-            ) : (
+          <ScrollArea className="space-y-6">
+            {rows.length === 0 ? (
               <EmptyState
                 icon={
                   <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -290,6 +75,80 @@ export default function StudentCourseContentsPage() {
                 title="No assignments yet"
                 description="Assignments will appear here once they are published by your instructor."
               />
+            ) : (
+              <>
+                <Toolbar>
+                  <Button variant="ghost" size="sm" onClick={() => setAllExpanded(false)}>
+                    Collapse all
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setAllExpanded(true)}>
+                    Expand all
+                  </Button>
+                </Toolbar>
+
+                <TreeRows>
+                  {rows.map(({ key, item, depth, label, expanded, hasChildren, toggle, childCount }) => {
+                    const isAssignment = item?.course_content_kind_id === 'assignment';
+
+                    return (
+                      <TreeRow
+                        key={key}
+                        depth={depth}
+                        expandable={hasChildren}
+                        expanded={expanded}
+                        onToggle={toggle}
+                        markerColor={item?.color}
+                        markerTitle={item?.course_content_type?.slug}
+                        label={label}
+                      >
+                        {!isAssignment && hasChildren && (
+                          <Badge tone="muted" className="shrink-0">
+                            {childCount} {childCount === 1 ? 'item' : 'items'}
+                          </Badge>
+                        )}
+
+                        {item && isAssignment && (
+                          <>
+                            {item.submitted ? (
+                              <Badge tone="success" className="shrink-0">
+                                Submitted
+                              </Badge>
+                            ) : (
+                              <Badge tone="warning" className="shrink-0">
+                                Not submitted
+                              </Badge>
+                            )}
+
+                            <Badge
+                              tone="muted"
+                              className="shrink-0 tabular-nums"
+                              title="Test runs and submissions used, against your budget"
+                            >
+                              {formatUsageCompact(item.result_count, item.max_test_runs)}T /{' '}
+                              {formatUsageCompact(item.submission_count, item.max_submissions)}S
+                            </Badge>
+
+                            <span className="shrink-0 w-14 text-right">
+                              <Score value={item.result ? (item.result.result ?? 0) : null} />
+                            </span>
+                          </>
+                        )}
+
+                        {item && (
+                          <ButtonLink
+                            href={`/courses/${courseId}/student/assignments/${item.id}`}
+                            variant="ghost"
+                            size="xs"
+                            className="shrink-0"
+                          >
+                            Open
+                          </ButtonLink>
+                        )}
+                      </TreeRow>
+                    );
+                  })}
+                </TreeRows>
+              </>
             )}
           </ScrollArea>
         )}
