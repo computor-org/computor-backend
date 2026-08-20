@@ -212,6 +212,7 @@
 | --- | --- | --- | --- | --- |
 | `listCoursesCoursesGet` | GET | `/courses` | — | `CourseList[]` |
 | `createCoursesCoursesPost` | POST | `/courses` | `CourseCreate` | `CourseGet` |
+| `listPublicCoursesCoursesPublicGet` | GET | `/courses/public` | — | `CoursePublicList[]` |
 | `deleteCourseEndpointCoursesCourseIdDelete` | DELETE | `/courses/{course_id}` | — | `CascadeDeleteResult` |
 | `getCourseGitBindingEndpointCoursesCourseIdGitGet` | GET | `/courses/{course_id}/git` | — | `CourseGitBindingGet` |
 | `upsertCourseGitBindingEndpointCoursesCourseIdGitPut` | PUT | `/courses/{course_id}/git` | `CourseGitBindingUpsert` | `CourseGitBindingGet` |

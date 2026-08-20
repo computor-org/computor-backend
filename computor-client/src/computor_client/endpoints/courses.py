@@ -13,6 +13,7 @@ from computor_types.courses import (
     CourseCreate,
     CourseGet,
     CourseList,
+    CoursePublicList,
     CourseUpdate,
 )
 from pydantic import BaseModel
@@ -63,6 +64,17 @@ class CoursesClient:
         """Create Courses"""
         response = await self._http.post("/courses", json_data=data, params=kwargs)
         return CourseGet.model_validate(response.json())
+
+    async def list_public(
+        self,
+        **kwargs: Any,
+    ) -> List[CoursePublicList]:
+        """Browse courses open for self-registration"""
+        response = await self._http.get("/courses/public", params=kwargs)
+        data = response.json()
+        if isinstance(data, list):
+            return [CoursePublicList.model_validate(item) for item in data]
+        return []
 
     async def delete(
         self,
