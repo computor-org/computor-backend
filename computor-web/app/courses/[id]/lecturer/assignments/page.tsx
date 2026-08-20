@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { depthOf } from '@/src/utils/ltree';
 import { useResource } from '@/src/hooks/useResource';
+import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -18,7 +19,7 @@ import {
   hiddenRowTitleCls,
   rowTitleCls,
 } from '@/src/components/ui/tokens';
-import type { CourseGet, CourseContentLecturerList, CourseContentTypeList } from 'types/generated';
+import type { CourseContentLecturerList, CourseContentTypeList } from 'types/generated';
 import { displayName } from '@/src/utils/displayName';
 
 // Deployment status → badge styling. The lecturer list always carries the
@@ -45,17 +46,17 @@ function deploymentBadge(c: CourseContentLecturerList): { label: string; color: 
 
 export default function LecturerContentPage() {
   const courseId = useParams().id as string;
+  const crumbs = useCourseCrumbs(courseId, 'Assignments');
 
   // reload re-fetches everything (badges move pending → deploying → deployed as
   // the release workflow runs).
   const { data, loading, error, reload } = useResource(async () => {
-    const [cRes, ccRes, ctRes] = await Promise.all([
-      apiFetch(`${API_BASE_URL}/courses/${courseId}`),
+    // The course itself comes from CourseContext — this page only needs what is
+    // specific to it.
+    const [ccRes, ctRes] = await Promise.all([
       apiFetch(`${API_BASE_URL}/lecturers/course-contents?course_id=${courseId}&limit=500`),
       apiFetch(`${API_BASE_URL}/course-content-types?course_id=${courseId}&limit=200`),
     ]);
-    if (!cRes.ok) throw new Error('Failed to load course');
-    const course: CourseGet = await cRes.json();
     let contents: CourseContentLecturerList[] = [];
     if (ccRes.ok) {
       contents = await ccRes.json();
@@ -68,10 +69,9 @@ export default function LecturerContentPage() {
       const types: CourseContentTypeList[] = await ctRes.json();
       typeMap = Object.fromEntries(types.map((t) => [t.id, t]));
     }
-    return { course, contents, typeMap };
+    return { contents, typeMap };
   }, [courseId]);
 
-  const course = data?.course ?? null;
   const contents = data?.contents ?? [];
   const typeMap = data?.typeMap ?? {};
 
@@ -158,15 +158,7 @@ export default function LecturerContentPage() {
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
-        <PageHeader
-          breadcrumbs={[
-            { label: 'Courses', href: '/courses' },
-            { label: displayName(course, 'Course'), href: `/courses/${courseId}` },
-            { label: 'Lecturer View', href: `/courses/${courseId}/lecturer` },
-            { label: 'Assignments' },
-          ]}
-          title="Assignments"
-        />
+        <PageHeader breadcrumbs={crumbs} title="Assignments" />
 
         <ErrorBanner>{error}</ErrorBanner>
 

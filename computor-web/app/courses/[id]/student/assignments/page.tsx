@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useResource } from '@/src/hooks/useResource';
+import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -32,6 +33,7 @@ interface TreeNode {
 
 export default function StudentCourseContentsPage() {
   const courseId = useParams().id as string;
+  const crumbs = useCourseCrumbs(courseId, 'Assignments');
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
   const { data, loading, error } = useResource(async () => {
@@ -255,10 +257,7 @@ export default function StudentCourseContentsPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[
-            { label: 'Courses', href: '/courses' },
-            { label: 'Assignments' },
-          ]}
+          breadcrumbs={crumbs}
           title="Assignments"
           subtitle={
             loading ? undefined : (

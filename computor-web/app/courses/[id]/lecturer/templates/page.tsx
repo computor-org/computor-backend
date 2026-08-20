@@ -7,13 +7,13 @@ import { downloadBlob, filenameFromContentDisposition } from '@/src/utils/file';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
+import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
 import type { CourseGet } from 'types/generated';
-import { displayName } from '@/src/utils/displayName';
 
 type Layout = 'flat' | 'hierarchical';
 
@@ -43,6 +43,7 @@ const LAYOUTS: {
 
 export default function LecturerTemplatesPage() {
   const courseId = useParams().id as string;
+  const crumbs = useCourseCrumbs(courseId, 'Templates');
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
 
@@ -99,12 +100,7 @@ export default function LecturerTemplatesPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[
-            { label: 'Courses', href: '/courses' },
-            { label: displayName(course, 'Course'), href: `/courses/${courseId}` },
-            { label: 'Lecturer View', href: `/courses/${courseId}/lecturer` },
-            { label: 'Templates' },
-          ]}
+          breadcrumbs={crumbs}
           title="Templates"
         />
 

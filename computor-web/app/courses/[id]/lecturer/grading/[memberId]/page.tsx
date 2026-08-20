@@ -2,10 +2,10 @@
 
 import { useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
+import Breadcrumbs from '@/src/components/Breadcrumbs';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import { useResource } from '@/src/hooks/useResource';
 import { CourseMemberGradingsClient } from '@/src/generated/clients/CourseMemberGradingsClient';
@@ -13,6 +13,7 @@ import ProgressBar from '@/src/components/progress/ProgressBar';
 import ContentTree from '@/src/components/progress/ContentTree';
 import SubmissionCurve from '@/src/components/progress/SubmissionCurve';
 import { usePersistedCourseDate } from '@/src/hooks/usePersistedCourseDate';
+import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 
 // Pulls in recharts — load only when this page renders (keeps the shared
 // bundle free of the charting library).
@@ -68,6 +69,12 @@ export default function StudentProgressPage() {
     ? `${data.given_name || ''} ${data.family_name || ''}`.trim() || data.username || 'Unknown'
     : '';
 
+  const crumbs = useCourseCrumbs(
+    courseId,
+    { label: 'Grading', href: `/courses/${courseId}/lecturer/grading` },
+    studentName || 'Student',
+  );
+
   const gradePercent = data?.overall_average_grading != null
     ? Math.round(data.overall_average_grading * 100)
     : null;
@@ -96,15 +103,9 @@ export default function StudentProgressPage() {
         <div id="printable-report" className="contents">
           {/* Header */}
           <div>
-            <Link
-              href={`/courses/${courseId}/lecturer/grading`}
-              className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-2 print:hidden"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Back to Grading
-            </Link>
+            <div className="print:hidden">
+              <Breadcrumbs items={crumbs} />
+            </div>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">

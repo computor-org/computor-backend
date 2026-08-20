@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
+import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollPanel, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -14,17 +15,15 @@ import Forbidden from '@/src/components/Forbidden';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import { CourseGroupsClient } from '@/src/generated/clients/CourseGroupsClient';
 import { CourseMembersClient } from '@/src/generated/clients/CourseMembersClient';
-import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import type { CourseGroupList } from 'types/generated';
 import { Table, Thead, Tbody, Th } from '@/src/components/ui/Table';
-import { displayName } from '@/src/utils/displayName';
 
 const groupsClient = new CourseGroupsClient();
 const membersClient = new CourseMembersClient();
-const coursesClient = new CoursesClient();
 
 export default function CourseGroupsPage() {
   const courseId = useParams().id as string;
+  const crumbs = useCourseCrumbs(courseId, 'Course Groups');
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
 
@@ -35,20 +34,18 @@ export default function CourseGroupsPage() {
 
   const { data, loading, error, reload } = useResource(
     async () => {
-      const [groups, members, course] = await Promise.all([
+      const [groups, members] = await Promise.all([
         groupsClient.listCourseGroupsCourseGroupsGet({ courseId, limit: 500 }),
         // Member counts drive whether a group can be deleted (the FK is RESTRICT).
         membersClient.listCourseMembersCourseMembersGet({ courseId, limit: 2000 }),
-        coursesClient.getCoursesCoursesIdGet({ id: courseId }).catch(() => null),
       ]);
-      return { groups, members, course };
+      return { groups, members };
     },
     [courseId],
     { enabled: canManage },
   );
 
   const groups = data?.groups ?? [];
-  const course = data?.course ?? null;
   const memberCount = useMemo(() => {
     const map = new Map<string, number>();
     for (const m of data?.members ?? []) {
@@ -79,17 +76,11 @@ export default function CourseGroupsPage() {
     );
   }
 
-  const courseLabel = displayName(course, 'Course');
-
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[
-            { label: 'Courses', href: '/courses' },
-            { label: courseLabel, href: `/courses/${courseId}` },
-            { label: 'Course Groups' },
-          ]}
+          breadcrumbs={crumbs}
           title="Course Groups"
           subtitle="Groups (lab sections, tutorial cohorts) students are assigned to. Every student must belong to a group."
           actions={

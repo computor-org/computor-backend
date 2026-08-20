@@ -10,9 +10,8 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import StatCards from './StatCards';
 import ProgressBar from './ProgressBar';
 import { CourseMemberGradingsClient } from '@/src/generated/clients/CourseMemberGradingsClient';
-import { CoursesClient } from '@/src/generated/clients/CoursesClient';
+import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import type { CourseMemberGradingsList } from 'types/generated';
-import { displayName } from '@/src/utils/displayName';
 
 // Charts pull in recharts (~large) — load them only when this view renders
 // instead of shipping the library in the shared bundle.
@@ -27,7 +26,6 @@ const ContentTypeChart = dynamic(() => import('./ContentTypeChart'), {
 });
 
 const gradingsClient = new CourseMemberGradingsClient();
-const coursesClient = new CoursesClient();
 
 function daysSince(dateStr: string | null | undefined): number | null {
   if (!dateStr) return null;
@@ -63,7 +61,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
 
-  const [courseTitle, setCourseTitle] = useState('Course');
+  const crumbs = useCourseCrumbs(courseId, 'Grading');
   const [students, setStudents] = useState<CourseMemberGradingsList[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,12 +86,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
     fetchData();
-    // Course title is best-effort — the breadcrumb falls back to "Course".
-    coursesClient.getCoursesCoursesIdGet({ id: courseId }).then(
-      (c) => setCourseTitle(displayName(c, 'Course')),
-      () => {},
-    );
-  }, [authLoading, isAuthenticated, fetchData, courseId]);
+  }, [authLoading, isAuthenticated, fetchData]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -145,12 +138,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
   return (
     <ListPageLayout>
       <PageHeader
-        breadcrumbs={[
-          { label: 'Courses', href: '/courses' },
-          { label: courseTitle, href: `/courses/${courseId}` },
-          { label: 'Lecturer View', href: `/courses/${courseId}/lecturer` },
-          { label: 'Grading' },
-        ]}
+        breadcrumbs={crumbs}
         title="Grading"
         subtitle="Overview of student progress and grading"
         actions={

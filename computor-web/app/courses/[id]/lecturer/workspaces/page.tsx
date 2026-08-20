@@ -13,6 +13,7 @@ import WorkspaceStatusBadge from '@/src/components/workspaces/WorkspaceStatusBad
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
+import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { inputCls } from '@/src/components/ui/tokens';
 import { CourseMembersClient } from '@/src/generated/clients/CourseMembersClient';
@@ -29,6 +30,7 @@ function memberName(user?: { given_name?: string | null; family_name?: string | 
 
 function LecturerWorkspacesContent() {
   const courseId = useParams().id as string;
+  const crumbs = useCourseCrumbs(courseId, 'Workspaces');
   const notify = useNotify();
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -199,12 +201,7 @@ function LecturerWorkspacesContent() {
   return (
     <ListPageLayout>
       <PageHeader
-        breadcrumbs={[
-          { label: 'Courses', href: '/courses' },
-          { label: 'Course', href: `/courses/${courseId}` },
-          { label: 'Lecturer View', href: `/courses/${courseId}/lecturer` },
-          { label: 'Workspaces' },
-        ]}
+        breadcrumbs={crumbs}
         title="Student workspaces"
         subtitle="Provision (throwaway) workspaces for your students and manage the ones that exist"
       />
