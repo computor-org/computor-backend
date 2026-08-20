@@ -1,14 +1,16 @@
 'use client';
 
 import { ReactNode } from 'react';
+import Panel from './ui/Panel';
 
 /**
- * A titled panel on a settings page: white card, heading, optional right-hand
- * slot, optional footer note.
+ * A titled panel: white card, heading, optional right-hand slot, optional
+ * footer note.
  *
  * This chrome was hand-rolled on every settings section, which is why those
- * pages carried most of the app's raw palette classes. One component, so the
- * card radius and border live in a single place.
+ * pages carried most of the app's raw palette classes. The surface itself now
+ * comes from <Panel>, so this component owns only the heading — the card radius,
+ * border and padding live in one place for headed and un-headed panels alike.
  */
 export default function SectionCard({
   title,
@@ -24,7 +26,7 @@ export default function SectionCard({
   children: ReactNode;
 }) {
   return (
-    <section className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+    <Panel className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
         {action}
@@ -33,7 +35,7 @@ export default function SectionCard({
         <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded p-2.5">{note}</p>
       )}
       {children}
-    </section>
+    </Panel>
   );
 }
 
