@@ -41,20 +41,22 @@ bindings.
 | 6 | 24px | `p-6` | `var(--sp-6)` |
 | 8 | 32px | `p-8` | `var(--sp-8)` |
 
-**Radius** — the one ladder the two surfaces currently disagree on. This is the
-resolution: **6px is the card/panel radius on both.**
+**Radius** — the one ladder whose *value* is per-surface. The role names are
+shared; the panel radius resolves to **8px on the web and 6px in the extension**.
+Each surface sits in a different frame: the web app owns its own chrome, while a
+webview is embedded in the editor's 6px geometry and looks pasted-on at anything
+rounder.
 
-| Role | Value | Web | Extension |
-|---|---|---|---|
-| tight (chips, code spans) | 2px | `rounded-sm` | `var(--radius-sm)` |
-| default (buttons, inputs, notices) | 4px | `rounded` | `var(--radius)` |
-| panel (cards, sections, modals) | 6px | `rounded-md` | `var(--radius-lg)` |
-| pill (badges, toggles) | 999px | `rounded-full` | `var(--radius-pill)` |
+| Role | Web | Extension |
+|---|---|---|
+| tight (chips, code spans) | `rounded-sm` (2px) | `var(--radius-sm)` (2px) |
+| default (buttons, inputs, notices) | `rounded` (4px) | `var(--radius)` (4px) |
+| panel (cards, sections, modals) | `rounded-lg` (8px) | `var(--radius-lg)` (6px) |
+| pill (badges, toggles) | `rounded-full` | `var(--radius-pill)` |
 
-> Web currently uses `rounded-lg` (8px) for panels and buttons. That is the drift.
-> New code uses `rounded-md` for panels and `rounded` for controls; existing
-> `rounded-lg` gets corrected when you are already editing that file, not in a
-> sweep of its own.
+> These four rungs are the whole ladder. `rounded-xl`, `rounded-2xl` and a bare
+> `rounded-md` on the web are off it — correct them when you are already editing
+> the file, not in a sweep of their own.
 
 **Type** — the web has a fixed base; the extension inherits the editor's.
 
@@ -170,19 +172,23 @@ destructive action repeated in every table row), `ghost` (muted text, no fill).
 Fix opportunistically — when you are already editing the file. Do not open a
 sweeping reformat PR.
 
-Both checkers below report the current numbers with `--all`; these were true when
-this spec was written.
+Both checkers below report the current numbers with `--all`; these were
+re-measured on 2026-08-20.
 
-**Web** (`node computor-web/scripts/check-styling.mjs --all`, 72 files in `app/`)
-- **1,231** palette-utility occurrences in `app/**` that should be components
-  (a further ~526 sit legitimately inside `src/components/**`).
-- **82** raw `<button>` in `app/**`; only 18 files import `Button`.
-- `PageHeader` reaches 39 of 68 pages.
+**Web** (`node computor-web/scripts/check-styling.mjs --all`, 74 files in `app/`)
+- **1,155** palette-utility occurrences in `app/**` that should be components
+  (a further 666 sit legitimately inside `src/components/**`).
+- **77** raw `<button>` in `app/**`; only 9 files import `Button`.
+- `PageHeader` reaches 40 of 70 pages; a header scaffold (`PageHeader` **or**
+  `FormPanel`) reaches 56 of 70. Create/edit is the healthy half — 16 of 18 of
+  those routes already go through `FormPanel`.
+- `EmptyState` is used on 4 pages against 15 hand-rolled dashed-border empties.
+- Three separate ltree tree renderers draw the same course content hierarchy at
+  three different indents.
 - `Badge` still takes literal color names (`green`, `purple`) — migrate its API to
   tones, keeping the color names as deprecated aliases until callers are moved.
 - `src/components/ui/tokens.ts` holds exactly one string (`inputCls`); the rest of
   the shared class strings are still inlined in components.
-- Panels use `rounded-lg` (8px) against this spec's 6px.
 
 **Extension** (`node scripts/check-webview-styling.js --all`, 24 stylesheets)
 - **24** hardcoded hex/`rgba()` declarations across 6 non-base stylesheets
