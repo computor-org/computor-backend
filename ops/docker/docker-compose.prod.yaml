@@ -84,6 +84,11 @@ services:
       DEPLOYMENTS_DIR: /deployments
       API_ADMIN_EMAIL: ${API_ADMIN_EMAIL}
       API_ADMIN_PASSWORD: ${API_ADMIN_PASSWORD}
+      # Read-only: the backend only compares it against API_ADMIN_EMAIL and warns
+      # when they collide (a shared address means the platform admin can never
+      # get a git-server account). The Forgejo admin itself is created by the
+      # bootstrap container, not here.
+      FORGEJO_ADMIN_EMAIL: ${FORGEJO_ADMIN_EMAIL:-}
       # Empty repository = no issue reporting on this deployment. Never default
       # these: "unset" has to stay distinguishable from "configured".
       GITHUB_ISSUE_REPORT_REPOSITORY: ${GITHUB_ISSUE_REPORT_REPOSITORY:-}

@@ -536,6 +536,14 @@ async def handle_sso_callback(
             if not existing_admin:
                 db.add(UserRole(user_id=user.id, role_id="_admin"))
 
+        # Mark the bootstrap admin (API_ADMIN_EMAIL) once, so git provisioning
+        # can skip an identity that is infrastructure rather than a person — see
+        # utils/bootstrap_admin.py. Stamped here because this is the only place
+        # the account materializes as a computor User row.
+        from computor_backend.utils.bootstrap_admin import stamp_bootstrap_admin
+
+        stamp_bootstrap_admin(user)
+
         # Refuse to mint a session for a banned user. A freshly created user
         # (is_new_user) can never be banned, so this only bites returning users.
         # Defence in depth alongside the per-request gate in PrincipalBuilder.build.
