@@ -27,7 +27,12 @@ from computor_backend.business_logic.course_template_export import (
     build_hierarchical_mapping,
     remap_archive_to_hierarchy,
 )
+from computor_backend.business_logic.course_registration import (
+    list_public_courses as list_public_courses_bl,
+)
+from computor_backend.api._pagination import paginated_list
 from computor_types.cascade_deletion import CascadeDeleteResult
+from computor_types.courses import CoursePublicList, CoursePublicQuery
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +61,33 @@ async def check_template_download_rate_limit(user_id: str, cache) -> bool:
     except Exception as e:
         logger.error(f"Template download rate limit check failed: {e}")
         return False
+
+
+@course_router.router.get(
+    "/public",
+    response_model=list[CoursePublicList],
+    summary="Browse courses open for self-registration",
+)
+async def list_public_courses(
+    response: Response,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    params: Annotated[CoursePublicQuery, Depends()],
+    db: Session = Depends(get_db),
+):
+    """Courses a lecturer has opened for student self-registration.
+
+    Authenticated but role-free: every signed-in user sees the same catalog,
+    including users who hold no role anywhere. That is the point — this is how
+    someone with no memberships finds their first course.
+
+    Metadata only. Course contents, members, git configuration and organization
+    internals stay behind the normal permission checks; registering is a
+    separate call. Declared before the generated ``GET /{id}`` route: module
+    level decorators run at import time, so this static path is matched first
+    (see CrudRouter.register_routes).
+    """
+    items, total = list_public_courses_bl(params, permissions, db)
+    return paginated_list(items, total, response=response)
 
 
 @course_router.router.get(

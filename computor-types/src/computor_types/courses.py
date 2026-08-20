@@ -148,6 +148,43 @@ class CourseQuery(ListQuery):
     public: Optional[bool] = None
 
 
+class CoursePublicList(BaseModel):
+    """One row of the public course catalog (issue #213).
+
+    Deliberately NOT ``CourseList``. That DTO carries ``properties``, whose
+    ``CoursePropertiesGet`` is ``extra='allow'`` and therefore re-exports
+    whatever was written onto ``Course.properties["gitlab"]`` — group ids, full
+    paths, web URLs — plus the organization/family ids, the ltree path and the
+    grading budgets. A catalog row is read by people who are *not* members of
+    the course, so it carries only what someone needs in order to decide
+    whether to register.
+    """
+    id: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    # Kept so the web `displayName()` helper can fall back to the slug for a
+    # course whose title was never set, as it does for every other course view.
+    path: str
+    language_code: Optional[str] = None
+    organization_title: Optional[str] = None
+    # Caller-relative: true when this user already has a CourseMember row here.
+    # Lets the catalog render "Open" instead of "Register" without a second
+    # round trip, and without consulting the 15-minute-stale principal claims.
+    enrolled: bool = False
+
+    @field_validator('path', mode='before')
+    @classmethod
+    def cast_str_to_ltree(cls, value):
+        return str(value)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CoursePublicQuery(ListQuery):
+    title: Optional[str] = None
+    language_code: Optional[str] = None
+
+
 class CourseInterface(EntityInterface):
     create = CourseCreate
     get = CourseGet
