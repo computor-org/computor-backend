@@ -70,7 +70,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-accent-wash via-white to-accent-wash">
       {/* Header */}
       <header className="border-b bg-surface/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -88,7 +88,7 @@ export default function Home() {
               </Link>
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 bg-surface text-danger-text border-2 border-red-600 rounded-lg hover:bg-danger-wash transition-colors font-medium"
+                className="px-4 py-2 bg-surface text-danger-text border-2 border-danger rounded-lg hover:bg-danger-wash transition-colors font-medium"
               >
                 Sign Out
               </button>

@@ -178,7 +178,7 @@ export default function WorkspacesPage() {
           <span className="inline-flex items-center gap-1.5">
             <span
               className={`h-2 w-2 rounded-full ${
-                health === null ? 'bg-gray-300' : health.healthy ? 'bg-green-500' : 'bg-red-500'
+                health === null ? 'bg-faint' : health.healthy ? 'bg-success' : 'bg-danger'
               }`}
             />
             {health === null

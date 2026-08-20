@@ -23,12 +23,12 @@ const usersClient = new UsersClient();
 
 // Readable label per claim_value prefix
 const CLAIM_COLORS: Record<string, string> = {
-  user: 'bg-purple-100 text-purple-800',
-  account: 'bg-indigo-100 text-indigo-800',
+  user: 'bg-sunken text-body',
+  account: 'bg-sunken text-body',
   role: 'bg-danger-wash text-danger-text',
   user_role: 'bg-danger-wash text-danger-text',
   role_claim: 'bg-danger-wash text-danger-text',
-  workspace: 'bg-teal-100 text-teal-800',
+  workspace: 'bg-sunken text-body',
   course: 'bg-accent-wash text-accent-text',
   organization: 'bg-warn-wash text-warn-text',
   course_family: 'bg-warn-wash text-warn-text',
@@ -52,7 +52,7 @@ function ClaimChip({ claim }: { claim: RoleClaimList }) {
 
 function RoleBadge({ role }: { role: RoleList | RoleGet }) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${role.builtin ? 'bg-slate-200 text-slate-700' : 'bg-success-wash text-success-text'}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${role.builtin ? 'bg-sunken text-body' : 'bg-success-wash text-success-text'}`}>
       {role.id}
     </span>
   );

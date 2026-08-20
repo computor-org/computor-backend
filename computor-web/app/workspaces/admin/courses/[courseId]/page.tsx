@@ -190,7 +190,7 @@ function CourseWorkspaceConfigContent() {
                       onClick={() => toggle(item.name)}
                       className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-colors ${
                         checked
-                          ? 'border-accent ring-1 ring-blue-600 bg-accent-wash/50'
+                          ? 'border-accent ring-1 ring-accent bg-accent-wash/50'
                           : 'border-rule bg-surface hover:border-rule-strong'
                       }`}
                     >

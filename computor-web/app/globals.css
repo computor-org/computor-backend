@@ -66,6 +66,14 @@
   --c-success-text: #15803d;   /* green-700 */
   --c-success-wash: #f0fdf4;   /* green-50 */
   --c-success-line: #bbf7d0;   /* green-200 */
+  --c-success: #16a34a;        /* green-600 — a confirming action's fill */
+  --c-success-hover: #15803d;  /* green-700 */
+
+  /* A surface that inverts against the page — the "copied to clipboard" pill,
+     a code block header. Named rather than bg-gray-900 so it flips with the
+     theme instead of staying dark on a dark page. */
+  --c-inverse: #111827;
+  --c-inverse-hover: #1f2937;
 
   color-scheme: light;
   /* Recolors every native checkbox, radio and range to the brand blue that
@@ -110,6 +118,10 @@
   --color-success-text: var(--c-success-text);
   --color-success-wash: var(--c-success-wash);
   --color-success-line: var(--c-success-line);
+  --color-success: var(--c-success);
+  --color-success-hover: var(--c-success-hover);
+  --color-inverse: var(--c-inverse);
+  --color-inverse-hover: var(--c-inverse-hover);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);

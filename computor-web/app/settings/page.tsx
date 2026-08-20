@@ -196,7 +196,7 @@ export default function SettingsPage() {
               </div>
 
               {createdToken && (
-                <div className="mb-5 rounded-lg border border-green-300 bg-success-wash p-4">
+                <div className="mb-5 rounded-lg border border-success-line bg-success-wash p-4">
                   <p className="text-sm font-medium text-success-text">Token created — copy it now. You won’t be able to see it again.</p>
                   <div className="mt-2 flex items-center gap-2">
                     <code className="flex-1 font-mono text-xs bg-surface border border-success-line rounded px-2 py-1.5 break-all">{createdToken.token}</code>
@@ -205,7 +205,7 @@ export default function SettingsPage() {
                         navigator.clipboard?.writeText(createdToken.token);
                         setCopied(true);
                       }}
-                      className="px-3 py-1.5 text-xs font-medium bg-green-600 text-on-accent rounded hover:bg-green-700 whitespace-nowrap"
+                      className="px-3 py-1.5 text-xs font-medium bg-success text-on-accent rounded hover:bg-success-hover whitespace-nowrap"
                     >
                       {copied ? 'Copied' : 'Copy'}
                     </button>
@@ -363,7 +363,7 @@ export default function SettingsPage() {
                           <button
                             onClick={handleWithdraw}
                             disabled={withdrawing}
-                            className="px-4 py-2 rounded-lg bg-danger text-on-accent hover:bg-danger-hover disabled:bg-gray-300 text-sm font-medium"
+                            className="px-4 py-2 rounded-lg bg-danger text-on-accent hover:bg-danger-hover disabled:bg-faint text-sm font-medium"
                           >
                             {withdrawing ? 'Withdrawing…' : 'Yes, withdraw'}
                           </button>

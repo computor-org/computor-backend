@@ -427,7 +427,7 @@ export default function UpdatesPage() {
                         </p>
                         <button
                           onClick={() => window.location.reload()}
-                          className="px-3 py-1.5 text-sm font-medium text-on-accent bg-green-600 rounded-lg hover:bg-green-700 transition-colors shrink-0"
+                          className="px-3 py-1.5 text-sm font-medium text-on-accent bg-success rounded-lg hover:bg-success-hover transition-colors shrink-0"
                         >
                           Reload page
                         </button>

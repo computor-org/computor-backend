@@ -16,8 +16,8 @@ export type ProgressTone = 'blue' | 'green' | 'red' | 'amber' | 'gray';
 
 const FILL_CLS: Record<ProgressTone, string> = {
   blue: 'bg-blue-500',
-  green: 'bg-green-500',
-  red: 'bg-red-500',
+  green: 'bg-success',
+  red: 'bg-danger',
   amber: 'bg-amber-500',
   gray: 'bg-gray-400',
 };

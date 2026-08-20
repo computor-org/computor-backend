@@ -69,7 +69,7 @@ export default function NotificationsPage() {
               return (
                 <div
                   key={m.id}
-                  className={`bg-surface border border-rule border-l-4 ${levelAccent(m.level)} rounded-lg p-4 ${isNew ? 'ring-1 ring-blue-100' : ''}`}
+                  className={`bg-surface border border-rule border-l-4 ${levelAccent(m.level)} rounded-lg p-4 ${isNew ? 'ring-1 ring-accent-line' : ''}`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">

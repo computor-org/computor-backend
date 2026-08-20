@@ -46,7 +46,7 @@ export default function AuthSuccessPage() {
         {error ? (
           <>
             <p className="text-danger-text font-medium mb-3">{error}</p>
-            <a href="/login" className="px-4 py-2 bg-gray-900 text-on-accent rounded hover:bg-gray-800 inline-block">
+            <a href="/login" className="px-4 py-2 bg-inverse text-on-accent rounded hover:bg-inverse-hover inline-block">
               Back to login
             </a>
           </>

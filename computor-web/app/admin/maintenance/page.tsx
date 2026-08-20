@@ -210,7 +210,7 @@ export default function MaintenancePage() {
                   <button
                     onClick={() => setShowDeactivateConfirm(true)}
                     disabled={deactivating}
-                    className="px-4 py-2 text-sm font-medium text-on-accent bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                    className="px-4 py-2 text-sm font-medium text-on-accent bg-success rounded-lg hover:bg-success-hover disabled:opacity-50 transition-colors"
                   >
                     {deactivating ? 'Deactivating...' : 'Deactivate Maintenance'}
                   </button>

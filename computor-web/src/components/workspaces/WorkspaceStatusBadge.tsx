@@ -41,10 +41,10 @@ const categoryColor: Record<StatusCategory, BadgeColor> = {
 };
 
 const categoryDots: Record<StatusCategory, string> = {
-  running: 'bg-green-500',
+  running: 'bg-success',
   stopped: 'bg-gray-400',
   pending: 'bg-yellow-500 animate-pulse',
-  failed: 'bg-red-500',
+  failed: 'bg-danger',
   unknown: 'bg-gray-400',
 };
 

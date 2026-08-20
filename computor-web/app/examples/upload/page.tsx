@@ -189,7 +189,7 @@ function UploadInner() {
                         value={r.directory}
                         disabled={uploading || r.status === 'ok'}
                         onChange={(e) => setRows((rs) => rs.map((x, idx) => (idx === i ? { ...x, directory: e.target.value } : x)))}
-                        className={`flex-1 px-2 py-1 border rounded text-sm font-mono ${DIR_OK.test(r.directory) ? 'border-rule-strong' : 'border-red-400'}`}
+                        className={`flex-1 px-2 py-1 border rounded text-sm font-mono ${DIR_OK.test(r.directory) ? 'border-rule-strong' : 'border-danger-line'}`}
                       />
                       <span className="text-xs text-subtle shrink-0">{r.fileCount} files</span>
                       <span

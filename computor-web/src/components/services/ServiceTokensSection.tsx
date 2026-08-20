@@ -109,7 +109,7 @@ export default function ServiceTokensSection({
         )}
 
         {createdToken && (
-          <div className="mb-5 rounded-lg border border-green-300 bg-success-wash p-4">
+          <div className="mb-5 rounded-lg border border-success-line bg-success-wash p-4">
             <p className="text-sm font-medium text-success-text">
               Token created — copy it now. You won’t be able to see it again.
             </p>
@@ -122,7 +122,7 @@ export default function ServiceTokensSection({
                   navigator.clipboard?.writeText(createdToken.token);
                   setCopied(true);
                 }}
-                className="px-3 py-1.5 text-xs font-medium bg-green-600 text-on-accent rounded hover:bg-green-700 whitespace-nowrap"
+                className="px-3 py-1.5 text-xs font-medium bg-success text-on-accent rounded hover:bg-success-hover whitespace-nowrap"
               >
                 {copied ? 'Copied' : 'Copy'}
               </button>

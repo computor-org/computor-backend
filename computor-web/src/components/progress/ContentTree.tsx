@@ -10,10 +10,10 @@ interface ContentTreeProps {
 
 function statusColor(status: string | null | undefined): string {
   switch (status) {
-    case 'corrected': return 'bg-green-500';
-    case 'correction_necessary': return 'bg-red-500';
+    case 'corrected': return 'bg-success';
+    case 'correction_necessary': return 'bg-danger';
     case 'improvement_possible': return 'bg-amber-500';
-    default: return 'bg-gray-300';
+    default: return 'bg-faint';
   }
 }
 

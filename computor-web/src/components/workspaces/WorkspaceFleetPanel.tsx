@@ -196,7 +196,7 @@ export default function WorkspaceFleetPanel() {
         <span className="inline-flex items-center gap-1.5">
           <span
             className={`h-2 w-2 rounded-full ${
-              data === null ? 'bg-gray-300' : data.fleet.healthy ? 'bg-green-500' : 'bg-red-500'
+              data === null ? 'bg-faint' : data.fleet.healthy ? 'bg-success' : 'bg-danger'
             }`}
           />
           {data === null

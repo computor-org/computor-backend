@@ -83,7 +83,7 @@ export default function TemplatePicker({
             onClick={() => onChange(t.name)}
             className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-line focus-visible:ring-offset-2 ${
               selected
-                ? 'border-accent ring-1 ring-blue-600 bg-accent-wash/50'
+                ? 'border-accent ring-1 ring-accent bg-accent-wash/50'
                 : 'border-rule bg-surface hover:border-rule-strong'
             }`}
           >

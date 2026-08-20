@@ -168,7 +168,7 @@ export default function ConsentPage() {
             submissions. The details are described in the privacy notice below.
           </p>
           <div className="bg-accent-wash border border-accent-line rounded-lg p-4">
-            <p className="text-sm text-blue-900">
+            <p className="text-sm text-accent-text">
               <span className="font-semibold">Cookies:</span> this platform only uses strictly
               necessary cookies for authentication (single sign-on session). These are required
               for the platform to function and do not need your consent; they are listed here for
@@ -231,7 +231,7 @@ export default function ConsentPage() {
               <button
                 onClick={handleSubmit}
                 disabled={!accepted || submitting}
-                className="px-6 py-2 rounded-lg font-medium bg-accent text-on-accent hover:bg-accent-hover disabled:bg-gray-300 disabled:cursor-not-allowed"
+                className="px-6 py-2 rounded-lg font-medium bg-accent text-on-accent hover:bg-accent-hover disabled:bg-faint disabled:cursor-not-allowed"
               >
                 {submitting ? 'Saving...' : 'Agree and continue'}
               </button>

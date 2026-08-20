@@ -40,7 +40,7 @@ export default function TemplateIcon({
   }
   if (hint.includes('terminal') || hint.includes('bash')) {
     return (
-      <div className={`${pad} bg-gray-800 rounded-lg shrink-0`}>
+      <div className={`${pad} bg-inverse-hover rounded-lg shrink-0`}>
         <svg className={`${dim} text-green-400`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M4 5a2 2 0 012-2h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V5z" />
         </svg>
