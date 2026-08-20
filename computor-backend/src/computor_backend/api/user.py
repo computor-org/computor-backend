@@ -18,12 +18,19 @@ from computor_types.course_git import (
     StudentRepositoryProvisioned,
     TemplateAccessGet,
 )
-from computor_backend.permissions.auth import get_current_principal
+from computor_backend.permissions.auth import (
+    ApiTokenCredentials,
+    SSOAuthCredentials,
+    get_current_principal,
+    parse_authorization_header,
+)
 from computor_backend.permissions.principal import Principal
 import httpx
 from fastapi import APIRouter, Depends, Response
 
-from computor_backend.exceptions import ServiceUnavailableException
+from computor_backend.exceptions import RateLimitException, ServiceUnavailableException
+from computor_backend.redis_cache import get_redis_client
+from computor_types.course_members import CourseMemberGet
 
 # Import business logic
 from computor_backend.business_logic.users import (
@@ -35,6 +42,9 @@ from computor_backend.business_logic.users import (
 from computor_backend.business_logic.course_accounts import (
     validate_user_course,
     register_user_course_account,
+)
+from computor_backend.business_logic.course_registration import (
+    register_in_public_course,
 )
 from computor_backend.business_logic.course_git import (
     get_course_git_descriptor,
@@ -324,3 +334,112 @@ async def register_current_user_course_account(
         permissions=permissions,
         db=db,
     )
+
+
+# Fixed window, per user, across ALL courses rather than per course: one
+# registration provisions a SubmissionGroup per submittable content in the
+# course, so the expensive case is a script walking the catalog, not repeated
+# attempts at a single course.
+REGISTRATION_LIMIT = 10
+REGISTRATION_WINDOW = 3600
+
+
+async def check_registration_rate_limit(user_id: str, cache) -> bool:
+    """True once the user has spent their self-registration budget.
+
+    Same shape as check_template_download_rate_limit in api/courses.py. Fails
+    open: this bounds casual and accidental abuse, it is not a security
+    control.
+    """
+    key = f"rate_limit:course_registration:{user_id}"
+    try:
+        count = await cache.incr(key)
+        if count == 1:
+            await cache.expire(key, REGISTRATION_WINDOW)
+        return count > REGISTRATION_LIMIT
+    except Exception as e:
+        logger.error(f"Course registration rate limit check failed: {e}")
+        return False
+
+
+@user_router.post(
+    "/courses/{course_id}/enroll",
+    response_model=CourseMemberGet,
+    status_code=201,
+    summary="Enrol yourself as a student in a public course",
+)
+async def enroll_in_public_course(
+    course_id: UUID | str,
+    response: Response,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    credentials: Annotated[
+        SSOAuthCredentials | ApiTokenCredentials,
+        Depends(parse_authorization_header),
+    ],
+    db: Session = Depends(get_db),
+    cache=Depends(get_redis_client),
+):
+    """Create your own ``_student`` membership in a public course.
+
+    Named ``enroll`` rather than ``register`` because ``POST
+    /user/courses/{course_id}/register`` above already means "register your git
+    provider account for this course" — two unrelated meanings one letter apart
+    would be a trap.
+
+    The request has no body. The role is not a parameter: self-registration can
+    only ever produce ``_student``, in the course's first existing group (or a
+    ``default`` group created for the purpose). Idempotent — an existing
+    membership of any role comes back unchanged with a 200, so a lecturer who
+    clicks Enrol is not demoted. There is no matching DELETE; course staff
+    remove members.
+
+    404 when the course does not exist *or* is not public: a private course
+    must not be distinguishable from a missing one.
+    """
+    user_id = permissions.get_user_id_or_throw()
+    if await check_registration_rate_limit(str(user_id), cache):
+        raise RateLimitException(
+            error_code="RATE_001",
+            detail="Too many course registrations. Please wait before trying again.",
+            retry_after=REGISTRATION_WINDOW,
+            context={
+                "limit": REGISTRATION_LIMIT,
+                "window_seconds": REGISTRATION_WINDOW,
+            },
+        )
+
+    member, created = await register_in_public_course(course_id, permissions, db)
+
+    if not created:
+        response.status_code = 200
+        return CourseMemberGet.model_validate(member, from_attributes=True)
+
+    # A fresh membership must be visible to the caller NOW. Three caches would
+    # otherwise hide it: the per-token Principal (AUTH_CACHE_TTL = 900 s), which
+    # backs GET /user/scopes and therefore all client-side gating; the user's
+    # course-membership permission cache; and the role-aware dashboard views.
+    await _invalidate_after_enrollment(member, credentials, cache)
+
+    return CourseMemberGet.model_validate(member, from_attributes=True)
+
+
+async def _invalidate_after_enrollment(member, credentials, cache) -> None:
+    """Best-effort cache busting; a stale cache must never fail a good write."""
+    try:
+        from computor_backend.business_logic.auth import (
+            invalidate_principal_cache_for_token,
+        )
+        from computor_backend.business_logic.messages import invalidate_course_dashboards
+        from computor_backend.permissions.cache import (
+            invalidate_user_course_memberships_sync,
+        )
+        from computor_backend.redis_cache import get_cache
+
+        await invalidate_principal_cache_for_token(credentials.token, cache)
+        invalidate_user_course_memberships_sync(str(member.user_id))
+
+        view_cache = get_cache()
+        invalidate_course_dashboards(member.course_id, view_cache)
+        view_cache.invalidate_user_views(user_id=str(member.user_id))
+    except Exception as e:
+        logger.warning(f"Cache invalidation after course enrollment failed: {e}")

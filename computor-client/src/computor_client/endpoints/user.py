@@ -20,6 +20,7 @@ from computor_types.course_member_accounts import (
     CourseMemberReadinessStatus,
     CourseMemberValidationRequest,
 )
+from computor_types.course_members import CourseMemberGet
 from computor_types.users import (
     UserGet,
     UserScopes,
@@ -44,6 +45,15 @@ class UserClient:
         """Get Current User Endpoint"""
         response = await self._http.get("/user", params=kwargs)
         return UserGet.model_validate(response.json())
+
+    async def courses_enroll(
+        self,
+        course_id: str,
+        **kwargs: Any,
+    ) -> CourseMemberGet:
+        """Enrol yourself as a student in a public course"""
+        response = await self._http.post(f"/user/courses/{quote_path(course_id)}/enroll", params=kwargs)
+        return CourseMemberGet.model_validate(response.json())
 
     async def get_courses_git(
         self,

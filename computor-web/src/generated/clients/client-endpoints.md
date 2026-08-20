@@ -709,6 +709,7 @@
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
 | `getCurrentUserEndpointUserGet` | GET | `/user` | — | `UserGet` |
+| `enrollInPublicCourseUserCoursesCourseIdEnrollPost` | POST | `/user/courses/{course_id}/enroll` | — | `CourseMemberGet` |
 | `getCourseGitDescriptorEndpointUserCoursesCourseIdGitGet` | GET | `/user/courses/{course_id}/git` | — | `CourseGitDescriptor` |
 | `provisionStudentRepositoryEndpointUserCoursesCourseIdProvisionRepositoryPost` | POST | `/user/courses/{course_id}/provision-repository` | — | `StudentRepositoryProvisioned` |
 | `registerCurrentUserCourseAccountUserCoursesCourseIdRegisterPost` | POST | `/user/courses/{course_id}/register` | `CourseMemberProviderAccountUpdate` | `CourseMemberReadinessStatus` |
