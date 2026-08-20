@@ -161,7 +161,6 @@ export const getViewNavigation = (courseId: string): NavItem[] => [
       { id: 'lecturer-assignments', label: 'Assignments', path: `/courses/${courseId}/lecturer/assignments` },
       { id: 'lecturer-templates', label: 'Templates', path: `/courses/${courseId}/lecturer/templates` },
       { id: 'lecturer-workspaces', label: 'Workspaces', path: `/courses/${courseId}/lecturer/workspaces` },
-      { id: 'lecturer-settings', label: 'Settings', path: `/courses/${courseId}/lecturer/settings` },
     ],
   },
 ];

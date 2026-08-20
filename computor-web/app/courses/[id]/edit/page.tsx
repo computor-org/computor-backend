@@ -14,6 +14,7 @@ import Forbidden from '@/src/components/Forbidden';
 import { Field } from '@/src/components/FormPanel';
 import { inputCls, readOnlyInputCls } from '@/src/components/ui/tokens';
 import SectionCard, { SectionHint, SectionStatus } from '@/src/components/SectionCard';
+import PublicCourseField from '@/src/components/courses/PublicCourseField';
 import DescriptionList from '@/src/components/DescriptionList';
 import Button from '@/src/components/ui/Button';
 import Badge from '@/src/components/Badge';
@@ -42,8 +43,16 @@ const MODE_LABELS: Record<string, string> = {
 export default function CourseEditPage() {
   const courseId = useParams().id as string;
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  // The git binding is registry-backed (manager-only).
-  const { canManageHierarchy: canManage } = usePermissions();
+  const { canManageHierarchy: canManage, courseHasAtLeast } = usePermissions();
+  // Course staff reach this page too, not only the org hierarchy: the backend
+  // behind it is the _lecturer cohort (Course.update, and api/course_git.py's
+  // "lecturer cohort only"), so gating the page on admin/_organization_manager
+  // locked lecturers out of their own course's settings.
+  const canEdit = canManage || courseHasAtLeast(courseId, '_lecturer');
+  // Opening a course for self-registration is held one rung higher — it
+  // advertises the course to every account on the deployment. Mirrors the
+  // backend guard in interfaces/course.py.
+  const canSetPublic = canManage || courseHasAtLeast(courseId, '_maintainer');
 
   const [course, setCourse] = useState<CourseGet | null>(null);
   const [binding, setBinding] = useState<CourseGitBindingGet | null>(null);
@@ -55,6 +64,7 @@ export default function CourseEditPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [language, setLanguage] = useState('');
+  const [isPublic, setIsPublic] = useState(false);
   // Course-wide budget defaults. Held as strings so an empty field can mean
   // "unlimited" rather than collapsing to 0.
   const [maxTestRuns, setMaxTestRuns] = useState('');
@@ -86,6 +96,7 @@ export default function CourseEditPage() {
       setTitle(c.title || '');
       setDescription(c.description || '');
       setLanguage(c.language_code || '');
+      setIsPublic(c.public ?? false);
       setMaxTestRuns(c.max_test_runs != null ? String(c.max_test_runs) : '');
       setMaxSubmissions(c.max_submissions != null ? String(c.max_submissions) : '');
       setVisible(c.visible ?? null);
@@ -117,9 +128,9 @@ export default function CourseEditPage() {
   }, [courseId]);
 
   useEffect(() => {
-    if (authLoading || !isAuthenticated || !canManage) return;
+    if (authLoading || !isAuthenticated || !canEdit) return;
     load();
-  }, [authLoading, isAuthenticated, canManage, load]);
+  }, [authLoading, isAuthenticated, canEdit, load]);
 
   async function saveGeneral() {
     setSavingGeneral(true);
@@ -131,6 +142,10 @@ export default function CourseEditPage() {
           title: title.trim() || null,
           description: description.trim() || null,
           language_code: language.trim() || null,
+          // Only sent when the caller may change it: the backend guard keys on
+          // the field being present at all, so a lecturer including it — even
+          // unchanged — would have their whole save rejected.
+          ...(canSetPublic ? { public: isPublic } : {}),
           max_test_runs: parseLimit(maxTestRuns),
           max_submissions: parseLimit(maxSubmissions),
           visible,
@@ -176,7 +191,7 @@ export default function CourseEditPage() {
     }
   }
 
-  if (!authLoading && isAuthenticated && !canManage) {
+  if (!authLoading && isAuthenticated && !canEdit) {
     return <Forbidden message="You do not have access to this course's settings." backLink={`/courses/${courseId}`} backText="Back to course" />;
   }
 
@@ -259,6 +274,20 @@ export default function CourseEditPage() {
                     onChange={setVisible}
                   />
                 </Field>
+                <Field
+                  label="Self-registration"
+                  hint={
+                    canSetPublic
+                      ? 'Independent of student visibility above: that hides course content from members, this decides who may become one.'
+                      : 'Only a course maintainer or owner can change this — listing a course advertises it to every account on this deployment.'
+                  }
+                >
+                  <PublicCourseField
+                    value={isPublic}
+                    onChange={setIsPublic}
+                    disabled={!canSetPublic}
+                  />
+                </Field>
                 <div className="flex items-center gap-3">
                   <Button onClick={saveGeneral} loading={savingGeneral} loadingLabel="Saving…">
                     Save
@@ -299,6 +328,12 @@ export default function CourseEditPage() {
                   <>
                     {!gitConfigured && (
                       <SectionHint>This course has no git configuration yet. Configure it to enable student repositories.</SectionHint>
+                    )}
+                    {!canManage && servers.length === 0 && (
+                      <SectionHint>
+                        The list of git servers is managed centrally, so it is empty here. Ask an
+                        administrator to pick the server for this course.
+                      </SectionHint>
                     )}
                     <Field label="Delivery">
                       <select value={delivery} onChange={(e) => setDelivery(e.target.value as 'git' | 'download')} className={inputCls}>
