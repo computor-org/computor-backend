@@ -142,6 +142,10 @@ class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'course'
     __table_args__ = (
         Index('course_path_key', 'course_family_id', 'path', unique=True),
+        # Serves GET /courses/public: the predicate is the most selective one
+        # on the table and `title` is that endpoint's ORDER BY. Partial, so
+        # only the handful of public rows are ever indexed.
+        Index('ix_course_public_title', 'title', postgresql_where=text('public')),
     )
 
     properties = Column(JSONB)
