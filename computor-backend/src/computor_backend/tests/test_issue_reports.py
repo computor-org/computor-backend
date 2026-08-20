@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from computor_backend.permissions.principal import Principal
-from computor_backend.services import issue_reports
+from computor_backend.issue_reports import service as issue_reports
 from computor_types.issue_reports import IssueReportCreate
 
 

@@ -12,14 +12,14 @@ import httpx
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
+from computor_backend.issue_reports.config import IssueReportSettings, get_issue_report_settings
+from computor_backend.issue_reports.health import mark_unhealthy
 from computor_backend.model.auth import User
 from computor_backend.permissions.principal import Principal
-from computor_backend.settings import settings
 from computor_types.issue_reports import IssueReportCreate, IssueReportCreated
 
 logger = logging.getLogger(__name__)
 
-_REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _SENSITIVE_KEY_RE = re.compile(
     r"(?:token|secret|password|authorization|cookie|credential|private[_-]?key)",
     re.IGNORECASE,
@@ -56,20 +56,19 @@ def _redact(value: Any, depth: int = 0) -> Any:
     return value
 
 
-def _require_configuration() -> tuple[str, str, str, str, list[str]]:
-    if not settings.GITHUB_ISSUE_REPORT_ENABLED or not settings.GITHUB_ISSUE_REPORT_TOKEN:
-        raise IssueReportNotConfigured("GitHub issue reporting is not enabled")
-    repository = settings.GITHUB_ISSUE_REPORT_REPOSITORY.strip()
-    if not _REPOSITORY_RE.fullmatch(repository):
-        raise IssueReportNotConfigured("GITHUB_ISSUE_REPORT_REPOSITORY must be owner/name")
-    labels = [label.strip() for label in settings.GITHUB_ISSUE_REPORT_LABELS.split(",") if label.strip()]
-    return (
-        settings.GITHUB_ISSUE_REPORT_API_URL,
-        repository,
-        settings.GITHUB_ISSUE_REPORT_BRANCH.strip() or "main",
-        settings.GITHUB_ISSUE_REPORT_TOKEN,
-        labels,
-    )
+def _require_configuration() -> IssueReportSettings:
+    """The configuration a server-side submission needs.
+
+    A token is what makes submitting on the user's behalf possible at all —
+    GitHub has no anonymous issue creation — so its absence means this
+    deployment does not submit reports, whatever else is set.
+    """
+    settings = get_issue_report_settings()
+    if not settings.configured:
+        raise IssueReportNotConfigured("GitHub issue reporting is not configured")
+    if not settings.has_token:
+        raise IssueReportNotConfigured("GITHUB_ISSUE_REPORT_TOKEN is not set")
+    return settings
 
 
 def _github_headers(token: str) -> dict[str, str]:
@@ -91,10 +90,7 @@ def _error_detail(response: httpx.Response) -> str:
 
 async def _upload_screenshot(
     client: httpx.AsyncClient,
-    api_url: str,
-    repository: str,
-    branch: str,
-    token: str,
+    settings: IssueReportSettings,
     report_id: str,
     screenshot: UploadFile,
 ) -> str:
@@ -102,19 +98,22 @@ async def _upload_screenshot(
     if extension is None:
         raise IssueReportSubmissionError("Screenshot must be PNG, JPEG, GIF, or WebP")
 
-    contents = await screenshot.read(settings.GITHUB_ISSUE_REPORT_MAX_SCREENSHOT_BYTES + 1)
-    if len(contents) > settings.GITHUB_ISSUE_REPORT_MAX_SCREENSHOT_BYTES:
+    contents = await screenshot.read(settings.max_screenshot_bytes + 1)
+    if len(contents) > settings.max_screenshot_bytes:
         raise IssueReportSubmissionError("Screenshot is larger than the configured upload limit")
 
     path = f"issue-reports/{report_id}/screenshot{extension}"
-    endpoint = f"{api_url}/repos/{repository}/contents/{quote(path, safe='/')}"
+    endpoint = (
+        f"{settings.api_base}/repos/{settings.reference.full_name}"
+        f"/contents/{quote(path, safe='/')}"
+    )
     response = await client.put(
         endpoint,
-        headers=_github_headers(token),
+        headers=_github_headers(settings.token.strip()),
         json={
             "message": f"Add screenshot for user report {report_id}",
             "content": base64.b64encode(contents).decode("ascii"),
-            "branch": branch,
+            "branch": settings.branch.strip() or "main",
         },
     )
     if response.status_code not in (200, 201):
@@ -177,28 +176,32 @@ async def submit_issue_report(
     screenshot: UploadFile | None = None,
 ) -> IssueReportCreated:
     """Create one GitHub issue and optionally store its screenshot in GitHub."""
-    api_url, repository, branch, token, labels = _require_configuration()
+    settings = _require_configuration()
+    token = settings.token.strip()
     report_id = str(uuid4())
     user = db.get(User, principal.user_id) if principal.user_id else None
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         screenshot_url = None
         if screenshot is not None:
-            screenshot_url = await _upload_screenshot(
-                client, api_url, repository, branch, token, report_id, screenshot
-            )
+            screenshot_url = await _upload_screenshot(client, settings, report_id, screenshot)
 
         response = await client.post(
-            f"{api_url}/repos/{repository}/issues",
+            f"{settings.api_base}/repos/{settings.reference.full_name}/issues",
             headers=_github_headers(token),
             json={
                 "title": _issue_title(payload),
                 "body": _issue_body(payload, principal, user, screenshot_url),
-                "labels": labels,
+                "labels": settings.label_list,
             },
         )
         if response.status_code not in (200, 201):
             logger.warning("GitHub issue creation failed with status %s", response.status_code)
+            # A token revoked or a repository moved after startup looks exactly
+            # like a broken configuration; stop the feature rather than failing
+            # every report individually until the next restart.
+            if response.status_code in (401, 403, 404):
+                mark_unhealthy(f"GitHub rejected a submission with HTTP {response.status_code}")
             raise IssueReportSubmissionError(
                 f"GitHub rejected the issue ({response.status_code}): {_error_detail(response)}"
             )

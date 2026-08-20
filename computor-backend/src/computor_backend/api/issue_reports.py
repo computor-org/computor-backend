@@ -12,7 +12,7 @@ from computor_backend.database import get_db
 from computor_backend.exceptions import BadRequestException, ServiceUnavailableException
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
-from computor_backend.services.issue_reports import (
+from computor_backend.issue_reports.service import (
     IssueReportNotConfigured,
     IssueReportSubmissionError,
     submit_issue_report,
