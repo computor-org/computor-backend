@@ -3,8 +3,8 @@
 import base64
 import json
 import os
+import uuid
 from contextlib import contextmanager
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -34,6 +34,35 @@ def configured(**overrides):
         finally:
             issue_config.get_issue_report_settings.cache_clear()
             issue_health.reset_health()
+
+
+class _Session:
+    """Session stand-in that records the issue_report row the service writes.
+
+    Only the four calls the service makes; ``refresh`` stands in for the
+    ``uuid_generate_v4()`` server default, which needs a real database.
+    """
+
+    def __init__(self):
+        self.added: list = []
+
+    def add(self, obj):
+        self.added.append(obj)
+
+    def commit(self):
+        return None
+
+    def refresh(self, obj):
+        if getattr(obj, "id", None) is None:
+            obj.id = uuid.uuid4()
+
+    def get(self, model, key):
+        return None
+
+    @property
+    def report(self):
+        assert len(self.added) == 1, f"expected one issue_report row, got {len(self.added)}"
+        return self.added[0]
 
 
 class _Response:
@@ -93,10 +122,11 @@ async def test_submit_issue_report_creates_issue_and_redacts_context():
         "AsyncClient",
         lambda **kwargs: _GitHubClient(calls),
     ):
+        session = _Session()
         result = await issue_reports.submit_issue_report(
             payload,
             Principal(user_id="user-1"),
-            SimpleNamespace(get=lambda model, user_id: SimpleNamespace(email="tester@example.org")),
+            session,
             _Screenshot(),
         )
 
@@ -129,7 +159,7 @@ async def test_submit_issue_report_rejects_non_image_before_github_call():
         await issue_reports.submit_issue_report(
             IssueReportCreate(description="bad attachment"),
             Principal(user_id="user-1"),
-            SimpleNamespace(get=lambda model, user_id: None),
+            _Session(),
             _TextFile(),
         )
 
@@ -327,7 +357,7 @@ async def test_a_public_tracker_may_be_linked_back_to_the_reporter():
             result = await issue_reports.submit_issue_report(
                 IssueReportCreate(description="something broke"),
                 Principal(user_id="user-1"),
-                SimpleNamespace(get=lambda model, user_id: None),
+                _Session(),
             )
 
     assert str(result.issue_url) == "https://github.com/computor-org/issues/issues/123"
@@ -347,7 +377,7 @@ async def test_a_revoked_token_disables_the_feature_instead_of_failing_every_rep
         await issue_reports.submit_issue_report(
             IssueReportCreate(description="something broke"),
             Principal(user_id="user-1"),
-            SimpleNamespace(get=lambda model, user_id: None),
+            _Session(),
         )
 
     assert not issue_health.current_health().available
@@ -373,7 +403,7 @@ def _client(cache=None):
     register_exception_handlers(app)
     app.include_router(issue_api.router, prefix="/issue-reports")
     app.dependency_overrides[get_current_principal] = lambda: Principal(user_id="user-1")
-    app.dependency_overrides[get_db] = lambda: SimpleNamespace(get=lambda model, user_id: None)
+    app.dependency_overrides[get_db] = lambda: _Session()
     app.dependency_overrides[get_redis_client] = lambda: cache or _Cache()
     return TestClient(app, raise_server_exceptions=False)
 
@@ -443,3 +473,75 @@ def test_rate_limit_can_be_switched_off():
         client = _client()
         assert client.post("/issue-reports", data={"description": "one"}).status_code == 201
         assert client.post("/issue-reports", data={"description": "two"}).status_code == 201
+
+
+# ---------------------------------------------------------------------------
+# The issue names nobody; the database holds the join
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_the_issue_body_never_identifies_the_reporter():
+    calls: list[dict] = []
+    session = _Session()
+    with configured(), patch.object(
+        issue_reports.httpx, "AsyncClient", lambda **kwargs: _GitHubClient(calls)
+    ):
+        result = await issue_reports.submit_issue_report(
+            IssueReportCreate(
+                description="something broke",
+                context={"email": "tester@example.org", "route": "/courses"},
+            ),
+            Principal(user_id="1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed"),
+            session,
+        )
+
+    body = calls[-1]["json"]["body"]
+    assert "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed" not in body
+    assert "tester@example.org" not in body
+    # The report id is the only handle a maintainer gets.
+    assert result.report_id in body
+
+
+@pytest.mark.asyncio
+async def test_the_report_row_records_the_reporter_and_the_issue():
+    calls: list[dict] = []
+    session = _Session()
+    with configured(), patch.object(
+        issue_reports.httpx, "AsyncClient", lambda **kwargs: _GitHubClient(calls)
+    ):
+        result = await issue_reports.submit_issue_report(
+            IssueReportCreate(description="something broke"),
+            Principal(user_id="1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed"),
+            session,
+        )
+
+    row = session.report
+    assert str(row.id) == result.report_id
+    assert row.user_id == "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed"
+    assert row.repository == "computor-org/issues"
+    assert row.issue_number == 123
+    assert row.issue_url == "https://github.com/computor-org/issues/issues/123"
+
+
+@pytest.mark.asyncio
+async def test_a_failed_submission_still_leaves_a_row():
+    """The row is written before GitHub is called, so the attempt is traceable."""
+
+    class _Rejecting(_GitHubClient):
+        async def post(self, url, headers=None, json=None):
+            return _Response({"message": "nope"}, 500)
+
+    session = _Session()
+    with configured(), patch.object(
+        issue_reports.httpx, "AsyncClient", lambda **kwargs: _Rejecting([])
+    ), pytest.raises(issue_reports.IssueReportSubmissionError):
+        await issue_reports.submit_issue_report(
+            IssueReportCreate(description="something broke"),
+            Principal(user_id="1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed"),
+            session,
+        )
+
+    row = session.report
+    assert row.issue_number is None
+    assert row.issue_url is None

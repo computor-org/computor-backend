@@ -14,14 +14,21 @@ from sqlalchemy.orm import Session
 
 from computor_backend.issue_reports.config import IssueReportSettings, get_issue_report_settings
 from computor_backend.issue_reports.health import current_health, mark_unhealthy
-from computor_backend.model.auth import User
+from computor_backend.model.issue_report import IssueReport
 from computor_backend.permissions.principal import Principal
 from computor_types.issue_reports import IssueReportCreate, IssueReportCreated
 
 logger = logging.getLogger(__name__)
 
+# Redacted out of the diagnostic context before it reaches the issue: secrets,
+# because they must not leave the deployment at all, and anything that names a
+# person, because the issue is deliberately unattributable and a client is free
+# to put whatever it likes in this blob. A key blacklist cannot be airtight —
+# what the user *writes*, and what their screenshot shows, stays their
+# responsibility, which is why the report form says so.
 _SENSITIVE_KEY_RE = re.compile(
-    r"(?:token|secret|password|authorization|cookie|credential|private[_-]?key)",
+    r"(?:token|secret|password|authorization|cookie|credential|private[_-]?key"
+    r"|e?mail|user|login|account|name|phone|address|\bip\b)",
     re.IGNORECASE,
 )
 _SCREENSHOT_TYPES = {
@@ -132,18 +139,21 @@ def _issue_title(payload: IssueReportCreate) -> str:
 
 def _issue_body(
     payload: IssueReportCreate,
-    principal: Principal,
-    user: User | None,
+    report_id: str,
     screenshot_url: str | None,
 ) -> str:
+    """Render the issue.
+
+    The reporter is deliberately absent. Anyone who can read the tracker would
+    otherwise learn which student filed which complaint, which is exactly the
+    exposure the backend-held token exists to prevent. The report id is the only
+    handle, and resolving it to a person needs an admin lookup against the
+    ``issue_report`` table.
+    """
     context = _redact(payload.context)
     context_json = json.dumps(context, indent=2, sort_keys=True, default=str)
     if len(context_json) > 16_000:
         context_json = f"{context_json[:16_000]}\n… [truncated]"
-
-    reporter = f"user_id `{principal.user_id or 'unknown'}`"
-    if user and user.email:
-        reporter += f" ({user.email})"
 
     lines = [
         "## Description",
@@ -160,12 +170,18 @@ def _issue_body(
         context_json,
         "```",
         "",
-        "## Reporter",
-        f"- {reporter}",
+        "## Report",
+        f"- id `{report_id}`",
     ]
     if screenshot_url:
         lines.extend(["", "## Screenshot", f"[Open screenshot]({screenshot_url})"])
-    lines.extend(["", "_Submitted through the Computor issue-reporting endpoint._"])
+    lines.extend(
+        [
+            "",
+            "_Submitted through the Computor issue-reporting endpoint. The reporter is "
+            "recorded in the deployment's database, not here._",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -175,11 +191,22 @@ async def submit_issue_report(
     db: Session,
     screenshot: UploadFile | None = None,
 ) -> IssueReportCreated:
-    """Create one GitHub issue and optionally store its screenshot in GitHub."""
+    """Create one GitHub issue and record who filed it, separately.
+
+    The ``issue_report`` row is written *before* GitHub is called so a failed
+    submission still leaves a trace, and updated with the issue's number and URL
+    once it exists. That row is the only place the reporter appears; the issue
+    itself names nobody.
+    """
     settings = _require_configuration()
     token = settings.token.strip()
-    report_id = str(uuid4())
-    user = db.get(User, principal.user_id) if principal.user_id else None
+    repository = settings.reference.full_name
+
+    record = IssueReport(user_id=principal.user_id or None, repository=repository)
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    report_id = str(record.id)
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         screenshot_url = None
@@ -187,11 +214,11 @@ async def submit_issue_report(
             screenshot_url = await _upload_screenshot(client, settings, report_id, screenshot)
 
         response = await client.post(
-            f"{settings.api_base}/repos/{settings.reference.full_name}/issues",
+            f"{settings.api_base}/repos/{repository}/issues",
             headers=_github_headers(token),
             json={
                 "title": _issue_title(payload),
-                "body": _issue_body(payload, principal, user, screenshot_url),
+                "body": _issue_body(payload, report_id, screenshot_url),
                 "labels": settings.label_list,
             },
         )
@@ -207,11 +234,17 @@ async def submit_issue_report(
             )
 
     issue = response.json()
+    issue_number = int(issue["number"])
+    issue_url = str(issue["html_url"])
+
+    record.issue_number = issue_number
+    record.issue_url = issue_url
+    db.commit()
+
     # Only a public tracker may be linked back to the reporter; a private one is
     # the maintainer board they are meant not to reach.
-    is_public = current_health().is_public
     return IssueReportCreated(
         report_id=report_id,
-        issue_number=int(issue["number"]),
-        issue_url=issue["html_url"] if is_public else None,
+        issue_number=issue_number,
+        issue_url=issue_url if current_health().is_public else None,
     )
