@@ -165,6 +165,14 @@ class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     # business_logic.content_visibility.
     visible = Column(Boolean)
 
+    # Listed in the authenticated catalog (GET /courses/public), where any
+    # signed-in user may enrol themselves as _student. NOT NULL with a false
+    # default rather than the nullable tri-state `visible` above: there is no
+    # parent to inherit from, so a third "unset" state would be
+    # indistinguishable from false and every query would need IS NOT TRUE.
+    # Same shape as CourseContent.is_submittable.
+    public = Column(Boolean, nullable=False, server_default=text("false"))
+
     # Relationships
     course_family = relationship('CourseFamily', back_populates='courses')
     organization = relationship('Organization', back_populates='courses')

@@ -41,6 +41,11 @@ class CourseCreate(BaseModel):
     # students. Unlike the budgets above this is a veto, not a fallback: a
     # course content cannot re-grant visibility the course denied.
     visible: Optional[bool] = None
+    # Listed in the self-registration catalog (GET /courses/public), where any
+    # signed-in user may enrol themselves as _student. The column is NOT NULL
+    # DEFAULT false; Optional here so an omitted key takes the server default
+    # and a partially-loaded row still validates.
+    public: Optional[bool] = None
 
 class CourseGet(BaseEntityGet,CourseCreate):
     id: str
@@ -61,6 +66,11 @@ class CourseGet(BaseEntityGet,CourseCreate):
     # students. Unlike the budgets above this is a veto, not a fallback: a
     # course content cannot re-grant visibility the course denied.
     visible: Optional[bool] = None
+    # Listed in the self-registration catalog (GET /courses/public), where any
+    # signed-in user may enrol themselves as _student. The column is NOT NULL
+    # DEFAULT false; Optional here so an omitted key takes the server default
+    # and a partially-loaded row still validates.
+    public: Optional[bool] = None
 
     course_family: Optional[CourseFamilyGet] = None
 
@@ -90,6 +100,11 @@ class CourseList(BaseModel):
     # students. Unlike the budgets above this is a veto, not a fallback: a
     # course content cannot re-grant visibility the course denied.
     visible: Optional[bool] = None
+    # Listed in the self-registration catalog (GET /courses/public), where any
+    # signed-in user may enrol themselves as _student. The column is NOT NULL
+    # DEFAULT false; Optional here so an omitted key takes the server default
+    # and a partially-loaded row still validates.
+    public: Optional[bool] = None
 
     @field_validator('path', mode='before')
     @classmethod
@@ -111,6 +126,10 @@ class CourseUpdate(BaseModel):
     # ``model_dump(exclude_unset=True)``, so omitting the key leaves the course
     # alone while sending an explicit ``null`` resets it to "inherit".
     visible: Optional[bool] = None
+    # Omit to leave the flag alone (``model_dump(exclude_unset=True)``). The
+    # column is NOT NULL, so an explicit ``null`` is rejected rather than
+    # meaning "unset".
+    public: Optional[bool] = None
 
 
 class CourseQuery(ListQuery):
@@ -126,6 +145,7 @@ class CourseQuery(ListQuery):
     max_test_runs: Optional[int] = None
     max_submissions: Optional[int] = None
     visible: Optional[bool] = None
+    public: Optional[bool] = None
 
 
 class CourseInterface(EntityInterface):
