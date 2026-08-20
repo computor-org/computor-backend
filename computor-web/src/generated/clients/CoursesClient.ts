@@ -3,7 +3,7 @@
  * Endpoint: /courses
  */
 
-import type { CascadeDeleteResult, CourseCreate, CourseGet, CourseGitBindingGet, CourseGitBindingUpsert, CourseList, CourseStudentWorkspacesResponse, CourseUpdate, CourseWorkspaceSettingsGet, CourseWorkspaceSettingsUpdate, StudentWorkspaceProvisionRequest, StudentWorkspaceProvisionResponse, WorkspaceActionResponse } from 'types/generated';
+import type { CascadeDeleteResult, CourseCreate, CourseGet, CourseGitBindingGet, CourseGitBindingUpsert, CourseList, CoursePublicList, CourseStudentWorkspacesResponse, CourseUpdate, CourseWorkspaceSettingsGet, CourseWorkspaceSettingsUpdate, StudentWorkspaceProvisionRequest, StudentWorkspaceProvisionResponse, WorkspaceActionResponse } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -15,7 +15,7 @@ export class CoursesClient extends BaseEndpointClient {
   /**
    * List Courses
    */
-  async listCoursesCoursesGet({ courseFamilyId, description, fullPath, id, languageCode, limit, maxSubmissions, maxTestRuns, organizationId, path, providerUrl, skip, title, userId, visible }: { courseFamilyId?: string | null; description?: string | null; fullPath?: string | null; id?: string | null; languageCode?: string | null; limit?: number | null; maxSubmissions?: number | null; maxTestRuns?: number | null; organizationId?: string | null; path?: string | null; providerUrl?: string | null; skip?: number | null; title?: string | null; userId?: string | null; visible?: boolean | null }): Promise<CourseList[]> {
+  async listCoursesCoursesGet({ courseFamilyId, description, fullPath, id, languageCode, limit, maxSubmissions, maxTestRuns, organizationId, path, providerUrl, public_value, skip, title, userId, visible }: { courseFamilyId?: string | null; description?: string | null; fullPath?: string | null; id?: string | null; languageCode?: string | null; limit?: number | null; maxSubmissions?: number | null; maxTestRuns?: number | null; organizationId?: string | null; path?: string | null; providerUrl?: string | null; public_value?: boolean | null; skip?: number | null; title?: string | null; userId?: string | null; visible?: boolean | null }): Promise<CourseList[]> {
     const queryParams: Record<string, unknown> = {
       course_family_id: courseFamilyId,
       description,
@@ -28,6 +28,7 @@ export class CoursesClient extends BaseEndpointClient {
       organization_id: organizationId,
       path,
       provider_url: providerUrl,
+      public: public_value,
       skip,
       title,
       user_id: userId,
@@ -44,6 +45,29 @@ export class CoursesClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.post<CourseGet>(this.basePath, body, { params: queryParams });
+  }
+
+  /**
+   * Browse courses open for self-registration
+   * Courses a lecturer has opened for student self-registration.
+   * Authenticated but role-free: every signed-in user sees the same catalog,
+   * including users who hold no role anywhere. That is the point — this is how
+   * someone with no memberships finds their first course.
+   * Metadata only. Course contents, members, git configuration and organization
+   * internals stay behind the normal permission checks; registering is a
+   * separate call. Declared before the generated ``GET /{id}`` route: module
+   * level decorators run at import time, so this static path is matched first
+   * (see CrudRouter.register_routes).
+   */
+  async listPublicCoursesCoursesPublicGet({ languageCode, limit, skip, title, userId }: { languageCode?: string | null; limit?: number | null; skip?: number | null; title?: string | null; userId?: string | null }): Promise<CoursePublicList[]> {
+    const queryParams: Record<string, unknown> = {
+      language_code: languageCode,
+      limit,
+      skip,
+      title,
+      user_id: userId,
+    };
+    return this.client.get<CoursePublicList[]>(this.buildPath('public'), { params: queryParams });
   }
 
   /**

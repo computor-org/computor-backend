@@ -1291,6 +1291,7 @@ export interface CourseCreate {
   max_test_runs?: number | null;
   max_submissions?: number | null;
   visible?: boolean | null;
+  public?: boolean | null;
 }
 
 export interface CourseGet {
@@ -1304,6 +1305,7 @@ export interface CourseGet {
   max_test_runs?: number | null;
   max_submissions?: number | null;
   visible?: boolean | null;
+  public?: boolean | null;
   /** Creation timestamp */
   created_at?: string | null;
   /** Update timestamp */
@@ -1326,6 +1328,7 @@ export interface CourseList {
   max_test_runs?: number | null;
   max_submissions?: number | null;
   visible?: boolean | null;
+  public?: boolean | null;
 }
 
 export interface CourseUpdate {
@@ -1335,6 +1338,7 @@ export interface CourseUpdate {
   max_test_runs?: number | null;
   max_submissions?: number | null;
   visible?: boolean | null;
+  public?: boolean | null;
 }
 
 export interface CourseQuery {
@@ -1352,6 +1356,35 @@ export interface CourseQuery {
   max_test_runs?: number | null;
   max_submissions?: number | null;
   visible?: boolean | null;
+  public?: boolean | null;
+}
+
+/**
+ * One row of the public course catalog (issue #213).
+ * 
+ * Deliberately NOT ``CourseList``. That DTO carries ``properties``, whose
+ * ``CoursePropertiesGet`` is ``extra='allow'`` and therefore re-exports
+ * whatever was written onto ``Course.properties["gitlab"]`` — group ids, full
+ * paths, web URLs — plus the organization/family ids, the ltree path and the
+ * grading budgets. A catalog row is read by people who are *not* members of
+ * the course, so it carries only what someone needs in order to decide
+ * whether to register.
+ */
+export interface CoursePublicList {
+  id: string;
+  title?: string | null;
+  description?: string | null;
+  path: string;
+  language_code?: string | null;
+  organization_title?: string | null;
+  enrolled?: boolean;
+}
+
+export interface CoursePublicQuery {
+  skip?: number | null;
+  limit?: number | null;
+  title?: string | null;
+  language_code?: string | null;
 }
 
 /**

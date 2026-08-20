@@ -53,6 +53,38 @@ RESERVED_IDENTIFIERS = {
     'interface',
     'this',
     'await',
+    # Strict-mode reserved words. Generated clients are ES modules and class
+    # bodies, both always strict, so these cannot be used as binding names even
+    # though they are legal object-property names. `public` reached this list
+    # via Course.public (#213): it emitted `async m({ public }: {...})`, which
+    # is a syntax error, not a type error — tsc reports TS1213.
+    'public',
+    'private',
+    'protected',
+    'static',
+    'implements',
+    'yield',
+    'enum',
+    'super',
+    'null',
+    'true',
+    'false',
+    'typeof',
+    'instanceof',
+    'in',
+    'of',
+    'void',
+    'do',
+    'if',
+    'else',
+    'try',
+    'catch',
+    'finally',
+    'throw',
+    'with',
+    'debugger',
+    'arguments',
+    'eval',
 }
 
 

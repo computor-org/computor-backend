@@ -3,7 +3,7 @@
  * Endpoint: /user
  */
 
-import type { CourseGitDescriptor, CourseMemberProviderAccountUpdate, CourseMemberReadinessStatus, CourseMemberRepositoryGet, CourseMemberRepositoryRegister, CourseMemberValidationRequest, StudentRepositoryProvisioned, TemplateAccessGet, UserGet, UserScopes } from 'types/generated';
+import type { CourseGitDescriptor, CourseMemberGet, CourseMemberProviderAccountUpdate, CourseMemberReadinessStatus, CourseMemberRepositoryGet, CourseMemberRepositoryRegister, CourseMemberValidationRequest, StudentRepositoryProvisioned, TemplateAccessGet, UserGet, UserScopes } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -21,6 +21,29 @@ export class UserClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.get<UserGet>(this.basePath, { params: queryParams });
+  }
+
+  /**
+   * Enrol yourself as a student in a public course
+   * Create your own ``_student`` membership in a public course.
+   * Named ``enroll`` rather than ``register`` because ``POST
+   * /user/courses/{course_id}/register`` above already means "register your git
+   * provider account for this course" — two unrelated meanings one letter apart
+   * would be a trap.
+   * The request has no body. The role is not a parameter: self-registration can
+   * only ever produce ``_student``, in the course's first existing group (or a
+   * ``default`` group created for the purpose). Idempotent — an existing
+   * membership of any role comes back unchanged with a 200, so a lecturer who
+   * clicks Enrol is not demoted. There is no matching DELETE; course staff
+   * remove members.
+   * 404 when the course does not exist *or* is not public: a private course
+   * must not be distinguishable from a missing one.
+   */
+  async enrollInPublicCourseUserCoursesCourseIdEnrollPost({ courseId, userId }: { courseId: string | string; userId?: string | null }): Promise<CourseMemberGet> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.post<CourseMemberGet>(this.buildPath('courses', courseId, 'enroll'), { params: queryParams });
   }
 
   /**

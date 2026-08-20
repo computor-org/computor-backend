@@ -1,8 +1,6 @@
 'use client';
 
-import Link from 'next/link';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
-import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
@@ -10,9 +8,8 @@ import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import EmptyState from '@/src/components/EmptyState';
-import Badge from '@/src/components/Badge';
-import { displayName } from '@/src/utils/displayName';
-import type { CourseList } from 'types/generated';
+import CourseCard, { CourseCardSkeleton, ViewCourseLink } from '@/src/components/courses/CourseCard';
+import { ButtonLink } from '@/src/components/ui/Button';
 
 const coursesClient = new CoursesClient();
 
@@ -27,19 +24,17 @@ export default function CoursesPage() {
         <PageHeader
           breadcrumbs={[{ label: 'Courses' }]}
           title="Courses"
-          subtitle="Browse and access all courses where you have permissions"
+          subtitle={
+            loading
+              ? 'Browse and access all courses where you have permissions'
+              : `${courses.length} ${courses.length === 1 ? 'course' : 'courses'} where you have permissions`
+          }
           actions={
             <>
-              {!loading && (
-                <span className="text-sm text-gray-500">
-                  {courses.length} {courses.length === 1 ? 'course' : 'courses'}
-                </span>
-              )}
-              {canCreateCourse() && (
-                <Link href="/courses/create" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
-                  New Course
-                </Link>
-              )}
+              <ButtonLink href="/courses/catalog" variant="secondary">
+                Browse catalog
+              </ButtonLink>
+              {canCreateCourse() && <ButtonLink href="/courses/create">New Course</ButtonLink>}
             </>
           }
         />
@@ -51,11 +46,7 @@ export default function CoursesPage() {
         {loading && (
           <ScrollArea className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 content-start">
             {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
-                <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
-                <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-              </div>
+              <CourseCardSkeleton key={i} />
             ))}
           </ScrollArea>
         )}
@@ -70,6 +61,7 @@ export default function CoursesPage() {
             }
             title="No courses found"
             description="You do not have access to any courses yet."
+            action={<ButtonLink href="/courses/catalog">Browse the catalog</ButtonLink>}
           />
         )}
 
@@ -77,59 +69,17 @@ export default function CoursesPage() {
         {!loading && !error && courses.length > 0 && (
           <ScrollArea className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 content-start">
             {courses.map((course) => (
-              <CourseCard key={course.id} course={course} role={courseRole(course.id)} />
+              <CourseCard
+                key={course.id}
+                course={course}
+                role={courseRole(course.id)}
+                href={`/courses/${course.id}`}
+                footer={<ViewCourseLink courseId={course.id} />}
+              />
             ))}
           </ScrollArea>
         )}
       </ListPageLayout>
     </AuthenticatedLayout>
-  );
-}
-
-function CourseCard({ course, role }: { course: CourseList; role: string | null }) {
-  // The launch buttons live OUTSIDE the Link: nesting them in the anchor would
-  // both be invalid HTML and still navigate the card on an icon click.
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-all h-full flex flex-col">
-      <Link href={`/courses/${course.id}`} className="flex flex-col flex-grow cursor-pointer">
-        <div className="flex items-start justify-between mb-4 gap-2">
-          <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
-            {displayName(course, 'Untitled Course')}
-          </h3>
-          {role && (
-            <Badge color="blue" className="shrink-0">
-              {role}
-            </Badge>
-          )}
-        </div>
-
-        <div className="space-y-2 mb-4 flex-grow">
-          {course.language_code && (
-            <div className="flex items-center text-sm text-gray-600">
-              <svg className="h-4 w-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-              </svg>
-              <span className="uppercase">{course.language_code}</span>
-            </div>
-          )}
-        </div>
-      </Link>
-
-      {/* Template icon launchers; hides itself when the course offers no
-          workspaces. Members only — the fetch would 403 without a role. */}
-      {role && <CourseWorkspaceLaunchButtons courseId={course.id} compact className="mb-4" />}
-
-      <div className="flex items-center justify-end pt-4 border-t border-gray-200 mt-auto">
-        <Link
-          href={`/courses/${course.id}`}
-          className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center"
-        >
-          View Course
-          <svg className="ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </Link>
-      </div>
-    </div>
   );
 }

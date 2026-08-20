@@ -12,7 +12,12 @@ import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
 import { Field } from '@/src/components/FormPanel';
-import { inputCls } from '@/src/components/ui/tokens';
+import { inputCls, readOnlyInputCls } from '@/src/components/ui/tokens';
+import SectionCard, { SectionHint, SectionStatus } from '@/src/components/SectionCard';
+import PublicCourseField from '@/src/components/courses/PublicCourseField';
+import DescriptionList from '@/src/components/DescriptionList';
+import Button from '@/src/components/ui/Button';
+import Badge from '@/src/components/Badge';
 import VisibilitySelect, { type VisibilityValue } from '@/src/components/courses/VisibilitySelect';
 import type { CourseGet, CourseGitBindingGet, CourseGitBindingUpsert, GitServerGet } from 'types/generated';
 import { displayName } from '@/src/utils/displayName';
@@ -38,8 +43,16 @@ const MODE_LABELS: Record<string, string> = {
 export default function CourseEditPage() {
   const courseId = useParams().id as string;
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  // The git binding is registry-backed (manager-only).
-  const { canManageHierarchy: canManage } = usePermissions();
+  const { canManageHierarchy: canManage, courseHasAtLeast } = usePermissions();
+  // Course staff reach this page too, not only the org hierarchy: the backend
+  // behind it is the _lecturer cohort (Course.update, and api/course_git.py's
+  // "lecturer cohort only"), so gating the page on admin/_organization_manager
+  // locked lecturers out of their own course's settings.
+  const canEdit = canManage || courseHasAtLeast(courseId, '_lecturer');
+  // Opening a course for self-registration is held one rung higher — it
+  // advertises the course to every account on the deployment. Mirrors the
+  // backend guard in interfaces/course.py.
+  const canSetPublic = canManage || courseHasAtLeast(courseId, '_maintainer');
 
   const [course, setCourse] = useState<CourseGet | null>(null);
   const [binding, setBinding] = useState<CourseGitBindingGet | null>(null);
@@ -51,6 +64,7 @@ export default function CourseEditPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [language, setLanguage] = useState('');
+  const [isPublic, setIsPublic] = useState(false);
   // Course-wide budget defaults. Held as strings so an empty field can mean
   // "unlimited" rather than collapsing to 0.
   const [maxTestRuns, setMaxTestRuns] = useState('');
@@ -82,6 +96,7 @@ export default function CourseEditPage() {
       setTitle(c.title || '');
       setDescription(c.description || '');
       setLanguage(c.language_code || '');
+      setIsPublic(c.public ?? false);
       setMaxTestRuns(c.max_test_runs != null ? String(c.max_test_runs) : '');
       setMaxSubmissions(c.max_submissions != null ? String(c.max_submissions) : '');
       setVisible(c.visible ?? null);
@@ -113,9 +128,9 @@ export default function CourseEditPage() {
   }, [courseId]);
 
   useEffect(() => {
-    if (authLoading || !isAuthenticated || !canManage) return;
+    if (authLoading || !isAuthenticated || !canEdit) return;
     load();
-  }, [authLoading, isAuthenticated, canManage, load]);
+  }, [authLoading, isAuthenticated, canEdit, load]);
 
   async function saveGeneral() {
     setSavingGeneral(true);
@@ -127,6 +142,10 @@ export default function CourseEditPage() {
           title: title.trim() || null,
           description: description.trim() || null,
           language_code: language.trim() || null,
+          // Only sent when the caller may change it: the backend guard keys on
+          // the field being present at all, so a lecturer including it — even
+          // unchanged — would have their whole save rejected.
+          ...(canSetPublic ? { public: isPublic } : {}),
           max_test_runs: parseLimit(maxTestRuns),
           max_submissions: parseLimit(maxSubmissions),
           visible,
@@ -172,7 +191,7 @@ export default function CourseEditPage() {
     }
   }
 
-  if (!authLoading && isAuthenticated && !canManage) {
+  if (!authLoading && isAuthenticated && !canEdit) {
     return <Forbidden message="You do not have access to this course's settings." backLink={`/courses/${courseId}`} backText="Back to course" />;
   }
 
@@ -204,8 +223,7 @@ export default function CourseEditPage() {
           <ScrollArea>
             <div className="max-w-3xl space-y-6">
               {/* General */}
-              <section className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
-                <h2 className="text-lg font-semibold text-gray-900">General</h2>
+              <SectionCard title="General">
                 <Field label="Title">
                   <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
                 </Field>
@@ -217,7 +235,7 @@ export default function CourseEditPage() {
                     <input value={language} onChange={(e) => setLanguage(e.target.value)} placeholder="en" className={inputCls} />
                   </Field>
                   <Field label="Path (immutable)">
-                    <input value={course?.path || ''} readOnly className={`${inputCls} bg-gray-50 text-gray-500`} />
+                    <input value={course?.path || ''} readOnly className={readOnlyInputCls} />
                   </Field>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -256,45 +274,66 @@ export default function CourseEditPage() {
                     onChange={setVisible}
                   />
                 </Field>
+                <Field
+                  label="Self-registration"
+                  hint={
+                    canSetPublic
+                      ? 'Independent of student visibility above: that hides course content from members, this decides who may become one.'
+                      : 'Only a course maintainer or owner can change this — listing a course advertises it to every account on this deployment.'
+                  }
+                >
+                  <PublicCourseField
+                    value={isPublic}
+                    onChange={setIsPublic}
+                    disabled={!canSetPublic}
+                  />
+                </Field>
                 <div className="flex items-center gap-3">
-                  <button onClick={saveGeneral} disabled={savingGeneral} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                    {savingGeneral ? 'Saving…' : 'Save'}
-                  </button>
-                  {generalMsg && <span className="text-sm text-gray-500">{generalMsg}</span>}
+                  <Button onClick={saveGeneral} loading={savingGeneral} loadingLabel="Saving…">
+                    Save
+                  </Button>
+                  <SectionStatus>{generalMsg}</SectionStatus>
                 </div>
-              </section>
+              </SectionCard>
 
               {/* Git */}
-              <section className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-gray-900">Git</h2>
-                  {gitLocked && (
-                    <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-500 rounded inline-flex items-center gap-1">
+              <SectionCard
+                title="Git"
+                action={
+                  gitLocked ? (
+                    <Badge color="gray" className="inline-flex items-center gap-1">
                       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
                       Locked
-                    </span>
-                  )}
-                </div>
-
+                    </Badge>
+                  ) : undefined
+                }
+                note={
+                  gitLocked
+                    ? `${binding?.lock_reason || 'This course’s git configuration is locked.'} Changing the server or template would orphan students’ existing repositories, so these settings are read-only.`
+                    : undefined
+                }
+              >
                 {gitLocked ? (
-                  <>
-                    <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded p-2.5">
-                      {binding?.lock_reason || 'This course’s git configuration is locked.'} Changing the server or
-                      template would orphan students’ existing repositories, so these settings are read-only.
-                    </p>
-                    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                      <div><dt className="text-gray-500">Delivery</dt><dd className="text-gray-900">{binding!.delivery}</dd></div>
-                      <div><dt className="text-gray-500">Git server</dt><dd className="text-gray-900">{binding!.git_server_id ? serverLabel(binding!.git_server_id) : '—'}</dd></div>
-                      <div><dt className="text-gray-500">Student-repo modes</dt><dd className="text-gray-900">{(binding!.student_repo_modes || []).join(', ') || '—'}</dd></div>
-                      <div><dt className="text-gray-500">Template</dt><dd className="text-gray-900 font-mono text-xs break-all">{binding!.template_repo || '—'}</dd></div>
-                    </dl>
-                  </>
+                  <DescriptionList
+                    items={[
+                      { term: 'Delivery', value: binding!.delivery },
+                      { term: 'Git server', value: binding!.git_server_id ? serverLabel(binding!.git_server_id) : '—' },
+                      { term: 'Student-repo modes', value: (binding!.student_repo_modes || []).join(', ') || '—' },
+                      { term: 'Template', value: binding!.template_repo || '—', mono: true },
+                    ]}
+                  />
                 ) : (
                   <>
                     {!gitConfigured && (
-                      <p className="text-sm text-gray-500">This course has no git configuration yet. Configure it to enable student repositories.</p>
+                      <SectionHint>This course has no git configuration yet. Configure it to enable student repositories.</SectionHint>
+                    )}
+                    {!canManage && servers.length === 0 && (
+                      <SectionHint>
+                        The list of git servers is managed centrally, so it is empty here. Ask an
+                        administrator to pick the server for this course.
+                      </SectionHint>
                     )}
                     <Field label="Delivery">
                       <select value={delivery} onChange={(e) => setDelivery(e.target.value as 'git' | 'download')} className={inputCls}>
@@ -334,7 +373,7 @@ export default function CourseEditPage() {
                     <Field label="Allowed student-repo modes">
                       <div className="flex flex-wrap gap-3">
                         {ALL_MODES.map((m) => (
-                          <label key={m} className="flex items-center gap-1.5 text-sm text-gray-700">
+                          <label key={m} className="flex items-center gap-1.5 text-sm">
                             <input type="checkbox" checked={modes.includes(m)} onChange={() => toggleMode(m)} />
                             {MODE_LABELS[m] ?? m}
                           </label>
@@ -342,14 +381,14 @@ export default function CourseEditPage() {
                       </div>
                     </Field>
                     <div className="flex items-center gap-3">
-                      <button onClick={saveGit} disabled={savingGit} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                        {savingGit ? 'Saving…' : gitConfigured ? 'Save git settings' : 'Configure git'}
-                      </button>
-                      {gitMsg && <span className="text-sm text-gray-500">{gitMsg}</span>}
+                      <Button onClick={saveGit} loading={savingGit} loadingLabel="Saving…">
+                        {gitConfigured ? 'Save git settings' : 'Configure git'}
+                      </Button>
+                      <SectionStatus>{gitMsg}</SectionStatus>
                     </div>
                   </>
                 )}
-              </section>
+              </SectionCard>
             </div>
           </ScrollArea>
         )}

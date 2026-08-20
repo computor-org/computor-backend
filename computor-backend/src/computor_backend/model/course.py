@@ -142,6 +142,10 @@ class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'course'
     __table_args__ = (
         Index('course_path_key', 'course_family_id', 'path', unique=True),
+        # Serves GET /courses/public: the predicate is the most selective one
+        # on the table and `title` is that endpoint's ORDER BY. Partial, so
+        # only the handful of public rows are ever indexed.
+        Index('ix_course_public_title', 'title', postgresql_where=text('public')),
     )
 
     properties = Column(JSONB)
@@ -164,6 +168,14 @@ class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     # setting visible=True cannot re-grant what the course denied. See
     # business_logic.content_visibility.
     visible = Column(Boolean)
+
+    # Listed in the authenticated catalog (GET /courses/public), where any
+    # signed-in user may enrol themselves as _student. NOT NULL with a false
+    # default rather than the nullable tri-state `visible` above: there is no
+    # parent to inherit from, so a third "unset" state would be
+    # indistinguishable from false and every query would need IS NOT TRUE.
+    # Same shape as CourseContent.is_submittable.
+    public = Column(Boolean, nullable=False, server_default=text("false"))
 
     # Relationships
     course_family = relationship('CourseFamily', back_populates='courses')
