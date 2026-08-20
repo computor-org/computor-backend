@@ -10,7 +10,8 @@ import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
-import Badge, { BadgeColor } from '@/src/components/Badge';
+import Badge from '@/src/components/Badge';
+import { deploymentBadge } from '@/src/utils/deployment';
 import { formatLimit } from '@/src/utils/limits';
 import Button, { ButtonLink } from '@/src/components/ui/Button';
 import {
@@ -21,28 +22,6 @@ import {
 } from '@/src/components/ui/tokens';
 import type { CourseContentLecturerList, CourseContentTypeList } from 'types/generated';
 import { displayName } from '@/src/utils/displayName';
-
-// Deployment status → badge styling. The lecturer list always carries the
-// top-level has_deployment + deployment_status (no include needed); values are
-// deployed | pending | failed | unassigned (see business_logic/lecturer_deployment).
-const STATUS_STYLES: Record<string, { label: string; color: BadgeColor }> = {
-  deployed: { label: 'Deployed', color: 'green' },
-  pending: { label: 'Pending', color: 'yellow' },
-  failed: { label: 'Failed', color: 'red' },
-  unassigned: { label: 'Unassigned', color: 'gray' },
-};
-
-function deploymentBadge(c: CourseContentLecturerList): { label: string; color: BadgeColor } {
-  const status = c.deployment_status || (c.has_deployment ? 'deployed' : null);
-  if (!status) {
-    // A unit isn't deployable (no example of its own) — label it as such rather
-    // than implying a submittable assignment is missing its example.
-    if (!c.is_submittable) return { label: 'Unit', color: 'gray' };
-    return { label: 'No example', color: 'gray' };
-  }
-  return STATUS_STYLES[status] ?? { label: status, color: 'gray' };
-}
-
 
 export default function LecturerContentPage() {
   const courseId = useParams().id as string;
@@ -338,16 +317,16 @@ export default function LecturerContentPage() {
                         }
                         return null;
                       })()}
-                      <Badge color={badge.color} className="shrink-0">
+                      <Badge tone={badge.tone} className="shrink-0">
                         {badge.label}
                       </Badge>
                       <ButtonLink
-                        href={`/courses/${courseId}/lecturer/assignments/${c.id}/edit`}
+                        href={`/courses/${courseId}/lecturer/assignments/${c.id}`}
                         variant="ghost"
                         size="xs"
                         className="shrink-0"
                       >
-                        Edit
+                        Open
                       </ButtonLink>
                     </div>
                   );
