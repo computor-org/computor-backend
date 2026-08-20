@@ -349,6 +349,7 @@
 | TS Method | HTTP | Path | Request | Response |
 | --- | --- | --- | --- | --- |
 | `createIssueReportIssueReportsPost` | POST | `/issue-reports` | — | `IssueReportCreated` |
+| `getIssueReportIssueReportsReportIdGet` | GET | `/issue-reports/{report_id}` | — | `IssueReportGet` |
 
 ## LanguagesClient
 - Base path: `/languages`

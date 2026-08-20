@@ -18,6 +18,7 @@ import json
 import logging
 from json import JSONDecodeError
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from sqlalchemy.orm import Session
@@ -26,11 +27,14 @@ from computor_backend.database import get_db
 from computor_backend.exceptions import (
     BadRequestException,
     EndpointNotFoundException,
+    ForbiddenException,
     IssueReportingUnavailableException,
+    NotFoundException,
     RateLimitException,
 )
 from computor_backend.issue_reports.config import get_issue_report_settings
 from computor_backend.issue_reports.health import ensure_probed
+from computor_backend.model.issue_report import IssueReport
 from computor_backend.issue_reports.service import (
     IssueReportNotConfigured,
     IssueReportSubmissionError,
@@ -39,7 +43,11 @@ from computor_backend.issue_reports.service import (
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.redis_cache import get_redis_client
-from computor_types.issue_reports import IssueReportCreate, IssueReportCreated
+from computor_types.issue_reports import (
+    IssueReportCreate,
+    IssueReportCreated,
+    IssueReportGet,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -144,3 +152,37 @@ async def create_issue_report(
         raise IssueReportingUnavailableException(
             detail="The problem report could not be submitted. Please try again later."
         ) from exc
+
+
+@router.get("/{report_id}", response_model=IssueReportGet)
+async def get_issue_report(
+    report_id: UUID,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+) -> IssueReportGet:
+    """Resolve a report id to the person who filed it.
+
+    The GitHub issue names nobody on purpose, so this is the only way back from
+    a report to a reporter — and it is admin-only precisely because that is a
+    step someone should have to take deliberately.
+    """
+    if not permissions.is_admin:
+        raise ForbiddenException(detail="Requires _admin role")
+
+    # UUID columns want strings here, not uuid.UUID objects.
+    record = db.query(IssueReport).filter(IssueReport.id == str(report_id)).first()
+    if record is None:
+        raise NotFoundException(detail="Issue report not found")
+
+    user = record.user
+    return IssueReportGet(
+        id=str(record.id),
+        user_id=str(record.user_id) if record.user_id else None,
+        user_email=user.email if user else None,
+        given_name=user.given_name if user else None,
+        family_name=user.family_name if user else None,
+        repository=record.repository,
+        issue_number=record.issue_number,
+        issue_url=record.issue_url,
+        submitted_at=record.submitted_at,
+    )

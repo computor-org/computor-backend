@@ -52,6 +52,34 @@ export interface IssueReportCreated {
   issue_url?: any | null;
 }
 
+/**
+ * Who filed a report — the half deliberately absent from the GitHub issue.
+ * 
+ * Admin-only. The issue itself names nobody, so this lookup is the only way
+ * back from a report id to a person, and asking for it is an act a maintainer
+ * performs knowingly rather than a detail they stumble over in the tracker.
+ */
+export interface IssueReportGet {
+  /** Report id, as quoted in the issue body. */
+  id: string;
+  /** Reporter; null once the account has been deleted. */
+  user_id?: string | null;
+  /** Reporter's email, resolved at read time. */
+  user_email?: string | null;
+  /** Reporter's given name. */
+  given_name?: string | null;
+  /** Reporter's family name. */
+  family_name?: string | null;
+  /** Tracker the report was filed in. */
+  repository: string;
+  /** Issue number; null if the submission never reached GitHub. */
+  issue_number?: number | null;
+  /** Link to the created issue. */
+  issue_url?: string | null;
+  /** When the report was submitted. */
+  submitted_at: string;
+}
+
 export interface StudentProfileCreate {
   student_id?: string | null;
   student_email?: string | null;

@@ -5,6 +5,8 @@ import json
 import os
 import uuid
 from contextlib import contextmanager
+from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -545,3 +547,93 @@ async def test_a_failed_submission_still_leaves_a_row():
     row = session.report
     assert row.issue_number is None
     assert row.issue_url is None
+
+
+# ---------------------------------------------------------------------------
+# Admin lookup — the only route back from a report id to a person
+# ---------------------------------------------------------------------------
+
+
+class _LookupSession(_Session):
+    """Session stand-in serving one issue_report row through a query chain."""
+
+    def __init__(self, record):
+        super().__init__()
+        self.record = record
+
+    def query(self, model):
+        return self
+
+    def filter(self, *args):
+        return self
+
+    def first(self):
+        return self.record
+
+
+def _lookup_client(record, principal):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from computor_backend.api import issue_reports as issue_api
+    from computor_backend.database import get_db
+    from computor_backend.exceptions.error_handlers import register_exception_handlers
+    from computor_backend.permissions.auth import get_current_principal
+
+    app = FastAPI()
+    register_exception_handlers(app)
+    app.include_router(issue_api.router, prefix="/issue-reports")
+    app.dependency_overrides[get_current_principal] = lambda: principal
+    app.dependency_overrides[get_db] = lambda: _LookupSession(record)
+    return TestClient(app, raise_server_exceptions=False)
+
+
+def _stored_report():
+    from computor_backend.model.issue_report import IssueReport
+
+    record = IssueReport(
+        user_id="1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed",
+        repository="computor-org/issues",
+        issue_number=123,
+        issue_url="https://github.com/computor-org/issues/issues/123",
+    )
+    record.id = uuid.UUID("2c8e7d6a-5b4f-4e3d-9a2b-1c0d9e8f7a6b")
+    record.submitted_at = datetime(2026, 8, 20, 12, 0, tzinfo=timezone.utc)
+    record.user = SimpleNamespace(
+        email="tester@example.org", given_name="Tes", family_name="Ter"
+    )
+    return record
+
+
+def test_an_admin_can_resolve_a_report_to_its_reporter():
+    record = _stored_report()
+    principal = Principal(user_id="admin-1")
+    principal.is_admin = True
+    with configured():
+        response = _lookup_client(record, principal).get(f"/issue-reports/{record.id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["user_email"] == "tester@example.org"
+    assert body["issue_url"] == "https://github.com/computor-org/issues/issues/123"
+
+
+def test_a_non_admin_cannot_resolve_a_report():
+    record = _stored_report()
+    with configured():
+        response = _lookup_client(record, Principal(user_id="user-1")).get(
+            f"/issue-reports/{record.id}"
+        )
+
+    assert response.status_code == 403
+
+
+def test_a_missing_report_is_a_404():
+    principal = Principal(user_id="admin-1")
+    principal.is_admin = True
+    with configured():
+        response = _lookup_client(None, principal).get(
+            "/issue-reports/2c8e7d6a-5b4f-4e3d-9a2b-1c0d9e8f7a6b"
+        )
+
+    assert response.status_code == 404

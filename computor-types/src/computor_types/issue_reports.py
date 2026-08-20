@@ -1,5 +1,6 @@
 """DTOs for client-submitted issue reports."""
 
+from datetime import datetime
 from typing import Any, Optional
 
 from pydantic import AnyHttpUrl, BaseModel, Field
@@ -34,3 +35,29 @@ class IssueReportCreated(BaseModel):
         default=None,
         description="Link to the created issue; null when the tracker is private.",
     )
+
+
+class IssueReportGet(BaseModel):
+    """Who filed a report — the half deliberately absent from the GitHub issue.
+
+    Admin-only. The issue itself names nobody, so this lookup is the only way
+    back from a report id to a person, and asking for it is an act a maintainer
+    performs knowingly rather than a detail they stumble over in the tracker.
+    """
+
+    id: str = Field(description="Report id, as quoted in the issue body.")
+    user_id: Optional[str] = Field(
+        None,
+        description="Reporter; null once the account has been deleted.",
+    )
+    user_email: Optional[str] = Field(
+        None, description="Reporter's email, resolved at read time."
+    )
+    given_name: Optional[str] = Field(None, description="Reporter's given name.")
+    family_name: Optional[str] = Field(None, description="Reporter's family name.")
+    repository: str = Field(description="Tracker the report was filed in.")
+    issue_number: Optional[int] = Field(
+        None, description="Issue number; null if the submission never reached GitHub."
+    )
+    issue_url: Optional[str] = Field(None, description="Link to the created issue.")
+    submitted_at: datetime = Field(description="When the report was submitted.")
