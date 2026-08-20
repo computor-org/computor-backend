@@ -48,29 +48,6 @@ class BackendSettings:
         # localhost:3000). When unset, /instance-info uses PUBLIC_DOMAIN.
         self.WEB_APP_URL = os.environ.get("WEB_APP_URL", None)
 
-        # User issue reports are submitted by the backend to a private GitHub
-        # repository. The token is deliberately backend-only: clients only
-        # call POST /issue-reports with their normal Computor credentials.
-        self.GITHUB_ISSUE_REPORT_ENABLED = os.environ.get(
-            "GITHUB_ISSUE_REPORT_ENABLED", "false"
-        ).lower() in ["true", "1", "yes", "on"]
-        self.GITHUB_ISSUE_REPORT_TOKEN = os.environ.get("GITHUB_ISSUE_REPORT_TOKEN", None)
-        self.GITHUB_ISSUE_REPORT_REPOSITORY = os.environ.get(
-            "GITHUB_ISSUE_REPORT_REPOSITORY", "computor-org/issues"
-        )
-        self.GITHUB_ISSUE_REPORT_BRANCH = os.environ.get(
-            "GITHUB_ISSUE_REPORT_BRANCH", "main"
-        )
-        self.GITHUB_ISSUE_REPORT_LABELS = os.environ.get(
-            "GITHUB_ISSUE_REPORT_LABELS", "Testing"
-        )
-        self.GITHUB_ISSUE_REPORT_API_URL = os.environ.get(
-            "GITHUB_ISSUE_REPORT_API_URL", "https://api.github.com"
-        ).rstrip("/")
-        self.GITHUB_ISSUE_REPORT_MAX_SCREENSHOT_BYTES = int(
-            os.environ.get("GITHUB_ISSUE_REPORT_MAX_SCREENSHOT_BYTES", str(5 * 1024 * 1024))
-        )
-
         # WebSocket settings
         self.WS_MAX_CONNECTIONS_PER_USER = int(os.environ.get("WS_MAX_CONNECTIONS_PER_USER", "10"))
         self.WS_MAX_TOTAL_CONNECTIONS = int(os.environ.get("WS_MAX_TOTAL_CONNECTIONS", "10000"))
