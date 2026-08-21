@@ -2870,12 +2870,14 @@ export interface SubmissionGroupGradingGet {
 export interface SubmissionGroupGradingList {
   id: string;
   submission_group_id: string;
+  artifact_id?: string | null;
   graded_by_course_member_id: string;
   result_id?: string | null;
   grading: number;
   status: GradingStatus;
   feedback?: string | null;
   created_at: string;
+  graded_at?: string | null;
   graded_by_course_member?: GradedByCourseMember | null;
 }
 

@@ -617,6 +617,7 @@ export interface SubmissionGroupStudentList {
   status?: string | null;
   grading?: number | null;
   graded_by_course_member?: GradedByCourseMember | null;
+  latest_submitted_artifact_id?: string | null;
   count?: number;
   max_submissions?: number | null;
   unread_message_count?: number;
@@ -637,6 +638,7 @@ export interface SubmissionGroupStudentGet {
   status?: string | null;
   grading?: number | null;
   graded_by_course_member?: GradedByCourseMember | null;
+  latest_submitted_artifact_id?: string | null;
   count?: number;
   max_submissions?: number | null;
   unread_message_count?: number;
