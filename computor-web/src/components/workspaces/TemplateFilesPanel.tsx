@@ -78,87 +78,98 @@ export default function TemplateFilesPanel({ templateName }: { templateName: str
 
   return (
     <>
-      <ErrorBanner>{error}</ErrorBanner>
+      {/*
+        Fills the page rather than growing past it. The editor is the only
+        part that scrolls: with a fixed `rows` the card grew to the file's
+        length, so a 60-line Dockerfile pushed Save several hundred pixels
+        below the fold and you had to scroll the whole page to reach the
+        button for the file you were already looking at.
+      */}
+      <div className="flex h-full min-h-0 flex-col gap-4">
+        <ErrorBanner>{error}</ErrorBanner>
 
-      <div className="shrink-0 bg-surface rounded-lg border border-rule p-5 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-lg font-semibold text-fg">Template files</h2>
-            <p className="text-sm text-muted mt-1">
-              Raw editing of the deployed Terraform files. Saved .tf files are syntax-checked;
-              the real gate stays the terraform plan run by the next template push.
-            </p>
+        <div className="flex-1 min-h-0 flex flex-col gap-4 bg-surface rounded-lg border border-rule p-5">
+          <div className="shrink-0 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-semibold text-fg">Template files</h2>
+              <p className="text-sm text-muted mt-1">
+                Raw editing of the deployed Terraform files. Saved .tf files are syntax-checked;
+                the real gate stays the terraform plan run by the next template push.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {data && (
+                <Badge color={data.customized ? 'yellow' : 'green'}>
+                  {data.customized ? 'customized' : 'managed'}
+                </Badge>
+              )}
+              {data?.customized && (
+                <Button size="xs" variant="ghost" onClick={() => setConfirmRestore(true)}>
+                  Restore managed
+                </Button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {data && (
-              <Badge color={data.customized ? 'yellow' : 'green'}>
-                {data.customized ? 'customized' : 'managed'}
-              </Badge>
-            )}
-            {data?.customized && (
-              <Button size="xs" variant="ghost" onClick={() => setConfirmRestore(true)}>
-                Restore managed
+
+          <div className="shrink-0 flex flex-wrap gap-1.5">
+            {files.map((file) => (
+              <Button
+                key={file.name}
+                size="xs"
+                variant={file.name === active ? 'secondary' : 'ghost'}
+                onClick={() => setActiveFile(file.name)}
+              >
+                {file.name}
+                {isDirty(file.name) && <span className="text-warn-text ml-1">•</span>}
+              </Button>
+            ))}
+            {files.length === 0 && <p className="text-sm text-muted">No editable files.</p>}
+          </div>
+
+          {currentFile && (
+            <textarea
+              value={currentContent}
+              onChange={(event) =>
+                setDrafts((previous) => ({ ...previous, [active as string]: event.target.value }))
+              }
+              spellCheck={false}
+              // No `rows`: the height comes from the flex row, so the editor
+              // ends exactly where the card does. min-h keeps it usable on a
+              // very short window — then, and only then, the page scrolls again.
+              className={`${inputCls} flex-1 min-h-48 resize-none font-mono text-xs leading-5 whitespace-pre`}
+              aria-label={`Content of ${currentFile.name}`}
+              disabled={saving}
+            />
+          )}
+
+          <div className="shrink-0 flex flex-wrap items-center gap-3">
+            <Button
+              onClick={requestSave}
+              disabled={!active || !isDirty(active)}
+              loading={saving}
+              loadingLabel="Saving…"
+            >
+              Save {active ?? 'file'}
+            </Button>
+            {active && isDirty(active) && (
+              <Button
+                variant="ghost"
+                disabled={saving}
+                onClick={() =>
+                  setDrafts((previous) => {
+                    const next = { ...previous };
+                    delete next[active];
+                    return next;
+                  })
+                }
+              >
+                Discard changes
               </Button>
             )}
+            <span className="text-xs text-muted">
+              Changes take effect after the next template push (Fleet tab).
+            </span>
           </div>
-        </div>
-
-        <div className="flex flex-wrap gap-1.5">
-          {files.map((file) => (
-            <Button
-              key={file.name}
-              size="xs"
-              variant={file.name === active ? 'secondary' : 'ghost'}
-              onClick={() => setActiveFile(file.name)}
-            >
-              {file.name}
-              {isDirty(file.name) && <span className="text-warn-text ml-1">•</span>}
-            </Button>
-          ))}
-          {files.length === 0 && <p className="text-sm text-muted">No editable files.</p>}
-        </div>
-
-        {currentFile && (
-          <textarea
-            value={currentContent}
-            onChange={(event) =>
-              setDrafts((previous) => ({ ...previous, [active as string]: event.target.value }))
-            }
-            spellCheck={false}
-            rows={26}
-            className={`${inputCls} font-mono text-xs leading-5 whitespace-pre`}
-            aria-label={`Content of ${currentFile.name}`}
-            disabled={saving}
-          />
-        )}
-
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={requestSave}
-            disabled={!active || !isDirty(active)}
-            loading={saving}
-            loadingLabel="Saving…"
-          >
-            Save {active ?? 'file'}
-          </Button>
-          {active && isDirty(active) && (
-            <Button
-              variant="ghost"
-              disabled={saving}
-              onClick={() =>
-                setDrafts((previous) => {
-                  const next = { ...previous };
-                  delete next[active];
-                  return next;
-                })
-              }
-            >
-              Discard changes
-            </Button>
-          )}
-          <span className="text-xs text-muted">
-            Changes take effect after the next template push (Fleet tab).
-          </span>
         </div>
       </div>
 
