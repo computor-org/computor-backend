@@ -18,7 +18,7 @@ from uuid import UUID
 from datetime import datetime, timezone
 from sqlalchemy import func, case, select, and_, literal
 import sqlalchemy as sa
-from sqlalchemy.orm import Session, joinedload, contains_eager, subqueryload
+from sqlalchemy.orm import Session, joinedload, contains_eager, selectinload, subqueryload
 from pydantic import BaseModel, ConfigDict
 
 from computor_backend.exceptions import NotFoundException
@@ -30,6 +30,7 @@ from computor_backend.model.course import (
     CourseMember,
     SubmissionGroup
 )
+from computor_backend.model.deployment import CourseContentDeployment
 from computor_backend.model.result import Result
 from computor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
 from computor_backend.model.auth import User
@@ -382,6 +383,15 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
         .joinedload(SubmissionArtifact.grades)
         .joinedload(SubmissionGrade.graded_by)
         .joinedload(CourseMember.user),
+        # Every mapped row reads ``deployment`` (and, through it, the example
+        # version that supplies the title/description a listing shows), so
+        # leaving them lazy costs one round trip each: on a 172-row dashboard
+        # that was 172 + 148 queries. selectinload rather than joinedload —
+        # this query already carries a dozen joins and a DISTINCT, and widening
+        # it again risks the row blow-up guarded against above.
+        selectinload(CourseContent.deployment).selectinload(
+            CourseContentDeployment.example_version
+        ),
     )
 
     query = query.distinct()

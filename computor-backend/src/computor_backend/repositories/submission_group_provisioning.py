@@ -93,10 +93,15 @@ def stamp_member_repo_on_submission_groups(course_member, db) -> int:
     return updated
 
 
+#: Distinguishes "caller did not look it up" from "caller looked and found none".
+_NOT_FETCHED = object()
+
+
 def _create_submission_group_for_member(
     course_member: CourseMember,
     course_content: CourseContent,
-    db: Session
+    db: Session,
+    existing_group: "SubmissionGroup | None | object" = _NOT_FETCHED,
 ) -> SubmissionGroup | None:
     """
     Helper function to create or update a submission group for a course member and course content.
@@ -116,16 +121,19 @@ def _create_submission_group_for_member(
     Returns:
         Created or updated SubmissionGroup, or None if already exists and properly configured
     """
-    # Check if submission group already exists
-    existing_group = (
-        db.query(SubmissionGroup)
-        .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id)
-        .filter(
-            SubmissionGroup.course_content_id == course_content.id,
-            SubmissionGroupMember.course_member_id == course_member.id
+    # Check if submission group already exists. ``provision_submission_groups_for_user``
+    # resolves these for a whole course in one query and passes the answer in;
+    # asked one content at a time this was ~150 queries per page load.
+    if existing_group is _NOT_FETCHED:
+        existing_group = (
+            db.query(SubmissionGroup)
+            .join(SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id)
+            .filter(
+                SubmissionGroup.course_content_id == course_content.id,
+                SubmissionGroupMember.course_member_id == course_member.id
+            )
+            .first()
         )
-        .first()
-    )
 
     # Calculate max_group_size
     max_group_size = course_content.max_group_size if course_content.max_group_size is not None else 1
@@ -299,6 +307,29 @@ def provision_submission_groups_for_user(
             .all()
         )
 
+        # Which of those this member already has a group for, in one query.
+        # This runs on every cache miss of the student course-contents view, so
+        # in steady state it is the whole cost of provisioning: asking per
+        # content was ~150 queries that created nothing.
+        content_ids = [content.id for content, _ in submittable_contents]
+        existing_by_content = {}
+        if content_ids:
+            existing_by_content = {
+                group.course_content_id: group
+                for group in (
+                    db.query(SubmissionGroup)
+                    .join(
+                        SubmissionGroupMember,
+                        SubmissionGroupMember.submission_group_id == SubmissionGroup.id,
+                    )
+                    .filter(
+                        SubmissionGroup.course_content_id.in_(content_ids),
+                        SubmissionGroupMember.course_member_id == course_member.id,
+                    )
+                    .all()
+                )
+            }
+
         for course_content, course_content_kind in submittable_contents:
             # Check max_group_size - skip team assignments
             if course_content.max_group_size is not None and course_content.max_group_size > 1:
@@ -310,7 +341,10 @@ def provision_submission_groups_for_user(
 
             # Use helper function to create submission group
             submission_group = _create_submission_group_for_member(
-                course_member, course_content, db
+                course_member,
+                course_content,
+                db,
+                existing_group=existing_by_content.get(course_content.id),
             )
             if submission_group:
                 created_count += 1

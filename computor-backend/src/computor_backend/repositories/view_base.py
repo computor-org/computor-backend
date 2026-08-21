@@ -434,15 +434,31 @@ class ViewRepository(ABC):
         tag each course_content for deployment-related cache invalidation, cache
         the serialized DTOs, and return the list.
         """
-        from .view_mappers import course_member_course_content_result_mapper
+        from .view_mappers import (
+            build_submission_group_prefetch,
+            course_member_course_content_result_mapper,
+        )
         from .course_content_queries import CourseMemberCourseContentQueryResult
 
         from ..business_logic.content_visibility import annotate_effective_visibility
 
+        typed_rows = [CourseMemberCourseContentQueryResult.from_tuple(raw) for raw in raw_results]
+
+        # Resolve the per-group lookups for the whole page in two queries rather
+        # than two per row. Without this a 172-row dashboard issued 302 extra
+        # round trips whose combined result set was a handful of rows.
+        prefetch = build_submission_group_prefetch(
+            (row.submission_group.id for row in typed_rows if row.submission_group is not None),
+            self.db,
+        )
+
         response_list: List[Any] = []
-        for raw in raw_results:
-            typed = CourseMemberCourseContentQueryResult.from_tuple(raw)
-            response_list.append(await course_member_course_content_result_mapper(typed, self.db))
+        for typed in typed_rows:
+            response_list.append(
+                await course_member_course_content_result_mapper(
+                    typed, self.db, prefetch=prefetch
+                )
+            )
 
         # Resolve visibility once for the whole set (issue #338). Students have
         # already had their hidden rows filtered out in SQL, so this is a no-op
