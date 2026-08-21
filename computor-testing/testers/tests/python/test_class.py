@@ -38,7 +38,97 @@ from ..test_base import (
     check_error,
     check_warning,
     compare_variable_by_qualification,
+    check_occurrence_range,
 )
+from ctcore.security import safe_regex_findall, RegexTimeoutError
+
+
+# Token types that carry no code and must never take part in a name match.
+# COMMENT/STRING/FSTRING_* exclusion keeps matches out of comments and literals.
+_NEEDLE_SKIP_TYPES = {
+    tokenize.ENCODING, tokenize.NEWLINE, tokenize.NL, tokenize.INDENT,
+    tokenize.DEDENT, tokenize.ENDMARKER, tokenize.COMMENT,
+}
+_HAYSTACK_SKIP_TYPES = {
+    tokenize.ENCODING, tokenize.INDENT, tokenize.DEDENT, tokenize.COMMENT,
+    tokenize.STRING, tokenize.ENDMARKER,
+} | {
+    t for t in (
+        # FSTRING_* only exist on Python 3.12+
+        getattr(tokenize, _n, None)
+        for _n in ("FSTRING_START", "FSTRING_MIDDLE", "FSTRING_END")
+    )
+    if t is not None
+}
+
+
+def _tokenize_name(name: str):
+    """
+    Tokenize a searched-for name into its significant token strings.
+
+    "for" -> ["for"], "np.pi" -> ["np", ".", "pi"].
+    Returns None if the name is not tokenizable Python.
+    """
+    try:
+        pieces = [
+            t.string for t in tokenize.generate_tokens(io.StringIO(name).readline)
+            if t.type not in _NEEDLE_SKIP_TYPES and t.string
+        ]
+    except (tokenize.TokenError, SyntaxError, IndentationError):
+        return None
+    return pieces or None
+
+
+def _read_tokens(file_path: str):
+    """Tokenize a student file, failing the test if it cannot be parsed."""
+    try:
+        with open(file_path, 'rb') as f:
+            return list(tokenize.tokenize(f.readline))
+    except (tokenize.TokenError, SyntaxError, IndentationError) as e:
+        pytest.fail(f"Could not tokenize student file: {e}")
+
+
+def _count_single_token(file_path: str, name: str, occurance_type=None) -> int:
+    """Count tokens whose text equals `name`, optionally filtered by token type."""
+    count = 0
+    for _token in _read_tokens(file_path):
+        if occurance_type:
+            c_type = getattr(token, occurance_type, None)
+            if c_type and _token.type == c_type and _token.string == name:
+                count += 1
+        elif _token.type not in _HAYSTACK_SKIP_TYPES and _token.string == name:
+            count += 1
+    return count
+
+
+def _count_token_sequence(file_path: str, name: str) -> int:
+    """
+    Count non-overlapping occurrences of `name` as a token sequence.
+
+    Multi-token names such as "np.pi" are matched as consecutive tokens, which
+    plain per-token comparison can never do. NEWLINE/NL are kept in the stream
+    so a sequence cannot span logical lines.
+    """
+    needle = _tokenize_name(name)
+    if needle is None:
+        return _count_single_token(file_path, name)
+    if len(needle) == 1:
+        return _count_single_token(file_path, needle[0])
+
+    hay = [
+        t.string for t in _read_tokens(file_path)
+        if t.type not in _HAYSTACK_SKIP_TYPES
+    ]
+
+    count = 0
+    i = 0
+    while i <= len(hay) - len(needle):
+        if hay[i:i + len(needle)] == needle:
+            count += 1
+            i += len(needle)
+        else:
+            i += 1
+    return count
 
 
 def get_solution(mm, pytestconfig, idx: int, where: Solution) -> dict:
@@ -436,27 +526,32 @@ class TestComputorPython:
             if not file_path or not os.path.exists(file_path):
                 pytest.fail("Python file not found for structural test")
 
-            if sub.allowedOccuranceRange is None:
+            if sub.allowedOccuranceRange is None and sub.countRequirement is None:
                 pytest.skip("allowedOccuranceRange not set")
 
-            c_min, c_max = sub.allowedOccuranceRange
-            if c_max == 0:
-                c_max = float('inf')
+            if sub.pattern:
+                with open(file_path, 'r') as f:
+                    source = f.read()
+                try:
+                    count = len(safe_regex_findall(sub.pattern, source))
+                except RegexTimeoutError:
+                    pytest.fail(f"Pattern `{sub.pattern}` timed out (possible ReDoS)")
+            elif sub.occuranceType:
+                count = _count_single_token(
+                    file_path, sub.name, occurance_type=sub.occuranceType
+                )
+            else:
+                count = _count_token_sequence(file_path, sub.name)
 
-            count = 0
-            with open(file_path, 'rb') as f:
-                tokens = tokenize.tokenize(f.readline)
-                for _token in tokens:
-                    if sub.occuranceType:
-                        c_type = getattr(token, sub.occuranceType, None)
-                        if c_type and _token.type == c_type and _token.string == sub.name:
-                            count += 1
-                    else:
-                        if _token.string == sub.name:
-                            count += 1
-
-            assert c_min <= count <= c_max, \
-                f"`{sub.name}` found {count} times, expected {c_min}-{c_max}"
+            if sub.allowedOccuranceRange is not None:
+                check_occurrence_range(
+                    count, sub.allowedOccuranceRange, f"`{sub.name}`"
+                )
+            elif count != sub.countRequirement:
+                pytest.fail(
+                    f"`{sub.name}` found {count} times, "
+                    f"expected {sub.countRequirement}"
+                )
 
         elif testtype == TypeEnum.linting:
             # Python-specific: flake8

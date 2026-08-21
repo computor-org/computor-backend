@@ -123,12 +123,12 @@ def pytest_configure(config: pytest.Config) -> None:
     testcases = []
     main_tests: List[ComputorReportMain] = []
 
+    # NOTE: allowedOccuranceRange/occuranceType are deliberately NOT inherited,
+    # matching BaseTesterConfig.sub_fields - see conftest_base.py.
     subfields = [
         "qualification",
         "relativeTolerance",
         "absoluteTolerance",
-        "allowedOccuranceRange",
-        "occuranceType",
         "typeCheck",
         "shapeCheck",
         "ignoreClass",

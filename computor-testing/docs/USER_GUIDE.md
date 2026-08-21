@@ -209,14 +209,28 @@ Available for ALL languages. Checks for keywords/patterns in source code.
 
     - name: uses_function
       pattern: "\\bdef\\b"
-      allowedOccuranceRange: [1, 0]  # Must appear at least once (0 = no upper limit)
+      allowedOccuranceRange: [1, 0]  # At least once, no upper limit
 
     - name: for_loop
       pattern: "\\bfor\\b"
       allowedOccuranceRange: [2, 5]  # Must appear 2-5 times
 ```
 
-**Note on `allowedOccuranceRange`:** The format is `[min, max]`. A `max` of `0` means "no upper limit".
+**Note on `allowedOccuranceRange`:** The format is `[min, max]`:
+
+| Value | Meaning |
+| --- | --- |
+| `[0, 0]` | The item must **not** occur at all |
+| `[n, 0]` (n > 0) | At least `n` occurrences, no upper limit |
+| `[min, max]` | Between `min` and `max` occurrences, inclusive |
+
+Alternatively, `countRequirement: n` asserts an exact count. It applies only when
+`allowedOccuranceRange` is not set; a sub-test with neither is skipped.
+
+For Python, `name` is matched against the token stream, so dotted names such as
+`np.pi` are counted as a unit and matches inside comments and strings are
+ignored. Supplying a `pattern` instead switches to a regex over the raw file
+text, which does include comments and strings.
 
 ### exitcode - Exit Code Check (C, Fortran)
 

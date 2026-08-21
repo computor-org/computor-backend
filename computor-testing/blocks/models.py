@@ -224,7 +224,11 @@ COMMON_FIELDS = {
         name="allowedOccuranceRange",
         type=FieldType.ARRAY,
         array_item_type=FieldType.INTEGER,
-        description="Allowed occurrence count [min, max]",
+        description=(
+            "Allowed occurrence count [min, max]. [0, 0] forbids the item, "
+            "[n, 0] with n > 0 means at least n with no upper limit, "
+            "otherwise the range is inclusive."
+        ),
         required=False,
         min_length=2,
         max_length=2,

@@ -626,6 +626,53 @@ def check_exist(
     return matches
 
 
+def resolve_occurrence_range(allowed_range: List[int]) -> Tuple[int, float]:
+    """
+    Resolve an [min, max] occurrence range into effective bounds.
+
+    Semantics (uniform across all testers):
+        [0, 0]     -> forbidden: must occur exactly 0 times
+        [n, 0]     -> at least n, no upper bound (n > 0)
+        [min, max] -> literal inclusive range
+    """
+    c_min, c_max = allowed_range
+    if c_max == 0 and c_min > 0:
+        return c_min, float('inf')
+    return c_min, c_max
+
+
+def check_occurrence_range(
+    count: int, allowed_range: List[int], subject: str, style: str = "found",
+):
+    """
+    Assert an occurrence count lies within allowed_range, failing with a message
+    that reflects which of the three range semantics applies.
+
+    Args:
+        count: The measured number of occurrences
+        allowed_range: [min, max] as written in the test definition
+        subject: What was counted, e.g. "`for`" or "Word count"
+        style: "found" for countable tokens, "is" for document metrics
+    """
+    c_min, c_max = resolve_occurrence_range(allowed_range)
+
+    if c_min <= count <= c_max:
+        return
+
+    if c_min == 0 and c_max == 0:
+        if style == "is":
+            pytest.fail(f"{subject} is {count}, but must be 0")
+        pytest.fail(f"{subject} found {count} times, but must not occur")
+    elif c_max == float('inf'):
+        if style == "is":
+            pytest.fail(f"{subject} is {count}, expected at least {c_min}")
+        pytest.fail(f"{subject} found {count} times, expected at least {c_min}")
+    else:
+        if style == "is":
+            pytest.fail(f"{subject} is {count}, expected {c_min}-{c_max}")
+        pytest.fail(f"{subject} found {count} times, expected {c_min}-{c_max}")
+
+
 def check_structural(
     name: str, pattern: Optional[str], file: Optional[str],
     dir_student: str, file_extensions: List[str],
@@ -668,15 +715,13 @@ def check_structural(
     else:
         occurrences = code.count(name)
 
-    if allowed_occurance_range:
-        min_occ, max_occ = allowed_occurance_range
-        if max_occ == 0:
-            max_occ = float('inf')
-        assert min_occ <= occurrences <= max_occ, \
-            f"'{name}' found {occurrences} times, expected {min_occ}-{max_occ}"
+    if allowed_occurance_range is not None:
+        check_occurrence_range(occurrences, allowed_occurance_range, f"'{name}'")
     elif count_requirement is not None:
-        assert occurrences == count_requirement, \
-            f"'{name}' found {occurrences} times, expected {count_requirement}"
+        if occurrences != count_requirement:
+            pytest.fail(
+                f"'{name}' found {occurrences} times, expected {count_requirement}"
+            )
 
 
 def check_error(solution: dict, pattern: Optional[str] = None):

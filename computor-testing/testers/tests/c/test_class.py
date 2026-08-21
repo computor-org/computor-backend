@@ -26,6 +26,7 @@ from ..test_base import (
     Solution,
     CompiledSolutionManager,
     CompiledTestClass,
+    check_occurrence_range,
 )
 
 
@@ -218,12 +219,8 @@ class TestComputorC(CompiledTestClass):
         elif name in analysis.get("keywords", {}):
             count = analysis["keywords"][name]
             allowed_range = context["allowed_occurance_range"]
-            if allowed_range:
-                c_min, c_max = allowed_range
-                if c_max == 0:
-                    c_max = float('inf')
-                if not (c_min <= count <= c_max):
-                    pytest.fail(f"`{name}` found {count} times, expected {c_min}-{c_max}")
+            if allowed_range is not None:
+                check_occurrence_range(count, allowed_range, f"`{name}`")
             elif value is not None:
                 if count != int(value):
                     pytest.fail(f"`{name}` found {count} times, expected {value}")
