@@ -123,6 +123,35 @@ export function ScrollPanel({
   );
 }
 
+/**
+ * The surface's commit action, pinned below the scroll body.
+ *
+ * Rendered as the LAST child of <ListPageLayout>, after the ScrollArea — the
+ * arrangement ListPageLayout's own docstring describes for a pager. A Save that
+ * lives at the bottom of the scrolling body instead scrolls away exactly when a
+ * form is long enough to need it, which is the one case where you want it.
+ *
+ * For a page whose fields sit in a <form>, keep the submit here and wire it with
+ * the HTML `form=` attribute, the way <FormPanel> does, so Enter still submits.
+ *
+ * Only for a surface with ONE commit. A page whose cards each save separately
+ * keeps its buttons in the cards: a single pinned "Save" cannot say which card
+ * it means.
+ */
+export function PageActions({
+  className = '',
+  children,
+}: {
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`shrink-0 flex flex-wrap items-center gap-3 border-t border-rule pt-4 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
 /** Centered, borderless placeholder that occupies the scroll body while loading. */
 export function ListLoading({ children = 'Loading…' }: { children?: ReactNode }) {
   return <div className="flex-1 min-h-0 flex items-center justify-center text-muted">{children}</div>;

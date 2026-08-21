@@ -128,10 +128,15 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
   if (loading) return <ListLoading>Loading settings…</ListLoading>;
 
   return (
-    <>
+    // Fills the page: the settings cards scroll, "Save settings" does not. It
+    // used to be the last child of a page-length scroll, so on a template with
+    // several Terraform variables you had to scroll to the bottom to commit a
+    // change you made at the top.
+    <div className="flex h-full min-h-0 flex-col gap-4">
       <ErrorBanner>{error}</ErrorBanner>
 
-      <div className="shrink-0 bg-surface rounded-lg border border-rule p-5 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto scroll-slim scroll-gutter space-y-4">
+      <div className="bg-surface rounded-lg border border-rule p-5 space-y-4">
         <div>
           <h2 className="text-lg font-semibold text-fg">Resource limits &amp; seats</h2>
           <p className="text-sm text-muted mt-1">
@@ -208,7 +213,7 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
         </div>
       </div>
 
-      <div className="shrink-0 bg-surface rounded-lg border border-rule p-5 space-y-4">
+      <div className="bg-surface rounded-lg border border-rule p-5 space-y-4">
         <div>
           <h2 className="text-lg font-semibold text-fg">Root &amp; internet policy</h2>
           <p className="text-sm text-muted mt-1">
@@ -255,7 +260,7 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
         </label>
       </div>
 
-      <div className="shrink-0 bg-surface rounded-lg border border-rule p-5 space-y-3">
+      <div className="bg-surface rounded-lg border border-rule p-5 space-y-3">
         <div>
           <h2 className="text-lg font-semibold text-fg">Terraform variable overrides</h2>
           <p className="text-sm text-muted mt-1">
@@ -365,7 +370,9 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
         )}
       </div>
 
-      <div className="shrink-0 flex items-center gap-3">
+      </div>
+
+      <div className="shrink-0 flex flex-wrap items-center gap-3 border-t border-rule pt-4">
         <Button onClick={save} loading={saving} loadingLabel="Saving…">
           Save settings
         </Button>
@@ -375,6 +382,6 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
           </Button>
         )}
       </div>
-    </>
+    </div>
   );
 }

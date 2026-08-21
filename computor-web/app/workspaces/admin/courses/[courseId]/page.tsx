@@ -3,7 +3,7 @@
 import { Suspense, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
+import ListPageLayout, { ScrollArea, ListLoading, PageActions } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import Forbidden from '@/src/components/Forbidden';
 import ErrorBanner from '@/src/components/ErrorBanner';
@@ -292,17 +292,22 @@ function CourseWorkspaceConfigContent() {
             </label>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Button onClick={save} loading={saving} loadingLabel="Saving…">
-              Save configuration
-            </Button>
-            {draft && (
-              <Button variant="ghost" onClick={() => setDraft(null)} disabled={saving}>
-                Discard changes
-              </Button>
-            )}
-          </div>
         </ScrollArea>
+      )}
+
+      {/* One form, one commit — pinned so it is reachable from any scroll
+          position rather than only after scrolling past the template picker. */}
+      {!loading && (
+        <PageActions>
+          <Button onClick={save} loading={saving} loadingLabel="Saving…">
+            Save configuration
+          </Button>
+          {draft && (
+            <Button variant="ghost" onClick={() => setDraft(null)} disabled={saving}>
+              Discard changes
+            </Button>
+          )}
+        </PageActions>
       )}
     </ListPageLayout>
   );

@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
+import ListPageLayout, { ScrollArea, PageActions } from '@/src/components/ListPageLayout';
+import Button from '@/src/components/ui/Button';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
@@ -249,19 +250,22 @@ export default function PrivacyNoticesPage() {
               </button>
             </div>
 
-            <div className="mt-5 flex items-center gap-4">
-              <button
-                type="button"
-                onClick={onClickPublish}
-                disabled={publishing || !!validationError}
-                className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors"
-              >
-                {publishing ? 'Publishing…' : 'Publish version'}
-              </button>
-              {validationError && <span className="text-sm text-muted">{validationError}</span>}
-            </div>
           </div>
         </ScrollArea>
+
+        {/* The page's one write action — pinned rather than left at the foot of
+            the publish form, which sits below a version history of any length. */}
+        <PageActions>
+          <Button
+            onClick={onClickPublish}
+            disabled={publishing || !!validationError}
+            loading={publishing}
+            loadingLabel="Publishing…"
+          >
+            Publish version
+          </Button>
+          {validationError && <span className="text-sm text-muted">{validationError}</span>}
+        </PageActions>
 
         <ConfirmDialog
           open={showConfirm}
