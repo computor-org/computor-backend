@@ -45,6 +45,16 @@ class GradingStatus(IntEnum):
         except (ValueError, TypeError):
             return cls.NOT_REVIEWED
 
+    @classmethod
+    def from_slug(cls, value: str) -> Optional["GradingStatus"]:
+        """Inverse of :meth:`to_slug`. ``None`` for anything unrecognised, so a
+        caller filtering on a user-supplied slug can reject it rather than
+        silently matching nothing."""
+        try:
+            return cls[value.strip().upper()]
+        except KeyError:
+            return None
+
 class SubmissionGroupGradingCreate(BaseModel):
     """Create a new grading for a submission group."""
     submission_group_id: str

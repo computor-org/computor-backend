@@ -27,6 +27,7 @@ from computor_types.student_course_contents import (
     CourseContentStudentQuery,
 )
 from computor_backend.interfaces.student_course_contents import CourseContentStudentInterface
+from computor_types.grading import GradingStatus
 from computor_types.student_courses import (
     CourseStudentGet,
     CourseStudentList,
@@ -34,8 +35,32 @@ from computor_types.student_courses import (
 )
 from computor_backend.interfaces.student_courses import CourseStudentInterface
 from ..model.course import Course, CourseContent, CourseMember
-from ..exceptions import NotFoundException
+from ..exceptions import BadRequestException, NotFoundException
 from computor_backend.permissions.roles import CourseRole
+
+
+def _parse_grading_statuses(raw: Optional[str]) -> Optional[list[int]]:
+    """``"correction_necessary,corrected"`` -> ``[2, 1]``.
+
+    Rejects an unknown slug rather than filtering on nothing: a typo that
+    silently returned an empty list would look like "you have no work to do".
+    """
+    if not raw:
+        return None
+    values: list[int] = []
+    for token in raw.split(","):
+        if not token.strip():
+            continue
+        status = GradingStatus.from_slug(token)
+        if status is None:
+            raise BadRequestException(
+                detail=(
+                    f"Unknown grading status {token.strip()!r}. Expected one of: "
+                    + ", ".join(s.to_slug() for s in GradingStatus)
+                )
+            )
+        values.append(int(status))
+    return values or None
 
 
 class StudentViewRepository(ViewRepository):
@@ -207,7 +232,9 @@ class StudentViewRepository(ViewRepository):
         include_hidden = self._may_see_hidden(permissions, params.course_id)
 
         # Query from DB using existing query function
-        query = user_course_content_list_query(user_id, self.db)
+        query = user_course_content_list_query(
+            user_id, self.db, grading_statuses=_parse_grading_statuses(params.status)
+        )
         course_contents_results = CourseContentStudentInterface.search(
             self.db, query, params, include_hidden=include_hidden
         ).all()
