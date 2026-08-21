@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuth } from '@/src/contexts/AuthContext';
+import Button from '@/src/components/ui/Button';
 import { API_BASE_URL, CONSENT_REDIRECT_KEY, apiGet, apiPost } from '@/src/utils/apiClient';
 import type {
   ConsentStatusGet as ConsentStatus,
@@ -183,24 +184,22 @@ export default function ConsentPage() {
             {policy?.languages && policy.languages.length > 1 && (
               <div className="flex gap-2">
                 {policy.languages.map((lang) => (
-                  <button
+                  <Button
                     key={lang}
+                    variant={policy.lang === lang ? 'primary' : 'secondary'}
+                    size="sm"
                     onClick={() => handleLanguageChange(lang)}
-                    className={`px-3 py-1 text-sm rounded-md border ${
-                      policy.lang === lang
-                        ? 'bg-accent text-on-accent border-accent'
-                        : 'bg-surface text-body border-rule-strong hover:bg-canvas'
-                    }`}
+                    aria-pressed={policy.lang === lang}
                   >
                     {lang.toUpperCase()}
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}
           </div>
           {policy ? (
             <div className="max-h-96 overflow-y-auto scroll-slim border border-rule rounded-lg p-4">
-              <div className="prose prose-slate max-w-none">
+              <div className="prose markdown max-w-none">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{policy.content}</ReactMarkdown>
               </div>
             </div>
@@ -228,13 +227,14 @@ export default function ConsentPage() {
               <p className="text-sm text-muted">
                 You can withdraw your consent at any time in Settings.
               </p>
-              <button
+              <Button
                 onClick={handleSubmit}
-                disabled={!accepted || submitting}
-                className="px-6 py-2 rounded-lg font-medium bg-accent text-on-accent hover:bg-accent-hover disabled:bg-faint disabled:cursor-not-allowed"
+                disabled={!accepted}
+                loading={submitting}
+                loadingLabel="Saving…"
               >
-                {submitting ? 'Saving...' : 'Agree and continue'}
-              </button>
+                Agree and continue
+              </Button>
             </div>
           </div>
         )}
