@@ -155,13 +155,6 @@ export default function DashboardPage() {
               </section>
             )}
 
-            {attention.length > 0 && (
-              <section>
-                <SectionHeading title="Sent back for correction" />
-                <NeedsAttention items={attention} />
-              </section>
-            )}
-
             <section>
               <SectionHeading title="Your courses" href="/courses" />
               {courses.length === 0 ? (
@@ -184,6 +177,13 @@ export default function DashboardPage() {
                 </div>
               )}
             </section>
+
+            {attention.length > 0 && (
+              <section>
+                <SectionHeading title="Sent back for correction" />
+                <NeedsAttention items={attention} />
+              </section>
+            )}
 
             {runningWorkspaces.length > 0 && (
               <section>
