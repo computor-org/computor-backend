@@ -214,6 +214,20 @@ class CourseContentStudentQuery(ListQuery):
     path: Optional[str] = None
     course_id: Optional[str] = None
     course_content_type_id: Optional[str] = None
+    # Comma-separated grading-status slugs ("correction_necessary",
+    # "corrected", ...). Narrows the listing to *assignments* carrying one of
+    # those verdicts, in SQL, before anything is mapped. Units never match: a
+    # unit's status is aggregated from its descendants and is not a verdict of
+    # its own, which is also why no caller wants them here.
+    #
+    # Note "not_reviewed" means a grade row that says so -- an assignment nobody
+    # has graded at all has ``status`` None and matches nothing. There is
+    # deliberately no filter for "ungraded": that is most of a course, and
+    # asking for it would defeat the point of this parameter.
+    #
+    # This exists for the dashboard, which needed 2 rows and was being handed
+    # every course content the student can see.
+    status: Optional[str] = None
     
     directory: Optional[str] = None
     project: Optional[str] = None

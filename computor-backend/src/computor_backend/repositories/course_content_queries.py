@@ -259,7 +259,11 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
     return CourseMemberCourseContentQueryResult.from_tuple(course_contents_result)
 
 
-def user_course_content_list_query(user_id: UUID | str, db: Session):
+def user_course_content_list_query(
+    user_id: UUID | str,
+    db: Session,
+    grading_statuses: Optional[list[int]] = None,
+):
     """
     Get list of all course contents for a specific user across all their courses.
 
@@ -268,6 +272,11 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
     Args:
         user_id: The user ID
         db: Database session
+        grading_statuses: Optional ``GradingStatus`` ints. Narrows the result to
+            assignments whose latest submitted artifact carries one of those
+            verdicts. Applied here rather than in
+            ``CourseContentStudentInterface.search`` because the status lives in
+            a subquery this function builds and nothing outside it can name.
 
     Returns:
         Query object that can be further filtered or executed
@@ -393,6 +402,14 @@ def user_course_content_list_query(user_id: UUID | str, db: Session):
             CourseContentDeployment.example_version
         ),
     )
+
+    if grading_statuses:
+        # An inner filter, not a post-map one: the point is that the rows never
+        # get built. Units drop out for free -- their aggregated status is not a
+        # grade on an artifact, so this column is NULL for them.
+        query = query.filter(
+            latest_submission_grade_sub.c.latest_grade_status.in_(grading_statuses)
+        )
 
     query = query.distinct()
 
