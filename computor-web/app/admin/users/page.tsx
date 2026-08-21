@@ -106,10 +106,15 @@ export default function UsersPage() {
               </Thead>
               <Tbody>
                 {users.map((u) => (
-                  <tr key={u.id} className={`hover:bg-canvas ${u.archived_at ? 'opacity-50' : ''}`}>
+                  // Archived rows read quieter through the muted address, not
+                  // `opacity` on the <tr>: opacity composites the whole subtree,
+                  // so it also faded the row's "Manage" link — the one action an
+                  // archived user's row is there for. The Archived badge already
+                  // carries the state.
+                  <tr key={u.id} className="hover:bg-canvas">
                     <td className="px-4 py-3">
                       <Link href={`/admin/users/${u.id}`} className="block group">
-                        <div className="font-medium text-fg text-sm group-hover:text-accent-text">{u.email ?? '—'}</div>
+                        <div className={`font-medium text-sm group-hover:text-accent-text ${u.archived_at ? 'text-muted' : 'text-fg'}`}>{u.email ?? '—'}</div>
                         <div className="text-xs text-muted">{u.given_name} {u.family_name}</div>
                       </Link>
                     </td>

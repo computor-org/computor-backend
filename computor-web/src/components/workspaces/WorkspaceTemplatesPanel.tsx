@@ -259,9 +259,15 @@ export default function WorkspaceTemplatesPanel() {
               {templates.map((template) => {
                 const settings = settingsByName.get(template.name);
                 const state = availability(template);
+                // Not currently offered to users, so the row reads quieter —
+                // but as a muted TITLE, never as opacity on the <tr>. Opacity
+                // composites the whole subtree and a child cannot opt out, so
+                // `opacity-70` here also dimmed the row's Deploy button: the one
+                // control these rows exist for looked disabled while being the
+                // primary action on them.
                 const dimmed = !template.deployed || !template.enabled;
                 return (
-                  <Tr key={template.name} className={`hover:bg-canvas ${dimmed ? 'opacity-70' : ''}`}>
+                  <Tr key={template.name} className="hover:bg-canvas">
                     <Td>
                       {/* Only undeployed templates are deploy targets, so only
                           they are selectable — the rest have no action here. */}
@@ -278,7 +284,7 @@ export default function WorkspaceTemplatesPanel() {
                       <div className="flex items-start gap-3">
                         <TemplateIcon template={template} size="sm" />
                         <div className="min-w-0">
-                          <div className="text-sm font-medium text-fg">
+                          <div className={`text-sm font-medium ${dimmed ? 'text-muted' : 'text-fg'}`}>
                             {template.display_name || template.name}
                           </div>
                           <div className="text-xs text-muted">{template.name}</div>
