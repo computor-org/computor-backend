@@ -95,12 +95,14 @@ class BaseTesterConfig(ABC):
     has_report_header: bool = True
 
     # Property inheritance fields (used when has_property_inheritance=True)
+    # NOTE: allowedOccuranceRange/occuranceType are deliberately NOT inherited.
+    # The suite-level defaults ([0, 0] / "NAME") would otherwise be pushed into
+    # every sub-test, making countRequirement unreachable and turning an
+    # explicit [0, 0] ("must not occur") into an unconditional pass.
     sub_fields: List[str] = [
         "qualification",
         "relativeTolerance",
         "absoluteTolerance",
-        "allowedOccuranceRange",
-        "occuranceType",
         "typeCheck",
         "shapeCheck",
         "ignoreClass",

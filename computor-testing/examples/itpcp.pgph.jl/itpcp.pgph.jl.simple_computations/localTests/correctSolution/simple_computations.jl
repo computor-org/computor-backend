@@ -1,5 +1,5 @@
 # Simple computations in Julia - Correct Solution
-# This is the correct implementation for testing
+# This is the correct implementation used in tests
 
 # Initialization of basic variables
 a = 2.0

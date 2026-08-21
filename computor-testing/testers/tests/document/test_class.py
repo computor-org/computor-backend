@@ -27,6 +27,7 @@ from ..test_base import (
     check_file_exists,
     check_success_dependencies,
     check_exist,
+    check_occurrence_range,
 )
 
 
@@ -277,12 +278,8 @@ class TestComputorDocument:
                     pytest.fail(f"Pattern `{pattern}` timed out (possible ReDoS)")
                 count = len(matches)
 
-                if allowed_range:
-                    c_min, c_max = allowed_range
-                    if c_max == 0:
-                        c_max = float('inf')
-                    if not (c_min <= count <= c_max):
-                        pytest.fail(f"Pattern `{pattern}` found {count} times, expected {c_min}-{c_max}")
+                if allowed_range is not None:
+                    check_occurrence_range(count, allowed_range, f"Pattern `{pattern}`")
                 elif value is not None:
                     if count != int(value):
                         pytest.fail(f"Pattern `{pattern}` found {count} times, expected {value}")
@@ -424,15 +421,10 @@ class TestComputorDocument:
             qualification: Test qualification type
             metric_name: Human-readable metric name for error messages
         """
-        if allowed_range:
-            c_min, c_max = allowed_range
-            if c_max == 0:
-                c_max = float('inf')
-            if not (c_min <= actual <= c_max):
-                if c_max == float('inf'):
-                    pytest.fail(f"{metric_name.capitalize()} is {actual}, expected at least {c_min}")
-                else:
-                    pytest.fail(f"{metric_name.capitalize()} is {actual}, expected {c_min}-{c_max}")
+        if allowed_range is not None:
+            check_occurrence_range(
+                actual, allowed_range, metric_name.capitalize(), style="is"
+            )
         elif value is not None:
             expected = int(value)
             if qualification == QualificationEnum.verifyEqual:

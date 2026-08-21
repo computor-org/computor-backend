@@ -29,7 +29,11 @@ from ctcore.stdio import (
     compare_outputs,
     match_exit_code,
 )
-from ..test_base import main_idx_by_dependency, check_file_exists
+from ..test_base import (
+    main_idx_by_dependency,
+    check_file_exists,
+    check_occurrence_range,
+)
 
 
 def get_source_files(main: ComputorTestCollection, directory: str) -> list:
@@ -431,12 +435,8 @@ class TestComputorFortran:
             elif name in analysis.get("keywords", {}):
                 count = analysis["keywords"][name]
                 allowed_range = sub.allowedOccuranceRange
-                if allowed_range:
-                    c_min, c_max = allowed_range
-                    if c_max == 0:
-                        c_max = float('inf')
-                    if not (c_min <= count <= c_max):
-                        pytest.fail(f"`{name}` found {count} times, expected {c_min}-{c_max}")
+                if allowed_range is not None:
+                    check_occurrence_range(count, allowed_range, f"`{name}`")
                 elif value is not None:
                     if count != int(value):
                         pytest.fail(f"`{name}` found {count} times, expected {value}")

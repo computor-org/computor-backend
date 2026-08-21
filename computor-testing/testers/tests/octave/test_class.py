@@ -35,6 +35,7 @@ from ..test_base import (
     check_warning,
     compare_variable_by_qualification,
     apply_token_exchange_to_code,
+    check_occurrence_range,
 )
 
 
@@ -265,9 +266,6 @@ class TestComputorOctave:
             if sub.allowedOccuranceRange is None:
                 pytest.skip(reason="allowedOccuranceRange not set")
 
-            c_min = sub.allowedOccuranceRange[0]
-            c_max = sub.allowedOccuranceRange[1]
-
             file_list = _report.get("student_file_list", [])
             command_list = _report.get("student_command_list", [])
             actual_file = token_exchange(main.file, file_list, command_list)
@@ -279,14 +277,7 @@ class TestComputorOctave:
             counts = run_structural_analysis(file_path, [sub.name])
             c = counts.get(sub.name, 0)
 
-            if c < c_min:
-                raise AssertionError(
-                    f"`{sub.name}` found {c} times, minimum required: {c_min}"
-                )
-            if c > c_max:
-                raise AssertionError(
-                    f"`{sub.name}` found {c} times, maximum allowed: {c_max}"
-                )
+            check_occurrence_range(c, sub.allowedOccuranceRange, f"`{sub.name}`")
 
         elif testtype == TypeEnum.linting:
             pass  # Octave linting not yet implemented
