@@ -6,6 +6,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import { PageLoading } from '@/src/components/ListPageLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
 import { inputCls } from '@/src/components/ui/tokens';
@@ -64,11 +65,11 @@ export default function GitServerEditPage() {
   return (
     <AuthenticatedLayout>
       {loading ? (
-        <div className="p-6 text-gray-500">Loading…</div>
+        <PageLoading />
       ) : (
         <FormPanel
           breadcrumbs={[
-            { label: 'Git Servers', href: '/admin/git-servers' },
+            { label: 'Git servers', href: '/admin/git-servers' },
             { label: server?.name || server?.base_url || 'Git Server', href: `/admin/git-servers/${serverId}` },
             { label: 'Edit' },
           ]}
@@ -82,9 +83,9 @@ export default function GitServerEditPage() {
             <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
           </Field>
           <Field label="Type & URL (immutable)">
-            <input value={`${server?.type ?? ''} · ${server?.base_url ?? ''}`} readOnly className={`${inputCls} bg-gray-50 text-gray-500`} />
+            <input value={`${server?.type ?? ''} · ${server?.base_url ?? ''}`} readOnly className={`${inputCls} bg-canvas text-muted`} />
           </Field>
-          <label className="flex items-center gap-2 text-sm text-gray-700">
+          <label className="flex items-center gap-2 text-sm text-body">
             <input type="checkbox" checked={managed} onChange={(e) => setManaged(e.target.checked)} />
             Managed (Computor operates it and holds a service token)
           </label>

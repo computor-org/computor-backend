@@ -108,7 +108,7 @@ export default function ImportFromFile({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-muted">
         Upload a CSV, JSON, Excel (.xlsx) or Excel-XML student list. Review and adjust the rows, then
         import the ones you want. Existing members are updated rather than duplicated.
       </p>
@@ -120,18 +120,18 @@ export default function ImportFromFile({
           if (f) handleFile(f);
           e.target.value = '';
         }}
-        className="block text-sm text-gray-500 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-blue-600 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700"
+        className="block text-sm text-muted file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-medium file:text-on-accent hover:file:bg-accent-hover"
       />
 
       <ErrorBanner>{fileError}</ErrorBanner>
 
       {fileParsing ? (
-        <div className="text-gray-500 py-8 text-center">Parsing file…</div>
+        <div className="text-muted py-8 text-center">Parsing file…</div>
       ) : parsedRows.length > 0 ? (
         <>
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="bg-surface border border-rule rounded-lg overflow-hidden">
             <Table>
-              <thead className="bg-gray-50">
+              <thead className="bg-canvas">
                 <tr>
                   <th className="px-3 py-3 w-8" />
                   <Th>User</Th>
@@ -145,7 +145,7 @@ export default function ImportFromFile({
                   const res = fileResults[i];
                   const name = `${r.given_name ?? ''} ${r.family_name ?? ''}`.trim() || r.email;
                   return (
-                    <tr key={i} className="hover:bg-gray-50">
+                    <tr key={i} className="hover:bg-canvas">
                       <td className="px-3 py-3">
                         <input
                           type="checkbox"
@@ -154,8 +154,8 @@ export default function ImportFromFile({
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900 text-sm">{name}</div>
-                        <div className="text-xs text-gray-500">{r.email}</div>
+                        <div className="font-medium text-fg text-sm">{name}</div>
+                        <div className="text-xs text-muted">{r.email}</div>
                       </td>
                       <td className="px-4 py-3">
                         <RoleSelect
@@ -169,18 +169,18 @@ export default function ImportFromFile({
                           value={rowGroupFile[i] ?? ''}
                           onChange={(e) => setRowGroupFile((p) => ({ ...p, [i]: e.target.value }))}
                           placeholder="—"
-                          className="w-32 px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-32 px-2 py-1 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
                         />
                       </td>
                       <td className="px-4 py-3 text-sm">
                         {res ? (
                           res.ok ? (
-                            <span className="text-green-700">Added ✓</span>
+                            <span className="text-success-text">Added ✓</span>
                           ) : (
-                            <span className="text-red-600" title={res.message}>Failed</span>
+                            <span className="text-danger-text" title={res.message}>Failed</span>
                           )
                         ) : (
-                          <span className="text-gray-400">—</span>
+                          <span className="text-subtle">—</span>
                         )}
                       </td>
                     </tr>
@@ -198,7 +198,7 @@ export default function ImportFromFile({
             >
               {`Import ${selectedFileCount} selected`}
             </Button>
-            {fileSummary && <span className="text-sm text-gray-600">{fileSummary}</span>}
+            {fileSummary && <span className="text-sm text-muted">{fileSummary}</span>}
           </div>
         </>
       ) : null}

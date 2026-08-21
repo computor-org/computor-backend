@@ -74,19 +74,19 @@ export default function InvitePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">Loading invite…</div>
+      <div className="min-h-screen bg-canvas flex items-center justify-center">
+        <div className="text-muted">Loading invite…</div>
       </div>
     );
   }
 
   if (loadError || !invite) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 w-full max-w-md p-8 text-center">
+      <div className="min-h-screen bg-canvas flex items-center justify-center p-4">
+        <div className="bg-surface rounded-xl shadow-sm border border-rule w-full max-w-md p-8 text-center">
           <div className="text-4xl mb-4">🔗</div>
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">Invite Not Found</h1>
-          <p className="text-sm text-gray-500">{loadError ?? 'This invite link is invalid or has expired.'}</p>
+          <h1 className="text-xl font-semibold text-fg mb-2">Invite Not Found</h1>
+          <p className="text-sm text-muted">{loadError ?? 'This invite link is invalid or has expired.'}</p>
         </div>
       </div>
     );
@@ -94,16 +94,16 @@ export default function InvitePage() {
 
   if (done) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 w-full max-w-md p-8 text-center">
+      <div className="min-h-screen bg-canvas flex items-center justify-center p-4">
+        <div className="bg-surface rounded-xl shadow-sm border border-rule w-full max-w-md p-8 text-center">
           <div className="text-4xl mb-4">✅</div>
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">Account ready</h1>
-          <p className="text-sm text-gray-500 mb-6">
+          <h1 className="text-xl font-semibold text-fg mb-2">Account ready</h1>
+          <p className="text-sm text-muted mb-6">
             Sign in with <strong>{form.email}</strong> and the password you just chose.
           </p>
           <button
             onClick={() => loginWithSSO('keycloak')}
-            className="w-full py-2.5 px-4 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            className="w-full py-2.5 px-4 bg-accent text-on-accent text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors"
           >
             Continue to sign in
           </button>
@@ -113,19 +113,19 @@ export default function InvitePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 w-full max-w-md">
+    <div className="min-h-screen bg-canvas flex items-center justify-center p-4">
+      <div className="bg-surface rounded-xl shadow-sm border border-rule w-full max-w-md">
         {/* Header */}
         <div className="p-8 pb-0">
           <div className="flex items-center gap-3 mb-6">
             <Image src="/computor_logo.png" alt="Computor" width={32} height={32} className="h-8 w-8" />
-            <span className="text-lg font-semibold text-gray-900">Computor</span>
+            <span className="text-lg font-semibold text-fg">Computor</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Create your account</h1>
-          <p className="text-sm text-gray-500 mb-2">You&apos;ve been invited to join Computor.</p>
+          <h1 className="text-2xl font-bold text-fg mb-1">Create your account</h1>
+          <p className="text-sm text-muted mb-2">You&apos;ve been invited to join Computor.</p>
 
           {/* Invite metadata */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6 text-xs text-blue-800 space-y-1">
+          <div className="bg-accent-wash border border-accent-line rounded-lg p-3 mb-6 text-xs text-accent-text space-y-1">
             <div>Expires: <strong>{formatDate(invite.expires_at)}</strong></div>
             {invite.email && <div>This invite is restricted to <strong>{invite.email}</strong></div>}
             {invite.roles && invite.roles.length > 0 && (
@@ -138,72 +138,72 @@ export default function InvitePage() {
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-8 pt-0 space-y-4">
           {submitError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{submitError}</div>
+            <div className="p-3 bg-danger-wash border border-danger-line rounded-lg text-sm text-danger-text">{submitError}</div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">First name *</label>
+              <label className="block text-xs font-medium text-body mb-1">First name *</label>
               <input
                 type="text"
                 required
                 value={form.givenName}
                 onChange={e => setForm(f => ({ ...f, givenName: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Last name *</label>
+              <label className="block text-xs font-medium text-body mb-1">Last name *</label>
               <input
                 type="text"
                 required
                 value={form.familyName}
                 onChange={e => setForm(f => ({ ...f, familyName: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Email *</label>
+            <label className="block text-xs font-medium text-body mb-1">Email *</label>
             <input
               type="email"
               required
               value={form.email}
               readOnly={!!invite.email}
               onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${invite.email ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+              className={`w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent ${invite.email ? 'bg-canvas cursor-not-allowed' : ''}`}
             />
-            {invite.email && <p className="mt-1 text-xs text-gray-500">Email is fixed by the invite restriction.</p>}
+            {invite.email && <p className="mt-1 text-xs text-muted">Email is fixed by the invite restriction.</p>}
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Password *</label>
+            <label className="block text-xs font-medium text-body mb-1">Password *</label>
             <input
               type="password"
               required
               minLength={8}
               value={form.password}
               onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Confirm password *</label>
+            <label className="block text-xs font-medium text-body mb-1">Confirm password *</label>
             <input
               type="password"
               required
               value={form.confirmPassword}
               onChange={e => setForm(f => ({ ...f, confirmPassword: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
             />
           </div>
 
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-2.5 px-4 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 mt-2"
+            className="w-full py-2.5 px-4 bg-accent text-on-accent text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors disabled:opacity-50 mt-2"
           >
             {submitting ? 'Creating account…' : 'Create account'}
           </button>

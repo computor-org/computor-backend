@@ -128,13 +128,18 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
   if (loading) return <ListLoading>Loading settings…</ListLoading>;
 
   return (
-    <>
+    // Fills the page: the settings cards scroll, "Save settings" does not. It
+    // used to be the last child of a page-length scroll, so on a template with
+    // several Terraform variables you had to scroll to the bottom to commit a
+    // change you made at the top.
+    <div className="flex h-full min-h-0 flex-col gap-4">
       <ErrorBanner>{error}</ErrorBanner>
 
-      <div className="shrink-0 bg-white rounded-lg border border-gray-200 p-5 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto scroll-slim scroll-gutter space-y-4">
+      <div className="bg-surface rounded-lg border border-rule p-5 space-y-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Resource limits &amp; seats</h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <h2 className="text-lg font-semibold text-fg">Resource limits &amp; seats</h2>
+          <p className="text-sm text-muted mt-1">
             Container limits are pushed as Terraform variables with the next{' '}
             <span className="font-medium">Build &amp; push</span> and take effect as workspaces
             restart onto the new version. The seat quota is enforced immediately on
@@ -150,8 +155,8 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
             className="mt-0.5"
           />
           <span>
-            <span className="block text-sm font-medium text-gray-900">Enabled</span>
-            <span className="block text-xs text-gray-500">
+            <span className="block text-sm font-medium text-fg">Enabled</span>
+            <span className="block text-xs text-muted">
               Disabled templates are hidden from users and courses and cannot be provisioned;
               existing workspaces keep running and starting.
             </span>
@@ -160,7 +165,7 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
 
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
-            <label htmlFor="tpl-memory" className="block text-xs font-medium text-gray-700 mb-1">
+            <label htmlFor="tpl-memory" className="block text-xs font-medium text-body mb-1">
               Memory cap (MiB)
             </label>
             <input
@@ -171,10 +176,10 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
               inputMode="numeric"
               className={inputCls}
             />
-            <p className="text-xs text-gray-500 mt-1">Empty or 0 = unlimited.</p>
+            <p className="text-xs text-muted mt-1">Empty or 0 = unlimited.</p>
           </div>
           <div>
-            <label htmlFor="tpl-cpu" className="block text-xs font-medium text-gray-700 mb-1">
+            <label htmlFor="tpl-cpu" className="block text-xs font-medium text-body mb-1">
               CPU shares
             </label>
             <input
@@ -185,12 +190,12 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
               inputMode="numeric"
               className={inputCls}
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted mt-1">
               Relative weight (default 1024); empty or 0 keeps the Docker default.
             </p>
           </div>
           <div>
-            <label htmlFor="tpl-seats" className="block text-xs font-medium text-gray-700 mb-1">
+            <label htmlFor="tpl-seats" className="block text-xs font-medium text-body mb-1">
               Max running workspaces
             </label>
             <input
@@ -201,17 +206,17 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
               inputMode="numeric"
               className={inputCls}
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted mt-1">
               Across all users (e.g. license seats); 0 freezes the template.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="shrink-0 bg-white rounded-lg border border-gray-200 p-5 space-y-4">
+      <div className="bg-surface rounded-lg border border-rule p-5 space-y-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Root &amp; internet policy</h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <h2 className="text-lg font-semibold text-fg">Root &amp; internet policy</h2>
+          <p className="text-sm text-muted mt-1">
             The ceiling for every workspace of this template. A course can restrict these
             further but can never grant what is switched off here. Applied with the next{' '}
             <span className="font-medium">Build &amp; push</span>, and to each workspace when
@@ -227,8 +232,8 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
             className="mt-0.5"
           />
           <span>
-            <span className="block text-sm font-medium text-gray-900">Root access (sudo)</span>
-            <span className="block text-xs text-gray-500">
+            <span className="block text-sm font-medium text-fg">Root access (sudo)</span>
+            <span className="block text-xs text-muted">
               Off runs the container with <code className="font-mono">no-new-privileges</code>,
               so <code className="font-mono">sudo</code> and <code className="font-mono">su</code>{' '}
               are refused by the kernel even though the image ships them. Users can no longer
@@ -245,8 +250,8 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
             className="mt-0.5"
           />
           <span>
-            <span className="block text-sm font-medium text-gray-900">Internet access</span>
-            <span className="block text-xs text-gray-500">
+            <span className="block text-sm font-medium text-fg">Internet access</span>
+            <span className="block text-xs text-muted">
               Off moves the workspace to an isolated network with no route out: the Computor
               API and git stay reachable, everything external fails immediately. Package
               installs from PyPI, npm or apt stop working.
@@ -255,10 +260,10 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
         </label>
       </div>
 
-      <div className="shrink-0 bg-white rounded-lg border border-gray-200 p-5 space-y-3">
+      <div className="bg-surface rounded-lg border border-rule p-5 space-y-3">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Terraform variable overrides</h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <h2 className="text-lg font-semibold text-fg">Terraform variable overrides</h2>
+          <p className="text-sm text-muted mt-1">
             Pushed as <code className="font-mono text-xs">--variable name=value</code> — they
             override the template&apos;s defaults without customizing its files. Empty values
             are ignored at push.
@@ -306,14 +311,14 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
         ))}
 
         {form.variables.length === 0 && addable.length === 0 && !declaredLoading && !declaredError && (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted">
             This template declares no overridable variables.
           </p>
         )}
 
         {addable.length > 0 && (
           <div className="space-y-2">
-            <p className="text-xs font-medium text-gray-700">
+            <p className="text-xs font-medium text-body">
               Declared by the template — pick one to override its default:
             </p>
             {addable.map((variable) => (
@@ -328,15 +333,15 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
                     ],
                   })
                 }
-                className="w-full text-left rounded border border-gray-200 px-3 py-2 hover:border-blue-400 hover:bg-blue-50"
+                className="w-full text-left rounded border border-rule px-3 py-2 hover:border-accent-line hover:bg-accent-wash"
               >
-                <span className="text-sm font-mono text-gray-900">+ {variable.name}</span>
-                <span className="text-xs text-gray-500 ml-2">
+                <span className="text-sm font-mono text-fg">+ {variable.name}</span>
+                <span className="text-xs text-muted ml-2">
                   {variable.type || 'untyped'}
                   {variable.has_default && ` · default: ${defaultToString(variable) || '""'}`}
                 </span>
                 {variable.description && (
-                  <span className="block text-xs text-gray-500 mt-0.5">{variable.description}</span>
+                  <span className="block text-xs text-muted mt-0.5">{variable.description}</span>
                 )}
               </button>
             ))}
@@ -344,14 +349,14 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
         )}
 
         {declaredLoading && (
-          <p className="text-xs text-gray-500">Loading declared variables…</p>
+          <p className="text-xs text-muted">Loading declared variables…</p>
         )}
 
         {declaredError && (
           // Pick-list unavailable (e.g. templates dir not mounted) — fall back
           // to free-form entry so overrides stay manageable.
           <div className="space-y-2">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted">
               Could not load the template&apos;s declared variables — enter names manually.
             </p>
             <Button
@@ -365,7 +370,9 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
         )}
       </div>
 
-      <div className="shrink-0 flex items-center gap-3">
+      </div>
+
+      <div className="shrink-0 flex flex-wrap items-center gap-3 border-t border-rule pt-4">
         <Button onClick={save} loading={saving} loadingLabel="Saving…">
           Save settings
         </Button>
@@ -375,6 +382,6 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
           </Button>
         )}
       </div>
-    </>
+    </div>
   );
 }

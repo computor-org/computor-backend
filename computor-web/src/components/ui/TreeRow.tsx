@@ -54,7 +54,7 @@ export default function TreeRow({
             onClick={onToggle}
             aria-expanded={expanded}
             aria-label={expanded ? `Collapse ${typeof label === 'string' ? label : 'section'}` : `Expand ${typeof label === 'string' ? label : 'section'}`}
-            className="text-gray-400 hover:text-gray-700 transition-colors"
+            className="text-subtle hover:text-body transition-colors"
           >
             <svg
               className={`h-3.5 w-3.5 transition-transform ${expanded ? 'rotate-90' : ''}`}
@@ -88,5 +88,5 @@ export default function TreeRow({
 
 /** The bordered card a list of TreeRows sits in. */
 export function TreeRows({ children }: { children: ReactNode }) {
-  return <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">{children}</div>;
+  return <div className="bg-surface border border-rule rounded-lg divide-y divide-rule-soft">{children}</div>;
 }

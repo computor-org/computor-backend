@@ -192,11 +192,11 @@ export default function WorkspaceFleetPanel() {
     <>
       <ErrorBanner>{error}</ErrorBanner>
 
-      <div className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600">
+      <div className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
         <span className="inline-flex items-center gap-1.5">
           <span
             className={`h-2 w-2 rounded-full ${
-              data === null ? 'bg-gray-300' : data.fleet.healthy ? 'bg-green-500' : 'bg-red-500'
+              data === null ? 'bg-faint' : data.fleet.healthy ? 'bg-success' : 'bg-danger'
             }`}
           />
           {data === null
@@ -205,20 +205,20 @@ export default function WorkspaceFleetPanel() {
               ? `Coder healthy${data.fleet.version ? ` · v${data.fleet.version}` : ''}`
               : 'Coder unreachable'}
         </span>
-        <span className="text-gray-300">·</span>
+        <span className="text-faint">·</span>
         <span>{loading ? '—' : `${data?.fleet.workspace_count ?? 0} workspaces`}</span>
       </div>
 
-      <div className="shrink-0 bg-white rounded-lg border border-gray-200 p-5 space-y-4">
+      <div className="shrink-0 bg-surface rounded-lg border border-rule p-5 space-y-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Template updates</h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <h2 className="text-lg font-semibold text-fg">Template updates</h2>
+          <p className="text-sm text-muted mt-1">
             Build and activate a new version for selected templates. A push schedules the fleet
             update by itself: every workspace adopts the new version on its next start. Update
             running now additionally rebuilds workspaces that are up right now — that interrupts
             whoever is working in them, so save it for fixes that cannot wait. Only templates
             already deployed to Coder appear here — to deploy one for the first time, use the{' '}
-            <Link href="/workspaces/admin?tab=templates" className="text-blue-600 hover:underline">
+            <Link href="/workspaces/admin?tab=templates" className="text-accent-text hover:underline">
               Templates
             </Link>{' '}
             tab.
@@ -227,7 +227,7 @@ export default function WorkspaceFleetPanel() {
 
         <div className="flex flex-wrap items-end gap-3">
           <div className="w-64">
-            <label htmlFor="image-tag" className="block text-xs font-medium text-gray-700 mb-1">
+            <label htmlFor="image-tag" className="block text-xs font-medium text-body mb-1">
               Image tag (advanced, optional)
             </label>
             <input
@@ -245,7 +245,7 @@ export default function WorkspaceFleetPanel() {
             the fallback for cache staleness elsewhere in the image, and it
             rebuilds everything (slow, especially for MATLAB).
           */}
-          <label className="flex items-center gap-2 pb-2 text-xs text-gray-700">
+          <label className="flex items-center gap-2 pb-2 text-xs text-body">
             <input
               type="checkbox"
               checked={noCache}
@@ -324,7 +324,7 @@ export default function WorkspaceFleetPanel() {
                     }
                   : readiness(template);
                 return (
-                  <Tr key={template.id} className="hover:bg-gray-50">
+                  <Tr key={template.id} className="hover:bg-canvas">
                     <Td>
                       <input
                         type="checkbox"
@@ -334,17 +334,17 @@ export default function WorkspaceFleetPanel() {
                       />
                     </Td>
                     <Td>
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium text-fg">
                         {template.display_name || template.name}
                       </div>
-                      <div className="text-xs text-gray-500">{template.name}</div>
+                      <div className="text-xs text-muted">{template.name}</div>
                     </Td>
-                    <Td className="text-sm text-gray-600 font-mono">
+                    <Td className="text-sm text-muted font-mono">
                       {template.active_version_id ? template.active_version_id.slice(0, 12) : '—'}
                     </Td>
                     <Td>
-                      <div className="text-sm text-gray-700">{template.workspace_count} total</div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-sm text-body">{template.workspace_count} total</div>
+                      <div className="text-xs text-muted">
                         {template.outdated_count > 0
                           ? `${template.outdated_count} on older version`
                           : `${template.current_count} current`}
@@ -352,7 +352,7 @@ export default function WorkspaceFleetPanel() {
                     </Td>
                     <Td>
                       <Badge color={state.color}>{state.label}</Badge>
-                      <div className="text-xs text-gray-500 mt-1">{state.detail}</div>
+                      <div className="text-xs text-muted mt-1">{state.detail}</div>
                     </Td>
                     <Td>
                       <div className="flex justify-end gap-2">
@@ -375,7 +375,7 @@ export default function WorkspaceFleetPanel() {
               })}
               {templates.length === 0 && (
                 <Tr>
-                  <Td colSpan={6} className="py-8 text-center text-sm text-gray-500">No templates.</Td>
+                  <Td colSpan={6} className="py-8 text-center text-sm text-muted">No templates.</Td>
                 </Tr>
               )}
             </Tbody>
@@ -383,12 +383,12 @@ export default function WorkspaceFleetPanel() {
         </ScrollPanel>
       )}
 
-      <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
+      <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 text-sm text-muted">
         <span>
           Workspace details
           {query.trim() && <span> · {visibleWorkspaces.length} of {workspaces.length}</span>}
           {visibleWorkspaces.some(isOutdated) && (
-            <span className="text-amber-700"> · {visibleWorkspaces.filter(isOutdated).length} on an older version</span>
+            <span className="text-warn-text"> · {visibleWorkspaces.filter(isOutdated).length} on an older version</span>
           )}
         </span>
         <div className="flex items-center gap-2">
@@ -416,29 +416,29 @@ export default function WorkspaceFleetPanel() {
               {visibleWorkspaces.map((workspace) => {
                 const owner = ownerLines(workspace);
                 return (
-                <Tr key={workspace.id} className="hover:bg-gray-50">
+                <Tr key={workspace.id} className="hover:bg-canvas">
                   <Td title={workspace.owner_name ? `Coder user: ${workspace.owner_name}` : undefined}>
                     {workspace.owner_user_id ? (
                       <Link
                         href={`/workspaces/admin/${workspace.owner_user_id}`}
-                        className="text-sm text-blue-600 hover:underline"
+                        className="text-sm text-accent-text hover:underline"
                       >
                         {owner.primary}
                       </Link>
                     ) : (
-                      <span className="text-sm text-gray-900">{owner.primary}</span>
+                      <span className="text-sm text-fg">{owner.primary}</span>
                     )}
                     {owner.secondary && (
-                      <div className="text-xs text-gray-500">{owner.secondary}</div>
+                      <div className="text-xs text-muted">{owner.secondary}</div>
                     )}
                   </Td>
-                  <Td className="text-sm text-gray-600">{workspace.name}</Td>
-                  <Td className="text-sm text-gray-600">
+                  <Td className="text-sm text-muted">{workspace.name}</Td>
+                  <Td className="text-sm text-muted">
                     {workspace.template_display_name || workspace.template_name || '—'}
                   </Td>
                   <Td>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">{workspace.template_version_name || '—'}</span>
+                      <span className="text-sm text-muted">{workspace.template_version_name || '—'}</span>
                       {isOutdated(workspace) ? (
                         <Badge color="yellow">outdated</Badge>
                       ) : workspace.template_version_id ? (
@@ -457,7 +457,7 @@ export default function WorkspaceFleetPanel() {
               })}
               {visibleWorkspaces.length === 0 && (
                 <Tr>
-                  <Td colSpan={5} className="py-8 text-center text-sm text-gray-500">
+                  <Td colSpan={5} className="py-8 text-center text-sm text-muted">
                     {workspaces.length === 0 ? 'No workspaces.' : 'No workspaces match the filter.'}
                   </Td>
                 </Tr>

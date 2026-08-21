@@ -51,18 +51,18 @@ export default function ExamplesPage() {
           breadcrumbs={[{ label: 'Examples' }]}
           title="Examples"
           subtitle={
-            <>Reusable assignment content. <Link href="/example-repositories" className="text-blue-600 hover:underline">Manage repositories</Link>.</>
+            <>Reusable assignment content. <Link href="/example-repositories" className="text-accent-text hover:underline">Manage repositories</Link>.</>
           }
           actions={
             <>
-              <select value={repoFilter} onChange={(e) => setRepoFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+              <select value={repoFilter} onChange={(e) => setRepoFilter(e.target.value)} className="px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line">
                 <option value="">All repositories</option>
                 {repos.map((r) => (
                   <option key={r.id} value={r.id}>{r.name}</option>
                 ))}
               </select>
               {canManageExamples && (
-                <Link href="/examples/upload" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 whitespace-nowrap">Upload examples</Link>
+                <Link href="/examples/upload" className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover whitespace-nowrap">Upload examples</Link>
               )}
             </>
           }
@@ -73,23 +73,23 @@ export default function ExamplesPage() {
         {loading ? (
           <ListLoading>Loading…</ListLoading>
         ) : visible.length === 0 ? (
-          <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">
+          <div className="text-muted border border-dashed border-rule-strong rounded-lg p-8 text-center">
             {examples.length === 0 ? 'No examples yet. Upload a zip of one or more examples to get started.' : 'No examples in this repository.'}
           </div>
         ) : (
-          <ScrollArea className="space-y-3">
+          <ScrollArea spacing="rows">
             {visible.map((ex) => (
-              <Link key={ex.id} href={`/examples/${ex.id}`} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-sm transition-all">
+              <Link key={ex.id} href={`/examples/${ex.id}`} className="flex items-center justify-between bg-surface border border-rule rounded-lg p-4 hover:border-accent-line hover:shadow-sm transition-all">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-gray-900 truncate">{ex.title || ex.directory}</div>
-                  <div className="text-xs text-gray-400 font-mono truncate">{ex.identifier}</div>
+                  <div className="text-sm font-medium text-fg truncate">{ex.title || ex.directory}</div>
+                  <div className="text-xs text-subtle font-mono truncate">{ex.identifier}</div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   {(ex.tags || []).slice(0, 2).map((t) => (
-                    <span key={t} className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">{t}</span>
+                    <span key={t} className="px-2 py-0.5 text-xs bg-sunken text-muted rounded">{t}</span>
                   ))}
-                  <span className="text-xs text-gray-400">{repoName[ex.example_repository_id] || ''}</span>
-                  <span className="text-gray-300">›</span>
+                  <span className="text-xs text-subtle">{repoName[ex.example_repository_id] || ''}</span>
+                  <span className="text-faint">›</span>
                 </div>
               </Link>
             ))}

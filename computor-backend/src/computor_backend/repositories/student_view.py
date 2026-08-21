@@ -5,7 +5,7 @@ This repository handles complex student-view queries that aggregate data
 from multiple tables (courses, course_contents, submissions, results, etc.)
 """
 
-from typing import List, Dict, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from .view_base import ViewRepository
@@ -33,7 +33,7 @@ from computor_types.student_courses import (
     CourseStudentQuery,
 )
 from computor_backend.interfaces.student_courses import CourseStudentInterface
-from ..model.course import Course, CourseContent
+from ..model.course import Course, CourseContent, CourseMember
 from ..exceptions import NotFoundException
 from computor_backend.permissions.roles import CourseRole
 
@@ -218,9 +218,49 @@ class StudentViewRepository(ViewRepository):
             view_type="course_contents",
             params=params,
             aggregate_user_id=user_id,
-            base_related_ids={'student_view': str(params.course_id)} if params.course_id else None,
+            base_related_ids=self._course_content_view_tags(user_id, params.course_id),
             include_hidden=include_hidden,
         )
+
+    def _course_content_view_tags(
+        self,
+        user_id: UUID | str,
+        course_id: UUID | str | None,
+    ) -> Optional[Dict[str, Any]]:
+        """Cache tags for a cached course-contents listing.
+
+        Scoped to one course, that is just this user's view of it. Unscoped —
+        ``course_id`` omitted, which the endpoint allows and the dashboard uses
+        to ask "what needs my attention across every course" — the answer spans
+        every course the user is enrolled in, so it has to be tagged with all of
+        them. Otherwise a tutor grading in course A invalidates only the tags
+        carrying A's id, and the cross-course entry, which carried no course tag
+        at all, kept serving the pre-grade answer for the rest of its TTL.
+
+        Tags with a None value are emitted verbatim (see Cache.set_user_view),
+        which is what lets one key carry N courses.
+        """
+        if course_id is not None:
+            return {'student_view': str(course_id)}
+
+        course_ids = [
+            str(row[0])
+            for row in self.db.query(CourseMember.course_id)
+            .filter(CourseMember.user_id == str(user_id))
+            .distinct()
+            .all()
+        ]
+        if not course_ids:
+            return None
+
+        tags: Dict[str, Any] = {}
+        for cid in course_ids:
+            # Both spellings: `student_view:<id>` is what the grading path emits
+            # for student-facing views, `course_id:<id>` is the generic user-view
+            # tag every ViewRepository auto-attaches when the id is in the params.
+            tags[f'student_view:{cid}'] = None
+            tags[f'course_id:{cid}'] = None
+        return tags
 
     def list_courses(
         self,

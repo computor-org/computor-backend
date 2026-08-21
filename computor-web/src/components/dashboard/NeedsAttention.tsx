@@ -8,23 +8,32 @@ import { displayName } from '@/src/utils/displayName';
 import type { CourseContentStudentList } from 'types/generated';
 
 /**
- * What a student still has to do, across every course they are in.
+ * What a tutor has asked a student to act on, across every course.
  *
- * There is no notion of a due date anywhere in the schema — the columns were
- * dropped in c4e5f6a7b8c9_drop_team_formation_fields — so this deliberately does
- * not claim anything is "due" or "upcoming". It reports the three states that
- * are actually knowable from a course content: never submitted, submitted but
- * not passing, and waiting on a tutor.
+ * Deliberately narrow. The first version also listed everything not yet
+ * submitted and everything not passing its tests, which on a real account is
+ * most of the semester — a list that long is not a call to action, it is the
+ * course tree again. What belongs here is only work a human has looked at and
+ * sent back.
+ *
+ * `status` is the grading status of the latest grade on the latest *submitted*
+ * artifact (view_mappers.course_member_course_content_result_mapper), so both
+ * states below can only be reached by a tutor grading. Test results and
+ * un-started work are not represented here at all — that is the point.
  */
-export type AttentionReason = 'not-submitted' | 'failing' | 'awaiting-review';
+export type AttentionReason = 'correction_necessary' | 'improvement_possible';
 
 const REASON: Record<AttentionReason, { label: string; tone: Tone; rank: number }> = {
-  // Ranked by how much of the student's own action is left: work that is failing
-  // outranks work not started, which outranks work already handed to someone else.
-  failing: { label: 'Not passing', tone: 'error', rank: 0 },
-  'not-submitted': { label: 'Not submitted', tone: 'warning', rank: 1 },
-  'awaiting-review': { label: 'Awaiting review', tone: 'info', rank: 2 },
+  correction_necessary: { label: 'Correction necessary', tone: 'error', rank: 0 },
+  improvement_possible: { label: 'Improvement possible', tone: 'warning', rank: 1 },
 };
+
+/**
+ * `improvement_possible` is wired up but off by default: it is advisory, not a
+ * request, so it would dilute a list whose whole job is "a tutor is waiting on
+ * you". To show it, pass `reasons` at the call site or add it here.
+ */
+export const DEFAULT_REASONS: AttentionReason[] = ['correction_necessary'];
 
 export interface AttentionItem {
   content: CourseContentStudentList;
@@ -32,14 +41,23 @@ export interface AttentionItem {
   courseTitle: string;
 }
 
+function isAttentionReason(status: string | null | undefined): status is AttentionReason {
+  return status === 'correction_necessary' || status === 'improvement_possible';
+}
+
 /**
- * Assignments only — a unit is a container, not work — and only the ones a
- * student can still act on. Returns them worst-first.
+ * Assignments a tutor has sent back, worst first.
+ *
+ * Assignments only — a unit's status is aggregated from its descendants
+ * (view_base._aggregate_unit_statuses), so including units would list the same
+ * piece of work twice, once under its own name and once under its unit's.
  */
 export function selectNeedsAttention(
   contents: CourseContentStudentList[],
   courseTitles: Map<string, string>,
+  reasons: AttentionReason[] = DEFAULT_REASONS,
 ): AttentionItem[] {
+  const wanted = new Set<AttentionReason>(reasons);
   const items: AttentionItem[] = [];
 
   for (const content of contents) {
@@ -47,20 +65,12 @@ export function selectNeedsAttention(
     // Hidden content is not the student's problem; it should not even be listed.
     if (content.visible_effective === false) continue;
 
-    let reason: AttentionReason | null = null;
-    if (!content.submitted) {
-      reason = 'not-submitted';
-    } else if ((content.unreviewed_count ?? 0) > 0) {
-      reason = 'awaiting-review';
-    } else if (content.result && (content.result.result ?? 0) < 1) {
-      // result.result is a 0..1 fraction of the tests that passed.
-      reason = 'failing';
-    }
-    if (!reason) continue;
+    const status = content.status;
+    if (!isAttentionReason(status) || !wanted.has(status)) continue;
 
     items.push({
       content,
-      reason,
+      reason: status,
       courseTitle: courseTitles.get(content.course_id) ?? 'Course',
     });
   }
@@ -78,12 +88,12 @@ export default function NeedsAttention({ items, limit = 8 }: { items: AttentionI
 
   return (
     <Panel padding="none">
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-rule-soft">
         {shown.map(({ content, reason, courseTitle }) => (
           <Link
             key={content.id}
             href={`/courses/${content.course_id}/student/assignments/${content.id}`}
-            className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-3 px-4 py-3 hover:bg-canvas transition-colors"
           >
             <span
               className="shrink-0 h-2.5 w-2.5 rounded-full"
@@ -91,9 +101,14 @@ export default function NeedsAttention({ items, limit = 8 }: { items: AttentionI
               aria-hidden="true"
             />
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-gray-900 truncate">{displayName(content)}</div>
-              <div className="text-xs text-gray-500 truncate">{courseTitle}</div>
+              <div className="text-sm font-medium text-fg truncate">{displayName(content)}</div>
+              <div className="text-xs text-muted truncate">{courseTitle}</div>
             </div>
+            {content.unread_message_count ? (
+              <Badge tone="info" className="shrink-0" title="Unread feedback on this assignment">
+                {content.unread_message_count} new
+              </Badge>
+            ) : null}
             <Badge tone={REASON[reason].tone} className="shrink-0">
               {REASON[reason].label}
             </Badge>
@@ -101,7 +116,7 @@ export default function NeedsAttention({ items, limit = 8 }: { items: AttentionI
         ))}
       </div>
       {items.length > shown.length && (
-        <p className="px-4 py-2.5 text-xs text-gray-500 border-t border-gray-100">
+        <p className="px-4 py-2.5 text-xs text-muted border-t border-rule-soft">
           and {items.length - shown.length} more
         </p>
       )}

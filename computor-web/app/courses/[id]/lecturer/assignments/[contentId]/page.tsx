@@ -176,11 +176,11 @@ export default function CourseContentDetailPage() {
 
               {history.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-2">History</h3>
-                  <ul className="text-sm text-gray-600 space-y-1">
+                  <h3 className="text-sm font-semibold text-fg mb-2">History</h3>
+                  <ul className="text-sm text-muted space-y-1">
                     {history.slice(0, 10).map((h) => (
                       <li key={h.id} className="flex gap-3">
-                        <span className="text-gray-400 shrink-0 w-40">
+                        <span className="text-subtle shrink-0 w-40">
                           {h.created_at ? new Date(h.created_at).toLocaleString() : '—'}
                         </span>
                         <span className="min-w-0">

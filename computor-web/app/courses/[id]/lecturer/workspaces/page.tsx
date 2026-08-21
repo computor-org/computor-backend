@@ -211,26 +211,26 @@ function LecturerWorkspacesContent() {
       {loading ? (
         <ListLoading>Loading…</ListLoading>
       ) : (
-        <ScrollArea className="space-y-6">
+        <ScrollArea>
           {!provisionAllowed ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <div className="rounded-lg border border-warn-line bg-warn-wash p-4 text-sm text-warn-text">
               Lecturer provisioning is not enabled for this course. A workspace maintainer can
               enable it in the workspace administration area.
             </div>
           ) : templates.length === 0 ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <div className="rounded-lg border border-warn-line bg-warn-wash p-4 text-sm text-warn-text">
               This course has no workspace templates yet. A workspace maintainer can assign
               templates in the workspace administration area.
             </div>
           ) : (
             <>
             {canManage && selectedTemplate && (
-              <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-4">
+              <div className="bg-surface rounded-lg border border-rule p-5 space-y-4">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900">
+                  <h2 className="text-lg font-semibold text-fg">
                     Root &amp; internet for {selectedTemplate.display_name || selectedTemplate.template_name}
                   </h2>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-sm text-muted mt-1">
                     What this course&apos;s workspaces of this template get. A course can only take
                     access away — a control is locked when the template itself already denies it.
                     New workspaces get this immediately; existing ones keep what they were created
@@ -245,7 +245,7 @@ function LecturerWorkspacesContent() {
                   ] as const).map(([key, label, ceiling, courseValue]) => (
                     <label
                       key={key}
-                      className={`flex items-center gap-2 text-sm ${ceiling ? 'text-gray-700' : 'text-gray-400'}`}
+                      className={`flex items-center gap-2 text-sm ${ceiling ? 'text-body' : 'text-subtle'}`}
                       title={ceiling ? undefined : 'The template denies this; a course cannot grant it.'}
                     >
                       <input
@@ -265,7 +265,7 @@ function LecturerWorkspacesContent() {
                           loadingLabel="Applying…">
                     Apply to running workspaces
                   </Button>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-muted">
                     Restarts them so the change takes effect now — running processes end, files are
                     untouched. Stopped workspaces pick it up when they next start.
                   </span>
@@ -273,10 +273,10 @@ function LecturerWorkspacesContent() {
               </div>
             )}
 
-            <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-4">
+            <div className="bg-surface rounded-lg border border-rule p-5 space-y-4">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Provision for students</h2>
-                <p className="text-sm text-gray-500 mt-1">
+                <h2 className="text-lg font-semibold text-fg">Provision for students</h2>
+                <p className="text-sm text-muted mt-1">
                   Creates one workspace per selected student. Students can open and start these,
                   but not provision new ones. A throwaway workspace uses its own scratch home
                   volume that is deleted together with the workspace — the student&apos;s regular
@@ -286,7 +286,7 @@ function LecturerWorkspacesContent() {
 
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
-                  <label htmlFor="sw-template" className="block text-xs font-medium text-gray-700 mb-1">
+                  <label htmlFor="sw-template" className="block text-xs font-medium text-body mb-1">
                     Template
                   </label>
                   <select
@@ -309,7 +309,7 @@ function LecturerWorkspacesContent() {
                     ))}
                   </select>
                   {selectedTemplate && !selectedIsDeployable && (
-                    <p className="mt-1 text-xs text-amber-700">
+                    <p className="mt-1 text-xs text-warn-text">
                       This workspace type is not set up on this server yet, so nothing can be
                       provisioned onto it. A workspace maintainer deploys it under workspace
                       administration.
@@ -319,7 +319,7 @@ function LecturerWorkspacesContent() {
                     // Read-only: the policy is set by a workspace maintainer,
                     // per template and per course. Shown here so a lecturer
                     // knows what the students they provision for will get.
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-muted">
                       Students get{' '}
                       <span className="font-medium">
                         {selectedTemplate.effective_allow_root ? 'root' : 'no root'}
@@ -333,8 +333,8 @@ function LecturerWorkspacesContent() {
                   )}
                 </div>
                 <div>
-                  <span className="block text-xs font-medium text-gray-700 mb-1">Home directory</span>
-                  <div className="space-y-1 text-sm text-gray-700">
+                  <span className="block text-xs font-medium text-body mb-1">Home directory</span>
+                  <div className="space-y-1 text-sm text-body">
                     <label className="flex items-center gap-2">
                       <input
                         type="radio"
@@ -356,7 +356,7 @@ function LecturerWorkspacesContent() {
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="sw-label" className="block text-xs font-medium text-gray-700 mb-1">
+                  <label htmlFor="sw-label" className="block text-xs font-medium text-body mb-1">
                     Label
                   </label>
                   <input
@@ -367,14 +367,14 @@ function LecturerWorkspacesContent() {
                     maxLength={32}
                     className={inputCls}
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted mt-1">
                     Name suffix (e.g. &quot;exam1&quot;) — keeps these apart from the students&apos;
                     own workspaces.
                   </p>
                 </div>
               </div>
 
-              <div className="max-h-80 overflow-y-auto scroll-slim rounded-lg border border-gray-200">
+              <div className="max-h-80 overflow-y-auto scroll-slim rounded-lg border border-rule">
                 <Table>
                   <Thead>
                     <tr>
@@ -395,7 +395,7 @@ function LecturerWorkspacesContent() {
                     {members.map((member) => {
                       const outcome = outcomeByMember.get(member.id);
                       return (
-                        <Tr key={member.id} className="hover:bg-gray-50">
+                        <Tr key={member.id} className="hover:bg-canvas">
                           <Td>
                             <input
                               type="checkbox"
@@ -404,19 +404,19 @@ function LecturerWorkspacesContent() {
                               onChange={() => toggleMember(member.id)}
                             />
                           </Td>
-                          <Td className="text-sm text-gray-900">{memberName(member.user)}</Td>
-                          <Td className="text-xs text-gray-500">{member.course_role_id}</Td>
+                          <Td className="text-sm text-fg">{memberName(member.user)}</Td>
+                          <Td className="text-xs text-muted">{member.course_role_id}</Td>
                           <Td className="text-xs">
                             {outcome ? (
                               outcome.success ? (
-                                <span className="text-green-700">
+                                <span className="text-success-text">
                                   Provisioned {outcome.workspace_name}
                                 </span>
                               ) : (
-                                <span className="text-red-700">{outcome.error}</span>
+                                <span className="text-danger-text">{outcome.error}</span>
                               )
                             ) : (
-                              <span className="text-gray-400">—</span>
+                              <span className="text-subtle">—</span>
                             )}
                           </Td>
                         </Tr>
@@ -424,7 +424,7 @@ function LecturerWorkspacesContent() {
                     })}
                     {members.length === 0 && (
                       <Tr>
-                        <Td colSpan={4} className="py-6 text-center text-sm text-gray-500">
+                        <Td colSpan={4} className="py-6 text-center text-sm text-muted">
                           No course members.
                         </Td>
                       </Tr>
@@ -442,7 +442,7 @@ function LecturerWorkspacesContent() {
                 >
                   Provision for {selected.size} selected
                 </Button>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-muted">
                   Runs one at a time; failures are reported per student and never abort the batch.
                 </span>
               </div>
@@ -450,10 +450,10 @@ function LecturerWorkspacesContent() {
             </>
           )}
 
-          <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-3">
+          <div className="bg-surface rounded-lg border border-rule p-5 space-y-3">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Existing student workspaces</h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <h2 className="text-lg font-semibold text-fg">Existing student workspaces</h2>
+              <p className="text-sm text-muted mt-1">
                 Workspaces provisioned for this course. A member&apos;s own workspace is not
                 listed here even when it uses one of these templates — it belongs to them, not to
                 the course, and is managed under workspace administration.
@@ -477,19 +477,19 @@ function LecturerWorkspacesContent() {
                     const scratch = w.home_mode === 'scratch';
                     const canDelete = scratch || (settings?.can_manage ?? false);
                     return (
-                      <Tr key={key} className="hover:bg-gray-50">
-                        <Td className="text-sm text-gray-900">{entry.full_name || entry.user_id}</Td>
-                        <Td className="text-sm font-mono text-gray-700">{w.name}</Td>
-                        <Td className="text-sm text-gray-700">
+                      <Tr key={key} className="hover:bg-canvas">
+                        <Td className="text-sm text-fg">{entry.full_name || entry.user_id}</Td>
+                        <Td className="text-sm font-mono text-body">{w.name}</Td>
+                        <Td className="text-sm text-body">
                           {w.template_display_name || w.template_name}
                         </Td>
                         <Td>
                           {scratch ? (
-                            <span className="inline-flex items-center rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                            <span className="inline-flex items-center rounded bg-warn-wash px-2 py-0.5 text-xs font-medium text-warn-text">
                               Throwaway
                             </span>
                           ) : (
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-muted">
                               {w.home_mode === 'shared' ? 'Shared' : '—'}
                             </span>
                           )}
@@ -521,7 +521,7 @@ function LecturerWorkspacesContent() {
                 )}
                 {(data?.studentWorkspaces?.students ?? []).length === 0 && (
                   <Tr>
-                    <Td colSpan={6} className="py-6 text-center text-sm text-gray-500">
+                    <Td colSpan={6} className="py-6 text-center text-sm text-muted">
                       No student workspaces on this course&apos;s templates.
                     </Td>
                   </Tr>

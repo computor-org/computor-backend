@@ -583,10 +583,19 @@ class Cache:
         if view_id:
             tags.add(f"user:{user_id}:{view_type}:{view_id}")
 
-        # Add related entity tags for cascade invalidation
+        # Add related entity tags for cascade invalidation.
+        #
+        # A None value means the caller already spelled the whole tag in the key
+        # (e.g. {"course_content:<uuid>": None}) because the tag is not a plain
+        # entity_type/entity_id pair. Appending the None produced tags like
+        # "course_content:<uuid>:None", which no invalidator ever emits — the
+        # eight call sites that invalidate a course content all use
+        # f"course_content:{id}" — so those entries were only ever evicted by
+        # TTL. Tag lookup is an exact Redis key, so the suffix silently broke
+        # every per-content invalidation of a student/tutor/lecturer view.
         if related_ids:
             for entity_type, entity_id in related_ids.items():
-                tags.add(f"{entity_type}:{entity_id}")
+                tags.add(entity_type if entity_id is None else f"{entity_type}:{entity_id}")
 
         self.set_with_tags(
             key=key,

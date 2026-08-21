@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
+import ListPageLayout, { ScrollArea, PageActions } from '@/src/components/ListPageLayout';
+import Button from '@/src/components/ui/Button';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
@@ -19,7 +20,7 @@ const consentClient = new ConsentClient();
 type LangRow = { lang: string; text: string; filename?: string };
 
 const inputCls =
-  'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm';
+  'w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-accent-line focus:border-accent-line text-sm';
 
 function fmtDate(s?: string | null): string {
   return s ? new Date(s).toLocaleString() : '—';
@@ -116,9 +117,9 @@ export default function PrivacyNoticesPage() {
     return (
       <AuthenticatedLayout>
         <div className="p-6">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-            <h2 className="text-lg font-semibold text-red-800">Access Denied</h2>
-            <p className="text-sm text-red-600 mt-2">Admin privileges are required to manage privacy notices.</p>
+          <div className="bg-danger-wash border border-danger-line rounded-lg p-6 text-center">
+            <h2 className="text-lg font-semibold text-danger-text">Access Denied</h2>
+            <p className="text-sm text-danger-text mt-2">Admin privileges are required to manage privacy notices.</p>
           </div>
         </div>
       </AuthenticatedLayout>
@@ -129,18 +130,18 @@ export default function PrivacyNoticesPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Privacy Notices' }]}
-          title="Privacy Notices"
+          breadcrumbs={[{ label: 'Privacy notices' }]}
+          title="Privacy notices"
           subtitle="Publish and review the GDPR consent policy versions that back the consent gate."
         />
 
         <ErrorBanner>{error}</ErrorBanner>
 
-        <ScrollArea className="space-y-6">
+        <ScrollArea>
           {/* Warning */}
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-            <h2 className="text-sm font-semibold text-amber-900 mb-1">Before you publish</h2>
-            <ul className="text-sm text-amber-800 space-y-1 list-disc list-inside">
+          <div className="bg-warn-wash border border-warn-line rounded-lg p-4">
+            <h2 className="text-sm font-semibold text-warn-text mb-1">Before you publish</h2>
+            <ul className="text-sm text-warn-text space-y-1 list-disc list-inside">
               <li>Versions are <strong>append-only</strong> — a version can be published once. Bump the version for any change.</li>
               <li>Publishing with an effective date of now <strong>re-gates every user</strong> who hasn’t consented to the new version.</li>
               <li>The VS Code extension has no consent handling yet — unconsented users will get errors there.</li>
@@ -148,28 +149,28 @@ export default function PrivacyNoticesPage() {
           </div>
 
           {/* Published versions */}
-          <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Published versions</h2>
+          <div className="bg-surface rounded-lg shadow border border-rule p-6">
+            <h2 className="text-lg font-semibold text-fg mb-4">Published versions</h2>
             {loading ? (
-              <div className="text-sm text-gray-500">Loading…</div>
+              <div className="text-sm text-muted">Loading…</div>
             ) : versions.length === 0 ? (
-              <div className="text-sm text-gray-500 border border-dashed border-gray-300 rounded-lg p-6 text-center">
+              <div className="text-sm text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">
                 No privacy notice has been published yet. The consent gate stays inactive until the first version is published.
               </div>
             ) : (
-              <div className="border border-gray-200 rounded-lg divide-y">
+              <div className="border border-rule rounded-lg divide-y">
                 {versions.map((v) => {
                   const scheduled = new Date(v.effective_from).getTime() > now;
                   const isCurrent = v.version === currentVersion;
                   return (
                     <div key={v.id} className="flex items-center justify-between px-4 py-3 gap-4">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                        <div className="text-sm font-medium text-fg flex items-center gap-2">
                           <span className="font-mono">{v.version}</span>
                           {isCurrent && <Badge color="green" pill>current</Badge>}
                           {scheduled && <Badge color="blue" pill>scheduled</Badge>}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-muted">
                           effective {fmtDate(v.effective_from)} · languages: {(v.languages || []).join(', ') || '—'} · published {fmtDate(v.created_at)}
                         </div>
                       </div>
@@ -181,12 +182,12 @@ export default function PrivacyNoticesPage() {
           </div>
 
           {/* Publish new */}
-          <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Publish a new version</h2>
+          <div className="bg-surface rounded-lg shadow border border-rule p-6">
+            <h2 className="text-lg font-semibold text-fg mb-4">Publish a new version</h2>
 
             <div className="flex flex-wrap gap-4 mb-4">
               <div className="flex-1 min-w-[12rem]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Version</label>
+                <label className="block text-sm font-medium text-body mb-1">Version</label>
                 <input
                   className={inputCls}
                   value={version}
@@ -195,30 +196,30 @@ export default function PrivacyNoticesPage() {
                 />
               </div>
               <div className="flex-1 min-w-[12rem]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Effective from</label>
+                <label className="block text-sm font-medium text-body mb-1">Effective from</label>
                 <input
                   type="datetime-local"
                   className={inputCls}
                   value={effectiveFrom}
                   onChange={(e) => setEffectiveFrom(e.target.value)}
                 />
-                <p className="text-xs text-gray-500 mt-1">Leave empty to become current immediately. A future date schedules it.</p>
+                <p className="text-xs text-muted mt-1">Leave empty to become current immediately. A future date schedules it.</p>
               </div>
             </div>
 
-            <label className="block text-sm font-medium text-gray-700 mb-2">Notice text (Markdown, one per language)</label>
+            <label className="block text-sm font-medium text-body mb-2">Notice text (Markdown, one per language)</label>
             <div className="space-y-4">
               {langs.map((l, i) => (
-                <div key={i} className="border border-gray-200 rounded-lg p-3">
+                <div key={i} className="border border-rule rounded-lg p-3">
                   <div className="flex flex-wrap items-center gap-3 mb-2">
                     <input
-                      className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      className="w-28 px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-accent-line focus:border-accent-line text-sm"
                       value={l.lang}
                       onChange={(e) => setLangCode(i, e.target.value)}
                       placeholder="lang (en)"
                       aria-label="Language code"
                     />
-                    <label className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 cursor-pointer">
+                    <label className="px-3 py-2 text-sm font-medium text-accent-text bg-accent-wash rounded-lg hover:bg-accent-wash cursor-pointer">
                       {l.filename ? `Replace ${l.filename}` : 'Upload .md'}
                       <input type="file" accept=".md,.markdown,text/markdown" className="hidden" onChange={(e) => onPickFile(i, e)} />
                     </label>
@@ -226,14 +227,14 @@ export default function PrivacyNoticesPage() {
                       <button
                         type="button"
                         onClick={() => removeLang(i)}
-                        className="ml-auto text-sm text-red-600 hover:underline"
+                        className="ml-auto text-sm text-danger-text hover:underline"
                       >
                         Remove
                       </button>
                     )}
                   </div>
                   <textarea
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-mono"
+                    className="w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-accent-line focus:border-accent-line text-sm font-mono"
                     rows={8}
                     value={l.text}
                     onChange={(e) => setLangText(i, e.target.value)}
@@ -244,24 +245,27 @@ export default function PrivacyNoticesPage() {
             </div>
 
             <div className="mt-3 flex items-center gap-4">
-              <button type="button" onClick={addLang} className="text-sm text-blue-600 hover:underline">
+              <button type="button" onClick={addLang} className="text-sm text-accent-text hover:underline">
                 + Add language
               </button>
             </div>
 
-            <div className="mt-5 flex items-center gap-4">
-              <button
-                type="button"
-                onClick={onClickPublish}
-                disabled={publishing || !!validationError}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {publishing ? 'Publishing…' : 'Publish version'}
-              </button>
-              {validationError && <span className="text-sm text-gray-500">{validationError}</span>}
-            </div>
           </div>
         </ScrollArea>
+
+        {/* The page's one write action — pinned rather than left at the foot of
+            the publish form, which sits below a version history of any length. */}
+        <PageActions>
+          <Button
+            onClick={onClickPublish}
+            disabled={publishing || !!validationError}
+            loading={publishing}
+            loadingLabel="Publishing…"
+          >
+            Publish version
+          </Button>
+          {validationError && <span className="text-sm text-muted">{validationError}</span>}
+        </PageActions>
 
         <ConfirmDialog
           open={showConfirm}

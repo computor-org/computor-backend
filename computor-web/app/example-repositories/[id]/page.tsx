@@ -52,17 +52,17 @@ export default function ExampleRepositoryDetailPage() {
     <AuthenticatedLayout>
       <ListPageLayout width="narrow">
         <PageHeader
-          breadcrumbs={[{ label: 'Example Repositories', href: '/example-repositories' }, { label: repo?.name || 'Repository' }]}
+          breadcrumbs={[{ label: 'Example repositories', href: '/example-repositories' }, { label: repo?.name || 'Repository' }]}
           title={repo?.name || 'Repository'}
-          subtitle={repo && <span className="font-mono text-sm text-gray-500">{repo.source_type} · {repo.source_url}</span>}
+          subtitle={repo && <span className="font-mono text-sm text-muted">{repo.source_type} · {repo.source_url}</span>}
           actions={
             repo && canManageExamples ? (
               <>
                 {uploadable && (
-                  <Link href={`/examples/upload?repository=${repo.id}`} className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">Upload examples</Link>
+                  <Link href={`/examples/upload?repository=${repo.id}`} className="px-3 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover">Upload examples</Link>
                 )}
-                <Link href={`/example-repositories/${repo.id}/edit`} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Edit</Link>
-                <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50">Delete</button>
+                <Link href={`/example-repositories/${repo.id}/edit`} className="px-3 py-2 text-sm font-medium text-body border border-rule-strong rounded-lg hover:bg-canvas">Edit</Link>
+                <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-danger-text border border-danger-line rounded-lg hover:bg-danger-wash">Delete</button>
               </>
             ) : undefined
           }
@@ -73,30 +73,30 @@ export default function ExampleRepositoryDetailPage() {
         {loading ? (
           <ListLoading>Loading…</ListLoading>
         ) : repo ? (
-          <ScrollArea className="space-y-6">
+          <ScrollArea>
             {repo.description && (
-              <div className="bg-white border border-gray-200 rounded-lg p-5">
-                <p className="text-gray-700">{repo.description}</p>
+              <div className="bg-surface border border-rule rounded-lg p-5">
+                <p className="text-body">{repo.description}</p>
               </div>
             )}
 
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-3">
-                Examples <span className="text-gray-400 font-normal">({examples.length})</span>
+              <h2 className="text-xl font-semibold text-fg mb-3">
+                Examples <span className="text-subtle font-normal">({examples.length})</span>
               </h2>
               {examples.length === 0 ? (
-                <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">
+                <div className="text-muted border border-dashed border-rule-strong rounded-lg p-8 text-center">
                   No examples yet.{uploadable ? ' Upload a zip containing one or more examples (each with a meta.yaml).' : ''}
                 </div>
               ) : (
-                <div className="bg-white border border-gray-200 rounded-lg divide-y">
+                <div className="bg-surface border border-rule rounded-lg divide-y">
                   {examples.map((ex) => (
-                    <Link key={ex.id} href={`/examples/${ex.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
+                    <Link key={ex.id} href={`/examples/${ex.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-canvas">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-gray-900 truncate">{ex.title || ex.directory}</div>
-                        <div className="text-xs text-gray-400 font-mono truncate">{ex.identifier}</div>
+                        <div className="text-sm font-medium text-fg truncate">{ex.title || ex.directory}</div>
+                        <div className="text-xs text-subtle font-mono truncate">{ex.identifier}</div>
                       </div>
-                      <span className="text-gray-300">›</span>
+                      <span className="text-faint">›</span>
                     </Link>
                   ))}
                 </div>

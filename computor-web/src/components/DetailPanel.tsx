@@ -54,7 +54,7 @@ export default function DetailPanel({
       {loading ? (
         <ListLoading>{loadingLabel}</ListLoading>
       ) : (
-        <ScrollArea className="space-y-6">{children}</ScrollArea>
+        <ScrollArea>{children}</ScrollArea>
       )}
     </ListPageLayout>
   );

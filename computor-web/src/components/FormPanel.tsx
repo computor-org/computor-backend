@@ -31,12 +31,12 @@ export function Field({
 
   return (
     <div>
-      <label htmlFor={htmlFor} className="block text-xs font-medium text-gray-700 mb-1">
+      <label htmlFor={htmlFor} className="block text-xs font-medium text-body mb-1">
         {label}
-        {required && <span className="text-red-500"> *</span>}
+        {required && <span className="text-danger-text"> *</span>}
       </label>
       {control}
-      {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-subtle">{hint}</p>}
     </div>
   );
 }
@@ -109,7 +109,7 @@ export default function FormPanel({
             onSubmit();
           }}
         >
-          <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">{children}</div>
+          <div className="bg-surface border border-rule rounded-lg p-6 space-y-4">{children}</div>
         </form>
       </ScrollArea>
     </ListPageLayout>

@@ -22,7 +22,7 @@ export default function Tabs<Id extends string>({
   onSelect: (id: Id) => void;
 }) {
   return (
-    <div className="shrink-0 border-b border-gray-200">
+    <div className="shrink-0 border-b border-rule">
       <nav className="flex gap-6">
         {tabs.map((tab) => (
           <button
@@ -31,8 +31,8 @@ export default function Tabs<Id extends string>({
             onClick={() => onSelect(tab.id)}
             className={`py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
               tab.id === active
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-accent text-accent-text'
+                : 'border-transparent text-muted hover:text-body'
             }`}
           >
             {tab.label}

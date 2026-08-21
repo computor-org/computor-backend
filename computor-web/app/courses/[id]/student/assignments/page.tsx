@@ -64,7 +64,7 @@ export default function StudentCourseContentsPage() {
         {loading ? (
           <ListLoading />
         ) : (
-          <ScrollArea className="space-y-6">
+          <ScrollArea>
             {rows.length === 0 ? (
               <EmptyState
                 icon={

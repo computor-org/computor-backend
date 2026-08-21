@@ -65,9 +65,9 @@ export default function WorkspaceVolumesPanel() {
     <>
       <ErrorBanner>{error}</ErrorBanner>
 
-      <div className="shrink-0 bg-white rounded-lg border border-gray-200 p-5">
-        <h2 className="text-lg font-semibold text-gray-900">Workspace volumes</h2>
-        <p className="text-sm text-gray-500 mt-1">
+      <div className="shrink-0 bg-surface rounded-lg border border-rule p-5">
+        <h2 className="text-lg font-semibold text-fg">Workspace volumes</h2>
+        <p className="text-sm text-muted mt-1">
           A <span className="font-medium">home</span> volume holds one user&apos;s files and is
           shared by all of their workspaces; deleting a workspace never touches it, which is why
           reclaiming one has to happen here. A <span className="font-medium">scratch</span> volume
@@ -75,16 +75,16 @@ export default function WorkspaceVolumesPanel() {
           {data ? ` ${formatSize(data.total_bytes)} in total.` : ''}
         </p>
         {data?.unresolved && (
-          <p className="mt-2 text-sm text-amber-700">
+          <p className="mt-2 text-sm text-warn-text">
             Coder is unreachable, so owners could not be resolved. Nothing is marked as an orphan —
             a missing owner here would only mean the lookup failed.
           </p>
         )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto bg-white rounded-lg border border-gray-200">
+      <div className="flex-1 min-h-0 overflow-auto bg-surface rounded-lg border border-rule">
         <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+          <thead className="bg-canvas text-left text-xs uppercase tracking-wide text-muted">
             <tr>
               <th className="px-4 py-2">Volume</th>
               <th className="px-4 py-2">Kind</th>
@@ -94,10 +94,10 @@ export default function WorkspaceVolumesPanel() {
               <th className="px-4 py-2 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-rule-soft">
             {volumes.map((volume) => (
-              <tr key={volume.name} className={volume.orphaned ? 'bg-amber-50/40' : undefined}>
-                <td className="px-4 py-2 font-mono text-xs text-gray-700">{volume.name}</td>
+              <tr key={volume.name} className={volume.orphaned ? 'bg-warn-wash/40' : undefined}>
+                <td className="px-4 py-2 font-mono text-xs text-body">{volume.name}</td>
                 <td className="px-4 py-2">{volume.kind}</td>
                 <td className="px-4 py-2">{owner(volume)}</td>
                 <td className="px-4 py-2 text-right tabular-nums">
@@ -105,13 +105,13 @@ export default function WorkspaceVolumesPanel() {
                 </td>
                 <td className="px-4 py-2">
                   {volume.in_use && (
-                    <span className="inline-flex items-center rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                    <span className="inline-flex items-center rounded bg-accent-wash px-2 py-0.5 text-xs font-medium text-accent-text">
                       In use
                     </span>
                   )}
                   {volume.orphaned && (
                     <span
-                      className="ml-1 inline-flex items-center rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
+                      className="ml-1 inline-flex items-center rounded bg-warn-wash px-2 py-0.5 text-xs font-medium text-warn-text"
                       title="The user or workspace this volume was created for no longer exists."
                     >
                       Orphaned
@@ -148,7 +148,7 @@ export default function WorkspaceVolumesPanel() {
             ))}
             {volumes.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-sm text-gray-500">
+                <td colSpan={6} className="px-4 py-6 text-center text-sm text-muted">
                   No workspace volumes.
                 </td>
               </tr>

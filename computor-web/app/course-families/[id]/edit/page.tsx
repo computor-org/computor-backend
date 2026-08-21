@@ -6,6 +6,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import { PageLoading } from '@/src/components/ListPageLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
 import { inputCls } from '@/src/components/ui/tokens';
@@ -62,11 +63,11 @@ export default function CourseFamilyEditPage() {
   return (
     <AuthenticatedLayout>
       {loading ? (
-        <div className="p-6 text-gray-500">Loading…</div>
+        <PageLoading />
       ) : (
         <FormPanel
           breadcrumbs={[
-            { label: 'Course Families', href: '/course-families' },
+            { label: 'Course families', href: '/course-families' },
             { label: family?.title || family?.path || 'Course Family', href: `/course-families/${familyId}` },
             { label: 'Edit' },
           ]}
@@ -83,7 +84,7 @@ export default function CourseFamilyEditPage() {
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className={inputCls} />
           </Field>
           <Field label="Path (immutable)" hint="The hierarchical path is fixed after creation.">
-            <input value={family?.path || ''} readOnly className={`${inputCls} bg-gray-50 text-gray-500`} />
+            <input value={family?.path || ''} readOnly className={`${inputCls} bg-canvas text-muted`} />
           </Field>
         </FormPanel>
       )}

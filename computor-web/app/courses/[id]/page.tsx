@@ -112,8 +112,8 @@ export default function CoursePage() {
 
   const repoRow = (label: string, value: ReactNode) => (
     <div className="flex gap-3">
-      <dt className="text-gray-500 w-28 shrink-0">{label}</dt>
-      <dd className="text-gray-900 min-w-0 break-all">{value}</dd>
+      <dt className="text-muted w-28 shrink-0">{label}</dt>
+      <dd className="text-fg min-w-0 break-all">{value}</dd>
     </div>
   );
 
@@ -125,7 +125,7 @@ export default function CoursePage() {
           title={displayName(course, 'Untitled Course')}
           subtitle={
             course.language_code && (
-              <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded uppercase">
+              <span className="px-2 py-0.5 text-xs font-medium bg-sunken text-body rounded uppercase">
                 {course.language_code}
               </span>
             )
@@ -134,7 +134,7 @@ export default function CoursePage() {
             canManage && (
               <Link
                 href={`/courses/${courseId}/edit`}
-                className="shrink-0 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="shrink-0 px-4 py-2 text-sm font-medium text-body border border-rule-strong rounded-lg hover:bg-canvas transition-colors"
               >
                 Edit
               </Link>
@@ -142,40 +142,40 @@ export default function CoursePage() {
           }
         />
 
-        <ScrollArea className="space-y-8">
+        <ScrollArea>
         {/* About — description + the few facts worth showing (no identifiers). */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">About</h2>
-          {course.description && <p className="text-gray-700 mb-6">{course.description}</p>}
+        <div className="bg-surface rounded-lg border border-rule p-6">
+          <h2 className="text-lg font-semibold text-fg mb-4">About</h2>
+          {course.description && <p className="text-body mb-6">{course.description}</p>}
           <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
             {organization && (
               <div>
-                <dt className="text-gray-500">Organization</dt>
-                <dd className="mt-1 text-gray-900">{displayName(organization)}</dd>
+                <dt className="text-muted">Organization</dt>
+                <dd className="mt-1 text-fg">{displayName(organization)}</dd>
               </div>
             )}
             {courseFamily && (
               <div>
-                <dt className="text-gray-500">Course family</dt>
-                <dd className="mt-1 text-gray-900">{displayName(courseFamily)}</dd>
+                <dt className="text-muted">Course family</dt>
+                <dd className="mt-1 text-fg">{displayName(courseFamily)}</dd>
               </div>
             )}
             {course.language_code && (
               <div>
-                <dt className="text-gray-500">Language</dt>
-                <dd className="mt-1 text-gray-900 uppercase">{course.language_code}</dd>
+                <dt className="text-muted">Language</dt>
+                <dd className="mt-1 text-fg uppercase">{course.language_code}</dd>
               </div>
             )}
             {course.created_at && (
               <div>
-                <dt className="text-gray-500">Created</dt>
-                <dd className="mt-1 text-gray-900">{new Date(course.created_at).toLocaleDateString()}</dd>
+                <dt className="text-muted">Created</dt>
+                <dd className="mt-1 text-fg">{new Date(course.created_at).toLocaleDateString()}</dd>
               </div>
             )}
             {course.updated_at && (
               <div>
-                <dt className="text-gray-500">Last updated</dt>
-                <dd className="mt-1 text-gray-900">{new Date(course.updated_at).toLocaleDateString()}</dd>
+                <dt className="text-muted">Last updated</dt>
+                <dd className="mt-1 text-fg">{new Date(course.updated_at).toLocaleDateString()}</dd>
               </div>
             )}
           </dl>
@@ -189,7 +189,7 @@ export default function CoursePage() {
           <CourseWorkspaceLaunchButtons
             courseId={courseId}
             title="Workspaces"
-            className="bg-white rounded-lg border border-gray-200 p-6"
+            className="bg-surface rounded-lg border border-rule p-6"
           />
         )}
 
@@ -197,14 +197,14 @@ export default function CoursePage() {
             uses git, then the course binding for managers. Hidden entirely for a
             student on a course that doesn't provision git. */}
         {(gitConfigured || canManageMembers) && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-          <h2 className="text-lg font-semibold text-gray-900">Git</h2>
+        <div className="bg-surface rounded-lg border border-rule p-6 space-y-6">
+          <h2 className="text-lg font-semibold text-fg">Git</h2>
 
           {/* Your repository — only when the course actually provisions git, so
               the provision button is never offered on a non-git course. */}
           {gitConfigured && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 mb-2">Your repository</h3>
+            <h3 className="text-sm font-semibold text-fg mb-2">Your repository</h3>
             {myRepo ? (
               <dl className="space-y-2 text-sm">
                 {repoRow('Mode', myRepo.mode)}
@@ -213,14 +213,14 @@ export default function CoursePage() {
                 {myRepo.web_url &&
                   repoRow(
                     'Web',
-                    <a href={myRepo.web_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                    <a href={myRepo.web_url} target="_blank" rel="noreferrer" className="text-accent-text hover:underline">
                       {myRepo.web_url}
                     </a>,
                   )}
                 {myRepo.http_url && repoRow('Clone (HTTPS)', <span className="font-mono">{myRepo.http_url}</span>)}
               </dl>
             ) : (
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted">
                 You don&apos;t have a repository for this course yet.
               </p>
             )}
@@ -228,23 +228,23 @@ export default function CoursePage() {
             <button
               onClick={ensureGitAccess}
               disabled={ensuring}
-              className="mt-4 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="mt-4 px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
             >
               {ensuring ? 'Working…' : myRepo ? 'Repair git access' : 'Ensure git access'}
             </button>
-            <p className="mt-2 text-xs text-gray-500">
+            <p className="mt-2 text-xs text-muted">
               Creates or repairs your repository for this course
               {canManage ? ' — as staff this also grants access to the template and reference repos.' : '.'}
             </p>
             {provisioned?.clone_token && (
-              <div className="mt-3 p-3 rounded border border-amber-200 bg-amber-50 text-sm text-amber-900">
+              <div className="mt-3 p-3 rounded border border-warn-line bg-warn-wash text-sm text-warn-text">
                 <p className="font-medium">One-time clone credential — copy it now, it won&apos;t be shown again.</p>
                 <p className="mt-1">
-                  <span className="text-amber-700">Username:</span>{' '}
+                  <span className="text-warn-text">Username:</span>{' '}
                   <span className="font-mono">{provisioned.clone_username}</span>
                 </p>
                 <p>
-                  <span className="text-amber-700">Token:</span>{' '}
+                  <span className="text-warn-text">Token:</span>{' '}
                   <span className="font-mono break-all">{provisioned.clone_token}</span>
                 </p>
               </div>
@@ -254,38 +254,38 @@ export default function CoursePage() {
 
           {/* Course configuration (managers only) */}
           {canManageMembers && (
-            <div className="border-t border-gray-100 pt-6">
-              <h3 className="text-sm font-semibold text-gray-900 mb-2">Course configuration</h3>
+            <div className="border-t border-rule-soft pt-6">
+              <h3 className="text-sm font-semibold text-fg mb-2">Course configuration</h3>
               {gitBinding ? (
                 <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                   <div>
-                    <dt className="text-gray-500">Delivery</dt>
-                    <dd className="mt-1 text-gray-900">{gitBinding.delivery}</dd>
+                    <dt className="text-muted">Delivery</dt>
+                    <dd className="mt-1 text-fg">{gitBinding.delivery}</dd>
                   </div>
                   {gitBinding.default_branch && (
                     <div>
-                      <dt className="text-gray-500">Default branch</dt>
-                      <dd className="mt-1 text-gray-900 font-mono">{gitBinding.default_branch}</dd>
+                      <dt className="text-muted">Default branch</dt>
+                      <dd className="mt-1 text-fg font-mono">{gitBinding.default_branch}</dd>
                     </div>
                   )}
                   {gitBinding.student_repo_modes && gitBinding.student_repo_modes.length > 0 && (
                     <div>
-                      <dt className="text-gray-500">Student repos</dt>
-                      <dd className="mt-1 text-gray-900">{gitBinding.student_repo_modes.join(', ')}</dd>
+                      <dt className="text-muted">Student repos</dt>
+                      <dd className="mt-1 text-fg">{gitBinding.student_repo_modes.join(', ')}</dd>
                     </div>
                   )}
                   <div>
-                    <dt className="text-gray-500">Status</dt>
+                    <dt className="text-muted">Status</dt>
                     <dd className="mt-1">
                       {gitBinding.locked ? (
                         <span
-                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800"
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-warn-wash text-warn-text"
                           title={gitBinding.lock_reason ?? undefined}
                         >
                           Locked
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-success-wash text-success-text">
                           Editable
                         </span>
                       )}
@@ -293,14 +293,14 @@ export default function CoursePage() {
                   </div>
                   {(gitBinding.template_url || gitBinding.template_repo) && (
                     <div className="col-span-2 sm:col-span-4">
-                      <dt className="text-gray-500">Template</dt>
-                      <dd className="mt-1 text-gray-900 break-all">
+                      <dt className="text-muted">Template</dt>
+                      <dd className="mt-1 text-fg break-all">
                         {gitBinding.template_url ? (
                           <a
                             href={gitBinding.template_url}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-blue-600 hover:underline"
+                            className="text-accent-text hover:underline"
                           >
                             {gitBinding.template_url}
                           </a>
@@ -312,7 +312,7 @@ export default function CoursePage() {
                   )}
                 </dl>
               ) : (
-                <p className="text-sm text-gray-500">No git binding configured for this course.</p>
+                <p className="text-sm text-muted">No git binding configured for this course.</p>
               )}
             </div>
           )}

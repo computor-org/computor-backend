@@ -3,7 +3,7 @@
 import { Suspense, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
+import ListPageLayout, { ScrollArea, ListLoading, PageActions } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import Forbidden from '@/src/components/Forbidden';
 import ErrorBanner from '@/src/components/ErrorBanner';
@@ -162,11 +162,11 @@ function CourseWorkspaceConfigContent() {
       {loading ? (
         <ListLoading>Loading configuration…</ListLoading>
       ) : (
-        <ScrollArea className="space-y-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-4">
+        <ScrollArea>
+          <div className="bg-surface rounded-lg border border-rule p-5 space-y-4">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Allowed templates</h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <h2 className="text-lg font-semibold text-fg">Allowed templates</h2>
+              <p className="text-sm text-muted mt-1">
                 Members of this course can launch the checked templates from the course page —
                 no global workspace role needed. Globally disabled templates stay associated
                 but are hidden from students until re-enabled.
@@ -174,7 +174,7 @@ function CourseWorkspaceConfigContent() {
             </div>
 
             {pickerItems.length === 0 ? (
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted">
                 No templates available — Coder may be unreachable or still initializing.
               </p>
             ) : (
@@ -190,21 +190,21 @@ function CourseWorkspaceConfigContent() {
                       onClick={() => toggle(item.name)}
                       className={`flex items-start gap-3 rounded-lg border p-4 text-left transition-colors ${
                         checked
-                          ? 'border-blue-600 ring-1 ring-blue-600 bg-blue-50/50'
-                          : 'border-gray-200 bg-white hover:border-gray-300'
+                          ? 'border-accent ring-1 ring-accent bg-accent-wash/50'
+                          : 'border-rule bg-surface hover:border-rule-strong'
                       }`}
                     >
                       <TemplateIcon template={{ icon: item.icon, name: item.name }} />
                       <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-gray-900">
+                        <span className="block text-sm font-semibold text-fg">
                           {item.display_name || item.name}
                         </span>
-                        <span className="mt-0.5 block text-xs text-gray-500">{item.name}</span>
+                        <span className="mt-0.5 block text-xs text-muted">{item.name}</span>
                         {item.description && (
-                          <span className="mt-0.5 block text-xs text-gray-500">{item.description}</span>
+                          <span className="mt-0.5 block text-xs text-muted">{item.description}</span>
                         )}
                         {item.globallyDisabled && (
-                          <span className="mt-1 inline-flex items-center rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                          <span className="mt-1 inline-flex items-center rounded bg-warn-wash px-2 py-0.5 text-xs font-medium text-warn-text">
                             Globally disabled
                           </span>
                         )}
@@ -217,10 +217,10 @@ function CourseWorkspaceConfigContent() {
           </div>
 
           {form.selected.length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-4">
+            <div className="bg-surface rounded-lg border border-rule p-5 space-y-4">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Root &amp; internet policy</h2>
-                <p className="text-sm text-gray-500 mt-1">
+                <h2 className="text-lg font-semibold text-fg">Root &amp; internet policy</h2>
+                <p className="text-sm text-muted mt-1">
                   What members of this course get when they launch each template. A course can
                   only take access away — a control is locked when the template itself already
                   denies it. Applies to newly provisioned workspaces; existing ones keep their
@@ -233,8 +233,8 @@ function CourseWorkspaceConfigContent() {
                   const ceiling = ceilingFor(name);
                   const policy = form.policies[name] ?? {};
                   return (
-                    <div key={name} className="rounded-lg border border-gray-200 p-3">
-                      <p className="text-sm font-medium text-gray-900">{name}</p>
+                    <div key={name} className="rounded-lg border border-rule p-3">
+                      <p className="text-sm font-medium text-fg">{name}</p>
                       <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2">
                         {([
                           ['allow_root', 'Root (sudo)', ceiling.root, policy.allow_root],
@@ -243,7 +243,7 @@ function CourseWorkspaceConfigContent() {
                           <label
                             key={key}
                             className={`flex items-center gap-2 text-sm ${
-                              allowedByTemplate ? 'text-gray-700' : 'text-gray-400'
+                              allowedByTemplate ? 'text-body' : 'text-subtle'
                             }`}
                             title={
                               allowedByTemplate
@@ -271,7 +271,7 @@ function CourseWorkspaceConfigContent() {
             </div>
           )}
 
-          <div className="bg-white rounded-lg border border-gray-200 p-5 space-y-3">
+          <div className="bg-surface rounded-lg border border-rule p-5 space-y-3">
             <label className="flex items-start gap-2">
               <input
                 type="checkbox"
@@ -280,10 +280,10 @@ function CourseWorkspaceConfigContent() {
                 className="mt-0.5"
               />
               <span>
-                <span className="block text-sm font-medium text-gray-900">
+                <span className="block text-sm font-medium text-fg">
                   Lecturer provisioning
                 </span>
-                <span className="block text-xs text-gray-500">
+                <span className="block text-xs text-muted">
                   Course lecturers may bulk-provision workspaces for their students — including
                   throwaway workspaces with a scratch home volume that is deleted with the
                   workspace. Students can open and start these, but not provision new ones.
@@ -292,17 +292,22 @@ function CourseWorkspaceConfigContent() {
             </label>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Button onClick={save} loading={saving} loadingLabel="Saving…">
-              Save configuration
-            </Button>
-            {draft && (
-              <Button variant="ghost" onClick={() => setDraft(null)} disabled={saving}>
-                Discard changes
-              </Button>
-            )}
-          </div>
         </ScrollArea>
+      )}
+
+      {/* One form, one commit — pinned so it is reachable from any scroll
+          position rather than only after scrolling past the template picker. */}
+      {!loading && (
+        <PageActions>
+          <Button onClick={save} loading={saving} loadingLabel="Saving…">
+            Save configuration
+          </Button>
+          {draft && (
+            <Button variant="ghost" onClick={() => setDraft(null)} disabled={saving}>
+              Discard changes
+            </Button>
+          )}
+        </PageActions>
       )}
     </ListPageLayout>
   );

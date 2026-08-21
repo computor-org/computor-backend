@@ -7,6 +7,7 @@ import { usePermissions } from '@/src/hooks/usePermissions';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import { PageLoading } from '@/src/components/ListPageLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
 import { inputCls } from '@/src/components/ui/tokens';
@@ -108,7 +109,7 @@ export default function CourseContentEditPage() {
   return (
     <AuthenticatedLayout>
       {loading ? (
-        <div className="p-6">Loading…</div>
+        <PageLoading />
       ) : (
         <FormPanel
           breadcrumbs={crumbs}

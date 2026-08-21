@@ -3,7 +3,7 @@
 import { Suspense } from 'react';
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
+import ListPageLayout from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import Forbidden from '@/src/components/Forbidden';
 import Tabs from '@/src/components/ui/Tabs';
@@ -44,13 +44,19 @@ function TemplateAdminContent() {
         onSelect={(id) => router.replace(id === 'settings' ? pathname : `${pathname}?tab=${id}`)}
       />
 
-      <ScrollArea className="space-y-6">
+      {/*
+        Both panels fill the page and scroll their own body, so the thing each
+        one commits with — Save settings, Save <file> — stays pinned instead of
+        sitting at the bottom of a page-length scroll. Same arrangement as the
+        tabs on /workspaces/admin.
+      */}
+      <div className="flex-1 min-h-0 flex flex-col">
         {tab === 'settings' ? (
           <TemplateSettingsPanel templateName={templateName} />
         ) : (
           <TemplateFilesPanel templateName={templateName} />
         )}
-      </ScrollArea>
+      </div>
     </ListPageLayout>
   );
 }

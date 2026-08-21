@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import ListPageLayout, { ScrollPanel, ListLoading } from '@/src/components/ListPageLayout';
+import ListPageLayout, { ScrollPanel, ListLoading, PageLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
@@ -71,7 +71,7 @@ export default function InvitesPage() {
   );
   const invites = data ?? [];
 
-  if (authLoading) return <AuthenticatedLayout><div className="p-8 text-gray-500">Loading…</div></AuthenticatedLayout>;
+  if (authLoading) return <AuthenticatedLayout><PageLoading width="wide" /></AuthenticatedLayout>;
   if (!isAuthenticated || !isUserManager) {
     return <Forbidden message="Requires admin or _user_manager role." backLink="/dashboard" backText="Back to Dashboard" />;
   }
@@ -119,13 +119,13 @@ export default function InvitesPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Users', href: '/admin/users' }, { label: 'Invite Links' }]}
-          title="Invite Links"
+          breadcrumbs={[{ label: 'Users', href: '/admin/users' }, { label: 'Invite links' }]}
+          title="Invite links"
           subtitle="Create one-time links to onboard new users without GitLab PAT"
           actions={
             <button
               onClick={() => setCreateModal(m => ({ ...m, open: true }))}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover transition-colors"
             >
               + New Invite
             </button>
@@ -146,25 +146,25 @@ export default function InvitesPage() {
                   <Th>Expires</Th>
                   <Th>Roles</Th>
                   <Th>Status</Th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-muted uppercase tracking-wider">Actions</th>
                 </tr>
               </Thead>
               <Tbody>
                 {invites.map(inv => (
                   <tr key={inv.id}>
                     <td className="px-4 py-3">
-                      <div className="text-sm font-medium text-gray-900">{inv.note || <span className="text-gray-400 italic">No note</span>}</div>
-                      {inv.email && <div className="text-xs text-gray-500">Restricted to: {inv.email}</div>}
+                      <div className="text-sm font-medium text-fg">{inv.note || <span className="text-subtle italic">No note</span>}</div>
+                      {inv.email && <div className="text-xs text-muted">Restricted to: {inv.email}</div>}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{inv.use_count} / {inv.max_uses}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{new Date(inv.expires_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 text-sm text-muted">{inv.use_count} / {inv.max_uses}</td>
+                    <td className="px-4 py-3 text-sm text-muted">{new Date(inv.expires_at).toLocaleDateString()}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
                         {inv.roles && inv.roles.length > 0
                           ? inv.roles.map(r => (
                               <Badge key={r} color="blue">{roleLabel(r)}</Badge>
                             ))
-                          : <span className="text-xs text-gray-400">None</span>
+                          : <span className="text-xs text-subtle">None</span>
                         }
                       </div>
                     </td>
@@ -173,14 +173,14 @@ export default function InvitesPage() {
                       <div className="flex justify-end gap-1">
                         <button
                           onClick={() => handleCopy(inv.id, inv.token)}
-                          className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          className="px-2 py-1 text-xs text-accent-text hover:bg-accent-wash rounded transition-colors"
                         >
                           {copiedId === inv.id ? 'Copied!' : 'Copy Link'}
                         </button>
                         {!inv.revoked_at && (
                           <button
                             onClick={() => setRevokeConfirm(inv.id)}
-                            className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
+                            className="px-2 py-1 text-xs text-danger-text hover:bg-danger-wash rounded transition-colors"
                           >
                             Revoke
                           </button>
@@ -191,7 +191,7 @@ export default function InvitesPage() {
                 ))}
                 {invites.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">No invite links yet. Create one to get started.</td>
+                    <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted">No invite links yet. Create one to get started.</td>
                   </tr>
                 )}
               </Tbody>
@@ -202,60 +202,60 @@ export default function InvitesPage() {
 
       {/* Create Modal */}
       {createModal.open && (
-        <Modal title="New Invite Link" onClose={() => setCreateModal(m => ({ ...m, open: false, error: null }))}>
+        <Modal title="New invite link" onClose={() => setCreateModal(m => ({ ...m, open: false, error: null }))}>
             <div className="p-6 pt-4">
               {createModal.error && (
                 <div className="mb-3"><ErrorBanner>{createModal.error}</ErrorBanner></div>
               )}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Restrict to email <span className="text-gray-400 font-normal">(optional — leave empty to allow any email)</span>
+                  <label className="block text-xs font-medium text-body mb-1">
+                    Restrict to email <span className="text-subtle font-normal">(optional — leave empty to allow any email)</span>
                   </label>
                   <input
                     type="email"
                     placeholder="student@example.com"
                     value={createModal.email}
                     onChange={e => setCreateModal(m => ({ ...m, email: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Expires in (days)</label>
+                    <label className="block text-xs font-medium text-body mb-1">Expires in (days)</label>
                     <input
                       type="number"
                       min={1}
                       max={365}
                       value={createModal.expiresInDays}
                       onChange={e => setCreateModal(m => ({ ...m, expiresInDays: parseInt(e.target.value) || 7 }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Max uses</label>
+                    <label className="block text-xs font-medium text-body mb-1">Max uses</label>
                     <input
                       type="number"
                       min={1}
                       max={100}
                       value={createModal.maxUses}
                       onChange={e => setCreateModal(m => ({ ...m, maxUses: parseInt(e.target.value) || 1 }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Note <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <label className="block text-xs font-medium text-body mb-1">Note <span className="text-subtle font-normal">(optional)</span></label>
                   <input
                     type="text"
                     placeholder="e.g. WS2024 students"
                     value={createModal.note}
                     onChange={e => setCreateModal(m => ({ ...m, note: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-2">Auto-assign roles on acceptance</label>
+                  <label className="block text-xs font-medium text-body mb-2">Auto-assign roles on acceptance</label>
                   <SystemRoleCheckboxes
                     selected={createModal.roles}
                     onToggle={roleId => setCreateModal(m => ({
@@ -266,17 +266,17 @@ export default function InvitesPage() {
                 </div>
               </div>
             </div>
-            <div className="px-6 py-4 bg-gray-50 rounded-b-lg flex justify-end gap-2">
+            <div className="px-6 py-4 bg-canvas rounded-b-lg flex justify-end gap-2">
               <button
                 onClick={() => setCreateModal(m => ({ ...m, open: false, error: null }))}
-                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+                className="px-4 py-2 text-sm text-muted hover:bg-sunken rounded-lg"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreate}
                 disabled={createModal.saving}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm bg-accent text-on-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
               >
                 {createModal.saving ? 'Creating…' : 'Create Invite'}
               </button>

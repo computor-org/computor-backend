@@ -81,14 +81,14 @@ export default function UserSearchPicker({
           <Spinner size="sm" label="Searching users" />
         </div>
       ) : users.length === 0 ? (
-        <p className="text-sm text-gray-400 italic">No matching users.</p>
+        <p className="text-sm text-subtle italic">No matching users.</p>
       ) : (
-        <ul className="bg-white border border-gray-200 rounded-md divide-y divide-gray-100">
+        <ul className="bg-surface border border-rule rounded-md divide-y divide-rule-soft">
           {users.map((u) => (
             <li key={u.id} className="flex items-center justify-between gap-3 px-3 py-2">
               <div className="min-w-0 text-sm">
-                <div className="font-medium text-gray-900 truncate">{userDisplayName(u)}</div>
-                <div className="text-xs text-gray-500 truncate">{u.email ?? '—'}</div>
+                <div className="font-medium text-fg truncate">{userDisplayName(u)}</div>
+                <div className="text-xs text-muted truncate">{u.email ?? '—'}</div>
               </div>
               <Button size="xs" variant="secondary" disabled={busy} onClick={() => onPick(u)}>
                 {pickLabel}

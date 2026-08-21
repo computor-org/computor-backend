@@ -45,10 +45,10 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto"></div>
+          <p className="mt-4 text-muted">Loading...</p>
         </div>
       </div>
     );
@@ -62,7 +62,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
     // CourseProvider wraps the chrome, not just the page: the top bar shows the
     // course name too, and it used to fetch the course a second time to get it.
     <CourseProvider>
-    <div className="h-screen overflow-hidden bg-gray-50 flex">
+    <div className="h-screen overflow-hidden bg-canvas flex">
       {/* Sidebar (fixed; scrolls internally via its own nav) */}
       <Sidebar />
 

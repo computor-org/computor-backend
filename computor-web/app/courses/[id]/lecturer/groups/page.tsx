@@ -23,7 +23,7 @@ const membersClient = new CourseMembersClient();
 
 export default function CourseGroupsPage() {
   const courseId = useParams().id as string;
-  const crumbs = useCourseCrumbs(courseId, 'Course Groups');
+  const crumbs = useCourseCrumbs(courseId, 'Course groups');
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
 
@@ -81,12 +81,12 @@ export default function CourseGroupsPage() {
       <ListPageLayout>
         <PageHeader
           breadcrumbs={crumbs}
-          title="Course Groups"
+          title="Course groups"
           subtitle="Groups (lab sections, tutorial cohorts) students are assigned to. Every student must belong to a group."
           actions={
             <Link
               href={`/courses/${courseId}/lecturer/groups/create`}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+              className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover"
             >
               New group
             </Link>
@@ -111,33 +111,33 @@ export default function CourseGroupsPage() {
                 {groups.map((g) => {
                   const count = memberCount.get(g.id) ?? 0;
                   return (
-                    <tr key={g.id} className="hover:bg-gray-50">
+                    <tr key={g.id} className="hover:bg-canvas">
                       <td className="px-4 py-3">
                         <Link
                           href={`/courses/${courseId}/lecturer/groups/${g.id}/edit`}
-                          className="font-medium text-gray-900 text-sm hover:text-blue-600"
+                          className="font-medium text-fg text-sm hover:text-accent-text"
                         >
                           {g.title || 'Untitled group'}
                         </Link>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{count}</td>
+                      <td className="px-4 py-3 text-sm text-muted">{count}</td>
                       <td className="px-4 py-3 text-right space-x-4">
                         <Link
                           href={`/courses/${courseId}/lecturer/groups/${g.id}/edit`}
-                          className="text-sm text-blue-600 hover:underline"
+                          className="text-sm text-accent-text hover:underline"
                         >
                           Edit
                         </Link>
                         {count === 0 ? (
                           <button
                             onClick={() => setToDelete(g)}
-                            className="text-sm text-red-600 hover:underline"
+                            className="text-sm text-danger-text hover:underline"
                           >
                             Delete
                           </button>
                         ) : (
                           <span
-                            className="text-sm text-gray-300 cursor-not-allowed"
+                            className="text-sm text-faint cursor-not-allowed"
                             title="Reassign this group's members before deleting it."
                           >
                             Delete
@@ -149,7 +149,7 @@ export default function CourseGroupsPage() {
                 })}
                 {groups.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="px-4 py-8 text-center text-sm text-gray-500">
+                    <td colSpan={3} className="px-4 py-8 text-center text-sm text-muted">
                       No groups yet. Create one so students can be assigned to it.
                     </td>
                   </tr>

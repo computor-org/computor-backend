@@ -19,7 +19,7 @@ export function warningText(w: CourseDeployWarning): string {
 }
 
 const BOX = 'mt-2 rounded-md border p-3 text-xs space-y-1';
-const NEUTRAL = 'border-gray-200 bg-gray-50';
+const NEUTRAL = 'border-rule bg-canvas';
 
 /**
  * Verdict of the automatic validate pass, shown under the file field. It is the
@@ -81,7 +81,7 @@ function Verdict({
 }): ReactNode {
   if (status === 'waiting') {
     return (
-      <div className={`${BOX} ${NEUTRAL} text-gray-500`}>
+      <div className={`${BOX} ${NEUTRAL} text-muted`}>
         Select a course family above — the file is then checked automatically.
       </div>
     );
@@ -89,7 +89,7 @@ function Verdict({
 
   if (status === 'checking') {
     return (
-      <div className={`${BOX} ${NEUTRAL} flex items-center gap-2 text-gray-500`}>
+      <div className={`${BOX} ${NEUTRAL} flex items-center gap-2 text-muted`}>
         <Spinner size="sm" label="Checking the file" />
         Checking the file…
       </div>
@@ -98,7 +98,7 @@ function Verdict({
 
   if (status === 'failed') {
     return (
-      <div className={`${BOX} border-red-200 bg-red-50 text-red-700`}>
+      <div className={`${BOX} border-danger-line bg-danger-wash text-danger-text`}>
         <div className="font-medium">This file can’t be used.</div>
         <div>{failure}</div>
         {onRecheck && (
@@ -118,24 +118,24 @@ function Verdict({
   const warnings = result.warnings ?? [];
   const s = result.summary ?? {};
   const tone = errors.length
-    ? 'border-red-200 bg-red-50'
+    ? 'border-danger-line bg-danger-wash'
     : warnings.length
-      ? 'border-amber-200 bg-amber-50'
+      ? 'border-warn-line bg-warn-wash'
       : NEUTRAL;
 
   return (
     <div className={`${BOX} ${tone}`}>
-      <div className="text-gray-700">
+      <div className="text-body">
         <span className="font-medium">{result.course_title || result.course_path}</span>{' '}
-        <span className="font-mono text-gray-500">({result.course_path})</span>
+        <span className="font-mono text-muted">({result.course_path})</span>
       </div>
-      <div className="text-gray-500">
+      <div className="text-muted">
         {s.content_types ?? 0} content types · {s.units ?? 0} units · {s.assignments ?? 0} assignments ·{' '}
         {s.examples_assigned ?? 0} examples
       </div>
 
       {errors.length > 0 && (
-        <div className="pt-1 text-red-700">
+        <div className="pt-1 text-danger-text">
           <div className="font-medium">
             {errors.length === 1 ? '1 problem blocks' : `${errors.length} problems block`} this file
             — fix it and upload it again:
@@ -149,7 +149,7 @@ function Verdict({
       )}
 
       {warnings.length > 0 && (
-        <div className="pt-1 text-amber-700">
+        <div className="pt-1 text-warn-text">
           <div className="font-medium">
             {warnings.length === 1 ? '1 thing is' : `${warnings.length} things are`} missing or
             incomplete{createdCourseId ? ':' : ' — the course can still be created:'}
@@ -163,11 +163,11 @@ function Verdict({
       )}
 
       {errors.length === 0 && warnings.length === 0 && !createdCourseId && (
-        <div className="text-green-700">Everything checks out — ready to create.</div>
+        <div className="text-success-text">Everything checks out — ready to create.</div>
       )}
 
       {createdCourseId && (
-        <div className="flex items-center gap-2 pt-1 text-green-700">
+        <div className="flex items-center gap-2 pt-1 text-success-text">
           <span>Course created{warnings.length > 0 ? ' with the issues above.' : '.'}</span>
           <Button variant="ghost" size="xs" onClick={onOpenCourse}>
             Open course

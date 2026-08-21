@@ -34,7 +34,7 @@ function WorkspaceAdminContent() {
     <ListPageLayout>
       <PageHeader
         breadcrumbs={[{ label: 'Workspaces', href: '/workspaces' }, { label: 'Administration' }]}
-        title="Workspace Administration"
+        title="Workspace administration"
         subtitle="Workspace roles, per-user access, which templates are available, and fleet-wide image rollouts"
       />
 
@@ -60,7 +60,7 @@ function WorkspaceAdminContent() {
       {tab === 'users' ? (
         <WorkspaceUsersPanel />
       ) : tab === 'fleet' ? (
-        <ScrollArea className="space-y-6">
+        <ScrollArea>
           <WorkspaceFleetPanel />
         </ScrollArea>
       ) : tab === 'templates' ? (

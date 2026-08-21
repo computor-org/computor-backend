@@ -148,11 +148,11 @@ export default function WorkspaceUsersPanel() {
   return (
     <>
       {/* Assign Role Form */}
-      <div className="shrink-0 bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Assign Role</h2>
+      <div className="shrink-0 bg-surface rounded-lg border border-rule p-6">
+        <h2 className="text-lg font-semibold text-fg mb-4">Assign Role</h2>
         <form onSubmit={handleAssignRole} className="flex flex-wrap items-end gap-4">
           <div className="flex-1 min-w-[200px]">
-            <label htmlFor="assign-email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label htmlFor="assign-email" className="block text-sm font-medium text-body mb-1">Email</label>
             <input
               id="assign-email"
               type="email"
@@ -164,7 +164,7 @@ export default function WorkspaceUsersPanel() {
             />
           </div>
           <div className="w-48">
-            <label htmlFor="assign-role" className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+            <label htmlFor="assign-role" className="block text-sm font-medium text-body mb-1">Role</label>
             <select
               id="assign-role"
               value={assignRole}
@@ -176,12 +176,12 @@ export default function WorkspaceUsersPanel() {
               ))}
             </select>
           </div>
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+          <label className="flex items-center gap-2 text-sm text-body cursor-pointer">
             <input
               type="checkbox"
               checked={assignProvision}
               onChange={(e) => setAssignProvision(e.target.checked)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="rounded border-rule-strong text-accent-text focus:ring-accent-line"
             />
             Provision workspace
           </label>
@@ -204,11 +204,11 @@ export default function WorkspaceUsersPanel() {
 
       {/* Loading */}
       {loading && !data && (
-        <div className="flex-1 min-h-0 bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
-          <div className="h-6 bg-gray-200 rounded w-1/4 mb-4" />
+        <div className="flex-1 min-h-0 bg-surface rounded-lg border border-rule p-6 animate-pulse">
+          <div className="h-6 bg-sunken rounded w-1/4 mb-4" />
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-12 bg-gray-200 rounded" />
+              <div key={i} className="h-12 bg-sunken rounded" />
             ))}
           </div>
         </div>
@@ -234,7 +234,7 @@ export default function WorkspaceUsersPanel() {
             <Tbody>
               {filteredUsers.length === 0 ? (
                 <Tr>
-                  <Td colSpan={6} className="py-8 text-center text-gray-500">
+                  <Td colSpan={6} className="py-8 text-center text-muted">
                     {searchQuery ? 'No users match your search' : 'No users with workspace roles'}
                   </Td>
                 </Tr>
@@ -245,14 +245,14 @@ export default function WorkspaceUsersPanel() {
                   const hasWsRole = u.roles.some((r) => r.startsWith('_workspace'));
 
                   return (
-                    <Tr key={u.user_id} className="hover:bg-gray-50">
-                      <Td className="text-gray-900">
+                    <Tr key={u.user_id} className="hover:bg-canvas">
+                      <Td className="text-fg">
                         {u.given_name || u.family_name
                           ? `${u.given_name || ''} ${u.family_name || ''}`.trim()
                           : '-'}
                       </Td>
-                      <Td className="text-gray-600">{u.email || '-'}</Td>
-                      <Td className="text-gray-600 font-mono text-xs">{u.username || '-'}</Td>
+                      <Td className="text-muted">{u.email || '-'}</Td>
+                      <Td className="text-muted font-mono text-xs">{u.username || '-'}</Td>
                       <Td>
                         <div className="flex flex-wrap items-center gap-1.5">
                           {u.roles.map((role) => (
@@ -260,7 +260,7 @@ export default function WorkspaceUsersPanel() {
                               {role}
                               <button
                                 onClick={() => setRemoveTarget({ userId: u.user_id, roleId: role, email: u.email || '' })}
-                                className="text-blue-400 hover:text-red-500 ml-1"
+                                className="text-blue-400 hover:text-danger-text ml-1"
                                 title="Remove role"
                               >
                                 &times;
@@ -269,7 +269,7 @@ export default function WorkspaceUsersPanel() {
                           ))}
                           {missingRoles.length > 0 && (
                             <select
-                              className="text-xs border border-gray-200 rounded px-1 py-0.5 text-gray-500"
+                              className="text-xs border border-rule rounded px-1 py-0.5 text-muted"
                               value=""
                               onChange={(e) => {
                                 if (e.target.value) handleInlineAddRole(u.user_id, e.target.value);
@@ -285,9 +285,9 @@ export default function WorkspaceUsersPanel() {
                       </Td>
                       <Td>
                         {!hasWsRole ? (
-                          <span className="text-xs text-gray-400">N/A</span>
+                          <span className="text-xs text-subtle">N/A</span>
                         ) : wsStatus === 'loading' ? (
-                          <span className="text-xs text-gray-400">Checking...</span>
+                          <span className="text-xs text-subtle">Checking...</span>
                         ) : wsStatus === true ? (
                           <Badge color="green" pill>Yes</Badge>
                         ) : wsStatus === false ? (
@@ -295,13 +295,13 @@ export default function WorkspaceUsersPanel() {
                             Provision
                           </Button>
                         ) : (
-                          <span className="text-xs text-gray-400">Unknown</span>
+                          <span className="text-xs text-subtle">Unknown</span>
                         )}
                       </Td>
                       <Td>
                         <Link
                           href={`/workspaces/admin/${u.user_id}`}
-                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                          className="text-sm text-accent-text hover:text-accent-text font-medium"
                         >
                           Manage
                         </Link>

@@ -180,12 +180,12 @@ export default function UserDetailPage() {
         <PageHeader
           breadcrumbs={[{ label: 'Users', href: '/admin/users' }, { label: user?.email || 'User' }]}
           title={user?.email || 'User'}
-          subtitle={user && <span className="text-sm text-gray-500">{user.given_name} {user.family_name}</span>}
+          subtitle={user && <span className="text-sm text-muted">{user.given_name} {user.family_name}</span>}
           actions={
             user ? (
               <>
-                <Link href={`/admin/users/${userId}/edit`} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Edit</Link>
-                <button onClick={() => setShowArchiveConfirm(true)} className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+                <Link href={`/admin/users/${userId}/edit`} className="px-3 py-2 text-sm font-medium text-body border border-rule-strong rounded-lg hover:bg-canvas">Edit</Link>
+                <button onClick={() => setShowArchiveConfirm(true)} className="px-3 py-2 text-sm font-medium text-body border border-rule-strong rounded-lg hover:bg-canvas">
                   {user.archived_at ? 'Unarchive' : 'Archive'}
                 </button>
               </>
@@ -198,41 +198,41 @@ export default function UserDetailPage() {
         {loading ? (
           <ListLoading>Loading…</ListLoading>
         ) : user ? (
-          <ScrollArea className="space-y-6">
-            <section className="bg-white border border-gray-200 rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+          <ScrollArea>
+            <section className="bg-surface border border-rule rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <div>
-                <dt className="text-gray-500">Status</dt>
-                <dd className="text-gray-900">
-                  {user.banned_at ? <span className="text-red-700 font-medium">Banned</span> : user.archived_at ? 'Archived' : 'Active'}
+                <dt className="text-muted">Status</dt>
+                <dd className="text-fg">
+                  {user.banned_at ? <span className="text-danger-text font-medium">Banned</span> : user.archived_at ? 'Archived' : 'Active'}
                 </dd>
               </div>
-              <div><dt className="text-gray-500">Created</dt><dd className="text-gray-900">{user.created_at ? new Date(user.created_at).toLocaleString() : '—'}</dd></div>
+              <div><dt className="text-muted">Created</dt><dd className="text-fg">{user.created_at ? new Date(user.created_at).toLocaleString() : '—'}</dd></div>
             </section>
 
             {/* Access control (ban / unban) */}
-            <section className="bg-white border border-gray-200 rounded-lg p-6 space-y-3">
-              <h2 className="text-lg font-semibold text-gray-900">Access control</h2>
+            <section className="bg-surface border border-rule rounded-lg p-6 space-y-3">
+              <h2 className="text-lg font-semibold text-fg">Access control</h2>
               {user.banned_at ? (
                 <div className="space-y-2 text-sm">
-                  <p className="text-red-700 font-medium">
+                  <p className="text-danger-text font-medium">
                     Banned on {new Date(user.banned_at).toLocaleString()}. This user cannot authenticate.
                   </p>
-                  {user.ban_reason ? <p className="text-gray-600">Reason: {user.ban_reason}</p> : null}
-                  <button onClick={() => setShowUnbanConfirm(true)} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                  {user.ban_reason ? <p className="text-muted">Reason: {user.ban_reason}</p> : null}
+                  <button onClick={() => setShowUnbanConfirm(true)} className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover">
                     Unban user
                   </button>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-sm text-gray-500">Banning immediately blocks this user from signing in and revokes their active sessions.</p>
+                  <p className="text-sm text-muted">Banning immediately blocks this user from signing in and revokes their active sessions.</p>
                   <input
                     value={banReason}
                     onChange={(e) => setBanReason(e.target.value)}
                     placeholder="Reason (optional)"
                     maxLength={1024}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line"
                   />
-                  <button onClick={() => setShowBanConfirm(true)} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700">
+                  <button onClick={() => setShowBanConfirm(true)} className="px-4 py-2 text-sm font-medium text-on-accent bg-danger rounded-lg hover:bg-danger-hover">
                     Ban user
                   </button>
                 </div>
@@ -240,41 +240,41 @@ export default function UserDetailPage() {
             </section>
 
             {/* Roles */}
-            <section className="bg-white border border-gray-200 rounded-lg p-6 space-y-3">
-              <h2 className="text-lg font-semibold text-gray-900">System roles</h2>
+            <section className="bg-surface border border-rule rounded-lg p-6 space-y-3">
+              <h2 className="text-lg font-semibold text-fg">System roles</h2>
               <SystemRoleCheckboxes selected={roles} onToggle={toggleRole} disabled={savingRoles} />
-              <button onClick={saveRoles} disabled={savingRoles} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              <button onClick={saveRoles} disabled={savingRoles} className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50">
                 {savingRoles ? 'Saving…' : 'Save roles'}
               </button>
             </section>
 
             {/* Accounts */}
-            <section className="bg-white border border-gray-200 rounded-lg p-6 space-y-3">
-              <h2 className="text-lg font-semibold text-gray-900">Linked accounts</h2>
+            <section className="bg-surface border border-rule rounded-lg p-6 space-y-3">
+              <h2 className="text-lg font-semibold text-fg">Linked accounts</h2>
               {accounts.length === 0 ? (
-                <p className="text-sm text-gray-400 italic">No linked accounts.</p>
+                <p className="text-sm text-subtle italic">No linked accounts.</p>
               ) : (
                 <div className="space-y-2">
                   {accounts.map((acc) => {
                     const prov = providers.find((p) => p.provider === acc.provider && p.type === acc.type);
                     return (
-                      <div key={acc.id} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                      <div key={acc.id} className="flex items-center justify-between px-3 py-2 bg-canvas rounded-lg border border-rule">
                         <div className="text-sm">
-                          <span className="font-medium text-gray-900">{prov?.display_name ?? acc.provider}</span>
-                          <span className="mx-2 text-gray-300">·</span>
-                          <span className="text-gray-600">{acc.provider_account_id}</span>
+                          <span className="font-medium text-fg">{prov?.display_name ?? acc.provider}</span>
+                          <span className="mx-2 text-faint">·</span>
+                          <span className="text-muted">{acc.provider_account_id}</span>
                         </div>
-                        <button onClick={() => setRemoveAccountId(acc.id)} className="text-xs text-red-500 hover:text-red-700">Remove</button>
+                        <button onClick={() => setRemoveAccountId(acc.id)} className="text-xs text-danger-text hover:text-danger-text">Remove</button>
                       </div>
                     );
                   })}
                 </div>
               )}
-              <div className="border-t border-gray-100 pt-3">
+              <div className="border-t border-rule-soft pt-3">
                 {addProvider === null ? (
                   <div className="flex flex-wrap gap-2">
                     {providers.map((p) => (
-                      <button key={p.id} onClick={() => { setAddProvider(p.id); setProviderUrl(p.provider); setAccountId(''); }} className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50">
+                      <button key={p.id} onClick={() => { setAddProvider(p.id); setProviderUrl(p.provider); setAccountId(''); }} className="px-3 py-1.5 text-xs border border-rule-strong rounded-lg hover:bg-canvas">
                         + {p.display_name}
                       </button>
                     ))}
@@ -285,16 +285,16 @@ export default function UserDetailPage() {
                     return (
                       <div className="space-y-2">
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Provider URL</label>
-                          <input value={providerUrl} onChange={(e) => setProviderUrl(e.target.value)} placeholder="gitlab.com" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" autoFocus />
+                          <label className="block text-xs font-medium text-body mb-1">Provider URL</label>
+                          <input value={providerUrl} onChange={(e) => setProviderUrl(e.target.value)} placeholder="gitlab.com" className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line" autoFocus />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">{prov.field_label}</label>
-                          <input value={accountId} onChange={(e) => setAccountId(e.target.value)} placeholder={prov.placeholder} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500" />
+                          <label className="block text-xs font-medium text-body mb-1">{prov.field_label}</label>
+                          <input value={accountId} onChange={(e) => setAccountId(e.target.value)} placeholder={prov.placeholder} className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line" />
                         </div>
                         <div className="flex justify-end gap-2">
-                          <button onClick={() => setAddProvider(null)} className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
-                          <button onClick={addAccount} disabled={savingAccount || !providerUrl.trim() || !accountId.trim()} className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                          <button onClick={() => setAddProvider(null)} className="px-3 py-2 text-sm text-muted hover:bg-sunken rounded-lg">Cancel</button>
+                          <button onClick={addAccount} disabled={savingAccount || !providerUrl.trim() || !accountId.trim()} className="px-3 py-2 text-sm bg-accent text-on-accent rounded-lg hover:bg-accent-hover disabled:opacity-50">
                             {savingAccount ? 'Linking…' : 'Link account'}
                           </button>
                         </div>

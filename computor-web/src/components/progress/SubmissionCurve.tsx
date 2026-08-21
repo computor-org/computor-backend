@@ -53,9 +53,9 @@ export default function SubmissionCurve({
 
   if (windowed.length === 0) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-5">
-        <h3 className="text-sm font-semibold text-gray-900 mb-2">Submission timeline</h3>
-        <p className="rounded-md bg-gray-50 px-3 py-6 text-center text-sm text-gray-500">
+      <div className="bg-surface rounded-lg border border-rule p-5">
+        <h3 className="text-sm font-semibold text-fg mb-2">Submission timeline</h3>
+        <p className="rounded-md bg-canvas px-3 py-6 text-center text-sm text-muted">
           {startValid ? 'No official submissions in the selected window.' : 'No official submissions to plot.'}
         </p>
       </div>
@@ -88,8 +88,8 @@ export default function SubmissionCurve({
   const lateCount = dueValid ? times.filter((t) => t > dueMs).length : 0;
 
   return (
-    <figure className="bg-white rounded-lg border border-gray-200 p-5 m-0">
-      <figcaption className="text-sm font-semibold text-gray-900 mb-3">
+    <figure className="bg-surface rounded-lg border border-rule p-5 m-0">
+      <figcaption className="text-sm font-semibold text-fg mb-3">
         Submission timeline
       </figcaption>
       <svg
@@ -153,11 +153,11 @@ export default function SubmissionCurve({
           {fmt(new Date(maxT).toISOString())}
         </text>
       </svg>
-      <figcaption className="mt-2 text-center text-xs text-gray-400">
+      <figcaption className="mt-2 text-center text-xs text-subtle">
         Cumulative assignments submitted ({windowed.length}/{total})
         {startValid && <span> · from start date</span>}
         {dueValid && lateCount > 0 && (
-          <span className="text-red-500"> · {lateCount} after due date</span>
+          <span className="text-danger-text"> · {lateCount} after due date</span>
         )}
       </figcaption>
     </figure>

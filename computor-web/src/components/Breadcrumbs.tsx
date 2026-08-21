@@ -19,23 +19,23 @@ export interface Crumb {
 export default function Breadcrumbs({ items }: { items: Crumb[] }) {
   return (
     <nav aria-label="Breadcrumb" className="mb-4">
-      <ol className="flex flex-wrap items-center gap-1.5 text-sm text-gray-500">
+      <ol className="flex flex-wrap items-center gap-1.5 text-sm text-muted">
         {items.map((item, i) => {
           const last = i === items.length - 1;
           return (
             <Fragment key={i}>
               {i > 0 && (
-                <li aria-hidden="true" className="text-gray-300 select-none">
+                <li aria-hidden="true" className="text-faint select-none">
                   /
                 </li>
               )}
               <li className="min-w-0">
                 {item.href && !last ? (
-                  <Link href={item.href} className="hover:text-blue-600 transition-colors">
+                  <Link href={item.href} className="hover:text-accent-text transition-colors">
                     {item.label}
                   </Link>
                 ) : (
-                  <span className={last ? 'font-medium text-gray-900' : ''} aria-current={last ? 'page' : undefined}>
+                  <span className={last ? 'font-medium text-fg' : ''} aria-current={last ? 'page' : undefined}>
                     {item.label}
                   </span>
                 )}

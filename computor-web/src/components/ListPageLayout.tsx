@@ -54,25 +54,42 @@ export default function ListPageLayout({
 /**
  * Borderless region that grows to fill the layout and scrolls internally — the
  * body for pages whose content isn't a single table (e.g. a stack of cards).
- * Pass `space-y-*` via className for inter-child spacing.
+ *
+ * `spacing` names what the children ARE, not how many pixels sit between them.
+ * Pages used to pass `space-y-*` themselves and picked 12px, 16px, 24px and
+ * 32px for the same job, so moving between two pages of the same kind changed
+ * the page's rhythm under you. There are two rhythms and this owns both.
  *
  * `scroll-slim` gives the thumb its inset so it never touches the content, and
  * `scroll-gutter` reserves its width so the content doesn't shift sideways when
  * the list crosses the fold. Bordered bodies opt out of the gutter — see
  * <ScrollPanel>.
  */
+export type ScrollAreaSpacing = 'sections' | 'rows' | 'none';
+
+const SPACING_CLS: Record<ScrollAreaSpacing, string> = {
+  /** Titled blocks — cards, panels, a summary strip above a list. */
+  sections: 'space-y-6',
+  /** A stack of peer rows or small cards that read as one list. */
+  rows: 'space-y-3',
+  /** The body is a grid, or a single child that owns its own spacing. */
+  none: '',
+};
+
 export function ScrollArea({
+  spacing = 'sections',
   className = '',
   gutter = true,
   children,
 }: {
+  spacing?: ScrollAreaSpacing;
   className?: string;
   gutter?: boolean;
   children: ReactNode;
 }) {
   return (
     <div
-      className={`flex-1 min-h-0 overflow-y-auto scroll-slim scroll-fade ${gutter ? 'scroll-gutter' : ''} ${className}`}
+      className={`flex-1 min-h-0 overflow-y-auto scroll-slim scroll-fade ${gutter ? 'scroll-gutter' : ''} ${SPACING_CLS[spacing]} ${className}`}
     >
       {children}
     </div>
@@ -98,7 +115,7 @@ export function ScrollPanel({
 }) {
   return (
     <ScrollArea
-      className={`overflow-x-auto rounded-lg border border-gray-200 bg-white ${className}`}
+      className={`overflow-x-auto rounded-lg border border-rule bg-surface ${className}`}
       gutter={false}
     >
       {children}
@@ -106,7 +123,61 @@ export function ScrollPanel({
   );
 }
 
+/**
+ * The surface's commit action, pinned below the scroll body.
+ *
+ * Rendered as the LAST child of <ListPageLayout>, after the ScrollArea — the
+ * arrangement ListPageLayout's own docstring describes for a pager. A Save that
+ * lives at the bottom of the scrolling body instead scrolls away exactly when a
+ * form is long enough to need it, which is the one case where you want it.
+ *
+ * For a page whose fields sit in a <form>, keep the submit here and wire it with
+ * the HTML `form=` attribute, the way <FormPanel> does, so Enter still submits.
+ *
+ * Only for a surface with ONE commit. A page whose cards each save separately
+ * keeps its buttons in the cards: a single pinned "Save" cannot say which card
+ * it means.
+ */
+export function PageActions({
+  className = '',
+  children,
+}: {
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`shrink-0 flex flex-wrap items-center gap-3 border-t border-rule pt-4 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
 /** Centered, borderless placeholder that occupies the scroll body while loading. */
 export function ListLoading({ children = 'Loading…' }: { children?: ReactNode }) {
-  return <div className="flex-1 min-h-0 flex items-center justify-center text-gray-500">{children}</div>;
+  return <div className="flex-1 min-h-0 flex items-center justify-center text-muted">{children}</div>;
+}
+
+/**
+ * The whole page, while it has nothing to show yet.
+ *
+ * For the moment before a form or a detail page has its data — where pages had
+ * been returning a bare `<div className="p-6">Loading…</div>`. That sits at the
+ * top-left of an empty viewport, then the real page replaces it with a header
+ * 24px lower, so every edit page visibly jumped on load. This occupies the same
+ * scaffold the page is about to use, so nothing moves.
+ *
+ * Default `narrow` matches FormPanel; pass `wide` ahead of a table or grid.
+ */
+export function PageLoading({
+  width = 'narrow',
+  children,
+}: {
+  width?: 'wide' | 'narrow';
+  children?: ReactNode;
+}) {
+  return (
+    <ListPageLayout width={width}>
+      <ListLoading>{children}</ListLoading>
+    </ListPageLayout>
+  );
 }

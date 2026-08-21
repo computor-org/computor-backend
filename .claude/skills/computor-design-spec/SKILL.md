@@ -97,9 +97,37 @@ Foreground/surface roles:
 | link | `text-blue-600` | `var(--c-link)` |
 | focus ring | `focus:ring-2 focus:ring-blue-500` | `outline 1px var(--c-focus)` |
 
-The web bindings are the **only** place those literal Tailwind palette classes are
-allowed — inside the shared component layer (`src/components/**`). A page in
-`app/**` that writes `text-gray-500` directly has bypassed the system.
+### 2a. The web's tokens
+
+On the web those bindings are **CSS custom properties in `app/globals.css`**,
+registered with `@theme inline` so Tailwind emits a utility for each. Use the
+utility; never the palette.
+
+| Role | Utility | Was |
+|---|---|---|
+| primary text | `text-fg` | `text-gray-900` |
+| running text | `text-body` | `text-gray-700` |
+| secondary / label | `text-muted` | `text-gray-500/600` |
+| hint / timestamp | `text-subtle` | `text-gray-400` |
+| card, panel | `bg-surface` | `bg-white` |
+| page behind them | `bg-canvas` | `bg-gray-50` |
+| well inside a card | `bg-sunken` | `bg-gray-100` |
+| panel / table border | `border-rule` | `border-gray-200` |
+| row separator | `border-rule-soft` / `divide-rule-soft` | `border-gray-100` |
+| input border | `border-rule-strong` | `border-gray-300` |
+| button fill | `bg-accent` / `hover:bg-accent-hover` | `bg-blue-600/700` |
+| text on that fill | `text-on-accent` | `text-white` |
+| link / accent text | `text-accent-text` | `text-blue-600` |
+| tint behind a chip | `bg-accent-wash` | `bg-blue-50` |
+
+The same three registers exist for `danger`, `warn` and `success`
+(`bg-*-wash`, `text-*-text`, `border-*-line`, plus `bg-danger` / `bg-success`
+fills). `bg-inverse` is a surface that flips against the page.
+
+This is what makes dark mode a single block rather than a per-page audit — see §6.
+
+Literal Tailwind palette classes are allowed **nowhere** in `app/**`, and inside
+`src/components/**` only where no token fits.
 
 ---
 
@@ -145,9 +173,9 @@ destructive action repeated in every table row), `ghost` (muted text, no fill).
 3. Page headers go through `PageHeader`; status chips through `Badge`; inline
    errors through `ErrorBanner`; dialogs through `Modal` / `ConfirmDeleteDialog`.
 4. `Badge` takes a **tone**, not a color name.
-5. The app is light-only today (`color-scheme: light`, zero `dark:` variants).
-   Do not add a one-off `dark:` variant — it produces a half-dark page. Dark mode
-   becomes possible only once rule 1 holds; see §6.
+5. **Never write a `dark:` variant.** The app has dark mode and it works through
+   the tokens in rule 1 — a per-page `dark:` override is how you get a page that
+   is half-dark. If something looks wrong in dark mode, the fix is a token.
 6. Custom CSS goes in `app/globals.css` as an `@utility`, with a comment saying
    why a utility class could not do it. That file's existing comments are the
    standard to match.
@@ -175,20 +203,21 @@ sweeping reformat PR.
 Both checkers below report the current numbers with `--all`; these were
 re-measured on 2026-08-20.
 
-**Web** (`node computor-web/scripts/check-styling.mjs --all`, 74 files in `app/`)
-- **1,155** palette-utility occurrences in `app/**` that should be components
-  (a further 666 sit legitimately inside `src/components/**`).
-- **77** raw `<button>` in `app/**`; only 9 files import `Button`.
-- `PageHeader` reaches 40 of 70 pages; a header scaffold (`PageHeader` **or**
-  `FormPanel`) reaches 56 of 70. Create/edit is the healthy half — 16 of 18 of
-  those routes already go through `FormPanel`.
-- `EmptyState` is used on 4 pages against 15 hand-rolled dashed-border empties.
-- Three separate ltree tree renderers draw the same course content hierarchy at
-  three different indents.
-- `Badge` still takes literal color names (`green`, `purple`) — migrate its API to
-  tones, keeping the color names as deprecated aliases until callers are moved.
-- `src/components/ui/tokens.ts` holds exactly one string (`inputCls`); the rest of
-  the shared class strings are still inlined in components.
+**Web** (`node computor-web/scripts/check-styling.mjs --all`, 75 files in `app/`)
+- **0** palette-utility occurrences in `app/**` — down from 1,155. Colours are
+  named by role now (see §2a); the checker will block a regression at commit time.
+- **71** raw `<button>` in `app/**`. This is the remaining debt: each one is a
+  `Button` with a hand-rolled class string. Concentrated in `settings` (8),
+  `admin/users/[id]` (8), `admin/updates` (7), `admin/users/invites` (5).
+- A header scaffold (`PageHeader` / `FormPanel` / `DetailPanel`) reaches **59 of
+  71** pages. The remaining 12 are correct as they are and should NOT be
+  "fixed": four sit outside the app shell (the public landing page, login,
+  auth/success, the invite acceptance page), three are redirect stubs, three are
+  `ComingSoon` states, one is a thin wrapper whose child owns the header, and one
+  (`workspaces/launch`) is deliberately standalone with a comment saying why.
+  Count adoption against the 59, not against 71.
+- `Badge` takes `tone`; the old `color` names remain as deprecated aliases.
+  New code passes `tone`.
 
 **Extension** (`node scripts/check-webview-styling.js --all`, 24 stylesheets)
 - **24** hardcoded hex/`rgba()` declarations across 6 non-base stylesheets
@@ -203,16 +232,31 @@ re-measured on 2026-08-20.
 - Duplicate spellings `.btn.secondary` / `.btn-secondary` (and `.sm`/`-sm`,
   `.xs`/`-xs`) — the chained form is canonical; the hyphenated one is legacy.
 
-## 6. Dark mode on the web (not yet — the prerequisite)
+## 6. Dark mode on the web
 
-The web app declares `color-scheme: light` and has zero `dark:` variants. Adding
-them page by page is what produces a half-broken dark theme, so it is forbidden
-by §4 rule 5.
+Shipped. `app/globals.css` defines the light palette on bare `:root`, then
+redefines the same tokens twice: under
+`@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }` and
+under `:root[data-theme="dark"]`.
 
-The order that works: get rule 1 to hold (palette only in `src/components/**`),
-promote the §2 bindings into CSS custom properties in `globals.css`, point the
-components at those properties, and only then add one `@media (prefers-color-scheme: dark)`
-block that redefines them. One change, whole app, no per-page audit.
+Three states, not two — an explicit choice stamps `data-theme` on `<html>`, and
+the default "system" setting stamps nothing, so only `prefers-color-scheme`
+separates light from dark there. The guards make an explicit choice win in both
+directions. `e2e/theme-check.spec.ts` asserts all four combinations.
+
+The preference lives in `localStorage` under `computor-theme` and is applied by a
+blocking inline script in `app/layout.tsx` **before first paint** — read it in a
+component instead and dark-mode users get a white flash on every document load.
+`ThemePicker` (on `/settings`) reads it through `useSyncExternalStore`, because
+this repo's lint forbids `setState` inside an effect and the server has no
+`localStorage` to render against.
+
+Dark is not an inversion of light: the greys are re-picked so contrast holds, and
+the washes are deep tints — a lightened wash on a dark ground reads as a hole in
+the page. The accent **fill** stays `#2563eb` in both themes so white button text
+keeps 5.17:1; only the accent *text* lightens.
+
+To change a colour in either theme, edit the token. Never add a `dark:` variant.
 
 ## Checks
 

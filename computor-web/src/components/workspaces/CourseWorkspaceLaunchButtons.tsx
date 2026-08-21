@@ -163,7 +163,7 @@ export default function CourseWorkspaceLaunchButtons({
 
   return (
     <div className={`space-y-4 ${className ?? ''}`}>
-      {title && <h2 className="text-lg font-semibold text-gray-900">{title}</h2>}
+      {title && <h2 className="text-lg font-semibold text-fg">{title}</h2>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {courseOptions.map((option) => (
           <TemplateCard
@@ -178,16 +178,16 @@ export default function CourseWorkspaceLaunchButtons({
 
       {workspaces.length > 0 && (
         <div>
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Your workspaces</h3>
+          <h3 className="text-sm font-medium text-body mb-2">Your workspaces</h3>
           <ul className="space-y-1.5">
             {workspaces.map((w) => (
               <li
                 key={w.id}
-                className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2"
+                className="flex items-center justify-between gap-2 rounded-lg border border-rule px-3 py-2"
               >
                 <div className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-gray-900">{w.name}</span>
-                  <span className="block text-xs text-gray-500">
+                  <span className="block truncate text-sm font-medium text-fg">{w.name}</span>
+                  <span className="block text-xs text-muted">
                     {w.template_display_name || w.template_name}
                   </span>
                 </div>

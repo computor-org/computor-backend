@@ -27,7 +27,7 @@ export default function Spinner({
     <span
       role="status"
       aria-live="polite"
-      className={`inline-block animate-spin rounded-full border-blue-600 ${SIZE_CLS[size]} ${className}`}
+      className={`inline-block animate-spin rounded-full border-accent ${SIZE_CLS[size]} ${className}`}
     >
       <span className="sr-only">{label ?? 'Loading'}</span>
     </span>

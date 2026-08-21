@@ -124,17 +124,17 @@ export default function ProfilePage() {
       <ListPageLayout width="narrow">
         <PageHeader
           breadcrumbs={[{ label: 'My Profile' }]}
-          title="My Profile"
+          title="My profile"
           subtitle="Your identity and public profile across Computor."
           actions={
             user ? (
               <div className="flex items-center gap-3">
-                {saved && <span className="text-sm text-green-600">Saved</span>}
+                {saved && <span className="text-sm text-success-text">Saved</span>}
                 <button
                   type="submit"
                   form="profile-form"
                   disabled={saving}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
                 >
                   {saving ? 'Saving…' : 'Save changes'}
                 </button>
@@ -148,21 +148,21 @@ export default function ProfilePage() {
         <ScrollArea>
           <div className="space-y-6">
         {loading ? (
-          <div className="text-gray-500">Loading…</div>
+          <div className="text-muted">Loading…</div>
         ) : !user ? null : (
           <>
             {/* Identity card */}
-            <div className="bg-white border border-gray-200 rounded-lg p-6 flex items-center gap-5">
+            <div className="bg-surface border border-rule rounded-lg p-6 flex items-center gap-5">
               <Avatar size="lg" name={fullName} fallback={user.email} avatarColor={previewColorInt} avatarImage={avatarImage || null} />
               <div className="min-w-0">
-                <div className="text-xl font-semibold text-gray-900 truncate">{fullName}</div>
-                <div className="text-sm text-gray-500 truncate">{user.email}</div>
+                <div className="text-xl font-semibold text-fg truncate">{fullName}</div>
+                <div className="text-sm text-muted truncate">{user.email}</div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {(authUser?.systemRoles ?? []).map((r) => (
-                    <span key={r} className="px-2 py-0.5 text-xs rounded bg-blue-50 text-blue-700">{roleLabel(r)}</span>
+                    <span key={r} className="px-2 py-0.5 text-xs rounded bg-accent-wash text-accent-text">{roleLabel(r)}</span>
                   ))}
                   {user.created_at && (
-                    <span className="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-500">
+                    <span className="px-2 py-0.5 text-xs rounded bg-sunken text-muted">
                       joined {new Date(user.created_at).toLocaleDateString()}
                     </span>
                   )}
@@ -177,7 +177,7 @@ export default function ProfilePage() {
                 e.preventDefault();
                 save();
               }}
-              className="bg-white border border-gray-200 rounded-lg"
+              className="bg-surface border border-rule rounded-lg"
             >
               <div className="p-6 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -189,7 +189,7 @@ export default function ProfilePage() {
                   </Field>
                 </div>
                 <Field label="Email" hint="Email is managed by your login provider — change it under Account & Security in Settings.">
-                  <input className={`${inputCls} bg-gray-50 text-gray-500`} value={user.email ?? ''} disabled />
+                  <input className={`${inputCls} bg-canvas text-muted`} value={user.email ?? ''} disabled />
                 </Field>
                 <Field label="Nickname" hint="A short public handle (letters, numbers, - and _).">
                   <input className={inputCls} value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="jdoe" />
@@ -212,7 +212,7 @@ export default function ProfilePage() {
                   <Field label="Avatar color" hint="Used for the initials badge when no image is set.">
                     <input
                       type="color"
-                      className="h-10 w-16 border border-gray-300 rounded cursor-pointer"
+                      className="h-10 w-16 border border-rule-strong rounded cursor-pointer"
                       value={avatarColor}
                       onChange={(e) => setAvatarColor(e.target.value)}
                     />

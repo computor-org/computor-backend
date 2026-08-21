@@ -85,14 +85,14 @@ export default function Sidebar() {
               href={linkHref}
               className={`flex-1 flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
                 isExactActive
-                  ? 'bg-blue-50 text-blue-600'
+                  ? 'bg-accent-wash text-accent-text'
                   : isChildActive
-                  ? 'bg-blue-50/50 text-blue-600'
-                  : 'text-gray-700 hover:bg-gray-100'
+                  ? 'bg-accent-wash/50 text-accent-text'
+                  : 'text-body hover:bg-sunken'
               }`}
               title={collapsed ? navItem.label : undefined}
             >
-              <span className={isExactActive || isChildActive ? 'text-blue-600' : 'text-gray-500'}>
+              <span className={isExactActive || isChildActive ? 'text-accent-text' : 'text-muted'}>
                 {icons[navItem.icon]}
               </span>
               {!collapsed && (
@@ -105,7 +105,7 @@ export default function Sidebar() {
                 onClick={() => toggleView(navItem.id)}
                 aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${navItem.label} section`}
                 aria-expanded={isExpanded}
-                className="p-2 hover:bg-gray-100 rounded transition-colors"
+                className="p-2 hover:bg-sunken rounded transition-colors"
               >
                 <span aria-hidden="true" className={`transition-transform inline-block ${isExpanded ? 'rotate-180' : ''}`}>
                   {icons.chevronDown}
@@ -125,8 +125,8 @@ export default function Sidebar() {
                     href={subItem.path}
                     className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
                       isSubActive
-                        ? 'bg-blue-50 text-blue-600 font-medium'
-                        : 'text-gray-600 hover:bg-gray-100'
+                        ? 'bg-accent-wash text-accent-text font-medium'
+                        : 'text-muted hover:bg-sunken'
                     }`}
                   >
                     {subItem.label}
@@ -159,7 +159,7 @@ export default function Sidebar() {
         {/* Back to Courses Link */}
         <Link
           href="/courses"
-          className="flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors mb-4"
+          className="flex items-center space-x-3 px-3 py-2 rounded-lg text-body hover:bg-sunken transition-colors mb-4"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -174,12 +174,12 @@ export default function Sidebar() {
           href={`/courses/${currentCourseId}`}
           className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors mb-1 ${
             pathname === `/courses/${currentCourseId}`
-              ? 'bg-blue-50 text-blue-600'
-              : 'text-gray-700 hover:bg-gray-100'
+              ? 'bg-accent-wash text-accent-text'
+              : 'text-body hover:bg-sunken'
           }`}
           title={collapsed ? 'Overview' : undefined}
         >
-          <span className={pathname === `/courses/${currentCourseId}` ? 'text-blue-600' : 'text-gray-500'}>
+          <span className={pathname === `/courses/${currentCourseId}` ? 'text-accent-text' : 'text-muted'}>
             {icons.overview}
           </span>
           {!collapsed && <span className="text-sm font-medium">Overview</span>}
@@ -240,25 +240,25 @@ function SidebarShell({
     <aside
       className={`${
         collapsed ? 'w-16' : 'w-64'
-      } bg-white border-r border-gray-200 transition-all duration-300 flex flex-col print:hidden`}
+      } bg-surface border-r border-rule transition-all duration-300 flex flex-col print:hidden`}
     >
       {/* Header */}
-      <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200">
+      <div className="h-16 flex items-center justify-between px-4 border-b border-rule">
         {!collapsed && (
-          <Link href="/dashboard" className="flex-1 min-w-0 hover:bg-gray-50 rounded px-2 py-1 -mx-2 -my-1 transition-colors cursor-pointer">
-            <p className="text-sm font-semibold text-gray-900 truncate">
+          <Link href="/dashboard" className="flex-1 min-w-0 hover:bg-canvas rounded px-2 py-1 -mx-2 -my-1 transition-colors cursor-pointer">
+            <p className="text-sm font-semibold text-fg truncate">
               {user?.givenName} {user?.familyName}
             </p>
           </Link>
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
+          className="p-1 rounded-lg hover:bg-sunken transition-colors"
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           <svg
-            className={`h-5 w-5 text-gray-600 transition-transform ${collapsed ? 'rotate-180' : ''}`}
+            className={`h-5 w-5 text-muted transition-transform ${collapsed ? 'rotate-180' : ''}`}
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -271,14 +271,14 @@ function SidebarShell({
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto scroll-slim">{children}</nav>
 
       {/* Footer - Logo & Version */}
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-rule">
         {!collapsed ? (
           <div className="space-y-2">
             <div className="flex items-center justify-center space-x-2">
               <Image src="/computor_logo.png" alt="Computor" width={24} height={24} className="h-6 w-6" />
-              <span className="text-sm font-semibold text-gray-700">Computor</span>
+              <span className="text-sm font-semibold text-body">Computor</span>
             </div>
-            <p className="text-xs text-gray-500 text-center" title="Running version (git commit)">{APP_VERSION}</p>
+            <p className="text-xs text-muted text-center" title="Running version (git commit)">{APP_VERSION}</p>
           </div>
         ) : (
           <div className="flex justify-center">

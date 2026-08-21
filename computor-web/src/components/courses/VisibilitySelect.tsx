@@ -79,14 +79,14 @@ export default function VisibilitySelect({
       </select>
 
       {overriddenFromAbove && (
-        <p className="text-xs text-amber-700">
+        <p className="text-xs text-warn-text">
           Currently hidden anyway: a unit above this one, or the course itself,
           is hidden. Setting this to visible will not override that.
         </p>
       )}
 
       {value === false && (
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-muted">
           Students will not see this in their assignment tree and cannot test or
           submit. Their files, existing tests and submissions are untouched and
           reappear when you make it visible again.

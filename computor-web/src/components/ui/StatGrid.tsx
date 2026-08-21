@@ -32,8 +32,8 @@ export function StatCard({
   return (
     <Panel padding="compact">
       <div className={`text-2xl font-bold ${TONE_TEXT_CLS[tone]}`}>{value}</div>
-      <div className="text-xs text-gray-500 mt-1">{label}</div>
-      {hint && <div className="text-xs text-gray-400 mt-0.5">{hint}</div>}
+      <div className="text-xs text-muted mt-1">{label}</div>
+      {hint && <div className="text-xs text-subtle mt-0.5">{hint}</div>}
     </Panel>
   );
 }

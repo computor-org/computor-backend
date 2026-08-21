@@ -5,7 +5,7 @@
  *
  * The backend reports a 0..1 fraction of the tests that passed; every call site
  * was multiplying by 100 itself and picking its own threshold and its own green
- * and red — text-green-600 in a tree row, an inline style={{ color: '#10B981' }}
+ * and red — text-success-text in a tree row, an inline style={{ color: '#10B981' }}
  * on the detail page next to it. One place to decide what "passing" looks like.
  */
 export default function Score({
@@ -22,12 +22,12 @@ export default function Score({
   className?: string;
 }) {
   if (value == null) {
-    return <span className={`text-sm text-gray-400 tabular-nums ${className}`}>&mdash;</span>;
+    return <span className={`text-sm text-subtle tabular-nums ${className}`}>&mdash;</span>;
   }
   const passing = value >= passAt;
   return (
     <span
-      className={`text-sm font-medium tabular-nums ${passing ? 'text-green-600' : 'text-red-600'} ${className}`}
+      className={`text-sm font-medium tabular-nums ${passing ? 'text-success-text' : 'text-danger-text'} ${className}`}
     >
       {(value * 100).toFixed(decimals)}%
     </span>

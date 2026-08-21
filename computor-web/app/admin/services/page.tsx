@@ -36,10 +36,10 @@ export default function ServicesPage() {
       <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: 'Services' }]}
-          title="Service Accounts"
+          title="Service accounts"
           subtitle="Machine identities — testing systems, integrations and AI agents. Each one is a user that cannot log in, authenticating only with an API token."
           actions={
-            <Link href="/admin/services/create" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+            <Link href="/admin/services/create" className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover">
               New Service
             </Link>
           }
@@ -50,7 +50,7 @@ export default function ServicesPage() {
         {loading ? (
           <ListLoading>Loading…</ListLoading>
         ) : services.length === 0 ? (
-          <div className="text-gray-500 border border-dashed border-gray-300 rounded-lg p-8 text-center">
+          <div className="text-muted border border-dashed border-rule-strong rounded-lg p-8 text-center">
             No service accounts yet. Create one to register a testing system or an AI agent.
           </div>
         ) : (
@@ -72,16 +72,16 @@ export default function ServicesPage() {
                   return (
                     <Tr key={s.id}>
                       <Td>
-                        <Link href={`/admin/services/${s.id}`} className="font-medium text-blue-600 hover:underline">
+                        <Link href={`/admin/services/${s.id}`} className="font-medium text-accent-text hover:underline">
                           {s.name}
                         </Link>
-                        {s.description && <div className="text-xs text-gray-500">{s.description}</div>}
+                        {s.description && <div className="text-xs text-muted">{s.description}</div>}
                       </Td>
                       <Td><span className="font-mono text-xs">{s.slug}</span></Td>
-                      <Td><span className="font-mono text-xs text-gray-600">{s.service_type_path ?? '—'}</span></Td>
-                      <Td>{typeof language === 'string' ? <Badge color="blue">{language}</Badge> : <span className="text-gray-400">—</span>}</Td>
+                      <Td><span className="font-mono text-xs text-muted">{s.service_type_path ?? '—'}</span></Td>
+                      <Td>{typeof language === 'string' ? <Badge color="blue">{language}</Badge> : <span className="text-subtle">—</span>}</Td>
                       <Td>{s.enabled ? <Badge color="green">enabled</Badge> : <Badge color="gray">disabled</Badge>}</Td>
-                      <Td><span className="text-xs text-gray-500">{lastSeenLabel(s.last_seen_at)}</span></Td>
+                      <Td><span className="text-xs text-muted">{lastSeenLabel(s.last_seen_at)}</span></Td>
                     </Tr>
                   );
                 })}

@@ -83,12 +83,12 @@ export default function AssignmentDetailPage() {
             >
               {resultData ? (
                 <>
-                  <Panel padding="compact" className="bg-gray-50">
+                  <Panel padding="compact" className="bg-canvas">
                     <div className="flex flex-wrap items-center gap-4 text-sm">
                       <Badge tone={resultData.result === 'PASSED' ? 'success' : 'error'}>
                         {resultData.result ?? 'UNKNOWN'}
                       </Badge>
-                      <span className="text-gray-600">
+                      <span className="text-muted">
                         {resultData.summary.passed} passed · {resultData.summary.failed} failed
                         {resultData.summary.skipped > 0 && ` · ${resultData.summary.skipped} skipped`}
                         {' · '}

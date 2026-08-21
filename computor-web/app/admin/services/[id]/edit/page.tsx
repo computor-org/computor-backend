@@ -86,7 +86,7 @@ export default function ServiceEditPage() {
           { label: service?.name || 'Service', href: `/admin/services/${serviceId}` },
           { label: 'Edit' },
         ]}
-        title="Edit Service Account"
+        title="Edit service account"
         description="Slug and service type are immutable — both are join keys other records already point at."
         error={error}
         submitting={saving || loading}
@@ -96,10 +96,10 @@ export default function ServiceEditPage() {
         onSubmit={save}
       >
         <Field label="Slug" hint="Immutable: examples bind to this string via meta.yaml.">
-          <input value={service?.slug ?? ''} disabled className={`${inputCls} bg-gray-50 text-gray-500`} />
+          <input value={service?.slug ?? ''} disabled className={`${inputCls} bg-canvas text-muted`} />
         </Field>
         <Field label="Service type" hint="Immutable: it determines default token scopes and dispatch rules.">
-          <input value={service?.service_type_path ?? ''} disabled className={`${inputCls} bg-gray-50 text-gray-500`} />
+          <input value={service?.service_type_path ?? ''} disabled className={`${inputCls} bg-canvas text-muted`} />
         </Field>
         <Field label="Name" required>
           <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
@@ -119,7 +119,7 @@ export default function ServiceEditPage() {
         <Field label="Temporal task queue" hint="Must equal the worker container's --queues= value.">
           <input value={taskQueue} onChange={(e) => setTaskQueue(e.target.value)} className={inputCls} />
         </Field>
-        <label className="flex items-center gap-2 text-sm text-gray-700">
+        <label className="flex items-center gap-2 text-sm text-body">
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
           Enabled (disabling stops it resolving for new tests)
         </label>

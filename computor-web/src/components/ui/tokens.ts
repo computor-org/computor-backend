@@ -7,7 +7,7 @@
 
 /** Standard text-input / select / textarea styling used by every form field. */
 export const inputCls =
-  'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent';
+  'w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent';
 
 /**
  * File picker. The `file:` variants restyle the browser's own button, which no
@@ -15,7 +15,7 @@ export const inputCls =
  * copy-pasted into whichever page happens to accept an upload.
  */
 export const fileInputCls =
-  'block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-blue-50 file:text-blue-700 file:text-sm file:font-medium hover:file:bg-blue-100';
+  'block w-full text-sm text-muted file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:bg-accent-wash file:text-accent-text file:text-sm file:font-medium hover:file:bg-accent-wash';
 
 /**
  * Rows for content hidden from students (issue #338).
@@ -26,11 +26,11 @@ export const fileInputCls =
  * of its own yet; these strings keep the palette utilities inside the
  * component layer until one exists.
  */
-export const hiddenRowCls = 'bg-gray-50';
-export const hiddenRowTitleCls = 'text-gray-400';
-export const rowTitleCls = 'text-gray-900';
+export const hiddenRowCls = 'bg-canvas';
+export const hiddenRowTitleCls = 'text-subtle';
+export const rowTitleCls = 'text-fg';
 /** Dot / icon alongside a dimmed row. */
 export const hiddenRowMarkCls = 'opacity-40';
 
 /** An input showing a value the user cannot change (e.g. an immutable path). */
-export const readOnlyInputCls = `${inputCls} bg-gray-50 text-gray-500`;
+export const readOnlyInputCls = `${inputCls} bg-canvas text-muted`;

@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 /**
  * The app's one white card: surface, border, radius, padding.
  *
- * Pages had been spelling this out inline — `bg-white border border-gray-200
+ * Pages had been spelling this out inline — `bg-surface border border-rule
  * rounded-lg p-6` — which is how the same card ended up at p-4, p-5, p-6 and p-8
  * on neighbouring pages. Callers choose a *density*, never a padding value, so
  * there is nothing left to disagree about.
@@ -33,7 +33,7 @@ export default function Panel({
   children: ReactNode;
 }) {
   return (
-    <div className={`bg-white border border-gray-200 rounded-lg ${PADDING_CLS[padding]} ${className}`}>
+    <div className={`bg-surface border border-rule rounded-lg ${PADDING_CLS[padding]} ${className}`}>
       {children}
     </div>
   );
@@ -46,7 +46,7 @@ export default function Panel({
  */
 export function PanelList({ className = '', children }: { className?: string; children: ReactNode }) {
   return (
-    <Panel padding="none" className={`divide-y divide-gray-100 ${className}`}>
+    <Panel padding="none" className={`divide-y divide-rule-soft ${className}`}>
       {children}
     </Panel>
   );

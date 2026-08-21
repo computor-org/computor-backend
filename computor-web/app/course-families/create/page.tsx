@@ -6,6 +6,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import { PageLoading } from '@/src/components/ListPageLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
 import { inputCls } from '@/src/components/ui/tokens';
@@ -71,8 +72,8 @@ function CreateInner() {
   return (
     <AuthenticatedLayout>
       <FormPanel
-        breadcrumbs={[{ label: 'Course Families', href: '/course-families' }, { label: 'New' }]}
-        title="New Course Family"
+        breadcrumbs={[{ label: 'Course families', href: '/course-families' }, { label: 'New' }]}
+        title="New course family"
         description="A course family is a lecture — a lecture type such as 'Introduction to Programming'. Each time it runs in a term, you add a course (one instance) under it."
         error={error}
         submitting={saving}
@@ -105,7 +106,7 @@ function CreateInner() {
 
 export default function CourseFamilyCreatePage() {
   return (
-    <Suspense fallback={<AuthenticatedLayout><div className="p-6 text-gray-500">Loading…</div></AuthenticatedLayout>}>
+    <Suspense fallback={<AuthenticatedLayout><PageLoading /></AuthenticatedLayout>}>
       <CreateInner />
     </Suspense>
   );

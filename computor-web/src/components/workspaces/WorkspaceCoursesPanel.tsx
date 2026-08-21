@@ -19,7 +19,7 @@ export default function WorkspaceCoursesPanel() {
     <>
       <ErrorBanner>{error}</ErrorBanner>
 
-      <p className="shrink-0 text-sm text-gray-500">
+      <p className="shrink-0 text-sm text-muted">
         Which workspace templates each course offers its members. Members of a course with at
         least one template can launch those workspaces from the course page — no global
         workspace role needed. Lecturer provisioning additionally lets the course&apos;s
@@ -41,9 +41,9 @@ export default function WorkspaceCoursesPanel() {
             </Thead>
             <Tbody>
               {courses.map((course) => (
-                <Tr key={course.course_id} className="hover:bg-gray-50">
+                <Tr key={course.course_id} className="hover:bg-canvas">
                   <Td>
-                    <div className="text-sm font-medium text-gray-900">
+                    <div className="text-sm font-medium text-fg">
                       {displayName(course, 'Untitled Course')}
                     </div>
                   </Td>
@@ -53,23 +53,23 @@ export default function WorkspaceCoursesPanel() {
                         {course.template_names.map((name) => (
                           <span
                             key={name}
-                            className="inline-flex items-center rounded bg-gray-100 px-2 py-0.5 text-xs font-mono text-gray-700"
+                            className="inline-flex items-center rounded bg-sunken px-2 py-0.5 text-xs font-mono text-body"
                           >
                             {name}
                           </span>
                         ))}
                       </div>
                     ) : (
-                      <span className="text-sm text-gray-400">None</span>
+                      <span className="text-sm text-subtle">None</span>
                     )}
                   </Td>
                   <Td>
                     {course.lecturer_provision_enabled ? (
-                      <span className="inline-flex items-center rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                      <span className="inline-flex items-center rounded bg-success-wash px-2 py-0.5 text-xs font-medium text-success-text">
                         Enabled
                       </span>
                     ) : (
-                      <span className="text-sm text-gray-400">Off</span>
+                      <span className="text-sm text-subtle">Off</span>
                     )}
                   </Td>
                   <Td>
@@ -87,7 +87,7 @@ export default function WorkspaceCoursesPanel() {
               ))}
               {courses.length === 0 && (
                 <Tr>
-                  <Td colSpan={4} className="py-8 text-center text-sm text-gray-500">
+                  <Td colSpan={4} className="py-8 text-center text-sm text-muted">
                     No courses.
                   </Td>
                 </Tr>

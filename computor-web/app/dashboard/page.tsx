@@ -30,9 +30,9 @@ const coderClient = new CoderClient();
 function SectionHeading({ title, href, linkLabel }: { title: string; href?: string; linkLabel?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 mb-3">
-      <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+      <h2 className="text-lg font-semibold text-fg">{title}</h2>
       {href && (
-        <Link href={href} className="text-sm text-blue-600 hover:underline shrink-0">
+        <Link href={href} className="text-sm text-accent-text hover:underline shrink-0">
           {linkLabel ?? 'View all'}
         </Link>
       )}
@@ -66,11 +66,17 @@ export default function DashboardPage() {
     const [contents, workspaces, announcements] = await Promise.all([
       // No course_id: the backend treats it as "every course this user is in"
       // (student_view.list_course_contents), which is the whole point of this
-      // page. Two consequences worth knowing: it also provisions any missing
-      // submission groups across all of those courses — idempotent, and the
-      // per-course page does the same thing on first visit — and it returns no
-      // hidden content even for staff, because _may_see_hidden cannot scope its
-      // staff check without a course. Both are the safe directions here.
+      // page. Server-side the response is cached per user for 5 minutes and —
+      // since _course_content_view_tags — tagged with every course the user is
+      // enrolled in, so a tutor grading in any of them evicts it immediately.
+      // Without those tags the entry carried no course tag at all and kept
+      // serving the pre-grade answer for the rest of its TTL.
+      //
+      // Two more consequences worth knowing: on a cache MISS this also
+      // provisions any missing submission groups across those courses
+      // (idempotent, and the per-course page does the same on first visit), and
+      // it returns no hidden content even for staff, because _may_see_hidden
+      // cannot scope its staff check without a course. Both are safe here.
       studentsClient
         .studentListCourseContentsEndpointStudentsCourseContentsGet({ limit: 500 })
         .catch(() => []),
@@ -109,10 +115,10 @@ export default function DashboardPage() {
             loading
               ? undefined
               : attention.length > 0
-                ? `${attention.length} ${attention.length === 1 ? 'assignment needs' : 'assignments need'} your attention.`
+                ? `${attention.length} ${attention.length === 1 ? 'assignment' : 'assignments'} sent back by a tutor.`
                 : courses.length === 0
                   ? "You're not enrolled in any courses yet."
-                  : 'Nothing needs your attention right now.'
+                  : 'Nothing is waiting on you right now.'
           }
         />
 
@@ -121,38 +127,31 @@ export default function DashboardPage() {
         {loading ? (
           <ListLoading />
         ) : (
-          <ScrollArea className="space-y-8">
+          <ScrollArea>
             {announcements.length > 0 && (
               <section>
                 <SectionHeading title="Announcements" href="/notifications" />
                 <Panel padding="none">
-                  <div className="divide-y divide-gray-100">
+                  <div className="divide-y divide-rule-soft">
                     {announcements.map((m) => (
                       <Link
                         key={m.id}
                         href="/notifications"
-                        className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+                        className="flex items-start gap-3 px-4 py-3 hover:bg-canvas transition-colors"
                       >
                         <Badge tone="info" className="shrink-0 mt-0.5">
                           New
                         </Badge>
                         <div className="min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate">
+                          <div className="text-sm font-medium text-fg truncate">
                             {m.title || 'Announcement'}
                           </div>
-                          <div className="text-xs text-gray-500 line-clamp-2">{m.content}</div>
+                          <div className="text-xs text-muted line-clamp-2">{m.content}</div>
                         </div>
                       </Link>
                     ))}
                   </div>
                 </Panel>
-              </section>
-            )}
-
-            {attention.length > 0 && (
-              <section>
-                <SectionHeading title="Needs your attention" />
-                <NeedsAttention items={attention} />
               </section>
             )}
 
@@ -179,16 +178,23 @@ export default function DashboardPage() {
               )}
             </section>
 
+            {attention.length > 0 && (
+              <section>
+                <SectionHeading title="Sent back for correction" />
+                <NeedsAttention items={attention} />
+              </section>
+            )}
+
             {runningWorkspaces.length > 0 && (
               <section>
                 <SectionHeading title="Your workspaces" href="/workspaces" />
                 <Panel padding="none">
-                  <div className="divide-y divide-gray-100">
+                  <div className="divide-y divide-rule-soft">
                     {runningWorkspaces.map((ws) => (
                       <div key={ws.id} className="flex items-center gap-3 px-4 py-3">
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium text-gray-900 truncate">{ws.name}</div>
-                          <div className="text-xs text-gray-500 truncate">{ws.template_name}</div>
+                          <div className="text-sm font-medium text-fg truncate">{ws.name}</div>
+                          <div className="text-xs text-muted truncate">{ws.template_name}</div>
                         </div>
                         <WorkspaceStatusBadge
                           status={ws.latest_build_status}

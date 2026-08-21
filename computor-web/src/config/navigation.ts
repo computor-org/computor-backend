@@ -45,7 +45,7 @@ export const coursesNavigation: NavItem[] = [
     icon: 'courses',
     ownPage: true,
     subItems: [
-      { id: 'courses-mine', label: 'My Courses', path: '/courses' },
+      { id: 'courses-mine', label: 'My courses', path: '/courses' },
       { id: 'courses-catalog', label: 'Catalog', path: '/courses/catalog' },
     ],
   },
@@ -83,10 +83,10 @@ export const managementNavigation: NavItem[] = [
     ownPage: true,
     subItems: [
       { id: 'mgmt-orgs', label: 'Organizations', path: '/organizations' },
-      { id: 'mgmt-families', label: 'Course Families', path: '/course-families' },
+      { id: 'mgmt-families', label: 'Course families', path: '/course-families' },
       { id: 'mgmt-examples', label: 'Examples', path: '/examples' },
-      { id: 'mgmt-example-repos', label: 'Example Repositories', path: '/example-repositories' },
-      { id: 'mgmt-gitservers', label: 'Git Servers', path: '/admin/git-servers' },
+      { id: 'mgmt-example-repos', label: 'Example repositories', path: '/example-repositories' },
+      { id: 'mgmt-gitservers', label: 'Git servers', path: '/admin/git-servers' },
     ],
   },
 ];
@@ -113,7 +113,7 @@ export const adminNavigation: NavItem[] = [
     subItems: [
       { id: 'sys-maintenance', label: 'Maintenance', path: '/admin/maintenance' },
       { id: 'sys-updates', label: 'Updates', path: '/admin/updates' },
-      { id: 'sys-consent', label: 'Privacy Notices', path: '/admin/consent' },
+      { id: 'sys-consent', label: 'Privacy notices', path: '/admin/consent' },
     ],
   },
 ];
@@ -128,8 +128,8 @@ export const userMgmtNavigation: NavItem[] = [
     ownPage: true,
     subItems: [
       { id: 'um-users', label: 'Users', path: '/admin/users' },
-      { id: 'um-invites', label: 'Invite Links', path: '/admin/users/invites' },
-      { id: 'um-roles', label: 'Roles & Claims', path: '/admin/users/roles' },
+      { id: 'um-invites', label: 'Invite links', path: '/admin/users/invites' },
+      { id: 'um-roles', label: 'Roles & claims', path: '/admin/users/roles' },
     ],
   },
 ];
@@ -187,8 +187,8 @@ export const getViewNavigation = (courseId: string): NavItem[] =>
         { id: 'lecturer-assignments', label: 'Assignments', path: `/courses/${courseId}/lecturer/assignments` },
         { id: 'lecturer-templates', label: 'Templates', path: `/courses/${courseId}/lecturer/templates` },
         { id: 'lecturer-grading', label: 'Grading', path: `/courses/${courseId}/lecturer/grading` },
-        { id: 'lecturer-members', label: 'Course Members', path: `/courses/${courseId}/lecturer/members` },
-        { id: 'lecturer-groups', label: 'Course Groups', path: `/courses/${courseId}/lecturer/groups` },
+        { id: 'lecturer-members', label: 'Course members', path: `/courses/${courseId}/lecturer/members` },
+        { id: 'lecturer-groups', label: 'Course groups', path: `/courses/${courseId}/lecturer/groups` },
         { id: 'lecturer-workspaces', label: 'Workspaces', path: `/courses/${courseId}/lecturer/workspaces` },
       ],
     },

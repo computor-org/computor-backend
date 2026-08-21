@@ -57,11 +57,11 @@ function WorkspaceRow({
   };
 
   return (
-    <Tr className="hover:bg-gray-50">
+    <Tr className="hover:bg-canvas">
       <Td>
-        <span className="font-medium text-gray-900 text-sm">{workspace.name}</span>
+        <span className="font-medium text-fg text-sm">{workspace.name}</span>
       </Td>
-      <Td className="text-sm text-gray-600">
+      <Td className="text-sm text-muted">
         {workspace.template_display_name || workspace.template_name || '—'}
       </Td>
       <Td>
@@ -72,7 +72,7 @@ function WorkspaceRow({
         */}
         <WorkspaceStatusBadge status={workspace.latest_build_status} transition={transition} />
       </Td>
-      <Td className="text-sm text-gray-500 whitespace-nowrap">
+      <Td className="text-sm text-muted whitespace-nowrap">
         {workspace.created_at ? new Date(workspace.created_at).toLocaleDateString() : '—'}
       </Td>
       <Td>

@@ -144,7 +144,7 @@ export default function LecturerContentPage() {
         {loading ? (
           <ListLoading />
         ) : (
-          <ScrollArea className="space-y-6">
+          <ScrollArea>
             {/* Summary — the at-a-glance deployment signal */}
             <StatGrid columns={5}>
               <StatCard label="Contents" value={active.length} />
@@ -160,7 +160,7 @@ export default function LecturerContentPage() {
               </Notice>
             )}
 
-            <Toolbar end={releaseMsg && <span className="text-sm text-gray-500">{releaseMsg}</span>}>
+            <Toolbar end={releaseMsg && <span className="text-sm text-muted">{releaseMsg}</span>}>
               <Button
                 onClick={() => release('all')}
                 size="sm"
@@ -324,7 +324,7 @@ export default function LecturerContentPage() {
             )}
 
             {archivedCount > 0 && (
-              <p className="text-xs text-gray-400">{archivedCount} archived content(s) hidden.</p>
+              <p className="text-xs text-subtle">{archivedCount} archived content(s) hidden.</p>
             )}
           </ScrollArea>
         )}

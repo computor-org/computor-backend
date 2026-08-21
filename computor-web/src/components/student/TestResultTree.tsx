@@ -53,13 +53,13 @@ export default function TestResultTree({ tests }: { tests: TestResult[] }) {
         const passed = test.result === 'PASSED';
         return (
           <Panel key={test.name ?? idx} padding="none">
-            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-rule bg-canvas rounded-t-lg">
               <div className="min-w-0">
-                <h4 className="text-sm font-medium text-gray-900 truncate">{test.name ?? 'Test'}</h4>
-                {test.type && <p className="text-xs text-gray-500">{test.type}</p>}
+                <h4 className="text-sm font-medium text-fg truncate">{test.name ?? 'Test'}</h4>
+                {test.type && <p className="text-xs text-muted">{test.type}</p>}
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                <span className="text-xs text-gray-500 tabular-nums">
+                <span className="text-xs text-muted tabular-nums">
                   {test.summary.passed}/{test.summary.total}
                 </span>
                 <Badge tone={passed ? 'success' : 'error'}>{test.result ?? 'UNKNOWN'}</Badge>
@@ -67,7 +67,7 @@ export default function TestResultTree({ tests }: { tests: TestResult[] }) {
             </div>
 
             {test.tests && test.tests.length > 0 && (
-              <ul className="divide-y divide-gray-100">
+              <ul className="divide-y divide-rule-soft">
                 {test.tests.map((subtest, subIdx) => {
                   const subPassed = subtest.result === 'PASSED';
                   return (
@@ -76,11 +76,11 @@ export default function TestResultTree({ tests }: { tests: TestResult[] }) {
                       className="flex items-start justify-between gap-3 px-4 py-2.5"
                     >
                       <div className="min-w-0">
-                        <p className="text-sm text-gray-900">{subtest.name ?? 'Case'}</p>
+                        <p className="text-sm text-fg">{subtest.name ?? 'Case'}</p>
                         {/* The message is only worth the space when it explains
                             a failure; on a pass it repeats the badge. */}
                         {subtest.resultMessage && !subPassed && (
-                          <p className="text-xs text-red-600 mt-1">{subtest.resultMessage}</p>
+                          <p className="text-xs text-danger-text mt-1">{subtest.resultMessage}</p>
                         )}
                       </div>
                       <Badge tone={subPassed ? 'success' : 'error'} className="shrink-0">

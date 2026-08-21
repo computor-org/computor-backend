@@ -7,6 +7,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import { PageLoading } from '@/src/components/ListPageLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
 import { inputCls } from '@/src/components/ui/tokens';
@@ -59,11 +60,11 @@ export default function ExampleRepositoryEditPage() {
   return (
     <AuthenticatedLayout>
       {loading ? (
-        <div className="p-6 text-gray-500">Loading…</div>
+        <PageLoading />
       ) : (
         <FormPanel
           breadcrumbs={[
-            { label: 'Example Repositories', href: '/example-repositories' },
+            { label: 'Example repositories', href: '/example-repositories' },
             { label: repo?.name || 'Repository', href: `/example-repositories/${repoId}` },
             { label: 'Edit' },
           ]}
@@ -81,7 +82,7 @@ export default function ExampleRepositoryEditPage() {
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={inputCls} />
           </Field>
           <Field label="Storage (immutable)" hint="Source type and URL are fixed once a repository exists.">
-            <input value={`${repo?.source_type ?? ''} · ${repo?.source_url ?? ''}`} readOnly className={`${inputCls} bg-gray-50 text-gray-500`} />
+            <input value={`${repo?.source_type ?? ''} · ${repo?.source_url ?? ''}`} readOnly className={`${inputCls} bg-canvas text-muted`} />
           </Field>
         </FormPanel>
       )}

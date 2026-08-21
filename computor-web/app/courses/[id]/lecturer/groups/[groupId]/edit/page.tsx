@@ -7,6 +7,7 @@ import { usePermissions } from '@/src/hooks/usePermissions';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import { PageLoading } from '@/src/components/ListPageLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
 import { inputCls } from '@/src/components/ui/tokens';
@@ -25,7 +26,7 @@ export default function CourseGroupEditPage() {
   const canManage = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
 
   const [title, setTitle] = useState('');
-  const crumbs = useCourseCrumbs(courseId, { label: 'Course Groups', href: `/courses/${courseId}/lecturer/groups` }, title || 'Group');
+  const crumbs = useCourseCrumbs(courseId, { label: 'Course groups', href: `/courses/${courseId}/lecturer/groups` }, title || 'Group');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -68,7 +69,7 @@ export default function CourseGroupEditPage() {
   return (
     <AuthenticatedLayout>
       {loading ? (
-        <div className="p-6 text-gray-500">Loading…</div>
+        <PageLoading />
       ) : (
         <FormPanel
           breadcrumbs={crumbs}

@@ -56,16 +56,16 @@ export default function TemplateCard({
       aria-label={usable ? undefined : `${label} — ${availabilityLabel(option)}`}
       className={`flex w-full items-center gap-3 rounded-lg border p-3 pr-4 text-left transition-colors ${
         usable
-          ? 'border-gray-200 bg-white hover:border-blue-400 hover:bg-blue-50 focus-visible:ring-2 focus-visible:ring-blue-500'
-          : 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-60'
+          ? 'border-rule bg-surface hover:border-accent-line hover:bg-accent-wash focus-visible:ring-2 focus-visible:ring-accent-line'
+          : 'cursor-not-allowed border-rule bg-canvas opacity-60'
       } ${busy ? 'animate-pulse' : ''} ${className}`}
     >
       <TemplateIcon template={{ icon: option.icon, name: option.name }} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold text-gray-900">{label}</span>
+        <span className="block truncate text-sm font-semibold text-fg">{label}</span>
         <span
           className={`block truncate text-xs ${
-            stage?.tone === 'red' ? 'text-red-700' : 'text-gray-500'
+            stage?.tone === 'red' ? 'text-danger-text' : 'text-muted'
           }`}
         >
           {usable ? actionLabel : availabilityLabel(option)}
@@ -85,7 +85,7 @@ export default function TemplateCard({
           />
         )}
         {usable && stage && (
-          <span className="mt-1 block truncate text-xs text-gray-400">
+          <span className="mt-1 block truncate text-xs text-subtle">
             Updating · {stage.label}
           </span>
         )}

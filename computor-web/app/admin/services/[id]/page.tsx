@@ -72,7 +72,7 @@ export default function ServiceDetailPage() {
           title={service?.name || 'Service'}
           subtitle={
             service ? (
-              <span className="font-mono text-sm text-gray-500">
+              <span className="font-mono text-sm text-muted">
                 {service.slug} · {service.service_type_path ?? 'no type'}
               </span>
             ) : undefined
@@ -82,13 +82,13 @@ export default function ServiceDetailPage() {
               <>
                 <Link
                   href={`/admin/services/${service.id}/edit`}
-                  className="px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="px-3 py-2 text-sm font-medium text-body border border-rule-strong rounded-lg hover:bg-canvas"
                 >
                   Edit
                 </Link>
                 <button
                   onClick={() => setConfirmArchive(true)}
-                  className="px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
+                  className="px-3 py-2 text-sm font-medium text-danger-text border border-danger-line rounded-lg hover:bg-danger-wash"
                 >
                   Archive
                 </button>
@@ -102,14 +102,14 @@ export default function ServiceDetailPage() {
         {loading ? (
           <ListLoading>Loading…</ListLoading>
         ) : service ? (
-          <ScrollArea className="space-y-6">
+          <ScrollArea>
             {archiveError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <div className="rounded-lg border border-danger-line bg-danger-wash p-4 text-sm text-danger-text">
                 <p>{archiveError}</p>
                 {needsForce && (
                   <button
                     onClick={() => void doArchive(true)}
-                    className="mt-3 px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-700"
+                    className="mt-3 px-3 py-1.5 text-xs font-medium text-on-accent bg-danger rounded hover:bg-danger-hover"
                   >
                     Archive anyway
                   </button>
@@ -117,62 +117,62 @@ export default function ServiceDetailPage() {
               </div>
             )}
 
-            <div className="bg-white border border-gray-200 rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            <div className="bg-surface border border-rule rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
               <div>
-                <dt className="text-gray-500">Status</dt>
+                <dt className="text-muted">Status</dt>
                 <dd>{service.enabled ? <Badge color="green">enabled</Badge> : <Badge color="gray">disabled</Badge>}</dd>
               </div>
               <div>
-                <dt className="text-gray-500">Last seen</dt>
-                <dd className="text-gray-900">
+                <dt className="text-muted">Last seen</dt>
+                <dd className="text-fg">
                   {lastSeenLabel(service.last_seen_at)}
                   {!service.last_seen_at && (
-                    <span className="ml-2 text-xs text-amber-700">worker has never checked in</span>
+                    <span className="ml-2 text-xs text-warn-text">worker has never checked in</span>
                   )}
                 </dd>
               </div>
               {language && (
                 <div>
-                  <dt className="text-gray-500">Language</dt>
-                  <dd className="text-gray-900">
+                  <dt className="text-muted">Language</dt>
+                  <dd className="text-fg">
                     <Badge color="blue">{language}</Badge>
-                    <span className="ml-2 text-xs text-gray-400">selects the test runner</span>
+                    <span className="ml-2 text-xs text-subtle">selects the test runner</span>
                   </dd>
                 </div>
               )}
               {taskQueue && (
                 <div>
-                  <dt className="text-gray-500">Temporal task queue</dt>
-                  <dd className="font-mono text-gray-900">{taskQueue}</dd>
+                  <dt className="text-muted">Temporal task queue</dt>
+                  <dd className="font-mono text-fg">{taskQueue}</dd>
                 </div>
               )}
               <div>
-                <dt className="text-gray-500">Service user</dt>
-                <dd className="font-mono text-xs text-gray-900">{service.user_id}</dd>
+                <dt className="text-muted">Service user</dt>
+                <dd className="font-mono text-xs text-fg">{service.user_id}</dd>
               </div>
               {service.created_at && (
                 <div>
-                  <dt className="text-gray-500">Created</dt>
-                  <dd className="text-gray-900">{new Date(service.created_at).toLocaleString()}</dd>
+                  <dt className="text-muted">Created</dt>
+                  <dd className="text-fg">{new Date(service.created_at).toLocaleString()}</dd>
                 </div>
               )}
               {service.description && (
                 <div className="sm:col-span-2">
-                  <dt className="text-gray-500">Description</dt>
-                  <dd className="text-gray-900">{service.description}</dd>
+                  <dt className="text-muted">Description</dt>
+                  <dd className="text-fg">{service.description}</dd>
                 </div>
               )}
               <div className="sm:col-span-2">
-                <dt className="text-gray-500 mb-1">Configuration</dt>
+                <dt className="text-muted mb-1">Configuration</dt>
                 <dd>
-                  <pre className="bg-gray-50 border border-gray-200 rounded p-3 text-xs overflow-x-auto">
+                  <pre className="bg-canvas border border-rule rounded p-3 text-xs overflow-x-auto">
                     {JSON.stringify(service.config ?? {}, null, 2)}
                   </pre>
                 </dd>
               </div>
             </div>
 
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-subtle">
               The slug <span className="font-mono">{service.slug}</span> is the binding to your examples: an
               assignment runs on this service when its <span className="font-mono">meta.yaml</span> declares{' '}
               <span className="font-mono">properties.executionBackend.slug: {service.slug}</span>. It is immutable

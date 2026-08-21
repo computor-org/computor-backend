@@ -54,8 +54,8 @@ export default function GitServerCreatePage() {
   return (
     <AuthenticatedLayout>
       <FormPanel
-        breadcrumbs={[{ label: 'Git Servers', href: '/admin/git-servers' }, { label: 'Register' }]}
-        title="Register Git Server"
+        breadcrumbs={[{ label: 'Git servers', href: '/admin/git-servers' }, { label: 'Register' }]}
+        title="New Git server"
         description="A git server is a Git instance (Forgejo or GitLab) that courses bind to for hosting reference and student repositories. Managed instances let Computor provision student repos automatically."
         error={error}
         submitting={saving}
@@ -76,7 +76,7 @@ export default function GitServerCreatePage() {
         <Field label="Name">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Our Forgejo" className={inputCls} />
         </Field>
-        <label className="flex items-center gap-2 text-sm text-gray-700">
+        <label className="flex items-center gap-2 text-sm text-body">
           <input type="checkbox" checked={managed} onChange={(e) => setManaged(e.target.checked)} />
           Managed (Computor operates it and holds a service token)
         </label>

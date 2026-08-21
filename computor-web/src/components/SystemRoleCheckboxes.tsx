@@ -19,8 +19,8 @@ export default function SystemRoleCheckboxes({
 }) {
   const { roles, loading } = useSystemRoles();
 
-  if (loading) return <p className="text-xs text-gray-400">Loading roles…</p>;
-  if (roles.length === 0) return <p className="text-xs text-gray-400">No system roles available.</p>;
+  if (loading) return <p className="text-xs text-subtle">Loading roles…</p>;
+  if (roles.length === 0) return <p className="text-xs text-subtle">No system roles available.</p>;
 
   return (
     <div className="space-y-2">
@@ -34,8 +34,8 @@ export default function SystemRoleCheckboxes({
             disabled={disabled}
           />
           <span>
-            <span className="text-sm font-medium text-gray-800">{r.title ?? r.id}</span>
-            {r.description && <span className="block text-xs text-gray-400">{r.description}</span>}
+            <span className="text-sm font-medium text-fg">{r.title ?? r.id}</span>
+            {r.description && <span className="block text-xs text-subtle">{r.description}</span>}
           </span>
         </label>
       ))}

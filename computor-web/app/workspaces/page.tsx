@@ -174,11 +174,11 @@ export default function WorkspacesPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {/* Compact status strip */}
-        <div className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600">
+        <div className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
           <span className="inline-flex items-center gap-1.5">
             <span
               className={`h-2 w-2 rounded-full ${
-                health === null ? 'bg-gray-300' : health.healthy ? 'bg-green-500' : 'bg-red-500'
+                health === null ? 'bg-faint' : health.healthy ? 'bg-success' : 'bg-danger'
               }`}
             />
             {health === null
@@ -187,12 +187,12 @@ export default function WorkspacesPage() {
                 ? 'Coder healthy'
                 : 'Coder unreachable'}
           </span>
-          <span className="text-gray-300">·</span>
+          <span className="text-faint">·</span>
           <span>{loading ? '—' : `${runningCount} running / ${workspaces.length} total`}</span>
           {busyCount > 0 && (
             <>
-              <span className="text-gray-300">·</span>
-              <span className="text-blue-700">
+              <span className="text-faint">·</span>
+              <span className="text-accent-text">
                 {busyCount} {busyCount === 1 ? 'workspace is' : 'workspaces are'} still working
               </span>
             </>
@@ -201,7 +201,7 @@ export default function WorkspacesPage() {
 
         {!templatesError && (
           <div className="shrink-0 space-y-3">
-            <h2 className="text-sm font-semibold text-gray-900">Create a workspace</h2>
+            <h2 className="text-sm font-semibold text-fg">Create a workspace</h2>
             {customFormOpen && (
               <NewWorkspaceForm
                 options={creatable}
@@ -238,7 +238,7 @@ export default function WorkspacesPage() {
           />
         ) : !error ? (
           <>
-            <h2 className="shrink-0 text-sm font-semibold text-gray-900">Your workspaces</h2>
+            <h2 className="shrink-0 text-sm font-semibold text-fg">Your workspaces</h2>
             <ScrollPanel>
               <WorkspaceTable
                 workspaces={workspaces}

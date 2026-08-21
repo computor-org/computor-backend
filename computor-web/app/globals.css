@@ -1,9 +1,80 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/*
+ * Semantic colour tokens.
+ *
+ * Pages had been naming Tailwind's palette directly — text-gray-500 for every
+ * secondary line, border-gray-200 for every panel edge — which put the app's
+ * colour decisions in ~1000 places across 70 files. Naming the ROLE instead puts
+ * them here, which is the prerequisite the design spec sets for dark mode: the
+ * theme block below redefines these eleven values and the whole app follows.
+ *
+ * Light values are the exact greys they replace, so this layer is a rename and
+ * changes nothing on screen.
+ */
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Foreground, strongest to faintest. */
+  --c-fg: #111827;        /* gray-900 — titles, primary values */
+  --c-body: #374151;      /* gray-700 — running text */
+  --c-muted: #6b7280;     /* gray-500 — labels, secondary lines */
+  --c-subtle: #9ca3af;    /* gray-400 — hints, timestamps */
+  --c-faint: #d1d5db;     /* gray-300 — separators in text, disabled glyphs */
+
+  /* Surfaces. */
+  --c-surface: #ffffff;   /* cards and panels */
+  --c-canvas: #f9fafb;    /* the page behind them (gray-50) */
+  --c-sunken: #f3f4f6;    /* a well inside a card (gray-100) */
+
+  /* Lines. */
+  --c-rule: #e5e7eb;      /* gray-200 — panel and table borders */
+  --c-rule-soft: #f3f4f6; /* gray-100 — row separators */
+  --c-rule-strong: #d1d5db; /* gray-300 — input borders */
+
+  /* Text ON a filled accent/danger button. Stays near-white in both themes —
+     the fill darkens rather than lightening, so this must not follow --c-fg. */
+  --c-on-accent: #ffffff;
+
+  /*
+   * Semantic tones (design spec §2). Four roles, each in three registers:
+   * a solid FILL for buttons, readable TEXT for a link or a figure, and a
+   * tinted WASH (plus its border) for a chip or an inline notice.
+   *
+   * The wash is the one that cannot survive a theme flip as a raw palette
+   * class: bg-blue-50 is a near-white block, which on a dark ground is a hole
+   * in the page rather than a tint.
+   */
+  --c-accent: #2563eb;         /* blue-600 */
+  --c-accent-hover: #1d4ed8;   /* blue-700 */
+  --c-accent-text: #2563eb;
+  --c-accent-wash: #eff6ff;    /* blue-50 */
+  --c-accent-line: #3b82f6;    /* blue-500 */
+
+  --c-danger: #dc2626;         /* red-600 */
+  --c-danger-hover: #b91c1c;   /* red-700 */
+  --c-danger-text: #b91c1c;
+  --c-danger-wash: #fef2f2;    /* red-50 */
+  --c-danger-line: #fecaca;    /* red-200 */
+
+  --c-warn-text: #92400e;      /* amber-800 */
+  --c-warn-wash: #fffbeb;      /* amber-50 */
+  --c-warn-line: #fde68a;      /* amber-200 */
+
+  --c-success-text: #15803d;   /* green-700 */
+  --c-success-wash: #f0fdf4;   /* green-50 */
+  --c-success-line: #bbf7d0;   /* green-200 */
+  --c-success: #16a34a;        /* green-600 — a confirming action's fill */
+  --c-success-hover: #15803d;  /* green-700 */
+
+  /* A surface that inverts against the page — the "copied to clipboard" pill,
+     a code block header. Named rather than bg-gray-900 so it flips with the
+     theme instead of staying dark on a dark page. */
+  --c-inverse: #111827;
+  --c-inverse-hover: #1f2937;
+
   color-scheme: light;
   /* Recolors every native checkbox, radio and range to the brand blue that
      Button's primary variant uses, while keeping the platform's own focus ring,
@@ -15,8 +86,162 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  /* Registered so Tailwind generates text-fg, bg-surface, border-rule, … .
+     `inline` keeps them pointing at the custom properties above rather than
+     inlining today's hex, which is what lets a theme block swap them. */
+  --color-fg: var(--c-fg);
+  --color-body: var(--c-body);
+  --color-muted: var(--c-muted);
+  --color-subtle: var(--c-subtle);
+  --color-faint: var(--c-faint);
+  --color-surface: var(--c-surface);
+  --color-canvas: var(--c-canvas);
+  --color-sunken: var(--c-sunken);
+  --color-rule: var(--c-rule);
+  --color-rule-soft: var(--c-rule-soft);
+  --color-rule-strong: var(--c-rule-strong);
+  --color-on-accent: var(--c-on-accent);
+  --color-accent: var(--c-accent);
+  --color-accent-hover: var(--c-accent-hover);
+  --color-accent-text: var(--c-accent-text);
+  --color-accent-wash: var(--c-accent-wash);
+  --color-accent-line: var(--c-accent-line);
+  --color-danger: var(--c-danger);
+  --color-danger-hover: var(--c-danger-hover);
+  --color-danger-text: var(--c-danger-text);
+  --color-danger-wash: var(--c-danger-wash);
+  --color-danger-line: var(--c-danger-line);
+  --color-warn-text: var(--c-warn-text);
+  --color-warn-wash: var(--c-warn-wash);
+  --color-warn-line: var(--c-warn-line);
+  --color-success-text: var(--c-success-text);
+  --color-success-wash: var(--c-success-wash);
+  --color-success-line: var(--c-success-line);
+  --color-success: var(--c-success);
+  --color-success-hover: var(--c-success-hover);
+  --color-inverse: var(--c-inverse);
+  --color-inverse-hover: var(--c-inverse-hover);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+}
+
+/*
+ * Dark theme.
+ *
+ * One block, because every colour in the app now resolves through the tokens
+ * above. This is what the palette sweep bought: no page needs a `dark:` variant,
+ * and none should get one — a per-page variant is how you end up with a
+ * half-dark app.
+ *
+ * Three states, not two. An explicit choice stamps data-theme on <html>; the
+ * default "system" setting stamps nothing, so only prefers-color-scheme
+ * separates light from dark there. The media query is guarded so an explicit
+ * light choice still beats a dark OS, and the attribute selector repeats the
+ * values so an explicit dark choice beats a light OS.
+ *
+ * Not an inversion: the greys are re-picked so that contrast holds (text-muted
+ * has to stay legible on --c-surface, which is now a raised dark grey rather
+ * than white), and the washes become deep tints rather than pale ones — a
+ * lightened wash on a dark ground reads as a hole in the page.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+  --background: #0d1017;
+  --foreground: #e8ebf2;
+
+  --c-fg: #e8ebf2;
+  --c-body: #c3cad8;
+  --c-muted: #949db1;
+  --c-subtle: #6f7889;
+  --c-faint: #4a5468;
+
+  --c-surface: #161b26;
+  --c-canvas: #0d1017;
+  --c-sunken: #1e2431;
+
+  --c-rule: #2a3140;
+  --c-rule-soft: #212734;
+  --c-rule-strong: #3a4356;
+
+  --c-on-accent: #ffffff;
+
+  --c-accent: #2563eb;
+  --c-accent-hover: #3b82f6;
+  --c-accent-text: #93b8ff;
+  --c-accent-wash: #16233c;
+  --c-accent-line: #3b6fd4;
+
+  --c-danger: #dc2626;
+  --c-danger-hover: #ef4444;
+  --c-danger-text: #f6a3a3;
+  --c-danger-wash: #2c1618;
+  --c-danger-line: #5e2a2c;
+
+  --c-warn-text: #e8bd7a;
+  --c-warn-wash: #2a1f0f;
+  --c-warn-line: #5a441f;
+
+  --c-success-text: #86d9a4;
+  --c-success-wash: #10261a;
+  --c-success-line: #24523a;
+  --c-success: #16a34a;
+  --c-success-hover: #22c55e;
+
+  --c-inverse: #e8ebf2;
+  --c-inverse-hover: #c3cad8;
+
+  color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --background: #0d1017;
+  --foreground: #e8ebf2;
+
+  --c-fg: #e8ebf2;
+  --c-body: #c3cad8;
+  --c-muted: #949db1;
+  --c-subtle: #6f7889;
+  --c-faint: #4a5468;
+
+  --c-surface: #161b26;
+  --c-canvas: #0d1017;
+  --c-sunken: #1e2431;
+
+  --c-rule: #2a3140;
+  --c-rule-soft: #212734;
+  --c-rule-strong: #3a4356;
+
+  --c-on-accent: #ffffff;
+
+  --c-accent: #2563eb;
+  --c-accent-hover: #3b82f6;
+  --c-accent-text: #93b8ff;
+  --c-accent-wash: #16233c;
+  --c-accent-line: #3b6fd4;
+
+  --c-danger: #dc2626;
+  --c-danger-hover: #ef4444;
+  --c-danger-text: #f6a3a3;
+  --c-danger-wash: #2c1618;
+  --c-danger-line: #5e2a2c;
+
+  --c-warn-text: #e8bd7a;
+  --c-warn-wash: #2a1f0f;
+  --c-warn-line: #5a441f;
+
+  --c-success-text: #86d9a4;
+  --c-success-wash: #10261a;
+  --c-success-line: #24523a;
+  --c-success: #16a34a;
+  --c-success-hover: #22c55e;
+
+  --c-inverse: #e8ebf2;
+  --c-inverse-hover: #c3cad8;
+
+  color-scheme: dark;
 }
 
 body {

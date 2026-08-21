@@ -208,6 +208,63 @@ if echo "$STAGED_FILES" | grep -qE '^(computor-backend/src/computor_backend/(api
     fi
 fi
 
+# Web styling ratchet. Only runs when the commit touches computor-web page code.
+#
+# Deliberately a RATCHET, not a gate: it scores each staged file against the same
+# file at HEAD and blocks only when the count went UP. A flat check would refuse
+# every commit that so much as reformats one of the ~70 files still carrying
+# pre-existing palette classes, which would train everyone to use --no-verify.
+WEB_STAGED=$(echo "$STAGED_FILES" | grep -E '^computor-web/app/.*\.tsx$' || true)
+if [ -n "$WEB_STAGED" ]; then
+    echo
+    echo "🔍 Checking web styling against the design spec..."
+    if ! command -v node &> /dev/null; then
+        echo -e "${YELLOW}⚠️  Node not found, skipping styling check...${NC}"
+    else
+        STYLE_TMP=$(mktemp -d)
+        STYLE_REGRESSED=0
+        for FILE in $WEB_STAGED; do
+            # Score the STAGED content, not the working tree — they can differ.
+            git show ":$FILE" > "$STYLE_TMP/new.tsx" 2>/dev/null || continue
+            NEW_COUNT=$(node computor-web/scripts/check-styling.mjs --count "$STYLE_TMP/new.tsx" 2>/dev/null || echo 0)
+
+            # A file that is new in this commit has no baseline; anything above 0 is new debt.
+            if git show "HEAD:$FILE" > "$STYLE_TMP/old.tsx" 2>/dev/null; then
+                OLD_COUNT=$(node computor-web/scripts/check-styling.mjs --count "$STYLE_TMP/old.tsx" 2>/dev/null || echo 0)
+            else
+                OLD_COUNT=0
+            fi
+
+            if [ "$NEW_COUNT" -gt "$OLD_COUNT" ]; then
+                echo -e "${RED}❌ $FILE: $OLD_COUNT → $NEW_COUNT design-spec violations${NC}"
+                node computor-web/scripts/check-styling.mjs "$STYLE_TMP/new.tsx" 2>/dev/null | grep -E '^\s+' | head -10
+                STYLE_REGRESSED=1
+            fi
+        done
+        rm -rf "$STYLE_TMP"
+
+        if [ $STYLE_REGRESSED -eq 1 ]; then
+            echo
+            echo -e "${RED}❌ New design-spec violations! Commit blocked.${NC}"
+            echo
+            echo "Palette utilities (bg-gray-100, text-red-600, …) and raw <button>"
+            echo "belong in computor-web/src/components/**, not in app/**."
+            echo
+            echo "To fix this:"
+            echo "1. Use the shared component (Button, Badge, Panel, Notice, EmptyState…)"
+            echo "2. Add one to src/components/ui/ if none fits"
+            echo "3. See .claude/skills/computor-design-spec/SKILL.md"
+            echo
+            echo "If a line genuinely has to stay, mark it: // design-spec: allow"
+            echo
+            echo "If you must skip this check (NOT RECOMMENDED):"
+            echo "  git commit --no-verify"
+            exit 1
+        fi
+        echo -e "${GREEN}✅ No new design-spec violations.${NC}"
+    fi
+fi
+
 echo
 echo -e "${GREEN}✅ All pre-commit checks passed!${NC}"
 exit 0

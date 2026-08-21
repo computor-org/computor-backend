@@ -21,7 +21,7 @@ import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 // bundle free of the charting library).
 const SubmissionDonutChart = dynamic(
   () => import('@/src/components/progress/SubmissionDonutChart'),
-  { ssr: false, loading: () => <div className="h-48 bg-gray-100 rounded animate-pulse" /> },
+  { ssr: false, loading: () => <div className="h-48 bg-sunken rounded animate-pulse" /> },
 );
 
 const gradingsClient = new CourseMemberGradingsClient();
@@ -116,9 +116,9 @@ export default function StudentProgressPage() {
               data && (
                 <div className="space-y-0.5">
                   {data.student_id && (
-                    <p className="text-sm text-gray-500 font-mono">Matr. {data.student_id}</p>
+                    <p className="text-sm text-muted font-mono">Matr. {data.student_id}</p>
                   )}
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-subtle">
                     Last active: {relativeDate(data.latest_submission_at)}
                   </p>
                 </div>
@@ -127,7 +127,7 @@ export default function StudentProgressPage() {
             actions={
               <div className="flex items-end gap-2 print:hidden">
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="start-date" className="text-xs font-medium text-gray-600">
+                  <label htmlFor="start-date" className="text-xs font-medium text-muted">
                     Start date
                   </label>
                   <input
@@ -139,7 +139,7 @@ export default function StudentProgressPage() {
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="due-date" className="text-xs font-medium text-gray-600">
+                  <label htmlFor="due-date" className="text-xs font-medium text-muted">
                     Due date
                   </label>
                   <input
@@ -160,14 +160,14 @@ export default function StudentProgressPage() {
             }
           />
 
-          <ScrollArea className="space-y-6 print:overflow-visible">
+          <ScrollArea className="print:overflow-visible">
           {/* Loading */}
           {loading && (
             <div className="space-y-4">
-              <div className="h-32 bg-gray-100 rounded-lg animate-pulse" />
+              <div className="h-32 bg-sunken rounded-lg animate-pulse" />
               <div className="grid grid-cols-2 gap-4">
-                <div className="h-72 bg-gray-100 rounded-lg animate-pulse" />
-                <div className="h-72 bg-gray-100 rounded-lg animate-pulse" />
+                <div className="h-72 bg-sunken rounded-lg animate-pulse" />
+                <div className="h-72 bg-sunken rounded-lg animate-pulse" />
               </div>
             </div>
           )}
@@ -179,12 +179,12 @@ export default function StudentProgressPage() {
           {!loading && !error && data && (
             <>
               {/* Overall Progress Card */}
-              <div className="bg-white rounded-lg border border-gray-200 p-5">
+              <div className="bg-surface rounded-lg border border-rule p-5">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* Grade */}
                   <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Average Grade</p>
-                    <p className="text-3xl font-bold text-gray-900">
+                    <p className="text-xs font-medium text-muted mb-1">Average Grade</p>
+                    <p className="text-3xl font-bold text-fg">
                       {gradePercent != null ? `${gradePercent}%` : '-'}
                     </p>
                     {gradePercent != null && (
@@ -196,8 +196,8 @@ export default function StudentProgressPage() {
 
                   {/* Overall Progress */}
                   <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Overall Progress</p>
-                    <p className="text-3xl font-bold text-gray-900">{progressPercent}%</p>
+                    <p className="text-xs font-medium text-muted mb-1">Overall Progress</p>
+                    <p className="text-3xl font-bold text-fg">{progressPercent}%</p>
                     <div className="mt-2">
                       <ProgressBar value={progressPercent} color="#6366f1" />
                     </div>
@@ -205,17 +205,17 @@ export default function StudentProgressPage() {
 
                   {/* Stats */}
                   <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Submissions</p>
+                    <p className="text-xs font-medium text-muted mb-1">Submissions</p>
                     <div className="space-y-1.5 mt-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Submitted</span>
-                        <span className="font-medium text-gray-900">
+                        <span className="text-muted">Submitted</span>
+                        <span className="font-medium text-fg">
                           {data.total_submitted_assignments} / {data.total_max_assignments}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Remaining</span>
-                        <span className="font-medium text-gray-900">{remaining}</span>
+                        <span className="text-muted">Remaining</span>
+                        <span className="font-medium text-fg">{remaining}</span>
                       </div>
                     </div>
                   </div>
@@ -240,8 +240,8 @@ export default function StudentProgressPage() {
                 />
 
                 {/* Content Type Breakdown */}
-                <div className="bg-white rounded-lg border border-gray-200 p-5">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-4">Content Type Breakdown</h3>
+                <div className="bg-surface rounded-lg border border-rule p-5">
+                  <h3 className="text-sm font-semibold text-fg mb-4">Content Type Breakdown</h3>
                   <div className="space-y-4">
                     {(data.by_content_type || []).map(ct => {
                       const pct = Math.round(ct.progress_percentage);
@@ -256,11 +256,11 @@ export default function StudentProgressPage() {
                                 className="inline-block w-2.5 h-2.5 rounded-full"
                                 style={{ backgroundColor: ct.course_content_type_color || '#6366f1' }}
                               />
-                              <span className="text-sm font-medium text-gray-700">
+                              <span className="text-sm font-medium text-body">
                                 {ct.course_content_type_title || ct.course_content_type_slug}
                               </span>
                             </div>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-muted">
                               {ct.submitted_assignments}/{ct.max_assignments} ({pct}%) | Grade: {gradeStr}
                             </span>
                           </div>
@@ -273,7 +273,7 @@ export default function StudentProgressPage() {
                       );
                     })}
                     {(!data.by_content_type || data.by_content_type.length === 0) && (
-                      <p className="text-sm text-gray-500">No content type data available.</p>
+                      <p className="text-sm text-muted">No content type data available.</p>
                     )}
                   </div>
                 </div>

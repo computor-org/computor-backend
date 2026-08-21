@@ -40,14 +40,14 @@ export default function WorkspaceTypeGrid({
 }) {
   if (options.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-500">
+      <div className="rounded-lg border border-dashed border-rule-strong bg-canvas p-4 text-sm text-muted">
         <p>No workspace types are available to you yet.</p>
         {isMaintainer ? (
           <p className="mt-1">
             Nothing is deployed automatically — pick which ones this deployment offers under{' '}
             <Link
               href="/workspaces/admin?tab=templates"
-              className="text-blue-600 hover:underline"
+              className="text-accent-text hover:underline"
             >
               Administration → Templates
             </Link>

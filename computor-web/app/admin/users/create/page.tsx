@@ -59,7 +59,7 @@ export default function UserCreatePage() {
     <AuthenticatedLayout>
       <FormPanel
         breadcrumbs={[{ label: 'Users', href: '/admin/users' }, { label: 'New' }]}
-        title="Create User"
+        title="New user"
         description="The user will have no password — send them an invite link to set one."
         error={error}
         submitting={saving}

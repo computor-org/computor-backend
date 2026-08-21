@@ -120,7 +120,7 @@ export default function UserDetailPage() {
             { label: 'Administration', href: '/workspaces/admin' },
             { label: 'User Detail' },
           ]}
-          title="User Detail"
+          title="User detail"
           actions={
             user && (
               <div className="flex items-center gap-2">
@@ -156,45 +156,45 @@ export default function UserDetailPage() {
         {/* Error */}
         <ErrorBanner>{error}</ErrorBanner>
 
-        <ScrollArea className="space-y-6">
+        <ScrollArea>
         {/* Loading */}
         {loading && !data && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
-            <div className="h-6 bg-gray-200 rounded w-1/3 mb-4" />
+          <div className="bg-surface rounded-lg border border-rule p-6 animate-pulse">
+            <div className="h-6 bg-sunken rounded w-1/3 mb-4" />
             <div className="space-y-2">
-              <div className="h-4 bg-gray-200 rounded w-1/2" />
-              <div className="h-4 bg-gray-200 rounded w-2/3" />
+              <div className="h-4 bg-sunken rounded w-1/2" />
+              <div className="h-4 bg-sunken rounded w-2/3" />
             </div>
           </div>
         )}
 
         {/* User Info Card */}
         {user && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">User Information</h2>
+          <div className="bg-surface rounded-lg border border-rule p-6">
+            <h2 className="text-lg font-semibold text-fg mb-4">User Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
-                <span className="font-medium text-gray-600">Name:</span>
-                <span className="ml-2 text-gray-900">
+                <span className="font-medium text-muted">Name:</span>
+                <span className="ml-2 text-fg">
                   {user.given_name || user.family_name
                     ? `${user.given_name || ''} ${user.family_name || ''}`.trim()
                     : '-'}
                 </span>
               </div>
               <div>
-                <span className="font-medium text-gray-600">Email:</span>
-                <span className="ml-2 text-gray-900">{user.email || '-'}</span>
+                <span className="font-medium text-muted">Email:</span>
+                <span className="ml-2 text-fg">{user.email || '-'}</span>
               </div>
               <div>
-                <span className="font-medium text-gray-600">Username:</span>
-                <span className="ml-2 text-gray-900 font-mono text-xs">{user.username || '-'}</span>
+                <span className="font-medium text-muted">Username:</span>
+                <span className="ml-2 text-fg font-mono text-xs">{user.username || '-'}</span>
               </div>
               <div>
-                <span className="font-medium text-gray-600">User ID:</span>
-                <span className="ml-2 text-gray-500 font-mono text-xs">{user.user_id}</span>
+                <span className="font-medium text-muted">User ID:</span>
+                <span className="ml-2 text-muted font-mono text-xs">{user.user_id}</span>
               </div>
               <div className="md:col-span-2">
-                <span className="font-medium text-gray-600">Roles:</span>
+                <span className="font-medium text-muted">Roles:</span>
                 <span className="ml-2">
                   {user.roles.map((role) => (
                     <Badge key={role} color="blue" pill className="mr-1.5">
@@ -209,9 +209,9 @@ export default function UserDetailPage() {
 
         {/* App credential */}
         {user && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">App credential</h2>
-            <p className="text-sm text-gray-600 mb-4 max-w-3xl">
+          <div className="bg-surface rounded-lg border border-rule p-6">
+            <h2 className="text-lg font-semibold text-fg mb-2">App credential</h2>
+            <p className="text-sm text-muted mb-4 max-w-3xl">
               Every workspace app of this user — terminal, desktop, notebook, editor — requires
               one shared secret, which the proxy injects on their behalf. Rotating it revokes the
               old one. Their running workspaces restart immediately under the new secret; stopped
@@ -219,7 +219,7 @@ export default function UserDetailPage() {
             </p>
             <Button
               variant="secondary"
-              className="text-red-700 border-red-300 hover:bg-red-50"
+              className="text-danger-text border-danger-line hover:bg-danger-wash"
               onClick={() => setRotateOpen(true)}
             >
               Rotate app credential
@@ -229,14 +229,14 @@ export default function UserDetailPage() {
 
         {/* Workspace Management */}
         {user && (
-          <div className="bg-white rounded-lg border border-gray-200">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Workspaces</h2>
+          <div className="bg-surface rounded-lg border border-rule">
+            <div className="p-6 border-b border-rule">
+              <h2 className="text-lg font-semibold text-fg">Workspaces</h2>
             </div>
 
             <div className="overflow-x-auto">
               {workspaces.length === 0 ? (
-                <p className="px-6 py-8 text-center text-gray-500 text-sm">No workspaces found for this user</p>
+                <p className="px-6 py-8 text-center text-muted text-sm">No workspaces found for this user</p>
               ) : (
                 <WorkspaceTable
                   workspaces={workspaces}

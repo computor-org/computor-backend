@@ -21,7 +21,7 @@ export default function NotFound({
         {/* 404 Icon */}
         <div className="flex justify-center">
           <svg
-            className="h-32 w-32 text-gray-300"
+            className="h-32 w-32 text-faint"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -36,17 +36,17 @@ export default function NotFound({
         </div>
 
         {/* Title */}
-        <h1 className="text-4xl font-bold text-gray-900">{title}</h1>
+        <h1 className="text-4xl font-bold text-fg">{title}</h1>
 
         {/* Message */}
-        <p className="text-lg text-gray-600">{message}</p>
+        <p className="text-lg text-muted">{message}</p>
 
         {/* Back Button */}
         {showBackButton && (
           <div className="pt-4">
             <Link
               href={backLink}
-              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              className="inline-flex items-center px-6 py-3 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-colors font-medium"
             >
               <svg
                 className="h-5 w-5 mr-2"
