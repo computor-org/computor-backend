@@ -6,6 +6,7 @@ import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { GitServersClient } from '@/src/generated/clients/GitServersClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -20,7 +21,6 @@ import Button from '@/src/components/ui/Button';
 import Badge from '@/src/components/Badge';
 import VisibilitySelect, { type VisibilityValue } from '@/src/components/courses/VisibilitySelect';
 import type { CourseGet, CourseGitBindingGet, CourseGitBindingUpsert, GitServerGet } from 'types/generated';
-import { displayName } from '@/src/utils/displayName';
 
 const coursesClient = new CoursesClient();
 const gitServersClient = new GitServersClient();
@@ -42,6 +42,7 @@ const MODE_LABELS: Record<string, string> = {
 
 export default function CourseEditPage() {
   const courseId = useParams().id as string;
+  const crumbs = useCourseCrumbs(courseId, 'Edit');
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { canManageHierarchy: canManage, courseHasAtLeast } = usePermissions();
   // Course staff reach this page too, not only the org hierarchy: the backend
@@ -207,11 +208,7 @@ export default function CourseEditPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[
-            { label: 'Courses', href: '/courses' },
-            { label: displayName(course, 'Course'), href: `/courses/${courseId}` },
-            { label: 'Edit' },
-          ]}
+          breadcrumbs={crumbs}
           title="Edit course"
         />
 

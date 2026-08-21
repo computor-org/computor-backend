@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
@@ -42,6 +43,7 @@ export default function CourseContentEditPage() {
   const canManage = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
 
   const [title, setTitle] = useState('');
+  const crumbs = useCourseCrumbs(courseId, { label: 'Assignments', href: `/courses/${courseId}/lecturer/assignments` }, title || 'Content');
   const [description, setDescription] = useState('');
   const [position, setPosition] = useState('');
   const [maxGroupSize, setMaxGroupSize] = useState('');
@@ -109,11 +111,7 @@ export default function CourseContentEditPage() {
         <div className="p-6">Loading…</div>
       ) : (
         <FormPanel
-          breadcrumbs={[
-            { label: 'Courses', href: '/courses' },
-            { label: 'Assignments', href: backHref },
-            { label: title || 'Content' },
-          ]}
+          breadcrumbs={crumbs}
           title={`Edit ${title || 'content'}`}
           error={loadError ?? saveError}
           submitting={saving}

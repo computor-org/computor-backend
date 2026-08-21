@@ -4,20 +4,18 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
-import { useResource } from '@/src/hooks/useResource';
+import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
 import { inputCls } from '@/src/components/ui/tokens';
 import { CourseGroupsClient } from '@/src/generated/clients/CourseGroupsClient';
-import { CoursesClient } from '@/src/generated/clients/CoursesClient';
-import { displayName } from '@/src/utils/displayName';
 
 const groupsClient = new CourseGroupsClient();
-const coursesClient = new CoursesClient();
 
 export default function CourseGroupCreatePage() {
   const courseId = useParams().id as string;
+  const crumbs = useCourseCrumbs(courseId, { label: 'Course Groups', href: `/courses/${courseId}/lecturer/groups` }, 'New');
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
@@ -28,13 +26,6 @@ export default function CourseGroupCreatePage() {
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const { data: course } = useResource(
-    () => coursesClient.getCoursesCoursesIdGet({ id: courseId }).catch(() => null),
-    [courseId],
-    { enabled: canManage },
-  );
-  const courseLabel = displayName(course, 'Course');
 
   async function save() {
     setSaving(true);
@@ -61,12 +52,7 @@ export default function CourseGroupCreatePage() {
   return (
     <AuthenticatedLayout>
       <FormPanel
-        breadcrumbs={[
-          { label: 'Courses', href: '/courses' },
-          { label: courseLabel, href: `/courses/${courseId}` },
-          { label: 'Course Groups', href: `/courses/${courseId}/lecturer/groups` },
-          { label: 'New' },
-        ]}
+        breadcrumbs={crumbs}
         title="New group"
         description="A group students are assigned to (e.g. a lab section or tutorial cohort). Every student in the course must belong to a group."
         error={error}

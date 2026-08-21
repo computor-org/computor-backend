@@ -18,33 +18,45 @@ export type TreeNode<T> = T & { children: TreeNode<T>[]; depth: number };
  * Build a nested tree from a flat list carrying ltree `path`s.
  *
  * Canonical sort order: siblings by `position` ascending, then by `path` as a
- * deterministic tiebreaker (the tree structure already keeps parents before
- * children). An item whose parent path is absent from `items` becomes a root.
+ * deterministic tiebreaker. An item whose parent path is absent from `items`
+ * becomes a root.
+ *
+ * Linking happens in a pass of its own, after every node exists. Doing it while
+ * walking a position-sorted list looked equivalent but was not: a unit at
+ * position 5 holding assignments at positions 0 and 1 was reached *after* its
+ * own children, so they found no parent in the map and the whole unit rendered
+ * flat and empty.
+ *
+ * `path` must be unique within `items` — scope the list to one course before
+ * calling, or two courses sharing a `week1` would collapse into one node.
  */
 export function buildTree<T extends { path: string; position?: number | null }>(
   items: T[],
 ): TreeNode<T>[] {
-  const sorted = [...items].sort((a, b) => {
-    const posA = a.position ?? 0;
-    const posB = b.position ?? 0;
-    if (posA !== posB) return posA - posB;
-    return a.path.localeCompare(b.path);
-  });
-
   const nodeMap = new Map<string, TreeNode<T>>();
-  const roots: TreeNode<T>[] = [];
-
-  for (const item of sorted) {
-    const node: TreeNode<T> = { ...item, children: [], depth: depthOf(item.path) };
-    nodeMap.set(item.path, node);
-
-    const parent = parentPath(item.path);
-    if (parent && nodeMap.has(parent)) {
-      nodeMap.get(parent)!.children.push(node);
-    } else {
-      roots.push(node);
-    }
+  for (const item of items) {
+    nodeMap.set(item.path, { ...item, children: [], depth: depthOf(item.path) });
   }
+
+  const roots: TreeNode<T>[] = [];
+  for (const item of items) {
+    const node = nodeMap.get(item.path)!;
+    const parent = parentPath(item.path);
+    const parentNode = parent ? nodeMap.get(parent) : undefined;
+    if (parentNode) parentNode.children.push(node);
+    else roots.push(node);
+  }
+
+  const sortSiblings = (nodes: TreeNode<T>[]): void => {
+    nodes.sort((a, b) => {
+      const posA = a.position ?? 0;
+      const posB = b.position ?? 0;
+      if (posA !== posB) return posA - posB;
+      return a.path.localeCompare(b.path);
+    });
+    for (const node of nodes) sortSiblings(node.children);
+  };
+  sortSiblings(roots);
 
   return roots;
 }

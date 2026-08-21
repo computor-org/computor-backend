@@ -1,15 +1,12 @@
 'use client';
 
-import { useState } from 'react';
 import type { CourseMemberGradingNode } from 'types/generated';
-import { buildTree, type TreeNode as LtreeNode } from '@/src/utils/ltree';
-import { displayName } from '@/src/utils/displayName';
+import { useContentTree, type ContentTreeRow } from '@/src/hooks/useContentTree';
+import Panel from '@/src/components/ui/Panel';
 
 interface ContentTreeProps {
   nodes: CourseMemberGradingNode[];
 }
-
-type TreeNode = LtreeNode<CourseMemberGradingNode>;
 
 function statusColor(status: string | null | undefined): string {
   switch (status) {
@@ -30,11 +27,19 @@ function statusLabel(status: string | null | undefined): string {
   }
 }
 
-function TreeNodeRow({ node, defaultExpanded }: { node: TreeNode; defaultExpanded: boolean }) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
-  const hasChildren = node.children.length > 0;
+/**
+ * Grading keeps <tr> rows — it is a table with six numeric columns — so it takes
+ * the structure from useContentTree and renders it itself, rather than the
+ * <TreeRow> the two assignment trees share. What matters is that all three now
+ * agree on nesting order, indent and expand behaviour.
+ */
+function TreeNodeRow({ row }: { row: ContentTreeRow<CourseMemberGradingNode> }) {
+  const { item, depth, label, expanded, hasChildren, toggle } = row;
+  // The grading endpoint returns every node; nothing is synthesised here.
+  if (!item) return null;
+  const node = item;
   const isAssignment = node.submittable === true;
-  const indent = node.depth * 20;
+  const indent = depth * 20;
   // Hidden from students, here or by an ancestor (issue #338).
   const hidden = node.visible_effective === false;
 
@@ -54,7 +59,9 @@ function TreeNodeRow({ node, defaultExpanded }: { node: TreeNode; defaultExpande
           <div className="flex items-center gap-1.5">
             {hasChildren ? (
               <button
-                onClick={() => setExpanded(!expanded)}
+                onClick={toggle}
+                aria-expanded={expanded}
+                aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
                 className="w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 flex-shrink-0"
               >
                 <svg className={`h-3.5 w-3.5 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -79,7 +86,7 @@ function TreeNodeRow({ node, defaultExpanded }: { node: TreeNode; defaultExpande
                     : 'font-medium text-gray-900'
               }`}
             >
-              {displayName(node)}
+              {label}
             </span>
             {/* Marked, not excluded: the counts on this row deliberately still
                 include hidden content, because grading is staff-only and staff
@@ -148,18 +155,16 @@ function TreeNodeRow({ node, defaultExpanded }: { node: TreeNode; defaultExpande
           ) : null}
         </td>
       </tr>
-
-      {expanded && node.children.map(child => (
-        <TreeNodeRow key={child.path} node={child} defaultExpanded={child.depth < 2} />
-      ))}
     </>
   );
 }
 
 export default function ContentTree({ nodes }: ContentTreeProps) {
-  const tree = buildTree(nodes);
+  // Units open, their contents visible: a lecturer reading one student's report
+  // wants the whole picture, not a tree to click open.
+  const { rows } = useContentTree(nodes, {});
 
-  if (tree.length === 0) {
+  if (rows.length === 0) {
     return (
       <div className="text-center py-8 text-sm text-gray-500">
         No course content available.
@@ -168,9 +173,9 @@ export default function ContentTree({ nodes }: ContentTreeProps) {
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <Panel padding="none" className="overflow-hidden">
       <div className="px-5 py-3 border-b border-gray-200">
-        <h3 className="text-sm font-semibold text-gray-900">Course Content Progress</h3>
+        <h3 className="text-sm font-semibold text-gray-900">Course content progress</h3>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -186,12 +191,12 @@ export default function ContentTree({ nodes }: ContentTreeProps) {
             </tr>
           </thead>
           <tbody>
-            {tree.map(node => (
-              <TreeNodeRow key={node.path} node={node} defaultExpanded={node.depth < 2} />
+            {rows.map((row) => (
+              <TreeNodeRow key={row.key} row={row} />
             ))}
           </tbody>
         </table>
       </div>
-    </div>
+    </Panel>
   );
 }

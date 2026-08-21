@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
@@ -13,18 +14,16 @@ import AddFromUserList from '@/src/components/course-members/AddFromUserList';
 import AddByEmail from '@/src/components/course-members/AddByEmail';
 import ImportFromFile from '@/src/components/course-members/ImportFromFile';
 import { CourseGroupsClient } from '@/src/generated/clients/CourseGroupsClient';
-import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import type { CourseGroupList } from 'types/generated';
 import { assignableRoles, highestCourseRole, maxAssignableRole } from '@/src/utils/courseRoles';
-import { displayName } from '@/src/utils/displayName';
 
 const groupsClient = new CourseGroupsClient();
-const coursesClient = new CoursesClient();
 
 type AddTab = 'list' | 'email' | 'file';
 
 export default function AddCourseMembersPage() {
   const courseId = useParams().id as string;
+  const crumbs = useCourseCrumbs(courseId, { label: 'Course Members', href: `/courses/${courseId}/lecturer/members` }, 'Add');
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin, isOrganizationManager, courseRoles, courseHasAtLeast } = usePermissions();
 
@@ -37,13 +36,6 @@ export default function AddCourseMembersPage() {
   const defaultRole = roleOptions[0] ?? '_student';
 
   const [tab, setTab] = useState<AddTab>('list');
-
-  const { data: courseData } = useResource(
-    () => coursesClient.getCoursesCoursesIdGet({ id: courseId }).catch(() => null),
-    [courseId],
-    { enabled: canManage },
-  );
-  const courseLabel = displayName(courseData, 'Course');
 
   // Course groups — a student must be assigned to one (DB constraint), so the
   // user-list tab needs a group picker. Also feeds a sensible default below.
@@ -76,12 +68,7 @@ export default function AddCourseMembersPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[
-            { label: 'Courses', href: '/courses' },
-            { label: courseLabel, href: `/courses/${courseId}` },
-            { label: 'Course Members', href: `/courses/${courseId}/lecturer/members` },
-            { label: 'Add' },
-          ]}
+          breadcrumbs={crumbs}
           title="Add members"
           subtitle="Add existing users from the list, or invite someone new by email."
         />

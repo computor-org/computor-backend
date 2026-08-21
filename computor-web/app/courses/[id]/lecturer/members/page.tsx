@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
+import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollPanel, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -15,10 +16,8 @@ import Forbidden from '@/src/components/Forbidden';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import { CourseMembersClient } from '@/src/generated/clients/CourseMembersClient';
 import { CourseGroupsClient } from '@/src/generated/clients/CourseGroupsClient';
-import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import type { CourseMemberList, CourseGroupList } from 'types/generated';
 import { Table, Thead, Tbody, Th } from '@/src/components/ui/Table';
-import { displayName } from '@/src/utils/displayName';
 import {
   assignableRoles,
   canManageMemberRole,
@@ -30,7 +29,6 @@ import {
 const PAGE_SIZE = 25;
 const membersClient = new CourseMembersClient();
 const groupsClient = new CourseGroupsClient();
-const coursesClient = new CoursesClient();
 
 function memberName(m: CourseMemberList): string {
   const name = `${m.user?.given_name ?? ''} ${m.user?.family_name ?? ''}`.trim();
@@ -39,6 +37,7 @@ function memberName(m: CourseMemberList): string {
 
 export default function CourseMembersPage() {
   const courseId = useParams().id as string;
+  const crumbs = useCourseCrumbs(courseId, 'Course Members');
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const { isAdmin, isOrganizationManager, courseRoles, courseHasAtLeast } = usePermissions();
 
@@ -55,7 +54,7 @@ export default function CourseMembersPage() {
 
   const { data, loading, error, reload } = useResource(
     async () => {
-      const [members, groups, course] = await Promise.all([
+      const [members, groups] = await Promise.all([
         membersClient.listCourseMembersCourseMembersGet({
           courseId,
           skip: page * PAGE_SIZE,
@@ -64,16 +63,14 @@ export default function CourseMembersPage() {
         groupsClient
           .listCourseGroupsCourseGroupsGet({ courseId, limit: 200 })
           .catch(() => [] as CourseGroupList[]),
-        coursesClient.getCoursesCoursesIdGet({ id: courseId }).catch(() => null),
       ]);
-      return { members, groups, course };
+      return { members, groups };
     },
     [courseId, page],
     { enabled: canManage },
   );
 
   const members = data?.members ?? [];
-  const course = data?.course ?? null;
   const groups = data?.groups ?? [];
   const groupName = useMemo(() => {
     const map = new Map<string, string>();
@@ -140,17 +137,11 @@ export default function CourseMembersPage() {
     );
   }
 
-  const courseLabel = displayName(course, 'Course');
-
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[
-            { label: 'Courses', href: '/courses' },
-            { label: courseLabel, href: `/courses/${courseId}` },
-            { label: 'Course Members' },
-          ]}
+          breadcrumbs={crumbs}
           title="Course Members"
           subtitle="Manage who belongs to this course and their roles."
           actions={

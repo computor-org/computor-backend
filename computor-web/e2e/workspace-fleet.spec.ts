@@ -123,7 +123,7 @@ test('fleet supports template selection and readiness-aware actions', async ({ p
   await page.goto('/workspaces/admin?tab=fleet');
 
   await expect(page.getByText('Coder healthy · v2.29.4+7dfaa60')).toBeVisible();
-  await expect(page.getByText('Ready to roll out')).toBeVisible();
+  await expect(page.getByText('Running outdated')).toBeVisible();
   await expect(page.getByText('Scheduled', { exact: true })).toBeVisible();
 
   await page.getByLabel('Select VS Code').evaluate((element: HTMLInputElement) => element.click());

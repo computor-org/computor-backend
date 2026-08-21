@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
@@ -24,6 +25,7 @@ export default function CourseGroupEditPage() {
   const canManage = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
 
   const [title, setTitle] = useState('');
+  const crumbs = useCourseCrumbs(courseId, { label: 'Course Groups', href: `/courses/${courseId}/lecturer/groups` }, title || 'Group');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -69,11 +71,7 @@ export default function CourseGroupEditPage() {
         <div className="p-6 text-gray-500">Loading…</div>
       ) : (
         <FormPanel
-          breadcrumbs={[
-            { label: 'Courses', href: '/courses' },
-            { label: 'Course Groups', href: `/courses/${courseId}/lecturer/groups` },
-            { label: title || 'Group' },
-          ]}
+          breadcrumbs={crumbs}
           title={`Edit ${title || 'group'}`}
           error={loadError ?? saveError}
           submitting={saving}
