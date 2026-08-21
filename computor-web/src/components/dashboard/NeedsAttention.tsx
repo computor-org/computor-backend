@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Badge from '@/src/components/Badge';
 import Panel from '@/src/components/ui/Panel';
-import type { Tone } from '@/src/components/ui/tones';
+import { GRADING_STATUS } from '@/src/components/student/gradingStatus';
 import { displayName } from '@/src/utils/displayName';
 import type { CourseContentStudentList } from 'types/generated';
 
@@ -23,9 +23,10 @@ import type { CourseContentStudentList } from 'types/generated';
  */
 export type AttentionReason = 'correction_necessary' | 'improvement_possible';
 
-const REASON: Record<AttentionReason, { label: string; tone: Tone; rank: number }> = {
-  correction_necessary: { label: 'Correction necessary', tone: 'error', rank: 0 },
-  improvement_possible: { label: 'Improvement possible', tone: 'warning', rank: 1 },
+/** Worst first. Label and tone come from the shared grading-status vocabulary. */
+const RANK: Record<AttentionReason, number> = {
+  correction_necessary: 0,
+  improvement_possible: 1,
 };
 
 /**
@@ -77,7 +78,7 @@ export function selectNeedsAttention(
 
   return items.sort(
     (a, b) =>
-      REASON[a.reason].rank - REASON[b.reason].rank ||
+      RANK[a.reason] - RANK[b.reason] ||
       a.courseTitle.localeCompare(b.courseTitle) ||
       a.content.path.localeCompare(b.content.path),
   );
@@ -109,8 +110,8 @@ export default function NeedsAttention({ items, limit = 8 }: { items: AttentionI
                 {content.unread_message_count} new
               </Badge>
             ) : null}
-            <Badge tone={REASON[reason].tone} className="shrink-0">
-              {REASON[reason].label}
+            <Badge tone={GRADING_STATUS[reason].tone} className="shrink-0">
+              {GRADING_STATUS[reason].label}
             </Badge>
           </Link>
         ))}

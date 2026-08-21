@@ -3,28 +3,10 @@
 import type { CourseMemberGradingNode } from 'types/generated';
 import { useContentTree, type ContentTreeRow } from '@/src/hooks/useContentTree';
 import Panel from '@/src/components/ui/Panel';
+import { gradingStatusDot, gradingStatusLabel } from '@/src/components/student/gradingStatus';
 
 interface ContentTreeProps {
   nodes: CourseMemberGradingNode[];
-}
-
-function statusColor(status: string | null | undefined): string {
-  switch (status) {
-    case 'corrected': return 'bg-success';
-    case 'correction_necessary': return 'bg-danger';
-    case 'improvement_possible': return 'bg-amber-500';
-    default: return 'bg-faint';
-  }
-}
-
-function statusLabel(status: string | null | undefined): string {
-  switch (status) {
-    case 'corrected': return 'Corrected';
-    case 'correction_necessary': return 'Correction needed';
-    case 'improvement_possible': return 'Improvement possible';
-    case 'not_reviewed': return 'Not reviewed';
-    default: return '-';
-  }
 }
 
 /**
@@ -148,9 +130,9 @@ function TreeNodeRow({ row }: { row: ContentTreeRow<CourseMemberGradingNode> }) 
         {/* Status */}
         <td className="py-2 px-2 w-20">
           {isAssignment && node.status ? (
-            <div className="flex items-center gap-1.5" title={statusLabel(node.status)}>
-              <span className={`inline-block w-2 h-2 rounded-full ${statusColor(node.status)}`} />
-              <span className="text-xs text-muted truncate">{statusLabel(node.status)}</span>
+            <div className="flex items-center gap-1.5" title={gradingStatusLabel(node.status)}>
+              <span className={`inline-block w-2 h-2 rounded-full ${gradingStatusDot(node.status)}`} />
+              <span className="text-xs text-muted truncate">{gradingStatusLabel(node.status)}</span>
             </div>
           ) : null}
         </td>
