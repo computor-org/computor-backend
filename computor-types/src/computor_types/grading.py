@@ -83,12 +83,20 @@ class SubmissionGroupGradingList(BaseModel):
     """List view of grading."""
     id: str
     submission_group_id: str
+    # Which submission this grade is on. Grades hang off a submission artifact
+    # (``submission_grade.artifact_id``); flattening them onto the group loses
+    # that, and with it the client's ability to tell a grade on the current
+    # submission from one left on an earlier attempt.
+    artifact_id: Optional[str] = None
     graded_by_course_member_id: str
     result_id: Optional[str] = None
     grading: float
     status: GradingStatus
     feedback: Optional[str] = None
     created_at: datetime
+    # ``submission_grade`` carries its own ``graded_at``; a re-grade can move it
+    # without touching ``created_at``, so the two are not interchangeable.
+    graded_at: Optional[datetime] = None
     graded_by_course_member: Optional[GradedByCourseMember] = None
 
     model_config = ConfigDict(use_enum_values=True, from_attributes=True, populate_by_name=True)

@@ -156,12 +156,14 @@ def _fetch_grades_and_latest_artifact(
         SubmissionGroupGradingList(
             id=str(grade.id),
             submission_group_id=str(submission_group.id),
+            artifact_id=str(grade.artifact_id),
             graded_by_course_member_id=str(grade.graded_by_course_member_id),
             result_id=None,
             grading=grade.grade,
             status=GradingStatus(grade.status),
             feedback=grade.comment,
             created_at=grade.created_at,
+            graded_at=grade.graded_at,
             graded_by_course_member=(
                 GradedByCourseMember.model_validate(grade.graded_by, from_attributes=True)
                 if grade.graded_by else None
@@ -198,6 +200,7 @@ def _build_submission_group_payloads(
     max_submissions: Optional[int],
     unread: int,
     graded_by_course_member_payload: Optional[GradedByCourseMember],
+    latest_submitted_artifact_id: Optional[str],
     gradings_payload: List[SubmissionGroupGradingList],
     detailed: bool,
 ) -> Tuple[Optional[SubmissionGroupStudentList], Optional[SubmissionGroupStudentGet]]:
@@ -239,6 +242,7 @@ def _build_submission_group_payloads(
         max_submissions=max_submissions,
         unread_message_count=unread,
         graded_by_course_member=graded_by_course_member_payload,
+        latest_submitted_artifact_id=latest_submitted_artifact_id,
     )
 
     list_payload = SubmissionGroupStudentList(**common)
@@ -321,6 +325,9 @@ async def course_member_course_content_result_mapper(
         max_submissions=effective_max_submissions,
         unread=unread,
         graded_by_course_member_payload=graded_by_course_member_payload,
+        latest_submitted_artifact_id=(
+            str(latest_artifact_id) if latest_artifact_id else None
+        ),
         gradings_payload=gradings_payload,
         detailed=detailed,
     )

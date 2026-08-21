@@ -55,6 +55,10 @@ class SubmissionGroupStudentList(BaseModel):
     status: Optional[str] = None  # Backward compatibility
     grading: Optional[float] = None  # Backward compatibility
     graded_by_course_member: Optional[GradedByCourseMember] = None  # Who graded this
+    # The artifact the headline status/grading/grader above are taken from: the
+    # most recent one with submit=True. Carried so a client can tell whether a
+    # grading in ``gradings`` applies to what the student last submitted.
+    latest_submitted_artifact_id: Optional[str] = None
     count: int = 0  # Backward compatibility - submission count
     max_submissions: Optional[int] = None  # Backward compatibility
     unread_message_count: int = 0
