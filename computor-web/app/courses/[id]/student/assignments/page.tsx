@@ -14,6 +14,7 @@ import EmptyState from '@/src/components/EmptyState';
 import Badge from '@/src/components/Badge';
 import Button, { ButtonLink } from '@/src/components/ui/Button';
 import Score from '@/src/components/ui/Score';
+import GradingStatusBadge, { isGradingVerdict } from '@/src/components/student/gradingStatus';
 import Toolbar from '@/src/components/ui/Toolbar';
 import TreeRow, { TreeRows } from '@/src/components/ui/TreeRow';
 import { formatUsageCompact } from '@/src/utils/limits';
@@ -109,6 +110,13 @@ export default function StudentCourseContentsPage() {
 
                         {item && isAssignment && (
                           <>
+                            {/* Only a verdict a human reached. `not_reviewed` is
+                                the default state of most of a semester, and a
+                                grey chip on every row of 72 would say nothing. */}
+                            {isGradingVerdict(item.status) && (
+                              <GradingStatusBadge status={item.status} className="shrink-0" />
+                            )}
+
                             {item.submitted ? (
                               <Badge tone="success" className="shrink-0">
                                 Submitted
@@ -128,8 +136,13 @@ export default function StudentCourseContentsPage() {
                               {formatUsageCompact(item.submission_count, item.max_submissions)}S
                             </Badge>
 
-                            <span className="shrink-0 w-14 text-right">
+                            {/* Two numbers, always in the same two slots: what
+                                the tests said, then what a human said. */}
+                            <span className="shrink-0 w-14 text-right" title="Latest test result">
                               <Score value={item.result ? (item.result.result ?? 0) : null} />
+                            </span>
+                            <span className="shrink-0 w-14 text-right" title="Grade">
+                              <Score value={item.submission_group?.grading ?? null} />
                             </span>
                           </>
                         )}
