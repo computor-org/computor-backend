@@ -133,7 +133,7 @@ def _fetch_latest_submitted_artifact_id(submission_group, db: Session):
             SubmissionArtifact.submission_group_id == submission_group.id,
             SubmissionArtifact.submit == True,  # noqa: E712 — SQLAlchemy column comparison
         )
-        .order_by(SubmissionArtifact.created_at.desc())
+        .order_by(SubmissionArtifact.created_at.desc(), SubmissionArtifact.id.desc())
         .first()
     )
     return latest_submission[0] if latest_submission else None
@@ -217,6 +217,15 @@ def build_submission_group_prefetch(submission_group_ids, db: Session) -> Submis
 
     ``DISTINCT ON`` is the Postgres way to say "one row per group, the newest";
     this codebase is Postgres-only (ltree, JSONB) so it is available.
+
+    Every ordering here carries ``id`` as a tiebreaker. Two artifacts in a group
+    can share a ``created_at`` (two submissions committed in one transaction,
+    bulk-loaded bench data — the same tie the result join upstream already
+    guards against), and ``ORDER BY created_at DESC LIMIT 1`` then picks
+    whichever row the plan happens to yield first. That left the listing and the
+    detail view free to disagree about which grade was current for the same
+    assignment. Ordering by ``id`` as well makes the answer well-defined, and
+    makes the batched and single-row paths agree with each other.
     """
     group_ids = [gid for gid in submission_group_ids if gid is not None]
     if not group_ids:
@@ -232,6 +241,7 @@ def build_submission_group_prefetch(submission_group_ids, db: Session) -> Submis
         .order_by(
             SubmissionArtifact.submission_group_id,
             SubmissionArtifact.created_at.desc(),
+            SubmissionArtifact.id.desc(),
         )
         .all()
     )
@@ -248,7 +258,11 @@ def build_submission_group_prefetch(submission_group_ids, db: Session) -> Submis
                 joinedload(SubmissionGrade.graded_by).joinedload(CourseMember.course_role),
             )
             .distinct(SubmissionGrade.artifact_id)
-            .order_by(SubmissionGrade.artifact_id, SubmissionGrade.graded_at.desc())
+            .order_by(
+                SubmissionGrade.artifact_id,
+                SubmissionGrade.graded_at.desc(),
+                SubmissionGrade.id.desc(),
+            )
             .all()
         )
         latest_grade_by_artifact = {grade.artifact_id: grade for grade in grades}
@@ -267,7 +281,7 @@ def _fetch_latest_grade_for_artifact(artifact_id, db: Session) -> Optional[Submi
             joinedload(SubmissionGrade.graded_by).joinedload(CourseMember.user),
             joinedload(SubmissionGrade.graded_by).joinedload(CourseMember.course_role),
         )
-        .order_by(SubmissionGrade.graded_at.desc())
+        .order_by(SubmissionGrade.graded_at.desc(), SubmissionGrade.id.desc())
         .first()
     )
 
