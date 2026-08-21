@@ -66,11 +66,17 @@ export default function DashboardPage() {
     const [contents, workspaces, announcements] = await Promise.all([
       // No course_id: the backend treats it as "every course this user is in"
       // (student_view.list_course_contents), which is the whole point of this
-      // page. Two consequences worth knowing: it also provisions any missing
-      // submission groups across all of those courses — idempotent, and the
-      // per-course page does the same thing on first visit — and it returns no
-      // hidden content even for staff, because _may_see_hidden cannot scope its
-      // staff check without a course. Both are the safe directions here.
+      // page. Server-side the response is cached per user for 5 minutes and —
+      // since _course_content_view_tags — tagged with every course the user is
+      // enrolled in, so a tutor grading in any of them evicts it immediately.
+      // Without those tags the entry carried no course tag at all and kept
+      // serving the pre-grade answer for the rest of its TTL.
+      //
+      // Two more consequences worth knowing: on a cache MISS this also
+      // provisions any missing submission groups across those courses
+      // (idempotent, and the per-course page does the same on first visit), and
+      // it returns no hidden content even for staff, because _may_see_hidden
+      // cannot scope its staff check without a course. Both are safe here.
       studentsClient
         .studentListCourseContentsEndpointStudentsCourseContentsGet({ limit: 500 })
         .catch(() => []),
@@ -109,10 +115,10 @@ export default function DashboardPage() {
             loading
               ? undefined
               : attention.length > 0
-                ? `${attention.length} ${attention.length === 1 ? 'assignment needs' : 'assignments need'} your attention.`
+                ? `${attention.length} ${attention.length === 1 ? 'assignment' : 'assignments'} sent back by a tutor.`
                 : courses.length === 0
                   ? "You're not enrolled in any courses yet."
-                  : 'Nothing needs your attention right now.'
+                  : 'Nothing is waiting on you right now.'
           }
         />
 
@@ -151,7 +157,7 @@ export default function DashboardPage() {
 
             {attention.length > 0 && (
               <section>
-                <SectionHeading title="Needs your attention" />
+                <SectionHeading title="Sent back for correction" />
                 <NeedsAttention items={attention} />
               </section>
             )}
