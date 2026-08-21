@@ -118,20 +118,17 @@ async def _build_result_payload(result, detailed: bool):
     )
 
 
-def _fetch_grades_and_latest_artifact(
-    submission_group, db: Session,
-) -> Tuple[List[SubmissionGroupGradingList], Optional[object]]:
-    """Return ``(gradings_list, latest_submission_artifact_id)`` for a group.
+def _fetch_latest_submitted_artifact_id(submission_group, db: Session):
+    """Id of the group's most recent artifact with ``submit=True`` (or None).
 
-    The "latest submission artifact" is the most recent artifact with
-    ``submit=True``; the listing's headline grade attaches to it (see
-    ``_fetch_latest_grade_for_artifact``).
+    The listing's headline grade attaches to this artifact, not to whatever was
+    graded most recently — see ``_fetch_latest_grade_for_artifact``.
     """
     if submission_group is None:
-        return [], None
+        return None
 
     latest_submission = (
-        db.query(SubmissionArtifact)
+        db.query(SubmissionArtifact.id)
         .filter(
             SubmissionArtifact.submission_group_id == submission_group.id,
             SubmissionArtifact.submit == True,  # noqa: E712 — SQLAlchemy column comparison
@@ -139,6 +136,19 @@ def _fetch_grades_and_latest_artifact(
         .order_by(SubmissionArtifact.created_at.desc())
         .first()
     )
+    return latest_submission[0] if latest_submission else None
+
+
+def _fetch_grading_history(submission_group, db: Session) -> List[SubmissionGroupGradingList]:
+    """Every grade on every artifact of ``submission_group``, newest first.
+
+    Only the *detail* DTO carries this — ``SubmissionGroupStudentList`` has no
+    ``gradings`` field, so calling it on a listing loads every grade of every
+    group and throws the result away. Guard it with ``detailed`` at the call
+    site; on a 172-row dashboard that was 302 wasted queries.
+    """
+    if submission_group is None:
+        return []
 
     grades = (
         db.query(SubmissionGrade)
@@ -152,7 +162,7 @@ def _fetch_grades_and_latest_artifact(
         .all()
     )
 
-    gradings = [
+    return [
         SubmissionGroupGradingList(
             id=str(grade.id),
             submission_group_id=str(submission_group.id),
@@ -171,7 +181,79 @@ def _fetch_grades_and_latest_artifact(
         )
         for grade in grades
     ]
-    return gradings, (latest_submission.id if latest_submission else None)
+
+
+class SubmissionGroupPrefetch:
+    """Per-group lookups for a whole listing, resolved in two queries.
+
+    ``course_member_course_content_result_mapper`` needs, for each submission
+    group, the latest submitted artifact and the latest grade on it. Asked one
+    row at a time that is two round trips per row — 302 of them on a 172-row
+    dashboard — for data the database can return in two.
+
+    The single-row paths (``get_course_content``) pass no prefetch and keep the
+    direct queries; there is nothing to batch over.
+    """
+
+    __slots__ = ("_latest_artifact_by_group", "_latest_grade_by_artifact")
+
+    def __init__(self, latest_artifact_by_group: dict, latest_grade_by_artifact: dict):
+        self._latest_artifact_by_group = latest_artifact_by_group
+        self._latest_grade_by_artifact = latest_grade_by_artifact
+
+    def latest_artifact_id(self, submission_group):
+        if submission_group is None:
+            return None
+        return self._latest_artifact_by_group.get(submission_group.id)
+
+    def latest_grade(self, artifact_id) -> Optional[SubmissionGrade]:
+        if artifact_id is None:
+            return None
+        return self._latest_grade_by_artifact.get(artifact_id)
+
+
+def build_submission_group_prefetch(submission_group_ids, db: Session) -> SubmissionGroupPrefetch:
+    """Resolve latest-submitted-artifact and latest-grade for many groups at once.
+
+    ``DISTINCT ON`` is the Postgres way to say "one row per group, the newest";
+    this codebase is Postgres-only (ltree, JSONB) so it is available.
+    """
+    group_ids = [gid for gid in submission_group_ids if gid is not None]
+    if not group_ids:
+        return SubmissionGroupPrefetch({}, {})
+
+    latest_artifacts = (
+        db.query(SubmissionArtifact.submission_group_id, SubmissionArtifact.id)
+        .filter(
+            SubmissionArtifact.submission_group_id.in_(group_ids),
+            SubmissionArtifact.submit == True,  # noqa: E712 — SQLAlchemy column comparison
+        )
+        .distinct(SubmissionArtifact.submission_group_id)
+        .order_by(
+            SubmissionArtifact.submission_group_id,
+            SubmissionArtifact.created_at.desc(),
+        )
+        .all()
+    )
+    latest_artifact_by_group = {group_id: artifact_id for group_id, artifact_id in latest_artifacts}
+
+    artifact_ids = list(latest_artifact_by_group.values())
+    latest_grade_by_artifact = {}
+    if artifact_ids:
+        grades = (
+            db.query(SubmissionGrade)
+            .filter(SubmissionGrade.artifact_id.in_(artifact_ids))
+            .options(
+                joinedload(SubmissionGrade.graded_by).joinedload(CourseMember.user),
+                joinedload(SubmissionGrade.graded_by).joinedload(CourseMember.course_role),
+            )
+            .distinct(SubmissionGrade.artifact_id)
+            .order_by(SubmissionGrade.artifact_id, SubmissionGrade.graded_at.desc())
+            .all()
+        )
+        latest_grade_by_artifact = {grade.artifact_id: grade for grade in grades}
+
+    return SubmissionGroupPrefetch(latest_artifact_by_group, latest_grade_by_artifact)
 
 
 def _fetch_latest_grade_for_artifact(artifact_id, db: Session) -> Optional[SubmissionGrade]:
@@ -257,6 +339,7 @@ async def course_member_course_content_result_mapper(
     course_member_course_content_result: CourseMemberCourseContentQueryResult,
     db: Session,
     detailed: bool = False,
+    prefetch: Optional[SubmissionGroupPrefetch] = None,
 ):
     """Map a query result to a CourseContentStudent DTO.
 
@@ -282,12 +365,20 @@ async def course_member_course_content_result_mapper(
     repository = _build_repository(submission_group)
     result_payload = await _build_result_payload(qr.result, detailed)
 
-    gradings_payload, latest_artifact_id = _fetch_grades_and_latest_artifact(submission_group, db)
+    # Listings have nowhere to put a grading history, so do not pay for one:
+    # only the detail DTO has a ``gradings`` field.
+    gradings_payload = _fetch_grading_history(submission_group, db) if detailed else []
 
-    # The headline grade in the listing follows the *latest submitted artifact*,
-    # not just the most-recent grade overall — students should see the verdict
-    # on what they actually submitted, not on a prior attempt.
-    latest_grade = _fetch_latest_grade_for_artifact(latest_artifact_id, db)
+    # The headline grade follows the *latest submitted artifact*, not just the
+    # most-recent grade overall — students should see the verdict on what they
+    # actually submitted, not on a prior attempt. A listing resolves both from
+    # the batch its caller built; a single row asks directly.
+    if prefetch is not None:
+        latest_artifact_id = prefetch.latest_artifact_id(submission_group)
+        latest_grade = prefetch.latest_grade(latest_artifact_id)
+    else:
+        latest_artifact_id = _fetch_latest_submitted_artifact_id(submission_group, db)
+        latest_grade = _fetch_latest_grade_for_artifact(latest_artifact_id, db)
     if latest_grade is not None:
         latest_grading_value = latest_grade.grade
         latest_status_value = latest_grade.status
