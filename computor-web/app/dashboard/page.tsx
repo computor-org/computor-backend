@@ -11,7 +11,10 @@ import Badge from '@/src/components/Badge';
 import { ButtonLink } from '@/src/components/ui/Button';
 import CourseCard, { ViewCourseLink } from '@/src/components/courses/CourseCard';
 import WorkspaceStatusBadge, { categorizeStatus } from '@/src/components/workspaces/WorkspaceStatusBadge';
-import NeedsAttention, { selectNeedsAttention } from '@/src/components/dashboard/NeedsAttention';
+import NeedsAttention, {
+  DEFAULT_REASONS,
+  selectNeedsAttention,
+} from '@/src/components/dashboard/NeedsAttention';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
@@ -72,13 +75,25 @@ export default function DashboardPage() {
       // Without those tags the entry carried no course tag at all and kept
       // serving the pre-grade answer for the rest of its TTL.
       //
+      // `status` narrows that to the handful of rows this page can actually
+      // render. Unfiltered it fetched every course content the student can see
+      // — 172 rows and 455KB on a real account — to draw a list of two, reading
+      // about a tenth of the fields. The filter runs in SQL, so the rows are
+      // never built; DEFAULT_REASONS is passed rather than hardcoded so the
+      // server and `selectNeedsAttention` cannot drift apart. The client-side
+      // filter below stays as the source of truth for ordering and for
+      // excluding units (whose status is aggregated from these very rows).
+      //
       // Two more consequences worth knowing: on a cache MISS this also
       // provisions any missing submission groups across those courses
       // (idempotent, and the per-course page does the same on first visit), and
       // it returns no hidden content even for staff, because _may_see_hidden
       // cannot scope its staff check without a course. Both are safe here.
       studentsClient
-        .studentListCourseContentsEndpointStudentsCourseContentsGet({ limit: 500 })
+        .studentListCourseContentsEndpointStudentsCourseContentsGet({
+          limit: 500,
+          status: DEFAULT_REASONS.join(','),
+        })
         .catch(() => []),
       coderClient
         .listWorkspaces()
