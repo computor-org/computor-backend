@@ -752,6 +752,7 @@ export interface CourseContentStudentQuery {
   path?: string | null;
   course_id?: string | null;
   course_content_type_id?: string | null;
+  status?: string | null;
   directory?: string | null;
   project?: string | null;
   provider_url?: string | null;
