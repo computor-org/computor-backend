@@ -251,6 +251,41 @@ body {
 }
 
 /*
+ * Rendered markdown — assignment descriptions, the consent document.
+ *
+ * @tailwindcss/typography ships fixed grey scales (`prose-gray`, `prose-slate`)
+ * that know nothing about the theme, so on a dark page the body text kept its
+ * gray-700 and read as washed out against the panel behind it. Binding the
+ * plugin's own variables to our tokens themes every markdown block at once,
+ * which is what the design spec asks for instead of a `dark:` variant per call
+ * site.
+ *
+ * A plain `.prose { … }` rule here does NOT work: `prose` is a registered
+ * Tailwind utility and the compiler drops the user rule that shadows it. Hence
+ * our own class, written alongside it — `class="prose markdown"`. Being
+ * unlayered it also outranks the plugin's `@layer utilities` output, so the
+ * `prose-*` palette modifiers are redundant and should be left off.
+ */
+.markdown {
+  --tw-prose-body: var(--c-body);
+  --tw-prose-headings: var(--c-fg);
+  --tw-prose-lead: var(--c-muted);
+  --tw-prose-links: var(--c-accent-text);
+  --tw-prose-bold: var(--c-fg);
+  --tw-prose-counters: var(--c-muted);
+  --tw-prose-bullets: var(--c-faint);
+  --tw-prose-hr: var(--c-rule);
+  --tw-prose-quotes: var(--c-fg);
+  --tw-prose-quote-borders: var(--c-rule);
+  --tw-prose-captions: var(--c-muted);
+  --tw-prose-code: var(--c-fg);
+  --tw-prose-pre-code: var(--c-fg);
+  --tw-prose-pre-bg: var(--c-sunken);
+  --tw-prose-th-borders: var(--c-rule-strong);
+  --tw-prose-td-borders: var(--c-rule);
+}
+
+/*
  * Scrollbar styling for the app's internal scroll areas.
  *
  * Opt-in (a utility, not a `*` rule) on purpose: nearly every route funnels

@@ -140,7 +140,7 @@ export default function AssignmentDetailPage() {
 
             <SectionCard title="Description">
               {description ? (
-                <div className="prose prose-slate max-w-none">
+                <div className="prose markdown max-w-none">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{description}</ReactMarkdown>
                 </div>
               ) : (

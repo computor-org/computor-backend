@@ -126,7 +126,7 @@ export default function CourseContentDetailPage() {
 
             <SectionCard title="Description">
               {content.description ? (
-                <div className="prose prose-slate max-w-none">
+                <div className="prose markdown max-w-none">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{content.description}</ReactMarkdown>
                 </div>
               ) : (
