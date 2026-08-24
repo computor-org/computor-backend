@@ -146,6 +146,8 @@ class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
         # on the table and `title` is that endpoint's ORDER BY. Partial, so
         # only the handful of public rows are ever indexed.
         Index('ix_course_public_title', 'title', postgresql_where=text('public')),
+        # The organization permission filter resolves accessible courses by owner.
+        Index('course_organization_idx', 'organization_id'),
     )
 
     properties = Column(JSONB)
@@ -193,7 +195,10 @@ class CourseContentType(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __table_args__ = (
         CheckConstraint("(slug)::text ~* '^[A-Za-z0-9_-]+$'::text"),
         Index('course_content_type_course_id_key', 'id', 'course_id', unique=True),
-        Index('course_content_type_slug_key', 'slug', 'course_id', 'course_content_kind_id', unique=True)
+        Index('course_content_type_slug_key', 'slug', 'course_id', 'course_content_kind_id', unique=True),
+        # Neither index above leads with course_id, so "the types of this course"
+        # — asked on every content listing — could not use either.
+        Index('course_content_type_course_idx', 'course_id'),
     )
 
     properties = Column(JSONB)
@@ -236,6 +241,8 @@ class CourseContent(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
                            ondelete='RESTRICT', onupdate='RESTRICT'),
         Index('course_content_path_key', 'course_id', 'path', unique=True),
         CheckConstraint("path::text ~ '^[a-z0-9_]+(\\.[a-z0-9_]+)*$'", name='course_content_path_format'),
+        # Joined to course_content_type on every content read.
+        Index('course_content_course_content_type_idx', 'course_content_type_id'),
         # Note: Example-submittable validation is enforced by database trigger
         # validate_course_content_example_submittable_trigger
     )
@@ -335,7 +342,11 @@ class CourseMember(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
         ForeignKeyConstraint(['course_id', 'course_group_id'], 
                            ['course_group.course_id', 'course_group.id'], 
                            ondelete='RESTRICT', onupdate='RESTRICT'),
-        Index('course_member_key', 'user_id', 'course_id', unique=True)
+        Index('course_member_key', 'user_id', 'course_id', unique=True),
+        # Tutor views filter a roster down to one group; the role filter is what
+        # every course-scoped permission subquery narrows on.
+        Index('course_member_course_group_idx', 'course_group_id'),
+        Index('course_member_course_role_idx', 'course_role_id'),
     )
 
     properties = Column(JSONB)
@@ -370,6 +381,13 @@ class CourseMember(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
 
 class SubmissionGroup(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'submission_group'
+    __table_args__ = (
+        # This table carried nothing but its primary key. Both foreign keys are
+        # joined on in the student, tutor and lecturer content reads — every one
+        # of them was a sequential scan over the whole table.
+        Index('submission_group_course_content_idx', 'course_content_id'),
+        Index('submission_group_course_idx', 'course_id'),
+    )
 
     properties = Column(JSONB)  # Should contain gitlab/git repository info
     # Removed: status and grading - moved to SubmissionGrade
@@ -444,6 +462,12 @@ class SubmissionGroupMember(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __table_args__ = (
         # Only keep the constraint that makes sense: unique member per submission group
         Index('submission_group_member_key', 'submission_group_id', 'course_member_id', unique=True),
+        # The unique index above cannot answer "which groups is this member in" —
+        # course_member_id is not its leading column — and that is the single most
+        # common student lookup. It also makes deleting a course_member cheap:
+        # that foreign key is ON DELETE RESTRICT, so Postgres had to scan this
+        # whole table to prove the member was unreferenced.
+        Index('submission_group_member_course_member_idx', 'course_member_id'),
     )
 
     properties = Column(JSONB)

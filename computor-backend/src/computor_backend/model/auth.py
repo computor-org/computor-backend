@@ -121,6 +121,9 @@ class StudentProfile(Base):
     __table_args__ = (
         # Composite unique constraint: one profile per user per organization
         Index('uq_student_profile_user_org', 'user_id', 'organization_id', unique=True),
+        # The unique index leads with user_id, so an organization-scoped profile
+        # lookup (the grading views resolve student ids that way) could not use it.
+        Index('student_profile_organization_idx', 'organization_id'),
     )
 
     id = Column(UUID, primary_key=True, server_default=text("uuid_generate_v4()"))
