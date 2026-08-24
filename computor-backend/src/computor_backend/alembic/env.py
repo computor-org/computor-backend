@@ -2,6 +2,7 @@ from logging.config import fileConfig
 import os
 
 from sqlalchemy import engine_from_config, create_engine
+from sqlalchemy.engine import URL
 from sqlalchemy import pool
 
 from alembic import context
@@ -70,8 +71,19 @@ def run_migrations_online() -> None:
     POSTGRES_PASSWORD = os.environ.get("POSTGRES_PASSWORD")
     POSTGRES_DB = os.environ.get("POSTGRES_DB")
 
-    connectable = create_engine(f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}")
-    #connectable = create_engine(f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_URL}/{POSTGRES_DB}")
+    # URL.create rather than an f-string: a password containing @ / % or : is a
+    # perfectly ordinary generated secret, and interpolating it produces a URL
+    # that either fails to parse or silently connects somewhere else.
+    connectable = create_engine(
+        URL.create(
+            "postgresql",
+            username=POSTGRES_USER,
+            password=POSTGRES_PASSWORD,
+            host=POSTGRES_HOST,
+            port=int(POSTGRES_PORT) if POSTGRES_PORT else None,
+            database=POSTGRES_DB,
+        )
+    )
                             
     # connectable = engine_from_config(
     #     config.get_section(config.config_ini_section, {}),
