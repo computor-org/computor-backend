@@ -27,6 +27,7 @@ from computor_backend.permissions.auth import (
 from computor_backend.permissions.principal import Principal
 import httpx
 from fastapi import APIRouter, Depends, Response
+from starlette.concurrency import run_in_threadpool
 
 from computor_backend.exceptions import RateLimitException, ServiceUnavailableException
 from computor_backend.redis_cache import get_redis_client
@@ -202,7 +203,13 @@ async def provision_student_repository_endpoint(
     which invalidates the previous token, so the client must then update the
     remotes of all its clones on that server.
     """
-    return provision_student_repository(course_id, permissions, db, rotate=rotate)
+    # Off the event loop: this issues blocking HTTP to the git server, including
+    # a Forgejo `POST /repos/migrate` that clones the template server-side (30s
+    # timeout) or a GitLab fork poll of up to 30 seconds. Run inline it would
+    # stall every other request this worker is serving for that whole time.
+    return await run_in_threadpool(
+        provision_student_repository, course_id, permissions, db, rotate=rotate
+    )
 
 
 @user_router.post(
@@ -242,7 +249,9 @@ async def register_gitlab_managed_endpoint(
     a Maintainer on their repo (Reporter on the template). Provisions the repo
     first if needed. Idempotent.
     """
-    return register_gitlab_managed_access(
+    # Off the event loop: blocking python-gitlab calls, including a fork poll.
+    return await run_in_threadpool(
+        register_gitlab_managed_access,
         course_id,
         payload.provider_access_token if payload else None,
         permissions,
@@ -268,7 +277,8 @@ async def template_access_endpoint(
     cannot push. `token` is null until the member's first git-server SSO login
     (re-call afterwards). Managed-Forgejo courses only.
     """
-    return get_template_access(course_id, permissions, db)
+    # Off the event loop: mints the token over blocking HTTP to Forgejo.
+    return await run_in_threadpool(get_template_access, course_id, permissions, db)
 
 
 @user_router.get("/courses/{course_id}/template/archive")

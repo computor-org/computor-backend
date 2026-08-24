@@ -29,7 +29,16 @@ def _decrypt_or_none(encrypted: Optional[str]) -> Optional[str]:
     try:
         return decrypt_secret(encrypted)
     except Exception as e:
-        logger.warning(f"Could not decrypt git token: {e}")
+        # "Stored but undecryptable" is a different problem from "not stored":
+        # it almost always means TOKEN_SECRET drifted between the value being
+        # written and this process. Downstream both look like "no token", and
+        # the push then fails unauthenticated with a confusing error — so say
+        # loudly which one this is.
+        logger.error(
+            "A git token is stored but could not be decrypted (%s). This usually means "
+            "TOKEN_SECRET differs from the one used to store it; the operation will "
+            "proceed as if no token were configured.", e
+        )
         return None
 
 

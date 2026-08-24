@@ -313,6 +313,23 @@ class ForgejoProviderClient:
         )
         return False
 
+    def remove_collaborator(self, owner: str, repo: str, username: str) -> bool:
+        """Revoke a user's collaborator access on a repo.
+
+        Used when a member is removed from a course: without it they keep write
+        access to the repository indefinitely. A 404 counts as success — the
+        grant (or the repo) already being gone is the state we wanted.
+        """
+        with self._client() as client:
+            r = client.delete(f"{_BASE}/repos/{owner}/{repo}/collaborators/{username}")
+        if r.status_code in (204, 404):
+            return True
+        logger.warning(
+            "Forgejo: could not remove collaborator %s from %s/%s (status %s)",
+            username, owner, repo, r.status_code,
+        )
+        return False
+
     def mint_user_clone_token(
         self,
         username: str,

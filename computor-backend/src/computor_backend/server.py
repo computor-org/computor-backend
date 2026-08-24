@@ -476,8 +476,12 @@ organization_router.register_routes(app, skip={"delete"})
 course_family_router.register_routes(app, skip={"delete"})
 CrudRouter(CourseGroupInterface).register_routes(app)
 from computor_backend.interfaces.course_member import guard_course_member_delete
+from computor_backend.business_logic.course_git import revoke_course_member_git_access
 _course_member_router = CrudRouter(CourseMemberInterface)
 _course_member_router.pre_delete.append(guard_course_member_delete)
+# Order matters: the guard may refuse the deletion, and we must not have revoked
+# anyone's access before knowing it goes ahead.
+_course_member_router.pre_delete.append(revoke_course_member_git_access)
 _course_member_router.register_routes(app)
 LookUpRouter(CourseRoleInterface).register_routes(app)
 LookUpRouter(OrganizationRoleInterface).register_routes(app)
