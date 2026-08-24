@@ -308,7 +308,7 @@ def build_steps(students: int, assignments: int) -> list[tuple[str, str]]:
         ("result", f"""
             INSERT INTO result (id, course_member_id, submission_artifact_id, submission_group_id,
                                 course_content_id, course_content_type_id, version_identifier,
-                                status, test_system_id, grade, created_at)
+                                status, test_system_id, result, grade, created_at)
             SELECT md5('bench:res:' || c || ':' || a || ':' || s || ':' || n || ':' || r)::uuid,
                    CASE WHEN s = 0 THEN md5('bench:cm:' || c || ':0')::uuid
                         ELSE md5('bench:cm:' || c || ':' || (c * {per_course_users} + s))::uuid END,
@@ -319,6 +319,7 @@ def build_steps(students: int, assignments: int) -> list[tuple[str, str]]:
                    substr(md5('bench:rver:' || c || ':' || a || ':' || s || ':' || n || ':' || r), 1, 40),
                    CASE WHEN r = 0 THEN 1 ELSE 0 END,
                    'bench-test-system',
+                   (s % 10) / 10.0,
                    (s % 10) / 10.0,
                    timestamptz '2026-01-01 12:00:00+00'
                      + (((((c * {assignments} + a) * {students} + s) * 2 + n) * 2 + r) * interval '1 second')
