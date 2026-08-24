@@ -30,6 +30,13 @@ computor-web/.playwright/
 __pycache__
 .vscode
 tmp/
+
+# Snapshots produced by extract_system.sh: a full pg_dump (password hashes,
+# encrypted tokens, personal data) plus mirrored MinIO buckets. This repo is
+# public — these must never be committed.
+computor_export/
+computor_export.tar.gz
+computor_export*.tar.gz
 **.egg-info/
 .prefectignore
 **/venv/**
