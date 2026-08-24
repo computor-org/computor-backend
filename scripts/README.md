@@ -5,6 +5,7 @@ depends on live under `ops/` (see [`ops/README.md`](../ops/README.md)).
 
 | Path | Purpose |
 |------|---------|
+| `bench/` | SQL benchmarks: a synthetic dataset in a throwaway `computor_bench` database plus a timing harness for the hot read queries. Details in [`bench/README.md`](bench/README.md) |
 | `check_forbidden_imports.py` | Architecture guard: blocks backend-only imports (fastapi, sqlalchemy, `computor_backend`, …) in `computor-types`/`computor-cli`/`computor-client`. Run by the pre-commit hook; manual: `python3 scripts/check_forbidden_imports.py` |
 | `git-hooks/` | Pre-commit hook (secret scanning + the import guard above). Install once: `bash scripts/git-hooks/install-hooks.sh` — details in [`git-hooks/README.md`](git-hooks/README.md) |
 | `utilities/ensure_venv.sh` | `ensure_venv()` helper that auto-activates `.venv`; sourced by `generate.sh` and `seed.sh` |
