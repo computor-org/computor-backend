@@ -199,6 +199,29 @@ async def get_entity_by_id(
 
 
 @lru_cache(maxsize=None)
+def _pagination_tiebreaker(model: Any) -> tuple:
+    """Primary key columns, appended to a paginated list's ORDER BY.
+
+    LIMIT/OFFSET over an unordered query is not pagination — SQL guarantees no
+    row order without an ORDER BY, so Postgres is free to return the same rows
+    in a different order for page 1 and page 2. Most of the list interfaces
+    define no ordering at all, which meant paging a roster could show one
+    member twice and never show another.
+
+    Appended rather than substituted: it goes after whatever ordering the
+    interface already asked for, so it cannot reorder rows that differ on those
+    columns — it only decides ties, which the interfaces that order by
+    ``position`` or ``path`` also have.
+    """
+    try:
+        return tuple(inspect(model).primary_key)
+    except Exception:
+        # Not a mapped class (test doubles reach here). Ordering is a
+        # correctness improvement we can only make when we know the key.
+        return ()
+
+
+@lru_cache(maxsize=None)
 def _list_eager_relationships(model: Any, list_dto: Any) -> tuple[str, ...]:
     """Relationship names a ``list`` DTO reads off its model.
 
@@ -265,6 +288,7 @@ async def list_entities(
     query = query_func(db, query, params)
 
     eager = _list_eager_relationships(db_type, interface.list)
+    tiebreaker = _pagination_tiebreaker(db_type)
 
     # Wrap blocking pagination queries in threadpool
     def _get_paginated_results():
@@ -277,6 +301,8 @@ async def list_entities(
             paginated_query = paginated_query.options(
                 *(selectinload(getattr(db_type, name)) for name in eager)
             )
+        if tiebreaker:
+            paginated_query = paginated_query.order_by(*tiebreaker)
         if params.limit is not None:
             paginated_query = paginated_query.limit(params.limit)
         if params.skip is not None:

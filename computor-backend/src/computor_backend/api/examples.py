@@ -383,20 +383,24 @@ async def list_versions(
             version = version_repo.find_by_version_tag(example_id, normalized_tag)
             versions = [version] if version else []
     else:
-        # Get all versions for example
-        versions = version_repo.find_by_example(example_id)
+        # Paginate in SQL, not by slicing a fully materialised list. An example
+        # with a long release history had every one of its versions loaded and
+        # validated so that all but one page could be thrown away.
+        skip = params.skip if params else None
+        limit = params.limit if params else None
+        versions = version_repo.find_by_example(example_id, limit=limit, skip=skip)
+        total = version_repo.count_by_example(example_id)
+        return paginated_list(
+            [ExampleVersionList.model_validate(v) for v in versions],
+            total,
+            response=response,
+        )
 
-    # Convert to response model
+    # The version_tag branches above resolve at most one version, so there is
+    # nothing to page through; report it as a one-row result.
     result = [ExampleVersionList.model_validate(v) for v in versions]
 
-    # Apply the skip/limit the endpoint accepts (ExampleVersionQuery extends
-    # ListQuery) and stamp X-Total-Count. Previously these params were silently
-    # ignored and the full, unbounded list was returned.
-    total = len(result)
-    skip = params.skip or 0
-    page = result[skip:skip + params.limit] if params.limit is not None else result[skip:]
-
-    return paginated_list(page, total, response=response)
+    return paginated_list(result, len(result), response=response)
 
 @examples_router.get("/versions/{version_id}", response_model=ExampleVersionGet)
 async def get_version(
