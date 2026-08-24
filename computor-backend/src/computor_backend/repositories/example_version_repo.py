@@ -197,12 +197,19 @@ class ExampleVersionRepository(BaseRepository[ExampleVersion]):
     # Specialized queries
     # ========================================================================
 
-    def find_by_example(self, example_id: str | UUID) -> List[ExampleVersion]:
+    def find_by_example(
+        self,
+        example_id: str | UUID,
+        limit: Optional[int] = None,
+        skip: Optional[int] = None,
+    ) -> List[ExampleVersion]:
         """
-        Find all versions of an example.
+        Find versions of an example.
 
         Args:
             example_id: Example identifier
+            limit: Maximum number of versions to return (None = all)
+            skip: Number of versions to skip
 
         Returns:
             List of example versions ordered by version_number descending
@@ -211,7 +218,18 @@ class ExampleVersionRepository(BaseRepository[ExampleVersion]):
             ExampleVersion.example_id == str(example_id)
         ).order_by(ExampleVersion.version_number.desc())
 
+        if skip:
+            query = query.offset(skip)
+        if limit is not None:
+            query = query.limit(limit)
+
         return query.all()
+
+    def count_by_example(self, example_id: str | UUID) -> int:
+        """How many versions an example has, without loading any of them."""
+        return self.db.query(ExampleVersion).filter(
+            ExampleVersion.example_id == str(example_id)
+        ).count()
 
     def find_by_version_tag(
         self,
