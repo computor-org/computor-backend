@@ -298,23 +298,38 @@ async def list_submission_artifacts(
         SubmissionArtifact.created_at.desc()
     ).limit(params.limit).offset(params.skip).all()
 
+    # The latest finished result for the whole page in one statement, rather
+    # than one query per artifact. DISTINCT ON is how Postgres says "the newest
+    # row per group"; ``id`` joins the ordering as a tiebreaker because two
+    # results for one artifact can share a created_at, and without it which one
+    # was "latest" depended on the plan.
+    latest_result_by_artifact = {}
+    if with_latest_result and artifacts:
+        latest_rows = (
+            db.query(Result)
+            .filter(
+                Result.submission_artifact_id.in_([artifact.id for artifact in artifacts]),
+                Result.status == 0,  # FINISHED status
+            )
+            .distinct(Result.submission_artifact_id)
+            .order_by(
+                Result.submission_artifact_id,
+                Result.created_at.desc(),
+                Result.id.desc(),
+            )
+            .all()
+        )
+        latest_result_by_artifact = {row.submission_artifact_id: row for row in latest_rows}
+
     # Build response with optional latest result
     result_list = []
     for artifact in artifacts:
         artifact_dto = SubmissionArtifactList.model_validate(artifact, from_attributes=True)
 
-        # Fetch latest successful result if requested
-        if with_latest_result:
-            latest_result = db.query(Result).filter(
-                Result.submission_artifact_id == artifact.id,
-                Result.status == 0  # FINISHED status
-            ).order_by(
-                Result.created_at.desc()
-            ).first()
-
-            if latest_result:
-                from computor_types.results import ResultList
-                artifact_dto.latest_result = ResultList.model_validate(latest_result, from_attributes=True)
+        latest_result = latest_result_by_artifact.get(artifact.id)
+        if latest_result is not None:
+            from computor_types.results import ResultList
+            artifact_dto.latest_result = ResultList.model_validate(latest_result, from_attributes=True)
 
         result_list.append(artifact_dto)
 
