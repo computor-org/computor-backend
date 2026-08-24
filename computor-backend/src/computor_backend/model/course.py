@@ -193,7 +193,7 @@ class CourseContentType(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __table_args__ = (
         CheckConstraint("(slug)::text ~* '^[A-Za-z0-9_-]+$'::text"),
         Index('course_content_type_course_id_key', 'id', 'course_id', unique=True),
-        Index('course_content_type_slug_key', 'slug', 'course_id', 'course_content_kind_id', unique=True)
+        Index('course_content_type_slug_key', 'slug', 'course_id', 'course_content_kind_id', unique=True),
     )
 
     properties = Column(JSONB)
@@ -335,7 +335,13 @@ class CourseMember(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
         ForeignKeyConstraint(['course_id', 'course_group_id'], 
                            ['course_group.course_id', 'course_group.id'], 
                            ondelete='RESTRICT', onupdate='RESTRICT'),
-        Index('course_member_key', 'user_id', 'course_id', unique=True)
+        Index('course_member_key', 'user_id', 'course_id', unique=True),
+        # Tutor rosters, message audiences and the websocket fan-out all filter
+        # a course's members down to one group, with nothing else to narrow on.
+        # (An index on course_role_id was measured too and dropped: that filter
+        # never appears without user_id or course_id beside it, and those
+        # indexes always win the plan.)
+        Index('course_member_course_group_idx', 'course_group_id'),
     )
 
     properties = Column(JSONB)
@@ -370,6 +376,13 @@ class CourseMember(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
 
 class SubmissionGroup(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'submission_group'
+    __table_args__ = (
+        # This table carried nothing but its primary key. Both foreign keys are
+        # joined on in the student, tutor and lecturer content reads — every one
+        # of them was a sequential scan over the whole table.
+        Index('submission_group_course_content_idx', 'course_content_id'),
+        Index('submission_group_course_idx', 'course_id'),
+    )
 
     properties = Column(JSONB)  # Should contain gitlab/git repository info
     # Removed: status and grading - moved to SubmissionGrade
@@ -444,6 +457,12 @@ class SubmissionGroupMember(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __table_args__ = (
         # Only keep the constraint that makes sense: unique member per submission group
         Index('submission_group_member_key', 'submission_group_id', 'course_member_id', unique=True),
+        # The unique index above cannot answer "which groups is this member in" —
+        # course_member_id is not its leading column — and that is the single most
+        # common student lookup. It also makes deleting a course_member cheap:
+        # that foreign key is ON DELETE RESTRICT, so Postgres had to scan this
+        # whole table to prove the member was unreferenced.
+        Index('submission_group_member_course_member_idx', 'course_member_id'),
     )
 
     properties = Column(JSONB)

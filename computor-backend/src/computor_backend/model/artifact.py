@@ -28,6 +28,14 @@ class SubmissionArtifact(Base):
         Index('submission_artifact_uploaded_at_idx', 'uploaded_at'),
         Index('submission_artifact_version_idx', 'version_identifier'),
         Index('submission_artifact_group_version_idx', 'submission_group_id', 'version_identifier'),
+        # "The latest submitted artifact per group" is the shape every grading
+        # read starts from. Partial on ``submit`` so only official submissions
+        # are indexed, and ordered so the aggregate reads straight off the index.
+        # ``id`` is in the key for the same reason view_mappers orders by it:
+        # two artifacts in a group can share a created_at.
+        Index('submission_artifact_submitted_latest_idx',
+              'submission_group_id', text('created_at DESC'), text('id DESC'),
+              postgresql_where=text('submit')),
         # Note: No unique constraint - allows multiple submissions with same version_identifier
     )
 
