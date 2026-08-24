@@ -2,7 +2,6 @@
 
 import { useState, type ReactNode } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
 import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
@@ -14,6 +13,11 @@ import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
+import Badge from '@/src/components/Badge';
+import DescriptionList from '@/src/components/DescriptionList';
+import SectionCard from '@/src/components/SectionCard';
+import Button, { ButtonLink } from '@/src/components/ui/Button';
+import Notice from '@/src/components/ui/Notice';
 import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import { displayName } from '@/src/utils/displayName';
 import type { StudentRepositoryProvisioned } from 'types/generated';
@@ -110,12 +114,9 @@ export default function CoursePage() {
   if (crumbs.length === 0) crumbs.push({ label: 'Courses', href: '/courses' });
   crumbs.push({ label: displayName(course, 'Untitled Course') });
 
-  const repoRow = (label: string, value: ReactNode) => (
-    <div className="flex gap-3">
-      <dt className="text-muted w-28 shrink-0">{label}</dt>
-      <dd className="text-fg min-w-0 break-all">{value}</dd>
-    </div>
-  );
+  type Fact = { term: string; value: ReactNode; mono?: boolean };
+  const facts = (items: (Fact | false | null | undefined | '')[]): Fact[] =>
+    items.filter(Boolean) as Fact[];
 
   return (
     <AuthenticatedLayout>
@@ -132,59 +133,42 @@ export default function CoursePage() {
           }
           actions={
             canManage && (
-              <Link
-                href={`/courses/${courseId}/edit`}
-                className="shrink-0 px-4 py-2 text-sm font-medium text-body border border-rule-strong rounded-lg hover:bg-canvas transition-colors"
-              >
+              <ButtonLink href={`/courses/${courseId}/edit`} variant="secondary" className="shrink-0">
                 Edit
-              </Link>
+              </ButtonLink>
             )
           }
         />
 
         <ScrollArea>
         {/* About — description + the few facts worth showing (no identifiers). */}
-        <div className="bg-surface rounded-lg border border-rule p-6">
-          <h2 className="text-lg font-semibold text-fg mb-4">About</h2>
-          {course.description && <p className="text-body mb-6">{course.description}</p>}
-          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-            {organization && (
-              <div>
-                <dt className="text-muted">Organization</dt>
-                <dd className="mt-1 text-fg">{displayName(organization)}</dd>
-              </div>
-            )}
-            {courseFamily && (
-              <div>
-                <dt className="text-muted">Course family</dt>
-                <dd className="mt-1 text-fg">{displayName(courseFamily)}</dd>
-              </div>
-            )}
-            {course.language_code && (
-              <div>
-                <dt className="text-muted">Language</dt>
-                <dd className="mt-1 text-fg uppercase">{course.language_code}</dd>
-              </div>
-            )}
-            {course.created_at && (
-              <div>
-                <dt className="text-muted">Created</dt>
-                <dd className="mt-1 text-fg">{new Date(course.created_at).toLocaleDateString()}</dd>
-              </div>
-            )}
-            {course.updated_at && (
-              <div>
-                <dt className="text-muted">Last updated</dt>
-                <dd className="mt-1 text-fg">{new Date(course.updated_at).toLocaleDateString()}</dd>
-              </div>
-            )}
-          </dl>
-        </div>
+        <SectionCard title="About">
+          {course.description && <p className="text-body">{course.description}</p>}
+          <DescriptionList
+            items={facts([
+              organization && { term: 'Organization', value: displayName(organization) },
+              courseFamily && { term: 'Course family', value: displayName(courseFamily) },
+              course.language_code && {
+                term: 'Language',
+                value: <span className="uppercase">{course.language_code}</span>,
+              },
+              course.created_at && {
+                term: 'Created',
+                value: new Date(course.created_at).toLocaleDateString(),
+              },
+              course.updated_at && {
+                term: 'Last updated',
+                value: new Date(course.updated_at).toLocaleDateString(),
+              },
+            ])}
+          />
+        </SectionCard>
 
         {/* Workspaces — launch buttons for the course's allowed templates.
             The component hides itself (card and heading included) when the
             course offers none; the role gate only avoids a guaranteed-403
-            fetch for non-members. */}
+            fetch for non-members. The card chrome is the caller's because the
+            compact variant on the courses list renders without one. */}
         {(isAdmin || courseRole(courseId) != null) && (
           <CourseWorkspaceLaunchButtons
             courseId={courseId}
@@ -197,57 +181,57 @@ export default function CoursePage() {
             uses git, then the course binding for managers. Hidden entirely for a
             student on a course that doesn't provision git. */}
         {(gitConfigured || canManageMembers) && (
-        <div className="bg-surface rounded-lg border border-rule p-6 space-y-6">
-          <h2 className="text-lg font-semibold text-fg">Git</h2>
-
+        <SectionCard title="Git">
           {/* Your repository — only when the course actually provisions git, so
               the provision button is never offered on a non-git course. */}
           {gitConfigured && (
           <div>
             <h3 className="text-sm font-semibold text-fg mb-2">Your repository</h3>
             {myRepo ? (
-              <dl className="space-y-2 text-sm">
-                {repoRow('Mode', myRepo.mode)}
-                {myRepo.provider_type && repoRow('Provider', myRepo.provider_type)}
-                {myRepo.repo_ref && repoRow('Repository', <span className="font-mono">{myRepo.repo_ref}</span>)}
-                {myRepo.web_url &&
-                  repoRow(
-                    'Web',
-                    <a href={myRepo.web_url} target="_blank" rel="noreferrer" className="text-accent-text hover:underline">
-                      {myRepo.web_url}
-                    </a>,
-                  )}
-                {myRepo.http_url && repoRow('Clone (HTTPS)', <span className="font-mono">{myRepo.http_url}</span>)}
-              </dl>
+              <DescriptionList
+                items={facts([
+                  { term: 'Mode', value: myRepo.mode },
+                  myRepo.provider_type && { term: 'Provider', value: myRepo.provider_type },
+                  myRepo.repo_ref && { term: 'Repository', value: myRepo.repo_ref, mono: true },
+                  myRepo.web_url && {
+                    term: 'Web',
+                    value: (
+                      <a href={myRepo.web_url} target="_blank" rel="noreferrer" className="text-accent-text hover:underline">
+                        {myRepo.web_url}
+                      </a>
+                    ),
+                  },
+                  myRepo.http_url && { term: 'Clone (HTTPS)', value: myRepo.http_url, mono: true },
+                ])}
+              />
             ) : (
               <p className="text-sm text-muted">
                 You don&apos;t have a repository for this course yet.
               </p>
             )}
 
-            <button
+            <Button
+              className="mt-4"
               onClick={ensureGitAccess}
-              disabled={ensuring}
-              className="mt-4 px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
+              loading={ensuring}
+              loadingLabel="Working…"
             >
-              {ensuring ? 'Working…' : myRepo ? 'Repair git access' : 'Ensure git access'}
-            </button>
+              {myRepo ? 'Repair git access' : 'Ensure git access'}
+            </Button>
             <p className="mt-2 text-xs text-muted">
               Creates or repairs your repository for this course
               {canManage ? ' — as staff this also grants access to the template and reference repos.' : '.'}
             </p>
             {provisioned?.clone_token && (
-              <div className="mt-3 p-3 rounded border border-warn-line bg-warn-wash text-sm text-warn-text">
+              <Notice tone="warning" className="mt-3">
                 <p className="font-medium">One-time clone credential — copy it now, it won&apos;t be shown again.</p>
                 <p className="mt-1">
-                  <span className="text-warn-text">Username:</span>{' '}
-                  <span className="font-mono">{provisioned.clone_username}</span>
+                  Username: <span className="font-mono">{provisioned.clone_username}</span>
                 </p>
                 <p>
-                  <span className="text-warn-text">Token:</span>{' '}
-                  <span className="font-mono break-all">{provisioned.clone_token}</span>
+                  Token: <span className="font-mono break-all">{provisioned.clone_token}</span>
                 </p>
-              </div>
+              </Notice>
             )}
           </div>
           )}
@@ -257,66 +241,52 @@ export default function CoursePage() {
             <div className="border-t border-rule-soft pt-6">
               <h3 className="text-sm font-semibold text-fg mb-2">Course configuration</h3>
               {gitBinding ? (
-                <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <dt className="text-muted">Delivery</dt>
-                    <dd className="mt-1 text-fg">{gitBinding.delivery}</dd>
-                  </div>
-                  {gitBinding.default_branch && (
-                    <div>
-                      <dt className="text-muted">Default branch</dt>
-                      <dd className="mt-1 text-fg font-mono">{gitBinding.default_branch}</dd>
-                    </div>
-                  )}
-                  {gitBinding.student_repo_modes && gitBinding.student_repo_modes.length > 0 && (
-                    <div>
-                      <dt className="text-muted">Student repos</dt>
-                      <dd className="mt-1 text-fg">{gitBinding.student_repo_modes.join(', ')}</dd>
-                    </div>
-                  )}
-                  <div>
-                    <dt className="text-muted">Status</dt>
-                    <dd className="mt-1">
-                      {gitBinding.locked ? (
-                        <span
-                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-warn-wash text-warn-text"
-                          title={gitBinding.lock_reason ?? undefined}
-                        >
+                <DescriptionList
+                  items={facts([
+                    { term: 'Delivery', value: gitBinding.delivery },
+                    gitBinding.default_branch && {
+                      term: 'Default branch',
+                      value: gitBinding.default_branch,
+                      mono: true,
+                    },
+                    gitBinding.student_repo_modes &&
+                      gitBinding.student_repo_modes.length > 0 && {
+                        term: 'Student repos',
+                        value: gitBinding.student_repo_modes.join(', '),
+                      },
+                    {
+                      term: 'Status',
+                      value: gitBinding.locked ? (
+                        <Badge tone="warning" title={gitBinding.lock_reason ?? undefined}>
                           Locked
-                        </span>
+                        </Badge>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-success-wash text-success-text">
-                          Editable
-                        </span>
-                      )}
-                    </dd>
-                  </div>
-                  {(gitBinding.template_url || gitBinding.template_repo) && (
-                    <div className="col-span-2 sm:col-span-4">
-                      <dt className="text-muted">Template</dt>
-                      <dd className="mt-1 text-fg break-all">
-                        {gitBinding.template_url ? (
-                          <a
-                            href={gitBinding.template_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-accent-text hover:underline"
-                          >
-                            {gitBinding.template_url}
-                          </a>
-                        ) : (
-                          gitBinding.template_repo
-                        )}
-                      </dd>
-                    </div>
-                  )}
-                </dl>
+                        <Badge tone="success">Editable</Badge>
+                      ),
+                    },
+                    (gitBinding.template_url || gitBinding.template_repo) && {
+                      term: 'Template',
+                      value: gitBinding.template_url ? (
+                        <a
+                          href={gitBinding.template_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-accent-text hover:underline break-all"
+                        >
+                          {gitBinding.template_url}
+                        </a>
+                      ) : (
+                        gitBinding.template_repo
+                      ),
+                    },
+                  ])}
+                />
               ) : (
                 <p className="text-sm text-muted">No git binding configured for this course.</p>
               )}
             </div>
           )}
-        </div>
+        </SectionCard>
         )}
         </ScrollArea>
       </ListPageLayout>
