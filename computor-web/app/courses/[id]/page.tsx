@@ -49,7 +49,7 @@ function CopyValue({ value }: { value: string }) {
       <span className="font-mono text-xs break-all">{value}</span>
       <Button
         size="xs"
-        variant="ghost"
+        variant="secondary"
         onClick={() =>
           navigator.clipboard
             ?.writeText(value)
@@ -269,6 +269,16 @@ export default function CoursePage() {
                   ])}
                 />
               </>
+            ) : canManageMembers ? (
+              // Staff reach this page without ever opening the course in the
+              // editor, and for them the call does something the sentence above
+              // would not explain: it re-grants their access to the canonical
+              // template and reference repositories.
+              <p className="text-sm text-muted">
+                No repository has been created for you yet. Members get one automatically the
+                first time they open the course in VS Code; Check access creates yours now and
+                re-grants your staff access to the template and reference repositories.
+              </p>
             ) : (
               <p className="text-sm text-muted">
                 Nothing to do here. Your repository is created for you the first time you open
@@ -279,7 +289,11 @@ export default function CoursePage() {
             {/* Clone details and the credential: needed only by someone working
                 outside the editor, so they are folded away rather than pushed at
                 a student who will never type a git command. */}
-            <details open={cloneOpen} onToggle={(e) => setCloneOpen(e.currentTarget.open)}>
+            <details
+              className="border-t border-rule-soft pt-4"
+              open={cloneOpen}
+              onToggle={(e) => setCloneOpen(e.currentTarget.open)}
+            >
               <summary className="cursor-pointer text-sm text-body marker:text-muted">
                 Working outside VS Code?
               </summary>
