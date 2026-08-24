@@ -29,7 +29,7 @@ const organizationsClient = new OrganizationsClient();
 const userClient = new UserClient();
 export default function CoursePage() {
   const courseId = useParams().id as string;
-  const { canManageHierarchy: canManage, isAdmin, isOrganizationManager, courseHasAtLeast, courseRole } = usePermissions();
+  const { canManageHierarchy: canManage, isAdmin, isOrganizationManager, courseHasAtLeast, courseRole, courseRoles } = usePermissions();
   const canManageMembers = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
 
   const { data, loading, error, reload } = useResource(
@@ -66,6 +66,17 @@ export default function CoursePage() {
   // The caller's own standing in this course, as a label ('Student',
   // 'Lecturer', …) or null when they hold no course role.
   const myRole = courseRole(courseId);
+
+  // Where this course's work actually happens, so the overview isn't a dead
+  // end that leaves the sidebar as the only way on. The lecturer cohort is
+  // sent to their own authoring list; a plain member to the student one. A
+  // tutor-only member has no destination while the tutor view is disabled,
+  // and then the header simply carries no primary action.
+  const workHref = canManageMembers
+    ? `/courses/${courseId}/lecturer/assignments`
+    : (courseRoles[courseId] ?? []).includes('_student')
+      ? `/courses/${courseId}/student/assignments`
+      : null;
 
   const notify = useNotify();
   const [ensuring, setEnsuring] = useState(false);
@@ -136,11 +147,16 @@ export default function CoursePage() {
             )
           }
           actions={
-            canManage && (
-              <ButtonLink href={`/courses/${courseId}/edit`} variant="secondary" className="shrink-0">
-                Edit
-              </ButtonLink>
-            )
+            <>
+              {workHref && (
+                <ButtonLink href={workHref}>Go to assignments</ButtonLink>
+              )}
+              {canManage && (
+                <ButtonLink href={`/courses/${courseId}/edit`} variant="secondary">
+                  Edit
+                </ButtonLink>
+              )}
+            </>
           }
         />
 
