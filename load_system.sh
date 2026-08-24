@@ -4,25 +4,42 @@
 # (release/2026.10) system, MIGRATE it to the release schema, and ADOPT the legacy
 # per-ORGANIZATION GitLab config into the new per-COURSE git model.
 #
-# Runs three stages, each independently skippable:
+# Runs four stages, each independently skippable:
 #   [1] RESTORE — DROP+recreate the target DB from the dump, mirror MinIO buckets.
 #                 Restores at main's schema (alembic_version = cc1d2e3f4a5b).
-#   [2] MIGRATE — `alembic upgrade head`: replays the release migrations, incl.
+#   [2] STASH   — copy organization.properties.gitlab aside BEFORE migrating.
+#                 THIS MUST HAPPEN FIRST: `alembic upgrade head` destroys the org
+#                 GitLab token and url (b1c2d3e4f5a6 moves them into a
+#                 git_provider table; f0a1b2c3d4e5 then drops that table), so
+#                 without the stash there is no credential left to bridge.
+#   [3] MIGRATE — `alembic upgrade head`: replays the release migrations, incl.
 #                 creating the git_server / course_git_binding tables.
-#   [3] ADOPT   — for every course carrying legacy `properties.gitlab`, register a
-#                 gitlab `git_server` and create a `course_git_binding` pointing at
-#                 the EXISTING student-template, copying the group token from the
-#                 course's ORGANIZATION (`organization.properties.gitlab.token`) onto
-#                 the binding. The token is decrypted with the LEGACY TOKEN_SECRET and
-#                 re-encrypted with THIS system's TOKEN_SECRET (keycove is wire-
-#                 compatible), so it works even when the two secrets differ.
-#                 DRY-RUN by default — set ADOPT_APPLY=1 to write. Adoptive only:
-#                 it NEVER calls GitLab, it just records where repos already live.
-#                 Assumes all legacy git was managed + gitlab (no forgejo).
+#   [4] ADOPT   — for every course carrying legacy `properties.gitlab`, register a
+#                 gitlab `git_server` and write a `course_git_binding` that maps the
+#                 legacy repository names onto the new model:
+#
+#                     student-template -> template_repo / template_path
+#                     assignments      -> reference_path
+#
+#                 plus the students/course/parent group ids, and the existing
+#                 student repositories as course_member_repository rows. The org
+#                 token is decrypted with the LEGACY TOKEN_SECRET and re-encrypted
+#                 with THIS system's (keycove is wire-compatible), so it works even
+#                 when the two secrets differ.
+#
+#                 DRY-RUN by default — set ADOPT_APPLY=1 to write. It contacts
+#                 GitLab only with ADOPT_RESOLVE_IDS=1, and then only to READ.
+#                 Nothing is ever created, renamed or deleted on the git server.
+#
+# The adoption itself lives in
+#   computor-backend/src/computor_backend/scripts/adopt_legacy_git.py
+# and is the same module adopt_git.sh pipes into the backend container, so the
+# mapping has exactly one implementation. Run it directly for --preflight,
+# --repair, or anything else this wrapper does not expose.
 #
 # DESTRUCTIVE to the TARGET: stage 1 DROPs and recreates the target database.
 # Auth from the TARGET system's .env. Restore uses Docker over published host ports;
-# migrate/adopt use the repo-root .venv. Needs NO psql/mc on the host.
+# stash/migrate/adopt use the repo-root .venv. Needs NO psql/mc on the host.
 #
 # Usage (from the TARGET repo root):
 #   IN_DIR=./computor_export.tar.gz bash load_system.sh                 # restore+migrate+adopt(dry-run)
@@ -33,12 +50,14 @@
 # Env knobs:
 #   FORCE=1               skip the "drop the DB?" confirmation (and the secret prompt)
 #   SKIP_RESTORE=1        skip stage 1 (DB/MinIO restore)
-#   SKIP_MIGRATE=1        skip stage 2 (alembic upgrade head)
-#   SKIP_ADOPT=1          skip stage 3 (git adoption)
-#   ADOPT_APPLY=1         stage 3 writes bindings (default: dry-run, rolled back)
+#   SKIP_MIGRATE=1        skip stages 2+3 (stash + alembic upgrade head)
+#   SKIP_ADOPT=1          skip stages 2+4 (stash + git adoption)
+#   ADOPT_APPLY=1         stage 4 writes bindings (default: dry-run, rolled back)
+#   ADOPT_RESOLVE_IDS=1   resolve GitLab project ids with READ-ONLY API calls, so
+#                         managed student provisioning works for adopted courses
 #   LEGACY_TOKEN_SECRET=  the SOURCE system's TOKEN_SECRET (to decrypt migrated
 #                         tokens). If unset you are prompted; blank = same as target's.
-#   GITLAB_BASE_URL=      override the git_server base_url (else from org properties.gitlab.url)
+#   GITLAB_BASE_URL=      override the git_server base_url (else from course/org properties)
 #   GITLAB_NAME=          display name for the registered git_server
 # ---------------------------------------------------------------------------
 set -euo pipefail
@@ -86,7 +105,7 @@ if [[ "${SKIP_RESTORE:-0}" != "1" ]]; then
     read -r -p "Proceed? type 'yes': " ans; [[ "$ans" == "yes" ]] || { echo "aborted"; exit 1; }
   fi
 
-  echo ">> [1/3] restoring database ..."
+  echo ">> [1/4] restoring database ..."
   PGPASSWORD="$POSTGRES_PASSWORD" docker run --rm --network host -e PGPASSWORD postgres:16 \
     dropdb   -h 127.0.0.1 -p "$PGPORT_VAL" -U "$PGUSER_VAL" --force --if-exists "$PGDB_VAL"
   PGPASSWORD="$POSTGRES_PASSWORD" docker run --rm --network host -e PGPASSWORD postgres:16 \
@@ -118,17 +137,39 @@ if [[ "${SKIP_RESTORE:-0}" != "1" ]]; then
       '
   fi
 else
-  echo ">> [1/3] SKIP_RESTORE=1 -> skipping DB/MinIO restore"
+  echo ">> [1/4] SKIP_RESTORE=1 -> skipping DB/MinIO restore"
 fi
 
 # ===========================================================================
-# [2] MIGRATE — replay release migrations onto the restored schema
+# [2] STASH — preserve the org GitLab credential BEFORE migrating
+#
+# `alembic upgrade head` destroys it: migration b1c2d3e4f5a6 moves
+# organization.properties.gitlab.{url,token} into a git_provider table and
+# strips them from the JSONB, and f0a1b2c3d4e5 then drops that table. Without
+# this step there is no token left to bridge onto the course bindings.
+# ===========================================================================
+ADOPT_PY="$ROOT/computor-backend/src/computor_backend/scripts/adopt_legacy_git.py"
+PY_BIN="$ROOT/.venv/bin/python"; [[ -x "$PY_BIN" ]] || PY_BIN="python3"
+export PYTHONPATH="$ROOT/computor-backend/src:$ROOT/computor-types/src${PYTHONPATH:+:$PYTHONPATH}"
+# One address for every stage: stage 3 below reads these too, and alembic builds
+# its own URL from POSTGRES_HOST/POSTGRES_PORT rather than the published port.
+export POSTGRES_HOST=127.0.0.1
+export POSTGRES_PORT="$PGPORT_VAL"
+export POSTGRES_USER="$PGUSER_VAL"
+export POSTGRES_DB="$PGDB_VAL"
+
+if [[ "${SKIP_ADOPT:-0}" != "1" && "${SKIP_MIGRATE:-0}" != "1" ]]; then
+  echo ">> [2/4] stashing the organization GitLab credential (pre-migration) ..."
+  "$PY_BIN" "$ADOPT_PY" --stash-org-git --apply
+fi
+
+# ===========================================================================
+# [3] MIGRATE — replay release migrations onto the restored schema
 # ===========================================================================
 if [[ "${SKIP_MIGRATE:-0}" != "1" ]]; then
-  echo ">> [2/3] migrating target to release head (alembic upgrade head) ..."
+  echo ">> [3/4] migrating target to release head (alembic upgrade head) ..."
   ALEMBIC_BIN="$ROOT/.venv/bin/alembic"; [[ -x "$ALEMBIC_BIN" ]] || ALEMBIC_BIN="alembic"
   ( cd "$ROOT/computor-backend/src" \
-      && export PYTHONPATH="$PWD:${PYTHONPATH:-}" \
       && cd computor_backend \
       && "$ALEMBIC_BIN" upgrade head )
   echo "   head now:"
@@ -136,167 +177,36 @@ if [[ "${SKIP_MIGRATE:-0}" != "1" ]]; then
     psql -h 127.0.0.1 -p "$PGPORT_VAL" -U "$PGUSER_VAL" -d "$PGDB_VAL" -tAc "SELECT version_num FROM alembic_version" \
     | sed 's/^/     /'
 else
-  echo ">> [2/3] SKIP_MIGRATE=1 -> skipping migration"
+  echo ">> [3/4] SKIP_MIGRATE=1 -> skipping migration"
 fi
 
 # ===========================================================================
-# [3] ADOPT — legacy org GitLab config -> per-course git bindings (token bridged)
+# [4] ADOPT — legacy org GitLab config -> per-course git bindings
+#
+# Runs the SAME module adopt_git.sh pipes into the backend container, so the
+# mapping (student-template -> template, assignments -> reference) has exactly
+# one implementation.
 # ===========================================================================
 if [[ "${SKIP_ADOPT:-0}" != "1" ]]; then
-  echo ">> [3/3] adopting legacy GitLab config into course_git_binding ..."
-  PY_BIN="$ROOT/.venv/bin/python"; [[ -x "$PY_BIN" ]] || PY_BIN="python3"
+  echo ">> [4/4] adopting legacy GitLab config into course_git_binding ..."
 
   if [[ -z "${LEGACY_TOKEN_SECRET:-}" && -t 0 && "${FORCE:-0}" != "1" ]]; then
     read -r -s -p "   Legacy TOKEN_SECRET to decrypt migrated tokens (blank = same as target's): " LEGACY_TOKEN_SECRET || true
     echo
   fi
   export LEGACY_TOKEN_SECRET="${LEGACY_TOKEN_SECRET:-${TOKEN_SECRET:-}}"
-  export PGPORT_VAL PGUSER_VAL PGDB_VAL
-  export ADOPT_APPLY="${ADOPT_APPLY:-0}"
-  export GITLAB_BASE_URL="${GITLAB_BASE_URL:-}"
-  export GITLAB_NAME="${GITLAB_NAME:-}"
 
-  "$PY_BIN" - <<'PYEOF'
-import os, sys, json
-from sqlalchemy import create_engine, text
-try:
-    from keycove import encrypt, decrypt   # same primitive computor_types.encryption uses
-except Exception as e:  # pragma: no cover
-    sys.exit("   !! keycove not importable (%s); cannot bridge tokens" % e)
+  adopt_args=()
+  [[ "${ADOPT_APPLY:-0}" == "1" ]] && adopt_args+=(--apply)
+  [[ "${ADOPT_RESOLVE_IDS:-0}" == "1" ]] && adopt_args+=(--resolve-ids)
+  [[ -n "${GITLAB_BASE_URL:-}" ]] && adopt_args+=(--gitlab-base-url "$GITLAB_BASE_URL")
+  [[ -n "${GITLAB_NAME:-}" ]] && adopt_args+=(--gitlab-name "$GITLAB_NAME")
 
-APPLY      = os.environ.get("ADOPT_APPLY") == "1"
-NEW_SECRET = os.environ.get("TOKEN_SECRET") or ""
-LEG_SECRET = os.environ.get("LEGACY_TOKEN_SECRET") or NEW_SECRET
-BASE_OVER  = (os.environ.get("GITLAB_BASE_URL") or "").rstrip("/") or None
-NAME_OVER  = os.environ.get("GITLAB_NAME") or None
-if not NEW_SECRET:
-    sys.exit("   !! TOKEN_SECRET not set in target .env; cannot re-encrypt tokens")
-
-eng = create_engine("postgresql+psycopg2://%s:%s@127.0.0.1:%s/%s" % (
-    os.environ["PGUSER_VAL"], os.environ["POSTGRES_PASSWORD"],
-    os.environ["PGPORT_VAL"], os.environ["PGDB_VAL"]))
-
-def as_dict(v):
-    if v is None: return {}
-    if isinstance(v, dict): return v
-    try: return json.loads(v)
-    except Exception: return {}
-
-def extract_template(cg, base_url):
-    """Return (template_repo, template_url) from a legacy course gitlab blob,
-    handling both the flat (template_path) and nested (projects.student_template)
-    shapes."""
-    tp = cg.get("template_path") or cg.get("full_path")
-    if tp:
-        return tp, (cg.get("template_url") or (("%s/%s.git" % (base_url, tp)) if base_url else None))
-    projects = cg.get("projects") or {}
-    st = projects.get("student_template") or projects.get("student-template") or projects.get("template") or {}
-    fp = st.get("full_path") if isinstance(st, dict) else None
-    if not fp and cg.get("full_path"):
-        fp = "%s/student-template" % cg["full_path"]
-    if not fp:
-        return None, None
-    tu = (st.get("http_url_to_repo") if isinstance(st, dict) else None) or (("%s/%s.git" % (base_url, fp)) if base_url else None)
-    return fp, tu
-
-print("\n   === adoption %s | legacy-secret=%s ===" % (
-    "APPLY" if APPLY else "DRY-RUN",
-    "custom" if LEG_SECRET != NEW_SECRET else "same-as-target"))
-
-conn = eng.connect()
-trans = conn.begin()
-servers = {}
-
-def get_server(base_url):
-    if base_url in servers:
-        return servers[base_url]
-    row = conn.execute(text("SELECT id FROM git_server WHERE type='gitlab' AND base_url=:u"),
-                       {"u": base_url}).first()
-    if row:
-        servers[base_url] = row[0]
-        print("     git_server reuse: %s (%s)" % (base_url, str(row[0])[:8]))
-        return row[0]
-    name = NAME_OVER or ("GitLab (%s)" % base_url)
-    nid = conn.execute(text(
-        "INSERT INTO git_server (type, base_url, name, managed) "
-        "VALUES ('gitlab', :u, :n, false) RETURNING id"), {"u": base_url, "n": name}).scalar()
-    servers[base_url] = nid
-    print("     git_server CREATE: %s (%s) name=%r" % (base_url, str(nid)[:8], name))
-    return nid
-
-rows = conn.execute(text("""
-    SELECT c.id, c.title, c.properties->'gitlab', o.title, o.properties->'gitlab'
-    FROM course c JOIN organization o ON o.id = c.organization_id
-    WHERE c.properties ? 'gitlab'
-    ORDER BY o.title, c.title
-""")).all()
-print("     %d course(s) carry properties.gitlab\n" % len(rows))
-
-created = existing = skipped = 0
-errors = []
-for cid, ctitle, cg_raw, otitle, og_raw in rows:
-    cg = as_dict(cg_raw); og = as_dict(og_raw)
-    print("   - %s  (org: %s)" % (ctitle, otitle))
-    if conn.execute(text("SELECT 1 FROM course_git_binding WHERE course_id=:c"), {"c": cid}).first():
-        print("       -> SKIP (already bound)"); existing += 1; continue
-    base_url = BASE_OVER or ((og.get("url") or "").rstrip("/") or None)
-    if not base_url:
-        print("       -> SKIP (no gitlab base_url on org; pass GITLAB_BASE_URL= to override)"); skipped += 1; continue
-    tpl_repo, tpl_url = extract_template(cg, base_url)
-    if not tpl_repo:
-        print("       -> SKIP (no student-template found; gitlab keys=%s)" % list(cg.keys())); skipped += 1; continue
-    tok_ct = None
-    enc = og.get("token")
-    if enc:
-        try:
-            pt = decrypt(enc, LEG_SECRET)
-            if not isinstance(pt, str) or not pt.strip():
-                raise ValueError("decrypted to empty string")
-            tok_ct = encrypt(pt, NEW_SECRET)
-            warn = "" if pt.startswith("glpat-") else "  (WARN: plaintext is not a glpat- token)"
-            print("       token: org token decrypted OK -> re-encrypted%s" % warn)
-        except Exception as e:
-            print("       -> ERROR decrypting org token: %s  (wrong LEGACY_TOKEN_SECRET?)" % e)
-            errors.append(ctitle); skipped += 1; continue
-    else:
-        print("       token: NONE on org.properties.gitlab (binding will have no credential)")
-    pgid = cg.get("parent_group_id") or cg.get("parent") or cg.get("parent_id")
-    props = {"gitlab": dict(cg)}
-    if pgid is not None:
-        props["gitlab"]["parent_group_id"] = pgid
-    srv = get_server(base_url)
-    print("       -> BIND server=%s template_repo=%s parent_group_id=%s token=%s modes=[managed]" % (
-        base_url, tpl_repo, pgid, "set" if tok_ct else "none"))
-    created += 1
-    if APPLY:
-        conn.execute(text("""
-            INSERT INTO course_git_binding
-              (course_id, delivery, git_server_id, template_repo, template_url,
-               default_branch, token, student_repo_modes, properties)
-            VALUES (:c, 'git', :srv, :tr, :tu, 'main', :tok,
-                    CAST(:modes AS jsonb), CAST(:props AS jsonb))
-        """), {"c": cid, "srv": srv, "tr": tpl_repo, "tu": tpl_url, "tok": tok_ct,
-               "modes": json.dumps(["managed"]), "props": json.dumps(props)})
-
-if errors and APPLY:
-    trans.rollback()
-    sys.exit("\n   !! %d course(s) failed token-decrypt -> NOTHING written. Fix "
-             "LEGACY_TOKEN_SECRET and re-run: SKIP_RESTORE=1 SKIP_MIGRATE=1 ADOPT_APPLY=1 bash load_system.sh"
-             % len(errors))
-
-if APPLY:
-    trans.commit()
-    print("\n   === APPLIED: %d created, %d already bound, %d skipped ===" % (created, existing, skipped))
-else:
-    trans.rollback()
-    print("\n   === DRY-RUN: would create %d, %d already bound, %d skipped. "
-          "Re-run with ADOPT_APPLY=1 to write. ===" % (created, existing, skipped))
-    if errors:
-        print("   (%d course(s) would fail token-decrypt with the current LEGACY_TOKEN_SECRET)" % len(errors))
-PYEOF
+  "$PY_BIN" "$ADOPT_PY" "${adopt_args[@]:-}"
 else
-  echo ">> [3/3] SKIP_ADOPT=1 -> skipping git adoption"
+  echo ">> [4/4] SKIP_ADOPT=1 -> skipping git adoption"
 fi
+
 
 # --- summary ----------------------------------------------------------------
 r_stat="yes"; if [[ "${SKIP_RESTORE:-0}" == "1" ]]; then r_stat="skipped"; fi

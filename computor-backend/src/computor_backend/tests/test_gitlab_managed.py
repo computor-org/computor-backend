@@ -134,7 +134,21 @@ class _FakeGitlab:
             self._gl = gl
 
         def get(self, gid):
-            return self._gl._groups[int(gid)]
+            # python-gitlab accepts a numeric id or a full path; adoption
+            # resolves legacy groups by path, so the double must too.
+            if isinstance(gid, int) or str(gid).isdigit():
+                try:
+                    return self._gl._groups[int(gid)]
+                except KeyError:
+                    from gitlab.exceptions import GitlabGetError
+
+                    raise GitlabGetError("404", response_code=404)
+            for g in self._gl._groups.values():
+                if g.full_path == gid:
+                    return g
+            from gitlab.exceptions import GitlabGetError
+
+            raise GitlabGetError("404", response_code=404)
 
         def create(self, data):
             gl = self._gl
@@ -272,3 +286,102 @@ class TestAddMember:
         assert client.add_member(project_id, 7, GITLAB_MAINTAINER) is True
         # Reporter on a (different) template project also works.
         assert client.add_member(s["template_project_id"], 7, GITLAB_REPORTER) is True
+
+
+def _seed_legacy_course(fake, parent_group_id=100):
+    """A course laid out the way the LEGACY system named things.
+
+    Built by hand rather than via ``ensure_course_structure``, because that
+    method hardcodes the release names ``template``/``reference`` — the whole
+    point of adoption is that the repositories on disk are called something else.
+    """
+    course = fake.groups.create({"path": "fam--course", "parent_id": parent_group_id})
+    students = fake.groups.create({"path": "students", "parent_id": course.id})
+    template = fake.projects.create({"path": "student-template", "namespace_id": course.id})
+    assignments = fake.projects.create({"path": "assignments", "namespace_id": course.id})
+    return course, students, template, assignments
+
+
+class TestResolveExistingStructure:
+    """Read-only resolution used to adopt a legacy course."""
+
+    def test_resolve_project_by_full_path_and_by_id(self):
+        fake = _FakeGitlab(root_group_id=100)
+        client = _client_with_fake(fake)
+        _, _, template, _ = _seed_legacy_course(fake)
+
+        by_path = client.resolve_project("root/fam--course/student-template")
+        by_id = client.resolve_project(template.id)
+
+        assert by_path.id == template.id == by_id.id
+
+    def test_resolve_project_raises_for_a_missing_repository(self):
+        from gitlab.exceptions import GitlabGetError
+
+        fake = _FakeGitlab(root_group_id=100)
+        client = _client_with_fake(fake)
+        _seed_legacy_course(fake)
+
+        with pytest.raises(GitlabGetError):
+            client.resolve_project("root/fam--course/does-not-exist")
+
+    def test_resolve_group_by_full_path(self):
+        fake = _FakeGitlab(root_group_id=100)
+        client = _client_with_fake(fake)
+        _, students, _, _ = _seed_legacy_course(fake)
+
+        assert client.resolve_group("root/fam--course/students").id == students.id
+
+    def test_describes_legacy_names_with_the_native_key_set(self):
+        """An adopted binding must be indistinguishable from a natively
+        provisioned one to every consumer — same keys, legacy paths."""
+        fake = _FakeGitlab(root_group_id=100)
+        client = _client_with_fake(fake)
+        course, students, template, assignments = _seed_legacy_course(fake)
+
+        found = client.describe_existing_course_structure(
+            template_path="root/fam--course/student-template",
+            reference_path="root/fam--course/assignments",
+            students_group_path="root/fam--course/students",
+            course_group_path="root/fam--course",
+        )
+
+        assert found["template_project_id"] == template.id
+        assert found["template_path"] == "root/fam--course/student-template"
+        assert found["reference_project_id"] == assignments.id
+        assert found["reference_path"] == "root/fam--course/assignments"
+        assert found["students_group_id"] == students.id
+        assert found["course_group_id"] == course.id
+        # parent_group_id is the one the DTO types as a string.
+        assert found["parent_group_id"] == str(course.parent_id)
+        assert isinstance(found["parent_group_id"], str)
+
+    def test_a_missing_reference_repository_is_not_fatal(self):
+        """A course without an assignments repo still deploys templates; only
+        the solution push stays disabled."""
+        fake = _FakeGitlab(root_group_id=100)
+        client = _client_with_fake(fake)
+        _seed_legacy_course(fake)
+
+        found = client.describe_existing_course_structure(
+            template_path="root/fam--course/student-template",
+            reference_path="root/fam--course/nope",
+        )
+
+        assert "template_project_id" in found
+        assert "reference_project_id" not in found
+
+    def test_creates_nothing(self):
+        fake = _FakeGitlab(root_group_id=100)
+        client = _client_with_fake(fake)
+        _seed_legacy_course(fake)
+        groups_before, projects_before = len(fake._groups), len(fake._projects)
+
+        client.describe_existing_course_structure(
+            template_path="root/fam--course/student-template",
+            reference_path="root/fam--course/assignments",
+            students_group_path="root/fam--course/students",
+            course_group_path="root/fam--course",
+        )
+
+        assert (len(fake._groups), len(fake._projects)) == (groups_before, projects_before)
