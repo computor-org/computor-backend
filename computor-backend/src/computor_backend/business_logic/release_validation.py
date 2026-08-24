@@ -154,15 +154,22 @@ def validate_course_for_release(
 
     validation_errors = []
 
+    # One query for the whole release rather than one per assignment: a course
+    # with 150 assignments issued 150 identical-shaped deployment lookups
+    # before the first check ran.
+    deployments_by_content = {
+        deployment.course_content_id: deployment
+        for deployment in db.query(CourseContentDeployment).options(
+            joinedload(CourseContentDeployment.example_version)
+        ).filter(
+            CourseContentDeployment.course_content_id.in_([a.id for a in assignments])
+        ).all()
+    }
+
     for i, assignment in enumerate(assignments, 1):
         logger.debug(f"[Validation] [{i}/{len(assignments)}] Checking '{assignment.path}' (ID: {assignment.id})")
 
-        # Get deployment for this assignment
-        deployment = db.query(CourseContentDeployment).options(
-            joinedload(CourseContentDeployment.example_version)
-        ).filter(
-            CourseContentDeployment.course_content_id == assignment.id
-        ).first()
+        deployment = deployments_by_content.get(assignment.id)
 
         # Check 1: Deployment exists
         if not deployment:
