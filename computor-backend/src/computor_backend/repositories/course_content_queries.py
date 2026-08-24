@@ -132,7 +132,9 @@ def user_course_content_query(user_id: UUID | str, course_content_id: UUID | str
     results_count_sub = results_count_subquery(user_id, None, course_content_id, db)
     submission_count_sub = submission_count_subquery(user_id, None, course_content_id, db)
     content_unread_sub, submission_group_unread_sub = message_unread_subqueries(user_id, db)
-    latest_submission_grade_sub = latest_submission_grade_status_subquery(db)
+    latest_submission_grade_sub = latest_submission_grade_status_subquery(
+        user_id, None, course_content_id, db
+    )
 
     content_unread_column = (
         func.coalesce(content_unread_sub.c.unread_count, 0).label("content_unread_count")
@@ -285,7 +287,7 @@ def user_course_content_list_query(
     results_count_sub = results_count_subquery(user_id, None, None, db)
     submission_count_sub = submission_count_subquery(user_id, None, None, db)
     content_unread_sub, submission_group_unread_sub = message_unread_subqueries(user_id, db)
-    latest_submission_grade_sub = latest_submission_grade_status_subquery(db)
+    latest_submission_grade_sub = latest_submission_grade_status_subquery(user_id, None, None, db)
 
     content_unread_column = (
         func.coalesce(content_unread_sub.c.unread_count, 0).label("content_unread_count")
@@ -559,7 +561,9 @@ def course_member_course_content_list_query(
     results_count_sub = results_count_subquery(None, course_member_id, None, db)
     submission_count_sub = submission_count_subquery(None, course_member_id, None, db)
     content_unread_sub, submission_group_unread_sub = message_unread_subqueries(reader_user_id, db)
-    latest_submission_grade_sub = latest_submission_grade_status_subquery(db)
+    latest_submission_grade_sub = latest_submission_grade_status_subquery(
+        None, course_member_id, None, db
+    )
 
     content_unread_column = (
         func.coalesce(content_unread_sub.c.unread_count, 0).label("content_unread_count")
