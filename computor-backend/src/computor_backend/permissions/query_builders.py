@@ -123,23 +123,28 @@ class UserPermissionQueryBuilder:
     
     @classmethod
     def filter_visible_users(cls, user_id: str, db: Session) -> Query:
-        """Filter users that are visible to the current user"""
-        cm_other = aliased(CourseMember)
-        
-        # Get the subquery for courses where user is at least a tutor
-        subquery = CoursePermissionQueryBuilder.user_courses_subquery(user_id, "_tutor", db)
-        
-        # User can see themselves and other users in courses where they're at least a tutor
-        query = (
-            db.query(User)
-            .outerjoin(cm_other, cm_other.user_id == User.id)
-            .filter(
-                or_(
-                    User.id == user_id,
-                    cm_other.course_id.in_(subquery)
-                )
-            )
-            .distinct()
+        """Filter users that are visible to the current user.
+
+        A user sees themselves, plus everyone enrolled in a course where they
+        are at least a tutor.
+
+        Expressed as a semi-join rather than an outer join plus DISTINCT. The
+        join produced one row per (user, membership) pair and then deduplicated
+        them by comparing every column of ``user`` — including its JSONB
+        ``properties`` — which is a sort or hash over the whole table to answer
+        a question that is really just "does any such membership exist". It
+        also made ``Query.count()`` on this query (X-Total-Count on
+        ``GET /users``) pay for the dedup a second time.
+        """
+        course_subquery = CoursePermissionQueryBuilder.user_courses_subquery(user_id, "_tutor", db)
+
+        visible_user_ids = select(CourseMember.user_id).where(
+            CourseMember.course_id.in_(course_subquery)
         )
-        
-        return query
+
+        return db.query(User).filter(
+            or_(
+                User.id == user_id,
+                User.id.in_(visible_user_ids),
+            )
+        )
