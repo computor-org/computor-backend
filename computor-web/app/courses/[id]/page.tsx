@@ -27,6 +27,42 @@ const courseFamiliesClient = new CourseFamiliesClient();
 const organizationsClient = new OrganizationsClient();
 
 const userClient = new UserClient();
+
+/** What a repository mode means to the person who owns it, rather than the
+    word the binding stores. */
+const REPO_MODE_LABEL: Record<string, string> = {
+  managed: 'Hosted for you',
+  external: 'Your own repository',
+  download: 'Download only',
+};
+
+const PROVIDER_LABEL: Record<string, string> = {
+  forgejo: 'Forgejo',
+  gitlab: 'GitLab',
+};
+
+/** A value nobody wants to select by hand — a clone URL, a token. */
+function CopyValue({ value }: { value: string }) {
+  const notify = useNotify();
+  return (
+    <span className="inline-flex items-start gap-2">
+      <span className="font-mono text-xs break-all">{value}</span>
+      <Button
+        size="xs"
+        variant="ghost"
+        onClick={() =>
+          navigator.clipboard
+            ?.writeText(value)
+            .then(() => notify('Copied.', 'success'))
+            .catch(() => notify('Could not copy to clipboard', 'error'))
+        }
+      >
+        Copy
+      </Button>
+    </span>
+  );
+}
+
 export default function CoursePage() {
   const courseId = useParams().id as string;
   const { canManageHierarchy: canManage, isAdmin, isOrganizationManager, courseHasAtLeast, courseRole, courseRoles } = usePermissions();
@@ -81,6 +117,10 @@ export default function CoursePage() {
   const notify = useNotify();
   const [ensuring, setEnsuring] = useState(false);
   const [provisioned, setProvisioned] = useState<StudentRepositoryProvisioned | null>(null);
+  // Fully controlled rather than an `open` attribute derived from `provisioned`:
+  // any unrelated re-render would otherwise snap the disclosure shut under the
+  // reader while they are copying out of it.
+  const [cloneOpen, setCloneOpen] = useState(false);
 
   async function ensureGitAccess() {
     setEnsuring(true);
@@ -90,10 +130,13 @@ export default function CoursePage() {
         { courseId },
       );
       setProvisioned(r);
-      notify('Git access ensured.', 'success');
+      // The credential is only reachable from inside the disclosure, so open it
+      // rather than leaving the freshly-fetched token hidden behind a summary.
+      if (r.clone_token) setCloneOpen(true);
+      notify('Git access checked — your repository is reachable.', 'success');
       await reload(); // refresh the persisted repository details below
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Failed to ensure git access', 'error');
+      notify(e instanceof Error ? e.message : 'Could not check git access', 'error');
     } finally {
       setEnsuring(false);
     }
@@ -161,15 +204,15 @@ export default function CoursePage() {
         />
 
         <ScrollArea>
-        {/* Ordered by what a member came here to do — open the editor, check
-            that their repository is in place — not by what the course *is*.
-            About holds the description and a handful of facts, so it reads as
-            reference material and sits last. */}
-        {/* Workspaces — launch buttons for the course's allowed templates.
-            The component hides itself (card and heading included) when the
-            course offers none; the role gate only avoids a guaranteed-403
-            fetch for non-members. The card chrome is the caller's because the
-            compact variant on the courses list renders without one. */}
+        {/* Cards are ordered by what a member came here to do — open the editor,
+            check that their repository is in place — not by what the course *is*;
+            About is reference material and sits last.
+
+            Workspaces: launch buttons for the course's allowed templates. The
+            component hides itself (card and heading included) when the course
+            offers none; the role gate only avoids a guaranteed-403 fetch for
+            non-members. The card chrome is the caller's because the compact
+            variant on the courses list renders without one. */}
         {(isAdmin || myRole != null) && (
           <CourseWorkspaceLaunchButtons
             courseId={courseId}
@@ -178,117 +221,169 @@ export default function CoursePage() {
           />
         )}
 
-        {/* Git — the caller's own repository (+ ensure access) when the course
-            uses git, then the course binding for managers. Hidden entirely for a
-            student on a course that doesn't provision git. */}
-        {(gitConfigured || canManageMembers) && (
-        <SectionCard title="Git">
-          {/* Your repository — only when the course actually provisions git, so
-              the provision button is never offered on a non-git course. */}
-          {gitConfigured && (
-          <div>
-            <h3 className="text-sm font-semibold text-fg mb-2">Your repository</h3>
+        {/* Your repository — status, not a chore. The repository is created and
+            cloned by the VSCode extension the first time a member opens the
+            course, so this frame's job is to say whether that has happened. The
+            provisioning call stays reachable because it is also the self-heal
+            path (it re-applies the git-server grants) and the only way to get a
+            repository without the editor — but as a quiet control, not as the
+            loudest button on the page. */}
+        {gitConfigured && (
+          <SectionCard
+            title="Your repository"
+            action={
+              <div className="flex items-center gap-2">
+                {myRepo ? (
+                  <Badge tone="success" pill>Ready</Badge>
+                ) : (
+                  <Badge tone="muted" pill>Not set up yet</Badge>
+                )}
+                <Button size="sm" variant="secondary" onClick={ensureGitAccess} loading={ensuring} loadingLabel="Checking…">
+                  Check access
+                </Button>
+              </div>
+            }
+          >
             {myRepo ? (
-              <DescriptionList
-                items={facts([
-                  { term: 'Mode', value: myRepo.mode },
-                  myRepo.provider_type && { term: 'Provider', value: myRepo.provider_type },
-                  myRepo.repo_ref && { term: 'Repository', value: myRepo.repo_ref, mono: true },
-                  myRepo.web_url && {
-                    term: 'Web',
-                    value: (
-                      <a href={myRepo.web_url} target="_blank" rel="noreferrer" className="text-accent-text hover:underline">
-                        {myRepo.web_url}
-                      </a>
-                    ),
-                  },
-                  myRepo.http_url && { term: 'Clone (HTTPS)', value: myRepo.http_url, mono: true },
-                ])}
-              />
-            ) : (
-              <p className="text-sm text-muted">
-                You don&apos;t have a repository for this course yet.
-              </p>
-            )}
-
-            <Button
-              className="mt-4"
-              onClick={ensureGitAccess}
-              loading={ensuring}
-              loadingLabel="Working…"
-            >
-              {myRepo ? 'Repair git access' : 'Ensure git access'}
-            </Button>
-            <p className="mt-2 text-xs text-muted">
-              Creates or repairs your repository for this course
-              {canManage ? ' — as staff this also grants access to the template and reference repos.' : '.'}
-            </p>
-            {provisioned?.clone_token && (
-              <Notice tone="warning" className="mt-3">
-                <p className="font-medium">One-time clone credential — copy it now, it won&apos;t be shown again.</p>
-                <p className="mt-1">
-                  Username: <span className="font-mono">{provisioned.clone_username}</span>
+              <>
+                <p className="text-sm text-muted">
+                  Set up automatically when you opened this course in VS Code. Your work is
+                  pushed from there — nothing here needs doing.
                 </p>
-                <p>
-                  Token: <span className="font-mono break-all">{provisioned.clone_token}</span>
-                </p>
-              </Notice>
-            )}
-          </div>
-          )}
-
-          {/* Course configuration (managers only) */}
-          {canManageMembers && (
-            <div className="border-t border-rule-soft pt-6">
-              <h3 className="text-sm font-semibold text-fg mb-2">Course configuration</h3>
-              {gitBinding ? (
                 <DescriptionList
                   items={facts([
-                    { term: 'Delivery', value: gitBinding.delivery },
-                    gitBinding.default_branch && {
-                      term: 'Default branch',
-                      value: gitBinding.default_branch,
-                      mono: true,
-                    },
-                    gitBinding.student_repo_modes &&
-                      gitBinding.student_repo_modes.length > 0 && {
-                        term: 'Student repos',
-                        value: gitBinding.student_repo_modes.join(', '),
-                      },
-                    {
-                      term: 'Status',
-                      value: gitBinding.locked ? (
-                        <Badge tone="warning" title={gitBinding.lock_reason ?? undefined}>
-                          Locked
-                        </Badge>
-                      ) : (
-                        <Badge tone="success">Editable</Badge>
-                      ),
-                    },
-                    (gitBinding.template_url || gitBinding.template_repo) && {
-                      term: 'Template',
-                      value: gitBinding.template_url ? (
+                    myRepo.repo_ref && { term: 'Repository', value: myRepo.repo_ref, mono: true },
+                    myRepo.web_url && {
+                      term: 'Browse',
+                      value: (
                         <a
-                          href={gitBinding.template_url}
+                          href={myRepo.web_url}
                           target="_blank"
                           rel="noreferrer"
                           className="text-accent-text hover:underline break-all"
                         >
-                          {gitBinding.template_url}
+                          {myRepo.web_url}
                         </a>
-                      ) : (
-                        gitBinding.template_repo
                       ),
                     },
                   ])}
                 />
-              ) : (
-                <p className="text-sm text-muted">No git binding configured for this course.</p>
-              )}
-            </div>
-          )}
-        </SectionCard>
+              </>
+            ) : (
+              <p className="text-sm text-muted">
+                Nothing to do here. Your repository is created for you the first time you open
+                this course in VS Code — in a Computor workspace or with the Computor extension.
+              </p>
+            )}
+
+            {/* Clone details and the credential: needed only by someone working
+                outside the editor, so they are folded away rather than pushed at
+                a student who will never type a git command. */}
+            <details open={cloneOpen} onToggle={(e) => setCloneOpen(e.currentTarget.open)}>
+              <summary className="cursor-pointer text-sm text-body marker:text-muted">
+                Working outside VS Code?
+              </summary>
+              <div className="mt-3 space-y-3">
+                <p className="text-sm text-muted">
+                  A Computor workspace configures git for you. These are the details for cloning
+                  the repository by hand; use <span className="font-medium">Check access</span> to
+                  create it and reveal the credential.
+                  {canManage
+                    ? ' As staff, that call also re-grants your access to the course template and reference repositories.'
+                    : ''}
+                </p>
+                {myRepo && (
+                  <DescriptionList
+                    items={facts([
+                      { term: 'Hosting', value: REPO_MODE_LABEL[myRepo.mode] ?? myRepo.mode },
+                      myRepo.provider_type && {
+                        term: 'Git server',
+                        value: PROVIDER_LABEL[myRepo.provider_type] ?? myRepo.provider_type,
+                      },
+                      myRepo.http_url && {
+                        term: 'Clone (HTTPS)',
+                        value: <CopyValue value={myRepo.http_url} />,
+                      },
+                    ])}
+                  />
+                )}
+                {provisioned?.clone_token && (
+                  <Notice tone="warning">
+                    <p className="font-medium">
+                      Your git credential for this server — treat it like a password.
+                    </p>
+                    <p className="mt-1">
+                      It is the same credential your workspace already uses, so it is shown again
+                      whenever you check access; it is not a one-time secret.
+                    </p>
+                    <dl className="mt-2 space-y-1">
+                      <div className="flex gap-2">
+                        <dt className="w-20 shrink-0">Username</dt>
+                        <dd><CopyValue value={provisioned.clone_username ?? ''} /></dd>
+                      </div>
+                      <div className="flex gap-2">
+                        <dt className="w-20 shrink-0">Token</dt>
+                        <dd><CopyValue value={provisioned.clone_token} /></dd>
+                      </div>
+                    </dl>
+                  </Notice>
+                )}
+              </div>
+            </details>
+          </SectionCard>
         )}
+
+        {/* Git configuration — the course's binding. Its own card: it describes
+            the course, not the reader, and only the lecturer cohort sees it. */}
+        {canManageMembers && (
+          <SectionCard title="Git configuration">
+            {gitBinding ? (
+              <DescriptionList
+                items={facts([
+                  { term: 'Delivery', value: gitBinding.delivery },
+                  gitBinding.default_branch && {
+                    term: 'Default branch',
+                    value: gitBinding.default_branch,
+                    mono: true,
+                  },
+                  gitBinding.student_repo_modes &&
+                    gitBinding.student_repo_modes.length > 0 && {
+                      term: 'Student repos',
+                      value: gitBinding.student_repo_modes.join(', '),
+                    },
+                  {
+                    term: 'Status',
+                    value: gitBinding.locked ? (
+                      <Badge tone="warning" title={gitBinding.lock_reason ?? undefined}>
+                        Locked
+                      </Badge>
+                    ) : (
+                      <Badge tone="success">Editable</Badge>
+                    ),
+                  },
+                  (gitBinding.template_url || gitBinding.template_repo) && {
+                    term: 'Template',
+                    value: gitBinding.template_url ? (
+                      <a
+                        href={gitBinding.template_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-accent-text hover:underline break-all"
+                      >
+                        {gitBinding.template_url}
+                      </a>
+                    ) : (
+                      gitBinding.template_repo
+                    ),
+                  },
+                ])}
+              />
+            ) : (
+              <p className="text-sm text-muted">No git binding configured for this course.</p>
+            )}
+          </SectionCard>
+        )}
+
         {/* About — description + the few facts worth showing (no identifiers).
             "Your role" leads because it is the only line here that is about the
             reader. The record timestamps are administrative trivia to everyone
