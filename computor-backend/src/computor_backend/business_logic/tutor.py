@@ -4,7 +4,8 @@ from uuid import UUID
 from typing import List, Optional
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session, contains_eager, joinedload
+from sqlalchemy.orm import Session, contains_eager, joinedload, selectinload
+from sqlalchemy.orm.attributes import set_committed_value
 
 from computor_backend.business_logic.submission_limits import resolve_limits
 from computor_backend.exceptions import BadRequestException, ForbiddenException, NotFoundException
@@ -524,6 +525,81 @@ def get_tutor_submission_group(
     )
 
 
+def _submission_stats_for_groups(group_ids, db: Session) -> dict:
+    """``submission_group_id -> (submitted count, latest submitted at)``.
+
+    Counted in SQL rather than by loading every artifact and measuring the
+    list: the listing only ever shows the number and the timestamp.
+    """
+    if not group_ids:
+        return {}
+
+    from sqlalchemy import func
+
+    rows = (
+        db.query(
+            SubmissionArtifact.submission_group_id,
+            func.count(SubmissionArtifact.id),
+            func.max(SubmissionArtifact.created_at),
+        )
+        .filter(
+            SubmissionArtifact.submission_group_id.in_(group_ids),
+            SubmissionArtifact.submit == True,  # noqa: E712 — SQLAlchemy column comparison
+        )
+        .group_by(SubmissionArtifact.submission_group_id)
+        .all()
+    )
+    return {group_id: (count, latest) for group_id, count, latest in rows}
+
+
+def _groups_with_ungraded_submissions(group_ids, db: Session) -> set:
+    """The subset of ``group_ids`` holding a submitted artifact with no grade.
+
+    One NOT EXISTS over the page instead of a grade lookup per artifact; the
+    answer is a yes/no per group, so no grade rows need to come back at all.
+    """
+    if not group_ids:
+        return set()
+
+    from sqlalchemy import exists, and_
+
+    rows = (
+        db.query(SubmissionArtifact.submission_group_id)
+        .filter(
+            SubmissionArtifact.submission_group_id.in_(group_ids),
+            SubmissionArtifact.submit == True,  # noqa: E712 — SQLAlchemy column comparison
+            ~exists().where(SubmissionGrade.artifact_id == SubmissionArtifact.id),
+        )
+        .distinct()
+        .all()
+    )
+    return {group_id for (group_id,) in rows}
+
+
+def _members_for_groups(group_ids, db: Session) -> dict:
+    """``submission_group_id -> [SubmissionGroupMember]`` for the display name.
+
+    Only called for the groups that have no stored ``display_name``, since
+    that is the only thing the members are needed for here.
+    """
+    if not group_ids:
+        return {}
+
+    members = (
+        db.query(SubmissionGroupMember)
+        .options(
+            joinedload(SubmissionGroupMember.course_member).joinedload(CourseMember.user)
+        )
+        .filter(SubmissionGroupMember.submission_group_id.in_(group_ids))
+        .all()
+    )
+
+    by_group: dict = {}
+    for member in members:
+        by_group.setdefault(member.submission_group_id, []).append(member)
+    return by_group
+
+
 def list_tutor_submission_groups(
     permissions: Principal,
     params: TutorSubmissionGroupQuery,
@@ -574,7 +650,13 @@ def list_tutor_submission_groups(
         CourseContent.archived_at.is_(None)
     ).outerjoin(
         SubmissionGroupMember, SubmissionGroupMember.submission_group_id == SubmissionGroup.id
-    ).group_by(SubmissionGroup.id)
+    ).group_by(SubmissionGroup.id).options(
+        # _effective_max_submissions / _effective_max_test_runs walk
+        # group -> content -> course for every row. selectinload, not
+        # contains_eager: this query aggregates with GROUP BY SubmissionGroup.id,
+        # so widening its select list would mean widening the GROUP BY too.
+        selectinload(SubmissionGroup.course_content).selectinload(CourseContent.course)
+    )
 
     # Filter by tutor's courses (unless admin)
     if not permissions.is_admin:
@@ -620,28 +702,30 @@ def list_tutor_submission_groups(
 
     results = query.all()
 
+    # Everything the loop below needs, fetched for the whole page at once.
+    #
+    # It used to fetch per group: the artifacts, then one grade lookup per
+    # submitted artifact, then the members. A page of 100 groups issued over
+    # 350 statements to render 100 rows.
+    group_ids = [submission_group.id for submission_group, _ in results]
+    submission_stats = _submission_stats_for_groups(group_ids, db)
+    ungraded_group_ids = _groups_with_ungraded_submissions(group_ids, db)
+    members_by_group = _members_for_groups(
+        [submission_group.id for submission_group, _ in results
+         if not submission_group.display_name],
+        db,
+    )
+
     # Build response list with additional statistics
     response_list = []
-    submission_artifact_repo = SubmissionArtifactRepository(db, cache)
-    submission_grade_repo = SubmissionGradeRepository(db, cache)
 
     for submission_group, member_count in results:
-        # Get submission artifacts
-        artifacts = submission_artifact_repo.find_by_submission_group(submission_group.id)
-        submitted_artifacts = [a for a in artifacts if a.submit]
+        submission_count, latest_submission_at = submission_stats.get(
+            submission_group.id, (0, None)
+        )
+        has_ungraded = submission_group.id in ungraded_group_ids
 
-        # Get latest submission
-        latest_submission = max(submitted_artifacts, key=lambda a: a.created_at) if submitted_artifacts else None
-
-        # Check for ungraded submissions
-        has_ungraded = False
         if params.has_ungraded_submissions is not None:
-            for artifact in submitted_artifacts:
-                artifact_grades = submission_grade_repo.find_by_artifact(artifact.id)
-                if not artifact_grades:
-                    has_ungraded = True
-                    break
-
             # Skip if filtering for ungraded and this group doesn't match
             if params.has_ungraded_submissions and not has_ungraded:
                 continue
@@ -651,11 +735,13 @@ def list_tutor_submission_groups(
         # Determine display name
         display_name = submission_group.display_name
         if not display_name:
-            # Need to load members to compute display name
-            members = db.query(SubmissionGroupMember).options(
-                joinedload(SubmissionGroupMember.course_member).joinedload(CourseMember.user)
-            ).filter(SubmissionGroupMember.submission_group_id == submission_group.id).all()
-            submission_group.members = members
+            # set_committed_value, not plain assignment: assigning to a loaded
+            # instance's relationship makes SQLAlchemy read the current
+            # collection first so it can record the change — one query per
+            # group, exactly what the batch above set out to avoid.
+            set_committed_value(
+                submission_group, "members", members_by_group.get(submission_group.id, [])
+            )
             display_name = submission_group.get_computed_display_name()
 
         response_list.append(TutorSubmissionGroupList(
@@ -667,8 +753,8 @@ def list_tutor_submission_groups(
             max_submissions=_effective_max_submissions(submission_group),
             max_test_runs=_effective_max_test_runs(submission_group),
             member_count=member_count,
-            submission_count=len(submitted_artifacts),
-            latest_submission_at=latest_submission.created_at if latest_submission else None,
+            submission_count=submission_count,
+            latest_submission_at=latest_submission_at,
             has_ungraded_submissions=has_ungraded,
             created_at=submission_group.created_at,
             updated_at=submission_group.updated_at,
