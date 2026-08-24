@@ -171,13 +171,6 @@ export default function CoursePage() {
         <PageHeader
           breadcrumbs={crumbs}
           title={displayName(course, 'Untitled Course')}
-          subtitle={
-            course.language_code && (
-              <span className="px-2 py-0.5 text-xs font-medium bg-sunken text-body rounded uppercase">
-                {course.language_code}
-              </span>
-            )
-          }
           actions={
             canManage && (
               <ButtonLink href={`/courses/${courseId}/edit`} variant="secondary">
@@ -195,8 +188,7 @@ export default function CoursePage() {
 
             "Your role" leads because it is the only line here that is about the
             reader. The record timestamps are administrative trivia to everyone
-            below the lecturer cohort, and the language already sits in the page
-            header, so neither is repeated to a student. */}
+            below the lecturer cohort, so a student is not shown them. */}
         <SectionCard title="About">
           {course.description && <p className="text-body">{course.description}</p>}
           <DescriptionList
@@ -204,6 +196,10 @@ export default function CoursePage() {
               myRole && { term: 'Your role', value: <Badge tone="info">{myRole}</Badge> },
               organization && { term: 'Organization', value: displayName(organization) },
               courseFamily && { term: 'Course family', value: displayName(courseFamily) },
+              course.language_code && {
+                term: 'Language',
+                value: <span className="uppercase">{course.language_code}</span>,
+              },
               canManageMembers &&
                 course.created_at && {
                   term: 'Created',
