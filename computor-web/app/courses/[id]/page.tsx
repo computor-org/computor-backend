@@ -63,6 +63,10 @@ export default function CoursePage() {
   // repo section on this so a non-git course never offers the provision button.
   const gitConfigured = gitDescriptor?.configured === true && gitDescriptor?.delivery === 'git';
 
+  // The caller's own standing in this course, as a label ('Student',
+  // 'Lecturer', …) or null when they hold no course role.
+  const myRole = courseRole(courseId);
+
   const notify = useNotify();
   const [ensuring, setEnsuring] = useState(false);
   const [provisioned, setProvisioned] = useState<StudentRepositoryProvisioned | null>(null);
@@ -150,7 +154,7 @@ export default function CoursePage() {
             course offers none; the role gate only avoids a guaranteed-403
             fetch for non-members. The card chrome is the caller's because the
             compact variant on the courses list renders without one. */}
-        {(isAdmin || courseRole(courseId) != null) && (
+        {(isAdmin || myRole != null) && (
           <CourseWorkspaceLaunchButtons
             courseId={courseId}
             title="Workspaces"
@@ -269,25 +273,28 @@ export default function CoursePage() {
           )}
         </SectionCard>
         )}
-        {/* About — description + the few facts worth showing (no identifiers). */}
+        {/* About — description + the few facts worth showing (no identifiers).
+            "Your role" leads because it is the only line here that is about the
+            reader. The record timestamps are administrative trivia to everyone
+            below the lecturer cohort, and the language already sits in the page
+            header, so neither is repeated to a student. */}
         <SectionCard title="About">
           {course.description && <p className="text-body">{course.description}</p>}
           <DescriptionList
             items={facts([
+              myRole && { term: 'Your role', value: <Badge tone="info">{myRole}</Badge> },
               organization && { term: 'Organization', value: displayName(organization) },
               courseFamily && { term: 'Course family', value: displayName(courseFamily) },
-              course.language_code && {
-                term: 'Language',
-                value: <span className="uppercase">{course.language_code}</span>,
-              },
-              course.created_at && {
-                term: 'Created',
-                value: new Date(course.created_at).toLocaleDateString(),
-              },
-              course.updated_at && {
-                term: 'Last updated',
-                value: new Date(course.updated_at).toLocaleDateString(),
-              },
+              canManageMembers &&
+                course.created_at && {
+                  term: 'Created',
+                  value: new Date(course.created_at).toLocaleDateString(),
+                },
+              canManageMembers &&
+                course.updated_at && {
+                  term: 'Last updated',
+                  value: new Date(course.updated_at).toLocaleDateString(),
+                },
             ])}
           />
         </SectionCard>
