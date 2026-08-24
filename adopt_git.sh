@@ -73,7 +73,7 @@ fi
 # --- optional: run the migration in the container ---------------------------
 migrate=0
 filtered=()
-for arg in "${args[@]:-}"; do
+for arg in ${args[@]+"${args[@]}"}; do
   [[ -z "$arg" ]] && continue
   if [[ "$arg" == "--migrate" ]]; then migrate=1; else filtered+=("$arg"); fi
 done
@@ -95,10 +95,10 @@ fi
 docker exec -i \
   -e TOKEN_SECRET -e LEGACY_TOKEN_SECRET -e ADOPT_GITLAB_TOKEN \
   -e GITLAB_BASE_URL -e GITLAB_NAME \
-  "$CONTAINER" python3 - "${filtered[@]:-}" < "$ADOPT_PY"
+  "$CONTAINER" python3 - ${filtered[@]+"${filtered[@]}"} < "$ADOPT_PY"
 
 # --- restart so the API serves the adopted data -----------------------------
-for arg in "${filtered[@]:-}"; do
+for arg in ${filtered[@]+"${filtered[@]}"}; do
   if [[ "$arg" == "--apply" && "${SKIP_RESTART:-0}" != "1" ]]; then
     echo ">> restarting $CONTAINER ..."
     docker restart "$CONTAINER" >/dev/null

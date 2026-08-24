@@ -150,11 +150,11 @@ if [[ "${SKIP_RESTORE:-0}" != "1" ]]; then
   if [[ -z "${BUCKETS// }" ]]; then
     echo "   (no buckets in $IN_DIR/minio — skipping)"
   else
-    MINIO_PASS="$MINIO_PASS_VAL" BUCKETS="$BUCKETS" \
-    docker run --rm --network host -e MINIO_PASS -e BUCKETS \
+    MINIO_USER="$MINIO_USER_VAL" MINIO_PASS="$MINIO_PASS_VAL" BUCKETS="$BUCKETS" \
+    docker run --rm --network host -e MINIO_USER -e MINIO_PASS -e BUCKETS \
       -v "$IN_DIR/minio:/import" --entrypoint sh minio/mc -c '
         set -e
-        mc alias set dst "http://127.0.0.1:'"$MINIO_PORT_VAL"'" "'"$MINIO_USER_VAL"'" "$MINIO_PASS" >/dev/null 2>&1
+        mc alias set dst "http://127.0.0.1:'"$MINIO_PORT_VAL"'" "$MINIO_USER" "$MINIO_PASS" >/dev/null 2>&1
         for b in $BUCKETS; do
           echo "   bucket: $b"
           mc mb --ignore-existing "dst/$b" >/dev/null
@@ -237,7 +237,7 @@ if [[ "${SKIP_ADOPT:-0}" != "1" ]]; then
   [[ -n "${GITLAB_BASE_URL:-}" ]] && adopt_args+=(--gitlab-base-url "$GITLAB_BASE_URL")
   [[ -n "${GITLAB_NAME:-}" ]] && adopt_args+=(--gitlab-name "$GITLAB_NAME")
 
-  "$PY_BIN" "$ADOPT_PY" "${adopt_args[@]:-}"
+  "$PY_BIN" "$ADOPT_PY" ${adopt_args[@]+"${adopt_args[@]}"}
 else
   echo ">> [4/4] SKIP_ADOPT=1 -> skipping git adoption"
 fi
