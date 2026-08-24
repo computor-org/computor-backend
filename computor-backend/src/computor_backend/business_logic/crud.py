@@ -8,6 +8,7 @@ async/await compatibility.
 """
 
 import logging
+from functools import lru_cache
 from uuid import UUID
 from typing import Any, Optional, Callable
 from datetime import datetime, timezone
@@ -15,7 +16,7 @@ from enum import Enum
 
 from fastapi import HTTPException
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import exc
 from sqlalchemy.inspection import inspect
 from starlette.concurrency import run_in_threadpool
@@ -197,6 +198,41 @@ async def get_entity_by_id(
         raise
 
 
+@lru_cache(maxsize=None)
+def _list_eager_relationships(model: Any, list_dto: Any) -> tuple[str, ...]:
+    """Relationship names a ``list`` DTO reads off its model.
+
+    ``list_entities`` serializes each row with ``model_validate(entity,
+    from_attributes=True)``, which touches every field the DTO declares. Where
+    a field names a relationship, that read is a lazy load — one round trip per
+    row. A roster page of 100 course members issued 100 extra queries for
+    ``CourseMember.user`` alone.
+
+    Answering this from the DTO rather than a hand-maintained per-interface
+    list means an interface cannot grow a nested field and quietly reintroduce
+    the N+1.
+
+    ``selectinload``, not ``joinedload``: this query is about to have LIMIT and
+    OFFSET applied, and a joined eager load of a collection makes LIMIT count
+    joined rows instead of entities. selectinload issues one extra statement per
+    relationship no matter how many rows come back.
+    """
+    try:
+        relationships = {r.key: r for r in inspect(model).relationships}
+        names = []
+        for field in list_dto.model_fields:
+            relationship = relationships.get(field)
+            # A dynamic relationship is a query, not a loadable attribute.
+            if relationship is not None and relationship.lazy != "dynamic":
+                names.append(field)
+        return tuple(names)
+    except Exception:
+        # Not a mapped class, or not a real pydantic model (test doubles reach
+        # here). Eager loading is an optimization: if we cannot work out what to
+        # load, load nothing and let the lazy path run.
+        return ()
+
+
 async def list_entities(
     permissions: Principal,
     db: Session,
@@ -228,11 +264,19 @@ async def list_entities(
 
     query = query_func(db, query, params)
 
+    eager = _list_eager_relationships(db_type, interface.list)
+
     # Wrap blocking pagination queries in threadpool
     def _get_paginated_results():
+        # order_by(None) because Query.count() wraps this in a subquery and an
+        # ORDER BY inside it makes Postgres sort a result set it only counts.
         total = query.order_by(None).count()
 
         paginated_query = query
+        if eager:
+            paginated_query = paginated_query.options(
+                *(selectinload(getattr(db_type, name)) for name in eager)
+            )
         if params.limit is not None:
             paginated_query = paginated_query.limit(params.limit)
         if params.skip is not None:

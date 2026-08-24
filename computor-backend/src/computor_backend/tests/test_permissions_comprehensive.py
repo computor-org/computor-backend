@@ -106,6 +106,8 @@ def mock_db_session():
         query_mock.order_by = Mock(return_value=query_mock)
         query_mock.limit = Mock(return_value=query_mock)
         query_mock.offset = Mock(return_value=query_mock)
+        # list_entities eager-loads the relationships its DTO reads.
+        query_mock.options = Mock(return_value=query_mock)
         query_mock.first = Mock(return_value=None)
         query_mock.all = Mock(return_value=[])
         query_mock.count = Mock(return_value=0)
