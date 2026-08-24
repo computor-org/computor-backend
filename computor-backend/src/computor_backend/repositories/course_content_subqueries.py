@@ -177,12 +177,23 @@ def results_count_subquery(
 # tuple layout unchanged.
 
 
-def latest_submission_grade_status_subquery(db: Session):
+def latest_submission_grade_status_subquery(
+    user_id: UUID | str | None,
+    course_member_id: UUID | str | None,
+    course_content_id: UUID | str | None,
+    db: Session,
+):
     """
     Get the grade status of the latest submission artifact per submission group.
 
     For each submission group, finds the latest submitted artifact (submit=true)
     and returns its latest grade's status.
+
+    Takes the same scope arguments as its sibling builders in this module, and
+    for the same reason. This one used to take only ``db``: it aggregated every
+    submitted artifact and every grade in the installation, on every dashboard
+    request, so the outer query could keep the caller's handful of rows and
+    discard the rest. Every call site already knows whose rows it wants.
 
     Returns columns:
         - submission_group_id
@@ -192,11 +203,33 @@ def latest_submission_grade_status_subquery(db: Session):
         - is_unreviewed: 1 if unreviewed (no grades or latest grade status=0), 0 otherwise
 
     Args:
+        user_id: Scope to this user's submission groups (mutually exclusive
+            with course_member_id)
+        course_member_id: Scope to this course member's submission groups
+        course_content_id: Additionally scope to one course content
         db: Database session
 
     Returns:
         Subquery with latest submission grade status info
     """
+    scope = None
+    if user_id is not None or course_member_id is not None or course_content_id is not None:
+        scope = db.query(SubmissionGroup.id).select_from(SubmissionGroup)
+        if user_id is not None:
+            scope = scope.join(
+                SubmissionGroupMember,
+                SubmissionGroupMember.submission_group_id == SubmissionGroup.id,
+            ).join(
+                CourseMember, CourseMember.id == SubmissionGroupMember.course_member_id
+            ).filter(CourseMember.user_id == user_id)
+        elif course_member_id is not None:
+            scope = scope.join(
+                SubmissionGroupMember,
+                SubmissionGroupMember.submission_group_id == SubmissionGroup.id,
+            ).filter(SubmissionGroupMember.course_member_id == course_member_id)
+        if course_content_id is not None:
+            scope = scope.filter(SubmissionGroup.course_content_id == course_content_id)
+        scope = scope.subquery()
     # Promote the "latest submitted artifact per submission_group"
     # aggregation to a CTE. Previously this was a ``.subquery()`` referenced
     # twice — once as the FROM in the outer return, and again inside the
@@ -205,12 +238,21 @@ def latest_submission_grade_status_subquery(db: Session):
     # WHERE submit=true GROUP BY ...`` block twice, forcing Postgres to
     # compute the aggregation twice per request (#119). A CTE is materialised
     # once and referenced N times.
-    latest_artifact_cte = (
+    latest_artifact_query = (
         db.query(
             SubmissionArtifact.submission_group_id,
             func.max(SubmissionArtifact.created_at).label("latest_artifact_created_at"),
         )
         .filter(SubmissionArtifact.submit == True)
+    )
+    # Narrowing the CTE narrows everything downstream: the grade ranking joins
+    # it, and the final left join reads off it.
+    if scope is not None:
+        latest_artifact_query = latest_artifact_query.filter(
+            SubmissionArtifact.submission_group_id.in_(select(scope.c.id))
+        )
+    latest_artifact_cte = (
+        latest_artifact_query
         .group_by(SubmissionArtifact.submission_group_id)
         .cte("latest_artifact_per_group")
     )

@@ -156,7 +156,7 @@ def _latest_grade_subquery(db, fx):
     from computor_backend.repositories.course_content_subqueries import (
         latest_submission_grade_status_subquery,
     )
-    sub = latest_submission_grade_status_subquery(db)
+    sub = latest_submission_grade_status_subquery(fx.student_user_id, None, None, db)
     return db.query(sub).all()
 
 

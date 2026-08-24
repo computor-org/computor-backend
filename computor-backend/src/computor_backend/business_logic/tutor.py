@@ -3,6 +3,7 @@ import logging
 from uuid import UUID
 from typing import List, Optional
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session, contains_eager, joinedload
 
 from computor_backend.business_logic.submission_limits import resolve_limits
@@ -341,10 +342,13 @@ def list_tutor_course_members(
     if cached is not None:
         return [TutorCourseMemberList.model_validate(item) for item in cached]
 
-    subquery = db.query(Course.id).select_from(User).filter(User.id == permissions.get_user_id_or_throw()) \
+    # Left as a subquery rather than ``.all()``-ed into a Python list: the ids
+    # only ever feed the IN below, and materialising them meant a round trip
+    # plus a bind parameter per accessible course.
+    tutor_course_ids = db.query(Course.id).select_from(User).filter(User.id == permissions.get_user_id_or_throw()) \
         .join(CourseMember, CourseMember.user_id == User.id) \
         .join(Course, Course.id == CourseMember.course_id) \
-        .filter(CourseMember.course_role_id.in_((allowed_course_role_ids("_tutor")))).all()
+        .filter(CourseMember.course_role_id.in_((allowed_course_role_ids("_tutor")))).subquery()
 
     query = course_course_member_list_query(db, course_id=course_id)
     query = query.join(User, User.id == CourseMember.user_id)
@@ -353,7 +357,7 @@ def list_tutor_course_members(
 
     if not permissions.is_admin:
         query = query.join(Course, Course.id == CourseMember.course_id).filter(
-            Course.id.in_([r.id for r in subquery])
+            Course.id.in_(select(tutor_course_ids.c.id))
         )
 
     query = query.order_by(User.family_name)
