@@ -141,29 +141,10 @@ export default function CoursePage() {
         />
 
         <ScrollArea>
-        {/* About — description + the few facts worth showing (no identifiers). */}
-        <SectionCard title="About">
-          {course.description && <p className="text-body">{course.description}</p>}
-          <DescriptionList
-            items={facts([
-              organization && { term: 'Organization', value: displayName(organization) },
-              courseFamily && { term: 'Course family', value: displayName(courseFamily) },
-              course.language_code && {
-                term: 'Language',
-                value: <span className="uppercase">{course.language_code}</span>,
-              },
-              course.created_at && {
-                term: 'Created',
-                value: new Date(course.created_at).toLocaleDateString(),
-              },
-              course.updated_at && {
-                term: 'Last updated',
-                value: new Date(course.updated_at).toLocaleDateString(),
-              },
-            ])}
-          />
-        </SectionCard>
-
+        {/* Ordered by what a member came here to do — open the editor, check
+            that their repository is in place — not by what the course *is*.
+            About holds the description and a handful of facts, so it reads as
+            reference material and sits last. */}
         {/* Workspaces — launch buttons for the course's allowed templates.
             The component hides itself (card and heading included) when the
             course offers none; the role gate only avoids a guaranteed-403
@@ -288,6 +269,29 @@ export default function CoursePage() {
           )}
         </SectionCard>
         )}
+        {/* About — description + the few facts worth showing (no identifiers). */}
+        <SectionCard title="About">
+          {course.description && <p className="text-body">{course.description}</p>}
+          <DescriptionList
+            items={facts([
+              organization && { term: 'Organization', value: displayName(organization) },
+              courseFamily && { term: 'Course family', value: displayName(courseFamily) },
+              course.language_code && {
+                term: 'Language',
+                value: <span className="uppercase">{course.language_code}</span>,
+              },
+              course.created_at && {
+                term: 'Created',
+                value: new Date(course.created_at).toLocaleDateString(),
+              },
+              course.updated_at && {
+                term: 'Last updated',
+                value: new Date(course.updated_at).toLocaleDateString(),
+              },
+            ])}
+          />
+        </SectionCard>
+
         </ScrollArea>
       </ListPageLayout>
     </AuthenticatedLayout>
