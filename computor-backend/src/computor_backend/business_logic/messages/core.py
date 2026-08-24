@@ -2,6 +2,7 @@
 user-filtered listing and thread assembly."""
 from uuid import UUID
 from typing import Tuple, List
+from sqlalchemy import literal
 from sqlalchemy.orm import Session
 
 from computor_backend.exceptions import BadRequestException, NotImplementedException
@@ -315,15 +316,31 @@ def get_message_thread(
             context={"message_id": str(message_id)},
         )
 
-    # Walk up the parent chain to find the root
-    root = start_message
-    while root.parent_id is not None:
-        parent = db.query(Message).filter(Message.id == root.parent_id).first()
-        if parent is None:
-            break
-        root = parent
-
-    root_id = str(root.id)
+    # Walk up the parent chain to find the root.
+    #
+    # One recursive query rather than one round trip per level, matching how
+    # the descendants are already fetched below. ``depth`` reproduces the old
+    # loop's behaviour exactly, including where it stopped: the deepest row the
+    # walk could actually reach, which for a chain whose parent row is missing
+    # is the last message that still exists.
+    if start_message.parent_id is None:
+        root_id = str(start_message.id)
+    else:
+        ancestors = (
+            db.query(Message.id, Message.parent_id, literal(0).label("depth"))
+            .filter(Message.id == str(start_message.id))
+            .cte(name="ancestors", recursive=True)
+        )
+        ancestors = ancestors.union_all(
+            db.query(Message.id, Message.parent_id, ancestors.c.depth + 1)
+            .filter(Message.id == ancestors.c.parent_id)
+        )
+        root_id = str(
+            db.query(ancestors.c.id)
+            .order_by(ancestors.c.depth.desc())
+            .limit(1)
+            .scalar()
+        )
 
     # Use recursive CTE to get all descendants of the root
     # This is efficient and handles arbitrary nesting depth
