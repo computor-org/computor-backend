@@ -571,7 +571,10 @@ async def list_artifact_grades(
         grades = [grade] if grade else []
         total = len(grades)
     else:
-        total = query.count()
+        # order_by(None): Query.count() wraps this in a subquery, and an
+        # ORDER BY inside it makes Postgres sort every matching grade only to
+        # count the rows.
+        total = query.order_by(None).count()
         grades = query.limit(params.limit).offset(params.skip).all()
 
     return paginated_list(grades, total, response=response, schema=SubmissionGradeList)
@@ -695,8 +698,9 @@ async def list_grades(
     # Order by graded_at descending
     query = query.order_by(SubmissionGrade.graded_at.desc())
 
-    # Get total count before pagination
-    total = query.count()
+    # Get total count before pagination (order_by(None) so the count does not
+    # sort a result set it only counts — see list_artifact_grades above).
+    total = query.order_by(None).count()
 
     # Apply pagination
     grades = query.limit(params.limit).offset(params.skip).all()
