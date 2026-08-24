@@ -204,11 +204,37 @@ export default function CoursePage() {
         />
 
         <ScrollArea>
-        {/* Cards are ordered by what a member came here to do — open the editor,
-            check that their repository is in place — not by what the course *is*;
-            About is reference material and sits last.
+        {/* About — description + the few facts worth showing (no identifiers).
+            First card: the course introduces itself before it hands out tools,
+            and the description is what a member opening an unfamiliar course
+            came to read.
 
-            Workspaces: launch buttons for the course's allowed templates. The
+            "Your role" leads because it is the only line here that is about the
+            reader. The record timestamps are administrative trivia to everyone
+            below the lecturer cohort, and the language already sits in the page
+            header, so neither is repeated to a student. */}
+        <SectionCard title="About">
+          {course.description && <p className="text-body">{course.description}</p>}
+          <DescriptionList
+            items={facts([
+              myRole && { term: 'Your role', value: <Badge tone="info">{myRole}</Badge> },
+              organization && { term: 'Organization', value: displayName(organization) },
+              courseFamily && { term: 'Course family', value: displayName(courseFamily) },
+              canManageMembers &&
+                course.created_at && {
+                  term: 'Created',
+                  value: new Date(course.created_at).toLocaleDateString(),
+                },
+              canManageMembers &&
+                course.updated_at && {
+                  term: 'Last updated',
+                  value: new Date(course.updated_at).toLocaleDateString(),
+                },
+            ])}
+          />
+        </SectionCard>
+
+        {/* Workspaces: launch buttons for the course's allowed templates. The
             component hides itself (card and heading included) when the course
             offers none; the role gate only avoids a guaranteed-403 fetch for
             non-members. The card chrome is the caller's because the compact
@@ -397,32 +423,6 @@ export default function CoursePage() {
             )}
           </SectionCard>
         )}
-
-        {/* About — description + the few facts worth showing (no identifiers).
-            "Your role" leads because it is the only line here that is about the
-            reader. The record timestamps are administrative trivia to everyone
-            below the lecturer cohort, and the language already sits in the page
-            header, so neither is repeated to a student. */}
-        <SectionCard title="About">
-          {course.description && <p className="text-body">{course.description}</p>}
-          <DescriptionList
-            items={facts([
-              myRole && { term: 'Your role', value: <Badge tone="info">{myRole}</Badge> },
-              organization && { term: 'Organization', value: displayName(organization) },
-              courseFamily && { term: 'Course family', value: displayName(courseFamily) },
-              canManageMembers &&
-                course.created_at && {
-                  term: 'Created',
-                  value: new Date(course.created_at).toLocaleDateString(),
-                },
-              canManageMembers &&
-                course.updated_at && {
-                  term: 'Last updated',
-                  value: new Date(course.updated_at).toLocaleDateString(),
-                },
-            ])}
-          />
-        </SectionCard>
 
         </ScrollArea>
       </ListPageLayout>
