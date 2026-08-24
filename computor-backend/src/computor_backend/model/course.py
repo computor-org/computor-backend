@@ -146,8 +146,6 @@ class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
         # on the table and `title` is that endpoint's ORDER BY. Partial, so
         # only the handful of public rows are ever indexed.
         Index('ix_course_public_title', 'title', postgresql_where=text('public')),
-        # The organization permission filter resolves accessible courses by owner.
-        Index('course_organization_idx', 'organization_id'),
     )
 
     properties = Column(JSONB)
@@ -196,9 +194,6 @@ class CourseContentType(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
         CheckConstraint("(slug)::text ~* '^[A-Za-z0-9_-]+$'::text"),
         Index('course_content_type_course_id_key', 'id', 'course_id', unique=True),
         Index('course_content_type_slug_key', 'slug', 'course_id', 'course_content_kind_id', unique=True),
-        # Neither index above leads with course_id, so "the types of this course"
-        # — asked on every content listing — could not use either.
-        Index('course_content_type_course_idx', 'course_id'),
     )
 
     properties = Column(JSONB)
@@ -241,8 +236,6 @@ class CourseContent(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
                            ondelete='RESTRICT', onupdate='RESTRICT'),
         Index('course_content_path_key', 'course_id', 'path', unique=True),
         CheckConstraint("path::text ~ '^[a-z0-9_]+(\\.[a-z0-9_]+)*$'", name='course_content_path_format'),
-        # Joined to course_content_type on every content read.
-        Index('course_content_course_content_type_idx', 'course_content_type_id'),
         # Note: Example-submittable validation is enforced by database trigger
         # validate_course_content_example_submittable_trigger
     )
@@ -343,10 +336,12 @@ class CourseMember(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
                            ['course_group.course_id', 'course_group.id'], 
                            ondelete='RESTRICT', onupdate='RESTRICT'),
         Index('course_member_key', 'user_id', 'course_id', unique=True),
-        # Tutor views filter a roster down to one group; the role filter is what
-        # every course-scoped permission subquery narrows on.
+        # Tutor rosters, message audiences and the websocket fan-out all filter
+        # a course's members down to one group, with nothing else to narrow on.
+        # (An index on course_role_id was measured too and dropped: that filter
+        # never appears without user_id or course_id beside it, and those
+        # indexes always win the plan.)
         Index('course_member_course_group_idx', 'course_group_id'),
-        Index('course_member_course_role_idx', 'course_role_id'),
     )
 
     properties = Column(JSONB)
