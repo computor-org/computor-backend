@@ -635,9 +635,7 @@ def list_tutor_submission_groups(
         Course, Course.id == CourseMember.course_id
     ).filter(
         CourseMember.course_role_id.in_(allowed_course_role_ids("_tutor"))
-    ).all()
-
-    tutor_course_id_list = [c.id for c in tutor_course_ids]
+    ).subquery()
 
     # Base query with member count, excluding archived course content
     from computor_backend.model.course import CourseContent
@@ -660,7 +658,7 @@ def list_tutor_submission_groups(
 
     # Filter by tutor's courses (unless admin)
     if not permissions.is_admin:
-        query = query.filter(SubmissionGroup.course_id.in_(tutor_course_id_list))
+        query = query.filter(SubmissionGroup.course_id.in_(select(tutor_course_ids.c.id)))
 
     # Apply filters from params
     if params.course_id:
@@ -697,7 +695,26 @@ def list_tutor_submission_groups(
                 )
             )
 
-    # Apply pagination
+    if params.has_ungraded_submissions is not None:
+        # Decided in SQL, not after paginating. This filter used to run in the
+        # loop below with a ``continue``, which drops rows the database already
+        # counted towards LIMIT: a page came back short, and the groups that
+        # fell off the end of it were unreachable by paging further.
+        has_ungraded = exists().where(
+            and_(
+                SubmissionArtifact.submission_group_id == SubmissionGroup.id,
+                SubmissionArtifact.submit == True,
+                ~exists().where(SubmissionGrade.artifact_id == SubmissionArtifact.id),
+            )
+        )
+        query = query.filter(
+            has_ungraded if params.has_ungraded_submissions else ~has_ungraded
+        )
+
+    # Apply pagination. The tiebreaker makes paging stable: without an ORDER BY
+    # the database is free to hand back page 2 in a different order than it
+    # ordered page 1 from, which repeats rows and hides others.
+    query = query.order_by(SubmissionGroup.id)
     query = query.offset(params.offset).limit(params.limit)
 
     results = query.all()
@@ -724,13 +741,6 @@ def list_tutor_submission_groups(
             submission_group.id, (0, None)
         )
         has_ungraded = submission_group.id in ungraded_group_ids
-
-        if params.has_ungraded_submissions is not None:
-            # Skip if filtering for ungraded and this group doesn't match
-            if params.has_ungraded_submissions and not has_ungraded:
-                continue
-            if not params.has_ungraded_submissions and has_ungraded:
-                continue
 
         # Determine display name
         display_name = submission_group.display_name
