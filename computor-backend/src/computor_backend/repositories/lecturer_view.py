@@ -249,14 +249,21 @@ class LecturerViewRepository(ViewRepository):
         # Batch-compute has_newer_version for all deployments
         newer_version_map = self._compute_has_newer_version_batch(course_contents)
 
-        # Use CourseRepository with cache for efficient course lookups
+        # Resolve every course this page touches once, up front. This lookup is
+        # per course, not per content, but it used to sit inside the loop below:
+        # a 170-content tree asked for the same one or two courses 170 times,
+        # and the repository cache only softened that when it was warm.
         course_repo = CourseRepository(self.db, self.cache)
+        courses_by_id = {
+            course_id: course_repo.get_by_id_optional(course_id)
+            for course_id in {cc.course_id for cc in course_contents}
+        }
 
         # Build response with course repository info for each item
         result = []
         for course_content in course_contents:
             # Get the course to extract GitLab repository information (cached)
-            course = course_repo.get_by_id_optional(course_content.course_id)
+            course = courses_by_id.get(course_content.course_id)
 
             # Safely extract GitLab properties (handle dict or None)
             gitlab_props = {}
