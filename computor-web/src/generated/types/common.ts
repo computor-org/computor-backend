@@ -555,8 +555,10 @@ export interface CodeAbilityMeta {
   links?: CodeAbilityLink[] | null;
   /** Supporting material links */
   supportingMaterial?: CodeAbilityLink[] | null;
-  /** Keywords for categorization */
+  /** Keywords for categorization; stored as the example's tags */
   keywords?: string[] | null;
+  /** Single grouping for this example, e.g. 'Numerics' or 'Plotting' */
+  category?: string | null;
   /** Assignment-specific properties */
   properties?: CodeAbilityMetaProperties | null;
 }

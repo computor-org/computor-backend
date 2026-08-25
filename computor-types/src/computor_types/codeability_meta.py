@@ -244,7 +244,11 @@ class CodeAbilityMeta(CodeAbilityBase):
     )
     keywords: Optional[List[str]] = Field(
         default_factory=list,
-        description="Keywords for categorization"
+        description="Keywords for categorization; stored as the example's tags"
+    )
+    category: Optional[str] = Field(
+        None,
+        description="Single grouping for this example, e.g. 'Numerics' or 'Plotting'"
     )
     properties: Optional[CodeAbilityMetaProperties] = Field(
         default_factory=CodeAbilityMetaProperties,

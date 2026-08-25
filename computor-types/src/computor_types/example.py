@@ -80,7 +80,6 @@ class ExampleCreate(BaseModel):
     identifier: str = Field(..., description="Hierarchical identifier with dots as separators")
     title: str
     description: Optional[str] = None
-    subject: Optional[str] = None
     category: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
 
@@ -110,7 +109,6 @@ class ExampleList(BaseEntityList):
     directory: str
     identifier: str
     title: str
-    subject: Optional[str] = None
     category: Optional[str] = None
     tags: List[str] = []
     example_repository_id: str
@@ -127,7 +125,6 @@ class ExampleUpdate(BaseModel):
     identifier: Optional[str] = None
     title: Optional[str] = None
     description: Optional[str] = None
-    subject: Optional[str] = None
     category: Optional[str] = None
     tags: Optional[List[str]] = None
 

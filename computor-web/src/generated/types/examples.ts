@@ -87,7 +87,6 @@ export interface ExampleCreate {
   identifier: string;
   title: string;
   description?: string | null;
-  subject?: string | null;
   category?: string | null;
   tags?: string[];
 }
@@ -102,7 +101,6 @@ export interface ExampleGet {
   identifier: string;
   title: string;
   description?: string | null;
-  subject?: string | null;
   category?: string | null;
   tags?: string[];
   created_at: string;
@@ -127,7 +125,6 @@ export interface ExampleList {
   directory: string;
   identifier: string;
   title: string;
-  subject?: string | null;
   category?: string | null;
   tags?: string[];
   example_repository_id: string;
@@ -140,7 +137,6 @@ export interface ExampleUpdate {
   identifier?: string | null;
   title?: string | null;
   description?: string | null;
-  subject?: string | null;
   category?: string | null;
   tags?: string[] | null;
 }
