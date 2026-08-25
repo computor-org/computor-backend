@@ -36,6 +36,39 @@ system_router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _binding_deploy_urls(binding) -> tuple[Optional[str], Optional[str]]:
+    """The (student-template, reference) push URLs a course git binding names.
+
+    Kept free of the request and the session so the precedence it encodes can be
+    tested directly. Returns ``(None, None)`` for a binding that names no
+    template, which lets the caller fall back to legacy ``properties.gitlab``.
+
+    The reference repository is not a column: GitLab keeps its path under
+    ``properties.gitlab.reference_path`` and Forgejo keeps a full ref under
+    ``properties.forgejo.reference_repo`` — the same two keys
+    ``push_reference_repo`` reads. Both are resolved against the bound server's
+    base URL, and neither is assumed to be named ``reference``: an adopted
+    legacy course points at ``assignments``.
+    """
+    if binding is None or not binding.template_url:
+        return None, None
+
+    template_url = binding.template_url
+
+    properties = binding.properties or {}
+    reference_ref = (
+        (properties.get("gitlab") or {}).get("reference_path")
+        or (properties.get("forgejo") or {}).get("reference_repo")
+    )
+    reference_url = None
+    server = getattr(binding, "git_server", None)
+    base_url = (getattr(server, "base_url", None) or "").rstrip("/")
+    if reference_ref and base_url:
+        reference_url = f"{base_url}/{reference_ref}.git"
+
+    return template_url, reference_url
+
+
 @system_router.post("/deploy/courses", response_model=TaskResponse)
 async def create_course_async(
     request: CourseTaskRequest,
@@ -151,26 +184,33 @@ async def generate_student_template(
 
     # Managed courses keep the student-template location in the CourseGitBinding
     # (and the push token on the bound GitServer), not in course/org
-    # properties.gitlab. Resolve from the binding first; the legacy properties
-    # path below remains the fallback for pre-binding (org-level GitLab) courses.
+    # properties.gitlab. The binding is authoritative when it names a template;
+    # the legacy properties path below is the fallback for pre-binding
+    # (org-level GitLab) courses only.
     binding = (
         db.query(CourseGitBinding)
         .filter(CourseGitBinding.course_id == course_id)
         .first()
     )
-    if binding is not None and binding.template_url:
-        student_template_url = binding.template_url
+    if binding is not None:
+        student_template_url, assignments_url = _binding_deploy_urls(binding)
 
     # First check if course has GitLab properties
     if course.properties and "gitlab" in course.properties:
         course_gitlab = course.properties["gitlab"]
-        
-        # Option 1: Direct URLs stored (backward compatibility)
-        if "student_template_url" in course_gitlab:
+
+        # Option 1: Direct URLs stored (backward compatibility).
+        #
+        # These are a FALLBACK, never an override: a course adopted from the
+        # legacy system keeps a `student_template_url` that may be stale, and a
+        # release-created course's legacy value says `student-template` while
+        # the repository is actually named `template`. Letting either win over
+        # the binding makes the binding decorative.
+        if not student_template_url and "student_template_url" in course_gitlab:
             student_template_url = course_gitlab["student_template_url"]
-        if "assignments_url" in course_gitlab:
+        if not assignments_url and "assignments_url" in course_gitlab:
             assignments_url = course_gitlab["assignments_url"]
-        
+
         # Option 2: Construct from course's full_path
         if "full_path" in course_gitlab and (not student_template_url or not assignments_url):
             # Get GitLab URL from organization
@@ -347,8 +387,21 @@ async def generate_assignments(
             context={"course_id": str(course_id)}
         )
 
-    # Determine assignments URL if not provided
+    # Determine assignments URL if not provided.
+    #
+    # The binding comes first for the same reason as in generate_student_template:
+    # it is the only source that knows the repository's real name. A course
+    # created on the release model calls it `reference`, and an adopted legacy
+    # course calls it `assignments` — deriving `<full_path>/assignments` from
+    # course properties is right for exactly one of those.
     assignments_url = request.assignments_url
+    if not assignments_url:
+        binding = (
+            db.query(CourseGitBinding)
+            .filter(CourseGitBinding.course_id == course_id)
+            .first()
+        )
+        _, assignments_url = _binding_deploy_urls(binding)
     if not assignments_url and course.properties and 'gitlab' in course.properties:
         course_gitlab = course.properties['gitlab']
         if 'assignments_url' in course_gitlab:
@@ -471,10 +524,25 @@ async def get_course_gitlab_status(
         "recommendations": []
     }
     
+    # A bound course carries its template location on the binding, which may name
+    # a repository the course properties know nothing about (an adopted legacy
+    # course points at `student-template`, a release-created one at `template`).
+    # Without this, such a course reports "cannot generate" while the deploy
+    # itself would have worked.
+    binding = (
+        db.query(CourseGitBinding)
+        .filter(CourseGitBinding.course_id == course_id)
+        .first()
+    )
+    binding_template_url, _ = _binding_deploy_urls(binding)
+    if binding_template_url:
+        status["has_student_template_url"] = True
+        status["gitlab_config"]["student_template_url"] = binding_template_url
+
     if course.properties and "gitlab" in course.properties:
         status["has_gitlab_config"] = True
         gitlab_props = course.properties["gitlab"]
-        
+
         # Check for group ID
         if "group_id" in gitlab_props:
             status["has_group_id"] = True
@@ -482,11 +550,11 @@ async def get_course_gitlab_status(
         else:
             status["missing_items"].append("GitLab group ID")
             
-        # Check for student template URL
-        if "student_template_url" in gitlab_props:
+        # Check for student template URL (fallback — the binding above wins)
+        if not status["has_student_template_url"] and "student_template_url" in gitlab_props:
             status["has_student_template_url"] = True
             status["gitlab_config"]["student_template_url"] = gitlab_props["student_template_url"]
-        else:
+        elif not status["has_student_template_url"]:
             status["missing_items"].append("Student template repository URL")
             
         # Check for other GitLab properties

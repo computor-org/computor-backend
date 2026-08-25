@@ -281,6 +281,91 @@ class GitLabProviderClient:
             "students_group_path": students.full_path,
         }
 
+    # ------------------------------------------------------------------
+    # Read-only resolution of an EXISTING structure (legacy adoption).
+    #
+    # The write twin above, ``ensure_course_structure``, hardcodes the repo
+    # names ``template`` and ``reference``. A legacy course names the same two
+    # repos ``student-template`` and ``assignments``, so adoption passes the
+    # paths in explicitly and these create nothing.
+    #
+    # Resolution is by full path (``group/sub/project``) rather than through
+    # ``_find_project_in_namespace``: that helper searches by name and compares
+    # namespace ids with an untyped ``==``, and legacy ids arrive from JSONB as
+    # ints while a freshly resolved namespace id may be a str.
+    # ------------------------------------------------------------------
+
+    def resolve_project(self, ref):
+        """An existing project by numeric id or ``group/sub/project`` full path.
+
+        Raises ``GitlabGetError`` (404) when it does not exist. Creates nothing.
+        """
+        return self._gl().projects.get(ref)
+
+    def resolve_group(self, ref):
+        """An existing group by numeric id or full path. Creates nothing."""
+        return self._gl().groups.get(ref)
+
+    def describe_existing_course_structure(
+        self,
+        *,
+        template_path,
+        reference_path=None,
+        students_group_path=None,
+        course_group_path=None,
+    ) -> dict:
+        """Read-only twin of ``ensure_course_structure`` for repos that already
+        exist under any naming.
+
+        Returns the same key set, so an adopted binding is indistinguishable
+        from a natively provisioned one to every consumer. Pieces that cannot be
+        resolved are simply absent rather than raising — except the template,
+        which is the one identity the caller cannot do without.
+        """
+        found: dict = {}
+
+        template = self.resolve_project(template_path)
+        found["template_project_id"] = int(template.id)
+        found["template_path"] = template.path_with_namespace
+        found["template_url"] = construct_gitlab_http_url(
+            self._url, template.path_with_namespace
+        )
+        namespace = template.namespace
+        namespace_id = (
+            namespace.get("id") if hasattr(namespace, "get") else getattr(namespace, "id", None)
+        )
+        if namespace_id is not None:
+            found["course_group_id"] = int(namespace_id)
+
+        if reference_path:
+            try:
+                reference = self.resolve_project(reference_path)
+                found["reference_project_id"] = int(reference.id)
+                found["reference_path"] = reference.path_with_namespace
+            except Exception:
+                # A course without a reference repo still deploys templates; the
+                # reference push simply stays disabled until it is repaired.
+                pass
+
+        for key_id, key_path, ref in (
+            ("students_group_id", "students_group_path", students_group_path),
+            ("course_group_id", "course_group_path", course_group_path),
+        ):
+            if not ref:
+                continue
+            try:
+                group = self.resolve_group(ref)
+            except Exception:
+                continue
+            found[key_id] = int(group.id)
+            found[key_path] = group.full_path
+            parent_id = getattr(group, "parent_id", None)
+            if key_path == "course_group_path" and parent_id is not None:
+                # The DTO types this one as a string; every other id is an int.
+                found["parent_group_id"] = str(parent_id)
+
+        return found
+
     def provision_student_fork(self, template_project_id, students_group_id, new_name, new_path=None) -> StudentRepoResult:
         """Fork the course ``template`` project into the ``students`` subgroup as
         the student's repository. Idempotent (returns the existing fork if present).
