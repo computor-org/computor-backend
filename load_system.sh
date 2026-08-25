@@ -66,6 +66,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${ENV_FILE:-$ROOT/.env}"
 IN_DIR="${IN_DIR:-$ROOT/computor_export.tar.gz}"
 
+# The legacy system's single alembic head. A dump at any other revision is not
+# the thing this script knows how to migrate.
+LEGACY_HEAD="cc1d2e3f4a5b"
+
 [[ -f "$ENV_FILE" ]] || { echo "ERROR: target .env not found at $ENV_FILE" >&2; exit 1; }
 set -a; source "$ENV_FILE"; set +a
 
@@ -101,6 +105,21 @@ if [[ "${SKIP_RESTORE:-0}" != "1" ]]; then
   echo "TARGET: db '$PGDB_VAL' @ 127.0.0.1:$PGPORT_VAL   |   MinIO @ 127.0.0.1:$MINIO_PORT_VAL"
   echo "SOURCE: $IN_DIR"
   echo "!! This DROPS and recreates the target database '$PGDB_VAL'."
+
+  # `dropdb --force` terminates existing connections, but the API and the
+  # Temporal workers reconnect within seconds — against a half-restored
+  # database, where they can auto-provision users and fail migrations on locks.
+  # Refuse to start while anything else is connected.
+  others="$(PGPASSWORD="$POSTGRES_PASSWORD" docker run --rm --network host -e PGPASSWORD postgres:16 \
+    psql -h 127.0.0.1 -p "$PGPORT_VAL" -U "$PGUSER_VAL" -d postgres -tAc \
+    "SELECT count(*) FROM pg_stat_activity WHERE datname = '$PGDB_VAL' AND pid <> pg_backend_pid()" 2>/dev/null || echo 0)"
+  if [[ "${others:-0}" -gt 0 ]]; then
+    echo "ERROR: $others other connection(s) to '$PGDB_VAL' are open." >&2
+    echo "       Stop the API and the Temporal workers first (./api.sh stop, ./computor.sh down)," >&2
+    echo "       or they will reconnect to a half-restored database." >&2
+    exit 1
+  fi
+
   if [[ "${FORCE:-0}" != "1" ]]; then
     read -r -p "Proceed? type 'yes': " ans; [[ "$ans" == "yes" ]] || { echo "aborted"; exit 1; }
   fi
@@ -113,10 +132,17 @@ if [[ "${SKIP_RESTORE:-0}" != "1" ]]; then
   PGPASSWORD="$POSTGRES_PASSWORD" docker run --rm -i --network host -e PGPASSWORD postgres:16 \
     pg_restore -h 127.0.0.1 -p "$PGPORT_VAL" -U "$PGUSER_VAL" -d "$PGDB_VAL" --no-owner --no-acl \
     < "$IN_DIR/computor_db.dump"
-  echo "   restored (alembic_version below should be main's head cc1d2e3f4a5b):"
-  PGPASSWORD="$POSTGRES_PASSWORD" docker run --rm --network host -e PGPASSWORD postgres:16 \
-    psql -h 127.0.0.1 -p "$PGPORT_VAL" -U "$PGUSER_VAL" -d "$PGDB_VAL" -tAc "SELECT version_num FROM alembic_version" \
-    | sed 's/^/     /'
+  # Assert rather than print: the stages below assume the legacy schema, and
+  # their behaviour on an unexpected revision is undefined.
+  restored_head="$(PGPASSWORD="$POSTGRES_PASSWORD" docker run --rm --network host -e PGPASSWORD postgres:16 \
+    psql -h 127.0.0.1 -p "$PGPORT_VAL" -U "$PGUSER_VAL" -d "$PGDB_VAL" -tAc "SELECT version_num FROM alembic_version")"
+  echo "   restored at alembic head: ${restored_head:-<none>}"
+  if [[ "$restored_head" != "$LEGACY_HEAD" ]]; then
+    echo "ERROR: expected the legacy head $LEGACY_HEAD, got '${restored_head:-<none>}'." >&2
+    echo "       This dump is not from the legacy system this script migrates." >&2
+    echo "       Set SKIP_RESTORE=1 to skip stage 1 if you know what you are doing." >&2
+    exit 1
+  fi
 
   echo ">> restoring MinIO buckets ..."
   BUCKETS=""
@@ -124,11 +150,11 @@ if [[ "${SKIP_RESTORE:-0}" != "1" ]]; then
   if [[ -z "${BUCKETS// }" ]]; then
     echo "   (no buckets in $IN_DIR/minio — skipping)"
   else
-    MINIO_PASS="$MINIO_PASS_VAL" BUCKETS="$BUCKETS" \
-    docker run --rm --network host -e MINIO_PASS -e BUCKETS \
+    MINIO_USER="$MINIO_USER_VAL" MINIO_PASS="$MINIO_PASS_VAL" BUCKETS="$BUCKETS" \
+    docker run --rm --network host -e MINIO_USER -e MINIO_PASS -e BUCKETS \
       -v "$IN_DIR/minio:/import" --entrypoint sh minio/mc -c '
         set -e
-        mc alias set dst "http://127.0.0.1:'"$MINIO_PORT_VAL"'" "'"$MINIO_USER_VAL"'" "$MINIO_PASS" >/dev/null 2>&1
+        mc alias set dst "http://127.0.0.1:'"$MINIO_PORT_VAL"'" "$MINIO_USER" "$MINIO_PASS" >/dev/null 2>&1
         for b in $BUCKETS; do
           echo "   bucket: $b"
           mc mb --ignore-existing "dst/$b" >/dev/null
@@ -194,6 +220,15 @@ if [[ "${SKIP_ADOPT:-0}" != "1" ]]; then
     read -r -s -p "   Legacy TOKEN_SECRET to decrypt migrated tokens (blank = same as target's): " LEGACY_TOKEN_SECRET || true
     echo
   fi
+  # Defaulting to the target's secret is right for a same-system re-run and
+  # wrong for an actual migration, where it produces a decrypt failure that
+  # looks like a corrupt token. Non-interactively, make the choice explicit.
+  if [[ -z "${LEGACY_TOKEN_SECRET:-}" && "${ADOPT_APPLY:-0}" == "1" ]]; then
+    echo "ERROR: LEGACY_TOKEN_SECRET is not set and there is no terminal to ask." >&2
+    echo "       Set it to the SOURCE system's TOKEN_SECRET, or set it equal to this" >&2
+    echo "       system's if the snapshot was taken from this same system." >&2
+    exit 1
+  fi
   export LEGACY_TOKEN_SECRET="${LEGACY_TOKEN_SECRET:-${TOKEN_SECRET:-}}"
 
   adopt_args=()
@@ -202,7 +237,7 @@ if [[ "${SKIP_ADOPT:-0}" != "1" ]]; then
   [[ -n "${GITLAB_BASE_URL:-}" ]] && adopt_args+=(--gitlab-base-url "$GITLAB_BASE_URL")
   [[ -n "${GITLAB_NAME:-}" ]] && adopt_args+=(--gitlab-name "$GITLAB_NAME")
 
-  "$PY_BIN" "$ADOPT_PY" "${adopt_args[@]:-}"
+  "$PY_BIN" "$ADOPT_PY" ${adopt_args[@]+"${adopt_args[@]}"}
 else
   echo ">> [4/4] SKIP_ADOPT=1 -> skipping git adoption"
 fi

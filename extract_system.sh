@@ -15,8 +15,8 @@
 # computor-postgres-1). Needs Docker; needs NO psql/mc on the host.
 #
 # Usage (run from the SOURCE repo root, or point ENV_FILE at its .env):
-#     bash tmp/extract_system.sh
-#     ENV_FILE=/path/to/source/.env OUT_DIR=./export_main bash tmp/extract_system.sh
+#     bash extract_system.sh
+#     ENV_FILE=/path/to/source/.env OUT_DIR=./export_main bash extract_system.sh
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
@@ -52,11 +52,17 @@ echo "   -> $OUT_DIR/computor_db.dump ($(du -h "$OUT_DIR/computor_db.dump" | cut
 # `mc mirror <alias> <dir>` mirrors ALL buckets into <dir>/<bucket>/... (no per-
 # bucket enumeration needed, so no awk — the minio/mc image is minimal).
 echo ">> [2/2] mirroring ALL MinIO buckets from 127.0.0.1:$MINIO_PORT_VAL (only failures are printed) ..."
-MINIO_PASS="$MINIO_PASS_VAL" \
-docker run --rm --network host -e MINIO_PASS -e MC_CONFIG_DIR=/tmp/mc --user "$(id -u):$(id -g)" \
+# Both credentials go in as environment variables and are only ever expanded
+# INSIDE the container's shell: splicing them into the `sh -c` string breaks on
+# quotes and `$`, and an MC_HOST_-style URL breaks on the `/ + =` that a
+# base64-generated secret routinely contains. Neither value appears in argv.
+# NOTE: this mirrors object CONTENT only — bucket policies, versioning and
+# lifecycle rules are not carried over.
+MINIO_USER="$MINIO_USER_VAL" MINIO_PASS="$MINIO_PASS_VAL" \
+docker run --rm --network host -e MINIO_USER -e MINIO_PASS -e MC_CONFIG_DIR=/tmp/mc --user "$(id -u):$(id -g)" \
   -v "$OUT_DIR/minio:/export" --entrypoint sh minio/mc -c '
     set -e
-    mc alias set src "http://127.0.0.1:'"$MINIO_PORT_VAL"'" "'"$MINIO_USER_VAL"'" "$MINIO_PASS" >/dev/null 2>&1
+    mc alias set src "http://127.0.0.1:'"$MINIO_PORT_VAL"'" "$MINIO_USER" "$MINIO_PASS" >/dev/null 2>&1
     mc mirror --overwrite src /export 1>/dev/null   # per-object successes go to stdout -> dropped; errors (stderr) still print
   '
 
