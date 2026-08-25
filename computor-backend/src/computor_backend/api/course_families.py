@@ -56,8 +56,13 @@ async def delete_course_family_endpoint(
         raise NotFoundException(detail=f"Course family not found: {course_family_id}")
 
     # Guard: never cascade through courses. A family with courses must be emptied
-    # first (deleting a course tears down its Forgejo repos and members properly),
-    # otherwise an org/family delete silently orphans student repositories.
+    # first, otherwise an org/family delete silently orphans student repositories.
+    #
+    # Note that deleting a course does NOT remove anything from the git server
+    # either — the org, the student repositories, the graders team and the
+    # per-user clone tokens all survive. Deleting one course at a time at least
+    # makes that visible and recoverable, rather than losing a whole family's
+    # worth of repositories in a single call.
     course_count = db.query(Course).filter(Course.course_family_id == str(course_family_id)).count()
     if course_count > 0 and not dry_run:
         raise ConflictException(

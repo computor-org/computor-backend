@@ -566,6 +566,28 @@ def _resolve_oidc_handle(user_id: str, db: Session) -> Optional[str]:
     return None
 
 
+def _lock_clone_token(user_id: str, server_id, db: Session) -> None:
+    """Hold a per-(user, server) lock for the rest of this transaction.
+
+    Forgejo keeps ONE clone token per user and instance, and minting deletes the
+    existing one first, so the read-then-mint below has to be serialized across
+    workers — an in-process lock would not be enough. Advisory locks are
+    transaction-scoped and released automatically on commit or rollback.
+
+    Best-effort: a database that cannot take the lock should not stop a student
+    from getting their repository.
+    """
+    from sqlalchemy import text
+
+    try:
+        db.execute(
+            text("SELECT pg_advisory_xact_lock(hashtext(:key)::bigint)"),
+            {"key": f"clone-token:{user_id}:{server_id}"},
+        )
+    except Exception as exc:  # pragma: no cover - depends on the backend
+        logger.warning("Could not take the clone-token lock for %s: %s", user_id, exc)
+
+
 def _stored_clone_token(user_id: str, server_id, db: Session) -> Optional[str]:
     """The clone token remembered for this user and Forgejo server, if any.
 
@@ -891,6 +913,12 @@ def _provisioned_response(
         handle = _resolve_oidc_handle(user_id, db)
         creds = _forgejo_admin_basic_auth_for(server) if server is not None else None
         if server is not None and handle and creds:
+            # Serialize per (user, server). Minting DELETES any same-named token
+            # before creating the new one, so two concurrent provision calls (the
+            # extension retries readily) would both see nothing stored, both
+            # mint, and the second would revoke the token the first just handed
+            # back — leaving that client with 401s until the next call healed it.
+            _lock_clone_token(user_id, rec.git_server_id, db)
             if not rotate:
                 clone_token = _stored_clone_token(user_id, rec.git_server_id, db)
             if not clone_token:
@@ -1500,3 +1528,53 @@ def get_template_archive_source(
         raise NotFoundException(error_code="GIT_002", detail="You are not a member of this course")
 
     return resolve_template_archive_source(course_id, db)
+
+
+def revoke_course_member_git_access(member, permissions, db: Session) -> None:
+    """Take away a departing member's access to their course repository.
+
+    Wired as a ``pre_delete`` guard so the repository record is still readable.
+    Deleting a course member used to be purely a database operation: the row and
+    its ``course_member_repository`` went away, but on the git server the person
+    kept write access to the repository forever.
+
+    Deliberately does NOT revoke their clone token. Forgejo issues one token per
+    user per instance and it is shared by every course they are in, so revoking
+    it here would break the repositories of the courses they remain enrolled in.
+    Removing the collaborator grant is what actually removes the access.
+
+    Best effort: a git server that is down must not stop someone being removed
+    from a course.
+    """
+    try:
+        rec = (
+            db.query(CourseMemberGitRepository)
+            .filter(CourseMemberGitRepository.course_member_id == str(member.id))
+            .first()
+        )
+        if rec is None or rec.mode != "managed" or not rec.git_server_id or not rec.repo_ref:
+            return
+
+        server = db.query(GitServer).filter(GitServer.id == rec.git_server_id).first()
+        if server is None or server.type != "forgejo":
+            # GitLab access is a project membership managed with the group token;
+            # nothing repo-scoped to revoke here today.
+            return
+
+        handle = _resolve_oidc_handle(str(member.user_id), db)
+        if not handle:
+            return
+
+        owner, _, repo = rec.repo_ref.partition("/")
+        if not owner or not repo:
+            return
+
+        client = get_provider_client_for_server(server)
+        if hasattr(client, "remove_collaborator"):
+            client.remove_collaborator(owner, repo, handle)
+            logger.info(
+                "Revoked %s's collaborator access on %s after course-member removal",
+                handle, rec.repo_ref,
+            )
+    except Exception as exc:  # pragma: no cover - never block a deletion
+        logger.warning("Could not revoke git access for course member %s: %s", member.id, exc)

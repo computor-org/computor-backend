@@ -182,10 +182,16 @@ def _require_registry_admin(principal: Principal) -> None:
 
 def _to_get(server: GitServer) -> GitServerGet:
     parent_group_id = ((server.properties or {}).get("gitlab") or {}).get("parent_group_id")
+    # Surface the public host, not the docker-internal one. Listing the registry
+    # is open to any authenticated user, so an unrewritten base_url published
+    # `http://computor-forgejo:3030` to every student — and it is inconsistent
+    # with every other git URL the API returns, all of which are rewritten.
+    from computor_backend.git_server.config import to_public_git_url
+
     return GitServerGet(
         id=str(server.id),
         type=server.type,
-        base_url=server.base_url,
+        base_url=to_public_git_url(server.base_url) or server.base_url,
         name=server.name,
         managed=bool(server.managed),
         has_token=bool(server.token),

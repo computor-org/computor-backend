@@ -26,7 +26,7 @@ from temporalio import workflow, activity
 from temporalio.common import RetryPolicy
 from sqlalchemy.orm import Session
 from gitlab import Gitlab
-from gitlab.exceptions import GitlabGetError
+from gitlab.exceptions import GitlabError, GitlabGetError
 
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .registry import register_task
@@ -174,10 +174,13 @@ def find_existing_repository(
         for project in namespace_group.projects.list(search=repo_path, per_page=10):
             if project.path == repo_path:
                 return gitlab.projects.get(project.id)
-                
-    except Exception as e:
+
+    except GitlabError as e:
+        # Only a GitLab-level "not there" answer may read as absent. A transient
+        # 5xx or a timeout swallowed here is indistinguishable from "no repo",
+        # and the caller then forks a duplicate.
         logger.warning(f"Error checking for existing repository: {e}")
-    
+
     return None
 
 

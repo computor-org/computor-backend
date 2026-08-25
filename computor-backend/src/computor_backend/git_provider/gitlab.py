@@ -40,6 +40,9 @@ def make_gitlab_client(url: str, token: str) -> Gitlab:
         url=transform_localhost_url(url),
         private_token=token,
         keep_base_url=True,
+        # Without this a hung GitLab holds the caller open indefinitely — and
+        # these calls run inside request handlers and Temporal activities.
+        timeout=30,
     )
 
 
@@ -231,7 +234,10 @@ class GitLabProviderClient:
     def _find_project_in_namespace(self, gl, namespace_id, path):
         for p in gl.projects.list(search=path, all=True):
             ns = p.namespace.get("id") if hasattr(p.namespace, "get") else p.namespace.id
-            if p.path == path and ns == namespace_id:
+            # Compare as strings: the API returns an int while ids read back out
+            # of a JSONB properties blob can be either, and an untyped `==`
+            # silently never matches across the two.
+            if p.path == path and str(ns) == str(namespace_id):
                 return gl.projects.get(p.id)
         return None
 

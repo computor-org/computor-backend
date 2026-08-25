@@ -38,11 +38,29 @@ class AccountGet(BaseEntityGet):
     builtin: bool = Field(False, description="Built-in identity account (SSO / Git server) that the user cannot unlink")
     properties: Optional[dict] = Field(None, description="Provider-specific properties")
 
+    @field_validator("properties", mode="after")
+    @classmethod
+    def _drop_secret_properties(cls, value: Optional[dict]) -> Optional[dict]:
+        """Keep credential material out of a general-purpose entity response.
+
+        An OIDC account carries the user's per-git-server clone tokens under
+        ``forgejo_clone_tokens``. They are encrypted and only the owner can read
+        their own accounts, so the exposure is small — but secrets should not
+        ride along in a response whose job is describing an identity, and if
+        TOKEN_SECRET ever leaked these would be decryptable offline.
+        """
+        if not value:
+            return value
+        secret_keys = {"forgejo_clone_tokens"}
+        if not secret_keys & value.keys():
+            return value
+        return {k: v for k, v in value.items() if k not in secret_keys}
+
     @property
     def display_name(self) -> str:
         """Get display name for the account"""
         return f"{self.provider} ({self.type}): {self.provider_account_id}"
-    
+
     model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
 class AccountList(BaseEntityList):
