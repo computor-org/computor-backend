@@ -115,6 +115,28 @@ def _resolve_testing_service_id(db: Session, meta: dict) -> Optional[str]:
     return service.id
 
 
+def _as_string_list(value) -> list[str]:
+    """Trimmed, de-duplicated strings from a meta.yaml list — or a lone scalar.
+
+    Order is kept: it is the order the lecturer wrote them in, and it is what
+    the Examples filter shows back.
+    """
+    if value is None:
+        return []
+    items = value if isinstance(value, list) else [value]
+
+    result: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        if item is None:
+            continue
+        text = str(item).strip()
+        if text and text not in seen:
+            seen.add(text)
+            result.append(text)
+    return result
+
+
 def _split_promoted_meta(meta: dict) -> dict:
     """Pull promoted columns out of a parsed meta.yaml dict.
 
@@ -774,11 +796,20 @@ async def upload_example(
             detail=f"Invalid version format in meta.yaml: {str(e)}"
         ) from e
 
-    # Extract tags and other metadata
-    tags = []
-    if 'tags' in meta_data:
-        tags = meta_data['tags'] if isinstance(meta_data['tags'], list) else [meta_data['tags']]
-    
+    # Tags and category, the two fields the Examples filters offer.
+    #
+    # `keywords` is what the meta.yaml schema documents and what our own "new
+    # example" scaffold writes, but nothing ever read it: tags came only from a
+    # `tags:` key that is not part of the format, and category was never written
+    # at all — so both filters filtered over columns that stayed empty
+    # (computor-org/issues#358). `keywords` is the source now; `tags` keeps
+    # working for the examples that already use it.
+    tags = _as_string_list(meta_data.get('keywords')) or _as_string_list(meta_data.get('tags'))
+
+    category = meta_data.get('category')
+    category = str(category).strip() if category is not None and str(category).strip() else None
+
+
     # Check if example exists
     example = db.query(Example).filter(
         Example.example_repository_id == request.repository_id,
@@ -794,6 +825,7 @@ async def upload_example(
             title=title,
             description=description,
             tags=tags,
+            category=category,
             created_by=permissions.user_id,
             updated_by=permissions.user_id,
         )
@@ -805,6 +837,7 @@ async def upload_example(
         example.title = title
         example.description = description
         example.tags = tags
+        example.category = category
         example.updated_by = permissions.user_id
     
     # Initialize repository

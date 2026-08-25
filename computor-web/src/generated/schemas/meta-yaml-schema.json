@@ -417,8 +417,21 @@
           "type": "null"
         }
       ],
-      "description": "Keywords for categorization",
+      "description": "Keywords for categorization; stored as the example's tags",
       "title": "Keywords"
+    },
+    "category": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Single grouping for this example, e.g. 'Numerics' or 'Plotting'",
+      "title": "Category"
     },
     "properties": {
       "anyOf": [
