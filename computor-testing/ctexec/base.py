@@ -41,7 +41,12 @@ def sandbox_command_prefix(
     """
     if os.environ.get(SANDBOX_ENABLE_ENV) != "1":
         return []
-    argv = [sys.executable, "-m", "sandbox.launch", "--required"]
+    # Invoke by file path, not `-m sandbox.launch`: the launcher is stdlib-only
+    # with no package imports, so running it by path works even though the
+    # child's HOME (and thus Python's user-site) is redirected away from where
+    # the sandbox package is installed.
+    from sandbox import launch as _launch
+    argv = [sys.executable, os.path.abspath(_launch.__file__), "--required"]
     if workdir:
         argv += ["--workdir", workdir]
     for path in rw_paths or []:

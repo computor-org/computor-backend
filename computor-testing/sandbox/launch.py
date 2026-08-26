@@ -219,10 +219,25 @@ def _runtime_ro_paths():
     return list(DEFAULT_RO) + [sys.prefix, sys.base_prefix]
 
 
+def _real_home():
+    """The account's home from the passwd database, not $HOME.
+
+    The child's HOME is redirected into the writable sandbox dir, so relying
+    on $HOME here would drop the real home — where the language runtimes and
+    per-user virtualenvs live — out of the read-only allow-list.
+    """
+    try:
+        import pwd
+        return pwd.getpwuid(os.getuid()).pw_dir
+    except (ImportError, KeyError):
+        return os.path.expanduser("~")
+
+
 def _existing(paths):
+    home = _real_home()
     seen = []
     for path in paths:
-        expanded = os.path.expanduser(path)
+        expanded = home if path == "~" else os.path.expanduser(path)
         if expanded and os.path.exists(expanded) and expanded not in seen:
             seen.append(expanded)
     return seen
