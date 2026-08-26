@@ -195,14 +195,17 @@ def enforce_workspace_user_cap(
     if len(owners) < limit:
         return
 
-    raise ConflictException(
-        detail=(
+    # A cap of 0 is not "full", it is an operator freezing workspaces — telling
+    # the user to wait for someone to stop theirs would be a lie.
+    if limit == 0:
+        reason = "Workspaces are currently switched off on this Computor instance."
+    else:
+        reason = (
             f"This Computor instance is at its capacity of {limit} concurrent "
             f"workspace user(s) ({len(owners)} currently active). Your workspace "
             "cannot be started until someone stops theirs."
-            + _local_install_hint()
-        ),
-    )
+        )
+    raise ConflictException(detail=reason + _local_install_hint())
 
 
 # -----------------------------------------------------------------------------
@@ -308,10 +311,13 @@ async def enforce_login_cap(db: Session, user_id: str) -> None:
     if seats < limit:
         return
 
-    raise ForbiddenException(
-        detail=(
+    # Same as the workspace cap: 0 means sign-in is switched off, not full.
+    if limit == 0:
+        reason = "Sign-in is currently switched off on this Computor instance."
+    else:
+        reason = (
             f"This Computor instance is at its capacity of {limit} concurrent "
             f"user(s) ({seats} currently signed in). Please try again in a few "
-            "minutes." + _local_install_hint()
-        ),
-    )
+            "minutes."
+        )
+    raise ForbiddenException(detail=reason + _local_install_hint())

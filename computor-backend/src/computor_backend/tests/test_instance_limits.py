@@ -98,6 +98,15 @@ def test_workspace_cap_counts_users_not_workspaces():
     enforce_workspace_user_cap(db, workspaces, "ualice", is_staff=False)
 
 
+def test_a_cap_of_zero_reads_as_switched_off_not_full():
+    """0 is an operator freezing the feature; "wait for a seat" would be a lie."""
+    db = _db(instance_row=InstanceSettings(max_workspace_users=0))
+    with pytest.raises(ConflictException) as excinfo:
+        enforce_workspace_user_cap(db, [], "ualice", is_staff=False)
+    assert "switched off" in excinfo.value.detail
+    assert "stops theirs" not in excinfo.value.detail
+
+
 def test_workspace_cap_refusal_points_at_the_local_install(monkeypatch):
     monkeypatch.setenv("EXTENSION_PUBLIC_DOWNLOAD_URL", "https://example.org/computor.vsix")
     db = _db(instance_row=InstanceSettings(max_workspace_users=1))
