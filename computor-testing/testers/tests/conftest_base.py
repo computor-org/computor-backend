@@ -446,12 +446,9 @@ class BaseTesterConfig(ABC):
             "executionDurationStudent": time_s,
             "executionDurationReference": time_r,
         }
-        report.properties = {
-            "test": testyamlfile,
-            "specification": specyamlfile,
-            "pytestflags": pytestflags,
-            "exitcode": str(exitstatus),
-        }
+        # Full paths go to the worker log only, never into the report (#239).
+        logger.info("Test file: %s, specification file: %s", testyamlfile, specyamlfile)
+        report.properties = build_report_properties(pytestflags, exitstatus)
 
         with open(reportfile, "w", encoding="utf-8") as file:
             json.dump(
@@ -658,6 +655,18 @@ def create_conftest_hooks(config_class: Type[BaseTesterConfig]) -> Dict[str, Cal
     hooks["pytest_terminal_summary"] = pytest_terminal_summary
 
     return hooks
+
+
+def build_report_properties(pytestflags: str, exitstatus: int) -> Dict[str, str]:
+    """Report properties shared by every tester.
+
+    The report is returned verbatim to the student, so nothing here may be a
+    filesystem path — the spec file contains the reference solution (#239).
+    """
+    return {
+        "pytestflags": pytestflags,
+        "exitcode": str(exitstatus),
+    }
 
 
 # =============================================================================

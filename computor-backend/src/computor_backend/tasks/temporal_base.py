@@ -167,6 +167,24 @@ def extract_test_counts(test_results: Dict[str, Any]) -> Tuple[int, int, int]:
         test_results.get("total", 0),
     )
 
+
+def strip_path_properties(test_results: Dict[str, Any]) -> Dict[str, Any]:
+    """Drop report properties whose value is an absolute filesystem path.
+
+    The tester report lands verbatim in ``result_json`` and is returned to the
+    student; worker-container paths in it disclose where the reference and
+    spec files live (#239). The testers no longer write them, but this guards
+    every other tester and any future one that forgets.
+    """
+    properties = test_results.get("properties")
+    if isinstance(properties, dict):
+        test_results["properties"] = {
+            k: v
+            for k, v in properties.items()
+            if not (isinstance(v, str) and v.startswith("/"))
+        }
+    return test_results
+
 # Interval between activity heartbeats. Must stay comfortably below the
 # ``heartbeat_timeout`` declared on long-running activities, so a healthy but
 # slow run is never mistaken for a dead worker.
