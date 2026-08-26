@@ -89,9 +89,13 @@ from computor_backend.coder.service import (
 from computor_backend.business_logic.workspace_credentials import (
     rotate_workspace_app_credential,
 )
+from computor_backend.business_logic.instance_limits import (
+    principal_is_staff as _principal_is_staff,
+    user_is_staff as _user_is_staff,
+)
 from computor_backend.business_logic.course_workspaces import (
     ACTIVE_BUILD_STATUSES,
-    enforce_template_quota as _enforce_template_quota,
+    enforce_workspace_admission as _enforce_workspace_admission,
     get_disabled_template_names,
     get_member_course_template_names,
     is_template_enabled,
@@ -215,9 +219,26 @@ async def require_coder_enabled(
     return settings
 
 
-# Template quota + settings-row helpers live in business_logic.course_workspaces
+# Admission checks + settings-row helpers live in business_logic.course_workspaces
 # (shared with the course-scoped workspace endpoints); imported above as
-# _enforce_template_quota / _template_settings_row.
+# _enforce_workspace_admission / _template_settings_row.
+
+
+def _owner_is_staff(db: Session, permissions: Principal, username: str) -> bool:
+    """Whether the workspace's OWNER bypasses the instance limits.
+
+    The owner is usually the caller, and then the Principal already in hand
+    answers it without a query. It is not the caller when a maintainer acts on
+    someone else's workspace — and it is that person's seat being spent, so it
+    is their roles that decide. An owner name Coder did not get from us decodes
+    to nothing; treat that as not-staff rather than guessing generously.
+    """
+    user_id = decode_coder_username(username)
+    if user_id is None:
+        return False
+    if permissions.user_id and str(permissions.user_id) == user_id:
+        return _principal_is_staff(permissions)
+    return _user_is_staff(db, user_id)
 
 
 # Terraform variables the push pipeline always supplies as --variable values.
@@ -518,20 +539,37 @@ async def provision_workspace(
         else:
             target_user = get_user_by_id(db, cache, str(permissions.user_id))
 
-        # Per-template seat quota (max running workspaces across ALL users).
-        # Re-provisioning an already-active workspace must not count itself,
-        # so its id is excluded when it exists.
+        # Admission: the per-template seat quota (max running workspaces across
+        # ALL users, admins included) and the instance-wide cap on concurrent
+        # workspace users (staff exempt). Re-provisioning an already-active
+        # workspace must not count itself, so its id is excluded when it exists.
+        # A user Coder has never seen owns nothing, which is exactly what a
+        # missing owner_username means to the workspace-user cap.
         exclude_workspace_id = None
+        owner_username = None
         try:
             coder_user = await client._find_user_by_email(get_user_email(target_user))
+            owner_username = coder_user.username
             existing = await client.get_user_workspaces(coder_user.username)
             exclude_workspace_id = next(
                 (w.id for w in existing if w.name == workspace_name), None
             )
         except CoderNotFoundError:
             pass
-        await _enforce_template_quota(
-            db, client, template, exclude_workspace_id=exclude_workspace_id
+        await _enforce_workspace_admission(
+            db,
+            client,
+            template,
+            owner_username=owner_username,
+            # Provisioning for someone else spends THEIR seat, so their roles
+            # decide the bypass — a manager acting on a student's behalf must
+            # not smuggle the student past the cap.
+            is_staff=(
+                _user_is_staff(db, str(target_user.id))
+                if request.email
+                else _principal_is_staff(permissions)
+            ),
+            exclude_workspace_id=exclude_workspace_id,
         )
 
         # Mint workspace token (bounded lifetime; rotated on each provision of
@@ -737,14 +775,19 @@ async def start_workspace(
     """Start a stopped workspace."""
     _check_workspace_access_or_course_member(permissions, "start", db, username=username)
     try:
-        # Per-template seat quota — the workspace being started never counts
-        # itself (it is stopped, but its latest build may still read "start").
+        # Admission (template quota + instance workspace-user cap) — the
+        # workspace being started never counts itself (it is stopped, but its
+        # latest build may still read "start").
         details = await client.get_workspace(username, workspace_name)
         if details.workspace.template_name:
-            await _enforce_template_quota(
+            await _enforce_workspace_admission(
                 db,
                 client,
                 details.workspace.template_name,
+                owner_username=username,
+                # The seat belongs to the workspace's owner, who is not the
+                # caller when a maintainer starts someone else's workspace.
+                is_staff=_owner_is_staff(db, permissions, username),
                 exclude_workspace_id=details.workspace.id,
             )
         # A course workspace starts under the course's CURRENT policy, not the
