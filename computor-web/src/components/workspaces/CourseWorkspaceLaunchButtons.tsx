@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useResource } from '@/src/hooks/useResource';
 import { useCoderTemplates } from '@/src/hooks/useCoderTemplates';
+import { useWorkspaceActions } from '@/src/hooks/useWorkspaceActions';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import Button from '@/src/components/ui/Button';
 import WorkspaceStatusBadge, {
@@ -62,27 +63,36 @@ export default function CourseWorkspaceLaunchButtons({
   const router = useRouter();
   const notify = useNotify();
   const [launching, setLaunching] = useState<string | null>(null);
+  const [stopping, setStopping] = useState<string | null>(null);
 
-  const { data } = useResource(
+  // Enabled course templates — one snapshot; what a course offers does not
+  // change under an open page.
+  const { data: courseTemplates } = useResource(
     async () => {
       const settings = await courseWorkspacesClient
         .getSettings({ courseId })
         .catch(() => null);
-      const templates = (settings?.templates ?? []).filter((t) => t.enabled);
-      if (templates.length === 0) return { templates: [], workspaces: [] as CoderWorkspace[] };
-      const names = new Set(templates.map((t) => t.template_name));
-      // Own workspaces on course templates (incl. lecturer-provisioned ones).
-      // 403s only when the caller has neither a workspace role nor course
-      // access — then the section is icon-only.
-      const workspaces = compact
-        ? []
-        : await coderClient
-            .listWorkspaces()
-            .then((r) => r.workspaces.filter((w) => w.template_name && names.has(w.template_name)))
-            .catch(() => [] as CoderWorkspace[]);
-      return { templates, workspaces };
+      return (settings?.templates ?? []).filter((t) => t.enabled);
     },
-    [courseId, compact],
+    [courseId],
+  );
+  const templates = useMemo(() => courseTemplates ?? [], [courseTemplates]);
+
+  // Own workspaces on course templates (incl. lecturer-provisioned ones),
+  // polled like the /workspaces table so the status chip follows a start or
+  // stop on its own instead of freezing on the first snapshot. 403s only when
+  // the caller has neither a workspace role nor course access — then the
+  // section is icon-only.
+  const { data: workspacesData, refresh } = useResource(
+    async () => {
+      const names = new Set(templates.map((t) => t.template_name));
+      return coderClient
+        .listWorkspaces()
+        .then((r) => r.workspaces.filter((w) => w.template_name && names.has(w.template_name)))
+        .catch(() => [] as CoderWorkspace[]);
+    },
+    [courseId, templates],
+    { enabled: !compact && templates.length > 0, refetchInterval: 3000 },
   );
 
   // Deployment state — including the build a user may be waiting on — comes
@@ -100,8 +110,12 @@ export default function CourseWorkspaceLaunchButtons({
     refetchInterval: compact ? undefined : 10000,
   });
 
-  const templates = useMemo(() => data?.templates ?? [], [data]);
-  const workspaces = data?.workspaces ?? [];
+  const workspaces = workspacesData ?? [];
+
+  // Same stop as the /workspaces table (notification + delayed refresh) — the
+  // backend allows course-derived callers to stop their own workspaces, and
+  // this widget is the only workspace surface many of them ever see.
+  const actions = useWorkspaceActions(refresh);
 
   const courseOptions = useMemo(() => {
     const byName = new Map(options.map((option) => [option.name, option]));
@@ -145,6 +159,16 @@ export default function CourseWorkspaceLaunchButtons({
     }
   }
 
+  async function stopExisting(workspace: CoderWorkspace) {
+    if (!workspace.owner_name) return;
+    setStopping(workspace.id);
+    try {
+      await actions.stop(workspace.owner_name, workspace.name);
+    } finally {
+      setStopping(null);
+    }
+  }
+
   if (compact) {
     return (
       <div className={`mt-2 flex flex-wrap items-center gap-1.5 ${className ?? ''}`}>
@@ -180,34 +204,47 @@ export default function CourseWorkspaceLaunchButtons({
         <div>
           <h3 className="text-sm font-medium text-body mb-2">Your workspaces</h3>
           <ul className="space-y-1.5">
-            {workspaces.map((w) => (
-              <li
-                key={w.id}
-                className="flex items-center justify-between gap-2 rounded-lg border border-rule px-3 py-2"
-              >
-                <div className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-fg">{w.name}</span>
-                  <span className="block text-xs text-muted">
-                    {w.template_display_name || w.template_name}
-                  </span>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {/*
-                    A badge, not a progress bar: this widget takes one snapshot
-                    and never polls, so a bar would animate without ever moving.
-                  */}
-                  <WorkspaceStatusBadge
-                    status={w.latest_build_status}
-                    transition={w.latest_build_transition}
-                  />
-                  <Button size="xs" variant="secondary" onClick={() => openExisting(w)}>
-                    {categorizeStatus(w.latest_build_status, w.latest_build_transition) === 'running'
-                      ? 'Open'
-                      : 'Start'}
-                  </Button>
-                </div>
-              </li>
-            ))}
+            {workspaces.map((w) => {
+              const category = categorizeStatus(w.latest_build_status, w.latest_build_transition);
+              return (
+                <li
+                  key={w.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-rule px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <span className="block truncate text-sm font-medium text-fg">{w.name}</span>
+                    <span className="block text-xs text-muted">
+                      {w.template_display_name || w.template_name}
+                    </span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {/*
+                      The chip alone, as in the workspaces table: starting or
+                      stopping is a wait of seconds with no stages to report,
+                      and the chip already names it.
+                    */}
+                    <WorkspaceStatusBadge
+                      status={w.latest_build_status}
+                      transition={w.latest_build_transition}
+                    />
+                    <Button size="xs" onClick={() => openExisting(w)}>
+                      {category === 'running' ? 'Open' : category === 'failed' ? 'Retry' : 'Start'}
+                    </Button>
+                    {category === 'running' && (
+                      <Button
+                        size="xs"
+                        variant="secondary"
+                        onClick={() => stopExisting(w)}
+                        loading={stopping === w.id}
+                        loadingLabel="Stopping…"
+                      >
+                        Stop
+                      </Button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
