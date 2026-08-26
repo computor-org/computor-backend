@@ -418,11 +418,11 @@ class TutorTestingWorkflow(BaseWorkflow):
             duration = (completed_at - started_at).total_seconds()
 
             # Extract results
-            passed, failed, total = extract_test_counts(test_results)
+            passed, failed, total, skipped = extract_test_counts(test_results)
 
             workflow.logger.info(
                 f"[TUTOR TEST COMPLETE] test_id={test_id}, "
-                f"passed={passed}/{total}, duration={duration:.1f}s"
+                f"passed={passed}/{total} (skipped={skipped}), duration={duration:.1f}s"
             )
 
             # Return results - API will write these to Redis

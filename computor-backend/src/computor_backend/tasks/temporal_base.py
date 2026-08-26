@@ -156,16 +156,36 @@ def make_provider_auth_url(url: str, token: str, server_type: str) -> str:
     return make_git_auth_url(url, token)
 
 
-def extract_test_counts(test_results: Dict[str, Any]) -> Tuple[int, int, int]:
-    """Extract (passed, failed, total) from test results dict."""
+def extract_test_counts(test_results: Dict[str, Any]) -> Tuple[int, int, int, int]:
+    """Extract (passed, failed, total, skipped) from test results dict."""
     if "summary" in test_results:
         s = test_results["summary"]
-        return s.get("passed", 0), s.get("failed", 0), s.get("total", 0)
+        return (
+            s.get("passed", 0),
+            s.get("failed", 0),
+            s.get("total", 0),
+            s.get("skipped", 0),
+        )
     return (
         test_results.get("passed", 0),
         test_results.get("failed", 0),
         test_results.get("total", 0),
+        test_results.get("skipped", 0),
     )
+
+
+def compute_result_value(test_results: Dict[str, Any]) -> float:
+    """Grade fraction for a test run: passed over the tests that actually ran.
+
+    Legitimate skips (test types a language does not implement, unsupported
+    qualifications) are not the student's doing, so they leave the denominator
+    (#232) — one skip out of four otherwise-passed tests is 1.0, not 0.75.
+    A run where everything was skipped is inconclusive, not a pass: 0.0.
+    """
+    passed, _, total, skipped = extract_test_counts(test_results)
+    if total > 0 and skipped >= total:
+        return 0.0
+    return passed / max(total - skipped, 1)
 
 
 def strip_path_properties(test_results: Dict[str, Any]) -> Dict[str, Any]:
