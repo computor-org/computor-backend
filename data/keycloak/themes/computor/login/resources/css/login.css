@@ -14,7 +14,14 @@
   --ct-gray-200: #e5e7eb;
   --ct-blue-500: #3b82f6;
   --ct-blue-600: #2563eb;
-  --ct-red-600: #dc2626;
+
+  /* Danger register, mirroring computor-web's --c-danger* tokens: a solid fill
+     for borders, a darker text tone that clears 4.5:1 on white (6.47:1), and a
+     tinted wash for the page-level alert. */
+  --ct-danger: #dc2626;      /* red-600 */
+  --ct-danger-text: #b91c1c; /* red-700 */
+  --ct-danger-wash: #fef2f2; /* red-50 */
+  --ct-danger-line: #fecaca; /* red-200 */
 }
 
 /* ---- Page background ------------------------------------------------ */
@@ -168,9 +175,49 @@ a:hover {
 .pf-c-alert.pf-m-danger,
 .alert-error {
   border-radius: 8px;
-  border: 1px solid #fecaca;
-  background: #fef2f2;
-  color: var(--ct-red-600);
+  border: 1px solid var(--ct-danger-line);
+  background: var(--ct-danger-wash);
+  color: var(--ct-danger-text);
+  padding: 12px 14px;
+}
+
+/*
+ * Field-level errors. A wrong password does NOT render the page-level alert
+ * above — Keycloak puts it inline as
+ *   <span id="input-error" class="pf-c-form__helper-text pf-m-error required
+ *         kc-feedback-text">Invalid username or password.</span>
+ * which matched no rule here, so it inherited ordinary body text: same grey,
+ * same 12px as a hint. The small red icon was the only thing marking it as an
+ * error. Give it the danger tone and readable size.
+ */
+#input-error,
+#input-error-username,
+#input-error-password,
+.pf-c-form__helper-text.pf-m-error,
+.kc-feedback-text.pf-m-error {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.875rem;
+  color: var(--ct-danger-text);
+}
+
+/* Mark the field itself, not just the sentence under it. Keycloak sets
+   aria-invalid on the offending input, so the styling follows the semantics. */
+.pf-c-form-control[aria-invalid="true"],
+input[aria-invalid="true"] {
+  border-color: var(--ct-danger) !important;
+}
+
+.pf-c-form-control[aria-invalid="true"]:focus,
+input[aria-invalid="true"]:focus,
+.pf-c-input-group:focus-within input[aria-invalid="true"] {
+  border-color: var(--ct-danger) !important;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.3) !important;
+}
+
+/* Keep the adjacent password-toggle border in step with the errored input. */
+.pf-c-input-group:has(input[aria-invalid="true"]) .pf-c-button.pf-m-control {
+  border-color: var(--ct-danger) !important;
 }
 
 /* ---- Misc tidy-up --------------------------------------------------- */
