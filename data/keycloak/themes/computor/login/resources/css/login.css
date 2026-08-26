@@ -25,9 +25,28 @@
 }
 
 /* ---- Page background ------------------------------------------------ */
+/*
+ * kcHtmlClass=login-pf puts PatternFly's .login-pf on <html>, which paints
+ * #030303 plus a 47 KB bg-login.jpg photo. The stock keycloak theme drops both
+ * in its own css/login.css — but this theme REPLACES that file rather than
+ * extending it (same `styles=css/login.css` path shadows the parent's), so the
+ * removal has to be repeated here. It previously was not: the photo was
+ * fetched on every login and then covered by an opaque gradient painted on
+ * <body>.
+ *
+ * Paint the gradient on <html> instead. Its background propagates to the
+ * canvas, so it covers the viewport whatever the body's height, and there is
+ * no near-black underneath to show through.
+ */
+html.login-pf {
+  /* Colour first so the shorthand leaves a light fallback rather than
+     `transparent` if the gradient is ever dropped. */
+  background: #ffffff linear-gradient(to bottom right, #eff6ff 0%, #ffffff 50%, #eef2ff 100%) !important;
+}
+
 body.login-pf,
 .login-pf body {
-  background: linear-gradient(to bottom right, #eff6ff 0%, #ffffff 50%, #eef2ff 100%) !important;
+  background: transparent !important;
   font-family: "Geist", Arial, Helvetica, sans-serif;
 }
 
