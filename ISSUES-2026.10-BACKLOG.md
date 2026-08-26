@@ -1685,9 +1685,14 @@ were the auth failures at 144/158 and 1011.
    *off*, and refuses a token belonging to a different user: the connection's
    subscriptions were authorised against the principal that opened it.
 3. ~~Extension: 4003 → refresh → reconnect, then `reportExpired`.~~ Done as
-   written, plus an `activeToken` so a refresh that returns the *same* token
-   is recognised as "nothing was renewed" instead of being sent to the server
-   as if it were new.
+   written, plus two things the plan did not name:
+   - An `activeToken`, so a refresh that returns the *same* token is
+     recognised as "nothing was renewed" rather than sent to the server as if
+     it were new.
+   - A probe when the reconnect ladder runs out. Exhausting the five attempts
+     left a red status-bar item and nothing else, which is precisely the
+     half-alive UI the report describes. A close code cannot separate a dead
+     session from a dead network, so one `GET /user` decides which it was.
 4. **Dropped: `computor-web` has no WebSocket client.** Only the generated
    event types under `src/generated/types/websocket.ts`; no `new WebSocket`
    anywhere in `src/`. Nothing to give the 4003 contract to until one exists.

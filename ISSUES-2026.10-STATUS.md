@@ -335,8 +335,13 @@ connection outlived the credential that opened it.
   `CredentialRecoveryService.reportExpired({ kind: 'backend' })` — #247's flow,
   not a second one. A token the server has already closed us on is never used
   to reconnect; that loop is what turned a dead session into endless retries.
+- **Giving up now says why.** Exhausting the five reconnect attempts used to
+  leave a red status-bar item and nothing else, which is the half-alive UI the
+  report describes. A close code cannot tell a dead session from a dead
+  network, so one `GET /user` settles it: a 401 routes to the same re-login
+  path every other 401 gives, anything else stays the network's problem.
 
-18 backend tests + 8 extension tests. Live-checked against the dev stack both
+18 backend tests + 10 extension tests. Live-checked against the dev stack both
 ways: an API token expiring in 20s warned at t+0 and closed 4003 at t+19.7s; an
 SSO session deleted mid-connection closed 4003 at the next re-check.
 
