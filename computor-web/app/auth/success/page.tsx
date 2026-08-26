@@ -5,9 +5,22 @@ import { ssoAuthService } from '@/src/services/authInstances';
 
 export default function AuthSuccessPage() {
   const [error, setError] = useState<string | null>(null);
+  const [refused, setRefused] = useState(false);
 
   useEffect(() => {
     (async () => {
+      // The backend bounces a refused sign-in back here rather than to /login,
+      // which would redirect straight to Keycloak again and loop forever. It
+      // carries the reason written for the user — an instance at its
+      // concurrent-user cap, a banned account — so render it verbatim and
+      // stop: there are no cookies to complete a session with.
+      const params = new URLSearchParams(window.location.search);
+      const description = params.get('error_description');
+      if (params.get('error') && description) {
+        setRefused(true);
+        setError(description);
+        return;
+      }
       try {
         // Backend has already set ct_access_token / ct_refresh_token cookies on
         // the redirect response. Fetch /user (with credentials) to populate the
@@ -45,9 +58,21 @@ export default function AuthSuccessPage() {
       <div className="text-center">
         {error ? (
           <>
-            <p className="text-danger-text font-medium mb-3">{error}</p>
+            {/* A refusal is a paragraph, not a label: it names the limit, the
+                current number and what to do instead (install VS Code
+                locally). Give it room and left-align it so a URL in the text
+                stays readable. */}
+            <p
+              className={
+                refused
+                  ? 'text-danger-text font-medium mb-3 max-w-lg text-left whitespace-pre-line break-words'
+                  : 'text-danger-text font-medium mb-3'
+              }
+            >
+              {error}
+            </p>
             <a href="/login" className="px-4 py-2 bg-inverse text-on-accent rounded hover:bg-inverse-hover inline-block">
-              Back to login
+              {refused ? 'Try again' : 'Back to login'}
             </a>
           </>
         ) : (

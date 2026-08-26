@@ -23,6 +23,7 @@ from computor_backend.coder.naming import coder_username_matches_user
 from computor_backend.database import get_db
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.exceptions import (
+    ComputorException,
     UnauthorizedException,
     BadRequestException,
     NotFoundException,
@@ -243,6 +244,19 @@ async def handle_callback(
             max_age=604800,
         )
         return redirect_response
+
+    except ComputorException as e:
+        # A deliberate refusal — the concurrent-login cap (#351), a ban, a
+        # revoked consent. These carry a message written for the user, and the
+        # only place they can be read is the client that started the sign-in.
+        # Bounce back to its callback (never to /login, which redirects
+        # straight to Keycloak again and would loop the refusal forever).
+        detail = getattr(e, "detail", None) or str(e)
+        logger.info(f"Refused sign-in via {provider}: {detail}")
+        target = state_data.get("redirect_uri") or "/"
+        params = {"error": "sign_in_refused", "error_description": detail}
+        sep = "&" if "?" in target else "?"
+        return RedirectResponse(url=f"{target}{sep}{urlencode(params)}", status_code=302)
 
     except Exception as e:
         logger.error(f"Failed to handle callback for {provider}: {e}")
