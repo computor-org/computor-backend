@@ -240,28 +240,72 @@ cannot" is no longer true.
    "didn't fix it". Decide whether to accept-and-ignore it or reject it in
    schema validation. Silent ignore is what burned the reporter; reject it.
 
-## #121 — "Course content not found" after Submit then Test — **OPEN, needs repro first**
+## #121 — "Course content not found" after Submit then Test — **DONE, and it was never the bug the title describes** (2026-08-26)
 
-Could not be pinned statically. The string comes from ten places; the plausible
-one on this path is `api/submissions.py:247` (artifact listing filtered by
-`course_content_id`).
+**Verified root cause: a mislabelled error code, not a missing course content.**
+The screenshot is not a backend `detail` string. It is the extension's catalog
+rendering for `CONTENT_001` (`src/types/generated/error-codes.ts:529`, severity
+INFO), built by `utils/errorDisplay.ts` as `` `${title}: ${plain}` ``, so the
+backend must have returned `error_code: "CONTENT_001"` on that request. The
+call site is `TestResultService.ts:283`, the catch around `POST /tests` — the
+Test click, exactly as reported.
 
-Two extension fixes since the report may already cover it —
-`fix/271-submit-auto-test` (`b03690f6`) and `fix/2026.10-submit-tested-commit`
-(`bd0862c`, "never submit an older or untested commit behind the student's
-back").
+At the tip commit on the day of the report (`8bfc493b`, 2025-10-20), the **only
+student-reachable `CONTENT_001` emitter in the whole backend** was
+`api/tests.py:426`:
 
-**Steps**
+```python
+else:
+    raise BadRequestException(
+        error_code="CONTENT_001",
+        detail=f"Execution backend type '{execution_backend.type}' not supported"
+    )
+```
 
-1. Reproduce on the current build: Python course, Submit, then Test
-   immediately. If it no longer reproduces, close it and say which fix covered
-   it.
-2. If it does: log the `course_content_id` the extension sends on the Test call
-   and compare it with the one it held before Submit. The likely shape is the
-   tree being rebuilt by the post-submit refresh while the command still holds
-   the old item.
-3. Fix by resolving the content id at invocation time from the course id +
-   path, rather than capturing the tree item.
+The other seven sites were `_lecturer` / `_maintainer` / `_tutor` endpoints,
+and the one `_student` site (`GET /course-contents/deployment/{id}`) has never
+been called from extension `src/` — it appears only in generated docs.
+
+So the course's execution backend `type` did not start with `temporal:`, and
+that configuration failure was tagged with a course-content error code. The
+extension faithfully printed the catalog text for that code, which is about
+something else entirely.
+
+It got the wrong code because the line was previously
+`BadRequestException(f"...")` — the positional-`error_code` footgun — and the
+2025-10-18 error-code sweep (`aae9b39d`) filled in a plausible-looking but
+wrong code.
+
+**Submit→Test is a red herring.** The branch fired on *any* test run against
+such a course. Submit runs a test first, so the sequence in the title is
+incidental narration. There is no race, no stale `course_content_id`, and no
+captured tree item involved — the old plan below chased all three.
+
+**Already fixed, twice over.**
+
+- `f4f5e5b3` (2025-10-21, **one day after the report**) — `CONTENT_001` →
+  `TASK_003`, plus a detail naming the expected prefix.
+- `554b89be` (2025-10-29) / `6a094568` (2025-11-02) — execution backends became
+  services and the whole `startswith("temporal:")` dispatch was deleted.
+
+Today `POST /tests` resolves the service, then `resolve_task_queue` +
+`assert_queue_has_worker` **before** the `Result` row is created
+(`api/tests.py:352-359`). The equivalent misconfiguration surfaces as
+`SUBMIT_005` "Execution Backend Not Configured", which is accurate and warning
+severity. No `CONTENT_001` remains anywhere a student can reach.
+
+**The one live leftover, now fixed.** `errorDisplay.ts` replaced the server's
+specific reason with the catalog's per-code text. `HttpError` has deliberately
+preferred the server detail since `3ea9a79` (2026-06-29) and this line, dating
+from `5524ab9` (2025-11-05), overrode it back — the two files contradicted each
+other, and that is what turned a config error into a nonsense popup. Fixed in
+`fix/121-error-detail-surfacing` (extension, 2026-08-26): `HttpError` keeps
+`serverDetail` as its own field and `errorDisplay` prefers it, with the catalog
+text as fallback and severity still taken from the catalog. Four unit tests in
+`test/utils/errorDisplay.test.ts`.
+
+**Do not run the old repro protocol.** It targets a mechanism that was never
+involved and would come back empty.
 
 ## #343 — MATLAB testing framework into the repo — **WON'T DO**
 
@@ -1390,30 +1434,50 @@ loudly naming the variable. Then the three unit tests above.
 
 ---
 
-## Plan #121 — "Course content not found" after Submit→Test (repro protocol)
+## Plan #121 — mislabelled error code, not a missing course content — **DONE**, and the plan below was chasing the wrong mechanism
 
-**Repos:** both, unknown until reproduced. **Branch:** after diagnosis.
-**Effort:** the repro is the work; the fix is likely small.
+**Repo:** extension. **Branch:** `fix/121-error-detail-surfacing`.
+**Effort:** the diagnosis was the work; the fix is three files.
 
-Two candidate fixes have landed since the report (`fix/271-submit-auto-test`,
-`fix/2026.10-submit-tested-commit`), so step 1 may close it.
+The report was closed by reading the screenshot, not by reproducing. The
+notification text is the extension's catalog rendering for `CONTENT_001`, so
+the backend must have sent that code, and `git grep CONTENT_001` at the
+report-date tip (`8bfc493b`) leaves exactly one student-reachable emitter:
+`api/tests.py:426`, "Execution backend type not supported". Corrected to
+`TASK_003` the next day and deleted a fortnight later. Full trail in the entry
+above.
 
-1. Current build, Python course: open an assignment, change a file, Submit,
-   then immediately Test. Repeat ×5 (the bug smells like a race with the
-   post-submit tree refresh).
-2. Not reproducible → close on the board naming `b03690f6` / `bd0862c` as the
-   likely fixes, in plain voice.
-3. Reproducible → capture the failing request from the extension's output
-   channel; the string comes from ten backend sites, the plausible one on
-   this path is `api/submissions.py:247` (artifact listing by
-   `course_content_id`). Compare the id sent with the id the tree held
-   before Submit. Expected shape: the command captured a tree item that the
-   post-submit `forceRefreshCourse` rebuilt.
-4. Fix in the extension: resolve the content id at invocation time (course id
-   + content path → fresh lookup), never from a captured tree item. #162 is
-   the same family of bug and shipped on 2026-08-26 — a stale read standing in
-   for a fresh one — but it is the *cache* that went stale there, so there is
-   no shared code to reuse, only the shape.
+**Steps taken**
+
+1. `HttpError` keeps `serverDetail` as its own public field rather than only
+   folding it into `message`, so display code can prefer it without knowing how
+   `message` was assembled.
+2. `errorDisplay.showErrorWithSeverity` uses `error.serverDetail` for the body,
+   falling back to the catalog's `message.plain`. Title and severity still come
+   from the catalog.
+3. `test/utils/errorDisplay.test.ts` pins all four behaviours: server detail
+   wins, catalog text fills in, severity still drives the notification level,
+   non-catalog errors still fall through to their raw message.
+
+**Verify**
+
+`npm run type-check`, `npx eslint src --ext ts`, `npm run test:unit` — 1073
+passing, 0 failing. The first test fails if the `serverDetail` preference is
+removed (confirmed by reverting the line).
+
+---
+
+**The old plan, kept as a warning.** It read the title literally and built a
+race hypothesis on it: Submit→Test ×5, compare the `course_content_id` the
+extension sends against the one the tree held, expect
+`api/submissions.py:247`, fix by resolving the id at invocation time instead of
+capturing a tree item. Every step of that is wrong. The Submit→Test sequence
+was incidental narration, no id was ever stale, and `api/submissions.py:247`
+does not carry `CONTENT_001` and never did. The repro would have come back
+empty and the issue would have been closed as "not reproducible" with the real
+cause — a wrong error code on a config failure — still unrecorded. When a
+report is a screenshot of an error message, identify the *string* first; the
+reporter's account of what they clicked is the least reliable part of it.
 
 ---
 
