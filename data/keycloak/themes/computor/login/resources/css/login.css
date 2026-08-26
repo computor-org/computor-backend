@@ -6,10 +6,17 @@
  */
 
 :root {
+  /* This theme is light-only: PatternFly pins the card and fields white, and
+     there is no dark palette to switch to. Say so, so a browser set to dark
+     does not hand the credential fields dark UA form control and autofill
+     colours on top of a light card. */
+  color-scheme: light;
+
   --ct-gray-900: #111827;
   --ct-gray-800: #1f2937;
   --ct-gray-700: #374151;
   --ct-gray-600: #4b5563;
+  --ct-gray-500: #6b7280;
   --ct-gray-300: #d1d5db;
   --ct-gray-200: #e5e7eb;
   --ct-blue-500: #3b82f6;
@@ -97,10 +104,18 @@ label {
   font-weight: 500;
 }
 
+/*
+ * #144 reported credential text that was near-invisible against the field.
+ * Nothing below inherits its colours by accident: the field pins its own
+ * foreground and background rather than relying on whatever PatternFly's
+ * --pf-c-form-control--Color happens to resolve to in a given release.
+ */
 .pf-c-form-control,
 input[type="text"],
 input[type="password"],
 input[type="email"] {
+  color: var(--ct-gray-900) !important;
+  background-color: #ffffff !important;
   border: 1px solid var(--ct-gray-300) !important;
   border-radius: 8px !important;
   padding: 10px 14px !important;
@@ -118,6 +133,30 @@ input[type="email"]:focus {
   border-color: var(--ct-blue-500) !important;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35) !important;
   outline: none !important;
+}
+
+/* Placeholder must read as a hint but still be legible — grey-500 is 4.83:1
+   on white, where the browser default (~grey-400 at 40% opacity) is not. */
+.pf-c-form-control::placeholder,
+input::placeholder {
+  color: var(--ct-gray-500);
+  opacity: 1;
+}
+
+/*
+ * Autofill. Chrome repaints an autofilled field with its own colours and
+ * ignores `background-color`; the inset shadow is the only way to override it.
+ * On a browser set to dark that pairing is exactly the unreadable combination
+ * #144 describes, so this is the one that keeps the report from recurring.
+ */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--ct-gray-900) !important;
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  caret-color: var(--ct-gray-900);
 }
 
 /* ---- Primary button ------------------------------------------------- */
