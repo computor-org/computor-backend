@@ -1,0 +1,6 @@
+# Preview-only overlay. The base and environment files preserve production
+# defaults while allowing the runner to provide a unique network name.
+
+networks:
+  computor-network:
+    name: ${COMPOSE_NETWORK_NAME:?COMPOSE_NETWORK_NAME must be set for previews}

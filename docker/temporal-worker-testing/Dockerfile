@@ -6,9 +6,9 @@
 # and COPY the (small, fast-changing) computor env on top — both are python:3.10-slim
 # based, so the CPython-3.10 env is ABI-compatible.
 # See docker/testing-runtimes/Dockerfile and docker/base/Dockerfile.
-FROM computor-base:latest AS pybase
+FROM computor-base AS pybase
 
-FROM computor-testing-runtimes:latest
+FROM computor-testing-runtimes
 
 # Bring in the computor python project env from the shared base. Same /home/worker
 # path + CPython 3.10, so the editable installs + their deps resolve.

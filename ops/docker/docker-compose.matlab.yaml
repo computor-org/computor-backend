@@ -16,6 +16,7 @@
 
 services:
   temporal-worker-matlab:
+    image: ${PREVIEW_IMAGE_PREFIX:-computor}-temporal-worker-matlab
     build:
       context: ../../
       dockerfile: ./docker/temporal-worker-matlab/Dockerfile

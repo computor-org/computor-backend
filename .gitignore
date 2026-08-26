@@ -65,6 +65,8 @@ start.sh
 .env.development.local
 .env.test.local
 .env.production.local
+.env.preview
+ops/environments/.env.preview
 # Keep templates in version control
 !.env.*.template
 
