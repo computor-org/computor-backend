@@ -384,6 +384,133 @@ course member, and `page.tsx:124` opens the disclosure on a successful call.
 
 ---
 
+### #162 — created content does not appear until a hard reload
+**Fixed.** Extension `fix/162-create-content-refresh`.
+
+`LecturerTreeDataProvider.createCourseContent` carried a comment saying "Cache
+cleared via API" next to no such call, and refreshed only when it could find
+the new content's parent inside `existingContents` — a list it read *before* the
+create, so a root-level unit never matched and nothing refreshed at all. The
+course cache then kept serving the pre-create list until the window reloaded.
+`createAssignment` hid this by calling `forceRefreshCourse` itself afterwards;
+`createUnit` did not, and a unit with a custom type is exactly the flow the
+report describes.
+
+It now drops the course cache and refreshes unconditionally, and `createUnit`
+uses the return value, so a failed create says so instead of looking like a
+create that silently vanished. Four unit tests.
+
+**Re-test:** rebuild the extension, right-click a course's Contents folder,
+create a unit with a custom content type. It must appear at once.
+
+---
+
+### #163 — undeployed content visible in the student view
+**Fixed.** Backend `fix/163-hide-undeployed`.
+
+The student read path filtered archived content and the #338 visibility veto,
+and nothing else — so an assignment created but never released listed for
+students with a name and a type and no files, which is what the report shows.
+
+`business_logic/content_visibility.py` now answers both questions in one place:
+a student sees a row when it is effectively visible **and**, if it is
+submittable, its deployment has completed a release. The list filters in SQL
+(`student_visible_predicate`), the single `GET` uses the row-at-a-time twin, and
+the unit badge re-applies the same predicate so it cannot aggregate work the
+student cannot see. Staff are unaffected — everything hangs off the existing
+`include_hidden` switch that tutors and lecturers already pass.
+
+Two deliberate choices:
+
+- The gate reads `deployed_at`, not `deployment_status == 'deployed'`. Bumping
+  an example version resets the status to `pending` and a release run moves it
+  through `deploying`, and during that window the students' files are still
+  there from the previous release — reading the status would have yanked a live
+  assignment out from under them.
+- It is **not** folded into `visible_effective`. That flag means "a lecturer hid
+  this" and the staff trees grey rows by it; an unreleased assignment is
+  unfinished, not hidden.
+
+A release now also invalidates the cached course-content views. It never did,
+which was harmless while a release only changed a badge, and would since this
+change have left a student waiting out a five-minute TTL to see work that is
+already in their repository.
+
+**Assumption worth flagging:** submittable content with *no* deployment row at
+all is treated as unreleased and hidden too. There is nothing a student can do
+with it — no directory, no files — but a lecturer who wants a file-less manual
+assignment now has to hide it a different way. If that turns out to matter, the
+rule to relax is `released_predicate`, not the plumbing.
+
+A unit with no visible children still renders as an empty unit. That is
+deliberate: a unit is never deployed, it can carry a description of its own, and
+a lecturer who wants to stage a whole unit has `visible=false` from #338.
+
+Thirteen tests, alongside the #338 ones.
+
+**Re-test:** deploy the backend. Create an assignment, assign an example, do
+**not** release, and switch to student view — nothing appears. Release it — it
+appears without a re-login.
+
+---
+
+### #150 — same example in two units collides in the student template
+**Fixed.** Backend `fix/150-deployment-path-collision` in `computor-fullstack`,
+extension branch of the same name in `computor-vsc-extension`.
+
+The report and the plan both had it slightly wrong, in opposite directions.
+
+The plan said nothing guarded this. Something did: `assign_example_to_content`
+has refused a second use of one example in a course since 2026-03-12
+(`8b2c484b`, `DEPLOY_005`), as did the batch validation behind the extension's
+pre-deploy check. That refusal post-dates the report, so it stopped new courses
+from being corrupted — by making the lecturer's ask impossible instead of making
+it work.
+
+The ask is ordinary: the same exercise in week 2 and week 5. What must not
+happen is the two contents sharing a directory, and that was the actual defect —
+`deployment_path` was set to the example identifier by both assign branches, so
+two contents resolved to one directory, the second release wrote over the first,
+and the student's second assignment opened onto the first one's files.
+
+So the refusal is gone and the collision is resolved in the name instead:
+
+- `business_logic/deployment_paths.py` allocates a directory no other
+  deployment of the course holds — `mathematical_constants`, then
+  `mathematical_constants-week5` (the discriminator is the content's own unit
+  segment), then a number. One example with one content is untouched, so
+  nothing about existing courses changes.
+- A version bump keeps the directory it already has. Renaming would orphan the
+  old one in every student's clone.
+- The release run refuses to write into a directory another content owns, and
+  fails that one deployment with a message naming the other content, rather
+  than silently overwriting. This is the backstop for courses assigned before
+  the allocator existed — the reporter's course among them. Ownership goes to
+  whoever released first, so a new assignment can never take a directory away
+  from students already working in it.
+- Extension: the assignment directory is resolved from the deployment record
+  only. Three places fell back to the example identifier when the deployment
+  had not told them a directory — which is precisely how the student opened one
+  assignment onto the other's files — and the course export named its folders
+  after the identifier outright, so two assignments collapsed into one folder.
+
+**Deliberately not done:** the plan's step 2 wanted a unique constraint on
+`(course_id, deployment_path)`. `course_id` is not on `course_content_deployment`
+and a partial index grandfathering legacy rows cannot catch a new row colliding
+with an old one, which is the only case that matters. `DEPLOY_005` stays in the
+error registry, unraised, rather than churn the generated catalogues in three
+repos over a removed code.
+
+Nothing renames an existing directory anywhere in this change.
+
+Seventeen backend tests plus two extension tests.
+
+**Re-test:** deploy the backend, rebuild the extension. Assign one example to
+two contents in different units of a course, release both, and open both as a
+student. Two directories, two assignments, no duplicate error.
+
+---
+
 ## Summary
 
 | Issue | State | Action |
@@ -406,6 +533,9 @@ course member, and `page.tsx:124` opens the disclosure on a successful call.
 | #257 | fixed | deploy the backend, rebuild the extension, re-test, close |
 | #333 | fixed | not a defect — answer with where the credential lives, close |
 | #342 | duplicate of #333 | close as duplicate |
+| #162 | fixed | rebuild the extension, re-test, close |
+| #163 | fixed | deploy the backend, re-test, close |
+| #150 | fixed | deploy the backend, rebuild the extension, re-test, close |
 
 Twelve issues closable without writing code, plus #144, #258 and #351, which
 did take code. All three are listed here because the report and the code
@@ -428,3 +558,8 @@ shipped on the web course page in August.
 the grant it asks for is a `_tutor` course membership and already worked, but
 the test it names as its success criterion did not exist, so nothing stopped
 the two grading floors from drifting apart later.
+
+#162, #163 and #150 arrived after this file's premise and break it: all three
+were real, reproducible defects, and all three took code on 2026-08-26. #150 is
+the one where the board, the plan and the code all disagreed — see its row for
+what was actually true.

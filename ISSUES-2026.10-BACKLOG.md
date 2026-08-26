@@ -324,7 +324,7 @@ follow that, not the paragraph that used to stand here.
 tells the lecturer exactly what is still required, and the version shown is the
 version deployed.
 
-## #150 — duplicate example in two units — **OPEN, root cause confirmed**
+## #150 — duplicate example in two units — **DONE** (`fix/150-deployment-path-collision`, 2026-08-26)
 
 **Verified root cause.** The student-template directory name comes from the
 example identifier, not the course content:
@@ -353,7 +353,7 @@ which is the duplicate error in the report.
 5. Regression test: same example assigned to two units in one course, both
    deploy, both open.
 
-## #162 — created content does not appear until a hard reload — **OPEN, root cause confirmed**
+## #162 — created content does not appear until a hard reload — **DONE** (`fix/162-create-content-refresh`, 2026-08-26)
 
 **Verified root cause.** `computor-vsc-extension/src/ui/tree/lecturer/
 LecturerTreeDataProvider.ts:1150-1165`:
@@ -393,7 +393,7 @@ Lecture below)", i.e. a unit.
    inconsistency is only in create.
 4. Verify with the reporter's exact flow, including a custom content type.
 
-## #163 — undeployed content visible in the student view — **OPEN**
+## #163 — undeployed content visible in the student view — **DONE** (`fix/163-hide-undeployed`, 2026-08-26)
 
 **Verified root cause.** `repositories/student_view.py:107-119` filters student
 content on **visibility** (`is_content_visible`, from the #338 work) but never
@@ -1138,7 +1138,10 @@ plus #358 populating Category and Tags where the filter reads them.
    This is the release gate.
 3. **#115 → #85** — the icon unblocks the VSIX pipeline, which unblocks #363.
 4. **#336** — the worst live bug outside the security bucket.
-5. **#162, #150, #163** — small, confirmed root causes, real lecturer pain.
+5. ~~**#162, #150, #163**~~ all done 2026-08-26. #150 was not small: the
+   one-example-per-course refusal it needed lifting had been added after the
+   report, so the fix is a directory allocator plus a release-time backstop
+   for the courses that already collided.
 6. ~~**#351**~~ done 2026-08-26; **#350** — the status surface, still open, and
    no longer blocking anything before the workshop.
 7. The session/credential bucket is clear: ~~**#247**~~, ~~**#257**~~ and
@@ -1407,8 +1410,10 @@ Two candidate fixes have landed since the report (`fix/271-submit-auto-test`,
    before Submit. Expected shape: the command captured a tree item that the
    post-submit `forceRefreshCourse` rebuilt.
 4. Fix in the extension: resolve the content id at invocation time (course id
-   + content path → fresh lookup), never from a captured tree item. Same
-   pattern as the #162 fix below — consider doing them together.
+   + content path → fresh lookup), never from a captured tree item. #162 is
+   the same family of bug and shipped on 2026-08-26 — a stale read standing in
+   for a fresh one — but it is the *cache* that went stale there, so there is
+   no shared code to reuse, only the shape.
 
 ---
 
@@ -1487,7 +1492,33 @@ fresh `deployed_at`. Then the student view (after `git pull`) shows it.
 
 ---
 
-## Plan #150 — same example in two units collides in the template repo
+## Plan #150 — same example in two units collides in the template repo — **DONE**, and the plan below missed a guard that already existed
+
+**Shipped 2026-08-26.** Backend `fix/150-deployment-path-collision`, extension
+branch of the same name. Where the plan below was wrong:
+
+- **Step 1 was written as if nothing guarded this.** `assign_example_to_content`
+  has raised `DEPLOY_005` on a second use of one example in a course since
+  2026-03-12 (`8b2c484b`), and `batch_validate_content` refused it too. That
+  refusal post-dates the report; it stopped new corruption by making the
+  lecturer's ask impossible. Both refusals are now gone, because the ask — the
+  same exercise in two weeks — is legitimate, and the allocator makes it safe.
+- **Step 2 (unique constraint) is deliberately not done.** `course_id` is not on
+  `course_content_deployment`, and the plan's own escape hatch — a partial index
+  `WHERE assigned_at > <cutoff>` — cannot catch a new row colliding with a
+  grandfathered old one, which is the only case that matters. Uniqueness is
+  enforced at the one chokepoint that allocates
+  (`business_logic/deployment_paths.py`) and backstopped at release time.
+- **The backstop is the piece the plan did not have.** `resolve_directory_owners`
+  decides which content owns each directory — whoever released into it first —
+  and the release run fails any other content that would write there, naming
+  the owner, instead of overwriting it. That is what covers the reporter's
+  own course, whose duplicates predate the allocator.
+- **Step 4 landed as written**, in three places in `StudentRepositoryManager`
+  plus `courseExportZip` (which preferred the identifier outright, so the export
+  collapsed two assignments into one folder) and `TutorStudentTreeProvider`.
+- Nothing renames an existing directory, per step 3.
+
 
 **Repo:** fullstack. **Branch:** `fix/150-deployment-path-collision`
 **Effort:** medium (migration + assign-time logic + tests).
@@ -1534,7 +1565,12 @@ first.
 
 ---
 
-## Plan #162 — created unit invisible until hard reload
+## Plan #162 — created unit invisible until hard reload — **DONE**
+
+**Shipped 2026-08-26**, as written. Step 3's sweep found nothing else:
+`updateCourseContent`, `deleteCourseContent` and both drag handlers already
+clear the course cache before firing. Four unit tests.
+
 
 **Repo:** extension. **Branch:** `fix/162-create-content-refresh`
 **Effort:** small. Good first pickup.
@@ -1566,7 +1602,34 @@ exactly the reported flow.
 
 ---
 
-## Plan #163 — undeployed assignments visible to students
+## Plan #163 — undeployed assignments visible to students — **DONE**
+
+**Shipped 2026-08-26.** Steps 1-3 and 6 as written; two corrections and one
+addition:
+
+- **Step 1 said `deployment_status` is `'deployed'`. Do not read the status.**
+  A version bump resets it to `pending` and a release moves it through
+  `deploying`, and in that window the students' files are still there from the
+  previous release — so the status would have pulled a live assignment out from
+  under them mid-course. `deployed_at IS NOT NULL` (plus `status <> 'unassigned'`)
+  is the durable "has been released at least once".
+- **Step 3 said fold it into `visible_effective`. It must not be folded in.**
+  That flag means "a lecturer hid this" and the staff trees grey rows by it.
+  One predicate serves both student read paths (`student_visible_predicate` /
+  `is_student_visible`), which is what step 3 was really after; the flag keeps
+  its #338 meaning.
+- **Step 5 assumed the cache was already invalidated on deploy. It was not.**
+  Nothing in the release workflow touched the cached views. Harmless while a
+  release only changed a badge, fatal once the cache decides visibility, so
+  `invalidate_deployment_views` now runs beside every post-commit broadcast.
+- **Step 4:** a unit with no visible children still renders as an empty unit,
+  and that is being left alone — a unit is never deployed, it can carry its own
+  description, and #338 already gives a lecturer `visible=false` to stage a
+  whole unit.
+
+Content with no deployment row at all is treated as unreleased. Flagged on the
+issue, since it also hides a hypothetical file-less manual assignment.
+
 
 **Repo:** fullstack. **Branch:** `fix/163-hide-undeployed`
 **Effort:** small-medium.
