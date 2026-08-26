@@ -34,6 +34,7 @@ from ..conftest_base import (
     metadata_key,
     report_key,
     add_common_options,
+    build_report_properties,
     get_report_header,
     add_terminal_summary,
 )
@@ -374,12 +375,9 @@ def pytest_sessionfinish(session: pytest.Session):
         "executionDurationStudent": time_s,
         "executionDurationReference": time_r,
     }
-    report.properties = {
-        "test": testyamlfile,
-        "specification": specyamlfile,
-        "pytestflags": pytestflags,
-        "exitcode": str(exitcode),
-    }
+    # Full paths go to the worker log only, never into the report (#239).
+    logger.info("Test file: %s, specification file: %s", testyamlfile, specyamlfile)
+    report.properties = build_report_properties(pytestflags, exitcode)
 
     with open(reportfile, "w", encoding="utf-8") as file:
         json.dump(
