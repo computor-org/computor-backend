@@ -5,7 +5,8 @@ Checked 2026-08-26 against `release/2026.10` in both `computor-fullstack` and
 by trusting the branch name.
 
 These need an image rebuild + a re-test on the deployed instance, then a close
-comment. No new code.
+comment. No new code, except where a row says otherwise (#144, #258, #351,
+#247).
 
 ---
 
@@ -254,6 +255,49 @@ statistics page stays a lecturer surface.
 
 ---
 
+### #247 — VSCode: token expiry error flow polish
+**Fixed, all three acceptance boxes.** Extension `a4e8a77` (branch
+`fix/247-token-expiry-ux`).
+
+`src/services/CredentialRecoveryService.ts` is now the single answer to "a
+credential just died — now what?", and every 401 surface routes through it.
+
+- **Own title.** The backend case says the *sign-in* expired and offers
+  `Sign in` / `Use API Token`; the git case names the server whose token was
+  rejected. Neither says "unreachable" — that word stays with
+  `BackendConnectionService.showConnectionError()`, which is what #117 settled.
+  `AuthenticationErrorStrategy` no longer says "reload the window", and no
+  longer *awaits* its own dialog (that await was the blocking prompt
+  `probeToken`'s comment warns about).
+- **Direct link.** `computor.settingsView` takes `{ section, url }`. The
+  webview's `applyFocus()` expands that server's *Update* panel — or opens a
+  pre-filled new entry when nothing is stored — scrolls to it, focuses the
+  token input and flashes it. The realm comes from parsing the URL git quoted
+  back; `URL.origin` drops userinfo, so a remote carrying its token inline
+  cannot leak it into the notification or the webview.
+- **No manual restart.** `commandRegistrar` — the one place that sees both the
+  command id and its arguments — remembers the blocked
+  `{command, args, label}` and reports it; everything else falls through to
+  `showErrorWithSeverity` unchanged. After the token is replaced, the eight
+  `*.refresh` reads replay silently and anything else gets a
+  `Retry "<action>"?` button. Writes are never auto-run, and the retry only
+  fires after `updateWorkspaceRemotes()` settles — earlier and it would
+  re-authenticate with the token that just died.
+
+Managed-Forgejo push failures keep their existing `Fix Authentication` route on
+purpose: students never see that backend-minted token, so a Settings deep link
+there is the dead end #318 already removed once.
+
+`npm run test:unit` — 1053 passing, including 24 new ones pinning the two error
+identities apart, the deep-link payload, the retry contract and the
+token-stripping.
+
+**Re-test:** corrupt a stored provider token, trigger a clone or push. The
+notification must name that server and its button must land on that server's
+token field, not the view root. Save a good token and take the offered retry.
+
+---
+
 ## Partly fixed — keep open, but the scope is much smaller than the text suggests
 
 ### #333 + #342 — Forgejo clone URL / token can't clone a repo
@@ -293,6 +337,7 @@ root cause; close one as a duplicate of the other.
 | #258 | fixed | rebuild the extension, re-test, close |
 | #351 | fixed | deploy, set the limits, re-test, close |
 | #262 | fixed | enrol the grader as `_tutor` on the course, re-test, close |
+| #247 | fixed | rebuild the extension, re-test with a broken token, close |
 | #333 | partly fixed | keep open — needs a UI surface only |
 | #342 | duplicate of #333 | close as duplicate |
 
@@ -302,6 +347,10 @@ disagreed: #144's screenshot showed a surface that was already gone, #258's
 session-on-startup was already gated (only the activation underneath it was
 not), and #351 looked half-implemented by a limit that turns out to be a
 different limit.
+
+#247 is the exception to the table's premise: it was a plain build, not a
+report the code contradicted. It sits here because it lands the same way — an
+extension rebuild and a re-test before it can be closed.
 
 #262 is the one row here that took a commit without taking a behaviour change:
 the grant it asks for is a `_tutor` course membership and already worked, but
