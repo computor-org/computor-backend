@@ -4,7 +4,8 @@
 domain steps live here, Temporal-free and individually testable:
 
 - selection:    which deployments/contents a run processes (incl. the
-                repo-state-mismatch scan)
+                repo-state-mismatch scan) and which content owns which
+                directory of the template
 - status:       deploying/deployed/failed transitions + history rows and
                 the post-commit websocket broadcast
 - readme:       top-level README generation
@@ -14,6 +15,7 @@ domain steps live here, Temporal-free and individually testable:
 
 from .selection import (  # noqa: F401
     resolve_deployment_directory,
+    resolve_directory_owners,
     select_contents_to_process,
     select_deployments_for_release,
 )
