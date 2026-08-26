@@ -581,24 +581,42 @@ Still true:
    That is a real permission widening and deserves its own decision, not a
    drive-by.
 
-## #262 — per-course grader access via Keycloak — **OPEN, well-scoped**
+## #262 — per-course grader access via Keycloak — **DONE** (`test/262-grading-access`, 2026-08-26)
 
-Self-contained, no dependencies, and the smallest P1 in this part. Note the
-grading surface has moved since the issue was written: there is no
-`api/grading.py`; the closest module is `api/course_member_gradings.py`, and
-`feat/2026.10-grading-page` and `refactor/grading-read-layer` have landed.
+The grant was already implemented. Step 1 below asked to reuse the course-role
+machinery "if a course role can express it" — it can, and the role already
+exists: **a grader is a `_tutor` on that one course**. Enrolling the person
+there lets them grade there and nowhere else, which is the whole of what the
+issue asks. No new role, no parallel table, no new Keycloak claim — identity
+comes from Keycloak, the grant lives in the database.
 
-**Steps**
+Steps 2 and 3 were already satisfied too. Enforcement is structural rather
+than per-endpoint: `CoursePermissionQueryBuilder.filter_by_course_membership`
+(`permissions/query_builders.py:54-56`) constrains every membership lookup to
+the courses where the caller holds the required role, so the endpoint and the
+route gating cannot disagree — they read the same memberships. Route hiding
+falls out of `/user/views/{course_id}` answering `["student","tutor"]` for a
+`_tutor` (`business_logic/users.py:16-19`) while the web's grading pages sit
+under the Lecturer section (`Sidebar.tsx:131-135`).
 
-1. Model the grant: `(user_id, course_id, role=grader)`. Reuse the existing
-   course-role machinery rather than adding a parallel table if a course role
-   can express it.
-2. Enforce in one place in the permission layer, so the endpoint and the route
-   gating cannot disagree. No grant → 403, route hidden.
-3. Reuse the Keycloak role/claim path already in `auth/` — do not add a second
-   identity source.
-4. Test as the issue specifies: granted user reaches the WSD cells, ungranted
-   gets 403, other courses stay hidden.
+Only step 4 was missing, and it is now `tests/test_grading_access.py` (16
+tests, all passing).
+
+**The one thing worth writing down**, because it is the question the issue
+invites and the answer is not obvious from the file names: the two grading
+surfaces sit at different floors *on purpose*.
+
+- `_tutor` grades a student's submitted work — `create_artifact_grade`
+  (`business_logic/submissions.py:701`), `check_artifact_access` (`:578-604`).
+- `_lecturer` gets `course_member_gradings`
+  (`repositories/course_member_gradings_view.py:200,266,375`), the course-wide
+  progress matrix over every member. That is a course-management statistic,
+  not an act of grading.
+
+Neither floor moved, and neither should: lowering the matrix to `_tutor` would
+hand every tutor in every course a report they are not meant to have, and a
+`_grader` role inserted below `_lecturer` would differ from `_tutor` by exactly
+that one report.
 
 ## #185 — email for notifications and sign-up — **OPEN, unstarted**
 
@@ -1662,9 +1680,44 @@ and an invite flow now exists (`api/invites.py`).
 
 ---
 
-## Plan #262 — per-course grader grants
+## Plan #262 — per-course grader grants — **DONE**, and steps 1–3 were the wrong shape
 
-**Repo:** fullstack. **Branch:** `feat/262-course-grader-grant`
+Shipped as `test/262-grading-access` (2026-08-26), not the branch named below:
+nothing needed granting, so nothing was a `feat`. What actually landed is in
+Part 4's corrected entry. The plan below is kept because three of its five
+steps would have built a role the system already has.
+
+> **Step 1 invented `_grader` when `_tutor` already is one.** The step hedged
+> correctly — "only if the role ladder hard-codes an ordering that `_grader`
+> breaks" — but checked the wrong thing. The ladder does not hard-code an
+> ordering (it is fully derived from `DEFAULT_HIERARCHY`/`ROLE_LEVELS` in
+> `permissions/principal.py:51-64`), so a `_grader` role *would* have slotted
+> in cleanly. The reason not to is different: `_tutor` already grades
+> (`business_logic/submissions.py:701`), so a `_grader` inserted below
+> `_lecturer` would differ from `_tutor` by exactly one report — the
+> course-member statistics matrix — and that report is deliberately a lecturer
+> surface. The new role would have been a rename.
+>
+> **Step 2 would have lowered a floor that is correct where it is.** "Gate
+> every read/write in `course_member_gradings.py` on tutor-or-above" is a real
+> permission widening: that module is the course-wide progress matrix over
+> every member, i.e. course management, not grading. It stays `_lecturer`.
+> Grading a submission was never in that module — it is
+> `create_artifact_grade`, and it was already at `_tutor`.
+>
+> **Step 3's "extend that endpoint's answer" was unnecessary.** Route hiding
+> already works: `/user/views/{course_id}` answers `["student","tutor"]` for a
+> `_tutor` (`business_logic/users.py:16-19`) and the web's grading pages render
+> only under the Lecturer section (`Sidebar.tsx:131-135`), which needs the
+> `lecturer` or `management` view. A grader never sees the link. (The path is
+> `/user/views/{course_id}`, not `/user/courses/{id}/views` as written below.)
+>
+> **Steps 4 and 5 were right.** Keycloak needed no new claim, for exactly the
+> reason step 4 gives. And step 5 was the only actual work: the test the issue
+> names did not exist. It does now.
+
+**Repo:** fullstack. **Branch:** ~~`feat/262-course-grader-grant`~~ →
+`test/262-grading-access`
 **Effort:** medium. No dependencies; can start any time.
 
 Note the issue's file names are stale: there is no `api/grading.py` — the

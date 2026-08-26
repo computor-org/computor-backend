@@ -204,6 +204,56 @@ still refuse an admin — that one is supposed to.
 
 ---
 
+### #262 — per-course individual grader access via Keycloak
+**Fixed, by machinery that predates the issue. No new role, no new table.**
+
+The issue asks for a grant of the shape `(user_id, course_id, role=grader)`,
+enforced per course, with no global "grade everything" role. That is exactly a
+`course_member` row: enrol the person on that one course with
+`course_role_id='_tutor'` and they can grade there and nowhere else. Keycloak
+supplies the identity, as the issue wanted; the grant itself lives in the
+database, so no new claim was needed.
+
+The issue's file list is stale — there is no `api/grading.py`. The two grading
+surfaces sit at deliberately different floors, and that split is correct as it
+stands:
+
+- **`_tutor` — grading a student's submitted work.** `create_artifact_grade`
+  (`business_logic/submissions.py:701`) and `check_artifact_access`
+  (`:578-604`) both gate at `_tutor` in the artifact's own course. The ladder
+  is inclusive, so `_lecturer`, `_maintainer` and `_owner` grade too.
+- **`_lecturer` — `course_member_gradings`.** The course-wide progress matrix
+  over every member (`repositories/course_member_gradings_view.py:200,266,375`)
+  is a course-management report, not an act of grading, so a grader does not
+  get it.
+
+Cross-course isolation is structural rather than per-endpoint:
+`CoursePermissionQueryBuilder.filter_by_course_membership`
+(`permissions/query_builders.py:54-56`) constrains every membership lookup to
+the courses where the caller holds the required role, so a grader on one course
+cannot reach another's members, artifacts or statistics. Denial hides existence
+(404) where the caller could not otherwise know the resource exists, and is a
+403 where they can already see it.
+
+Route hiding needed nothing either. `/user/views/{course_id}` answers
+`["student","tutor"]` for a `_tutor` (`business_logic/users.py:16-19`), and the
+web's grading pages live under the Lecturer section, which renders only for the
+`lecturer` or `management` view (`Sidebar.tsx:131-135`). A grader therefore
+never sees the link.
+
+One thing was genuinely missing: the test the issue names as its success
+criterion. Added as `tests/test_grading_access.py` — 16 tests against a live
+Postgres, covering the granted grader reaching the work, the same grader
+refused on a second course, students/outsiders refused, a lecturer grading, and
+the statistics matrix staying `_lecturer` in both its list and per-member form.
+All pass.
+
+**Re-test:** enrol the grader as `_tutor` on the WSD course only. They can
+grade WSD submissions; a second course stays invisible; the course-member
+statistics page stays a lecturer surface.
+
+---
+
 ## Partly fixed — keep open, but the scope is much smaller than the text suggests
 
 ### #333 + #342 — Forgejo clone URL / token can't clone a repo
@@ -242,12 +292,18 @@ root cause; close one as a duplicate of the other.
 | #144 | fixed | deploy theme, re-test a failed login, close |
 | #258 | fixed | rebuild the extension, re-test, close |
 | #351 | fixed | deploy, set the limits, re-test, close |
+| #262 | fixed | enrol the grader as `_tutor` on the course, re-test, close |
 | #333 | partly fixed | keep open — needs a UI surface only |
 | #342 | duplicate of #333 | close as duplicate |
 
-Ten issues closable without writing code, plus #144, #258 and #351, which did
-take code. All three are listed here because the report and the code disagreed:
-#144's screenshot showed a surface that was already gone, #258's
+Eleven issues closable without writing code, plus #144, #258 and #351, which
+did take code. All three are listed here because the report and the code
+disagreed: #144's screenshot showed a surface that was already gone, #258's
 session-on-startup was already gated (only the activation underneath it was
 not), and #351 looked half-implemented by a limit that turns out to be a
 different limit.
+
+#262 is the one row here that took a commit without taking a behaviour change:
+the grant it asks for is a `_tutor` course membership and already worked, but
+the test it names as its success criterion did not exist, so nothing stopped
+the two grading floors from drifting apart later.
