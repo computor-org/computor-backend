@@ -5,7 +5,7 @@ ARG MATLAB_BASE_IMAGE=computor-matlab-base:r2025b
 # The matlab base is a different OS image, so we can't `FROM computor-base`; we
 # COPY from it instead. Both run CPython 3.10, so the installed wheels are ABI
 # compatible. See docker/base/Dockerfile.
-FROM computor-base:latest AS pybase
+FROM computor-base AS pybase
 
 FROM ${MATLAB_BASE_IMAGE}
 
