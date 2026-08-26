@@ -20,6 +20,7 @@ from computor_backend.model.course import CourseMember, SubmissionGroup, Submiss
 from computor_backend.permissions.principal import Principal
 from computor_backend.redis_cache import get_redis_client
 from computor_backend.settings import settings
+from computor_backend.websocket.auth import WebSocketCredential
 from computor_backend.websocket.pubsub import pubsub, typing_tracker, TYPING_PREFIX
 
 logger = logging.getLogger(__name__)
@@ -105,6 +106,12 @@ class Connection:
     websocket: WebSocket
     principal: Principal
     subscriptions: Set[str] = field(default_factory=set)
+    #: What authenticated this connection and when it expires (issue #257).
+    #: Replaced wholesale by a successful ``system:reauth``; the expiry
+    #: watchdog re-reads it on every wake, so a re-armed connection simply
+    #: gets the new deadline. Optional so a Connection can still be built in
+    #: tests and by callers that do not care about expiry.
+    credential: Optional[WebSocketCredential] = None
 
 
 class ConnectionManager:

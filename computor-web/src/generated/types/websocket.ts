@@ -70,6 +70,25 @@ export interface WSPing {
 }
 
 /**
+ * Re-arm a live connection with a fresh credential (issue #257).
+ * 
+ * A socket used to outlive the token that opened it: the handshake
+ * authenticated once and nothing ever revisited it, so HTTP started
+ * answering 401 while the socket sat there looking healthy. The server now
+ * closes an expired connection with ``4003``; this event is the way to avoid
+ * that close entirely — on ``system:auth_expiring`` the client refreshes its
+ * session and sends the new token here, keeping its subscriptions.
+ * 
+ * The new token must belong to the same user; anything else is treated as a
+ * failed re-authentication, not as a way to change identity mid-connection.
+ */
+export interface WSReauth {
+  type?: "system:reauth";
+  /** Freshly issued session or API token for the same user */
+  token: string;
+}
+
+/**
  * Confirmation of successful subscription.
  */
 export interface WSChannelSubscribed {
@@ -187,6 +206,33 @@ export interface WSConnected {
   type?: "system:connected";
   /** ID of the authenticated user */
   user_id: string;
+  /** When the credential behind this connection expires; null when it never does */
+  expires_at?: string | null;
+}
+
+/**
+ * The credential behind this connection is about to expire (issue #257).
+ * 
+ * Sent once per deadline, shortly before it passes, so the client can refresh
+ * and answer with ``system:reauth`` instead of being closed with ``4003``.
+ */
+export interface WSAuthExpiring {
+  type?: "system:auth_expiring";
+  /** When the current credential expires */
+  expires_at: string;
+  /** Seconds left at the moment the warning was sent */
+  seconds_remaining: number;
+}
+
+/**
+ * Confirmation that a ``system:reauth`` was accepted and the deadline moved.
+ */
+export interface WSReauthed {
+  type?: "system:reauthed";
+  /** ID of the authenticated user (unchanged) */
+  user_id: string;
+  /** New expiry of the connection, or null when the new credential never expires */
+  expires_at?: string | null;
 }
 
 /**

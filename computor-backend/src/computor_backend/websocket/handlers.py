@@ -13,6 +13,11 @@ from sqlalchemy.orm import Session
 
 from computor_backend.database import get_db_session
 from computor_backend.model.auth import User
+from computor_backend.websocket.auth import (
+    authenticate_websocket_token,
+    WebSocketAuthError,
+    WS_CLOSE_TOKEN_EXPIRED,
+)
 from computor_backend.websocket.connection_manager import Connection, manager, ws_metrics
 from computor_backend.websocket.pubsub import pubsub, typing_tracker, CHANNEL_PREFIX
 from computor_backend.business_logic.messages import mark_message_as_read
@@ -25,12 +30,14 @@ from computor_types.websocket import (
     WSTypingStop,
     WSReadMark,
     WSPing,
+    WSReauth,
     WSChannelSubscribed,
     WSChannelUnsubscribed,
     WSChannelError,
     WSTypingUpdate,
     WSReadUpdate,
     WSPong,
+    WSReauthed,
     WSError,
 )
 
@@ -77,6 +84,9 @@ async def handle_client_message(connection: Connection, raw_data: dict):
 
         elif isinstance(event, WSPing):
             await handle_ping(connection)
+
+        elif isinstance(event, WSReauth):
+            await handle_reauth(connection, event)
 
         else:
             await manager.send_to_connection(connection, WSError(
@@ -259,6 +269,76 @@ async def handle_ping(connection: Connection):
     await manager.send_to_connection(connection, WSPong(
         timestamp=datetime.now(timezone.utc)
     ).model_dump(mode="json"))
+
+
+async def handle_reauth(connection: Connection, event: WSReauth):
+    """
+    Re-arm a live connection with a freshly issued credential (issue #257).
+
+    This is the escape hatch from the close/reconnect cycle: warned by
+    ``system:auth_expiring``, a client refreshes its session and sends the new
+    token here, so the connection keeps its subscriptions instead of dropping
+    and re-establishing all of them a minute later.
+
+    The new credential must belong to the same user. A socket is not a place to
+    change identity: its subscriptions were authorised against the principal
+    that opened it, and swapping that principal underneath them would hand the
+    new user everything the old one was already listening to. A mismatch is
+    therefore treated as a failed re-authentication and closes the connection.
+
+    Deliberately does not refresh an SSO session's sliding TTL: a connection
+    that could renew its own session by answering every expiry warning with the
+    same token would simply never expire, which is the state this issue exists
+    to end. A real refresh mints a new session with a full TTL of its own, so
+    nothing legitimate is lost.
+    """
+    try:
+        principal, credential = await authenticate_websocket_token(
+            event.token, refresh_session_ttl=False
+        )
+    except WebSocketAuthError as e:
+        logger.info(
+            f"WebSocket reauth rejected for user={connection.principal.user_id}: {e.reason}"
+        )
+        await _reject_reauth(connection, e.reason)
+        return
+
+    if str(principal.user_id) != str(connection.principal.user_id):
+        logger.warning(
+            "WebSocket reauth identity mismatch: connection user="
+            f"{connection.principal.user_id}, token user={principal.user_id}"
+        )
+        await _reject_reauth(connection, "Token belongs to a different user")
+        return
+
+    connection.credential = credential
+    logger.info(
+        f"WebSocket reauthenticated: user={principal.user_id} expires_at={credential.expires_at}"
+    )
+    await manager.send_to_connection(connection, WSReauthed(
+        user_id=str(principal.user_id),
+        expires_at=credential.expires_at,
+    ).model_dump(mode="json"))
+
+
+async def _reject_reauth(connection: Connection, reason: str):
+    """
+    A reauth attempt failed — say so, then close.
+
+    Closing with the token-expired code rather than leaving the socket up keeps
+    the client on one path: the connection it is holding is not authenticated
+    any more, so it must go back through the handshake with a credential the
+    user actually has.
+    """
+    await manager.send_to_connection(connection, WSError(
+        code="REAUTH_FAILED",
+        message=reason,
+    ).model_dump())
+    try:
+        await connection.websocket.close(code=WS_CLOSE_TOKEN_EXPIRED, reason=reason)
+    except Exception:
+        # Best-effort: the peer may already be gone.
+        logger.debug("Failed to close WebSocket after rejected reauth", exc_info=True)
 
 
 async def _get_user_display_name(user_id: str) -> Optional[str]:

@@ -6,7 +6,7 @@ by trusting the branch name.
 
 These need an image rebuild + a re-test on the deployed instance, then a close
 comment. No new code, except where a row says otherwise (#144, #258, #351,
-#247).
+#247, #257).
 
 ---
 
@@ -298,6 +298,64 @@ token field, not the view root. Save a good token and take the offered retry.
 
 ---
 
+### #257 — WebSocket disconnects leave clients in stale auth state
+**Fixed, both halves.** Backend `fix/257-ws-token-expiry` in
+`computor-fullstack`; extension `fix/257-ws-token-expiry` in
+`computor-vsc-extension`.
+
+The report's split state — HTTP answering 401 while the socket sits there
+looking healthy — was exactly what the code did: `websocket/auth.py`
+authenticated once at the handshake and nothing ever revisited it, so a
+connection outlived the credential that opened it.
+
+- **The handshake now resolves an expiry.** From the API token's `expires_at`
+  (read off the cache `authenticate_api_token` has just populated, so no second
+  DB round-trip) or from the SSO session key's own Redis TTL. It rides on the
+  `Connection` record and is echoed to the client in `system:connected`. A
+  credential with no expiry is left unwatched rather than given an invented
+  deadline, and an unreadable cache degrades to the same — never worse than
+  the old behaviour, where HTTP still enforced expiry.
+- **A watchdog runs beside the receive loop** and closes with **4003**, a code
+  of its own. 4001 means "your token was rejected" and needs the user; 4003
+  means "it expired" and is usually fixed by a silent refresh. Collapsing them
+  is why an ordinary session rollover looked like a hard auth failure.
+- **The deadline is re-read, not captured.** SSO TTLs slide, so a deadline is a
+  floor: an actively-working user keeps their socket for hours while an idle
+  one closes on time. The re-read is deliberately non-refreshing (`ttl`, never
+  `expire`) — a connection that renews its own session never expires. Signing
+  out elsewhere deletes the key and closes the socket too.
+- **`system:auth_expiring` / `system:reauth`** let a client re-arm in place
+  instead of dropping every subscription and rebuilding it a moment later. The
+  reauth path also refuses to slide the session TTL, so answering every warning
+  with the same token cannot make a socket immortal; and it refuses a token
+  belonging to a different user, since the subscriptions were authorised
+  against the principal that opened the connection.
+- **Extension:** 4003 refreshes and reconnects silently, and only after that
+  stops producing a *different* token does it hand over to
+  `CredentialRecoveryService.reportExpired({ kind: 'backend' })` — #247's flow,
+  not a second one. A token the server has already closed us on is never used
+  to reconnect; that loop is what turned a dead session into endless retries.
+- **Giving up now says why.** Exhausting the five reconnect attempts used to
+  leave a red status-bar item and nothing else, which is the half-alive UI the
+  report describes. A close code cannot tell a dead session from a dead
+  network, so one `GET /user` settles it: a 401 routes to the same re-login
+  path every other 401 gives, anything else stays the network's problem.
+
+18 backend tests + 10 extension tests. Live-checked against the dev stack both
+ways: an API token expiring in 20s warned at t+0 and closed 4003 at t+19.7s; an
+SSO session deleted mid-connection closed 4003 at the next re-check.
+
+**Not done — and not needed:** step 4 of the plan wanted the same contract in
+`computor-web`. There is no WebSocket client there at all, only the generated
+event types; nothing to fix until one exists.
+
+**Re-test:** sign in to the extension, leave the editor idle past the session
+TTL. The status bar must recover on its own without a notification; killing the
+session server-side must produce one clear "sign in again", not a silent dead
+socket.
+
+---
+
 ## Partly fixed — keep open, but the scope is much smaller than the text suggests
 
 ### #333 + #342 — Forgejo clone URL / token can't clone a repo
@@ -338,6 +396,7 @@ root cause; close one as a duplicate of the other.
 | #351 | fixed | deploy, set the limits, re-test, close |
 | #262 | fixed | enrol the grader as `_tutor` on the course, re-test, close |
 | #247 | fixed | rebuild the extension, re-test with a broken token, close |
+| #257 | fixed | deploy the backend, rebuild the extension, re-test, close |
 | #333 | partly fixed | keep open — needs a UI surface only |
 | #342 | duplicate of #333 | close as duplicate |
 
@@ -348,9 +407,10 @@ session-on-startup was already gated (only the activation underneath it was
 not), and #351 looked half-implemented by a limit that turns out to be a
 different limit.
 
-#247 is the exception to the table's premise: it was a plain build, not a
-report the code contradicted. It sits here because it lands the same way — an
-extension rebuild and a re-test before it can be closed.
+#247 and #257 are the exceptions to the table's premise: they were plain
+builds, not reports the code contradicted. They sit here because they land the
+same way — a rebuild and a re-test before they can be closed. #257 is the only
+row that also needs the backend deployed, since half of it is server-side.
 
 #262 is the one row here that took a commit without taking a behaviour change:
 the grant it asks for is a `_tutor` course membership and already worked, but

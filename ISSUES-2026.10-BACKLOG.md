@@ -491,29 +491,42 @@ that only ever had Keycloak.
    empty box.
 5. Close #342 as a duplicate of #333.
 
-## #257 — WebSocket disconnects leave clients in stale auth state — **OPEN**
+## #257 — WebSocket disconnects leave clients in stale auth state — **DONE** (2026-08-26)
 
-**Verified root cause.** `websocket/auth.py` authenticates once at handshake
-(`4001 Invalid or expired token` at lines 92 and 119) and never re-validates.
-There is no expiry watch on an established connection. Only the SSO session key
-is refreshed (`auth.py:145`). So when the token behind a live socket expires,
-HTTP starts returning 401 while the socket sits there, which is exactly the
+**Verified root cause.** `websocket/auth.py` authenticated once at handshake
+(`4001 Invalid or expired token` at lines 92 and 119) and never re-validated.
+There was no expiry watch on an established connection. Only the SSO session key
+was refreshed (`auth.py:145`). So when the token behind a live socket expired,
+HTTP started returning 401 while the socket sat there, which is exactly the
 production trace in the report.
+
+Landed on `fix/257-ws-token-expiry` in **both** repos — see Part 4's entry for
+what each step became. Steps 1, 2, 4 and 5 held as written; step 3 needed
+correcting on the web half and the plan's optional step 2 turned out to be
+worth doing.
 
 **Steps**
 
-1. Record the token's expiry at handshake and close the socket with a distinct
-   application close code when it passes — do not wait for the next failed
-   HTTP call to reveal it.
-2. On the client, treat that close code as "refresh the session", not as a
-   transport error: attempt a silent refresh, reconnect on success, and force a
-   clean re-login on failure.
-3. Make the failure legible in both surfaces: the extension shows one clear
-   "your session expired, sign in again" path; the web UI redirects to login
-   rather than half-rendering.
-4. Reconnect with backoff, and do not reuse a token already known to be dead.
-5. Reproduce by minting a short-lived token, opening a socket, and waiting past
-   expiry.
+1. ~~Record the token's expiry at handshake and close the socket with a
+   distinct application close code when it passes.~~ Done — `4003`, watched by
+   a task running beside the receive loop. The deadline is re-read on every
+   wake rather than captured, because SSO TTLs slide.
+2. ~~On the client, treat that close code as "refresh the session".~~ Done —
+   silent refresh, reconnect, and only then hand over to #247's
+   `CredentialRecoveryService`.
+3. **Extension only.** `computor-web` has no WebSocket client — only the
+   generated event types — so there was nothing there to redirect. Nothing to
+   do until one exists.
+4. ~~Do not reuse a token already known to be dead.~~ Done — the rejected token
+   is remembered and refused, which is what stopped the retry loop.
+5. ~~Reproduce by minting a short-lived token.~~ Done, both credential kinds:
+   a 20s API token closed 4003 at t+19.7s, and an SSO session deleted
+   mid-connection closed 4003 at the next re-check.
+
+**Beyond the plan:** `system:auth_expiring` + `system:reauth` let a client
+re-arm a live connection instead of dropping every subscription and rebuilding
+it a moment later. The plan marked this optional; it is what makes an hourly
+session boundary invisible rather than merely survivable.
 
 ## #247 — token expiry error flow polish — **DONE** (2026-08-26)
 
@@ -1127,8 +1140,9 @@ plus #358 populating Category and Tags where the filter reads them.
 5. **#162, #150, #163** — small, confirmed root causes, real lecturer pain.
 6. ~~**#351**~~ done 2026-08-26; **#350** — the status surface, still open, and
    no longer blocking anything before the workshop.
-7. **#257, #333** — session and credential papercuts; ~~**#247**~~ done
-   2026-08-26, and #257's forced re-login should reuse its rails.
+7. **#333** — the last session/credential papercut; ~~**#247**~~ and
+   ~~**#257**~~ both done 2026-08-26, and #257's forced re-login does reuse
+   #247's rails.
 8. Part 7 and Part 8 as filler; close #66, #146, #149, #178, #234 after
    re-testing rather than building anything.
 
@@ -1634,44 +1648,58 @@ existing clone's stored credential). The extension already consumes it
 
 ---
 
-## Plan #257 — websocket outlives its token
+## Plan #257 — websocket outlives its token — **DONE**
+
+Shipped as `fix/257-ws-token-expiry` in both repos (2026-08-26). Four of the
+five steps landed as written; the two corrections are noted below.
 
 **Repos:** both. **Branch:** `fix/257-ws-token-expiry`
 **Effort:** medium.
 
 ### Verified state
 
-`websocket/auth.py` authenticates once at handshake (4001 on bad token,
-lines 92/119) and refreshes only the SSO session TTL (:145). The receive
-loop (`websocket/router.py:107-167`) never revisits auth; close codes in use
-are the auth failures at 144/158 and 1011.
+`websocket/auth.py` authenticated once at handshake (4001 on bad token,
+lines 92/119) and refreshed only the SSO session TTL (:145). The receive
+loop (`websocket/router.py:107-167`) never revisited auth; close codes in use
+were the auth failures at 144/158 and 1011.
 
 ### Steps
 
-1. Backend: at handshake, resolve the credential's expiry (JWT `exp` /
-   API-token TTL / SSO session TTL — whichever authenticated). Hold it on
-   the connection record and, in the endpoint, wrap the receive loop with a
-   deadline (`asyncio.wait_for` per receive, or a companion timer task) that
-   closes with a **dedicated application close code** (pick 4003
-   "token expired", distinct from 4001 auth-failed) when the deadline
-   passes. Tokens without expiry → no timer.
-2. Optional refresh path: if the client can re-auth without dropping,
-   accept a `{"type": "reauth", "token": …}` message that revalidates and
-   extends the deadline. If skipped this cycle, note it — the close/reconnect
-   path below is sufficient.
-3. Extension (`src/services/WebSocketService.ts` — it already owns
-   reconnect + status bar items at :200): on close 4003, do not blind-retry;
-   run the session refresh (the same path HTTP 401 handling uses), reconnect
-   with the new token, and after N failures call
-   `CredentialRecoveryService.reportExpired({ kind: 'backend' })` — #247
-   shipped that flow, so do not write a second one. Never reconnect with a
-   token already seen rejected.
-4. Web (`AuthContext` / websocket client): same contract — 4003 → refresh →
-   reconnect, else redirect to `/login`.
-5. Verify: mint a short-TTL token, open the socket, wait past expiry —
-   socket closes 4003, client silently refreshes and reconnects (session
-   valid) or lands on a clean re-login (session gone). Grep production-style
-   logs to confirm no "connection open" survives its token.
+1. ~~Backend: resolve the credential's expiry at handshake, hold it on the
+   connection record, close with a dedicated 4003 when it passes.~~ Done, as
+   `WebSocketCredential` + `router._watch_credential_expiry`. Two things the
+   plan did not anticipate:
+   - **A per-receive `asyncio.wait_for` deadline is the wrong shape.** A
+     companion task is right, because the deadline has to be *re-read*, not
+     counted down: an SSO session's TTL slides with every HTTP request the
+     user makes, so a deadline captured at handshake would close the socket of
+     someone actively working. Re-reading is also what makes a sign-out
+     elsewhere close the connection.
+   - **That re-read must not refresh the TTL** (`ttl`, never `expire`), or a
+     connection keeps its own session alive and never expires. The same
+     applies to the reauth path — see step 2.
+2. ~~Optional refresh path.~~ Done rather than skipped: `system:auth_expiring`
+   warns the client, which answers `system:reauth` with a renewed token and
+   keeps its subscriptions. Worth the small surface — without it every session
+   boundary costs a full resubscribe. It authenticates with the TTL refresh
+   *off*, and refuses a token belonging to a different user: the connection's
+   subscriptions were authorised against the principal that opened it.
+3. ~~Extension: 4003 → refresh → reconnect, then `reportExpired`.~~ Done as
+   written, plus two things the plan did not name:
+   - An `activeToken`, so a refresh that returns the *same* token is
+     recognised as "nothing was renewed" rather than sent to the server as if
+     it were new.
+   - A probe when the reconnect ladder runs out. Exhausting the five attempts
+     left a red status-bar item and nothing else, which is precisely the
+     half-alive UI the report describes. A close code cannot separate a dead
+     session from a dead network, so one `GET /user` decides which it was.
+4. **Dropped: `computor-web` has no WebSocket client.** Only the generated
+   event types under `src/generated/types/websocket.ts`; no `new WebSocket`
+   anywhere in `src/`. Nothing to give the 4003 contract to until one exists.
+5. ~~Verify with a short-TTL token.~~ Done for both credential kinds — a 20s
+   API token (warned t+0, closed 4003 at t+19.7s) and an SSO session deleted
+   mid-connection (closed 4003 at the next re-check). Detection latency for
+   the sliding case is bounded by `EXPIRY_RECHECK_INTERVAL_SECONDS` (30s).
 
 ---
 
