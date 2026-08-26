@@ -66,7 +66,17 @@ BLOCKED_ENV_VARS: Set[str] = {
     "CI_REGISTRY_PASSWORD",
     "DOCKER_PASSWORD",
     "DOCKER_AUTH_CONFIG",
+    # Computor worker credentials — the testing worker's own API token, which
+    # is the same value as TESTING_WORKER_TOKEN (#241).
+    "API_TOKEN",
+    "TESTING_WORKER_TOKEN",
 }
+
+# Variables blocked by prefix rather than exact name. Every COMPUTOR_* value
+# is internal worker config and must not reach student code — with the one
+# exception of the flag that turns the sandbox on, which is harmless to leak
+# and is filtered here only for tidiness.
+BLOCKED_ENV_PREFIXES = ("COMPUTOR_",)
 
 
 # Minimal safe environment for subprocess execution
@@ -157,7 +167,7 @@ def get_safe_env(
     # Add extra variables (after filtering blocked ones)
     if extra_vars:
         for key, value in extra_vars.items():
-            if key.upper() not in BLOCKED_ENV_VARS:
+            if not is_blocked_var(key):
                 env[key] = value
 
     return env
@@ -173,9 +183,12 @@ def filter_env(env: Dict[str, str]) -> Dict[str, str]:
     Returns:
         Filtered environment dictionary
     """
-    return {k: v for k, v in env.items() if k.upper() not in BLOCKED_ENV_VARS}
+    return {k: v for k, v in env.items() if not is_blocked_var(k)}
 
 
 def is_blocked_var(name: str) -> bool:
-    """Check if an environment variable name is blocked."""
-    return name.upper() in BLOCKED_ENV_VARS
+    """Check if an environment variable name is blocked (exact or by prefix)."""
+    upper = name.upper()
+    if upper in BLOCKED_ENV_VARS:
+        return True
+    return any(upper.startswith(prefix) for prefix in BLOCKED_ENV_PREFIXES)
