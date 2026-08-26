@@ -14,6 +14,7 @@ from computor_backend.api.coder import (
 )
 from computor_backend.coder.exceptions import CoderTemplateNotFoundError
 from computor_backend.coder.naming import encode_coder_username
+from computor_backend.coder.schemas import WorkspaceBuildStatus
 from computor_backend.exceptions import (
     BadRequestException,
     ForbiddenException,
@@ -21,6 +22,8 @@ from computor_backend.exceptions import (
     ServiceUnavailableException,
 )
 from computor_backend.model.course import Course, CourseMember
+from computor_backend.model.instance import InstanceSettings
+from computor_backend.model.role import UserRole
 from computor_backend.model.workspace import (
     CourseWorkspaceSettings,
     CourseWorkspaceTemplate,
@@ -81,13 +84,17 @@ def make_db(
     course_settings=_UNSET,
     members=(),
     member_first=_UNSET,
+    instance_settings=None,
+    user_roles=(),
 ):
     """Routing Session mock: dispatches on the db.query(...) target.
 
     ``course_templates`` are CourseWorkspaceTemplate rows; ``disabled`` are
     template names with enabled=false; ``settings_row`` serves the
     per-template settings lookup; ``members`` serve .all(), ``member_first``
-    the .first() lookup of the bulk-provision loop.
+    the .first() lookup of the bulk-provision loop; ``instance_settings`` and
+    ``user_roles`` serve the deployment-wide admission limits (default: none
+    configured, no roles — the pre-#351 behaviour).
     """
     db = MagicMock()
     course_obj = MagicMock(spec=Course) if course is _UNSET else course
@@ -130,6 +137,10 @@ def make_db(
             q.filter.return_value.first.return_value = (
                 None if member_first is _UNSET else member_first
             )
+        elif target is InstanceSettings:
+            q.first.return_value = instance_settings
+        elif target is UserRole.role_id:
+            q.filter.return_value.all.return_value = [(r,) for r in user_roles]
         return q
 
     db.query.side_effect = query
@@ -586,6 +597,45 @@ async def test_bulk_provision_continues_past_failures_and_derives_name(monkeypat
     _, call_kwargs = client.provision_workspace.call_args
     assert call_kwargs["workspace_name"] == "vscode-exam1"
     assert call_kwargs["home_mode"] == "scratch"
+
+
+@pytest.mark.asyncio
+async def test_bulk_provision_records_the_instance_cap_per_student(monkeypatch):
+    """A batch that crosses the workspace-user cap refuses the students it
+    cannot admit and provisions the rest — it does not fail whole (#351)."""
+    member = _member()
+    db = _bulk_db(
+        member_first=member,
+        instance_settings=InstanceSettings(max_workspace_users=1),
+    )
+    monkeypatch.setattr(cw, "get_user_email", lambda u: "s@example.org")
+    monkeypatch.setattr(cw, "get_user_fullname", lambda u: "Student One")
+    monkeypatch.setattr(cw, "mint_workspace_token", lambda *a, **k: "tok")
+    monkeypatch.setenv("TOKEN_SECRET", "x" * 32)
+
+    client = MagicMock()
+    # One workspace already running, owned by somebody else: the cap of 1 is
+    # spent before the batch starts.
+    occupied = MagicMock()
+    occupied.id = "w1"
+    occupied.owner_name = "usomeoneelse"
+    occupied.template_name = "vscode-workspace"
+    occupied.latest_build_transition = "start"
+    occupied.latest_build_status = WorkspaceBuildStatus.SUCCEEDED
+    client.list_all_workspaces = AsyncMock(return_value=[occupied])
+    client._find_user_by_email = AsyncMock(side_effect=RuntimeError("no coder user"))
+    client.provision_workspace = AsyncMock()
+
+    request = StudentWorkspaceProvisionRequest(
+        template_name="vscode-workspace", course_member_ids=["m1"],
+    )
+    result = await cw.provision_student_workspaces(
+        "c1", request, _course_principal("l1", "c1", "_lecturer"),
+        db, MagicMock(), client, _coder_settings(),
+    )
+    assert result.failed == 1 and result.succeeded == 0
+    assert "capacity of 1 concurrent workspace user(s)" in result.outcomes[0].error
+    client.provision_workspace.assert_not_awaited()
 
 
 # --- lecturer delete gate -----------------------------------------------------
