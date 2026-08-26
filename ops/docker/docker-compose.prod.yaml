@@ -269,14 +269,10 @@ services:
     # SIGKILLs the worker while it is still draining a live run.
     stop_grace_period: 330s
     security_opt:
+      # Student code runs inside sandbox.launch, which uses Landlock (a kernel
+      # path/TCP allow-list) — this works under the DEFAULT seccomp profile, so
+      # no custom profile is needed (#240, #241).
       - "no-new-privileges:true"
-      # Student code runs inside sandbox.launch (Landlock + a loopback-only
-      # network namespace). Landlock alone works under the default profile;
-      # this tailored profile additionally permits the unprivileged
-      # user+net namespace (unshare/setns) so the network cut also covers
-      # UDP/ICMP. It is the Docker default profile plus that one allowance —
-      # never seccomp=unconfined (#240, #241).
-      - "seccomp=./seccomp-testing-worker.json"
     logging:
       driver: json-file
       options:
