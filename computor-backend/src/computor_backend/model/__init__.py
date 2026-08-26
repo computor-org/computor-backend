@@ -32,6 +32,7 @@ from .git_server import GitServer, CourseGitBinding, CourseMemberGitRepository
 from .consent import PolicyVersion, UserConsent
 from .issue_report import IssueReport
 from .workspace import WorkspaceTemplateSettings, CourseWorkspaceTemplate, CourseWorkspaceSettings
+from .instance import InstanceSettings
 
 # Import all models to ensure relationships are properly set up
 from . import (
@@ -54,6 +55,7 @@ from . import (
     consent,
     issue_report,
     workspace,
+    instance,
 )
 
 __all__ = [
@@ -136,4 +138,6 @@ __all__ = [
     # Course-scoped workspace configuration
     'CourseWorkspaceTemplate',
     'CourseWorkspaceSettings',
+    # Deployment-wide admission limits
+    'InstanceSettings',
 ]
