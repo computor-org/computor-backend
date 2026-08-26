@@ -6,6 +6,7 @@ ensuring consistent interfaces and shared functionality.
 """
 
 import os
+import sys
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -15,6 +16,40 @@ from .environment import get_safe_env
 from .exceptions import ExecutorError, RuntimeNotFoundError
 from .resources import ResourceLimits, make_preexec_fn
 from .runtime import check_runtime_installed, get_runtime_info, RuntimeType, get_binary_path
+
+
+# When set to "1" (the testing worker sets it), every student process is
+# spawned inside the kernel sandbox (Landlock filesystem allow-list + a
+# loopback-only network namespace where the host permits it) via
+# sandbox.launch. Off by default so local lecturer runs and the test suite
+# behave exactly as before. See computor-testing/sandbox/launch.py (#240/#241).
+SANDBOX_ENABLE_ENV = "COMPUTOR_SANDBOX_ENABLE"
+
+
+def sandbox_command_prefix(
+    workdir: Optional[str],
+    rw_paths: Optional[List[str]] = None,
+    ro_paths: Optional[List[str]] = None,
+) -> List[str]:
+    """argv prefix that runs the student process under sandbox.launch.
+
+    Empty (no wrapping) unless COMPUTOR_SANDBOX_ENABLE=1. The launcher is a
+    Python module, so it is always invoked with the framework interpreter and
+    then execs the real (possibly non-Python) student interpreter. Only the
+    explicitly listed paths are writable/readable beyond the fixed runtime set
+    — never a blanket /tmp, which holds the reference/example cache.
+    """
+    if os.environ.get(SANDBOX_ENABLE_ENV) != "1":
+        return []
+    argv = [sys.executable, "-m", "sandbox.launch", "--required"]
+    if workdir:
+        argv += ["--workdir", workdir]
+    for path in rw_paths or []:
+        argv += ["--rw", path]
+    for path in ro_paths or []:
+        argv += ["--ro", path]
+    argv.append("--")
+    return argv
 
 
 @dataclass

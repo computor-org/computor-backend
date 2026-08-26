@@ -14,7 +14,7 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from .base import BaseExecutor, ExecutorResult
+from .base import BaseExecutor, ExecutorResult, sandbox_command_prefix
 from .environment import get_safe_env, filter_env
 from .exceptions import CompilationError, ExecutionError, ExecutionTimeoutError
 from .resources import make_preexec_fn
@@ -257,7 +257,9 @@ class CompiledExecutor(BaseExecutor):
                 error_type="RuntimeError",
             )
 
-        cmd = [self.executable_path]
+        # Sandbox the student binary when the worker enables it: its own
+        # working dir stays read/write, the reference cache is bound nowhere.
+        cmd = sandbox_command_prefix(self.working_dir) + [self.executable_path]
         if args:
             cmd.extend(args)
 
