@@ -34,6 +34,12 @@ services:
       - "--providers.docker.endpoint=tcp://socket-proxy:2375"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=computor-network"
+      # Discover only the two explicitly named production Compose projects.
+      # Preview projects share Docker but must never be visible to this
+      # internet-facing router: their frontend/static routers use the same
+      # paths and otherwise make production routing nondeterministic. Workspace
+      # containers are routed by workspace-ingress and remain excluded too.
+      - '--providers.docker.constraints=(Label(`com.docker.compose.project`,`docker`) || Label(`com.docker.compose.project`,`computor`)) && !Label(`computor.ingress`,`workspace`)'
       - "--entrypoints.web.address=:80"
       - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
