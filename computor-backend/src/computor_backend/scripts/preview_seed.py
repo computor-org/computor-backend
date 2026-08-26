@@ -103,7 +103,9 @@ def _get_or_create_user(
     return user
 
 
-def _link_oidc_account(session, user: User, provider_id: str) -> None:
+def _link_oidc_account(
+    session, user: User, provider_id: str, username: str
+) -> None:
     account = (
         session.query(Account)
         .filter(Account.provider == "keycloak", Account.user_id == user.id)
@@ -116,13 +118,13 @@ def _link_oidc_account(session, user: User, provider_id: str) -> None:
                 type="oidc",
                 provider_account_id=provider_id,
                 user_id=user.id,
-                properties={"preview_seed": True, "username": user.username},
+                properties={"preview_seed": True, "username": username},
             )
         )
     else:
         account.type = "oidc"
         account.provider_account_id = provider_id
-        account.properties = {"preview_seed": True, "username": user.username}
+        account.properties = {"preview_seed": True, "username": username}
 
 
 def seed() -> dict[str, object]:
@@ -150,6 +152,7 @@ def seed() -> dict[str, object]:
                 session,
                 user,
                 ids.get(username, str(uuid5(OIDC_NAMESPACE, username))),
+                username,
             )
 
         admin_role = session.query(Role).filter_by(id="_admin").one_or_none()
