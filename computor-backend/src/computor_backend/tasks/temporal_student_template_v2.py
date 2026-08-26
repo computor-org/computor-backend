@@ -24,6 +24,7 @@ from .student_template import (
     mark_failed,
     push_reference_repo,
     resolve_deployment_directory,
+    resolve_directory_owners,
     select_contents_to_process,
     select_deployments_for_release,
 )
@@ -299,7 +300,7 @@ def generate_student_template_activity_v2(
     import tempfile
     from pathlib import Path
     from ..database import get_db_session
-    from ..model.course import Course
+    from ..model.course import Course, CourseContent
 
     with get_db_session() as db:
       try:
@@ -375,6 +376,11 @@ def generate_student_template_activity_v2(
                 db, course_id, selected_course_content_ids, force_redeploy, existing_directories
             )
 
+            # Who is allowed to write into which directory (issues#150). New
+            # assignments get a collision-free path at assign time; this covers
+            # the courses that were assigned before that was true.
+            directory_owners = resolve_directory_owners(db, course_id)
+
             logger.info(f"Selected {len(course_contents)} course contents to process")
             
             if not course_contents:
@@ -442,6 +448,27 @@ def generate_student_template_activity_v2(
                     
                     logger.info(f"Downloaded {len(files)} files for {content.path}")
                     
+                    # Refuse to write into a directory another content owns.
+                    # Overwriting it is what made one of two assignments on the
+                    # same example unopenable for the student (issues#150), and
+                    # a loud failure the lecturer can act on beats a release
+                    # that reports success and corrupts the template.
+                    owner_id = directory_owners.get(str(directory_name))
+                    if owner_id and owner_id != str(content.id):
+                        owner = db.query(CourseContent).filter(
+                            CourseContent.id == owner_id
+                        ).first()
+                        owner_name = str(owner.path) if owner else owner_id
+                        error_msg = (
+                            f"Directory '{directory_name}' is already used by '{owner_name}'. "
+                            f"Reassign the example on {content.path} so it gets its own "
+                            f"directory, then release again."
+                        )
+                        logger.error(f"Release refused for {content.path}: {error_msg}")
+                        mark_failed(db, content.deployment, error_msg, workflow_id)
+                        errors.append(f"{str(content.path)}: {error_msg}")
+                        continue
+
                     # Determine target directory in student template
                     # Use the example identifier as directory name for better organization
                     target_dir = str(directory_name)

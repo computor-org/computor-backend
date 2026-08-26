@@ -22,6 +22,7 @@ from computor_backend.exceptions import (
     ForbiddenException,
     BadRequestException
 )
+from computor_backend.business_logic.deployment_paths import allocate_deployment_path
 from computor_backend.custom_types.ltree import Ltree
 from computor_types.validation import SemanticVersion, normalize_version
 
@@ -317,33 +318,14 @@ def assign_example_to_content(
             }
         )
 
-    # 7. Check if this example is already assigned to another content in the same course
-    existing_in_course = db.query(CourseContentDeployment).join(
-        CourseContent, CourseContent.id == CourseContentDeployment.course_content_id
-    ).filter(
-        CourseContent.course_id == course_content.course_id,
-        CourseContentDeployment.example_identifier == example.identifier,
-        CourseContentDeployment.course_content_id != course_content_id,
-        CourseContentDeployment.deployment_status != 'unassigned',
-    ).first()
-
-    if existing_in_course:
-        conflicting_content = db.query(CourseContent).filter(
-            CourseContent.id == existing_in_course.course_content_id
-        ).first()
-        raise BadRequestException(
-            error_code="DEPLOY_005",
-            detail=f"Example '{example.identifier}' is already assigned to another "
-                   f"content in this course ('{conflicting_content.title if conflicting_content else 'unknown'}'). "
-                   f"Each example can only be assigned once per course, regardless of version.",
-            context={
-                "course_content_id": str(course_content_id),
-                "course_id": str(course_content.course_id),
-                "example_identifier": str(example.identifier),
-                "conflicting_content_id": str(existing_in_course.course_content_id),
-                "conflicting_content_title": conflicting_content.title if conflicting_content else None,
-            }
-        )
+    # 7. One example may be used by several contents of the same course -- the
+    # same exercise in week 2 and week 5 is a normal thing for a lecturer to
+    # want, and refusing it outright (which is what this step used to do, with
+    # DEPLOY_005) only moved the problem into the lecturer's way. What must not
+    # happen is two contents sharing a directory in the student template: the
+    # second release overwrites the first, and the student opens one assignment
+    # onto the other's files (computor-org/issues#150). The collision is
+    # resolved in the directory name instead, below.
 
     # 8. Check if deployment already exists
     existing_deployment = db.query(CourseContentDeployment).filter(
@@ -371,7 +353,13 @@ def assign_example_to_content(
         existing_deployment.example_version_id = example_version.id
         existing_deployment.example_identifier = example.identifier
         existing_deployment.version_tag = version_tag
-        existing_deployment.deployment_path = str(example.identifier)  # Set deployment path to example identifier
+        # A version bump keeps the directory it already has: renaming it would
+        # orphan the old one in every student's clone. A genuinely different
+        # example gets a freshly allocated name, as it always has.
+        if not (is_same_example and existing_deployment.deployment_path):
+            existing_deployment.deployment_path = allocate_deployment_path(
+                db, course_content, str(example.identifier)
+            )
         existing_deployment.deployment_status = 'pending'  # Reset to pending for redeployment
         existing_deployment.assigned_at = datetime.now(timezone.utc)
         existing_deployment.deployment_message = None
@@ -409,7 +397,9 @@ def assign_example_to_content(
             example_version_id=example_version.id,
             example_identifier=example.identifier,
             version_tag=version_tag,
-            deployment_path=str(example.identifier),  # Set deployment path to example identifier by default
+            deployment_path=allocate_deployment_path(
+                db, course_content, str(example.identifier)
+            ),
             deployment_status='pending',
             assigned_at=datetime.now(timezone.utc),
             created_by=permissions.user_id,
@@ -724,36 +714,12 @@ def batch_validate_content(
         key = (str(version.example_id), version.version_tag)
         version_map[key] = version
 
-    # 5.5 Check for duplicate examples within the batch
-    batch_identifier_to_content = {}  # identifier -> first content_id that uses it
-    batch_duplicates = {}  # content_id -> conflicting content_id
-    for item in content_validations:
-        identifier = str(item['example_identifier'])
-        content_id = item['content_id']
-        if identifier in batch_identifier_to_content:
-            batch_duplicates[content_id] = batch_identifier_to_content[identifier]
-        else:
-            batch_identifier_to_content[identifier] = content_id
-
-    # 5.6 Check for duplicate examples against existing deployments in the course
-    content_ids_in_batch = {item['content_id'] for item in content_validations}
-    existing_deployments = db.query(
-        CourseContentDeployment.course_content_id,
-        CourseContentDeployment.example_identifier,
-    ).join(
-        CourseContent, CourseContent.id == CourseContentDeployment.course_content_id
-    ).filter(
-        CourseContent.course_id == course_id,
-        CourseContentDeployment.deployment_status != 'unassigned',
-        CourseContentDeployment.example_identifier.isnot(None),
-    ).all()
-
-    # Build map: identifier -> existing content_id (excluding content items in this batch)
-    existing_identifier_map = {}
-    for dep in existing_deployments:
-        dep_identifier = str(dep.example_identifier)
-        if str(dep.course_content_id) not in content_ids_in_batch:
-            existing_identifier_map[dep_identifier] = str(dep.course_content_id)
+    # 5.5 There used to be a duplicate-example check here, in two halves: one
+    # against the rest of the batch, one against the course's existing
+    # deployments. Reusing an example inside a course is allowed now -- the
+    # same exercise in two weeks -- and the directory collision it used to
+    # cause is resolved when the path is allocated instead
+    # (business_logic.deployment_paths, computor-org/issues#150).
 
     # 6. Validate each content item
     validation_results = []
@@ -810,24 +776,10 @@ def batch_validate_content(
                 'message': 'Cannot validate version - example does not exist'
             }
 
-        # Check for duplicate example in batch or existing deployments
-        duplicate_validation = None
-        if content_id in batch_duplicates:
-            duplicate_validation = {
-                'is_duplicate': True,
-                'message': f"Example '{example_identifier}' is used by multiple content items in this batch"
-            }
-        elif example_identifier in existing_identifier_map:
-            duplicate_validation = {
-                'is_duplicate': True,
-                'message': f"Example '{example_identifier}' is already assigned to another content in this course"
-            }
-
         # Determine overall validity
         is_valid = (
             example_validation['exists']
             and version_validation['exists']
-            and duplicate_validation is None
         )
 
         if not is_valid:
@@ -841,8 +793,6 @@ def batch_validate_content(
                 messages.append(example_validation['message'])
             if not version_validation['exists']:
                 messages.append(version_validation['message'])
-            if duplicate_validation:
-                messages.append(duplicate_validation['message'])
             validation_message = '; '.join(messages)
 
         # Add result
@@ -853,8 +803,6 @@ def batch_validate_content(
             'version_validation': version_validation,
             'validation_message': validation_message
         }
-        if duplicate_validation:
-            result_entry['duplicate_validation'] = duplicate_validation
         validation_results.append(result_entry)
 
     # 7. Build response

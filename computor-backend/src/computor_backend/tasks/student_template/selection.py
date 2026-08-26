@@ -84,6 +84,55 @@ def resolve_deployment_directory(deployment, *, persist: bool = False) -> Option
     return None
 
 
+def resolve_directory_owners(db: Session, course_id: str) -> Dict[str, str]:
+    """Which course content owns each directory of the student template.
+
+    Deployment paths are allocated collision-free at assign time
+    (``business_logic.deployment_paths``), but courses assigned before that
+    existed can still hold two contents pointing at one directory — that is
+    computor-org/issues#150, and the release run is where it did its damage:
+    the second content silently wrote over the first, and the student opened
+    one assignment onto the other's files.
+
+    Ownership goes to whoever released into the directory first, so a new
+    assignment can never take a directory away from students already working
+    in it. If nobody has released yet, the first by ltree path wins, which
+    keeps the answer stable from run to run.
+    """
+    from ...model.course import CourseContent
+    from ...model.deployment import CourseContentDeployment
+
+    rows = db.query(CourseContent, CourseContentDeployment).join(
+        CourseContentDeployment,
+        CourseContentDeployment.course_content_id == CourseContent.id,
+    ).filter(
+        CourseContent.course_id == course_id,
+        CourseContent.archived_at.is_(None),
+        CourseContent.is_submittable.is_(True),
+        CourseContentDeployment.deployment_status != "unassigned",
+    ).order_by(CourseContent.path).all()
+
+    owners: Dict[str, str] = {}
+    claimed_by_release: Dict[str, Any] = {}
+    for content, deployment in rows:
+        directory = resolve_deployment_directory(deployment)
+        if not directory:
+            continue
+        released_at = deployment.deployed_at
+        if directory not in owners:
+            owners[directory] = str(content.id)
+            claimed_by_release[directory] = released_at
+            continue
+        # Someone already claims it. A completed release outranks a claim that
+        # has never been released, and an earlier release outranks a later one.
+        held = claimed_by_release.get(directory)
+        if released_at is not None and (held is None or released_at < held):
+            owners[directory] = str(content.id)
+            claimed_by_release[directory] = released_at
+
+    return owners
+
+
 def select_contents_to_process(
     db: Session,
     course_id: str,
