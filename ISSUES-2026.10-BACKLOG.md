@@ -515,29 +515,73 @@ production trace in the report.
 5. Reproduce by minting a short-lived token, opening a socket, and waiting past
    expiry.
 
-## #247 — token expiry error flow polish — **OPEN**
+## #247 — token expiry error flow polish — **DONE** (2026-08-26)
 
-Extension-side UX. No code investigation needed beyond confirming the current
-message is generic.
+Landed on the extension's `release/2026.10` as `a4e8a77` (branch
+`fix/247-token-expiry-ux`, five commits).
 
-**Steps**
+All three acceptance boxes are ticked, and the plan's steps 1–4 held up — this
+one needed no correction.
 
-1. Split the error identity: "token expired" and "backend unreachable" must not
-   share a title. #117 already settled the wording for the second.
-2. Deep-link to the specific realm's token field in the Settings View, not the
-   view root.
-3. Keep the failed action: capture the command and its arguments, and after a
-   token is entered and validated, offer "retry" — or retry automatically if
-   the action is idempotent.
-4. Re-check against #248 before building the retry plumbing; if self-rotation
-   lands later it should reuse this same "action was blocked on credentials"
-   path rather than inventing another.
+`src/services/CredentialRecoveryService.ts` is the new single answer to "a
+credential just died — now what?", and every 401 surface routes through it:
+
+1. **Identity.** A rejected credential now names itself. The backend case says
+   the *sign-in* expired and offers `Sign in` / `Use API Token`; the git case
+   names the server whose token was rejected. Neither says "unreachable" — that
+   word stays with `BackendConnectionService.showConnectionError()`, which is
+   what #117 settled. A unit test pins the two apart.
+   `AuthenticationErrorStrategy` used to say "Authentication failed … please
+   reload the window", which was both the wrong fix and — because it *awaited*
+   its own dialog — the blocking prompt `probeToken`'s comment warns about. It
+   no longer blocks.
+2. **Destination.** `computor.settingsView` takes an optional
+   `{ section, url }`. The provider passes it into the webview's initial state,
+   and `applyFocus()` in `settings-view.js` expands that server's *Update*
+   panel (or opens a pre-filled new entry when nothing is stored yet), scrolls
+   it into view, focuses the token input and flashes it. Re-showing an
+   already-open panel re-renders it, so the deep link works either way. The
+   focus is consumed once — a later validation result must not yank focus back.
+3. **Continuity.** `commandRegistrar` is the one place that knows both the
+   command id and its arguments, so its existing safety net now asks the
+   service first: a credential failure is remembered as
+   `{command, args, label}` and reported; anything else falls through to
+   `showErrorWithSeverity` unchanged. On `credentialRestored(realm)` a read
+   (the eight `*.refresh` commands) replays silently and anything else gets a
+   `Retry "<action>"?` button. Writes are never auto-run.
+
+Two details worth keeping:
+
+- The git realm is identified by parsing the URL git quoted back
+  (`extractAuthFailureOrigin` in `utils/gitErrors.ts`). `URL.origin` drops
+  userinfo, so a remote carrying its token inline — which is how this extension
+  writes them — can never leak that token into a notification or a webview. A
+  test pins it.
+- `RepositoryTokenManager.storeToken()` fires the retry only *after*
+  `updateWorkspaceRemotes()` settles. A retry that beat the remote rewrite
+  would re-authenticate with the token that just died.
+
+**Deliberately not done:** managed-Forgejo push failures keep their existing
+`Fix Authentication` route (`escalatePushFailure`). Students never see that
+backend-minted token, so a Settings deep link there is the dead end #318
+already removed once.
+
+**Verify:** `npm run test:unit` — 1053 passing. Manual pass: corrupt a stored
+provider token, trigger a clone/push, confirm the notification names the server
+and its button lands on that server's token field, then save a good token and
+take the offered retry.
+
+**#248 (self-rotation) picks this up unchanged** — it should call
+`reportExpired`/`credentialRestored` rather than inventing a second path, which
+is what step 4 asked for.
 
 ## #248 — token self-rotation — **OPEN, P3, record only**
 
 Out of scope for this release, by the issue's own text. When picked up: detect
 expiry within N days at startup, mint a successor with the existing credential,
-swap it in, notify non-blockingly. Build it on top of #247's plumbing.
+swap it in, notify non-blockingly. #247's plumbing now exists and is what to
+build on: `CredentialRecoveryService.reportExpired` /`credentialRestored` in
+the extension, keyed by realm.
 
 ## #244 — API-only test-user lifecycle — **PARTLY DONE, needs re-scoping**
 
@@ -1083,7 +1127,8 @@ plus #358 populating Category and Tags where the filter reads them.
 5. **#162, #150, #163** — small, confirmed root causes, real lecturer pain.
 6. ~~**#351**~~ done 2026-08-26; **#350** — the status surface, still open, and
    no longer blocking anything before the workshop.
-7. **#257, #333, #247** — session and credential papercuts.
+7. **#257, #333** — session and credential papercuts; ~~**#247**~~ done
+   2026-08-26, and #257's forced re-login should reuse its rails.
 8. Part 7 and Part 8 as filler; close #66, #146, #149, #178, #234 after
    re-testing rather than building anything.
 
@@ -1617,9 +1662,10 @@ are the auth failures at 144/158 and 1011.
 3. Extension (`src/services/WebSocketService.ts` — it already owns
    reconnect + status bar items at :200): on close 4003, do not blind-retry;
    run the session refresh (the same path HTTP 401 handling uses), reconnect
-   with the new token, and after N failures surface the #247-style
-   "session expired — sign in again" flow. Never reconnect with a token
-   already seen rejected.
+   with the new token, and after N failures call
+   `CredentialRecoveryService.reportExpired({ kind: 'backend' })` — #247
+   shipped that flow, so do not write a second one. Never reconnect with a
+   token already seen rejected.
 4. Web (`AuthContext` / websocket client): same contract — 4003 → refresh →
    reconnect, else redirect to `/login`.
 5. Verify: mint a short-TTL token, open the socket, wait past expiry —
@@ -1629,7 +1675,13 @@ are the auth failures at 144/158 and 1011.
 
 ---
 
-## Plan #247 — token-expiry flow polish
+## Plan #247 — token-expiry flow polish — **DONE**
+
+Shipped as `fix/247-token-expiry-ux` (2026-08-26), merged as `a4e8a77`. All
+five steps landed as written — see Part 4's entry for what each one became.
+Step 3's "capture `{command, args}` at the failure site" turned out to be
+better served one level up, in `commandRegistrar`: it is the only place that
+already sees both, so no failure site had to be threaded.
 
 **Repo:** extension. **Branch:** `fix/247-token-expiry-ux`
 **Effort:** small-medium. Pairs naturally with #257 step 3.
