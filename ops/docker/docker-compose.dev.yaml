@@ -126,6 +126,9 @@ services:
     stop_grace_period: 330s
     security_opt:
       - "no-new-privileges:true"
+      # See docker-compose.prod.yaml: Landlock + user/net namespace sandbox
+      # for student code; Docker default profile plus unshare/setns (#240/#241).
+      - "seccomp=./seccomp-testing-worker.json"
     logging:
       driver: json-file
       options:
@@ -139,6 +142,8 @@ services:
     environment:
       - TZ=UTC
       - RUNNING_IN_DOCKER=true
+      # Isolate every student process spawned by the test harness (#240, #241).
+      - COMPUTOR_SANDBOX_ENABLE=1
       - TEMPORAL_HOST=temporal
       - TEMPORAL_PORT=7233
       - TEMPORAL_NAMESPACE=default
