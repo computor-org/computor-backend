@@ -110,6 +110,29 @@ async def test_sso_expiry_comes_from_the_key_ttl_not_a_fresh_full_ttl():
 
 
 @pytest.mark.asyncio
+async def test_sso_auth_can_read_the_remaining_ttl_without_sliding_it():
+    """The reauth path must not renew a session just because a socket asked.
+
+    ``expire`` here would let a connection answer every expiry warning with the
+    same token and never die — exactly the immortal-socket state this issue
+    exists to end. A genuine refresh mints a new session with a full TTL of its
+    own, so refusing to slide the old one costs nothing legitimate.
+    """
+    redis = AsyncMock()
+    redis.get.return_value = '{"user_id": "u-1", "provider": "keycloak"}'
+    redis.ttl.return_value = 120
+
+    with patch.object(ws_auth, "get_redis_client", AsyncMock(return_value=redis)), \
+         patch.object(ws_auth, "get_db_session"), \
+         patch.object(ws_auth.PrincipalBuilder, "build", return_value=SimpleNamespace(user_id="u-1")):
+        _, credential = await ws_auth._authenticate_sso_token("tok", refresh_session_ttl=False)
+
+    redis.expire.assert_not_called()
+    remaining = (credential.expires_at - _utcnow()).total_seconds()
+    assert 110 < remaining <= 120
+
+
+@pytest.mark.asyncio
 async def test_api_token_expiry_is_read_from_the_token_cache():
     """``expires_at`` rides along in the cache the auth path just populated."""
     cached = SimpleNamespace(expires_at="2026-09-01T12:00:00+00:00")
@@ -341,6 +364,21 @@ async def test_reauth_replaces_the_credential_and_confirms_the_new_deadline():
     assert connection.credential is fresh
     assert sent[-1]["type"] == "system:reauthed"
     assert connection.websocket.closed_with == []
+
+
+@pytest.mark.asyncio
+async def test_reauth_never_slides_the_session_it_authenticates_against():
+    """Pinned at the call site too: the handler must ask for a non-refreshing read."""
+    connection = _connection(WebSocketCredential(kind="sso"))
+    authenticate = AsyncMock(
+        return_value=(SimpleNamespace(user_id="u-1"), WebSocketCredential(kind="sso"))
+    )
+
+    with patch.object(ws_handlers, "authenticate_websocket_token", authenticate), \
+         patch.object(ws_handlers.manager, "send_to_connection", AsyncMock()):
+        await ws_handlers.handle_reauth(connection, SimpleNamespace(token="new-token"))
+
+    assert authenticate.await_args.kwargs["refresh_session_ttl"] is False
 
 
 @pytest.mark.asyncio

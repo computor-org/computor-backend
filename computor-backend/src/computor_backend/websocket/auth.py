@@ -80,7 +80,10 @@ def _utcnow() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc)
 
 
-async def authenticate_websocket_token(token: str) -> Tuple[Principal, WebSocketCredential]:
+async def authenticate_websocket_token(
+    token: str,
+    refresh_session_ttl: bool = True,
+) -> Tuple[Principal, WebSocketCredential]:
     """
     Authenticate a WebSocket connection using a token.
 
@@ -90,6 +93,15 @@ async def authenticate_websocket_token(token: str) -> Tuple[Principal, WebSocket
 
     Args:
         token: Token from query parameter
+        refresh_session_ttl: Whether to treat this as user activity and push an
+            SSO session's sliding TTL back out. True for the handshake, which is
+            a request like any other. **False for re-authentication on an open
+            socket**: a connection must never be able to keep its own session
+            alive, or a client could hold a session open indefinitely by
+            answering every expiry warning with the same token, and expiry would
+            never arrive for anyone who left an editor running. A genuinely new
+            session token needs no refresh anyway — minting it gave it a full
+            TTL already.
 
     Returns:
         The authenticated Principal and the credential's expiry information.
@@ -105,7 +117,7 @@ async def authenticate_websocket_token(token: str) -> Tuple[Principal, WebSocket
         return await _authenticate_api_token(token)
 
     # Otherwise try SSO session token
-    return await _authenticate_sso_token(token)
+    return await _authenticate_sso_token(token, refresh_session_ttl=refresh_session_ttl)
 
 
 async def _authenticate_api_token(token: str) -> Tuple[Principal, WebSocketCredential]:
@@ -170,12 +182,16 @@ async def _api_token_expiry(token: str) -> Optional[datetime.datetime]:
     return expires_at
 
 
-async def _authenticate_sso_token(token: str) -> Tuple[Principal, WebSocketCredential]:
+async def _authenticate_sso_token(
+    token: str,
+    refresh_session_ttl: bool = True,
+) -> Tuple[Principal, WebSocketCredential]:
     """
     Authenticate using SSO session token (stored in Redis).
 
     Args:
         token: SSO session token
+        refresh_session_ttl: See :func:`authenticate_websocket_token`.
 
     Returns:
         The authenticated Principal and the session's expiry, taken from the
@@ -223,15 +239,20 @@ async def _authenticate_sso_token(token: str) -> Tuple[Principal, WebSocketCrede
             principal = PrincipalBuilder.build(auth_result, db)
 
         # Refresh session TTL — the handshake is user activity like any other
-        # request. The watchdog that later re-reads this TTL deliberately does
-        # NOT refresh it, or a connection would keep its own session alive
+        # request. Neither the watchdog that re-reads this TTL nor the reauth
+        # path does the same, or a connection would keep its own session alive
         # forever and expiry would never arrive.
-        await redis_client.expire(session_key, SSO_SESSION_TTL)
+        if refresh_session_ttl:
+            await redis_client.expire(session_key, SSO_SESSION_TTL)
+            expires_at = _utcnow() + datetime.timedelta(seconds=SSO_SESSION_TTL)
+        else:
+            ttl = await redis_client.ttl(session_key)
+            expires_at = _utcnow() + datetime.timedelta(seconds=ttl) if ttl and ttl > 0 else None
 
         logger.info(f"WebSocket SSO authentication successful for user {user_id}")
         credential = WebSocketCredential(
             kind="sso",
-            expires_at=_utcnow() + datetime.timedelta(seconds=SSO_SESSION_TTL),
+            expires_at=expires_at,
             session_key=session_key,
         )
         return principal, credential

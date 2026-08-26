@@ -285,9 +285,17 @@ async def handle_reauth(connection: Connection, event: WSReauth):
     that opened it, and swapping that principal underneath them would hand the
     new user everything the old one was already listening to. A mismatch is
     therefore treated as a failed re-authentication and closes the connection.
+
+    Deliberately does not refresh an SSO session's sliding TTL: a connection
+    that could renew its own session by answering every expiry warning with the
+    same token would simply never expire, which is the state this issue exists
+    to end. A real refresh mints a new session with a full TTL of its own, so
+    nothing legitimate is lost.
     """
     try:
-        principal, credential = await authenticate_websocket_token(event.token)
+        principal, credential = await authenticate_websocket_token(
+            event.token, refresh_session_ttl=False
+        )
     except WebSocketAuthError as e:
         logger.info(
             f"WebSocket reauth rejected for user={connection.principal.user_id}: {e.reason}"
