@@ -33,7 +33,7 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.endpoint=tcp://socket-proxy:2375"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=computor-network"
+      - "--providers.docker.network=${COMPOSE_NETWORK_NAME:-computor-network}"
       # Workspace containers are routed by workspace-ingress, which is the only
       # proxy on their networks. Without this constraint the main Traefik would
       # also claim their routers and then fail to dial them.
@@ -50,6 +50,7 @@ services:
 
   # Production API service
   uvicorn:
+    image: ${PREVIEW_IMAGE_PREFIX:-computor}-uvicorn
     build:
       context: ../../
       dockerfile: ./docker/api/Dockerfile
@@ -69,7 +70,7 @@ services:
       # Documents tree shared with static-server (which mounts the same host
       # path read-only). Same path inside the container as outside so
       # ``settings.DOCUMENTS_ROOT`` resolves consistently in both processes.
-      - ${DOCUMENTS_ROOT:-${SYSTEM_DEPLOYMENT_PATH}/shared/documents}:${DOCUMENTS_ROOT:-/opt/computor/shared/documents}
+      - ${DOCUMENTS_HOST_ROOT:-${SYSTEM_DEPLOYMENT_PATH}/shared/documents}:${DOCUMENTS_ROOT:-/opt/computor/shared/documents}
       # Bootstrap deployments staged by computor.sh up; applied idempotently at boot.
       - ${SYSTEM_DEPLOYMENT_PATH}/deployments:/deployments:ro
       # Deployed Coder templates, read-write: backs the template editing
@@ -77,7 +78,7 @@ services:
       # dir when Coder is disabled.
       - ${SYSTEM_DEPLOYMENT_PATH}/coder/templates:/templates
     ports:
-      - "127.0.0.1:${API_PORT:-8000}:8000"
+      - "${PREVIEW_BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8000}:8000"
     environment:
       TZ: UTC
       RUNNING_IN_DOCKER: true
@@ -110,6 +111,14 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       DEBUG_MODE: ${DEBUG_MODE}
+      KEYCLOAK_ENABLED: ${KEYCLOAK_ENABLED:-true}
+      ENABLE_KEYCLOAK: ${ENABLE_KEYCLOAK:-true}
+      AUTH_PLUGINS_CONFIG: ${AUTH_PLUGINS_CONFIG:-}
+      KEYCLOAK_SERVER_URL: ${KEYCLOAK_SERVER_URL:-http://keycloak:8080/auth}
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-computor}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-computor-backend}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-computor-backend-secret}
       TOKEN_SECRET: ${TOKEN_SECRET}
       TEMPORAL_HOST: temporal
       TEMPORAL_PORT: 7233
@@ -176,11 +185,17 @@ services:
       - "traefik.http.routers.uvicorn.service=uvicorn"
       - "traefik.http.middlewares.uvicorn-stripprefix.stripprefix.prefixes=/api"
       - "traefik.http.routers.uvicorn.middlewares=uvicorn-stripprefix"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/openapi.json', timeout=2)"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
 
   # Frontend: see docker-compose.web.yaml (included automatically in prod)
 
   # Temporal Worker (Production)
   temporal-worker:
+    image: ${PREVIEW_IMAGE_PREFIX:-computor}-temporal-worker
     build:
       context: ../../
       dockerfile: ./docker/temporal-worker/Dockerfile
@@ -241,6 +256,7 @@ services:
 
   # Unified Testing Worker
   temporal-worker-testing:
+    image: ${PREVIEW_IMAGE_PREFIX:-computor}-temporal-worker-testing
     build:
       context: ../../
       dockerfile: ./docker/temporal-worker-testing/Dockerfile
