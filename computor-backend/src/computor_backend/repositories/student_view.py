@@ -20,7 +20,7 @@ from ..repositories.course_content_queries import (
 from ..permissions.core import check_course_permissions
 from ..permissions.course_access import is_course_staff
 from ..permissions.principal import Principal
-from ..business_logic.content_visibility import is_content_visible
+from ..business_logic.content_visibility import is_content_released, is_content_visible
 from computor_types.student_course_contents import (
     CourseContentStudentGet,
     CourseContentStudentList,
@@ -106,6 +106,11 @@ class StudentViewRepository(ViewRepository):
         ``GET /students/course-contents/{id}`` which never goes through
         ``search()``. ``visible_effective`` is set either way so a staff caller
         gets the row marked rather than dropped.
+
+        Two things drop a row here, and only one of them is ``visible_effective``:
+        a lecturer hiding it (#338) and an assignment never released (#163).
+        The second is deliberately not written into the flag -- the staff trees
+        grey rows by it, and an undeployed assignment is unfinished, not hidden.
         """
         content = self.db.query(CourseContent).filter(
             CourseContent.id == result.id
@@ -116,7 +121,10 @@ class StudentViewRepository(ViewRepository):
         visible = is_content_visible(self.db, content)
         result.visible_effective = visible
 
-        if not visible and not self._may_see_hidden(permissions, result.course_id):
+        if visible and is_content_released(self.db, content):
+            return
+
+        if not self._may_see_hidden(permissions, result.course_id):
             raise NotFoundException()
 
     async def get_course_content(

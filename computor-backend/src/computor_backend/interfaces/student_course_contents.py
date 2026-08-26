@@ -9,7 +9,7 @@ from computor_types.student_course_contents import (
     CourseContentStudentQuery,
 )
 from computor_backend.business_logic.content_visibility import (
-    effective_visible_predicate,
+    student_visible_predicate,
 )
 from computor_backend.interfaces.base import BackendEntityInterface
 from computor_backend.model.course import CourseContent
@@ -39,15 +39,19 @@ class CourseContentStudentInterface(CourseContentStudentInterfaceBase, BackendEn
         former may lose rows -- so the caller decides rather than this function
         guessing. It defaults to False so a caller that forgets errs on the
         side of hiding.
+
+        It governs both reasons a row is dropped: hidden by a lecturer (#338)
+        and never released (#163). Staff see everything either way.
         """
         # Students never see archived content
         query = query.filter(CourseContent.archived_at.is_(None))
 
-        # ...nor content hidden by their lecturer, here or on any ancestor.
+        # ...nor content hidden by their lecturer, here or on any ancestor,
+        # nor an assignment that has never been released to them (#163).
         # Filtered in SQL rather than after the fact so the row never reaches
         # a student's payload at all.
         if not include_hidden:
-            query = query.filter(effective_visible_predicate())
+            query = query.filter(student_visible_predicate())
 
         if params is None:
             return query

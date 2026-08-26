@@ -696,7 +696,7 @@ class ViewRepository(ABC):
         from computor_types.grading import GradingStatus
         from sqlalchemy import text
 
-        from ..business_logic.content_visibility import effective_visible_predicate
+        from ..business_logic.content_visibility import student_visible_predicate
 
         unit_path = str(course_content.path)
 
@@ -709,9 +709,10 @@ class ViewRepository(ABC):
         # This fallback re-queries from scratch and therefore does NOT inherit
         # the filtering the caller's list query already applied. Without this,
         # a student's unit badge would aggregate descendants hidden from them
-        # (issue #338) -- the one place the read filter would otherwise leak.
+        # (issue #338) or not yet released to them (issue #163) -- the one
+        # place the read filter would otherwise leak.
         if not include_hidden:
-            query = query.filter(effective_visible_predicate())
+            query = query.filter(student_visible_predicate())
 
         all_contents = query.all()
 

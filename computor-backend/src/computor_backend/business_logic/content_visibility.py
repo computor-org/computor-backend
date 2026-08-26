@@ -29,15 +29,29 @@ and acting on hidden content; the API merely tells them it is hidden so the UI
 can mark it. Every enforcement helper here therefore takes ``exempt``, in the
 same shape as ``submission_limits.enforce_max_test_runs``, and callers pass
 ``permissions.course_access.is_course_staff(...)``.
+
+Issue #163 added the second reason a student may lose a row: an assignment the
+lecturer has created but never released. It lives here rather than in a filter
+of its own so that the student list, the student single-``GET`` and the unit
+badge cannot disagree about who may see what::
+
+    student_may_see(node) = effective_visible(node)
+                            AND (node is not submittable OR node was released)
+
+It is deliberately **not** folded into ``visible_effective``. That flag means
+"a lecturer hid this", and the lecturer tree greys rows by it; an undeployed
+assignment is not hidden, it is unfinished, and the staff views show its
+deployment status separately.
 """
 import logging
 from typing import Dict, Iterable, List, Optional
 
-from sqlalchemy import and_, exists
+from sqlalchemy import and_, exists, or_
 from sqlalchemy.orm import Session, aliased
 
 from computor_backend.exceptions import BadRequestException
 from computor_backend.model.course import Course, CourseContent
+from computor_backend.model.deployment import CourseContentDeployment
 from computor_types.custom_types import Ltree
 
 logger = logging.getLogger(__name__)
@@ -263,6 +277,86 @@ def effective_visible_predicate():
         .correlate(CourseContent)
     )
     return and_(~course_hidden, ~ancestor_hidden)
+
+
+# ---------------------------------------------------------------------------
+# Release state: the second reason a student loses a row (#163)
+# ---------------------------------------------------------------------------
+
+# A deployment row exists from the moment an example is assigned, long before
+# anything reaches the student template, so its mere presence proves nothing.
+# ``deployed_at`` is the one field that is only ever written by a *successful*
+# release (``CourseContentDeployment.set_deployed``,
+# ``tasks/student_template/status.py``) and never cleared afterwards.
+#
+# Reading it, rather than ``deployment_status == 'deployed'``, is what keeps a
+# lecturer's version bump from yanking a live assignment out from under the
+# students working on it: reassigning resets the status to 'pending' and the
+# release run moves it through 'deploying', and during that window the files
+# are still in the student's repository from the previous release.
+#
+# 'unassigned' is excluded all the same: the lecturer has taken the example
+# away, and the next release drops the directory.
+
+UNRELEASED_DEPLOYMENT_STATUS = "unassigned"
+
+
+def released_predicate():
+    """A SQLAlchemy predicate selecting ``CourseContent`` a student may reach.
+
+    Non-submittable content — units — passes unconditionally: a unit is never
+    deployed, it only holds things that are. Submittable content needs a
+    deployment that has completed a release at least once.
+    """
+    released = (
+        exists()
+        .where(
+            and_(
+                CourseContentDeployment.course_content_id == CourseContent.id,
+                CourseContentDeployment.deployed_at.isnot(None),
+                CourseContentDeployment.deployment_status
+                != UNRELEASED_DEPLOYMENT_STATUS,
+            )
+        )
+        .correlate(CourseContent)
+    )
+    return or_(CourseContent.is_submittable.is_(False), released)
+
+
+def student_visible_predicate():
+    """The whole student read filter, in SQL: hidden **and** unreleased.
+
+    The single predicate every student list path applies, so that "may this
+    student see this row" has exactly one answer.
+    """
+    return and_(effective_visible_predicate(), released_predicate())
+
+
+def is_content_released(db: Session, course_content) -> bool:
+    """Single-row counterpart of :func:`released_predicate`."""
+    if course_content is None:
+        return False
+    if not getattr(course_content, "is_submittable", False):
+        return True
+
+    released = (
+        db.query(CourseContentDeployment.id)
+        .filter(
+            CourseContentDeployment.course_content_id == course_content.id,
+            CourseContentDeployment.deployed_at.isnot(None),
+            CourseContentDeployment.deployment_status
+            != UNRELEASED_DEPLOYMENT_STATUS,
+        )
+        .first()
+    )
+    return released is not None
+
+
+def is_student_visible(db: Session, course_content, course=None) -> bool:
+    """Single-row counterpart of :func:`student_visible_predicate`."""
+    return is_content_visible(db, course_content, course) and is_content_released(
+        db, course_content
+    )
 
 
 # ---------------------------------------------------------------------------
