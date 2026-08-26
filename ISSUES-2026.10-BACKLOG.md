@@ -813,22 +813,51 @@ so this is a release blocker wearing a P2 label.
 **Steps:** add a 128×128 PNG under `resources/`, set `icon` in `package.json`,
 and check it renders on both Marketplace themes. Do it before #85.
 
-## #258 — background startup opens a Computor session — **OPEN, confirmed**
+## #258 — background startup opens a Computor session — **DONE** (2026-08-26)
 
-**Verified:** `package.json` declares `activationEvents: ["onStartupFinished"]`
-— the extension activates in every window, exactly as the issue describes.
+Landed on the extension's `release/2026.10` as `eb680dd` (branch
+`fix/258-lazy-activation`).
 
-**Steps**
+The report was half right. Signing in was *already* gated on the `.computor`
+marker — `extension.ts` checked for it before calling
+`handleComputorWorkspaceDetected()`, so a plain folder never authenticated,
+never opened a websocket and never showed a status item. What was not gated was
+activation itself: `onStartupFinished` loaded the extension in every VS Code
+window on the machine, which meant icon generation, a UI-state migration, three
+file watchers and a hidden status bar item in windows that had never heard of a
+course.
 
-1. Replace `onStartupFinished` with view- and command-specific activation
-   (`onView:computor.*`, `onCommand:computor.*`), plus a workspace-marker
-   condition if a Computor workspace should stay auto-available.
-2. Split activation from session start in `src/extension.ts`: registering
-   commands and views must not open a backend session or a websocket.
-3. Remove automatic view focus and panel moves from the background path — those
-   belong to an explicit user action.
-4. Verify with a plain unrelated workspace: no Computor views focused, no
-   status items, no network traffic until a Computor command is invoked.
+`activationEvents` is now `["workspaceContains:.computor"]`, so activation is
+gated on the same thing the login always was. Everything else reaches a plain
+folder through the implicit activation VS Code generates for contributed
+commands, views and custom editors — which is why the `^1.74.0` engine floor is
+now pinned by a test.
+
+The marker scan also moved off `workspaceFolders[0]` and onto every folder
+(`src/activation.ts`): `workspaceContains` fires for any folder of a multi-root
+workspace, so looking only at the first could have woken the extension and then
+found nothing to sign in to.
+
+**Deliberately not done:** the issue also asks to strip the post-login view
+focus. That focus is the remembered-container restore landed for #285 — the
+whole point is that reopening a workspace returns you where you were — so
+removing it would regress a shipped fix. It only ever runs after a session
+starts, which in a marker workspace is the expected outcome.
+
+**Coder is unaffected:** both code-server templates `touch` the marker
+(`ops/coder/templates/vscode/startup.sh.tftpl:58`,
+`matlab-vscode/startup.sh.tftpl:95`) well before they launch code-server
+(:175, :266), so a provisioned workspace still comes up connected.
+
+**One behaviour change to expect:** a student who clones their repo onto their
+own laptop has no marker until their first sign-in writes one, so the first
+`Computor: Login` there has to come from the command palette. Every later open
+of that folder activates on its own.
+
+**Re-test:** open a plain unrelated folder — the Computor output channel stays
+empty and no `computor.*` command is registered until one is invoked from the
+palette. Open a Coder workspace — unchanged, signs in and lands on the
+remembered container.
 
 ## #71 — auto-open the bottom views — **PARTLY DONE**
 
@@ -1828,36 +1857,28 @@ publisher is `itpcp-tugraz`.
 
 ---
 
-## Plan #258 — stop background startup from opening a session
+## Plan #258 — stop background startup from opening a session — **DONE**
 
-**Repo:** extension. **Branch:** `fix/258-lazy-activation`
-**Effort:** medium — the risk is regressions in implicit init ordering.
+**Repo:** extension. **Branch:** `fix/258-lazy-activation`, merged as `eb680dd`.
 
-Verified: `activationEvents: ["onStartupFinished"]` — every VS Code window
-activates the extension and its session startup.
+Two things in this plan turned out to be wrong when the code was read properly,
+and are recorded here so the same detours are not taken again.
 
-1. Replace with explicit events: the view containers
-   (`onView:computor.student.courses` etc. — enumerate from
-   `contributes.views`), `onCommand:` for entry commands (modern VS Code
-   auto-generates onCommand for contributed commands — verify the engine
-   version and drop redundant entries), plus a workspace-marker
-   `workspaceContains:` if Computor workspaces should self-activate.
-2. Split `src/extension.ts` activate() into (a) cheap registration —
-   commands, tree providers in lazy mode, no network — and (b)
-   `ensureSession()` invoked on first real use (view resolve, command run).
-   `BackendConnectionService` / `WebSocketService` construction moves into
-   (b); status bar items appear only after (b) runs.
-3. Kill any automatic focus/`workbench.view.*` calls on the background path
-   (`ui/focusViewContainer.ts` is the central place — verified it exists
-   for exactly this reason; make it a no-op unless user-initiated).
-4. Coder-workspace caveat: inside a Coder workspace the extension is
-   expected to come up connected. Detect (env marker the image sets) and
-   keep eager startup **only** there.
-5. Verify matrix: plain folder → zero Computor network traffic (watch the
-   output channel), no status items; Computor course folder → available on
-   marker if chosen; command palette entry → session starts once, works.
-   `npm run test:unit` + the quiet-startup test file the issue names
-   (`test/extension/quiet…` — it already exists as a stub, finish it).
+- **`onView:` cannot work.** Every Computor activity-bar container is
+  `when`-gated on a `computor.*.show` context key that only gets set after
+  login. A view that is not on screen cannot be revealed, so its activation
+  event can never fire. The marker is the only usable self-activation
+  condition, which is what shipped: `["workspaceContains:.computor"]`.
+- **The quiet-startup test file did not exist.** There was no
+  `test/extension/` directory at all, so it was written from scratch and
+  `test/extension/*.test.ts` added to `.mocharc.unit.json`.
+
+Step 3 (kill the post-login focus) was **declined**: that focus is #285's
+remembered-container restore and removing it regresses a shipped fix. Step 4
+(a Coder-only eager path) turned out to be unnecessary — the templates write
+the marker, so Coder is covered by the marker rule like everything else.
+
+What actually shipped is in the #258 entry in Part 7.
 
 ---
 

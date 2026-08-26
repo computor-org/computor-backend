@@ -138,6 +138,30 @@ Keycloak restart if theme caching is on.
 
 ---
 
+### #258 — background startup opens a Computor session
+**Fixed, and half of it was never broken.** Signing in was already gated on the
+`.computor` marker, so a plain folder never authenticated, never opened a
+websocket and never showed a status item. Activation was not gated:
+`onStartupFinished` loaded the extension in every VS Code window on the machine
+— icon generation, a UI-state migration, three file watchers and a hidden
+status bar item in windows with no connection to a course.
+
+`activationEvents` is now `["workspaceContains:.computor"]`; commands, views and
+custom editors still reach a plain folder through VS Code's implicit activation
+(engine floor `^1.74.0`, now pinned by a test). Marker detection also stopped
+looking only at `workspaceFolders[0]`.
+
+Landed as `eb680dd` on the extension's `release/2026.10`
+(`fix/258-lazy-activation`, 2 commits + 15 unit tests).
+
+**Re-test:** open a plain unrelated folder — nothing Computor loads until a
+command is run from the palette. Open a Coder workspace — unchanged; the
+templates write the marker before code-server starts. Note that a student's own
+laptop clone has no marker until the first sign-in writes one, so that first
+`Computor: Login` comes from the palette.
+
+---
+
 ## Partly fixed — keep open, but the scope is much smaller than the text suggests
 
 ### #333 + #342 — Forgejo clone URL / token can't clone a repo
@@ -174,9 +198,11 @@ root cause; close one as a duplicate of the other.
 | #161 | fixed | ask reporter to re-run the flow, then close |
 | #246 | fixed | close |
 | #144 | fixed | deploy theme, re-test a failed login, close |
+| #258 | fixed | rebuild the extension, re-test, close |
 | #333 | partly fixed | keep open — needs a UI surface only |
 | #342 | duplicate of #333 | close as duplicate |
 
-Ten issues closable without writing code, plus #144, which did take code — it
-is listed here because the surface its screenshot shows was already gone, so
-the report needed correcting rather than reproducing.
+Ten issues closable without writing code, plus #144 and #258, which did take
+code. Both are listed here because the report and the code disagreed: #144's
+screenshot showed a surface that was already gone, and #258's session-on-startup
+was already gated — only the activation underneath it was not.
