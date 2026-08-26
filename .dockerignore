@@ -1,0 +1,25 @@
+# Keep the shared base and service build contexts small. The Compose Dockerfiles
+# copy only the computor-* trees and their startup/config files below.
+.git
+.github
+.claude
+**/.git
+**/__pycache__
+**/.mypy_cache
+**/.pytest_cache
+**/.ruff_cache
+**/.venv
+**/venv
+**/node_modules
+**/.next
+**/dist
+**/build
+**/*.pyc
+**/*.pyo
+**/*.log
+*.egg-info
+coverage
+tmp
+.env
+.env.*
+!.env.*.template
