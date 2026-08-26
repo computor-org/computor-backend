@@ -5,19 +5,120 @@ Provides the FastAPI WebSocket endpoint for real-time communication.
 """
 
 import asyncio
+import datetime
 import json
 import logging
+from typing import Optional
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 
 from computor_backend.settings import settings
-from computor_backend.websocket.auth import authenticate_websocket_token, WebSocketAuthError
-from computor_backend.websocket.connection_manager import manager, ConnectionLimitError
+from computor_backend.websocket.auth import (
+    authenticate_websocket_token,
+    current_credential_expiry,
+    WebSocketAuthError,
+    WS_CLOSE_TOKEN_EXPIRED,
+)
+from computor_backend.websocket.connection_manager import Connection, manager, ConnectionLimitError
 from computor_backend.websocket.handlers import handle_client_message
-from computor_types.websocket import WSConnected, WSError
+from computor_types.websocket import WSAuthExpiring, WSConnected, WSError
 
 logger = logging.getLogger(__name__)
 
 ws_router = APIRouter()
+
+#: How long before a credential dies the client is told, so it has room to
+#: refresh and answer ``system:reauth`` instead of being closed.
+EXPIRY_WARNING_LEAD_SECONDS = 60
+
+#: Upper bound on how long the watchdog sleeps between re-reads. SSO TTLs
+#: slide, so a deadline resolved once is only a floor; re-reading on this
+#: cadence is what lets an active user hold a socket open past its original
+#: deadline while an idle one still closes on time.
+EXPIRY_RECHECK_INTERVAL_SECONDS = 30
+
+
+async def _watch_credential_expiry(connection: Connection) -> None:
+    """
+    Close a connection the moment its credential dies (issue #257).
+
+    Runs beside the receive loop for the life of the connection. Without it the
+    only thing that ever noticed an expired token was the client's next HTTP
+    call: the socket stayed open, kept delivering events, and reported itself
+    healthy while every request beside it came back 401 — the exact split state
+    the production report described.
+
+    The loop re-reads the deadline on every wake rather than trusting the one
+    from the handshake, because two things move it: an SSO session's sliding
+    TTL, and a successful ``system:reauth`` replacing the credential outright.
+
+    Shortly before the deadline the client is warned once (``system:auth_expiring``)
+    so it can refresh in place. If it does not, the connection is closed with
+    :data:`WS_CLOSE_TOKEN_EXPIRED` — a code of its own, so the client can tell
+    "refresh and come back" apart from "your token was rejected".
+    """
+    warned_for: Optional[datetime.datetime] = None
+
+    while True:
+        credential = connection.credential
+        if credential is None:
+            return
+
+        try:
+            expires_at = await current_credential_expiry(credential)
+        except WebSocketAuthError as e:
+            await _close_expired(connection, e.reason)
+            return
+        except Exception as e:
+            # A Redis blip must not take a healthy connection down. Back off
+            # and re-read; the HTTP path still enforces auth in the meantime.
+            logger.warning(f"Could not re-read credential expiry, retrying: {e}")
+            await asyncio.sleep(EXPIRY_RECHECK_INTERVAL_SECONDS)
+            continue
+
+        if expires_at is None:
+            # Nothing to watch — a token minted without an expiry, or a session
+            # key without a TTL. Leave the connection alone rather than
+            # inventing a deadline for it.
+            return
+
+        credential.expires_at = expires_at
+        remaining = (expires_at - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
+
+        if remaining <= 0:
+            await _close_expired(connection, "Token expired")
+            return
+
+        if remaining <= EXPIRY_WARNING_LEAD_SECONDS and warned_for != expires_at:
+            warned_for = expires_at
+            await manager.send_to_connection(connection, WSAuthExpiring(
+                expires_at=expires_at,
+                seconds_remaining=int(remaining),
+            ).model_dump(mode="json"))
+
+        sleep_for = min(remaining, EXPIRY_RECHECK_INTERVAL_SECONDS)
+        if remaining > EXPIRY_WARNING_LEAD_SECONDS:
+            # Do not sleep past the warning point, or the client loses the
+            # window it needs to refresh in place.
+            sleep_for = min(sleep_for, remaining - EXPIRY_WARNING_LEAD_SECONDS)
+        await asyncio.sleep(max(sleep_for, 0.1))
+
+
+async def _close_expired(connection: Connection, reason: str) -> None:
+    """Tell the client why, then close with the token-expired code."""
+    logger.info(
+        f"WebSocket credential expired: user={connection.principal.user_id} reason={reason}"
+    )
+    try:
+        await manager.send_to_connection(connection, WSError(
+            code="TOKEN_EXPIRED",
+            message=reason,
+        ).model_dump())
+        await connection.websocket.close(code=WS_CLOSE_TOKEN_EXPIRED, reason=reason)
+    except Exception:
+        # Best-effort: the peer may already be gone. The receive loop's
+        # disconnect branch cleans up either way.
+        logger.debug("Failed to close expired WebSocket", exc_info=True)
 
 
 @ws_router.websocket("/ws")
@@ -59,8 +160,11 @@ async def websocket_endpoint(
         - system:ping: Keep-alive ping
           {"type": "system:ping"}
 
+        - system:reauth: Re-arm this connection with a fresh credential
+          {"type": "system:reauth", "token": "..."}
+
     Server -> Client Events:
-        - system:connected: Connection established
+        - system:connected: Connection established (carries expires_at)
         - channel:subscribed: Subscription confirmed
         - channel:unsubscribed: Unsubscription confirmed
         - channel:error: Subscription failed
@@ -70,7 +174,18 @@ async def websocket_endpoint(
         - typing:update: Typing status changed
         - read:update: Read receipt (submission_group only)
         - system:pong: Keep-alive response
+        - system:auth_expiring: Credential expires shortly — refresh and send system:reauth
+        - system:reauthed: A system:reauth was accepted; carries the new expires_at
         - system:error: Error occurred
+
+    Close Codes:
+        - 4001: the credential was rejected at handshake — the client needs a new one
+        - 4003: the credential that opened this connection has since expired
+          (issue #257). Distinct from 4001 on purpose: a client should answer
+          this one with a silent session refresh and a reconnect, and only ask
+          the user to sign in again once that fails.
+        - 4008: connection limit reached
+        - 1011: internal error
 
     Channel Format:
         Channels follow the pattern: {scope}:{id}
@@ -85,18 +200,26 @@ async def websocket_endpoint(
         Presence is tracked with 30-second TTL.
     """
     connection = None
+    expiry_watchdog = None
 
     try:
         # Authenticate
-        principal = await authenticate_websocket_token(token)
+        principal, credential = await authenticate_websocket_token(token)
 
         # Register connection
         connection = await manager.connect(websocket, principal)
+        connection.credential = credential
 
         # Send connected confirmation
         await manager.send_to_connection(connection, WSConnected(
-            user_id=principal.user_id
-        ).model_dump())
+            user_id=principal.user_id,
+            expires_at=credential.expires_at,
+        ).model_dump(mode="json"))
+
+        # Watch the credential for the life of the connection (issue #257) —
+        # the receive loop below never revisits auth, so without this a socket
+        # outlives the token that opened it.
+        expiry_watchdog = asyncio.create_task(_watch_credential_expiry(connection))
 
         # Main message loop
         # Note: We don't use a hard timeout here because:
@@ -171,5 +294,7 @@ async def websocket_endpoint(
             logger.debug("Failed to close WebSocket after error", exc_info=True)
 
     finally:
+        if expiry_watchdog:
+            expiry_watchdog.cancel()
         if connection:
             await manager.disconnect(connection)
