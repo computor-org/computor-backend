@@ -635,39 +635,40 @@ These are multi-week arcs, listed for completeness.
 
 # Part 5 — Capacity and operability (P0/P1/P2)
 
-## #351 — limit concurrent users — **PARTLY DONE, with a design conflict to resolve**
+## #351 — limit concurrent users — **DONE** (`feat/351-capacity-limits`, 2026-08-26)
 
-One of the two limits exists. `enforce_template_quota`
-(`business_logic/course_workspaces.py:91-130`, called from `api/coder.py:521`
-and `:740`) caps running workspaces per template across all users.
-
-But it is deliberately built the opposite way to what #351 asks. Its docstring:
+The entry below said "partly done". It was wrong: **neither** of #351's limits
+existed. `enforce_template_quota` is a third, different limit —
 
 > The cap counts running/starting workspaces of the template across ALL users
 > and applies to everyone, admins included — it models hard capacity (e.g.
 > MATLAB license seats), which exceeding would break anyway.
 
-#351 asks for a limit that does **not** lock out admins and maintainers. Those
-are two different limits and should stay two different limits.
+— and step 1 below (leave it alone) was the only step already satisfied. All
+three limits now exist side by side. What landed:
 
-**Steps**
+1. `instance_settings`, a singleton table holding `max_workspace_users`,
+   `max_concurrent_logins` and `login_idle_minutes` (`null` = unlimited),
+   editable at runtime from `/admin/limits` via `GET/PUT /system/limits` —
+   step 5 taken in its DB-backed form, not the env-only fallback.
+2. The workspace limit caps **distinct users**, not workspaces: the issue asks
+   for "maximum number of workspace users", so a user with two workspaces
+   spends one seat and is never refused their second. Enforced at provision,
+   start and lecturer bulk-provision through `enforce_workspace_admission`,
+   which shares one Coder fleet listing with the template quota rather than
+   fetching it twice.
+3. The login limit caps distinct signed-in users, seats held in a Redis sorted
+   set keyed by user id (two tabs = one seat), taken at the SSO callback,
+   refreshed on each Principal-cache miss and released on logout.
+4. Both refusals name the limit, the current number and the local VS Code
+   alternative, linked when `EXTENSION_PUBLIC_DOWNLOAD_URL` is set. A cap of
+   `0` reads as "switched off" rather than "full".
+5. Staff bypass is an explicit role list, not the `_` prefix — see the
+   corrected plan in Part 8 for why that distinction is load-bearing.
 
-1. Keep `enforce_template_quota` as it is. A MATLAB licence seat is a hard
-   external constraint; exempting an admin from it just moves the failure.
-2. Add a **separate** instance-wide workspace-capacity limit — a memory/CPU
-   headroom guard — that admins and maintainers bypass. This is the one #351
-   is describing.
-3. Add the second limit it asks for: maximum concurrent logins, also with the
-   admin/maintainer bypass. Nothing like it exists today.
-4. Both refusals must carry an actionable message: why, and a link to the local
-   VS Code install. A bare 409 is what the issue is complaining about.
-   The course workspace rows in the web UI now poll live status and carry
-   Stop/Retry (`b81048ec`, #375) — that is where the refusal belongs, and it
-   does not surface a quota refusal today.
-5. Make both configurable at runtime (the same settings surface as the template
-   limits), not baked into the image.
-6. Feed the numbers from #350 so the guard can eventually be computed rather
-   than guessed.
+Step 6 (feed #350's numbers in) stays open by design: the issue asks for a hard
+limit *"in the meantime"*, before the computed one. #350 was therefore **not** a
+prerequisite, and #351 shipped without it.
 
 ## #350 — missing runtime info on the webpage — **OPEN, cheap and useful**
 
@@ -1062,7 +1063,8 @@ plus #358 populating Category and Tags where the filter reads them.
 3. **#115 → #85** — the icon unblocks the VSIX pipeline, which unblocks #363.
 4. **#336** — the worst live bug outside the security bucket.
 5. **#162, #150, #163** — small, confirmed root causes, real lecturer pain.
-6. **#351 + #350** — capacity guard and status surface, before the workshop.
+6. ~~**#351**~~ done 2026-08-26; **#350** — the status surface, still open, and
+   no longer blocking anything before the workshop.
 7. **#257, #333, #247** — session and credential papercuts.
 8. Part 7 and Part 8 as filler; close #66, #146, #149, #178, #234 after
    re-testing rather than building anything.
@@ -1721,8 +1723,13 @@ surface is `api/course_member_gradings.py` plus the grading read layer
 ## Plan #351 + #350 — capacity limits and the status surface
 
 **Repo:** fullstack (+ web). **Branch:** `feat/351-capacity-limits` and
-`feat/350-instance-status` (350 first — 351's guard wants its numbers).
-**Effort:** medium each.
+`feat/350-instance-status`. **Effort:** medium each.
+
+> **#351 is DONE** (2026-08-26). The ordering claim above — "350 first, 351's
+> guard wants its numbers" — was wrong: the issue asks for a hard limit
+> *"in the meantime"*, before the computed one, so #351 shipped standalone.
+> #350 is still open and still worth doing; when it lands it feeds the
+> *computed* variant of the guard, not the one that exists.
 
 ### #350 — `GET /instance-status`
 
@@ -1742,36 +1749,58 @@ surface is `api/course_member_gradings.py` plus the grading read layer
    course workspace rows — those already poll live status since `b81048ec`
    (#375), so hang it on that polling loop, don't add another.
 
-### #351 — two limits, plus the one that already exists
+### #351 — two limits, plus the one that already exists — **DONE**, and the plan below had four wrong turns
 
-Keep `enforce_template_quota` (`course_workspaces.py:91-130`) exactly as is
-— it models hard external capacity (MATLAB seats) and *must* bind admins.
-Add, separately:
+Kept for the record. What shipped is in Part 5's corrected entry; the four
+places the plan below was wrong are worth keeping, because each one would have
+produced a limit that did not do what the issue asked.
 
-1. **Instance workspace cap** (`MAX_WORKSPACE_USERS` or DB-backed setting):
-   checked in the same two places the template quota is
-   (`api/coder.py:521` provision, `:740` start), counting active workspaces
-   across all templates; `_admin`/`_maintainer` principals bypass. Refusal:
-   409 with `detail=` text that names the reason and links the local VS Code
-   install path (remember: `error_code` first-positional footgun — keyword
-   args only).
-2. **Concurrent login cap** (`MAX_CONCURRENT_LOGINS`): the `Session` model
-   already has the partial index for active sessions
-   (`model/auth.py:147-151`, `revoked_at IS NULL AND ended_at IS NULL`) —
-   count distinct users with an active, non-expired session at login/session
-   creation; over the cap → refuse non-admin logins with the actionable
-   message. Decide and document whether an idle-but-unexpired session holds
-   a seat (recommend: count `last_seen_at` within N minutes, N configurable,
-   so abandoned sessions do not exhaust seats).
-3. Both configurable at runtime (settings row alongside the template
-   settings surface rather than env-only, so the workshop can tune without a
-   redeploy) — if that is too much this cycle, env-only is acceptable;
-   state the choice.
-4. Extension + web must render the refusal message verbatim — check the 409
-   surfaces in the workspace launch paths on both clients.
-5. Tests: cap reached → student refused with message, admin passes; template
-   quota still binds admins (regression); login cap counts users not
-   sessions (two tabs ≠ two seats).
+**1. The `session` table is not where logins live.** Step 2 pointed at
+`model/auth.py:147-151`'s partial index for active sessions. Nothing writes
+that table on the login path — `business_logic/auth.py` stores
+`sso_session:<hash>` in Redis and never inserts a `Session` row, so counting it
+would have returned zero for every deployment and the cap would silently never
+have fired. Seats are a Redis sorted set instead: member = user id, score =
+last-seen epoch. That also gives the plan's own recommendation (an idle window
+in minutes, configurable) for free as a `ZCOUNT`, and makes "distinct users"
+rather than "sessions" the natural unit, which is what step 5 asks the tests to
+prove.
+
+The refresh point matters: seats are touched on a **Principal-cache miss**
+(`permissions/auth.py`), not on every request. `AUTH_CACHE_TTL` is 900s, so an
+active client refreshes its seat at least every 15 minutes — which is why the
+idle window is documented as "keep above 15" and defaults to 30. A per-request
+`ZADD` would have doubled the Redis traffic of the whole application for a
+counter nobody reads more than once a minute.
+
+**2. `_admin`/`_maintainer` is not the right bypass set.** `_maintainer` is a
+*course* role, not a system one, so it never appears in a Principal's system
+roles. The bypass is an explicit frozen set of the builtin staff roles
+(`_admin`, `_user_manager`, `_organization_manager`, `_service_manager`,
+`_example_manager`, `_git_manager`, `_workspace_maintainer`) plus `is_service`.
+Deriving it from the `_` prefix — the obvious shortcut — would exempt everyone,
+because `_workspace_user` is builtin and held by ordinary students. Service
+accounts bypass deliberately: shedding the testing workers takes the course
+down instead of shedding load.
+
+**3. "Counting active workspaces" is the wrong unit.** The issue says *maximum
+number of workspace **users***. A user with two workspaces has spent one seat,
+and refusing them a second workspace would enforce a limit nobody asked for.
+The cap counts distinct owners, and a caller already among them is admitted.
+
+**4. The extension half of step 4 does not exist.** There is no workspace
+launch path in `computor-vsc-extension` — no `/coder/workspaces` call site at
+all; joining a workspace is web-only. The web half needed no work either:
+`api/client.ts` already surfaces `detail` as the error message and every launch
+path notifies it. What *did* need work was the **login** refusal, which the plan
+did not consider: the SSO callback swallowed every exception into a redirect to
+the API's own root, and `/login` bounces straight back to Keycloak, so a refused
+sign-in would have looped forever. It now redirects to the client's own callback
+with the message, and `/auth/success` renders it instead of retrying.
+
+One thing the plan got exactly right: keeping `enforce_template_quota` untouched.
+It is the one limit that must bind admins, and there is now a regression test
+saying so.
 
 ---
 
@@ -1962,11 +1991,11 @@ outside `webview-ui/`.
 
 - **#237 / #238** — tracking + design-only this cycle (see Part 1).
 - **#368** — a measurement campaign, not a code plan; follows #350.
-- **#366** — its buildable slice IS #351; the rest needs its own scoped
-  issue first.
+- **#366** — its buildable slice IS #351, which is now done; the rest needs its
+  own scoped issue first.
 - **#176 / #179 / #236** — blocked on the #179 decision.
 - **#121** has a repro protocol above instead of a fix plan.
 - **Decisions before code:** #179 (token strategy), #123 (composer keys —
   code deliberately does the opposite), #126 (brand casing), #122 (tag
-  labels), #351's licence-cap vs capacity-guard split (settled inside the
-  #351 plan: keep both, separately).
+  labels). #351's licence-cap vs capacity-guard split is settled and shipped:
+  all three limits exist side by side.

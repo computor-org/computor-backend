@@ -162,6 +162,48 @@ laptop clone has no marker until the first sign-in writes one, so that first
 
 ---
 
+### #351 — limitation of amount of concurrent users
+**Fixed, both limits, and neither existed before.** The survey originally
+recorded this as "partly done" because `enforce_template_quota` looked like one
+of the two. It is not: it caps *running workspaces per template*, models a hard
+external constraint (MATLAB licence seats) and deliberately binds admins. #351
+asks for two instance-wide limits that admins and maintainers bypass. All three
+now exist side by side.
+
+- `instance_settings` (new singleton table) holds `max_workspace_users`,
+  `max_concurrent_logins` and `login_idle_minutes`. `null` = unlimited.
+  Editable at runtime from `/admin/limits`, so the workshop can tune without a
+  redeploy; `GET/PUT /system/limits` behind it (read: any authenticated user,
+  since it is the explanation behind a refusal; write: admin).
+- **Workspace users** caps DISTINCT users holding a running/starting workspace
+  across all templates — the issue asks for "workspace users", not workspaces,
+  so a user with two workspaces spends one seat. Enforced at provision, start
+  and lecturer bulk-provision, sharing one Coder fleet listing with the
+  template quota (`enforce_workspace_admission`).
+- **Concurrent logins** caps DISTINCT signed-in users. Seats are a Redis sorted
+  set keyed by user id — two tabs are one seat — taken at the SSO callback,
+  refreshed on each Principal-cache miss (≤15 min, hence the 30-minute default
+  idle window) and released on logout. **The `session` table was the wrong
+  place**: the SSO login path writes `sso_session:<hash>` to Redis and never
+  inserts a Session row, so counting that table would always have returned zero.
+- Both refusals name the limit, the current number and the local-VS-Code
+  alternative (linked when `EXTENSION_PUBLIC_DOWNLOAD_URL` is set). A cap of `0`
+  reads as "switched off", not "full".
+- Bypass is an explicit role list, not the `_` prefix: `_workspace_user` is
+  builtin and held by ordinary students, so a prefix rule would exempt everyone.
+  Service accounts bypass too — starving the testing workers would take the
+  course down rather than shed load.
+
+Landed as `feat/351-capacity-limits` (7 commits, 13 unit tests). Suite green:
+1697 passed, 0 failed.
+
+**Re-test:** set both limits low on the deployed instance from
+`/admin/limits`. A student launching a workspace gets the 409 with the local
+install link; an admin still gets through. The per-template MATLAB quota must
+still refuse an admin — that one is supposed to.
+
+---
+
 ## Partly fixed — keep open, but the scope is much smaller than the text suggests
 
 ### #333 + #342 — Forgejo clone URL / token can't clone a repo
@@ -199,10 +241,13 @@ root cause; close one as a duplicate of the other.
 | #246 | fixed | close |
 | #144 | fixed | deploy theme, re-test a failed login, close |
 | #258 | fixed | rebuild the extension, re-test, close |
+| #351 | fixed | deploy, set the limits, re-test, close |
 | #333 | partly fixed | keep open — needs a UI surface only |
 | #342 | duplicate of #333 | close as duplicate |
 
-Ten issues closable without writing code, plus #144 and #258, which did take
-code. Both are listed here because the report and the code disagreed: #144's
-screenshot showed a surface that was already gone, and #258's session-on-startup
-was already gated — only the activation underneath it was not.
+Ten issues closable without writing code, plus #144, #258 and #351, which did
+take code. All three are listed here because the report and the code disagreed:
+#144's screenshot showed a surface that was already gone, #258's
+session-on-startup was already gated (only the activation underneath it was
+not), and #351 looked half-implemented by a limit that turns out to be a
+different limit.
