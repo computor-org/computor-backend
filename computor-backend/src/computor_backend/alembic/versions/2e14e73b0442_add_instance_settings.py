@@ -10,7 +10,7 @@ tunable during a running workshop without a redeploy.
 No row is inserted. An absent row means "both limits unlimited", which is what
 every deployment upgrading into this migration was doing a moment earlier.
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: 2e14e73b0442
 Revises: f3a4b5c6d7e8
 Create Date: 2026-08-26
 
@@ -22,7 +22,7 @@ from alembic import op
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'a1b2c3d4e5f6'
+revision: str = '2e14e73b0442'
 down_revision: Union[str, None] = 'f3a4b5c6d7e8'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
