@@ -8,6 +8,12 @@ These need an image rebuild + a re-test on the deployed instance, then a close
 comment. No new code, except where a row says otherwise (#144, #258, #351,
 #247, #257).
 
+The Part 1 security bucket landed with new code, so it lives in
+`ISSUES-2026.10-BACKLOG.md`, not here, but it is now in the same "close after
+re-test" state: #239, #240, #241 and #232 are all done and merged to
+`release/2026.10` (status comments posted on the board). #237 stays open for its
+residual risks. Same rebuild + re-test gate applies before closing the four.
+
 ---
 
 ## Fully fixed — close after re-test
