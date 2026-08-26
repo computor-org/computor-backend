@@ -29,6 +29,7 @@ from .temporal_base import (
     WorkflowResult,
     extract_test_counts,
     start_activity_heartbeat,
+    strip_path_properties,
 )
 from .registry import register_task
 from computor_types.tasks import TaskStatus, map_task_status_to_int
@@ -526,6 +527,10 @@ def execute_tests_activity(
                     "total": 1,
                     "error": "No test results file found",
                 }
+
+        # Never hand worker-container paths back to the student (#239); this
+        # covers the tutor flow too, which runs through this same activity.
+        strip_path_properties(test_results)
 
         # Calculate result value
         try:
