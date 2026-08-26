@@ -153,6 +153,37 @@ def fail_all_deploying(db: Session, course_id: str, error_message: str, workflow
     return events
 
 
+def invalidate_deployment_views(course_id: str, events: List[Dict[str, Any]]) -> None:
+    """Drop the cached course-content views a status change just invalidated.
+
+    Call beside :func:`broadcast_deployment_events`, i.e. AFTER ``db.commit()``.
+
+    The student listing is cached per user for five minutes and nothing in this
+    workflow used to touch that cache — harmless while a release only changed a
+    badge, but since #163 the cache is what decides whether a just-released
+    assignment is visible at all, and a student would have had to wait out the
+    TTL to see work that is already in their repository.
+
+    Never lets a cache problem fail a release that has already been committed.
+    """
+    try:
+        from computor_backend.redis_cache import get_cache
+
+        cache = get_cache()
+        cache.invalidate_tags(
+            f"student_view:{course_id}",
+            f"course_id:{course_id}",
+            f"tutor_view:{course_id}",
+            f"lecturer_view:{course_id}",
+        )
+        for evt in events:
+            content_id = evt.get("course_content_id")
+            if content_id:
+                cache.invalidate_tags(f"course_content:{content_id}")
+    except Exception as e:  # pragma: no cover - cache is best-effort here
+        logger.warning(f"Could not invalidate course-content views for {course_id}: {e}")
+
+
 def broadcast_deployment_events(course_id: str, events: List[Dict[str, Any]], workflow_id: Optional[str]) -> None:
     """Publish deployment status changes. Call AFTER db.commit() succeeds."""
     from computor_backend.websocket.event_publisher import publish_deployment_status_changed
