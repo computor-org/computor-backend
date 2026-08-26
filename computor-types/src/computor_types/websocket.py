@@ -69,6 +69,24 @@ class WSPing(WSEventBase):
     type: Literal["system:ping"] = "system:ping"
 
 
+class WSReauth(WSEventBase):
+    """
+    Re-arm a live connection with a fresh credential (issue #257).
+
+    A socket used to outlive the token that opened it: the handshake
+    authenticated once and nothing ever revisited it, so HTTP started
+    answering 401 while the socket sat there looking healthy. The server now
+    closes an expired connection with ``4003``; this event is the way to avoid
+    that close entirely — on ``system:auth_expiring`` the client refreshes its
+    session and sends the new token here, keeping its subscriptions.
+
+    The new token must belong to the same user; anything else is treated as a
+    failed re-authentication, not as a way to change identity mid-connection.
+    """
+    type: Literal["system:reauth"] = "system:reauth"
+    token: str = Field(..., description="Freshly issued session or API token for the same user")
+
+
 # =============================================================================
 # Server -> Client Events
 # =============================================================================
@@ -148,6 +166,32 @@ class WSConnected(WSEventBase):
     """Connection established confirmation."""
     type: Literal["system:connected"] = "system:connected"
     user_id: str = Field(..., description="ID of the authenticated user")
+    expires_at: Optional[datetime] = Field(
+        None,
+        description="When the credential behind this connection expires; null when it never does"
+    )
+
+
+class WSAuthExpiring(WSEventBase):
+    """
+    The credential behind this connection is about to expire (issue #257).
+
+    Sent once per deadline, shortly before it passes, so the client can refresh
+    and answer with ``system:reauth`` instead of being closed with ``4003``.
+    """
+    type: Literal["system:auth_expiring"] = "system:auth_expiring"
+    expires_at: datetime = Field(..., description="When the current credential expires")
+    seconds_remaining: int = Field(..., description="Seconds left at the moment the warning was sent")
+
+
+class WSReauthed(WSEventBase):
+    """Confirmation that a ``system:reauth`` was accepted and the deadline moved."""
+    type: Literal["system:reauthed"] = "system:reauthed"
+    user_id: str = Field(..., description="ID of the authenticated user (unchanged)")
+    expires_at: Optional[datetime] = Field(
+        None,
+        description="New expiry of the connection, or null when the new credential never expires"
+    )
 
 
 # =============================================================================
@@ -276,6 +320,7 @@ ClientEvent = Union[
     WSTypingStop,
     WSReadMark,
     WSPing,
+    WSReauth,
 ]
 
 # All events that can be sent from server to client
@@ -291,6 +336,8 @@ ServerEvent = Union[
     WSPong,
     WSError,
     WSConnected,
+    WSAuthExpiring,
+    WSReauthed,
     WSMaintenanceActivated,
     WSMaintenanceDeactivated,
     WSMaintenanceScheduled,
@@ -315,6 +362,7 @@ CLIENT_EVENT_TYPES = {
     "typing:stop": WSTypingStop,
     "read:mark": WSReadMark,
     "system:ping": WSPing,
+    "system:reauth": WSReauth,
 }
 
 
