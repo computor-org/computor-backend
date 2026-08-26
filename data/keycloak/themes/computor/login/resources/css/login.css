@@ -6,22 +6,62 @@
  */
 
 :root {
+  /* This theme is light-only: PatternFly pins the card and fields white, and
+     there is no dark palette to switch to. Say so, so a browser set to dark
+     does not hand the credential fields dark UA form control and autofill
+     colours on top of a light card. */
+  color-scheme: light;
+
   --ct-gray-900: #111827;
   --ct-gray-800: #1f2937;
   --ct-gray-700: #374151;
   --ct-gray-600: #4b5563;
+  --ct-gray-500: #6b7280;
   --ct-gray-300: #d1d5db;
   --ct-gray-200: #e5e7eb;
   --ct-blue-500: #3b82f6;
   --ct-blue-600: #2563eb;
-  --ct-red-600: #dc2626;
+
+  /* Danger register, mirroring computor-web's --c-danger* tokens: a solid fill
+     for borders, a darker text tone that clears 4.5:1 on white (6.47:1), and a
+     tinted wash for the page-level alert. */
+  --ct-danger: #dc2626;      /* red-600 */
+  --ct-danger-text: #b91c1c; /* red-700 */
+  --ct-danger-wash: #fef2f2; /* red-50 */
+  --ct-danger-line: #fecaca; /* red-200 */
+
+  --ct-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
 }
 
 /* ---- Page background ------------------------------------------------ */
+/*
+ * kcHtmlClass=login-pf puts PatternFly's .login-pf on <html>, which paints
+ * #030303 plus a 47 KB bg-login.jpg photo. The stock keycloak theme drops both
+ * in its own css/login.css — but this theme REPLACES that file rather than
+ * extending it (same `styles=css/login.css` path shadows the parent's), so the
+ * removal has to be repeated here. It previously was not: the photo was
+ * fetched on every login and then covered by an opaque gradient painted on
+ * <body>.
+ *
+ * Paint the gradient on <html> instead. Its background propagates to the
+ * canvas, so it covers the viewport whatever the body's height, and there is
+ * no near-black underneath to show through.
+ */
+html.login-pf {
+  /* Colour first so the shorthand leaves a light fallback rather than
+     `transparent` if the gradient is ever dropped. */
+  background: #ffffff linear-gradient(to bottom right, #eff6ff 0%, #ffffff 50%, #eef2ff 100%) !important;
+}
+
 body.login-pf,
 .login-pf body {
-  background: linear-gradient(to bottom right, #eff6ff 0%, #ffffff 50%, #eef2ff 100%) !important;
-  font-family: "Geist", Arial, Helvetica, sans-serif;
+  background: transparent !important;
+  /* computor-web loads Geist through next/font; this page has no such loader,
+     so naming it here only fell through to Arial. Ask for the platform UI font
+     instead — closer to Geist than Arial, and it costs no request on a page
+     that must stay fast and self-contained. */
+  font-family: var(--ct-font);
 }
 
 .login-pf-page {
@@ -65,16 +105,28 @@ body.login-pf,
 }
 
 /* ---- Labels & inputs ------------------------------------------------ */
+/* PatternFly sizes form labels off --pf-global--FontSize--sm, which lands at
+   12px. computor-web's form labels are 14px; match that here — this is a form
+   people mistype under time pressure, not a dense table. */
 .pf-c-form__label,
 label {
   color: var(--ct-gray-700);
+  font-size: 0.875rem;
   font-weight: 500;
 }
 
+/*
+ * #144 reported credential text that was near-invisible against the field.
+ * Nothing below inherits its colours by accident: the field pins its own
+ * foreground and background rather than relying on whatever PatternFly's
+ * --pf-c-form-control--Color happens to resolve to in a given release.
+ */
 .pf-c-form-control,
 input[type="text"],
 input[type="password"],
 input[type="email"] {
+  color: var(--ct-gray-900) !important;
+  background-color: #ffffff !important;
   border: 1px solid var(--ct-gray-300) !important;
   border-radius: 8px !important;
   padding: 10px 14px !important;
@@ -92,6 +144,30 @@ input[type="email"]:focus {
   border-color: var(--ct-blue-500) !important;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35) !important;
   outline: none !important;
+}
+
+/* Placeholder must read as a hint but still be legible — grey-500 is 4.83:1
+   on white, where the browser default (~grey-400 at 40% opacity) is not. */
+.pf-c-form-control::placeholder,
+input::placeholder {
+  color: var(--ct-gray-500);
+  opacity: 1;
+}
+
+/*
+ * Autofill. Chrome repaints an autofilled field with its own colours and
+ * ignores `background-color`; the inset shadow is the only way to override it.
+ * On a browser set to dark that pairing is exactly the unreadable combination
+ * #144 describes, so this is the one that keeps the report from recurring.
+ */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--ct-gray-900) !important;
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  caret-color: var(--ct-gray-900);
 }
 
 /* ---- Primary button ------------------------------------------------- */
@@ -168,13 +244,54 @@ a:hover {
 .pf-c-alert.pf-m-danger,
 .alert-error {
   border-radius: 8px;
-  border: 1px solid #fecaca;
-  background: #fef2f2;
-  color: var(--ct-red-600);
+  border: 1px solid var(--ct-danger-line);
+  background: var(--ct-danger-wash);
+  color: var(--ct-danger-text);
+  padding: 12px 14px;
+}
+
+/*
+ * Field-level errors. A wrong password does NOT render the page-level alert
+ * above — Keycloak puts it inline as
+ *   <span id="input-error" class="pf-c-form__helper-text pf-m-error required
+ *         kc-feedback-text">Invalid username or password.</span>
+ * which matched no rule here, so it inherited ordinary body text: same grey,
+ * same 12px as a hint. The small red icon was the only thing marking it as an
+ * error. Give it the danger tone and readable size.
+ */
+#input-error,
+#input-error-username,
+#input-error-password,
+.pf-c-form__helper-text.pf-m-error,
+.kc-feedback-text.pf-m-error {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.875rem;
+  color: var(--ct-danger-text);
+}
+
+/* Mark the field itself, not just the sentence under it. Keycloak sets
+   aria-invalid on the offending input, so the styling follows the semantics. */
+.pf-c-form-control[aria-invalid="true"],
+input[aria-invalid="true"] {
+  border-color: var(--ct-danger) !important;
+}
+
+.pf-c-form-control[aria-invalid="true"]:focus,
+input[aria-invalid="true"]:focus,
+.pf-c-input-group:focus-within input[aria-invalid="true"] {
+  border-color: var(--ct-danger) !important;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.3) !important;
+}
+
+/* Keep the adjacent password-toggle border in step with the errored input. */
+.pf-c-input-group:has(input[aria-invalid="true"]) .pf-c-button.pf-m-control {
+  border-color: var(--ct-danger) !important;
 }
 
 /* ---- Misc tidy-up --------------------------------------------------- */
 #kc-form-options,
 .checkbox label {
   color: var(--ct-gray-600);
+  font-size: 0.875rem;
 }
