@@ -36,6 +36,11 @@ from computor_backend.coder.service import (
     get_user_fullname,
     mint_workspace_token,
 )
+from computor_backend.business_logic.instance_limits import (
+    enforce_workspace_user_cap,
+    instance_settings_row,
+    user_is_staff,
+)
 from computor_backend.exceptions import (
     BadRequestException,
     ComputorException,
@@ -93,6 +98,7 @@ async def enforce_template_quota(
     client: CoderClient,
     template_name: str,
     exclude_workspace_id: Optional[str] = None,
+    workspaces: Optional[list[CoderWorkspace]] = None,
 ) -> None:
     """Reject provision/start when the template is at its running-seat cap.
 
@@ -101,12 +107,17 @@ async def enforce_template_quota(
     (e.g. MATLAB license seats), which exceeding would break anyway. A soft
     check (two racing starts can both pass), which is acceptable for a cap
     whose violation just means one container too many until the next stop.
+
+    ``workspaces`` lets a caller that already holds the fleet listing hand it
+    in, so admission does not cost two Coder round-trips when the instance
+    workspace-user cap (see ``enforce_workspace_admission``) is checked too.
     """
     row = template_settings_row(db, template_name)
     if row is None or row.max_running_workspaces is None:
         return
     limit = int(row.max_running_workspaces)
-    workspaces = await client.list_all_workspaces()
+    if workspaces is None:
+        workspaces = await client.list_all_workspaces()
     active = 0
     for workspace in workspaces:
         if workspace.template_name != template_name:
@@ -127,6 +138,65 @@ async def enforce_template_quota(
                 f"workspace(s) ({active} currently active). Stop an existing "
                 "workspace or try again later."
             ),
+        )
+
+
+async def enforce_workspace_admission(
+    db: Session,
+    client: CoderClient,
+    template_name: str,
+    *,
+    owner_username: Optional[str],
+    is_staff: bool,
+    exclude_workspace_id: Optional[str] = None,
+) -> None:
+    """Both admission checks for one provision/start, over one fleet listing.
+
+    Two deliberately different limits (#351):
+
+    - the per-template running-seat quota, a HARD external constraint that
+      binds everyone, admins included;
+    - the instance-wide cap on how many distinct users may hold a workspace,
+      soft host capacity that staff bypass so an operator is never locked out
+      of their own deployment.
+
+    The template quota is evaluated first so a deployment that only configures
+    that one behaves byte-for-byte as it did before this function existed.
+
+    ``owner_username`` is the Coder username the workspace belongs to, and
+    ``is_staff`` refers to that same user — on the lecturer bulk-provisioning
+    path the seat is the student's, not the lecturer's.
+    """
+    template_row = template_settings_row(db, template_name)
+    needs_template_check = (
+        template_row is not None and template_row.max_running_workspaces is not None
+    )
+    instance_row = instance_settings_row(db)
+    needs_instance_check = (
+        not is_staff
+        and instance_row is not None
+        and instance_row.max_workspace_users is not None
+    )
+    # Nothing configured: never pay for the fleet listing.
+    if not needs_template_check and not needs_instance_check:
+        return
+
+    workspaces = await client.list_all_workspaces()
+    if needs_template_check:
+        await enforce_template_quota(
+            db,
+            client,
+            template_name,
+            exclude_workspace_id=exclude_workspace_id,
+            workspaces=workspaces,
+        )
+    if needs_instance_check:
+        enforce_workspace_user_cap(
+            db,
+            workspaces,
+            owner_username,
+            is_staff=is_staff,
+            exclude_workspace_id=exclude_workspace_id,
         )
 
 
@@ -603,8 +673,15 @@ async def provision_student_workspaces(
         raise BadRequestException(detail=f"Invalid label '{data.label}'.")
     workspace_name = sanitize_workspace_name(f"{derive_workspace_name(template)}-{suffix}")
 
+    # Whether admission has anything to check at all. Hoisted out of the loop
+    # so a batch with no limits configured costs no extra Coder calls per
+    # student — the same reason the template quota was hoisted before it.
     quota_row = template_settings_row(db, template)
-    has_quota = quota_row is not None and quota_row.max_running_workspaces is not None
+    instance_row = instance_settings_row(db)
+    has_admission_checks = (
+        (quota_row is not None and quota_row.max_running_workspaces is not None)
+        or (instance_row is not None and instance_row.max_workspace_users is not None)
+    )
 
     # Same for every workspace in the batch: this course's narrowing of the
     # template's root/internet ceiling.
@@ -634,11 +711,13 @@ async def provision_student_workspaces(
             outcomes.append(outcome)
             continue
         try:
-            if has_quota:
+            if has_admission_checks:
                 # Re-provisioning an existing workspace must not count itself.
                 exclude_id = None
+                owner_username = None
                 try:
                     coder_user = await client._find_user_by_email(email)
+                    owner_username = coder_user.username
                     existing = await client.get_user_workspaces(coder_user.username)
                     exclude_id = next(
                         (w.id for w in existing if w.name == workspace_name), None
@@ -647,8 +726,17 @@ async def provision_student_workspaces(
                     pass
                 except Exception:
                     pass
-                await enforce_template_quota(
-                    db, client, template, exclude_workspace_id=exclude_id
+                # Per-student, not per-batch: the seat spent is the student's,
+                # and a batch that crosses the cap half-way should record a
+                # refusal against the students it could not admit rather than
+                # fail whole. The outcome loop already reports per member.
+                await enforce_workspace_admission(
+                    db,
+                    client,
+                    template,
+                    owner_username=owner_username,
+                    is_staff=user_is_staff(db, str(member.user_id)),
+                    exclude_workspace_id=exclude_id,
                 )
             token = mint_workspace_token(
                 db, cache, str(member.user_id), str(permissions.user_id),

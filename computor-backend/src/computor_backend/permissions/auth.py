@@ -204,6 +204,20 @@ class AuthenticationService:
             # Refresh session TTL
             await redis_client.set(session_key, session_data_raw, ex=SSO_SESSION_TTL)
 
+            # Keep the user's login seat warm (#351). This runs on a Principal
+            # cache MISS, so at most once per AUTH_CACHE_TTL (900s) for an
+            # active client — which is why the idle window is documented as
+            # "keep above 15 minutes": a shorter one would evict users who are
+            # still working. Deliberately not on the cache-hit path, where an
+            # extra Redis write per request would be the cost of the whole
+            # feature.
+            from computor_backend.business_logic.instance_limits import (
+                login_idle_seconds,
+                touch_login_seat,
+            )
+
+            await touch_login_seat(user_id, login_idle_seconds(db))
+
             logger.info(f"SSO authentication successful for user {user_id} via {provider}")
             return AuthenticationResult(user_id, role_ids, provider)
 

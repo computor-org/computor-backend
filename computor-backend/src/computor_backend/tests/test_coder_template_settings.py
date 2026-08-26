@@ -6,9 +6,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from computor_backend.api.coder import (
-    _enforce_template_quota,
     _per_template_variables,
     update_template_settings,
+)
+# The endpoints call it through enforce_workspace_admission now (which also
+# applies the instance-wide cap); the hard per-template quota itself is
+# unchanged and still tested directly here.
+from computor_backend.business_logic.course_workspaces import (
+    enforce_template_quota as _enforce_template_quota,
 )
 from computor_backend.coder import templates_fs
 from computor_backend.coder.schemas import CoderWorkspace, WorkspaceBuildStatus

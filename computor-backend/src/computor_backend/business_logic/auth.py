@@ -16,6 +16,12 @@ from computor_backend.exceptions import (
     NotFoundException,
     ForbiddenException,
 )
+from computor_backend.business_logic.instance_limits import (
+    enforce_login_cap,
+    login_idle_seconds,
+    release_login_seat,
+    touch_login_seat,
+)
 from computor_backend.permissions.auth import AuthenticationService
 from computor_backend.permissions.principal import Principal
 from computor_backend.model.auth import User, Account
@@ -363,6 +369,13 @@ async def logout_session(
                             f"Error processing provider tokens during logout: {e}"
                         )
 
+    # Hand the login seat back (#351). Not authoritative — a user with another
+    # tab still open re-takes it on their next request, which is right: they
+    # are still logged in. Releasing here is what makes a deliberate logout
+    # free the seat immediately instead of after the idle window.
+    if principal.user_id:
+        await release_login_seat(str(principal.user_id))
+
     return LogoutResponse(message="Logout successful", provider=provider_name)
 
 
@@ -566,6 +579,12 @@ async def handle_sso_callback(
 
     is_new_user, user_primitives = await run_in_threadpool(_find_or_create_account)
 
+    # Concurrent-login cap (#351). Checked before any session is minted and
+    # before the git account is provisioned, so a refused login leaves nothing
+    # behind. Staff and users who already hold a seat pass; everyone else is
+    # refused with a message naming the cap and the local-VS-Code alternative.
+    await enforce_login_cap(db, user_primitives["id"])
+
     await _provision_git_server_account(
         user_id=user_primitives["id"],
         email=user_primitives["email"],
@@ -591,6 +610,10 @@ async def handle_sso_callback(
     from computor_backend.utils.token_hash import hash_token
     session_key = f"sso_session:{hash_token(api_session_token)}"
     await redis_client.set(session_key, json.dumps(session_data), ex=86400)  # 24 hours
+
+    # Take the login seat the cap above counts. After the session exists, so a
+    # login that fails between the two does not leave a seat held by nobody.
+    await touch_login_seat(user_primitives["id"], login_idle_seconds(db))
 
     # Store tokens in Redis if available
     if auth_result.access_token:
@@ -705,6 +728,12 @@ async def refresh_sso_token(
         from computor_backend.utils.token_hash import hash_token
         session_key = f"sso_session:{hash_token(new_session_token)}"
         await redis_client.set(session_key, json.dumps(session_data), ex=86400)
+
+        # A refresh is activity, so it renews the login seat — but is never
+        # gated on the cap (#351). Refusing here would evict someone who is
+        # already inside and working, which is a worse outcome than being one
+        # user over the line until they leave.
+        await touch_login_seat(str(user.id), login_idle_seconds(db))
 
         # Update stored provider tokens if available
         if auth_result.access_token:

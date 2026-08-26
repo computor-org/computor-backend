@@ -626,6 +626,8 @@
 | `createCourseAsyncSystemDeployCoursesPost` | POST | `/system/deploy/courses` | `CourseTaskRequest` | `TaskResponse` |
 | `createHierarchySystemHierarchyCreatePost` | POST | `/system/hierarchy/create` | `Record<string, unknown> & Record<string, unknown>` | `Record<string, unknown> & Record<string, unknown>` |
 | `getHierarchyStatusSystemHierarchyStatusWorkflowIdGet` | GET | `/system/hierarchy/status/{workflow_id}` | — | `Record<string, unknown> & Record<string, unknown>` |
+| `getInstanceLimitsSystemLimitsGet` | GET | `/system/limits` | — | `InstanceLimitsGet` |
+| `updateInstanceLimitsSystemLimitsPut` | PUT | `/system/limits` | `InstanceLimitsUpdate` | `InstanceLimitsGet` |
 | `activateMaintenanceSystemMaintenanceActivatePost` | POST | `/system/maintenance/activate` | `MaintenanceActivate` | `void` |
 | `deactivateMaintenanceSystemMaintenanceDeactivatePost` | POST | `/system/maintenance/deactivate` | — | `void` |
 | `cancelScheduledMaintenanceSystemMaintenanceScheduleDelete` | DELETE | `/system/maintenance/schedule` | — | `void` |

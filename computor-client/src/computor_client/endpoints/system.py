@@ -21,6 +21,10 @@ from computor_types.system import (
     GenerateTemplateResponse,
     TaskResponse,
 )
+from computor_types.system_limits import (
+    InstanceLimitsGet,
+    InstanceLimitsUpdate,
+)
 from computor_types.update import (
     SystemUpdateScheduleRequest,
     SystemUpdateScheduleResponse,
@@ -95,6 +99,23 @@ class SystemClient:
         """Get Hierarchy Status"""
         response = await self._http.get(f"/system/hierarchy/status/{quote_path(workflow_id)}", params=kwargs)
         return response.json()
+
+    async def get_limits(
+        self,
+        **kwargs: Any,
+    ) -> InstanceLimitsGet:
+        """Get Instance Limits"""
+        response = await self._http.get("/system/limits", params=kwargs)
+        return InstanceLimitsGet.model_validate(response.json())
+
+    async def replace_limits(
+        self,
+        data: Union[InstanceLimitsUpdate, Dict[str, Any]],
+        **kwargs: Any,
+    ) -> InstanceLimitsGet:
+        """Update Instance Limits"""
+        response = await self._http.put("/system/limits", json_data=data, params=kwargs)
+        return InstanceLimitsGet.model_validate(response.json())
 
     async def maintenance_activate(
         self,
