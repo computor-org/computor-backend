@@ -356,24 +356,31 @@ socket.
 
 ---
 
-## Partly fixed — keep open, but the scope is much smaller than the text suggests
-
 ### #333 + #342 — Forgejo clone URL / token can't clone a repo
-**Backend half is done. The user-facing half is missing.**
+**Fixed, and the report is not a defect.**
 
-`POST /user/courses/{course_id}/provision-repository` already mints and returns
-a per-user Forgejo clone token (`clone_token` + `clone_username`,
-`api/user.py:180-210`). It is minted once and reused, because Forgejo keeps one
-token per user per instance; `rotate=true` is the escape hatch.
+Forgejo accounts are created by Keycloak OIDC auto-registration
+(`docker-compose.forgejo.yaml:99`), so they have no local password, and SSH is
+off (line 83) — HTTPS Basic auth is the only git transport. A hand-typed
+`git clone` must therefore prompt for a password the SSO session cannot supply.
+That is how OIDC-only git accounts behave; nothing is broken.
 
-The extension consumes it internally
-(`StudentRepositoryManager.ts:644-662`) and clones fine. What does **not**
-exist is any way for a student to *see* a working credential, so a student who
-copies the clone URL out of the Forgejo web UI gets a password prompt for an
-account that only ever had Keycloak — which is exactly what both issues report.
+It is also off the supported path. `computor.student.cloneRepository`
+(`package.json:157`) clones for the student using the token
+`POST /user/courses/{course_id}/provision-repository` returns (`clone_token` +
+`clone_username`, `api/user.py:180-210`, minted once per user/instance,
+`rotate=true` the escape hatch), baked into the remote
+(`StudentRepositoryManager.ts:644-667`).
 
-Remaining work is in the backlog under **Part 4**. Both issues are the same
-root cause; close one as a duplicate of the other.
+The one real gap — nowhere for a student to *see* a working credential —
+closed on 2026-08-24 (`3de36662`, refined by `a6556c50`): course page →
+*Your repository* → **Working outside VS Code?** → **Check access** → username
+and token, each with a copy button, under a warning that the token is a
+password (`computor-web/app/courses/[id]/page.tsx:296-350`). Visible to any
+course member, and `page.tsx:124` opens the disclosure on a successful call.
+
+**Re-test:** as a student with no Forgejo password, open the course page, hit
+**Check access**, and clone with the username and token it shows.
 
 ---
 
@@ -397,10 +404,10 @@ root cause; close one as a duplicate of the other.
 | #262 | fixed | enrol the grader as `_tutor` on the course, re-test, close |
 | #247 | fixed | rebuild the extension, re-test with a broken token, close |
 | #257 | fixed | deploy the backend, rebuild the extension, re-test, close |
-| #333 | partly fixed | keep open — needs a UI surface only |
+| #333 | fixed | not a defect — answer with where the credential lives, close |
 | #342 | duplicate of #333 | close as duplicate |
 
-Eleven issues closable without writing code, plus #144, #258 and #351, which
+Twelve issues closable without writing code, plus #144, #258 and #351, which
 did take code. All three are listed here because the report and the code
 disagreed: #144's screenshot showed a surface that was already gone, #258's
 session-on-startup was already gated (only the activation underneath it was
@@ -411,6 +418,11 @@ different limit.
 builds, not reports the code contradicted. They sit here because they land the
 same way — a rebuild and a re-test before they can be closed. #257 is the only
 row that also needs the backend deployed, since half of it is server-side.
+
+#333 is the only row that is not a defect at all. SSO-only Forgejo accounts
+have no password by construction, so the prompt the student hit is correct
+behaviour; what was missing was somewhere to read the token instead, and that
+shipped on the web course page in August.
 
 #262 is the one row here that took a commit without taking a behaviour change:
 the grant it asks for is a `_tutor` course membership and already worked, but

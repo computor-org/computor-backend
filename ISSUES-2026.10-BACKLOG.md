@@ -464,32 +464,33 @@ current code, tick what shipped, and either close it or split whatever single
 bullet is genuinely outstanding into its own issue. Do not leave a P0 open
 because its description is stale.
 
-## #333 + #342 — Forgejo clone URL and token — **PARTLY DONE, small remainder**
+## #333 + #342 — Forgejo clone URL and token — **DONE** (2026-08-26)
 
-Backend is done (see `ISSUES-2026.10-STATUS.md`):
-`POST /user/courses/{course_id}/provision-repository` mints and returns
-`clone_token` + `clone_username` (`api/user.py:180-210`), minted once per user
-per instance, with `rotate=true` as the escape hatch. The extension consumes it
-(`StudentRepositoryManager.ts:644-662`) and clones fine.
+**Not a defect.** Forgejo accounts here are created by Keycloak OIDC
+auto-registration (`docker-compose.forgejo.yaml:99`), so they have no local
+password — nothing ever set one — and SSH is off (`DISABLE_SSH: "true"`,
+line 83), leaving HTTPS Basic auth as the only git transport. A bare
+`git clone` therefore *must* prompt for a password that the browser SSO
+session cannot answer. That is how OIDC-only git accounts behave everywhere.
 
-Missing: a student has no way to *see* a working credential, so copying the
-clone URL out of the Forgejo web UI leads to a password prompt for an account
-that only ever had Keycloak.
+It is also off the supported path: the extension clones for the student via
+`computor.student.cloneRepository` (`package.json:157`), using the token
+`POST /user/courses/{course_id}/provision-repository` returns (`clone_token` +
+`clone_username`, `api/user.py:180-210`, minted once per user/instance with
+`rotate=true` as the escape hatch) and baking it into the remote
+(`StudentRepositoryManager.ts:644-667`). A student never types a git command.
 
-**Steps**
+What was genuinely missing — somewhere a student can *see* a working
+credential — shipped in the web UI on 2026-08-24 (`3de36662`, refined by
+`a6556c50`): course page → *Your repository* → **Working outside VS Code?** →
+**Check access** → username and token, each with a copy button, under a
+warning that the token is a password
+(`computor-web/app/courses/[id]/page.tsx:296-350`). It renders for any course
+member, students included, and `page.tsx:124` opens the disclosure on a
+successful call so a freshly-minted token is not left hidden.
 
-1. Add a student command — "Copy git clone command" — that returns the ready
-   line: `git clone https://<clone_username>:<clone_token>@<host>/<owner>/<repo>.git`.
-   The value already exists on the client; this is a clipboard write plus a
-   warning that the line contains a credential.
-2. Same on the web course page, next to the repository link.
-3. Say what the credential is where the student looks for it: a short note in
-   the student help that Forgejo has no password under SSO, and that this token
-   is the terminal credential.
-4. Handle the null case: `clone_token` is null until the student has logged
-   into Forgejo once. Trigger the provisioning call rather than showing an
-   empty box.
-5. Close #342 as a duplicate of #333.
+**Remaining:** answer #333 with the mechanism and where the credential lives,
+close it, and close #342 as a duplicate. No code.
 
 ## #257 — WebSocket disconnects leave clients in stale auth state — **DONE** (2026-08-26)
 
@@ -1140,9 +1141,10 @@ plus #358 populating Category and Tags where the filter reads them.
 5. **#162, #150, #163** — small, confirmed root causes, real lecturer pain.
 6. ~~**#351**~~ done 2026-08-26; **#350** — the status surface, still open, and
    no longer blocking anything before the workshop.
-7. **#333** — the last session/credential papercut; ~~**#247**~~ and
-   ~~**#257**~~ both done 2026-08-26, and #257's forced re-login does reuse
-   #247's rails.
+7. The session/credential bucket is clear: ~~**#247**~~, ~~**#257**~~ and
+   ~~**#333**~~ all done 2026-08-26, and #257's forced re-login does reuse
+   #247's rails. #333 needed no code — the credential surface had already
+   shipped on the web course page.
 8. Part 7 and Part 8 as filler; close #66, #146, #149, #178, #234 after
    re-testing rather than building anything.
 
@@ -1605,10 +1607,26 @@ for students (name + type, no files).
 
 ---
 
-## Plan #333 — surface the Forgejo clone credential
+## Plan #333 — surface the Forgejo clone credential — **DONE** (2026-08-26)
+
+Shipped in the web UI on 2026-08-24 (`3de36662`, refined by `a6556c50`) — not
+under this plan's branch, and not in the extension. Steps 2 and 4 landed;
+steps 1 and 3 were **dropped on purpose**, and the plan's scope was wider than
+the issue's:
+
+- **Step 1** (extension `computor.student.copyCloneCommand`) is redundant. The
+  extension already clones for the student with the token baked into the
+  remote (`computor.student.cloneRepository`, `package.json:157`), so a
+  clipboard helper serves a command nobody in the editor types.
+- **Step 3** (student-help paragraph) is a docs line, not a fix, and belongs
+  with the help rewrite rather than this issue.
+- **Step 4's** exploratory caveat resolved the other way: the web UI *does*
+  render the repository, so the copy surface went there.
+
+The plan below is kept for the verified-state notes, which are still accurate.
 
 **Repos:** extension (primary), web (secondary). **Branch:**
-`feat/333-copy-clone-command`
+`feat/333-copy-clone-command` — never cut; the fix landed on `release/2026.10`.
 **Effort:** small. Backend is done — do not touch it.
 
 ### Verified state
@@ -1623,7 +1641,7 @@ existing clone's stored credential). The extension already consumes it
 
 ### Steps
 
-1. Extension: add `computor.student.copyCloneCommand` on the student course
+1. **Dropped.** Extension: add `computor.student.copyCloneCommand` on the student course
    root context menu (`viewItem =~ /^studentCourseRoot\.git(Managed)/` — see
    the existing menus around `package.json:2553`). Implementation: reuse the
    provisioning call (idempotent), build
@@ -1631,20 +1649,20 @@ existing clone's stored credential). The extension already consumes it
    existing `addBasicCredentialsToGitUrl`, write to clipboard, notify
    "Clone command copied — it contains your personal access token, treat it
    like a password."
-2. Null-token case (`clone_token` is null until first Forgejo login — the
+2. **Done** (`page.tsx:124`). Null-token case (`clone_token` is null until first Forgejo login — the
    generated type at `courses.ts:1137` documents this): the provisioning
    call itself resolves it; if still null afterwards, show the guidance
    message instead of a broken command.
-3. Add one paragraph to the student help (the `docs/student-help-rewrite`
+3. **Dropped** — belongs with the help rewrite. Add one paragraph to the student help (the `docs/student-help-rewrite`
    content): under SSO there is no Forgejo password; the terminal credential
    is this token.
-4. Web: the course page shows the repository — add a copy button beside it
+4. **Done** (`page.tsx:296-350`). Web: the course page shows the repository — add a copy button beside it
    calling the same endpoint. Exploratory: locate the component via the
    course detail page (no dedicated repo component found under
    `src/components/courses/` — search for `provision-repository` /
    `http_url` usage first; if the web UI turns out not to render the repo
    at all, drop this half and say so on the issue).
-5. Close #342 as duplicate of #333 (plain-voice comment).
+5. **Open.** Close #342 as duplicate of #333 (plain-voice comment).
 
 ---
 
