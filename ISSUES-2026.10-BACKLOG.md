@@ -1627,8 +1627,10 @@ addition:
   description, and #338 already gives a lecturer `visible=false` to stage a
   whole unit.
 
-Content with no deployment row at all is treated as unreleased. Flagged on the
-issue, since it also hides a hypothetical file-less manual assignment.
+Content with no deployment row at all is treated as unreleased. Raised as an
+open question and settled the same day: an assignment always holds an example,
+so one without a deployment is a half-finished setup. Pinned in a comment on
+`released_predicate`.
 
 
 **Repo:** fullstack. **Branch:** `fix/163-hide-undeployed`
