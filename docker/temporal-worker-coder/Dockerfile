@@ -7,9 +7,9 @@
 # python:3.10-slim based, so the CPython-3.10 env is ABI-compatible. This mirrors
 # the testing/matlab workers; see docker/coder-runtime/Dockerfile and
 # docker/base/Dockerfile.
-FROM computor-base:latest AS pybase
+FROM computor-base AS pybase
 
-FROM computor-coder-runtime:latest
+FROM computor-coder-runtime
 
 # Bring in the computor python project env from the shared base. Same /home/worker
 # path + CPython 3.10, so the editable installs + their deps resolve.
