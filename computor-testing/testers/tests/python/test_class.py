@@ -475,7 +475,15 @@ class TestComputorPython:
                     try:
                         val_reference = eval(sub.name, solution_reference)
                     except Exception:
-                        pytest.skip(f"Variable `{sub.name}` not found in reference")
+                        # A variable missing from the REFERENCE is a lecturer
+                        # authoring error, not a student outcome — fail loudly
+                        # instead of silently reducing the grade (#232).
+                        pytest.fail(
+                            f"BROKEN EXAMPLE: variable `{sub.name}` is missing "
+                            f"from the reference namespace — fix the example's "
+                            f"test.yaml or reference solution, this is not a "
+                            f"student error"
+                        )
 
             compare_variable_by_qualification(
                 val_student=val_student,
