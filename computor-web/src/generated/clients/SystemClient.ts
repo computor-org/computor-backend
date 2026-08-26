@@ -3,7 +3,7 @@
  * Endpoint: /system
  */
 
-import type { CourseTaskRequest, GenerateAssignmentsRequest, GenerateAssignmentsResponse, GenerateTemplateRequest, GenerateTemplateResponse, MaintenanceActivate, MaintenanceSchedule, MaintenanceStatusGet, SystemUpdateScheduleRequest, SystemUpdateScheduleResponse, SystemUpdateStatusGet, SystemUpdateTriggerResponse, TaskResponse } from 'types/generated';
+import type { CourseTaskRequest, GenerateAssignmentsRequest, GenerateAssignmentsResponse, GenerateTemplateRequest, GenerateTemplateResponse, InstanceLimitsGet, InstanceLimitsUpdate, MaintenanceActivate, MaintenanceSchedule, MaintenanceStatusGet, SystemUpdateScheduleRequest, SystemUpdateScheduleResponse, SystemUpdateStatusGet, SystemUpdateTriggerResponse, TaskResponse } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -83,6 +83,34 @@ export class SystemClient extends BaseEndpointClient {
    */
   async getHierarchyStatusSystemHierarchyStatusWorkflowIdGet({ workflowId }: { workflowId: string }): Promise<Record<string, unknown> & Record<string, unknown>> {
     return this.client.get<Record<string, unknown> & Record<string, unknown>>(this.buildPath('hierarchy', 'status', workflowId));
+  }
+
+  /**
+   * Get Instance Limits
+   * The configured limits and what they currently measure.
+   * Any authenticated user may read this — it is the explanation behind a
+   * refusal, and withholding it would leave the refusal looking like a bug.
+   */
+  async getInstanceLimitsSystemLimitsGet({ userId }: { userId?: string | null }): Promise<InstanceLimitsGet> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.get<InstanceLimitsGet>(this.buildPath('limits'), { params: queryParams });
+  }
+
+  /**
+   * Update Instance Limits
+   * Replace the stored limits. Admin only; effective on the next request.
+   * Both limits take effect immediately for new admissions and never evict
+   * anyone already inside: lowering the cap below the current usage stops the
+   * next arrival, it does not stop anybody's running workspace or sign a user
+   * out mid-session.
+   */
+  async updateInstanceLimitsSystemLimitsPut({ userId, body }: { userId?: string | null; body: InstanceLimitsUpdate }): Promise<InstanceLimitsGet> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.put<InstanceLimitsGet>(this.buildPath('limits'), body, { params: queryParams });
   }
 
   /**

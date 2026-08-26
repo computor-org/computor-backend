@@ -2528,6 +2528,46 @@ export interface DeploymentSummary {
 }
 
 /**
+ * What the limits currently measure, so an admin sees headroom not guesses.
+ */
+export interface InstanceLimitsUsage {
+  /** Distinct users holding a running or starting workspace right now. */
+  workspace_users: number;
+  /** Distinct users holding a login seat — one per user however many tabs or devices they are signed in from. */
+  login_seats: number;
+  /** False when the workspace-user count could not be read (Coder unreachable or disabled); the number above is then meaningless. */
+  workspace_users_available?: boolean | null;
+}
+
+/**
+ * The stored limits plus their current usage.
+ */
+export interface InstanceLimitsGet {
+  /** Max distinct users with an active workspace; null = unlimited, 0 = no non-staff workspaces at all. */
+  max_workspace_users?: number | null;
+  /** Max distinct users signed in at once; null = unlimited, 0 = no non-staff logins at all. */
+  max_concurrent_logins?: number | null;
+  /** How long a login seat is held after the user's last request. */
+  login_idle_minutes: number;
+  /** Download URL for the local VS Code extension, quoted in both refusals; null when EXTENSION_PUBLIC_DOWNLOAD_URL is unset. */
+  local_install_url?: string | null;
+  /** Current usage of both limits. */
+  usage?: InstanceLimitsUsage | null;
+}
+
+/**
+ * Full replacement of the stored limits (PUT semantics).
+ */
+export interface InstanceLimitsUpdate {
+  /** Max distinct users with an active workspace; null = unlimited. */
+  max_workspace_users?: number | null;
+  /** Max distinct users signed in at once; null = unlimited. */
+  max_concurrent_logins?: number | null;
+  /** Idle window for a login seat, in minutes. Keep it above 15: an active client re-authenticates (and so refreshes its seat) at most every 15 minutes, so a shorter window evicts users mid-session. */
+  login_idle_minutes?: number;
+}
+
+/**
  * Per-item override for release commit selection.
  */
 export interface ReleaseOverride {
