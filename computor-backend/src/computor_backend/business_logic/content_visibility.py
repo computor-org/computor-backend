@@ -307,6 +307,12 @@ def released_predicate():
     Non-submittable content — units — passes unconditionally: a unit is never
     deployed, it only holds things that are. Submittable content needs a
     deployment that has completed a release at least once.
+
+    An assignment with no deployment row at all therefore fails this too, and
+    that is correct rather than incidental: an assignment always holds an
+    example, so one without a deployment is a half-finished setup, not a
+    deliberately file-less exercise. Confirmed 2026-08-26 — do not loosen this
+    into "hide it only once someone has assigned an example".
     """
     released = (
         exists()

@@ -436,11 +436,11 @@ which was harmless while a release only changed a badge, and would since this
 change have left a student waiting out a five-minute TTL to see work that is
 already in their repository.
 
-**Assumption worth flagging:** submittable content with *no* deployment row at
-all is treated as unreleased and hidden too. There is nothing a student can do
-with it — no directory, no files — but a lecturer who wants a file-less manual
-assignment now has to hide it a different way. If that turns out to matter, the
-rule to relax is `released_predicate`, not the plumbing.
+Submittable content with *no* deployment row at all is hidden too. That was
+raised as an open assumption and is now settled: an assignment always holds an
+example, so one without a deployment is a half-finished setup rather than a
+deliberately file-less exercise. `released_predicate` says so in a comment, so
+nobody loosens it back later.
 
 A unit with no visible children still renders as an empty unit. That is
 deliberate: a unit is never deployed, it can carry a description of its own, and
