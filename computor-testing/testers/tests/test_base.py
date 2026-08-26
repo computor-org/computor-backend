@@ -817,7 +817,14 @@ def compare_variable_by_qualification(
         elif val_reference is not None:
             ref = val_reference
         else:
-            pytest.skip(f"Variable `{name}` not found in reference namespace")
+            # A variable missing from the REFERENCE is a lecturer authoring
+            # error, not a student outcome — fail loudly instead of skipping,
+            # which used to silently reduce the student's grade (#232).
+            pytest.fail(
+                f"BROKEN EXAMPLE: variable `{name}` is missing from the "
+                f"reference namespace — fix the example's test.yaml or "
+                f"reference solution, this is not a student error"
+            )
             return
 
         # Type check
