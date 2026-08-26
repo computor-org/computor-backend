@@ -29,6 +29,9 @@
   --ct-danger-text: #b91c1c; /* red-700 */
   --ct-danger-wash: #fef2f2; /* red-50 */
   --ct-danger-line: #fecaca; /* red-200 */
+
+  --ct-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
 }
 
 /* ---- Page background ------------------------------------------------ */
@@ -54,7 +57,11 @@ html.login-pf {
 body.login-pf,
 .login-pf body {
   background: transparent !important;
-  font-family: "Geist", Arial, Helvetica, sans-serif;
+  /* computor-web loads Geist through next/font; this page has no such loader,
+     so naming it here only fell through to Arial. Ask for the platform UI font
+     instead — closer to Geist than Arial, and it costs no request on a page
+     that must stay fast and self-contained. */
+  font-family: var(--ct-font);
 }
 
 .login-pf-page {
@@ -98,9 +105,13 @@ body.login-pf,
 }
 
 /* ---- Labels & inputs ------------------------------------------------ */
+/* PatternFly sizes form labels off --pf-global--FontSize--sm, which lands at
+   12px. computor-web's form labels are 14px; match that here — this is a form
+   people mistype under time pressure, not a dense table. */
 .pf-c-form__label,
 label {
   color: var(--ct-gray-700);
+  font-size: 0.875rem;
   font-weight: 500;
 }
 
@@ -282,4 +293,5 @@ input[aria-invalid="true"]:focus,
 #kc-form-options,
 .checkbox label {
   color: var(--ct-gray-600);
+  font-size: 0.875rem;
 }
