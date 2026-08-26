@@ -27,6 +27,7 @@ from temporalio.exceptions import ApplicationError
 from .temporal_base import (
     BaseWorkflow,
     WorkflowResult,
+    compute_result_value,
     extract_test_counts,
     start_activity_heartbeat,
     strip_path_properties,
@@ -532,10 +533,13 @@ def execute_tests_activity(
         # covers the tutor flow too, which runs through this same activity.
         strip_path_properties(test_results)
 
-        # Calculate result value
+        # Calculate result value. Skipped tests leave the denominator (#232);
+        # an all-skipped run is inconclusive, never a pass.
         try:
-            p, _, t = extract_test_counts(test_results)
-            test_results["result_value"] = p / max(t, 1)
+            test_results["result_value"] = compute_result_value(test_results)
+            _, _, total, skipped = extract_test_counts(test_results)
+            if total > 0 and skipped >= total:
+                test_results["error"] = "All tests were skipped; run is inconclusive"
         except Exception as e:
             logger.warning(f"Could not calculate result value: {e}")
             test_results["result_value"] = 0.0
@@ -898,9 +902,9 @@ class StudentTestingWorkflow(BaseWorkflow):
             duration = (completed_at - started_at).total_seconds()
 
             # Extract results
-            passed, failed, total = extract_test_counts(test_results)
+            passed, failed, total, skipped = extract_test_counts(test_results)
 
-            workflow.logger.info(f"[TEST COMPLETE] result_id={result_id}, passed={passed}/{total}, duration={duration:.1f}s")
+            workflow.logger.info(f"[TEST COMPLETE] result_id={result_id}, passed={passed}/{total} (skipped={skipped}), duration={duration:.1f}s")
 
             return WorkflowResult(
                 status="completed",
