@@ -14,6 +14,7 @@ from .git_ops import clone_or_init, commit_and_push, configure_identity
 from .registry import register_task
 from .student_template import (
     broadcast_deployment_events,
+    invalidate_deployment_views,
     collect_failed_events,
     fail_all_deploying,
     generate_main_readme,
@@ -316,6 +317,7 @@ def generate_student_template_activity_v2(
 
         # Broadcast deployment status changes after successful commit
         broadcast_deployment_events(course_id, deploying_events, workflow_id)
+        invalidate_deployment_views(course_id, deploying_events)
         logger.info(f"Updated {len(deployments_to_process)} deployments to 'deploying' status")
 
         # Get course details
@@ -564,6 +566,7 @@ def generate_student_template_activity_v2(
             # Now commit database changes, then broadcast
             db.commit()
             broadcast_deployment_events(course_id, final_status_events, workflow_id)
+            invalidate_deployment_views(course_id, final_status_events)
 
             # Do not generate assignments repository automatically; managed manually by lecturers
             assignments_result = None
@@ -595,6 +598,7 @@ def generate_student_template_activity_v2(
             failed_events = fail_all_deploying(db, course_id, str(e), workflow_id)
             db.commit()
             broadcast_deployment_events(course_id, failed_events, workflow_id)
+            invalidate_deployment_views(course_id, failed_events)
         except Exception as db_error:
             logger.error(f"Failed to update deployment statuses: {db_error}")
 

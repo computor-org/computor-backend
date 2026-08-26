@@ -21,6 +21,7 @@ from .status import (  # noqa: F401
     broadcast_deployment_events,
     collect_failed_events,
     fail_all_deploying,
+    invalidate_deployment_views,
     mark_deployed,
     mark_deploying,
     mark_failed,

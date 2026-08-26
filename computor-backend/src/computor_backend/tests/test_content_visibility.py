@@ -497,3 +497,199 @@ def test_no_role_grants_course_content_writes_outside_a_course():
     from computor_backend.model.course import CourseContent
 
     assert CourseContent.__tablename__ == "course_content"
+
+
+# --------------------------------------------------------------------------
+# Release state: the second reason a student loses a row (issue #163)
+# --------------------------------------------------------------------------
+
+_CONTENT_UUID = "11111111-1111-1111-1111-111111111111"
+
+
+def test_released_predicate_lets_units_through_untouched():
+    """A unit is never deployed; gating it on a deployment would empty the tree."""
+    from sqlalchemy import select
+
+    from computor_backend.business_logic.content_visibility import released_predicate
+
+    sql = _compiled(select(CourseContent.id).where(released_predicate()))
+    assert "course_content.is_submittable IS false OR" in sql
+
+
+def test_released_predicate_asks_for_a_completed_release_not_a_status():
+    """``deployed_at`` is the only field a *successful* release writes.
+
+    Reading ``deployment_status == 'deployed'`` instead would hide a live
+    assignment the moment a lecturer bumped its example version, because that
+    resets the status to 'pending' while the students' files stay in place.
+    """
+    from sqlalchemy import select
+
+    from computor_backend.business_logic.content_visibility import released_predicate
+
+    sql = _compiled(select(CourseContent.id).where(released_predicate()))
+    assert "course_content_deployment.deployed_at IS NOT NULL" in sql
+    assert "deployment_status = 'deployed'" not in sql
+
+
+def test_released_predicate_drops_an_unassigned_deployment():
+    from sqlalchemy import select
+
+    from computor_backend.business_logic.content_visibility import released_predicate
+
+    sql = _compiled(select(CourseContent.id).where(released_predicate()))
+    assert "deployment_status != 'unassigned'" in sql
+
+
+def test_released_predicate_correlates_to_the_outer_course_content():
+    from sqlalchemy import select
+
+    from computor_backend.business_logic.content_visibility import released_predicate
+
+    sql = _compiled(select(CourseContent.id).where(released_predicate()))
+    assert "course_content_deployment.course_content_id = course_content.id" in sql
+
+
+def test_student_visible_predicate_carries_both_rules():
+    """One predicate, so a list and a get cannot disagree about a row."""
+    from sqlalchemy import select
+
+    from computor_backend.business_logic.content_visibility import (
+        student_visible_predicate,
+    )
+
+    sql = _compiled(select(CourseContent.id).where(student_visible_predicate()))
+    assert "<@" in sql, "the #338 ancestor veto must survive"
+    assert "deployed_at IS NOT NULL" in sql, "the #163 release gate must be there"
+
+
+def test_student_search_hides_an_unreleased_assignment():
+    sql = _student_search_sql(include_hidden=False)
+    assert "deployed_at IS NOT NULL" in sql
+
+
+def test_staff_search_keeps_unreleased_assignments():
+    """A lecturer's own tree and a tutor's view of a student show everything."""
+    sql = _student_search_sql(include_hidden=True)
+    assert "deployed_at" not in sql
+
+
+def test_the_unit_badge_applies_the_same_filter():
+    """The badge re-queries from scratch, so it has to repeat the filter."""
+    import inspect
+
+    from computor_backend.repositories.view_base import ViewRepository
+
+    source = inspect.getsource(ViewRepository._aggregate_single_unit_status_for_list)
+    assert "student_visible_predicate" in source
+
+
+class _ReleaseQuery:
+    def __init__(self, first):
+        self._first = first
+
+    def filter(self, *args, **_kwargs):
+        _bind_check(args)
+        return self
+
+    def first(self):
+        return self._first
+
+
+class _ReleaseDb:
+    def __init__(self, released):
+        self.released = released
+        self.queries = 0
+
+    def query(self, *entities):
+        self.queries += 1
+        return _ReleaseQuery("a-deployment" if self.released else None)
+
+
+class _Submittable:
+    def __init__(self, is_submittable=True):
+        self.id = _CONTENT_UUID
+        self.path = "a.b"
+        self.course_id = "course-1"
+        self.is_submittable = is_submittable
+
+
+def test_is_content_released_answers_yes_for_a_unit_without_querying():
+    from computor_backend.business_logic.content_visibility import is_content_released
+
+    db = _ReleaseDb(released=False)
+    assert is_content_released(db, _Submittable(is_submittable=False)) is True
+    assert db.queries == 0
+
+
+def test_is_content_released_needs_a_completed_release():
+    from computor_backend.business_logic.content_visibility import is_content_released
+
+    assert is_content_released(_ReleaseDb(released=True), _Submittable()) is True
+    assert is_content_released(_ReleaseDb(released=False), _Submittable()) is False
+
+
+def test_the_single_get_guard_checks_release_as_well_as_visibility():
+    import inspect
+
+    from computor_backend.repositories.student_view import StudentViewRepository
+
+    source = inspect.getsource(StudentViewRepository._guard_hidden_content)
+    assert "is_content_released" in source
+    # visible_effective must keep meaning "a lecturer hid this" -- the lecturer
+    # tree greys rows by it, and an unreleased assignment is unfinished, not
+    # hidden.
+    assert "result.visible_effective = visible" in source
+
+
+def test_a_release_drops_the_cached_student_listing():
+    """Otherwise a student waits out the 5-minute TTL to see released work."""
+    import inspect
+
+    from computor_backend.tasks import temporal_student_template_v2 as workflow
+
+    source = inspect.getsource(workflow)
+    assert source.count("invalidate_deployment_views(") == source.count(
+        "broadcast_deployment_events("
+    ), "every committed status change must invalidate the views it changed"
+
+
+def test_view_invalidation_survives_a_broken_cache():
+    """A release that is already committed must not fail on a cache error."""
+    from computor_backend.tasks.student_template import status
+
+    class _Boom:
+        def invalidate_tags(self, *_tags):
+            raise RuntimeError("redis is down")
+
+    original = status.invalidate_deployment_views
+    import computor_backend.redis_cache as cache_module
+
+    real_get_cache = cache_module.get_cache
+    cache_module.get_cache = lambda: _Boom()
+    try:
+        original("course-1", [{"course_content_id": _CONTENT_UUID}])
+    finally:
+        cache_module.get_cache = real_get_cache
+
+
+def test_view_invalidation_covers_the_student_listing_tag():
+    from computor_backend.tasks.student_template import status
+
+    seen = []
+
+    class _Recorder:
+        def invalidate_tags(self, *tags):
+            seen.extend(tags)
+
+    import computor_backend.redis_cache as cache_module
+
+    real_get_cache = cache_module.get_cache
+    cache_module.get_cache = lambda: _Recorder()
+    try:
+        status.invalidate_deployment_views("course-1", [{"course_content_id": _CONTENT_UUID}])
+    finally:
+        cache_module.get_cache = real_get_cache
+
+    assert "student_view:course-1" in seen
+    assert f"course_content:{_CONTENT_UUID}" in seen
