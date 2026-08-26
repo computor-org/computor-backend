@@ -24,7 +24,9 @@ def test_prefix_wraps_when_enabled(monkeypatch):
     monkeypatch.setenv(SANDBOX_ENABLE_ENV, "1")
     prefix = sandbox_command_prefix("/work", rw_paths=["/scratch"], ro_paths=["/ref"])
     assert prefix[0] == sys.executable
-    assert prefix[1:4] == ["-m", "sandbox.launch", "--required"]
+    # Invoked by file path (not -m), so a redirected HOME cannot hide the module.
+    assert prefix[1].endswith("launch.py")
+    assert prefix[2] == "--required"
     assert "--workdir" in prefix and "/work" in prefix
     assert prefix[prefix.index("--rw") + 1] == "/scratch"
     assert prefix[prefix.index("--ro") + 1] == "/ref"
