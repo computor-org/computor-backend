@@ -13,7 +13,7 @@ import time
 from abc import abstractmethod
 from typing import Any, Dict, List, Optional
 
-from .base import BaseExecutor, ExecutorResult
+from .base import BaseExecutor, ExecutorResult, sandbox_command_prefix
 from .environment import get_safe_env
 from .exceptions import ExecutionError, ExecutionTimeoutError
 from .resources import make_preexec_fn
@@ -137,14 +137,21 @@ class InterpretedExecutor(BaseExecutor):
         result_path = None
 
         try:
+            # Wrapper and result files live in a private dir, not the shared
+            # system temp: under the sandbox only this dir is writable, so the
+            # student process can drop its extracted-variable JSON while the
+            # reference/example cache elsewhere in /tmp stays unreachable.
+            sandbox_dir = tempfile.mkdtemp(prefix="ctsbx_")
+            self._temp_files.append(sandbox_dir)
+
             # Create result file path
-            result_fd, result_path = tempfile.mkstemp(suffix=".json")
+            result_fd, result_path = tempfile.mkstemp(suffix=".json", dir=sandbox_dir)
             os.close(result_fd)
             self._temp_files.append(result_path)
 
             # Create wrapper script
             ext = self._get_wrapper_extension()
-            wrapper_fd, wrapper_path = tempfile.mkstemp(suffix=ext)
+            wrapper_fd, wrapper_path = tempfile.mkstemp(suffix=ext, dir=sandbox_dir)
             self._temp_files.append(wrapper_path)
 
             wrapper_code = self._build_wrapper_script(
@@ -158,9 +165,22 @@ class InterpretedExecutor(BaseExecutor):
             with os.fdopen(wrapper_fd, "w") as f:
                 f.write(wrapper_code)
 
-            # Execute in subprocess
-            cmd = self._get_interpreter_command() + [wrapper_path]
+            # Execute in subprocess, wrapped in the kernel sandbox when the
+            # worker enables it. The student may read/write its working dir and
+            # the private sandbox dir; the reference cache is bound nowhere.
+            prefix = sandbox_command_prefix(
+                self.working_dir, rw_paths=[sandbox_dir]
+            )
+            cmd = prefix + self._get_interpreter_command() + [wrapper_path]
             env = self._get_env()
+            if prefix:
+                # Interpreters scribble history/config/scratch into HOME and
+                # TMPDIR; under the sandbox those must point at the one
+                # writable place (the private dir), not the unbound /tmp.
+                # R keeps its real HOME — its libraries live there read-only.
+                env["TMPDIR"] = sandbox_dir
+                if env.get("HOME") in (None, "/tmp"):
+                    env["HOME"] = sandbox_dir
             preexec_fn = make_preexec_fn(self.resource_limits) if self.resource_limits else None
 
             start_time = time.perf_counter()
@@ -227,10 +247,14 @@ class InterpretedExecutor(BaseExecutor):
         return {}
 
     def _cleanup_temp_files(self) -> None:
-        """Remove temporary files created during execution."""
-        for path in self._temp_files:
+        """Remove temporary files (and the private sandbox dir) after a run."""
+        import shutil
+        # Files first, directories last, so a dir is empty when it is removed.
+        for path in sorted(self._temp_files, key=len, reverse=True):
             try:
-                if os.path.exists(path):
+                if os.path.isdir(path):
+                    shutil.rmtree(path, ignore_errors=True)
+                elif os.path.exists(path):
                     os.unlink(path)
             except OSError:
                 pass

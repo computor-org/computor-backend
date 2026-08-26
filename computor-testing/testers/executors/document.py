@@ -111,6 +111,10 @@ class DocumentAnalyzer(BaseExecutor):
             timeout: Not used (no execution)
             check_runtime: Not used (no external runtime)
         """
+        # use_safe_env=False is safe here: the document analyzer runs no
+        # subprocess (it is a pure in-process text analyzer), and even its
+        # _get_env fallback now routes through filter_env, which strips
+        # API_TOKEN and every COMPUTOR_* secret (#241).
         super().__init__(working_dir, timeout, use_safe_env=False, check_runtime=False)
         self._content: Optional[str] = None
         self._is_markdown: bool = False

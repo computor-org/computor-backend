@@ -4,6 +4,7 @@ Provides a flexible system to execute tests using different approaches (subproce
 """
 
 import json
+import os
 import socket
 import subprocess
 import logging
@@ -15,6 +16,23 @@ import Pyro5.errors
 from computor_backend.tasks.worker_settings import get_worker_settings
 
 logger = logging.getLogger(__name__)
+
+# Secrets that must never reach the test harness (and thus the student
+# process it spawns). The API token is the worker's own credential; every
+# COMPUTOR_* variable is treated as internal config except the flag that
+# switches the student sandbox on. See computor-testing/sandbox/launch.py.
+_HARNESS_BLOCKED_ENV = {"API_TOKEN", "TESTING_WORKER_TOKEN"}
+_HARNESS_KEEP_COMPUTOR = {"COMPUTOR_SANDBOX_ENABLE", "COMPUTOR_SANDBOX_DISABLE"}
+
+
+def _harness_env() -> Dict[str, str]:
+    """Worker environment with credentials stripped, for the test harness."""
+    return {
+        k: v
+        for k, v in os.environ.items()
+        if k not in _HARNESS_BLOCKED_ENV
+        and not (k.startswith("COMPUTOR_") and k not in _HARNESS_KEEP_COMPUTOR)
+    }
 
 
 class TestingBackend(ABC):
@@ -250,14 +268,16 @@ class ComputorTestingBackend(TestingBackend):
         if verbosity > 0:
             cmd_parts.extend(["-v", str(verbosity)])
 
-        cmd = " ".join(cmd_parts)
-        logger.info(f"Executing computor-test command: {cmd}")
+        logger.info("Executing computor-test command: %s", " ".join(cmd_parts))
 
         try:
-            # Execute test command
+            # Execute the test harness with the argv list directly — no shell,
+            # so nothing in a path is ever re-interpreted — and a scrubbed
+            # environment so the worker's API token (and any COMPUTOR_* secret)
+            # is not inherited by the harness or anything it spawns (#241).
             result = subprocess.run(
-                cmd,
-                shell=True,
+                cmd_parts,
+                env=_harness_env(),
                 capture_output=True,
                 text=True,
                 timeout=backend_properties.get("timeout_seconds", 300)
