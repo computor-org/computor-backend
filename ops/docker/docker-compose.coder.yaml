@@ -11,7 +11,7 @@ services:
   # needs the raw socket.
   coder-socket-proxy:
     image: tecnativa/docker-socket-proxy:0.3.0
-    container_name: computor-coder-socket-proxy
+    container_name: ${CONTAINER_NAME_PREFIX:-}coder-socket-proxy
     networks:
       - computor-network
     restart: unless-stopped
@@ -46,7 +46,7 @@ services:
   # a workspace.
   workspace-ingress:
     image: traefik:v3.6.6
-    container_name: computor-workspace-ingress
+    container_name: ${CONTAINER_NAME_PREFIX:-}workspace-ingress
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
@@ -64,7 +64,7 @@ services:
       # stripprefix) are picked up unchanged — the routing model did not move,
       # only which proxy performs it.
       - '--providers.docker.constraints=Label(`computor.ingress`,`workspace`)'
-      - "--providers.docker.network=${CODER_WORKSPACE_NETWORK:-computor-coder-workspaces}"
+      - "--providers.docker.network=${CODER_WORKSPACE_NETWORK:-${COMPOSE_NETWORK_NAME:-computor-network}-workspaces}"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.web.forwardedHeaders.trustedIPs=127.0.0.1/32,172.16.0.0/12,192.168.0.0/16"
       - "--providers.file.directory=/etc/traefik/dynamic"
@@ -98,7 +98,7 @@ services:
     image: postgres:16
     networks:
       - computor-network
-    container_name: computor-coder-postgres
+    container_name: ${CONTAINER_NAME_PREFIX:-}coder-postgres
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
@@ -108,7 +108,7 @@ services:
         max-size: "10m"
         max-file: "5"
     ports:
-      - "127.0.0.1:5439:5439"  # Different port from main postgres
+      - "127.0.0.1:${CODER_POSTGRES_PORT:-5439}:5439"  # Different port from main postgres
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/coder-postgres:/var/lib/postgresql/data
     environment:
@@ -136,7 +136,7 @@ services:
       - computor-network
       - computor-coder-workspaces
       - computor-coder-workspaces-offline
-    container_name: computor-coder
+    container_name: ${CONTAINER_NAME_PREFIX:-}coder
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
@@ -146,7 +146,7 @@ services:
         max-size: "10m"
         max-file: "5"
     ports:
-      - "127.0.0.1:7080:7080"  # Expose for local API access
+      - "${PREVIEW_BIND_ADDRESS:-127.0.0.1}:${CODER_EXTERNAL_PORT:-7080}:7080"  # Expose for local API access
     environment:
       CODER_PG_CONNECTION_URL: "postgresql://${CODER_POSTGRES_USER:?must be set in .env}:${CODER_POSTGRES_PASSWORD:?must be set in .env}@coder-postgres:5439/coder?sslmode=disable"
       CODER_HTTP_ADDRESS: "0.0.0.0:7080"
@@ -188,7 +188,7 @@ services:
   # at workspace creation), since both go through the docker socket.
   coder-registry:
     image: registry:2
-    container_name: computor-coder-registry
+    container_name: ${CONTAINER_NAME_PREFIX:-}coder-registry
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
@@ -212,6 +212,7 @@ services:
   # Temporal worker for Coder tasks (image building, template pushing)
   # Triggered via API endpoints: POST /coder/admin/images/build, POST /coder/admin/templates/push
   temporal-worker-coder:
+    image: ${PREVIEW_IMAGE_PREFIX:-computor}-temporal-worker-coder
     build:
       context: ../../
       dockerfile: ./docker/temporal-worker-coder/Dockerfile
@@ -280,7 +281,7 @@ networks:
   # computor-network itself is defined in docker-compose.base.yaml and merged in
   # at deploy time.
   computor-coder-workspaces:
-    name: computor-coder-workspaces
+    name: ${CODER_WORKSPACE_NETWORK:-${COMPOSE_NETWORK_NAME:-computor-network}-workspaces}
     driver: bridge
 
   # Same bridge, minus egress: `internal` means docker installs no NAT and no
@@ -291,7 +292,6 @@ networks:
   # allow_internet variable): attaching both would restore egress via the
   # non-internal one.
   computor-coder-workspaces-offline:
-    name: computor-coder-workspaces-offline
+    name: ${CODER_WORKSPACE_NETWORK_OFFLINE:-${COMPOSE_NETWORK_NAME:-computor-network}-workspaces-offline}
     driver: bridge
     internal: true
-

@@ -9,7 +9,7 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.endpoint=unix:///var/run/docker.sock"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=computor-network"
+      - "--providers.docker.network=${COMPOSE_NETWORK_NAME:-computor-network}"
       # Workspace containers are routed by workspace-ingress, which is the only
       # proxy on their networks. Without this constraint the main Traefik would
       # also claim their routers and then fail to dial them.
@@ -37,7 +37,7 @@ services:
         max-file: "5"
     networks:
       - computor-network
-    container_name: computor-temporal-ui
+    container_name: ${CONTAINER_NAME_PREFIX:-}temporal-ui
     restart: unless-stopped
     ports:
       - "127.0.0.1:${TEMPORAL_UI_PORT:-8088}:8080"
@@ -51,6 +51,7 @@ services:
 
   # Temporal Worker (Development with Hot Reload)
   temporal-worker:
+    image: ${PREVIEW_IMAGE_PREFIX:-computor}-temporal-worker
     build:
       context: ../../
       dockerfile: ./docker/temporal-worker/Dockerfile
@@ -113,6 +114,7 @@ services:
 
   # Unified Testing Worker - handles Python, Octave, R, Julia, C, Fortran, Document
   temporal-worker-testing:
+    image: ${PREVIEW_IMAGE_PREFIX:-computor}-temporal-worker-testing
     build:
       context: ../../
       dockerfile: ./docker/temporal-worker-testing/Dockerfile

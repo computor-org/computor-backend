@@ -190,7 +190,18 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         auth_endpoint = self._oidc_config.get("authorization_endpoint")
         if not auth_endpoint:
             raise ValueError("Authorization endpoint not found in OIDC configuration")
-        
+
+        # Discovery and token exchange use the internal Compose address, but
+        # the browser must be sent to the host-reachable preview address.
+        # Keep this override explicit so production continues to use the
+        # provider's discovery URL when no public URL is configured.
+        public_base = os.environ.get("KEYCLOAK_PUBLIC_URL", "").rstrip("/")
+        if public_base:
+            auth_endpoint = (
+                f"{public_base}/realms/{self.keycloak_config.realm}"
+                "/protocol/openid-connect/auth"
+            )
+
         params = {
             "client_id": self.keycloak_config.client_id,
             "response_type": "code",
@@ -356,29 +367,41 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         if not key:
             raise JWTError(f"No matching key found for kid: {kid}")
         
-        # Verify and decode the token.
-        # Use the issuer from the discovery doc rather than constructing one from
-        # server_url — when Keycloak is behind a reverse proxy / has KC_HOSTNAME set,
-        # the token's `iss` reflects the public URL (e.g. localhost:8080/auth)
-        # while server_url is the internal URL (e.g. localhost:8180/auth).
-        expected_issuer = (
+        # Verify and decode the token. Prefer the issuer advertised by
+        # discovery; a preview may also expose the same realm through its
+        # host-mapped public URL while the API talks to Keycloak internally.
+        issuers = [
             self._oidc_config.get("issuer")
             if self._oidc_config
             else f"{self.keycloak_config.server_url}/realms/{self.keycloak_config.realm}"
-        )
-        try:
-            claims = jwt.decode(
-                token,
-                key,
-                algorithms=["RS256"],
-                audience=self.keycloak_config.client_id,
-                issuer=expected_issuer,
-                options={"verify_at_hash": False}  # Skip at_hash verification
-            )
-            return claims
-        except JWTError as e:
-            logger.error(f"Token verification failed: {e}")
-            raise
+        ]
+        public_base = os.environ.get("KEYCLOAK_PUBLIC_URL", "").rstrip("/")
+        if public_base:
+            public_issuer = f"{public_base}/realms/{self.keycloak_config.realm}"
+            if public_issuer not in issuers:
+                issuers.append(public_issuer)
+        internal_issuer = f"{self.keycloak_config.server_url}/realms/{self.keycloak_config.realm}"
+        if internal_issuer not in issuers:
+            issuers.append(internal_issuer)
+
+        last_error: JWTError | None = None
+        for issuer in issuers:
+            if not issuer:
+                continue
+            try:
+                return jwt.decode(
+                    token,
+                    key,
+                    algorithms=["RS256"],
+                    audience=self.keycloak_config.client_id,
+                    issuer=issuer,
+                    options={"verify_at_hash": False},  # Skip at_hash verification
+                )
+            except JWTError as exc:
+                last_error = exc
+        assert last_error is not None
+        logger.error(f"Token verification failed: {last_error}")
+        raise last_error
     
     async def authenticate(self, credentials: Dict[str, Any]) -> AuthResult:
         """

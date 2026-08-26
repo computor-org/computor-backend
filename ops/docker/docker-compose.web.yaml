@@ -4,6 +4,7 @@
 
 services:
   frontend:
+    image: ${PREVIEW_IMAGE_PREFIX:-computor}-frontend
     build:
       context: ../../
       dockerfile: ./docker/web/Dockerfile
