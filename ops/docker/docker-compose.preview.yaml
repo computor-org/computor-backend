@@ -1,6 +1,23 @@
 # Preview-only overlay. The base and environment files preserve production
 # defaults while allowing the runner to provide a unique network name.
 
+services:
+  # A host may run production and several previews side by side. Scope this
+  # Docker provider to this Compose project so production routers cannot
+  # collide with the preview's frontend and document routes.
+  traefik:
+    command:
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.endpoint=tcp://socket-proxy:2375"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=${COMPOSE_NETWORK_NAME}"
+      - '--providers.docker.constraints=Label(`com.docker.compose.project`,`${PREVIEW_IMAGE_PREFIX}`)'
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.forwardedHeaders.trustedIPs=127.0.0.1/32,172.16.0.0/12,192.168.0.0/16"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+
 networks:
   computor-network:
     name: ${COMPOSE_NETWORK_NAME:?COMPOSE_NETWORK_NAME must be set for previews}
