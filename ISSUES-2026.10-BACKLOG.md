@@ -37,7 +37,18 @@ The production path never goes through `Dockerfile.sandbox`. Its header already
 documents the right recipe (`--network none --read-only --cap-drop ALL
 --pids-limit`); nothing runs it.
 
-## #239 — reference and spec paths disclosed in `result_json`  — **OPEN**
+## #239 — reference and spec paths disclosed in `result_json`  — **DONE 2026-08-26**
+
+Landed on `fix/239-result-path-disclosure`, merged to `release/2026.10`. Both
+conftests now build `report.properties` through
+`conftest_base.build_report_properties` (flags + exitcode only; full paths go
+to `logger.info`). The backend strips any absolute-path property on read via
+`temporal_base.strip_path_properties`, wired into `execute_tests_activity`
+(covers the tutor flow, same activity). Historic MinIO blobs scrubbed by
+`scripts/utilities/scrub_result_path_properties.py` (11 of 17 dev results).
+Regression tests: `computor-testing/tests/test_report_properties.py`,
+`computor-backend/.../tests/test_strip_path_properties.py`. Verified with live
+Python and Octave tester runs — no `/`-prefixed value in the report.
 
 **Verified root cause.** Two sites write absolute container paths into the
 report the student reads back:
@@ -76,7 +87,31 @@ disclosed verbatim, so the disclosure is unchanged in kind.
 **Done when** a student-visible result for a Python and an Octave assignment
 contains no absolute path, and older results have been scrubbed.
 
-## #240 — reference solution readable by the student subprocess — **OPEN**
+## #240 — reference solution readable by the student subprocess — **DONE 2026-08-26**
+
+Landed on `fix/240-241-student-sandbox`, merged to `release/2026.10`.
+
+**Mechanism chosen: Landlock, not bubblewrap.** The plan assumed
+bwrap/`unshare` with mount namespaces, but a runtime probe
+(`docker exec computor-temporal-worker-testing-1 unshare -Urn true`) showed the
+host's `kernel.apparmor_restrict_unprivileged_userns=1` plus docker-default
+AppArmor (`deny mount`) block that route, and the worker's
+`no-new-privileges:true` rules out setuid helpers. Landlock (LSM, ABI 8 on the
+target host, unprivileged, no namespaces required) works under the *default*
+Docker seccomp profile and is the actual boundary. `computor-testing/sandbox/
+launch.py` restricts the student process to a fixed runtime allow-list plus the
+explicit binds; the reference/example cache is bound nowhere, so a read returns
+`EACCES`. Wired around the student interpreter/binary only (not the pytest
+harness) in `ctexec/interpreted.py` and `ctexec/compiled.py`, gated on
+`COMPUTOR_SANDBOX_ENABLE=1` (set on both testing-worker services). Verified live
+in the running worker: with the sandbox on, `os.listdir('/tmp/examples')` and
+opening `*_master.py` both raise `PermissionError`, while grading of clean
+Python/Octave/R/C submissions is bit-identical to sandbox-off.
+
+**Known gaps (follow-ups, not silently skipped):** the Python *graphics* test
+path runs student code in-process (`test_class.py:_execute_graphics_inprocess`)
+and is therefore not sandboxed; the MATLAB worker uses a different execution
+path (MATLAB engine) and is not yet wired. Both are recorded under #237.
 
 **Verified root cause.** `tasks/temporal_student_testing.py:440-500`: the
 activity resolves `reference_path` (the cached example directory, master
@@ -109,7 +144,33 @@ tester as an ordinary subprocess of the worker — same UID (`worker`), same
 **Done when** a submission that tries to read the reference gets `ENOENT` or
 `EACCES`, and a normal submission still grades identically.
 
-## #241 — student subprocess has full network access — **OPEN**
+## #241 — student subprocess has full network access — **DONE 2026-08-26**
+
+Landed on `fix/240-241-student-sandbox`, merged to `release/2026.10`. Two
+layers, both in `sandbox/launch.py`:
+
+1. **Landlock network rule** (ABI 4+, works under the default profile): all TCP
+   bind/connect is denied — this alone refuses `redis:6379`, `postgres:5432`,
+   `minio:9000` and any public TCP (`1.1.1.1:443`) with `EACCES`. Verified live.
+2. **User+net namespace** (`unshare(CLONE_NEWUSER|CLONE_NEWNET)`, loopback
+   only): closes the remaining UDP/ICMP/raw hole (e.g. DNS to `8.8.8.8:53`),
+   which Landlock does not cover. This needs the tailored seccomp profile
+   `ops/docker/seccomp-testing-worker.json` (the Docker default plus
+   `unshare`/`setns` — never `seccomp=unconfined`), applied to both
+   testing-worker services. Where a host still blocks userns the launcher falls
+   back to Landlock-only automatically. Verified via a container started with
+   the profile: the full probe table (redis/postgres/minio/8.8.8.8/1.1.1.1) is
+   entirely refused.
+
+**Env-hygiene sub-finding — done, same branch.** `testing/backends.py` now runs
+the harness with the argv list (no `shell=True`) and a scrubbed `env=` that
+drops `API_TOKEN`/`TESTING_WORKER_TOKEN` and every `COMPUTOR_*` except the
+sandbox flag. `ctexec/environment.py` adds those tokens and a `COMPUTOR_`
+prefix rule to the blocklist (so the `document.py` `filter_env` fallback is
+covered too). Worker connectivity (Temporal, API) is unaffected — the student
+child needs no network. Compose-level network isolation (a dedicated
+`testing-network`) is left as a follow-up under #237; the in-sandbox netns
+already makes the cut.
 
 **Verified root cause.** `ops/docker/docker-compose.prod.yaml:243-283` — the
 `temporal-worker-testing` service sits on `computor-network` with the default
@@ -153,7 +214,20 @@ build a clean allowlist environment for the child
 `shell=True` and pass the argv list (the parts are already built at
 `backends.py:240-247`).
 
-## #232 — skipped tests reduce the grade — **OPEN**
+## #232 — skipped tests reduce the grade — **DONE 2026-08-26**
+
+Landed on `fix/232-skip-grade-erosion`, merged to `release/2026.10`. A variable
+missing from the *reference* now fails loudly as a `BROKEN EXAMPLE` (both
+emitters: `test_base.py:820` and `python/test_class.py:478`) instead of a silent
+skip. Legitimate skips leave the denominator: `extract_test_counts` returns
+`skipped` and `temporal_base.compute_result_value` computes
+`passed / max(total - skipped, 1)`, with an all-skipped run graded 0.0
+(inconclusive, not a pass). Both call sites updated. Old grades recomputed by
+`scripts/utilities/backfill_skip_result_values.py` (MinIO blob + `result.result`
+column; 2 of 17 dev results). Regression tests in
+`tests/test_result_value_skips.py` (1 skip of 4 → 1.0; 2 pass/1 fail/1 skip →
+2/3; all-skipped → 0.0). Verified: a probe example checking a variable absent
+from the reference fails loudly (failed=1, skipped=0) instead of skipping.
 
 **Verified root cause.** Unchanged from the issue text, at a new line number:
 
@@ -192,6 +266,26 @@ Close #239, #240 and #241 plus the env-hygiene sub-finding, then re-read the
 rest of the issue and either close each remaining bullet or record an explicit,
 named risk acceptance. Do not close #237 silently on the back of the three
 children.
+
+**Update 2026-08-26.** #239, #240, #241 and the env-hygiene sub-finding are all
+done and merged to `release/2026.10`. #237 stays **OPEN** until an image rebuild
++ live re-test, and until these named residual risks are accepted or closed:
+
+- **Graphics-in-process:** Python graphics tests exec student code in-process
+  (`test_class.py:_execute_graphics_inprocess`), so they are not sandboxed. A
+  graphics assignment's student code still runs with the worker's filesystem
+  reach. Fix needs moving graphics extraction into the sandboxed subprocess or
+  sandboxing the harness itself.
+- **MATLAB worker:** runs student code through the MATLAB engine, a different
+  path that `COMPUTOR_SANDBOX_ENABLE` does not touch. Not yet isolated.
+- **Compose network isolation:** the in-sandbox netns makes the egress cut, but
+  the workers still share `computor-network`; a dedicated `testing-network`
+  (defence in depth) is deferred.
+- **userns availability:** the UDP/ICMP half of #241 depends on the tailored
+  seccomp profile *and* the host permitting unprivileged userns. On a host that
+  refuses it even with the profile, the launcher silently falls back to
+  Landlock-only (TCP still blocked, UDP would leak). Confirm on the production
+  host after deploy.
 
 ## #238 — artifact-based grading epic — **OPEN, design only this cycle**
 
