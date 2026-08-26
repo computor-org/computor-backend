@@ -65,14 +65,31 @@ def _keycloak_ids() -> dict[str, str]:
     return {username: str(uuid5(OIDC_NAMESPACE, username)) for username in USERS}
 
 
-def _get_or_create_user(session, username: str, data: dict[str, str]) -> User:
-    user = session.query(User).filter(User.username == username).one_or_none()
+def _get_or_create_user(
+    session, username: str, data: dict[str, str], provider_id: str
+) -> User:
+    # ``user.username`` was removed by the current schema.  Reuse a seeded
+    # account by its OIDC subject first, then by its unique email, and keep the
+    # human-readable fixture name in JSON properties for diagnostics.
+    account = (
+        session.query(Account)
+        .filter(
+            Account.provider == "keycloak",
+            Account.provider_account_id == provider_id,
+        )
+        .one_or_none()
+    )
+    user = (
+        session.query(User).filter(User.id == account.user_id).one_or_none()
+        if account is not None
+        else session.query(User).filter(User.email == data["email"]).one_or_none()
+    )
     if user is None:
         user = User(
-            username=username,
             email=data["email"],
             given_name=data["given_name"],
             family_name=data["family_name"],
+            properties={"preview_seed": True, "username": username},
         )
         session.add(user)
         session.flush()
@@ -80,6 +97,9 @@ def _get_or_create_user(session, username: str, data: dict[str, str]) -> User:
         user.email = data["email"]
         user.given_name = data["given_name"]
         user.family_name = data["family_name"]
+        properties = dict(user.properties or {})
+        properties.update({"preview_seed": True, "username": username})
+        user.properties = properties
     return user
 
 
@@ -117,7 +137,12 @@ def seed() -> dict[str, object]:
     ids = _keycloak_ids()
     with get_db_session() as session:
         users = {
-            username: _get_or_create_user(session, username, data)
+            username: _get_or_create_user(
+                session,
+                username,
+                data,
+                ids.get(username, str(uuid5(OIDC_NAMESPACE, username))),
+            )
             for username, data in USERS.items()
         }
         for username, user in users.items():
