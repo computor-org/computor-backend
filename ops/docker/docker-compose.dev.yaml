@@ -125,10 +125,9 @@ services:
     # SIGKILLs the worker while it is still draining a live run.
     stop_grace_period: 330s
     security_opt:
+      # Student code runs inside sandbox.launch (Landlock, works under the
+      # default seccomp profile — no custom profile needed). See prod compose.
       - "no-new-privileges:true"
-      # See docker-compose.prod.yaml: Landlock + user/net namespace sandbox
-      # for student code; Docker default profile plus unshare/setns (#240/#241).
-      - "seccomp=./seccomp-testing-worker.json"
     logging:
       driver: json-file
       options:

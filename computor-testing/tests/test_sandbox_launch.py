@@ -40,13 +40,13 @@ def test_prefix_off_for_any_other_value(monkeypatch):
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Landlock is Linux-only")
 def test_probe_reports_landlock():
+    from sandbox import launch as _launch
     out = subprocess.check_output(
-        [sys.executable, "-m", "sandbox.launch", "--probe"], text=True
+        [sys.executable, os.path.abspath(_launch.__file__), "--probe"], text=True
     )
     import json
     report = json.loads(out)
     assert "landlock_abi" in report
-    assert "netns" in report
 
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Landlock is Linux-only")

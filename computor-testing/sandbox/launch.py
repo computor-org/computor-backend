@@ -1,41 +1,40 @@
-"""Unprivileged sandbox launcher for student code (#240, #241).
+"""Filesystem+network sandbox for student code, using Landlock (#240, #241).
 
-Exec-shim: ``python -m sandbox.launch --workdir DIR [--ro P]... [--rw P]...
-[--allow-net] [--required] -- CMD ARGS...`` applies kernel sandboxing to
-itself and then ``exec``s the real command, so the whole student process tree
-inherits the restrictions. Two independent layers:
+Landlock is a Linux kernel feature (5.13+): a process can voluntarily drop
+itself into an allow-list of file paths it may touch, and — from ABI 4 — a
+deny of outbound TCP. It needs no root, no CAP_SYS_ADMIN, and no namespaces,
+so it works inside the unprivileged, ``no-new-privileges`` testing worker under
+the *default* Docker seccomp profile. Think of it as a per-process firewall for
+the filesystem (plus TCP): once applied it cannot be widened, and it is
+inherited across ``exec`` and by children.
 
-- **Landlock** (kernel LSM, unprivileged, no mount namespaces needed):
-  filesystem allow-list — the runtime paths plus the explicit ``--ro``/``--rw``
-  paths are reachable, everything else (the reference/example cache under
-  ``/tmp/examples`` included) returns EACCES. From ABI 4 on, TCP bind/connect
-  is denied wholesale unless ``--allow-net`` is given. Landlock stacks with
-  the container's seccomp/AppArmor confinement and works under Docker's
-  default profiles.
+This module is an exec-shim: ``python launch.py --workdir DIR [--ro P]...
+[--rw P]... [--allow-net] [--required] -- CMD ARGS...`` applies Landlock to
+itself and then ``exec``s CMD, so the whole student process tree inherits the
+restriction. Run it by file PATH (as ctexec does), not ``-m sandbox.launch``:
+the child's HOME is redirected into the sandbox dir, so the package would not
+be importable — hence this file stays stdlib-only, no imports of its own.
 
-- **Network namespace** (``unshare(CLONE_NEWUSER | CLONE_NEWNET)``): the
-  student process gets a loopback-only network stack, cutting UDP/ICMP/raw
-  sockets too. This needs the testing worker's tailored seccomp profile
-  (``ops/docker/seccomp-testing-worker.json``); where the default Docker
-  profile still blocks ``unshare`` the launcher silently falls back to the
-  Landlock TCP restriction. Note the mount-namespace route (bwrap) is NOT
-  available in the workers: docker-default AppArmor carries ``deny mount``,
-  which would require host-installed AppArmor profiles to lift.
+What it guarantees, verified against the running worker:
 
-``--required`` makes a Landlock failure fatal (exit 125) instead of falling
-back to unsandboxed execution; the testing worker passes it, local lecturer
-runs on macOS or old kernels do not. ``COMPUTOR_SANDBOX_DISABLE=1`` in the
-launcher's own environment skips everything (debugging escape hatch).
+- The reference/example cache is bound nowhere, so reading it (the master
+  solution) returns ``EACCES`` (#240).
+- All outbound TCP is denied, so the databases, object store, API and any TCP
+  internet host are unreachable (#241). Raw UDP/ICMP egress is NOT covered by
+  Landlock; that residual (e.g. a DNS packet) is left to compose-level network
+  isolation — see the #237 note in ISSUES-2026.10-BACKLOG.md. Deliberately no
+  seccomp profile / network namespace here: that route needs unprivileged user
+  namespaces, which this host blocks, and buying it back with a vendored copy
+  of Docker's default seccomp profile was not worth the maintenance.
 
-``--probe`` prints a one-line JSON capability report and exits; the executors
-log it once per run so worker logs show which layers are active.
-
-Stdlib only — this module must stay importable with no dependencies.
+``--required`` makes a Landlock failure fatal (exit 125) instead of running
+unsandboxed; the testing worker passes it, local lecturer runs on macOS or old
+kernels do not. ``COMPUTOR_SANDBOX_DISABLE=1`` skips everything (debugging).
+``--probe`` prints a one-line JSON capability report and exits.
 """
 
 import argparse
 import ctypes
-import ctypes.util
 import json
 import os
 import struct
@@ -48,7 +47,7 @@ SYS_LANDLOCK_RESTRICT_SELF = 446
 
 LANDLOCK_CREATE_RULESET_VERSION = 1  # flag for the ABI probe
 
-# Rule types
+# Rule type
 LANDLOCK_RULE_PATH_BENEATH = 1
 
 # Filesystem access rights
@@ -56,18 +55,9 @@ FS_EXECUTE = 1 << 0
 FS_WRITE_FILE = 1 << 1
 FS_READ_FILE = 1 << 2
 FS_READ_DIR = 1 << 3
-FS_REMOVE_DIR = 1 << 4
-FS_REMOVE_FILE = 1 << 5
-FS_MAKE_CHAR = 1 << 6
-FS_MAKE_DIR = 1 << 7
-FS_MAKE_REG = 1 << 8
-FS_MAKE_SOCK = 1 << 9
-FS_MAKE_FIFO = 1 << 10
-FS_MAKE_BLOCK = 1 << 11
-FS_MAKE_SYM = 1 << 12
-FS_REFER = 1 << 13      # ABI >= 2
 FS_TRUNCATE = 1 << 14   # ABI >= 3
 FS_IOCTL_DEV = 1 << 15  # ABI >= 5
+FS_REFER = 1 << 13      # ABI >= 2
 
 # Network access rights (ABI >= 4)
 NET_BIND_TCP = 1 << 0
@@ -79,9 +69,6 @@ FILE_COMPATIBLE = FS_EXECUTE | FS_WRITE_FILE | FS_READ_FILE | FS_TRUNCATE | FS_I
 RO_RIGHTS = FS_EXECUTE | FS_READ_FILE | FS_READ_DIR
 
 PR_SET_NO_NEW_PRIVS = 38
-
-CLONE_NEWUSER = 0x10000000
-CLONE_NEWNET = 0x40000000
 
 # Runtime paths every sandboxed process may read/execute (existence-checked).
 # ~ is the worker home: language runtimes live there (test venv, R libraries).
@@ -162,7 +149,7 @@ def apply_landlock(ro_paths, rw_paths, allow_net: bool) -> None:
             _add_path_rule(ruleset_fd, path, RO_RIGHTS)
         for path in rw_paths:
             _add_path_rule(ruleset_fd, path, fs_mask)
-        # No net rules: with handled_access_net set, all TCP is denied.
+        # No net rules added: with handled_access_net set, all TCP is denied.
         _set_no_new_privs()
         if _libc.syscall(SYS_LANDLOCK_RESTRICT_SELF, ruleset_fd, 0) != 0:
             raise OSError(ctypes.get_errno(), "landlock_restrict_self failed")
@@ -170,56 +157,7 @@ def apply_landlock(ro_paths, rw_paths, allow_net: bool) -> None:
         os.close(ruleset_fd)
 
 
-def _bring_loopback_up() -> None:
-    import fcntl
-    import socket
-    SIOCGIFFLAGS = 0x8913
-    SIOCSIFFLAGS = 0x8914
-    IFF_UP = 0x1
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        ifreq = struct.pack("16sh14s", b"lo", 0, b"")
-        flags = struct.unpack("16sh14s",
-                              fcntl.ioctl(sock, SIOCGIFFLAGS, ifreq))[1]
-        fcntl.ioctl(sock, SIOCSIFFLAGS,
-                    struct.pack("16sh14s", b"lo", flags | IFF_UP, b""))
-
-
-def unshare_network() -> bool:
-    """Move into a fresh user+net namespace (loopback only). Best-effort:
-    returns False where the container's seccomp profile blocks unshare."""
-    uid, gid = os.getuid(), os.getgid()
-    if _libc.unshare(CLONE_NEWUSER | CLONE_NEWNET) != 0:
-        return False
-    try:
-        with open("/proc/self/setgroups", "w") as f:
-            f.write("deny")
-        with open("/proc/self/uid_map", "w") as f:
-            f.write(f"{uid} {uid} 1")
-        with open("/proc/self/gid_map", "w") as f:
-            f.write(f"{gid} {gid} 1")
-    except OSError:
-        # Namespace exists (network already cut); an unfinished id mapping
-        # only leaves the process as the overflow uid, which is harmless here.
-        pass
-    try:
-        _bring_loopback_up()
-    except OSError:
-        pass
-    return True
-
-
-def _runtime_ro_paths():
-    """Fixed read-only runtime paths, plus this interpreter's own prefixes.
-
-    The launcher runs as the framework interpreter and execs the student's;
-    for the Python testers they are the same binary, so a virtualenv's prefix
-    (which holds pyvenv.cfg and the base stdlib) must be reachable or the child
-    cannot even import ``site``.
-    """
-    return list(DEFAULT_RO) + [sys.prefix, sys.base_prefix]
-
-
-def _real_home():
+def _real_home() -> str:
     """The account's home from the passwd database, not $HOME.
 
     The child's HOME is redirected into the writable sandbox dir, so relying
@@ -233,6 +171,17 @@ def _real_home():
         return os.path.expanduser("~")
 
 
+def _runtime_ro_paths():
+    """Fixed read-only runtime paths, plus this interpreter's own prefixes.
+
+    The launcher runs as the framework interpreter and execs the student's;
+    for the Python testers they are the same binary, so a virtualenv's prefix
+    (which holds pyvenv.cfg and the base stdlib) must be reachable or the child
+    cannot even import ``site``.
+    """
+    return list(DEFAULT_RO) + [sys.prefix, sys.base_prefix]
+
+
 def _existing(paths):
     home = _real_home()
     seen = []
@@ -244,12 +193,8 @@ def _existing(paths):
 
 
 def probe() -> dict:
-    """Capability report. Must run in a throwaway process: unshare(2) cannot
-    be undone, so a successful netns probe poisons the caller."""
-    result = {"landlock_abi": _landlock_abi(), "netns": False}
-    if sys.platform == "linux":
-        result["netns"] = unshare_network()
-    return result
+    """Capability report: the Landlock ABI level, 0 if unavailable."""
+    return {"landlock_abi": _landlock_abi()}
 
 
 def main() -> int:
@@ -282,9 +227,6 @@ def main() -> int:
 
     if os.environ.get("COMPUTOR_SANDBOX_DISABLE") == "1":
         os.execvp(cmd[0], cmd)
-
-    if not args.allow_net:
-        unshare_network()
 
     ro_paths = _existing(_runtime_ro_paths() + args.ro)
     rw_paths = _existing(list(DEFAULT_RW) + args.rw

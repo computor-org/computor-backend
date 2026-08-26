@@ -91,22 +91,28 @@ contains no absolute path, and older results have been scrubbed.
 
 Landed on `fix/240-241-student-sandbox`, merged to `release/2026.10`.
 
-**Mechanism chosen: Landlock, not bubblewrap.** The plan assumed
-bwrap/`unshare` with mount namespaces, but a runtime probe
+**Mechanism chosen: Landlock, nothing else.** The plan assumed bwrap/`unshare`
+with mount namespaces, but a runtime probe
 (`docker exec computor-temporal-worker-testing-1 unshare -Urn true`) showed the
 host's `kernel.apparmor_restrict_unprivileged_userns=1` plus docker-default
 AppArmor (`deny mount`) block that route, and the worker's
 `no-new-privileges:true` rules out setuid helpers. Landlock (LSM, ABI 8 on the
-target host, unprivileged, no namespaces required) works under the *default*
-Docker seccomp profile and is the actual boundary. `computor-testing/sandbox/
-launch.py` restricts the student process to a fixed runtime allow-list plus the
-explicit binds; the reference/example cache is bound nowhere, so a read returns
-`EACCES`. Wired around the student interpreter/binary only (not the pytest
-harness) in `ctexec/interpreted.py` and `ctexec/compiled.py`, gated on
-`COMPUTOR_SANDBOX_ENABLE=1` (set on both testing-worker services). Verified live
-in the running worker: with the sandbox on, `os.listdir('/tmp/examples')` and
-opening `*_master.py` both raise `PermissionError`, while grading of clean
-Python/Octave/R/C submissions is bit-identical to sandbox-off.
+target host, unprivileged, no namespaces) works under the *default* Docker
+seccomp profile and is the whole boundary — no custom seccomp profile, no
+namespaces. `computor-testing/sandbox/launch.py` restricts the student process
+to a fixed runtime allow-list plus the explicit binds; the reference/example
+cache is bound nowhere, so a read returns `EACCES`. Wired around the student
+interpreter/binary only (not the pytest harness) in `ctexec/interpreted.py` and
+`ctexec/compiled.py`, gated on `COMPUTOR_SANDBOX_ENABLE=1` (set on both
+testing-worker services). Verified live in the running worker: with the sandbox
+on, `os.listdir('/tmp/examples')` and opening `*_master.py` both raise
+`PermissionError`, while grading of clean Python/Octave/R/C submissions is
+bit-identical to sandbox-off.
+
+An earlier iteration added a network namespace (via a vendored copy of Docker's
+default seccomp profile plus an `unshare` allowance) to also block UDP/ICMP.
+That was removed as not worth the maintenance — a ~830-line vendored profile to
+unlock one syscall — see #241.
 
 **Known gaps (follow-ups, not silently skipped):** the Python *graphics* test
 path runs student code in-process (`test_class.py:_execute_graphics_inprocess`)
@@ -146,21 +152,23 @@ tester as an ordinary subprocess of the worker — same UID (`worker`), same
 
 ## #241 — student subprocess has full network access — **DONE 2026-08-26**
 
-Landed on `fix/240-241-student-sandbox`, merged to `release/2026.10`. Two
-layers, both in `sandbox/launch.py`:
+Landed on `fix/240-241-student-sandbox`, simplified on
+`refactor/240-241-drop-seccomp-netns`, merged to `release/2026.10`.
 
-1. **Landlock network rule** (ABI 4+, works under the default profile): all TCP
-   bind/connect is denied — this alone refuses `redis:6379`, `postgres:5432`,
-   `minio:9000` and any public TCP (`1.1.1.1:443`) with `EACCES`. Verified live.
-2. **User+net namespace** (`unshare(CLONE_NEWUSER|CLONE_NEWNET)`, loopback
-   only): closes the remaining UDP/ICMP/raw hole (e.g. DNS to `8.8.8.8:53`),
-   which Landlock does not cover. This needs the tailored seccomp profile
-   `ops/docker/seccomp-testing-worker.json` (the Docker default plus
-   `unshare`/`setns` — never `seccomp=unconfined`), applied to both
-   testing-worker services. Where a host still blocks userns the launcher falls
-   back to Landlock-only automatically. Verified via a container started with
-   the profile: the full probe table (redis/postgres/minio/8.8.8.8/1.1.1.1) is
-   entirely refused.
+**Landlock TCP rule** (ABI 4+, works under the default seccomp profile): all TCP
+bind/connect is denied, so `redis:6379`, `postgres:5432`, `minio:9000` and any
+public TCP (`1.1.1.1:443`) are refused with `EACCES`. Verified live in the
+running worker. This is the whole network fix that ships.
+
+**UDP/ICMP egress is NOT closed by Landlock** and is deferred (see below). A
+first cut added a loopback-only network namespace to close it, but that needs
+unprivileged user namespaces — blocked on this host — bought back via a
+vendored ~830-line copy of Docker's default seccomp profile plus an `unshare`
+allowance. That was judged not worth the maintenance/drift and removed; the
+clean place to close UDP egress is compose-level network isolation, listed as a
+#237 follow-up. Net effect: a student can still emit a raw UDP/ICMP packet (e.g.
+a DNS query) but cannot reach any database, object store, API, or TCP host, and
+cannot read the reference.
 
 **Env-hygiene sub-finding — done, same branch.** `testing/backends.py` now runs
 the harness with the argv list (no `shell=True`) and a scrubbed `env=` that
@@ -278,14 +286,13 @@ done and merged to `release/2026.10`. #237 stays **OPEN** until an image rebuild
   sandboxing the harness itself.
 - **MATLAB worker:** runs student code through the MATLAB engine, a different
   path that `COMPUTOR_SANDBOX_ENABLE` does not touch. Not yet isolated.
-- **Compose network isolation:** the in-sandbox netns makes the egress cut, but
-  the workers still share `computor-network`; a dedicated `testing-network`
-  (defence in depth) is deferred.
-- **userns availability:** the UDP/ICMP half of #241 depends on the tailored
-  seccomp profile *and* the host permitting unprivileged userns. On a host that
-  refuses it even with the profile, the launcher silently falls back to
-  Landlock-only (TCP still blocked, UDP would leak). Confirm on the production
-  host after deploy.
+- **UDP/ICMP egress:** Landlock blocks all TCP but not UDP/ICMP, and the
+  network-namespace approach that would have was removed as too much machinery
+  (a vendored seccomp profile). The clean fix is compose-level network
+  isolation: put the testing workers on a dedicated network with no route to
+  `postgres`/`redis`/`minio` and no public egress, keeping only Temporal + API.
+  Deferred; until then a student can send a raw UDP/ICMP packet (but reach no
+  service — all TCP is blocked).
 
 ## #238 — artifact-based grading epic — **OPEN, design only this cycle**
 
