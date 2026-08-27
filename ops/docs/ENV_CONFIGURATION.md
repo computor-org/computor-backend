@@ -96,7 +96,29 @@ CODER_POSTGRES_PASSWORD=<set-in-.env>
 # coder-registry has no auth — it is protected by docker-network isolation
 # instead (it does not join computor-network, so workspaces can't reach it
 # over TCP). See docker-compose.coder.yaml for details.
+
+# Workspace networks. Leave unset for a normal deployment: the defaults are the
+# names the Terraform templates hardcode (ops/coder/templates/*/variables.tf),
+# and the templates are what actually attaches a workspace, so these two and the
+# template defaults must agree. Only a side-by-side preview stack sets them.
+# CODER_WORKSPACE_NETWORK=computor-coder-workspaces           # leave commented
+# CODER_WORKSPACE_NETWORK_OFFLINE=computor-coder-workspaces-offline
 ```
+
+### Container naming
+
+Services with an explicit `container_name` are written as
+`${CONTAINER_NAME_PREFIX:-computor-}<service>`. `CONTAINER_NAME_PREFIX` is unset
+for a normal deployment, which yields the production names (`computor-coder`,
+`computor-workspace-ingress`, …); previewctl sets it to run a second stack on the
+same host. The `computor-` belongs in the variable's *default*, never in the
+literal after it — `${CONTAINER_NAME_PREFIX:-}coder` drops the prefix off
+production entirely, which is how Coder broke in b9339eba.
+
+Several things resolve Coder by container name and will not find it if the names
+drift: `ops/lib/common.sh` (`CODER_DETECTED`) and the worker's
+`coder_registry_container` setting (`CODER_REGISTRY_CONTAINER`, default
+`computor-coder-registry`).
 
 ### Fail-Closed Variables
 
