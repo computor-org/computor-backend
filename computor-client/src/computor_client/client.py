@@ -119,7 +119,10 @@ class ComputorClient:
             auth_provider=self._auth_provider,
             timeout=timeout,
             max_retries=max_retries,
-            headers=headers,
+            # self._headers, not the raw argument: it carries the
+            # X-API-Token built above, without which every request is
+            # anonymous and the API answers 401.
+            headers=self._headers,
         )
 
         # Setup token refresh callback
