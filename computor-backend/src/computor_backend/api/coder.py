@@ -1165,12 +1165,23 @@ def _deployment_template_variables() -> dict:
 
     matlab_license_file: MATLAB site license (port@host or in-container
     path); empty falls back to in-browser MathWorks sign-in.
+
+    Preview deployments also set the two workspace-network names. They are
+    forwarded only when present; production keeps the template defaults.
     """
     import os
 
-    return {
+    variables = {
         "matlab_license_file": os.environ.get("MATLAB_MLM_LICENSE_FILE", ""),
     }
+    for variable, environment in (
+        ("docker_network", "CODER_WORKSPACE_NETWORK"),
+        ("docker_network_offline", "CODER_WORKSPACE_NETWORK_OFFLINE"),
+    ):
+        value = os.environ.get(environment, "").strip()
+        if value:
+            variables[variable] = value
+    return variables
 
 
 def _per_template_variables(db: Session) -> dict:

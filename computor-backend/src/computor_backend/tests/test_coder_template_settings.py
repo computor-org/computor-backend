@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from computor_backend.api.coder import (
+    _deployment_template_variables,
     _per_template_variables,
     update_template_settings,
 )
@@ -48,6 +49,24 @@ def _workspace(id_: str, template: str, transition="start",
 
 
 # --- push variable overrides -------------------------------------------------
+
+
+def test_preview_workspace_networks_are_forwarded_only_when_configured(monkeypatch):
+    monkeypatch.setenv("CODER_WORKSPACE_NETWORK", "computor-preview-x-coder-workspaces")
+    monkeypatch.setenv("CODER_WORKSPACE_NETWORK_OFFLINE", "computor-preview-x-coder-workspaces-offline")
+    monkeypatch.delenv("MATLAB_MLM_LICENSE_FILE", raising=False)
+    assert _deployment_template_variables() == {
+        "matlab_license_file": "",
+        "docker_network": "computor-preview-x-coder-workspaces",
+        "docker_network_offline": "computor-preview-x-coder-workspaces-offline",
+    }
+
+
+def test_production_workspace_network_defaults_are_not_overridden(monkeypatch):
+    monkeypatch.delenv("CODER_WORKSPACE_NETWORK", raising=False)
+    monkeypatch.delenv("CODER_WORKSPACE_NETWORK_OFFLINE", raising=False)
+    monkeypatch.delenv("MATLAB_MLM_LICENSE_FILE", raising=False)
+    assert _deployment_template_variables() == {"matlab_license_file": ""}
 
 
 def test_per_template_variables_stringifies_and_skips_unset_limits():
