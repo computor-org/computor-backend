@@ -136,6 +136,8 @@ export interface MessageGet {
   content: string;
   level: number;
   parent_id?: string | null;
+  /** author_id of the parent message, enriched server-side. Lets a client decide 'is this a reply to me?' from the broadcast alone. */
+  parent_author_id?: string | null;
   author_id: string;
   /** Author details (user info) */
   author?: MessageAuthor | null;
@@ -180,6 +182,8 @@ export interface MessageList {
   content: string;
   level: number;
   parent_id?: string | null;
+  /** author_id of the parent message, enriched server-side. Lets a client decide 'is this a reply to me?' from the broadcast alone. */
+  parent_author_id?: string | null;
   author_id: string;
   /** Author details (user info) */
   author?: MessageAuthor | null;
