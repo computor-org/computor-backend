@@ -49,6 +49,20 @@ services:
       KC_HTTP_PORT: 8080
       KC_HTTP_RELATIVE_PATH: /auth
       KC_HEALTH_ENABLED: "true"
+    # The API initializes its OIDC plugin during startup.  Waiting only for
+    # the Keycloak container process races the realm import and leaves a
+    # permanently uninitialized login provider, even though /docs is healthy.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9000;
+          printf "GET /auth/health/ready HTTP/1.0\r\nHost: localhost\r\n\r\n" >&3;
+          grep -q "200" <&3'
+      interval: 5s
+      timeout: 5s
+      start_period: 10s
+      retries: 30
     ports:
       - "${PREVIEW_BIND_ADDRESS:-127.0.0.1}:${KEYCLOAK_PORT:-8180}:8080"
     command: ["start-dev", "--import-realm"]
@@ -84,4 +98,4 @@ services:
   uvicorn:
     depends_on:
       keycloak:
-        condition: service_started
+        condition: service_healthy
