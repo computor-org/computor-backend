@@ -30,7 +30,7 @@ services:
         max-size: "10m"
         max-file: "5"
     ports:
-      - "127.0.0.1:${FORGEJO_DB_PORT:-5441}:5441"
+      - "${INFRA_BIND_ADDRESS:-127.0.0.1}:${FORGEJO_DB_PORT:-5441}:5441"
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/forgejo/postgres:/var/lib/postgresql/data
     environment:
@@ -60,7 +60,7 @@ services:
         max-size: "10m"
         max-file: "5"
     ports:
-      - "127.0.0.1:${FORGEJO_PORT:-3030}:3030"
+      - "${INFRA_BIND_ADDRESS:-127.0.0.1}:${FORGEJO_PORT:-3030}:3030"
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/forgejo/data:/data
     environment:

@@ -82,7 +82,7 @@ services:
       # Prod: set KEYCLOAK_HTTP_RELATIVE_PATH=/auth so Keycloak builds correct internal links.
       KC_HTTP_RELATIVE_PATH: "${KEYCLOAK_HTTP_RELATIVE_PATH:-/}"
     ports:
-      - "${KEYCLOAK_PORT:-8180}:8080"
+      - "${KEYCLOAK_BIND_ADDRESS:-127.0.0.1}:${KEYCLOAK_PORT:-8180}:8080"
     labels:
       # Dev: traefik.enable=false — access via direct port binding (KEYCLOAK_PORT).
       # Prod: set KEYCLOAK_TRAEFIK_ENABLED=true and KEYCLOAK_HTTP_RELATIVE_PATH=/auth in .env.

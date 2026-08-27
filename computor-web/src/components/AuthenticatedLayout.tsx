@@ -62,7 +62,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
     // CourseProvider wraps the chrome, not just the page: the top bar shows the
     // course name too, and it used to fetch the course a second time to get it.
     <CourseProvider>
-    <div className="h-screen overflow-hidden bg-canvas flex">
+    <div className="h-dvh overflow-hidden bg-canvas flex">
       {/* Sidebar (fixed; scrolls internally via its own nav) */}
       <Sidebar />
 
