@@ -214,8 +214,22 @@ export default function Home() {
       {/* Footer */}
       <footer className="fixed bottom-0 inset-x-0 z-40 border-t bg-surface">
         <div className="container mx-auto px-4 py-4">
-          <div className="text-center text-muted">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-center text-muted">
             <p>&copy; 2026 Computor. Educational Platform for Programming.</p>
+            {/* Funding notice required by the netidee Fördervereinbarung (prj 8012) */}
+            <a
+              href="https://www.netidee.at/computor"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2"
+              title="Dieses Projekt wurde mit den Mitteln der Förderaktion netidee finanziell unterstützt und ermöglicht."
+            >
+              <img src="/netidee_logo.svg" alt="netidee" className="h-5 w-auto" />
+              <span className="text-sm">
+                Mit den Mitteln der Förderaktion netidee finanziell unterstützt
+                und ermöglicht.
+              </span>
+            </a>
           </div>
         </div>
       </footer>
