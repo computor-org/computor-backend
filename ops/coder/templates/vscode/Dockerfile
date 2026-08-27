@@ -1,7 +1,7 @@
 # =========================
 # Stage 1: Build VSIX extension
 # =========================
-FROM node:20-bookworm AS vsix-builder
+FROM node:25-bookworm AS vsix-builder
 
 ARG EXTENSION_REPO_URL=https://github.com/computor-org/computor-vscode.git
 ARG EXTENSION_REPO_REF="release/2026.10"

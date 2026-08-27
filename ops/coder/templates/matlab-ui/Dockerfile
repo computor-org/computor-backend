@@ -19,7 +19,7 @@
 #
 # Keep this digest identical to matlab-vscode's: the two templates seed the
 # same shared per-user home volume and must be on the same MATLAB build.
-FROM mathworks/matlab:r2025b@sha256:7528b0873df0c6b640013cc37cceb848c60261aa2a7e44bd64387be7678b0ff0
+FROM mathworks/matlab:r2025b@sha256:7d19d7da58c81c5d03e808eee6c0daf2eb85ff27cf11d1c6eca0ac1e20440b53
 
 USER root
 
