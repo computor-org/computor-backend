@@ -94,6 +94,7 @@ def get_message_with_read_status(
 
     mentions: List[MessageMentionRef] = []
     context = None
+    parent_author_id = None
     if db_message:
         course_by_message = course_ids_for_messages([db_message], db)
         author_map, author_course_member_map = _get_author_info(
@@ -103,6 +104,7 @@ def get_message_with_read_status(
         author_course_member = author_course_member_map.get(str(message_id))
         mentions = _get_mentions_info([db_message], db).get(str(message_id), [])
         context = message_contexts_for([db_message], db, course_by_message).get(str(message_id))
+        parent_author_id = _get_parent_author_ids([db_message], db).get(str(message_id))
 
     return message.model_copy(update={
         "is_read": is_read,
@@ -113,7 +115,34 @@ def get_message_with_read_status(
         "author_course_member": author_course_member,
         "mentions": mentions,
         "context": context,
+        "parent_author_id": parent_author_id,
     })
+
+
+def _get_parent_author_ids(
+    db_messages: List[Message],
+    db: Session,
+) -> Dict[str, Optional[str]]:
+    """Map message_id -> author_id of its parent (None for roots).
+
+    Batched like the other enrichers: zero queries when the page has no
+    replies, otherwise one query over the distinct parent ids.
+    """
+    result: Dict[str, Optional[str]] = {str(msg.id): None for msg in db_messages}
+    parent_ids = {str(msg.parent_id) for msg in db_messages if msg.parent_id}
+    if not parent_ids:
+        return result
+
+    rows = (
+        db.query(Message.id, Message.author_id)
+        .filter(Message.id.in_(parent_ids))
+        .all()
+    )
+    author_by_parent = {str(row[0]): str(row[1]) for row in rows}
+    for msg in db_messages:
+        if msg.parent_id:
+            result[str(msg.id)] = author_by_parent.get(str(msg.parent_id))
+    return result
 
 
 def _get_author_info(
@@ -261,6 +290,7 @@ def list_messages_with_read_status(
     author_map, author_course_member_map = _get_author_info(db_messages, db, course_by_message)
     mentions_map = _get_mentions_info(db_messages, db)
     context_map = message_contexts_for(db_messages, db, course_by_message)
+    parent_author_map = _get_parent_author_ids(db_messages, db)
 
     return [
         item.model_copy(update={
@@ -272,6 +302,7 @@ def list_messages_with_read_status(
             "author_course_member": author_course_member_map.get(item.id),
             "mentions": mentions_map.get(item.id, []),
             "context": context_map.get(item.id),
+            "parent_author_id": parent_author_map.get(item.id),
         })
         for item in items
     ]

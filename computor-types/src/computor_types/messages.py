@@ -256,6 +256,11 @@ class MessageGet(BaseEntityGet):
     content: str
     level: int
     parent_id: Optional[str] = None
+    parent_author_id: Optional[str] = Field(
+        None,
+        description="author_id of the parent message, enriched server-side. "
+                    "Lets a client decide 'is this a reply to me?' from the broadcast alone.",
+    )
     author_id: str
     author: Optional[MessageAuthor] = Field(None, description="Author details (user info)")
     author_course_member: Optional[MessageAuthorCourseMember] = Field(
@@ -307,6 +312,11 @@ class MessageList(BaseEntityList):
     content: str
     level: int
     parent_id: Optional[str] = None
+    parent_author_id: Optional[str] = Field(
+        None,
+        description="author_id of the parent message, enriched server-side. "
+                    "Lets a client decide 'is this a reply to me?' from the broadcast alone.",
+    )
     author_id: str
     author: Optional[MessageAuthor] = Field(None, description="Author details (user info)")
     author_course_member: Optional[MessageAuthorCourseMember] = Field(
