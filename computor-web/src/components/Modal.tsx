@@ -96,7 +96,7 @@ export default function Modal({
   if (!mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/50" onClick={onClose} aria-hidden="true" />
       <div
         ref={panelRef}
@@ -104,12 +104,12 @@ export default function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`relative bg-surface rounded-lg shadow-xl w-full mx-4 ${maxWidth}`}
+        className={`relative bg-surface rounded-lg shadow-xl w-full max-h-full flex flex-col ${maxWidth}`}
       >
-        <h2 id={titleId} className={`${titleClassName} px-6 pt-6`}>
+        <h2 id={titleId} className={`${titleClassName} px-6 pt-6 shrink-0`}>
           {title}
         </h2>
-        {children}
+        <div className="min-h-0 overflow-y-auto scroll-slim rounded-b-lg">{children}</div>
       </div>
     </div>,
     document.body,
