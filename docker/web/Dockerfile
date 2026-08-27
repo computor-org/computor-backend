@@ -29,6 +29,8 @@ COPY computor-web/ .
 # These can be overridden at build time with --build-arg
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_BASE_PATH=
+ENV NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH
 # Build provenance (set by computor.sh) — shown in the sidebar footer.
 ARG GIT_COMMIT=
 ENV NEXT_PUBLIC_GIT_COMMIT=$GIT_COMMIT

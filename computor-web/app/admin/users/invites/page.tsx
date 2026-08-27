@@ -18,6 +18,7 @@ import { usePermissions } from '@/src/hooks/usePermissions';
 import { InviteLinkClient } from '@/src/generated/clients/InviteLinkClient';
 import type { InviteLinkList, InviteLinkCreate } from 'types/generated';
 import { Table, Thead, Tbody, Th } from '@/src/components/ui/Table';
+import { appPath } from '@/src/utils/appPath';
 
 const invitesClient = new InviteLinkClient();
 
@@ -76,7 +77,7 @@ export default function InvitesPage() {
     return <Forbidden message="Requires admin or _user_manager role." backLink="/dashboard" backText="Back to Dashboard" />;
   }
 
-  const inviteUrl = (token: string) => `${BASE_URL}/invite/${token}`;
+  const inviteUrl = (token: string) => `${BASE_URL}${appPath(`/invite/${token}`)}`;
 
   const handleCopy = (id: string, token: string) => {
     navigator.clipboard.writeText(inviteUrl(token)).then(() => {

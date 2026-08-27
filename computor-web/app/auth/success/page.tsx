@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ssoAuthService } from '@/src/services/authInstances';
+import { appPath, withoutAppBasePath } from '@/src/utils/appPath';
 
 export default function AuthSuccessPage() {
   const [error, setError] = useState<string | null>(null);
@@ -22,28 +23,28 @@ export default function AuthSuccessPage() {
         return;
       }
       try {
-        // Backend has already set ct_access_token / ct_refresh_token cookies on
-        // the redirect response. Fetch /user (with credentials) to populate the
+        // Backend has already set the configured HttpOnly auth cookies on the
+        // redirect response. Fetch /user (with credentials) to populate the
         // user record, then full-reload so AuthContext re-initializes.
         const result = await ssoAuthService.handleSSOCallback();
         if (!result.success) {
           throw new Error(result.error || 'Sign-in failed');
         }
-        let redirect = sessionStorage.getItem('auth_redirect') || '/dashboard';
+        let redirect = sessionStorage.getItem('auth_redirect') || appPath('/dashboard');
         sessionStorage.removeItem('auth_redirect');
         // Only accept same-origin absolute paths: anything not starting with a
         // single "/" (e.g. a protocol-relative "//host" planted in storage)
         // would send the user off-site.
         if (!redirect.startsWith('/') || redirect.startsWith('//')) {
-          redirect = '/dashboard';
+          redirect = appPath('/dashboard');
         }
         // Don't bounce back to single-use or pre-auth pages: an invite link is
         // consumed during this very sign-in (re-loading it 400s with "already
         // used"), and login/register/auth pages are meaningless once logged in.
         // Land on the dashboard instead. Genuine deep links (e.g. /courses/123)
         // are preserved.
-        if (/^\/(invite|login|register|auth)(\/|$)/.test(redirect)) {
-          redirect = '/dashboard';
+        if (/^\/(invite|login|register|auth)(\/|$)/.test(withoutAppBasePath(redirect))) {
+          redirect = appPath('/dashboard');
         }
         window.location.replace(redirect);
       } catch (err) {
@@ -71,7 +72,7 @@ export default function AuthSuccessPage() {
             >
               {error}
             </p>
-            <a href="/login" className="px-4 py-2 bg-inverse text-on-accent rounded hover:bg-inverse-hover inline-block">
+            <a href={appPath('/login')} className="px-4 py-2 bg-inverse text-on-accent rounded hover:bg-inverse-hover inline-block">
               {refused ? 'Try again' : 'Back to login'}
             </a>
           </>

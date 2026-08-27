@@ -26,6 +26,7 @@ from computor_backend.model.service import ApiToken
 from computor_backend.exceptions import NotFoundException, UnauthorizedException, ForbiddenException
 from computor_backend.redis_cache import get_redis_client
 from computor_backend.utils.api_token import hash_api_token, validate_token_format
+from computor_backend.utils.auth_cookies import ACCESS_COOKIE_NAME
 import logging
 
 # Import refactored permission components
@@ -428,7 +429,7 @@ def parse_authorization_header(request: Request) -> Optional[SSOAuthCredentials 
 
     # If no Authorization header, check for access_token cookie
     if not authorization:
-        access_token = request.cookies.get("ct_access_token")
+        access_token = request.cookies.get(ACCESS_COOKIE_NAME)
         if access_token:
             logger.debug("Using access_token from cookie")
             return SSOAuthCredentials(token=access_token, scheme="Bearer")

@@ -7,6 +7,7 @@ import remarkGfm from 'remark-gfm';
 import { useAuth } from '@/src/contexts/AuthContext';
 import Button from '@/src/components/ui/Button';
 import { API_BASE_URL, CONSENT_REDIRECT_KEY, apiGet, apiPost } from '@/src/utils/apiClient';
+import { appPath } from '@/src/utils/appPath';
 import type {
   ConsentStatusGet as ConsentStatus,
   PolicyTextGet as PolicyText,
@@ -156,7 +157,7 @@ export default function ConsentPage() {
               You accepted this privacy notice
               {status.granted_at ? ` on ${new Date(status.granted_at).toLocaleString()}` : ''}. You
               can withdraw your consent at any time in{' '}
-              <a href="/settings" className="underline font-medium">Settings</a>.
+              <a href={appPath('/settings')} className="underline font-medium">Settings</a>.
             </p>
           </div>
         )}

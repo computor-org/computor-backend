@@ -7,9 +7,9 @@ admin bypass, consent gate) resolve it here from the caches the auth system
 maintains, without running full authentication.
 
 Credential precedence mirrors permissions/auth.py:parse_authorization_header
-exactly (X-API-Token, then Authorization, then the ct_access_token cookie only
-when no Authorization header is present), so the identity a middleware acts on
-is the same one the route will authenticate.
+exactly (X-API-Token, then Authorization, then the configured access-token
+cookie only when no Authorization header is present), so the identity a
+middleware acts on is the same one the route will authenticate.
 
 Resolution sources per credential type:
 - SSO tokens: principal cache; fallback to the sso_session store.
@@ -29,6 +29,8 @@ from typing import Optional
 
 from starlette.concurrency import run_in_threadpool
 from starlette.types import Scope
+
+from computor_backend.utils.auth_cookies import ACCESS_COOKIE_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +65,7 @@ async def resolve_principal_from_scope(scope: Scope) -> Optional[dict]:
 
         cookie_header = _decode(headers.get(b"cookie"))
         if cookie_header:
-            token = _extract_cookie(cookie_header, "ct_access_token")
+            token = _extract_cookie(cookie_header, ACCESS_COOKIE_NAME)
             if token:
                 return await _resolve_sso_token(token)
     except Exception:

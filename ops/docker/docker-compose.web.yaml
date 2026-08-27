@@ -10,6 +10,7 @@ services:
       dockerfile: ./docker/web/Dockerfile
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        - NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH:-}
         - GIT_COMMIT=${GIT_COMMIT:-}
     networks:
       - computor-network

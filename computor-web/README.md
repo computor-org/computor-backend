@@ -14,6 +14,7 @@ The app talks to the Computor FastAPI backend. Configuration:
 | Env var | Default | Purpose |
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Backend API base URL. Baked in at build time (`NEXT_PUBLIC_*`), so set it when building the Docker image for production. |
+| `NEXT_PUBLIC_BASE_PATH` | unset | Optional Next.js path prefix (for example `/preview/<id>`); generated for HTTPS-routed previews and empty in production. |
 | `NEXT_PUBLIC_ANALYTICS_DEMO` | unset | `1` renders the lecturer analytics against synthetic data with no backend/auth — local UI development only, never set in production. |
 
 The production image is built from `docker/web/Dockerfile` at the monorepo root (yarn,

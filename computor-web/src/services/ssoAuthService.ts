@@ -2,6 +2,7 @@ import { AuthResponse, AuthUser } from '@/src/types/auth';
 import { ISSOAuthProvider } from '@/src/interfaces/IAuthProvider';
 import { UserGet } from '@/src/generated/types/users';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { appPath, withoutAppBasePath } from '@/src/utils/appPath';
 import {
   clearStoredSession,
   determineRole,
@@ -66,7 +67,7 @@ export class SSOAuthService implements ISSOAuthProvider {
     sessionStorage.setItem('auth_redirect', window.location.pathname);
 
     // Build the frontend callback URL
-    const frontendCallbackUrl = `${window.location.origin}/auth/success`;
+    const frontendCallbackUrl = `${window.location.origin}${appPath('/auth/success')}`;
 
     // Redirect to SSO login with redirect_uri parameter
     const params = new URLSearchParams({
@@ -212,7 +213,7 @@ export class SSOAuthService implements ISSOAuthProvider {
     // Clear local user data first — browser will navigate away after.
     this.clearSession();
 
-    const postLogoutRedirect = `${window.location.origin}/`;
+    const postLogoutRedirect = `${window.location.origin}${appPath('/')}`;
     const params = new URLSearchParams({ post_logout_redirect_uri: postLogoutRedirect });
     window.location.href = `${API_BASE_URL}/auth/keycloak/logout?${params.toString()}`;
   }
@@ -299,7 +300,7 @@ export class SSOAuthService implements ISSOAuthProvider {
       return false;
     }
 
-    const path = window.location.pathname;
+    const path = withoutAppBasePath(window.location.pathname);
     return path === '/auth/success' || path === '/auth/callback';
   }
 

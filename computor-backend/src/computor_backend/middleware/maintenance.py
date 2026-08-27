@@ -17,6 +17,8 @@ from typing import Optional, Tuple
 from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.responses import JSONResponse
 
+from computor_backend.utils.auth_cookies import ACCESS_COOKIE_NAME
+
 logger = logging.getLogger(__name__)
 
 REDIS_KEY_STATE = "maintenance:state"
@@ -182,13 +184,13 @@ class MaintenanceMiddleware:
             if await self._check_principal_cache("api_token_permissions", api_token):
                 return True
 
-        # Try cookie ct_access_token
+        # Try the configured access-token cookie.
         cookie_header = headers.get(b"cookie", b"")
         if isinstance(cookie_header, bytes):
             cookie_header = cookie_header.decode("utf-8", errors="ignore")
 
         if cookie_header:
-            token = self._extract_cookie(cookie_header, "ct_access_token")
+            token = self._extract_cookie(cookie_header, ACCESS_COOKIE_NAME)
             if token and await self._check_principal_cache("sso_permissions", token):
                 return True
 

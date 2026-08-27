@@ -8,6 +8,7 @@
  */
 
 import { refreshSession } from './tokenRefresh';
+import { appPath, withoutAppBasePath } from './appPath';
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -20,14 +21,14 @@ export const CONSENT_REDIRECT_KEY = 'consent_redirect';
  * AuthenticatedLayout bootstrap check.
  */
 export function redirectToConsent(): void {
-  if (typeof window === 'undefined' || window.location.pathname.startsWith('/consent')) {
+  if (typeof window === 'undefined' || withoutAppBasePath(window.location.pathname).startsWith('/consent')) {
     return;
   }
   sessionStorage.setItem(
     CONSENT_REDIRECT_KEY,
     window.location.pathname + window.location.search
   );
-  window.location.href = '/consent';
+  window.location.href = appPath('/consent');
 }
 
 /**
@@ -118,4 +119,3 @@ export function apiPost(url: string, body?: unknown, options: RequestInit = {}):
     body: isRaw ? (body as BodyInit | undefined) : JSON.stringify(body),
   });
 }
-

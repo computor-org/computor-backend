@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import Response
 
+from computor_backend.api import auth
 from computor_backend.api.auth import refresh_token
 from computor_backend.exceptions import UnauthorizedException
 from computor_backend.permissions.principal import Principal
@@ -65,6 +66,21 @@ async def test_refresh_prefers_body_token_when_present():
         await refresh_token(body, request, response, Principal(user_id="u1"), MagicMock())
 
     assert mock_refresh.await_args.kwargs["refresh_token"] == "body-refresh-token"
+
+
+@pytest.mark.asyncio
+async def test_refresh_scopes_cookies_to_preview_path_when_configured():
+    body = TokenRefreshRequest(provider="keycloak")
+    request = _Req({"ct_refresh_token": "cookie-refresh-token"})
+    response = Response()
+
+    with patch.object(auth, "_COOKIE_PATH", "/preview/release-2026-10-123"), \
+         patch("computor_backend.business_logic.auth.refresh_sso_token",
+               new=AsyncMock(return_value=REFRESH_RESULT)):
+        await refresh_token(body, request, response, Principal(user_id="u1"), MagicMock())
+
+    cookies = _set_cookies(response)
+    assert all("Path=/preview/release-2026-10-123" in cookie for cookie in cookies)
 
 
 @pytest.mark.asyncio

@@ -1,9 +1,16 @@
 import type { NextConfig } from "next";
 
+// Next.js applies basePath to Link/router URLs and emitted asset URLs at build
+// time. Production leaves it empty; path-routed previews set it to
+// /preview/<id> so a preview can share code.tugraz.at without leaking requests
+// to the production root.
+const basePath = (process.env.NEXT_PUBLIC_BASE_PATH || '').trim().replace(/\/+$/, '') || undefined;
+
 const nextConfig: NextConfig = {
   // Enable standalone output for Docker
   // This creates a minimal production build in .next/standalone
   output: 'standalone',
+  basePath,
 
   // Optionally disable source maps in production for smaller bundle
   // productionBrowserSourceMaps: false,

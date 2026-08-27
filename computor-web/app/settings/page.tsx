@@ -16,6 +16,7 @@ import { inputCls } from '@/src/components/ui/tokens';
 import type { ApiTokenGet, ApiTokenCreateResponse, AccountList } from 'types/generated';
 import type { ConsentStatusGet } from '@/src/generated/types/common';
 import { ConsentClient } from '@/src/generated/clients/ConsentClient';
+import { appPath } from '@/src/utils/appPath';
 
 const tokensClient = new TokensClient();
 const accountsClient = new AccountsClient();
@@ -356,7 +357,7 @@ export default function SettingsPage() {
 
                   <div className="flex flex-wrap items-center gap-3">
                     <a
-                      href="/consent?review=1"
+                      href={`${appPath('/consent')}?review=1`}
                       className="px-4 py-2 rounded-lg border border-rule-strong text-body hover:bg-canvas text-sm font-medium"
                     >
                       View privacy notice

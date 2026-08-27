@@ -11,7 +11,7 @@ import logging
 import os
 import secrets
 from typing import List, Optional
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import RedirectResponse, JSONResponse
@@ -33,6 +33,7 @@ from computor_backend.plugins import PluginMetadata
 from computor_backend.plugins.registry import get_plugin_registry
 from computor_backend.redis_cache import get_redis_client
 from computor_backend.settings import settings
+from computor_backend.utils.auth_cookies import ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME
 from computor_types.auth import (
     LogoutResponse,
     LocalTokenRefreshRequest,
@@ -49,6 +50,26 @@ logger = logging.getLogger(__name__)
 # but NOT in dev where the app is plain http://localhost — a Secure cookie set
 # over http is silently dropped by the browser, breaking local login.
 _COOKIE_SECURE = settings.DEBUG_MODE == "production"
+# Path-routed previews scope authentication cookies to their own prefix so a
+# preview cannot overwrite the production session (or another preview's
+# session) on the shared code.tugraz.at host. Production keeps the historical
+# root scope by default.
+_COOKIE_PATH = os.environ.get("AUTH_COOKIE_PATH", "/").strip() or "/"
+if not _COOKIE_PATH.startswith("/") or any(char in _COOKIE_PATH for char in "?#\\\"'"):
+    _COOKIE_PATH = "/"
+
+
+def _frontend_home() -> str:
+    """Return the browser app home for direct and path-routed deployments."""
+
+    api_base = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
+    parsed = urlsplit(api_base)
+    if not parsed.scheme or not parsed.netloc:
+        return "/"
+    prefix = parsed.path.rstrip("/")
+    if prefix.endswith("/api"):
+        prefix = prefix[:-4].rstrip("/")
+    return urlunsplit((parsed.scheme, parsed.netloc, f"{prefix}/" if prefix else "/", "", ""))
 
 auth_router = APIRouter(prefix="/auth")
 
@@ -175,11 +196,7 @@ async def handle_callback(
             # the user to the app home instead of a raw 4xx: they land logged in,
             # or the app bounces them to a fresh login. Avoids the scary error page.
             logger.warning("SSO callback with missing/expired state — redirecting to app home")
-            from urllib.parse import urlparse
-            _api_base = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
-            _parsed = urlparse(_api_base) if _api_base else None
-            home = f"{_parsed.scheme}://{_parsed.netloc}/" if _parsed and _parsed.scheme and _parsed.netloc else "/"
-            return RedirectResponse(url=home, status_code=302)
+            return RedirectResponse(url=_frontend_home(), status_code=302)
 
         state_data = json.loads(state_data_raw)
 
@@ -208,7 +225,7 @@ async def handle_callback(
         )
 
         # Get redirect URI from state or use default
-        redirect_uri = state_data.get("redirect_uri", "/")
+        redirect_uri = state_data.get("redirect_uri") or _frontend_home()
 
         # Redirect with encoded response
         params = {
@@ -228,19 +245,21 @@ async def handle_callback(
         # can authenticate to /user with credentials: 'include' after redirect.
         redirect_response = RedirectResponse(url=redirect_url, status_code=302)
         redirect_response.set_cookie(
-            key="ct_access_token",
+            key=ACCESS_COOKIE_NAME,
             value=result["token"],
             httponly=True,
             secure=_COOKIE_SECURE,
             samesite="lax",
+            path=_COOKIE_PATH,
             max_age=3600,
         )
         redirect_response.set_cookie(
-            key="ct_refresh_token",
+            key=REFRESH_COOKIE_NAME,
             value=result["refresh_token"],
             httponly=True,
             secure=_COOKIE_SECURE,
             samesite="lax",
+            path=_COOKIE_PATH,
             max_age=604800,
         )
         return redirect_response
@@ -253,7 +272,7 @@ async def handle_callback(
         # straight to Keycloak again and would loop the refusal forever).
         detail = getattr(e, "detail", None) or str(e)
         logger.info(f"Refused sign-in via {provider}: {detail}")
-        target = state_data.get("redirect_uri") or "/"
+        target = state_data.get("redirect_uri") or _frontend_home()
         params = {"error": "sign_in_refused", "error_description": detail}
         sep = "&" if "?" in target else "?"
         return RedirectResponse(url=f"{target}{sep}{urlencode(params)}", status_code=302)
@@ -263,7 +282,7 @@ async def handle_callback(
 
         # Redirect to error page
         error_params = {"error": str(e), "provider": provider}
-        error_url = f"/?{urlencode(error_params)}"
+        error_url = f"{_frontend_home()}?{urlencode(error_params)}"
         return RedirectResponse(url=error_url, status_code=302)
 
 @auth_router.get("/success", name="sso_success")
@@ -293,8 +312,8 @@ async def sso_logout(
     import os
     from computor_backend.utils.token_hash import hash_token
 
-    current_token = request.cookies.get("ct_access_token")
-    refresh_token = request.cookies.get("ct_refresh_token")
+    current_token = request.cookies.get(ACCESS_COOKIE_NAME)
+    refresh_token = request.cookies.get(REFRESH_COOKIE_NAME)
 
     # Read the stored id_token (for id_token_hint) before deleting the session,
     # then best-effort cleanup of Redis sessions — don't fail logout if Redis is unhappy.
@@ -320,7 +339,7 @@ async def sso_logout(
     if plugin is not None and getattr(plugin, "_oidc_config", None):
         end_session_endpoint = plugin._oidc_config.get("end_session_endpoint")
 
-    target = post_logout_redirect_uri or "/"
+    target = post_logout_redirect_uri or _frontend_home()
     if end_session_endpoint:
         params = {"client_id": os.environ.get("KEYCLOAK_CLIENT_ID", "computor-backend")}
         if post_logout_redirect_uri:
@@ -331,8 +350,8 @@ async def sso_logout(
         target = f"{end_session_endpoint}?{urlencode(params)}"
 
     redirect_response = RedirectResponse(url=target, status_code=302)
-    redirect_response.delete_cookie(key="ct_access_token", samesite="lax", secure=_COOKIE_SECURE)
-    redirect_response.delete_cookie(key="ct_refresh_token", samesite="lax", secure=_COOKIE_SECURE)
+    redirect_response.delete_cookie(key=ACCESS_COOKIE_NAME, path=_COOKIE_PATH, samesite="lax", secure=_COOKIE_SECURE)
+    redirect_response.delete_cookie(key=REFRESH_COOKIE_NAME, path=_COOKIE_PATH, samesite="lax", secure=_COOKIE_SECURE)
     return redirect_response
 
 @auth_router.post("/logout", response_model=LogoutResponse)
@@ -363,7 +382,7 @@ async def logout(
         current_token = authorization.replace("Bearer ", "")
     else:
         # Try to get from cookie
-        current_token = request.cookies.get("ct_access_token")
+        current_token = request.cookies.get(ACCESS_COOKIE_NAME)
 
     result = await logout_session(
         access_token=current_token,
@@ -373,8 +392,8 @@ async def logout(
     )
 
     # Clear cookies
-    response.delete_cookie(key="ct_access_token", samesite="lax", secure=_COOKIE_SECURE)
-    response.delete_cookie(key="ct_refresh_token", samesite="lax", secure=_COOKIE_SECURE)
+    response.delete_cookie(key=ACCESS_COOKIE_NAME, path=_COOKIE_PATH, samesite="lax", secure=_COOKIE_SECURE)
+    response.delete_cookie(key=REFRESH_COOKIE_NAME, path=_COOKIE_PATH, samesite="lax", secure=_COOKIE_SECURE)
 
     return result
 
@@ -501,9 +520,9 @@ async def refresh_token(
     Refresh SSO access token using refresh token.
 
     Cookie-based clients (the web UI) omit ``refresh_token`` from the body and
-    send the HttpOnly ``ct_refresh_token`` cookie instead — JS cannot read that
+    send the configured HttpOnly refresh-token cookie instead — JS cannot read that
     cookie, so we read it server-side. On success we re-set both HttpOnly cookies
-    so the browser session is renewed (otherwise the original ``ct_access_token``
+    so the browser session is renewed (otherwise the original access-token cookie
     max_age expires ~1h after login regardless of activity and the user is logged
     out, and the rotated refresh token never reaches the client).
 
@@ -511,7 +530,7 @@ async def refresh_token(
     """
     from computor_backend.business_logic.auth import refresh_sso_token
 
-    refresh_token_value = body.refresh_token or request.cookies.get("ct_refresh_token")
+    refresh_token_value = body.refresh_token or request.cookies.get(REFRESH_COOKIE_NAME)
     if not refresh_token_value:
         raise UnauthorizedException(detail="No refresh token provided")
 
@@ -524,20 +543,22 @@ async def refresh_token(
 
     # Renew the HttpOnly cookies so cookie-based clients stay logged in.
     response.set_cookie(
-        key="ct_access_token",
+        key=ACCESS_COOKIE_NAME,
         value=result["access_token"],
         httponly=True,
         secure=_COOKIE_SECURE,
         samesite="lax",
+        path=_COOKIE_PATH,
         max_age=3600,
     )
     if result.get("refresh_token"):
         response.set_cookie(
-            key="ct_refresh_token",
+            key=REFRESH_COOKIE_NAME,
             value=result["refresh_token"],
             httponly=True,
             secure=_COOKIE_SECURE,
             samesite="lax",
+            path=_COOKIE_PATH,
             max_age=604800,
         )
 
@@ -666,7 +687,7 @@ async def verify_documents_access(
     scope-checked in ``check_documents_write_permission``.
 
     Authentication is the platform-wide chain (``X-API-Token``, Bearer, or the
-    ``ct_access_token`` cookie), so a browser already logged into the web UI on
+    configured access-token cookie), so a browser already logged into the web UI on
     the same host passes without a prompt.
 
     Returns:
