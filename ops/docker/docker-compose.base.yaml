@@ -9,6 +9,15 @@
 # `-f` file assembled by computor.sh, so declaring it here covers the whole stack.
 name: computor
 
+# Services that pin an explicit container_name spell it
+# `${CONTAINER_NAME_PREFIX:-computor-}<service>`. The `computor-` belongs in the
+# DEFAULT, never in the literal after it: previewctl sets the variable to its own
+# prefix to run a second stack beside production, and unset must reproduce the
+# production names byte for byte. Writing `${CONTAINER_NAME_PREFIX:-}computor-x`
+# looks equivalent but yields `preview-computor-x` under previewctl; writing
+# `${CONTAINER_NAME_PREFIX:-}x` silently drops the prefix off production, which
+# is what broke Coder in b9339eba.
+
 networks:
   computor-network:
     name: ${COMPOSE_NETWORK_NAME:-computor-network}
@@ -110,7 +119,7 @@ services:
         max-file: "5"
     networks:
       - computor-network
-    container_name: ${CONTAINER_NAME_PREFIX:-}computor-temporal-postgres
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}temporal-postgres
     restart: unless-stopped
     ports:
       - "127.0.0.1:${TEMPORAL_POSTGRES_PORT:-5433}:5433"
@@ -140,7 +149,7 @@ services:
         max-file: "5"
     networks:
       - computor-network
-    container_name: ${CONTAINER_NAME_PREFIX:-}computor-temporal
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}temporal
     restart: unless-stopped
     ports:
       - "127.0.0.1:${TEMPORAL_EXTERNAL_PORT:-7233}:7233"
@@ -176,7 +185,7 @@ services:
         max-file: "5"
     networks:
       - computor-network
-    container_name: ${CONTAINER_NAME_PREFIX:-}computor-minio
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}minio
     restart: unless-stopped
     ports:
       - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"

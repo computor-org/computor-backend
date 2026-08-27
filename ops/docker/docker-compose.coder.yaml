@@ -11,7 +11,7 @@ services:
   # needs the raw socket.
   coder-socket-proxy:
     image: tecnativa/docker-socket-proxy:0.3.0
-    container_name: ${CONTAINER_NAME_PREFIX:-}coder-socket-proxy
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-socket-proxy
     networks:
       - computor-network
     restart: unless-stopped
@@ -46,7 +46,7 @@ services:
   # a workspace.
   workspace-ingress:
     image: traefik:v3.6.6
-    container_name: ${CONTAINER_NAME_PREFIX:-}workspace-ingress
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}workspace-ingress
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
@@ -64,7 +64,7 @@ services:
       # stripprefix) are picked up unchanged — the routing model did not move,
       # only which proxy performs it.
       - '--providers.docker.constraints=Label(`computor.ingress`,`workspace`)'
-      - "--providers.docker.network=${CODER_WORKSPACE_NETWORK:-${COMPOSE_NETWORK_NAME:-computor-network}-workspaces}"
+      - "--providers.docker.network=${CODER_WORKSPACE_NETWORK:-computor-coder-workspaces}"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.web.forwardedHeaders.trustedIPs=127.0.0.1/32,172.16.0.0/12,192.168.0.0/16"
       - "--providers.file.directory=/etc/traefik/dynamic"
@@ -98,7 +98,7 @@ services:
     image: postgres:16
     networks:
       - computor-network
-    container_name: ${CONTAINER_NAME_PREFIX:-}coder-postgres
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-postgres
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
@@ -136,7 +136,7 @@ services:
       - computor-network
       - computor-coder-workspaces
       - computor-coder-workspaces-offline
-    container_name: ${CONTAINER_NAME_PREFIX:-}coder
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
@@ -188,7 +188,7 @@ services:
   # at workspace creation), since both go through the docker socket.
   coder-registry:
     image: registry:2
-    container_name: ${CONTAINER_NAME_PREFIX:-}coder-registry
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-registry
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
@@ -280,8 +280,20 @@ networks:
   # (ingress) and the Coder server (agent connections) are also attached here.
   # computor-network itself is defined in docker-compose.base.yaml and merged in
   # at deploy time.
+  #
+  # The default is the literal name, NOT one derived from COMPOSE_NETWORK_NAME:
+  # the workspace templates hardcode it as the default of their `docker_network`
+  # variable (ops/coder/templates/*/variables.tf), and that variable is infra
+  # wiring the push pipeline deliberately does not override (_INFRA_VARIABLES in
+  # api/coder.py). Deriving it renamed the network out from under the templates,
+  # so workspaces attached to a bridge that neither Coder nor the ingress was on.
+  # A preview that runs the Coder addon MUST therefore set
+  # CODER_WORKSPACE_NETWORK and CODER_WORKSPACE_NETWORK_OFFLINE explicitly,
+  # alongside the COMPOSE_NETWORK_NAME and CONTAINER_NAME_PREFIX it already
+  # sets. Leaving them unset does not fail loudly — it silently lands the
+  # preview's workspaces on production's workspace bridge.
   computor-coder-workspaces:
-    name: ${CODER_WORKSPACE_NETWORK:-${COMPOSE_NETWORK_NAME:-computor-network}-workspaces}
+    name: ${CODER_WORKSPACE_NETWORK:-computor-coder-workspaces}
     driver: bridge
 
   # Same bridge, minus egress: `internal` means docker installs no NAT and no
@@ -292,6 +304,6 @@ networks:
   # allow_internet variable): attaching both would restore egress via the
   # non-internal one.
   computor-coder-workspaces-offline:
-    name: ${CODER_WORKSPACE_NETWORK_OFFLINE:-${COMPOSE_NETWORK_NAME:-computor-network}-workspaces-offline}
+    name: ${CODER_WORKSPACE_NETWORK_OFFLINE:-computor-coder-workspaces-offline}
     driver: bridge
     internal: true

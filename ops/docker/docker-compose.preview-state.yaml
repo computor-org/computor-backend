@@ -6,7 +6,7 @@ services:
     image: postgres:16
     networks:
       - computor-network
-    container_name: ${CONTAINER_NAME_PREFIX:-}keycloak-db
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}keycloak-db
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
@@ -29,7 +29,7 @@ services:
     image: quay.io/keycloak/keycloak:25.0.6
     networks:
       - computor-network
-    container_name: ${CONTAINER_NAME_PREFIX:-}keycloak
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}keycloak
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
@@ -64,7 +64,7 @@ services:
     image: ${PREVIEW_IMAGE_PREFIX:-computor}-uvicorn
     networks:
       - computor-network
-    container_name: ${CONTAINER_NAME_PREFIX:-}preview-seed
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}preview-seed
     restart: "no"
     security_opt:
       - "no-new-privileges:true"
