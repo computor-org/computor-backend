@@ -1,0 +1,58 @@
+# Split-host worker deployment overlay.
+#
+# Runs the execution-side services — testing workers, the Coder server, the
+# workspace fleet and its ingress — on a separate worker host, connected to
+# the control-plane host over an isolated point-to-point WireGuard link.
+# The control plane (API, Temporal, Postgres, Redis, MinIO, Keycloak,
+# Forgejo) keeps running on its own host and exposes the needed ports on the
+# WireGuard address by setting INFRA_BIND_ADDRESS=<its wg address> there.
+#
+# On the worker host, load AFTER the standard overlays and start only the
+# execution services:
+#
+#   docker compose --env-file .env \
+#     -f docker-compose.base.yaml -f docker-compose.prod.yaml \
+#     -f docker-compose.coder.yaml -f docker-compose.workerhost.yaml \
+#     up -d --build \
+#       temporal-worker-testing coder-socket-proxy workspace-ingress \
+#       coder-postgres coder coder-registry temporal-worker-coder
+#
+# depends_on of the cross-host services is reset because Temporal, Postgres,
+# Redis and MinIO do not run on this host. Required .env on the worker host:
+#
+#   WORKERHOST_CONTROL_ADDR   wg address of the control-plane host (e.g. 10.88.0.1)
+#   WORKERHOST_BIND_ADDRESS   wg address of THIS host (e.g. 10.88.0.2) — the
+#                             workspace-ingress and Coder API ports bind here
+#                             so only the control plane can reach them
+#   PREVIEW_BIND_ADDRESS      set equal to WORKERHOST_BIND_ADDRESS (Coder 7080)
+#   WORKSPACE_INGRESS_BACKEND_URL / WORKSPACE_INGRESS_GIT_URL
+#                             http://${WORKERHOST_CONTROL_ADDR}:8000 and
+#                             http://${WORKERHOST_CONTROL_ADDR}:3030
+#
+# The control-plane host forwards the public /coder path to this host with a
+# Traefik file-provider route targeting
+# http://${WORKERHOST_BIND_ADDRESS}:${WORKERHOST_INGRESS_PORT}.
+
+services:
+  temporal-worker-testing:
+    depends_on: !reset []
+    environment:
+      - TEMPORAL_HOST=${WORKERHOST_CONTROL_ADDR:?set WORKERHOST_CONTROL_ADDR in .env (wg address of the control-plane host)}
+      - TEMPORAL_PORT=${WORKERHOST_TEMPORAL_PORT:-7233}
+
+  workspace-ingress:
+    ports:
+      # Published on the wg address only: the control plane's Traefik forwards
+      # the public /coder prefix here; nothing else may reach it.
+      - "${WORKERHOST_BIND_ADDRESS:?set WORKERHOST_BIND_ADDRESS in .env (wg address of this host)}:${WORKERHOST_INGRESS_PORT:-8081}:80"
+
+  temporal-worker-coder:
+    depends_on: !reset []
+    environment:
+      TEMPORAL_HOST: ${WORKERHOST_CONTROL_ADDR}
+      TEMPORAL_PORT: ${WORKERHOST_TEMPORAL_PORT:-7233}
+      # Workspace credential rotation reads the app database (see the comment
+      # in docker-compose.coder.yaml) — reached over the wg link.
+      POSTGRES_HOST: ${WORKERHOST_CONTROL_ADDR}
+      POSTGRES_PORT: ${WORKERHOST_POSTGRES_PORT:-5432}
+      BACKEND_EXTERNAL_URL: ${BACKEND_EXTERNAL_URL:?set BACKEND_EXTERNAL_URL in .env (e.g. http://<control wg addr>:8000)}

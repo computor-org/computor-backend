@@ -152,6 +152,10 @@ Same concepts, same variant names, on both surfaces.
 | Progress | `<ProgressTrack>` | `.progress-track` + `.progress-fill` |
 | Modal | `<Modal>` / `<ConfirmDeleteDialog>` | — (no webview equivalent; use a `.section`) |
 
+> `Modal` caps itself to the viewport and scrolls its body (`scroll-slim`);
+> callers never add a whole-body `max-h-*` / `overflow-y-auto` wrapper — only
+> bounded inner lists (e.g. `max-h-64`).
+
 **Button variants** — `primary` (default, filled), `secondary` (outlined),
 `danger` (filled red / theme error), `dangerGhost` (red text, no fill — for a
 destructive action repeated in every table row), `ghost` (muted text, no fill).

@@ -1,5 +1,6 @@
 """Tests for the main ComputorClient class."""
 
+import httpx
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -74,6 +75,28 @@ class TestClientInitialization:
         assert client.auth_headers["X-API-Token"] == "ct_secret"
         # No bearer session is involved, so is_authenticated stays False.
         assert not client.is_authenticated
+
+    @pytest.mark.asyncio
+    async def test_api_token_is_sent_on_outgoing_requests(self, base_url):
+        """Regression: the header has to reach the wire, not just ``auth_headers``.
+
+        When the constructor forwarded its raw ``headers`` argument to the HTTP
+        client instead of the merged ``self._headers``, every request went out
+        anonymous and the API answered 401.
+        """
+        client = ComputorClient(base_url=base_url, api_token="ct_secret")
+        seen = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.update(request.headers)
+            return httpx.Response(200, json={})
+
+        client._http._client = httpx.AsyncClient(
+            base_url=base_url, transport=httpx.MockTransport(handler)
+        )
+        await client._http.get("/user")
+
+        assert seen["x-api-token"] == "ct_secret"
 
     def test_explicit_header_wins_over_api_token(self, base_url):
         client = ComputorClient(
