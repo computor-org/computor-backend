@@ -1,5 +1,9 @@
 """Instance/deployment info exposed to authenticated clients.
 
+Two endpoints, deliberately apart. ``GET /instance-info`` is discovery: the URLs
+any client needs, consent-exempt and safe for everyone. ``GET /instance-status``
+is runtime state about the deployment itself, and is admin-only.
+
 Surfaced by ``GET /instance-info`` so clients (notably the VSCode extension)
 can deep-link users to the web app and the git server. The endpoint is
 whitelisted in the consent gate, so a consent-blocked-but-authenticated client
@@ -8,6 +12,7 @@ can still discover where to go to give consent.
 Deliberately minimal: only the URLs a client legitimately needs to navigate.
 No internal service URLs (Coder, MinIO, Temporal, Keycloak admin, …).
 """
+from datetime import datetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
@@ -58,4 +63,37 @@ class InstanceInfoGet(BaseModel):
     issue_reporting: Optional[IssueReportingInfo] = Field(
         None,
         description="Problem-reporting capability of this deployment.",
+    )
+
+
+class InstanceStatusGet(BaseModel):
+    """Runtime state of the running API (#350) — admin-only.
+
+    Answers "when did this last restart, and what is it running", which nothing
+    in the UI could say before.
+
+    The issue also asks for system and workspace memory. That is deliberately
+    absent rather than null: the API holds no docker socket and there is no
+    metrics collector, so the only workspace memory figure available is the
+    per-template *cap* pushed at template-push time. Reporting a reservation
+    under the label "usage" would be worse than reporting nothing, so the
+    memory half stays open until there is something real to measure.
+    """
+
+    started_at: datetime = Field(
+        description="When this API process came up (UTC). The last server restart.",
+    )
+    uptime_seconds: int = Field(
+        description="Seconds since started_at, so a client need not trust its own clock.",
+    )
+    commit: str = Field(
+        description="Commit hash of the running code; 'unknown' if it cannot be determined.",
+    )
+    branch: str = Field(
+        description="Branch the running code was built from; 'unknown' if undeterminable.",
+    )
+    build_time: Optional[datetime] = Field(
+        None,
+        description="When the running image was built (UTC). Null in development, "
+        "where the API runs from a working tree and there is no build.",
     )
