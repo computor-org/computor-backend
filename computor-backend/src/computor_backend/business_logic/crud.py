@@ -37,6 +37,10 @@ from computor_backend.database import set_db_user
 
 logger = logging.getLogger(__name__)
 
+# How many blocking contents to name in a CONTENT_010 message before
+# collapsing the rest into "and N more".
+_TYPE_IN_USE_SAMPLE_SIZE = 5
+
 
 async def create_entity(
     permissions: Principal,
@@ -530,6 +534,78 @@ def _validate_course_content_type_change(db_item, new_type_id, db: Session):
         )
 
 
+def _validate_course_content_type_deletion(entity, db: Session):
+    """
+    Validate that a course content type can be safely deleted.
+
+    ``course_content.course_content_type_id`` and ``result.course_content_type_id``
+    are both NOT NULL with ``ondelete='RESTRICT'``, and the ORM relationships on
+    :class:`CourseContentType` carry no ``passive_deletes``. So SQLAlchemy tries to
+    NULL the children before Postgres can refuse the delete, and the failure
+    arrives as a ``NotNullViolation`` naming an internal column. Refuse up front
+    instead, and say which contents are in the way (computor-org/issues#387).
+
+    Args:
+        entity: CourseContentType entity to delete
+        db: Database session
+
+    Raises:
+        BadRequestException: If any course content or result still uses the type
+    """
+    from computor_backend.model.course import CourseContent
+    from computor_backend.model.result import Result
+
+    content_count = db.query(CourseContent.id).filter(
+        CourseContent.course_content_type_id == entity.id,
+    ).count()
+
+    # result.course_content_type_id carries no index, so only reach for it when
+    # nothing cheaper already blocks the delete.
+    result_count = 0
+    if not content_count:
+        result_count = db.query(Result.id).filter(
+            Result.course_content_type_id == entity.id,
+        ).count()
+        if not result_count:
+            return
+
+    label = entity.title or entity.slug
+
+    if content_count:
+        # Name a handful so the lecturer knows where to look; the tree shows
+        # titles, so prefer them and fall back to the ltree path.
+        sample_rows = db.query(CourseContent.title, CourseContent.path).filter(
+            CourseContent.course_content_type_id == entity.id,
+        ).order_by(CourseContent.path).limit(_TYPE_IN_USE_SAMPLE_SIZE).all()
+        names = [(title or str(path)) for title, path in sample_rows]
+        listed = ", ".join(f"'{name}'" for name in names)
+        if content_count > len(names):
+            listed = f"{listed} and {content_count - len(names)} more"
+        noun = "course content item" if content_count == 1 else "course content items"
+        detail = (
+            f"Cannot delete content type '{label}' because {content_count} {noun} "
+            f"still use it: {listed}. Change them to another content type of the "
+            f"same kind, or delete them first."
+        )
+    else:
+        noun = "test result" if result_count == 1 else "test results"
+        detail = (
+            f"Cannot delete content type '{label}' because {result_count} stored "
+            f"{noun} still reference it."
+        )
+
+    raise BadRequestException(
+        error_code="CONTENT_010",
+        detail=detail,
+        context={
+            "course_content_type_id": str(entity.id),
+            "course_id": str(entity.course_id),
+            "course_content_count": content_count,
+            "result_count": result_count,
+        },
+    )
+
+
 def _validate_course_content_deletion(entity, db: Session):
     """
     Validate that a course content can be safely deleted.
@@ -639,6 +715,10 @@ async def delete_entity(
             for descendant in descendants:
                 db.delete(descendant)
             # Note: self (entity) will be deleted below
+
+        # Special validation for CourseContentType deletion
+        elif db_type.__tablename__ == 'course_content_type':
+            _validate_course_content_type_deletion(entity, db)
 
         try:
             db.delete(entity)
