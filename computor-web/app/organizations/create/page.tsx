@@ -17,7 +17,7 @@ const ORG_TYPES: OrganizationType[] = ['organization', 'community', 'user'];
 
 export default function OrganizationCreatePage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, refreshPermissions } = useAuth();
   const { canCreateOrganization } = usePermissions();
 
   const [path, setPath] = useState('');
@@ -39,6 +39,9 @@ export default function OrganizationCreatePage() {
           description: description.trim() || null,
         },
       });
+      // Creating an organization enrols the creator as its `_owner`; re-pull
+      // /user/scopes so the page we are about to open sees that role.
+      await refreshPermissions();
       router.push(`/organizations/${org.id}`);
     } catch (e) {
       setSaving(false);

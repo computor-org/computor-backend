@@ -22,7 +22,7 @@ const courseFamiliesClient = new CourseFamiliesClient();
 function CreateInner() {
   const router = useRouter();
   const organizationIdParam = useSearchParam('organization_id');
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, refreshPermissions } = useAuth();
   const { canCreateCourseFamily } = usePermissions();
 
   const [orgs, setOrgs] = useState<OrganizationList[]>([]);
@@ -58,6 +58,9 @@ function CreateInner() {
           description: description.trim() || null,
         },
       });
+      // Creating a course family enrols the creator as its `_owner`; re-pull
+      // /user/scopes so the page we are about to open sees that role.
+      await refreshPermissions();
       router.push(`/course-families/${fam.id}`);
     } catch (e) {
       setSaving(false);
