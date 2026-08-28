@@ -451,6 +451,13 @@ class TemplateCatalogEntry(BaseModel):
         False,
         description="Operator-edited on disk, so no longer re-synced from the repo",
     )
+    cloned_from: Optional[str] = Field(
+        None,
+        description="Directory name of the template this one was cloned from. Set "
+                    "only for templates created through the API, which exist in the "
+                    "deployment's templates directory alone — the repo sync never "
+                    "touches them, and only they can be deleted.",
+    )
     workspace_count: int = Field(0, description="Workspaces currently on this template")
     running_workspace_count: int = Field(
         0,
@@ -594,6 +601,11 @@ class TemplateFilesResponse(BaseModel):
         description="True when the .computor-managed marker is absent: the deployed "
                     "template is operator-customized and no longer auto-synced from the repo",
     )
+    cloned_from: Optional[str] = Field(
+        None,
+        description="Directory name of the template this one was cloned from; set only "
+                    "for templates created through the API (never repo-synced)",
+    )
     files: list[TemplateFile] = Field(default_factory=list)
 
 
@@ -609,6 +621,85 @@ class TemplateFileActionResponse(BaseModel):
     success: bool
     message: str
     customized: bool
+
+
+# Template lifecycle: display metadata, cloning, deletion.
+#
+# Display metadata lives in the template directory's template.json — the same
+# place the push pipeline reads it from before PATCHing it into Coder — so
+# editing it is a file write, not a settings-row update. The length caps mirror
+# Coder's own template validation (display name <= 64, description < 128,
+# icon < 256) so the manifest never stores a value the live PATCH would reject.
+
+class TemplateMetadata(BaseModel):
+    """A template's identity and display metadata, read from its manifest."""
+
+    template_name: str = Field(..., description="Coder template name (e.g. 'vscode-workspace')")
+    dir_name: str = Field(..., description="Template directory name under the templates root")
+    display_name: Optional[str] = Field(None, description="Human-readable name")
+    description: Optional[str] = Field(None, description="What the template offers")
+    icon: Optional[str] = Field(None, description="Absolute http(s) URL or a Coder /icon/*.svg path")
+    image_name: Optional[str] = Field(None, description="Docker image the template builds")
+    cloned_from: Optional[str] = Field(
+        None, description="Directory name of the template this one was cloned from, if created here"
+    )
+    created_at: Optional[datetime] = Field(None, description="When the clone was created")
+    customized: bool = Field(
+        False, description="No longer re-synced from the repo (always true for a clone)"
+    )
+
+
+class TemplateMetadataUpdate(BaseModel):
+    """New display metadata for a template, written to its manifest."""
+
+    display_name: str = Field(..., min_length=1, max_length=64)
+    description: Optional[str] = Field(None, max_length=127)
+    icon: Optional[str] = Field(
+        None, max_length=255,
+        description="Absolute http(s) URL or a Coder built-in /icon/<name>.svg path; empty clears",
+    )
+
+
+class TemplateMetadataUpdateResponse(TemplateMetadata):
+    """Result of a metadata update: the manifest is always written; Coder is
+    patched live when the template is deployed and reachable."""
+
+    coder_updated: bool = Field(
+        False, description="Whether the live Coder template was patched as well"
+    )
+    message: str
+
+
+class TemplateCloneRequest(BaseModel):
+    """Create a new template as an independent copy of an existing one.
+
+    ``key`` becomes the directory name; the Coder template name
+    (``<key>-workspace``) and image name (``computor-workspace-<key>``) are
+    derived from it, following the shipped templates' convention.
+    """
+
+    source: str = Field(..., description="Directory name or Coder name of the template to copy")
+    key: str = Field(
+        ..., min_length=1, max_length=22,
+        description="Lowercase letters, digits and inner hyphens; must not end in '-workspace'",
+    )
+    display_name: str = Field(..., min_length=1, max_length=64)
+    description: Optional[str] = Field(None, max_length=127)
+    icon: Optional[str] = Field(
+        None, max_length=255,
+        description="Absolute http(s) URL or a Coder built-in /icon/<name>.svg path",
+    )
+
+
+class TemplateDeleteResponse(BaseModel):
+    """Result of deleting a cloned template."""
+
+    success: bool
+    message: str
+    coder_deleted: bool = Field(False, description="The live Coder template was deleted too")
+    settings_deleted: bool = Field(
+        False, description="Settings and course assignment rows for the name were removed"
+    )
 
 
 class TemplateVariable(BaseModel):

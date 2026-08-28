@@ -516,6 +516,8 @@ export interface TemplateCatalogEntry {
   enabled?: boolean;
   /** Operator-edited on disk, so no longer re-synced from the repo */
   customized?: boolean;
+  /** Directory name of the template this one was cloned from. Set only for templates created through the API, which exist in the deployment's templates directory alone — the repo sync never touches them, and only they can be deleted. */
+  cloned_from?: string | null;
   /** Workspaces currently on this template */
   workspace_count?: number;
   /** Workspaces of this template counting against its seat quota — the same rule the quota itself enforces (a start build in an active state). */
@@ -631,6 +633,8 @@ export interface TemplateFilesResponse {
   dir_name: string;
   /** True when the .computor-managed marker is absent: the deployed template is operator-customized and no longer auto-synced from the repo */
   customized: boolean;
+  /** Directory name of the template this one was cloned from; set only for templates created through the API (never repo-synced) */
+  cloned_from?: string | null;
   files?: TemplateFile[];
 }
 
@@ -648,6 +652,98 @@ export interface TemplateFileActionResponse {
   success: boolean;
   message: string;
   customized: boolean;
+}
+
+/**
+ * A template's identity and display metadata, read from its manifest.
+ */
+export interface TemplateMetadata {
+  /** Coder template name (e.g. 'vscode-workspace') */
+  template_name: string;
+  /** Template directory name under the templates root */
+  dir_name: string;
+  /** Human-readable name */
+  display_name?: string | null;
+  /** What the template offers */
+  description?: string | null;
+  /** Absolute http(s) URL or a Coder /icon/*.svg path */
+  icon?: string | null;
+  /** Docker image the template builds */
+  image_name?: string | null;
+  /** Directory name of the template this one was cloned from, if created here */
+  cloned_from?: string | null;
+  /** When the clone was created */
+  created_at?: string | null;
+  /** No longer re-synced from the repo (always true for a clone) */
+  customized?: boolean;
+}
+
+/**
+ * New display metadata for a template, written to its manifest.
+ */
+export interface TemplateMetadataUpdate {
+  display_name: string;
+  description?: string | null;
+  /** Absolute http(s) URL or a Coder built-in /icon/<name>.svg path; empty clears */
+  icon?: string | null;
+}
+
+/**
+ * Result of a metadata update: the manifest is always written; Coder is
+ * patched live when the template is deployed and reachable.
+ */
+export interface TemplateMetadataUpdateResponse {
+  /** Coder template name (e.g. 'vscode-workspace') */
+  template_name: string;
+  /** Template directory name under the templates root */
+  dir_name: string;
+  /** Human-readable name */
+  display_name?: string | null;
+  /** What the template offers */
+  description?: string | null;
+  /** Absolute http(s) URL or a Coder /icon/*.svg path */
+  icon?: string | null;
+  /** Docker image the template builds */
+  image_name?: string | null;
+  /** Directory name of the template this one was cloned from, if created here */
+  cloned_from?: string | null;
+  /** When the clone was created */
+  created_at?: string | null;
+  /** No longer re-synced from the repo (always true for a clone) */
+  customized?: boolean;
+  /** Whether the live Coder template was patched as well */
+  coder_updated?: boolean;
+  message: string;
+}
+
+/**
+ * Create a new template as an independent copy of an existing one.
+ * 
+ * ``key`` becomes the directory name; the Coder template name
+ * (``<key>-workspace``) and image name (``computor-workspace-<key>``) are
+ * derived from it, following the shipped templates' convention.
+ */
+export interface TemplateCloneRequest {
+  /** Directory name or Coder name of the template to copy */
+  source: string;
+  /** Lowercase letters, digits and inner hyphens; must not end in '-workspace' */
+  key: string;
+  display_name: string;
+  description?: string | null;
+  /** Absolute http(s) URL or a Coder built-in /icon/<name>.svg path */
+  icon?: string | null;
+}
+
+/**
+ * Result of deleting a cloned template.
+ */
+export interface TemplateDeleteResponse {
+  success: boolean;
+  message: string;
+  /** The live Coder template was deleted too */
+  coder_deleted?: boolean;
+  /** Settings and course assignment rows for the name were removed */
+  settings_deleted?: boolean;
 }
 
 /**
