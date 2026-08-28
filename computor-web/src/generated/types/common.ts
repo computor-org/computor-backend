@@ -1819,6 +1819,32 @@ export interface InstanceInfoGet {
 }
 
 /**
+ * Runtime state of the running API (#350) — admin-only.
+ * 
+ * Answers "when did this last restart, and what is it running", which nothing
+ * in the UI could say before.
+ * 
+ * The issue also asks for system and workspace memory. That is deliberately
+ * absent rather than null: the API holds no docker socket and there is no
+ * metrics collector, so the only workspace memory figure available is the
+ * per-template *cap* pushed at template-push time. Reporting a reservation
+ * under the label "usage" would be worse than reporting nothing, so the
+ * memory half stays open until there is something real to measure.
+ */
+export interface InstanceStatusGet {
+  /** When this API process came up (UTC). The last server restart. */
+  started_at: string;
+  /** Seconds since started_at, so a client need not trust its own clock. */
+  uptime_seconds: number;
+  /** Commit hash of the running code; 'unknown' if it cannot be determined. */
+  commit: string;
+  /** Branch the running code was built from; 'unknown' if undeterminable. */
+  branch: string;
+  /** When the running image was built (UTC). Null in development, where the API runs from a working tree and there is no build. */
+  build_time?: string | null;
+}
+
+/**
  * Payload describing a manual submission request.
  */
 export interface SubmissionCreate {

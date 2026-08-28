@@ -111,6 +111,7 @@ export const adminNavigation: NavItem[] = [
     path: '/admin',
     icon: 'admin',
     subItems: [
+      { id: 'sys-status', label: 'Status', path: '/admin/status' },
       { id: 'sys-maintenance', label: 'Maintenance', path: '/admin/maintenance' },
       { id: 'sys-limits', label: 'Instance limits', path: '/admin/limits' },
       { id: 'sys-updates', label: 'Updates', path: '/admin/updates' },

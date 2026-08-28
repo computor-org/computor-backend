@@ -95,6 +95,14 @@ class UpdateSettings(BaseSettings):
         validation_alias="GIT_BRANCH",
         description="Branch name baked into the running image at build time.",
     )
+    build_time: str = Field(
+        default="",
+        validation_alias="BUILD_TIME",
+        description=(
+            "ISO-8601 UTC timestamp of the image build, baked in beside the commit. "
+            "Empty in development, where there is no build."
+        ),
+    )
 
 
 class Settings:

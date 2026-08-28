@@ -334,6 +334,14 @@
 | --- | --- | --- | --- | --- |
 | `getInstanceInfoInstanceInfoGet` | GET | `/instance-info` | — | `InstanceInfoGet` |
 
+## InstanceStatusClient
+- Base path: `/instance-status`
+- Note: custom operations discovered from OpenAPI schema
+
+| TS Method | HTTP | Path | Request | Response |
+| --- | --- | --- | --- | --- |
+| `getInstanceStatusInstanceStatusGet` | GET | `/instance-status` | — | `InstanceStatusGet` |
+
 ## InvitesClient
 - Base path: `/invites`
 - Note: custom operations discovered from OpenAPI schema

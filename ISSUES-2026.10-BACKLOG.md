@@ -891,7 +891,10 @@ Step 6 (feed #350's numbers in) stays open by design: the issue asks for a hard
 limit *"in the meantime"*, before the computed one. #350 was therefore **not** a
 prerequisite, and #351 shipped without it.
 
-## #350 — missing runtime info on the webpage — **OPEN, cheap and useful**
+## #350 — missing runtime info on the webpage — **HALF DONE 2026-08-28**
+
+Steps 1, 3 and 5 shipped for the uptime/build half. What is still open is the
+memory half — steps 2's last three items, and step 4.
 
 `GET /instance-info` exists (`api/instance.py:54`) but carries discovery data
 (issue-reporting config, URLs), not runtime state.
@@ -1287,8 +1290,10 @@ plus #358 populating Category and Tags where the filter reads them.
    one-example-per-course refusal it needed lifting had been added after the
    report, so the fix is a directory allocator plus a release-time backstop
    for the courses that already collided.
-6. ~~**#351**~~ done 2026-08-26; **#350** — the status surface, still open, and
-   no longer blocking anything before the workshop.
+6. ~~**#351**~~ done 2026-08-26; **#350** — half done 2026-08-28: uptime and
+   build identity shipped as `GET /instance-status` + System → Status. The
+   memory half is still open, and the plan below was wrong about how cheap it
+   is — see the note there.
 7. The session/credential bucket is clear: ~~**#247**~~, ~~**#257**~~ and
    ~~**#333**~~ all done 2026-08-26, and #257's forced re-login does reuse
    #247's rails. #333 needed no code — the credential surface had already
@@ -2112,7 +2117,32 @@ surface is `api/course_member_gradings.py` plus the grading read layer
 > #350 is still open and still worth doing; when it lands it feeds the
 > *computed* variant of the guard, not the one that exists.
 
-### #350 — `GET /instance-status`
+### #350 — `GET /instance-status` — **the first half shipped 2026-08-28**
+
+What landed: `GET /instance-status` (admin-only) reporting `started_at`,
+`uptime_seconds`, `commit`, `branch` and `build_time`, rendered on a new
+System → Status page. `BUILD_TIME` is now baked into the images beside
+`GIT_COMMIT` (ops/lib/common.sh → docker/base/Dockerfile), and the commit/branch
+lookup moved from `api/update.py` into `business_logic/build_info.py`, which
+also holds the process start recorded by the lifespan.
+
+Two corrections to the plan below, found while doing it:
+
+- The endpoint needs **its own OpenAPI tag and router**. The client generator
+  gives one class per tag and derives its base path from the endpoints in it, so
+  putting /instance-status under the "instance" tag silently repointed the
+  generated `InstanceClient` at it and lost /instance-info.
+- Step 2 is **not** one endpoint's worth of work. The API container holds no
+  docker socket (only traefik/coder/updater/the coder worker do), nothing
+  collects metrics, and `CoderClient.list_all_workspaces` returns no resource
+  data — "container stats" would have to go through a Temporal activity the way
+  `list_workspace_volumes` already does. The only workspace memory number that
+  exists today is `WorkspaceTemplateSettings.memory_mb`, a **cap pushed at
+  template-push time**, not a measurement. Reporting a reservation under the
+  word "usage" is worse than reporting nothing, so the memory fields were left
+  out of the DTO entirely rather than shipped as nulls. `psutil` was not added.
+
+The steps below are kept as the plan for the remaining half.
 
 1. New endpoint in `api/instance.py` (keep `/instance-info` untouched — it
    is consent-exempt discovery). DTO in computor-types

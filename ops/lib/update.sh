@@ -121,9 +121,10 @@ fetch("http://localhost:3000/api/health")
 # base are no longer skipped when they DID change.
 build_images() {
     git_build_meta
-    ulog "building computor-base (commit ${GIT_COMMIT})"
+    ulog "building computor-base (commit ${GIT_COMMIT}, built ${BUILD_TIME})"
     (cd "$REPO_ROOT" && docker build -f docker/base/Dockerfile -t computor-base:latest \
-        --build-arg GIT_COMMIT="$GIT_COMMIT" --build-arg GIT_BRANCH="$GIT_BRANCH" .) || return 1
+        --build-arg GIT_COMMIT="$GIT_COMMIT" --build-arg GIT_BRANCH="$GIT_BRANCH" \
+        --build-arg BUILD_TIME="$BUILD_TIME" .) || return 1
 
     ulog "checking computor-testing-runtimes"
     build_base_image testing-runtimes computor-testing-runtimes:latest \

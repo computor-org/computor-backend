@@ -376,9 +376,10 @@ cmd_up() {
     if [[ "$DOCKER_ARGS" == *"--build"* ]] || [ "${FORCE_BASE_BUILD:-}" = "all" ] \
         || ! docker image inspect computor-base:latest >/dev/null 2>&1; then
         log "\n${GREEN}Building shared base image (computor-base)...${NC}"
-        echo "  Baking build provenance: commit=${GIT_COMMIT} branch=${GIT_BRANCH}"
+        echo "  Baking build provenance: commit=${GIT_COMMIT} branch=${GIT_BRANCH} built=${BUILD_TIME}"
         (cd "$REPO_ROOT" && docker build -f docker/base/Dockerfile -t computor-base:latest \
-            --build-arg GIT_COMMIT="$GIT_COMMIT" --build-arg GIT_BRANCH="$GIT_BRANCH" .)
+            --build-arg GIT_COMMIT="$GIT_COMMIT" --build-arg GIT_BRANCH="$GIT_BRANCH" \
+            --build-arg BUILD_TIME="$BUILD_TIME" .)
     fi
 
     # The remaining base images hold no project source, so --build must NOT drag them

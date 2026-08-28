@@ -85,7 +85,7 @@ from computor_backend.api.system_limits import system_limits_router
 from computor_backend.api.update import update_router
 from computor_backend.api.invites import invites_router
 from computor_backend.api.consent import consent_router
-from computor_backend.api.instance import instance_router
+from computor_backend.api.instance import instance_router, instance_status_router
 from computor_backend.api.accounts import accounts_router
 from computor_backend.api.documents import documents_router
 from computor_backend.exceptions import register_exception_handlers
@@ -345,6 +345,11 @@ async def startup_logic():
 async def lifespan(app: FastAPI):
     from computor_backend.maintenance_scheduler import MaintenanceReminderScheduler
     from computor_backend.business_logic.result_reconciler import ResultReconciler
+    from computor_backend.business_logic.build_info import mark_started
+
+    # First thing in the lifespan: "last restart" means when the app came up,
+    # not when startup_logic finished bootstrapping (#350).
+    mark_started()
 
     await startup_logic()
 
@@ -685,6 +690,11 @@ app.include_router(
 app.include_router(
     instance_router,
     tags=["instance"]
+)
+
+app.include_router(
+    instance_status_router,
+    tags=["instance-status"]
 )
 
 app.include_router(

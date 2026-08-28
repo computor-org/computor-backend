@@ -66,4 +66,5 @@ ENV PYTHONPATH=/home/worker/computor-backend/src
 # which commit it runs (read by /system/update/status).
 ARG GIT_COMMIT=unknown
 ARG GIT_BRANCH=unknown
-ENV GIT_COMMIT=${GIT_COMMIT} GIT_BRANCH=${GIT_BRANCH}
+ARG BUILD_TIME=
+ENV GIT_COMMIT=${GIT_COMMIT} GIT_BRANCH=${GIT_BRANCH} BUILD_TIME=${BUILD_TIME}
