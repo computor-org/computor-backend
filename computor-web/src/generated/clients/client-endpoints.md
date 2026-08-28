@@ -696,6 +696,7 @@
 | `tutorGetCoursesEndpointTutorsCoursesCourseIdGet` | GET | `/tutors/courses/{course_id}` | — | `CourseTutorGet` |
 | `tutorListSubmissionGroupsEndpointTutorsSubmissionGroupsGet` | GET | `/tutors/submission-groups` | — | `TutorSubmissionGroupList[]` |
 | `tutorGetSubmissionGroupEndpointTutorsSubmissionGroupsSubmissionGroupIdGet` | GET | `/tutors/submission-groups/{submission_group_id}` | — | `TutorSubmissionGroupGet` |
+| `tutorUpdateSubmissionGroupLimitsEndpointTutorsSubmissionGroupsSubmissionGroupIdPatch` | PATCH | `/tutors/submission-groups/{submission_group_id}` | `TutorSubmissionGroupLimitsUpdate` | `TutorSubmissionGroupGet` |
 | `getTutorTestEndpointTutorsTestsTestIdGet` | GET | `/tutors/tests/{test_id}` | — | `TutorTestGet` |
 | `listTutorTestArtifactsEndpointTutorsTestsTestIdArtifactsGet` | GET | `/tutors/tests/{test_id}/artifacts` | — | `TutorTestArtifactList` |
 | `downloadTutorTestArtifactsTutorsTestsTestIdArtifactsDownloadGet` | GET | `/tutors/tests/{test_id}/artifacts/download` | — | `void` |

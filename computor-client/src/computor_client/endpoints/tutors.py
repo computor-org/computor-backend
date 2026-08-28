@@ -26,6 +26,7 @@ from computor_types.tutor_grading import (
 )
 from computor_types.tutor_submission_groups import (
     TutorSubmissionGroupGet,
+    TutorSubmissionGroupLimitsUpdate,
     TutorSubmissionGroupList,
 )
 from computor_types.tutor_tests import (
@@ -170,6 +171,16 @@ class TutorsClient:
     ) -> TutorSubmissionGroupGet:
         """Tutor Get Submission Group Endpoint"""
         response = await self._http.get(f"/tutors/submission-groups/{quote_path(submission_group_id)}", params=kwargs)
+        return TutorSubmissionGroupGet.model_validate(response.json())
+
+    async def update_submission_groups(
+        self,
+        submission_group_id: str,
+        data: Union[TutorSubmissionGroupLimitsUpdate, Dict[str, Any]],
+        **kwargs: Any,
+    ) -> TutorSubmissionGroupGet:
+        """Tutor Update Submission Group Limits Endpoint"""
+        response = await self._http.patch(f"/tutors/submission-groups/{quote_path(submission_group_id)}", json_data=data, params=kwargs)
         return TutorSubmissionGroupGet.model_validate(response.json())
 
     async def get_tests(
