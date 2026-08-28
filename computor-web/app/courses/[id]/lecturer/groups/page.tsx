@@ -17,6 +17,7 @@ import { CourseGroupsClient } from '@/src/generated/clients/CourseGroupsClient';
 import { CourseMembersClient } from '@/src/generated/clients/CourseMembersClient';
 import type { CourseGroupList } from 'types/generated';
 import { Table, Thead, Tbody, Th } from '@/src/components/ui/Table';
+import { fetchCourseRoster } from '@/src/components/course-members/roster';
 
 const groupsClient = new CourseGroupsClient();
 const membersClient = new CourseMembersClient();
@@ -37,7 +38,7 @@ export default function CourseGroupsPage() {
       const [groups, members] = await Promise.all([
         groupsClient.listCourseGroupsCourseGroupsGet({ courseId, limit: 500 }),
         // Member counts drive whether a group can be deleted (the FK is RESTRICT).
-        membersClient.listCourseMembersCourseMembersGet({ courseId, limit: 2000 }),
+        fetchCourseRoster(membersClient, courseId),
       ]);
       return { groups, members };
     },
