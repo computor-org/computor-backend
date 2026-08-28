@@ -126,6 +126,10 @@ def _discover_templates(templates_dir: str) -> Dict[str, Dict[str, Any]]:
         return templates
 
     for entry in sorted(os.listdir(templates_dir)):
+        if entry.startswith("."):
+            # The staging dir of a clone the API is still assembling (see
+            # coder/templates_fs.clone_template), or Coder's own .coder/.
+            continue
         manifest_path = os.path.join(templates_dir, entry, "template.json")
         if os.path.isfile(manifest_path):
             try:
