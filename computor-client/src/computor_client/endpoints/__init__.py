@@ -32,6 +32,7 @@ from computor_client.endpoints.extensions import ExtensionsClient
 from computor_client.endpoints.git_servers import GitServersClient
 from computor_client.endpoints.groups import GroupsClient
 from computor_client.endpoints.instance import InstanceClient
+from computor_client.endpoints.instance_status import InstanceStatusClient
 from computor_client.endpoints.invites import InvitesClient
 from computor_client.endpoints.issue_reports import IssueReportsClient
 from computor_client.endpoints.languages import LanguagesClient
@@ -89,6 +90,7 @@ __all__ = [
     "GitServersClient",
     "GroupsClient",
     "InstanceClient",
+    "InstanceStatusClient",
     "InvitesClient",
     "IssueReportsClient",
     "LanguagesClient",

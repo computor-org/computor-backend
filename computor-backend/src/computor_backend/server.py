@@ -85,7 +85,7 @@ from computor_backend.api.system_limits import system_limits_router
 from computor_backend.api.update import update_router
 from computor_backend.api.invites import invites_router
 from computor_backend.api.consent import consent_router
-from computor_backend.api.instance import instance_router
+from computor_backend.api.instance import instance_router, instance_status_router
 from computor_backend.api.accounts import accounts_router
 from computor_backend.api.documents import documents_router
 from computor_backend.exceptions import register_exception_handlers
@@ -690,6 +690,11 @@ app.include_router(
 app.include_router(
     instance_router,
     tags=["instance"]
+)
+
+app.include_router(
+    instance_status_router,
+    tags=["instance-status"]
 )
 
 app.include_router(
