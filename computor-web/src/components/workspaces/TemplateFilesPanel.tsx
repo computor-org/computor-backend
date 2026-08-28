@@ -99,11 +99,18 @@ export default function TemplateFilesPanel({ templateName }: { templateName: str
             </div>
             <div className="flex items-center gap-2">
               {data && (
-                <Badge color={data.customized ? 'yellow' : 'green'}>
-                  {data.customized ? 'customized' : 'managed'}
-                </Badge>
+                data.cloned_from ? (
+                  <Badge tone="info" title="Created here; the repository sync never touches it">
+                    cloned from {data.cloned_from}
+                  </Badge>
+                ) : (
+                  <Badge tone={data.customized ? 'warning' : 'success'}>
+                    {data.customized ? 'customized' : 'managed'}
+                  </Badge>
+                )
               )}
-              {data?.customized && (
+              {/* A clone has no repo copy to restore to. */}
+              {data?.customized && !data.cloned_from && (
                 <Button size="xs" variant="ghost" onClick={() => setConfirmRestore(true)}>
                   Restore managed
                 </Button>

@@ -41,6 +41,7 @@ A template directory must contain:
   failing. The resolved commit is stamped on the image as `computor.extension.revision`, returned by
   the build activity, and shown in the admin panel's progress rows.
 - `display_name` / `description` / `icon` — display metadata PATCHed into Coder after each push; the web UI renders these. Icons: Coder built-ins under `/icon/*.svg` (see https://github.com/coder/coder/tree/main/site/static/icon) or an absolute URL.
+- `cloned_from` / `created_at` — provenance stamped on a template created in the web UI (Templates → New template): the directory it was copied from, and when. Such a template exists only in the deployed templates dir — `computor.sh up` enumerates the repo's template dirs, never the deployed root, so it is never re-seeded — and it is the only kind the UI can delete.
 
 ## Lifecycle
 
@@ -141,6 +142,17 @@ a container). Compose binds the platform's own ports to `127.0.0.1`, which is
 what keeps the datastores out of reach.
 
 ## Adding a new workspace type
+
+**From the web UI** — Workspaces → Administration → Templates → **New template** (or
+**Clone** on a row). This copies a template dir — Terraform, Dockerfile, payload — and
+its settings row into a new dir under the deployed templates dir, with its own Coder
+name (`<key>-workspace`) and image name (`computor-workspace-<key>`); **Deploy** then
+builds and pushes it. Edit its Dockerfile/Terraform in the Files tab and its display
+name / description / icon in the Details tab (applied to Coder without a rebuild).
+The dir never gets a `.computor-managed` marker and has no repo counterpart, so
+startup leaves it alone.
+
+**By hand** — for a type meant to ship with the repo:
 
 1. Copy an existing template dir (`vscode` for editor-based, `bash` for terminal-based,
    `ubuntu-desktop` for GUI-based types).

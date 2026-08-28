@@ -63,7 +63,8 @@ echo "  Images removed"
 
 if [ "$WIPE_TEMPLATES" = true ]; then
     echo -e "\n${YELLOW}5. Removing Coder templates...${NC}"
-    # Templates are re-seeded from the repo on next computor.sh up
+    # Repo templates are re-seeded on the next computor.sh up. Templates created
+    # in the web UI exist ONLY here — they are gone for good.
     if [ -n "$SYSTEM_DEPLOYMENT_PATH" ] && [ -d "$SYSTEM_DEPLOYMENT_PATH/coder" ]; then
         sudo rm -rf "$SYSTEM_DEPLOYMENT_PATH/coder"
         echo "  Coder directory removed from $SYSTEM_DEPLOYMENT_PATH/coder"

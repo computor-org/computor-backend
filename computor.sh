@@ -226,7 +226,9 @@ cmd_up() {
         # .computor-managed marker are re-synced from the repo on every startup so
         # template changes actually propagate; dirs WITHOUT the marker (operator-
         # customized, or seeded before markers existed) are never touched — delete
-        # such a dir once to adopt syncing.
+        # such a dir once to adopt syncing. The loop enumerates the REPO, not the
+        # deployed root: a dir that exists only there (a template created in the
+        # web UI, `cloned_from` in its template.json) is never visited at all.
         #
         # EVERY template is seeded, whether or not this deployment intends to
         # offer it. Seeding is a few kilobytes per directory; what costs anything

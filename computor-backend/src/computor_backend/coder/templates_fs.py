@@ -12,11 +12,19 @@ Any edit through this module therefore REMOVES the marker, flipping the
 template to operator-customized so startup stops clobbering it;
 ``restore_managed`` re-creates the marker, and the repo defaults return on
 the next system restart.
+
+Templates created through the API (``clone_template``) exist ONLY in the
+deployed dir. computor.sh iterates the repo's template dirs, never the deployed
+root, so such a dir is never visited — it carries no marker and ``cloned_from``
+in its manifest marks it as created here (the only kind that may be deleted).
 """
 
 import json
 import os
 import re
+import shutil
+import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import hcl2
@@ -28,9 +36,30 @@ _FILE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 _MAX_FILE_BYTES = 512 * 1024
 
+# Template KEY = directory name of a template created here: lowercase
+# alphanumerics with inner hyphens, i.e. a Coder template name minus the
+# "-workspace" suffix that is derived from it. 22 chars keeps the derived Coder
+# name inside Coder's 32-char limit.
+TEMPLATE_KEY_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
+TEMPLATE_KEY_MAX_LEN = 22
+CODER_TEMPLATE_SUFFIX = "-workspace"
+IMAGE_NAME_PREFIX = "computor-workspace-"
+
+# An icon is an absolute http(s) URL (the web UI renders it as an image) or one
+# of Coder's built-in /icon/*.svg paths. Nothing else: no javascript:/data:
+# URLs, no relative paths.
+_ICON_RE = re.compile(r"^(?:https?://\S+|/icon/[A-Za-z0-9._-]+\.(?:svg|png))$")
+
+# A clone is assembled in a dot-prefixed staging dir and renamed into place.
+_STAGING_PREFIX = ".clone-"
+
 
 class TemplateFileError(ValueError):
     """A template file operation failed validation (maps to 400)."""
+
+
+class TemplateConflictError(ValueError):
+    """A template name or image name is already taken (maps to 409)."""
 
 
 def resolve_templates_root(templates_dir: str) -> Optional[str]:
@@ -55,6 +84,10 @@ def discover_templates(root: str) -> Dict[str, Dict[str, Any]]:
     worker's discovery: a dir is a template iff it has template.json)."""
     templates: Dict[str, Dict[str, Any]] = {}
     for entry in sorted(os.listdir(root)):
+        if entry.startswith("."):
+            # The staging dir of an in-flight clone, or a stray dot-dir such
+            # as Coder's own .coder/ — never a template.
+            continue
         manifest_path = os.path.join(root, entry, "template.json")
         if os.path.isfile(manifest_path):
             try:
@@ -168,6 +201,221 @@ def write_template_file(template_dir: str, file_name: str, content: str) -> None
     with open(path, "w", encoding="utf-8") as f:
         f.write(content)
     mark_customized(template_dir)
+
+
+# ---------------------------------------------------------------------------
+# Manifest + template lifecycle (clone / metadata / delete)
+# ---------------------------------------------------------------------------
+
+
+def read_manifest(template_dir: str) -> Dict[str, Any]:
+    """The template's ``template.json`` as a dict. Raises TemplateFileError."""
+    path = os.path.join(template_dir, "template.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            manifest = json.load(f)
+    except FileNotFoundError as e:
+        raise TemplateFileError("template.json is missing.") from e
+    except json.JSONDecodeError as e:
+        raise TemplateFileError(f"template.json is not valid JSON: {e}") from e
+    if not isinstance(manifest, dict):
+        raise TemplateFileError("template.json must be a JSON object.")
+    return manifest
+
+
+def write_manifest(template_dir: str, manifest: Dict[str, Any]) -> None:
+    """Atomically replace ``template.json`` (write a sibling, then rename).
+
+    The marker is left alone — the caller decides whether the write
+    customizes the template. The ``dir_name`` key ``discover_templates``
+    injects is never persisted.
+    """
+    payload = {k: v for k, v in manifest.items() if k != "dir_name"}
+    path = os.path.join(template_dir, "template.json")
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=4)
+        f.write("\n")
+    os.replace(tmp, path)
+
+
+def is_clone(manifest: Dict[str, Any]) -> bool:
+    """Created through the API (``cloned_from`` set) — never repo-synced."""
+    return bool(manifest.get("cloned_from"))
+
+
+def validate_template_key(key: str) -> None:
+    """Gate a new template's key (= its directory name). Raises TemplateFileError."""
+    if not key or len(key) > TEMPLATE_KEY_MAX_LEN or not TEMPLATE_KEY_RE.match(key):
+        raise TemplateFileError(
+            f"Template key must be 1-{TEMPLATE_KEY_MAX_LEN} lowercase letters, "
+            "digits or hyphens, starting and ending with a letter or digit."
+        )
+    if key.endswith(CODER_TEMPLATE_SUFFIX):
+        raise TemplateFileError(
+            f"Template key must not end in '{CODER_TEMPLATE_SUFFIX}' — that "
+            "suffix is added automatically."
+        )
+
+
+def validate_icon(icon: Optional[str]) -> None:
+    """Empty is fine; otherwise an absolute http(s) URL or a Coder /icon path."""
+    if icon and not _ICON_RE.match(icon):
+        raise TemplateFileError(
+            "Icon must be an absolute http(s) URL or a Coder built-in "
+            "/icon/<name>.svg path."
+        )
+
+
+def derive_template_identity(key: str) -> Dict[str, str]:
+    """The dir name, Coder template name and image name a key expands to.
+
+    Same convention as the shipped templates (``vscode`` -> ``vscode-workspace``
+    / ``computor-workspace-vscode``), so ``naming.derive_workspace_name`` gives
+    a clone's workspaces the key as their default name.
+    """
+    return {
+        "dir_name": key,
+        "coder_template_name": f"{key}{CODER_TEMPLATE_SUFFIX}",
+        "image_name": f"{IMAGE_NAME_PREFIX}{key}",
+    }
+
+
+def _metadata_fields(
+    display_name: str, description: Optional[str], icon: Optional[str]
+) -> Dict[str, str]:
+    """Cleared values are stored as ``""`` (not dropped) so the push pipeline's
+    ``info.get("icon", "")`` clears the field in Coder as well."""
+    return {
+        "display_name": (display_name or "").strip(),
+        "description": (description or "").strip(),
+        "icon": (icon or "").strip(),
+    }
+
+
+def update_template_metadata(
+    template_dir: str,
+    *,
+    display_name: str,
+    description: Optional[str],
+    icon: Optional[str],
+) -> Dict[str, Any]:
+    """Rewrite the manifest's display metadata, flipping the dir to customized.
+
+    Customizing is a no-op for a clone (it has no marker) and, for a repo
+    template, the same detachment from repo syncing any raw file edit causes.
+    """
+    validate_icon(icon)
+    if not (display_name or "").strip():
+        raise TemplateFileError("Display name must not be empty.")
+    manifest = read_manifest(template_dir)
+    manifest.update(_metadata_fields(display_name, description, icon))
+    write_manifest(template_dir, manifest)
+    mark_customized(template_dir)
+    return manifest
+
+
+def clone_template(
+    root: str,
+    source_dir_name: str,
+    key: str,
+    *,
+    display_name: str,
+    description: Optional[str],
+    icon: Optional[str],
+) -> Tuple[str, Dict[str, Any]]:
+    """Copy a template dir into an independent new one named ``key``.
+
+    The whole tree comes along (Terraform, Dockerfile, payload dirs) except
+    the managed marker: a clone has no repo counterpart, so computor.sh never
+    visits it, and a marker would only claim otherwise. The manifest is
+    rewritten with the derived identity, the given display metadata, and
+    ``cloned_from`` / ``created_at`` provenance; ``build_args_env`` and
+    ``source_repos`` are inherited.
+
+    Uniqueness is checked over dir names AND Coder names AND image names of
+    every template on disk: ``resolve_template_dir`` and the push worker
+    match a requested name against either identity, and a shared image name
+    would make the clone's build overwrite its source's image.
+
+    Assembly is atomic for every discoverer: files land in a dot-prefixed
+    staging dir, the manifest is written last, and the dir is renamed into
+    place — neither the catalog nor a concurrent push can see a half copy.
+
+    Raises TemplateFileError (invalid input) or TemplateConflictError (a name
+    or image is already taken). Returns ``(dir_name, manifest)``.
+    """
+    validate_template_key(key)
+    validate_icon(icon)
+    if not (display_name or "").strip():
+        raise TemplateFileError("Display name must not be empty.")
+    identity = derive_template_identity(key)
+
+    source_dir = os.path.join(root, source_dir_name)
+    source_manifest = read_manifest(source_dir)
+
+    taken_names: set = set()
+    taken_images: set = set()
+    for dir_name, existing in discover_templates(root).items():
+        taken_names.add(dir_name)
+        if existing.get("coder_template_name"):
+            taken_names.add(existing["coder_template_name"])
+        if existing.get("image_name"):
+            taken_images.add(existing["image_name"])
+    if key in taken_names or identity["coder_template_name"] in taken_names:
+        raise TemplateConflictError(
+            f"A template named '{key}' ('{identity['coder_template_name']}') "
+            "already exists."
+        )
+    if identity["image_name"] in taken_images:
+        raise TemplateConflictError(
+            f"Image name '{identity['image_name']}' is already used by another template."
+        )
+    dest = os.path.join(root, key)
+    if os.path.lexists(dest):
+        raise TemplateConflictError(
+            f"Directory '{key}' already exists in the templates directory."
+        )
+
+    manifest = {k: v for k, v in source_manifest.items() if k != "dir_name"}
+    manifest["coder_template_name"] = identity["coder_template_name"]
+    manifest["image_name"] = identity["image_name"]
+    manifest.update(_metadata_fields(display_name, description, icon))
+    manifest["cloned_from"] = source_dir_name
+    manifest["created_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    staging = os.path.join(root, f"{_STAGING_PREFIX}{key}-{uuid.uuid4().hex[:8]}")
+    try:
+        shutil.copytree(
+            source_dir,
+            staging,
+            symlinks=True,
+            ignore=shutil.ignore_patterns(MANAGED_MARKER, "template.json", "template.json.tmp"),
+        )
+        write_manifest(staging, manifest)
+        os.rename(staging, dest)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    manifest["dir_name"] = key
+    return key, manifest
+
+
+def delete_template_dir(root: str, dir_name: str) -> None:
+    """Remove a cloned template directory. Refuses anything not created here.
+
+    ``template.json`` goes first, so the dir stops being a template for every
+    discoverer (catalog, push worker) before the rest of the tree is torn
+    down.
+    """
+    path = os.path.join(root, dir_name)
+    if not is_clone(read_manifest(path)):
+        raise TemplateFileError(
+            "Only templates created here can be deleted; repo-shipped templates "
+            "are removed from ops/coder/templates."
+        )
+    os.remove(os.path.join(path, "template.json"))
+    shutil.rmtree(path)
 
 
 # ---------------------------------------------------------------------------

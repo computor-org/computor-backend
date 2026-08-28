@@ -3,7 +3,7 @@
  * Endpoint: /tutors
  */
 
-import type { CourseContentStudentGet, CourseContentStudentList, CourseTutorGet, CourseTutorList, TutorCourseMemberGet, TutorCourseMemberList, TutorGradeCreate, TutorGradeResponse, TutorSubmissionGroupGet, TutorSubmissionGroupList, TutorTestArtifactList, TutorTestCreateResponse, TutorTestGet, TutorTestResultSubmit, TutorTestStatus } from 'types/generated';
+import type { CourseContentStudentGet, CourseContentStudentList, CourseTutorGet, CourseTutorList, TutorCourseMemberGet, TutorCourseMemberList, TutorGradeCreate, TutorGradeResponse, TutorSubmissionGroupGet, TutorSubmissionGroupLimitsUpdate, TutorSubmissionGroupList, TutorTestArtifactList, TutorTestCreateResponse, TutorTestGet, TutorTestResultSubmit, TutorTestStatus } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -210,6 +210,20 @@ export class TutorsClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.get<TutorSubmissionGroupGet>(this.buildPath('submission-groups', submissionGroupId), { params: queryParams });
+  }
+
+  /**
+   * Tutor Update Submission Group Limits Endpoint
+   * Grant one submission group extra test runs or submissions.
+   * Tutors and above, unlike the lecturer-only course and assignment limits:
+   * granting a single student another attempt is exactly the correction a tutor
+   * is there to make. Send ``null`` to drop the override and inherit again.
+   */
+  async tutorUpdateSubmissionGroupLimitsEndpointTutorsSubmissionGroupsSubmissionGroupIdPatch({ submissionGroupId, userId, body }: { submissionGroupId: string | string; userId?: string | null; body: TutorSubmissionGroupLimitsUpdate }): Promise<TutorSubmissionGroupGet> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.patch<TutorSubmissionGroupGet>(this.buildPath('submission-groups', submissionGroupId), body, { params: queryParams });
   }
 
   /**

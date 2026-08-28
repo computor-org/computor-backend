@@ -635,6 +635,18 @@ class CoderClient:
         )
         return resp.json()
 
+    async def delete_template(self, template_id: str) -> None:
+        """Delete a template. Coder refuses while workspaces still use it.
+
+        Raises:
+            CoderAPIError: If Coder rejects the deletion.
+        """
+        await self._request(
+            "DELETE",
+            f"/api/v2/templates/{template_id}",
+            ok=(200, 204),
+        )
+
     # -------------------------------------------------------------------------
     # Workspace operations
     # -------------------------------------------------------------------------

@@ -299,11 +299,20 @@ export default function WorkspaceTemplatesPanel() {
                     <Td>
                       <div className="flex flex-col items-start gap-1">
                         <Badge color={state.color} pill>{state.label}</Badge>
-                        {template.customized && (
-                          <Badge color="blue" title="Edited on disk; no longer re-synced from the repo">
+                        {/* A clone is always customized (it has no marker), so
+                            say where it came from instead of "edited on disk". */}
+                        {template.cloned_from ? (
+                          <Badge
+                            tone="info"
+                            title={`Created here from '${template.cloned_from}'; the repository sync never touches it`}
+                          >
+                            cloned from {template.cloned_from}
+                          </Badge>
+                        ) : template.customized ? (
+                          <Badge tone="info" title="Edited on disk; no longer re-synced from the repo">
                             customized
                           </Badge>
-                        )}
+                        ) : null}
                         {!template.dir_name && (
                           <span className="text-xs text-subtle">no template directory</span>
                         )}
@@ -365,6 +374,15 @@ export default function WorkspaceTemplatesPanel() {
                             variant="secondary"
                           >
                             Configure
+                          </ButtonLink>
+                        )}
+                        {template.dir_name && (
+                          <ButtonLink
+                            href={`/workspaces/admin/templates/create?from=${encodeURIComponent(template.dir_name)}`}
+                            size="xs"
+                            variant="ghost"
+                          >
+                            Clone
                           </ButtonLink>
                         )}
                       </div>
