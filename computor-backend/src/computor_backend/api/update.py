@@ -18,6 +18,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from computor_backend.business_logic.build_info import running_version
 from computor_backend.config import get_settings
 from computor_backend.database import get_db
 from computor_backend.exceptions import (
@@ -55,38 +56,6 @@ REDIS_KEY_SCHEDULE_RESULT = "update:schedule:result"
 REMOTE_CACHE_TTL = 300  # seconds
 LS_REMOTE_TIMEOUT = 10  # seconds
 UPDATE_LOCK_TTL = 7200  # seconds — matches ops/lib/update.sh
-
-# Resolved once per process: the running commit/branch never change while the
-# process lives (env is baked at image build; dev reads the working tree).
-_running_version: Optional[Tuple[str, str]] = None
-
-
-def _get_running_version() -> Tuple[str, str]:
-    """(commit, branch) of the running code: baked env, else git discovery."""
-    global _running_version
-    if _running_version is not None:
-        return _running_version
-
-    settings = get_settings().update
-    if settings.git_commit:
-        _running_version = (settings.git_commit, settings.git_branch or "unknown")
-        return _running_version
-
-    # Dev fallback: the API runs from a git working tree on the host.
-    try:
-        import git
-
-        repo = git.Repo(__file__, search_parent_directories=True)
-        commit = repo.head.commit.hexsha
-        try:
-            branch = repo.active_branch.name
-        except TypeError:  # detached HEAD
-            branch = "detached"
-        _running_version = (commit, branch)
-    except Exception:
-        _running_version = ("unknown", "unknown")
-    return _running_version
-
 
 def _sanitize(text: str) -> str:
     """Strip credentials from git output before it is stored or logged."""
@@ -176,7 +145,7 @@ async def _get_remote_state(redis, force_refresh: bool) -> dict:
 
 async def _build_status(redis, force_refresh: bool = False) -> SystemUpdateStatusGet:
     settings = get_settings().update
-    running_commit, running_branch = _get_running_version()
+    running_commit, running_branch = running_version()
     remote = await _get_remote_state(redis, force_refresh)
     raw_state = await redis.hgetall(REDIS_KEY_STATE)
     updater_online = bool(await redis.exists(REDIS_KEY_AGENT))

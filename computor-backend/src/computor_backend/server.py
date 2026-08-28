@@ -345,6 +345,11 @@ async def startup_logic():
 async def lifespan(app: FastAPI):
     from computor_backend.maintenance_scheduler import MaintenanceReminderScheduler
     from computor_backend.business_logic.result_reconciler import ResultReconciler
+    from computor_backend.business_logic.build_info import mark_started
+
+    # First thing in the lifespan: "last restart" means when the app came up,
+    # not when startup_logic finished bootstrapping (#350).
+    mark_started()
 
     await startup_logic()
 
