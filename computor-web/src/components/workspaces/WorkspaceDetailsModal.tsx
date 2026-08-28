@@ -19,7 +19,7 @@ export default function WorkspaceDetailsModal({
   const stage = workspaceStage(details.status, undefined, details.agent_lifecycle);
   return (
     <Modal title="Workspace Details" onClose={onClose} maxWidth="max-w-lg">
-      <div className="p-6 pt-4 max-h-[80vh] overflow-y-auto scroll-slim">
+      <div className="p-6 pt-4">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <tbody className="divide-y divide-rule-soft">

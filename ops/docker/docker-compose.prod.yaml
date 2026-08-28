@@ -132,8 +132,12 @@ services:
       MINIO_MAX_UPLOAD_SIZE: ${MINIO_MAX_UPLOAD_SIZE:-10485760}
       EXTENSION_PUBLIC_DOWNLOAD_URL: ${EXTENSION_PUBLIC_DOWNLOAD_URL}
       EXTENSION_GETTING_STARTED_URL: ${EXTENSION_GETTING_STARTED_URL}
-      # Coder integration (if enabled)
-      CODER_ENABLED: ${CODER_ENABLED:-false}
+      # Coder integration (if enabled). API_CODER_ENABLED decouples the API's
+      # workspace features from the local coder overlay: a split-host deploy
+      # (docker-compose.workerhost.yaml) runs Coder on the worker host and
+      # sets CODER_ENABLED=false (no local overlay) but API_CODER_ENABLED=true
+      # with CODER_URL pointing over the wg link.
+      CODER_ENABLED: ${API_CODER_ENABLED:-${CODER_ENABLED:-false}}
       CODER_URL: ${CODER_URL}
       CODER_WORKSPACE_BASE_URL: ${CODER_WORKSPACE_BASE_URL:-}
       CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}

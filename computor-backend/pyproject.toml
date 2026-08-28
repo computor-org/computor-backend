@@ -87,3 +87,7 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.uv.sources]
+computor-client = { path = "../computor-client" }
+computor-types = { path = "../computor-types" }
