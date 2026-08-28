@@ -19,14 +19,10 @@ import { inputCls } from '@/src/components/ui/tokens';
 import { CourseMembersClient } from '@/src/generated/clients/CourseMembersClient';
 import { CourseWorkspacesClient } from '@/src/clients/CourseWorkspacesClient';
 import type { StudentWorkspaceProvisionOutcome } from '@/src/types/workspaces';
+import { userName } from '@/src/utils/userName';
 
 const membersClient = new CourseMembersClient();
 const courseWorkspacesClient = new CourseWorkspacesClient();
-
-function memberName(user?: { given_name?: string | null; family_name?: string | null; email?: string | null } | null): string {
-  const name = [user?.given_name, user?.family_name].filter(Boolean).join(' ');
-  return name || user?.email || 'Unknown';
-}
 
 function LecturerWorkspacesContent() {
   const courseId = useParams().id as string;
@@ -62,7 +58,7 @@ function LecturerWorkspacesContent() {
     () =>
       (data?.members ?? [])
         .slice()
-        .sort((a, b) => memberName(a.user).localeCompare(memberName(b.user))),
+        .sort((a, b) => userName(a.user).localeCompare(userName(b.user))),
     [data],
   );
   const templates = (settings?.templates ?? []).filter((t) => t.enabled);
@@ -399,12 +395,12 @@ function LecturerWorkspacesContent() {
                           <Td>
                             <input
                               type="checkbox"
-                              aria-label={`Select ${memberName(member.user)}`}
+                              aria-label={`Select ${userName(member.user)}`}
                               checked={selected.has(member.id)}
                               onChange={() => toggleMember(member.id)}
                             />
                           </Td>
-                          <Td className="text-sm text-fg">{memberName(member.user)}</Td>
+                          <Td className="text-sm text-fg">{userName(member.user)}</Td>
                           <Td className="text-xs text-muted">{member.course_role_id}</Td>
                           <Td className="text-xs">
                             {outcome ? (

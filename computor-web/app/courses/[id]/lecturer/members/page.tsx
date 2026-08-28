@@ -25,15 +25,11 @@ import {
   highestCourseRole,
   maxAssignableRole,
 } from '@/src/utils/courseRoles';
+import { memberName } from '@/src/utils/userName';
 
 const PAGE_SIZE = 25;
 const membersClient = new CourseMembersClient();
 const groupsClient = new CourseGroupsClient();
-
-function memberName(m: CourseMemberList): string {
-  const name = `${m.user?.given_name ?? ''} ${m.user?.family_name ?? ''}`.trim();
-  return name || m.user?.email || m.user_id;
-}
 
 export default function CourseMembersPage() {
   const courseId = useParams().id as string;
