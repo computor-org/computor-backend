@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 import computor_backend.api.update as update_api
+from computor_backend.business_logic import build_info
 from computor_backend.api.update import (
     REDIS_KEY_AGENT,
     REDIS_KEY_REMOTE,
@@ -219,7 +220,7 @@ async def test_status_round_trips_schedule_and_result(monkeypatch):
         "resolved_at": "2026-07-19T05:00:00+00:00",
         "detail": "The system was unavailable at the scheduled time; the update was not run.",
     }
-    monkeypatch.setattr(update_api, "_running_version", ("a" * 40, "main"))
+    monkeypatch.setattr(build_info, "_running_version", ("a" * 40, "main"))
 
     with patch.object(update_api, "get_settings", return_value=_settings()):
         status = await _build_status(redis)
@@ -239,7 +240,7 @@ async def test_status_has_no_schedule_when_none_pending(monkeypatch):
         "checked_at": "2026-07-20T00:00:00+00:00",
         "error": "",
     }
-    monkeypatch.setattr(update_api, "_running_version", ("a" * 40, "main"))
+    monkeypatch.setattr(build_info, "_running_version", ("a" * 40, "main"))
 
     with patch.object(update_api, "get_settings", return_value=_settings()):
         status = await _build_status(redis)
