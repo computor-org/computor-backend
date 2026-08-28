@@ -249,11 +249,15 @@ redis_cli() {
     compose exec -T redis redis-cli -a "$REDIS_PASSWORD" "$@" 2>/dev/null
 }
 
-# Export GIT_COMMIT / GIT_BRANCH of the checked-out tree for image builds.
+# Export GIT_COMMIT / GIT_BRANCH / BUILD_TIME of the checked-out tree for image
+# builds. BUILD_TIME is the wall clock at build, not the commit date: a rebuild
+# of the same commit is a different running image, and "when did this start
+# running what it is running" is the question #350 asks.
 git_build_meta() {
     GIT_COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
     GIT_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
-    export GIT_COMMIT GIT_BRANCH
+    BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    export GIT_COMMIT GIT_BRANCH BUILD_TIME
 }
 
 # ---------------------------------------------------------------------------

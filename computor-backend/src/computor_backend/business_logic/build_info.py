@@ -1,17 +1,20 @@
 """What this process is and when it started (#350).
 
 Facts an operator asks for and the API could not answer: when the server last
-restarted, and which code it is running. Neither changes while the process
-lives, so both are resolved once and cached.
+restarted, which code it is running, and when that code was built. None of them
+changes while the process lives, so all are resolved once and cached.
 
 The commit/branch half moved here from ``api/update.py``, which needed it to
 compare the running version against the deployment repo's tip. Two endpoints now
 report the same identity, and there is one definition of it.
 """
+import logging
 from datetime import datetime, timezone
 from typing import Optional, Tuple
 
 from computor_backend.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 # Set by the FastAPI lifespan, so this is when the app came up rather than when
 # some module happened to be imported.
@@ -71,3 +74,21 @@ def running_version() -> Tuple[str, str]:
     except Exception:
         _running_version = ("unknown", "unknown")
     return _running_version
+
+
+def build_time() -> Optional[datetime]:
+    """When the running image was built, or None when this is not one.
+
+    ``BUILD_TIME`` is stamped into the image beside ``GIT_COMMIT`` (see
+    docker/base/Dockerfile). In development there is no build, so there is no
+    honest answer — and None says that, where a fabricated timestamp would not.
+    """
+    raw = get_settings().update.build_time.strip()
+    if not raw:
+        return None
+    try:
+        stamp = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        logger.warning(f"Ignoring unparseable BUILD_TIME: {raw!r}")
+        return None
+    return stamp if stamp.tzinfo else stamp.replace(tzinfo=timezone.utc)
