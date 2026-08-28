@@ -37,6 +37,7 @@ from computor_types.tutor_grading import TutorGradeCreate, TutorGradeResponse
 from computor_types.course_members import CourseMemberQuery
 from computor_types.tutor_submission_groups import (
     TutorSubmissionGroupGet,
+    TutorSubmissionGroupLimitsUpdate,
     TutorSubmissionGroupList,
     TutorSubmissionGroupQuery,
 )
@@ -58,6 +59,7 @@ from computor_backend.business_logic.tutor import (
     list_tutor_course_members,
     get_tutor_submission_group,
     list_tutor_submission_groups,
+    update_tutor_submission_group_limits,
 )
 
 tutor_router = APIRouter()
@@ -153,6 +155,24 @@ def tutor_get_submission_group_endpoint(
 ):
     """Get a submission group with detailed information for tutors."""
     return get_tutor_submission_group(submission_group_id, permissions, db, cache)
+
+@tutor_router.patch("/submission-groups/{submission_group_id}", response_model=TutorSubmissionGroupGet)
+def tutor_update_submission_group_limits_endpoint(
+    submission_group_id: UUID | str,
+    limits: TutorSubmissionGroupLimitsUpdate,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+    cache: Cache = Depends(get_cache)
+):
+    """Grant one submission group extra test runs or submissions.
+
+    Tutors and above, unlike the lecturer-only course and assignment limits:
+    granting a single student another attempt is exactly the correction a tutor
+    is there to make. Send ``null`` to drop the override and inherit again.
+    """
+    return update_tutor_submission_group_limits(
+        submission_group_id, limits, permissions, db, cache
+    )
 
 @tutor_router.get("/submission-groups", response_model=list[TutorSubmissionGroupList])
 def tutor_list_submission_groups_endpoint(

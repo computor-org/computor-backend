@@ -12,6 +12,7 @@ from computor_backend.exceptions import BadRequestException, ForbiddenException,
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.principal import Principal, allowed_course_role_ids
 from computor_backend.cache import Cache
+from computor_backend.database import set_db_user
 from computor_backend.repositories.tutor_view import TutorViewRepository
 from computor_backend.repositories.course_member import CourseMemberRepository
 from computor_backend.repositories.submission_group import SubmissionGroupRepository
@@ -39,6 +40,7 @@ from computor_types.tutor_grading import TutorGradeResponse, GradedArtifactInfo
 from computor_types.tutor_submission_groups import (
     TutorSubmissionGroupList,
     TutorSubmissionGroupGet,
+    TutorSubmissionGroupLimitsUpdate,
     TutorSubmissionGroupQuery,
     TutorSubmissionGroupMember,
 )
@@ -523,6 +525,66 @@ def get_tutor_submission_group(
         created_at=submission_group.created_at,
         updated_at=submission_group.updated_at,
     )
+
+
+def update_tutor_submission_group_limits(
+    submission_group_id: UUID | str,
+    limits: TutorSubmissionGroupLimitsUpdate,
+    permissions: Principal,
+    db: Session,
+    cache: Optional[Cache] = None,
+) -> TutorSubmissionGroupGet:
+    """Grant (or withdraw) a single group's budget override.
+
+    This is the one write on a submission group a ``_tutor`` may make; every
+    other field on the row stays behind the lecturer-only CRUD route. It exists
+    because the limit a student runs into is per assignment, and the only way
+    to hand *one* student another attempt is the group-level override
+    (computor-org/issues#393).
+
+    Lowering a limit below what the group has already spent is deliberately
+    allowed: nothing already submitted is invalidated, the group simply has no
+    budget left.
+    """
+    submission_group = db.query(SubmissionGroup).filter(
+        SubmissionGroup.id == submission_group_id
+    ).first()
+
+    if submission_group is None:
+        raise NotFoundException(
+            detail="Submission group not found",
+            context={"submission_group_id": str(submission_group_id)},
+        )
+
+    if check_course_permissions(permissions, CourseMember, "_tutor", db).filter(
+        CourseMember.course_id == submission_group.course_id,
+        CourseMember.user_id == permissions.get_user_id_or_throw()
+    ).first() is None:
+        raise ForbiddenException()
+
+    # `exclude_unset` is what makes the two fields independent: a client that
+    # sends only `max_submissions` must not silently clear `max_test_runs`.
+    updates = limits.model_dump(exclude_unset=True)
+    if not updates:
+        raise BadRequestException(
+            detail="Provide max_submissions and/or max_test_runs.",
+        )
+
+    set_db_user(db, permissions.user_id)
+    SubmissionGroupRepository(db, cache).update_entity(submission_group, updates)
+
+    if cache:
+        # The budget is rendered in all three trees, so all three views go stale.
+        cache.invalidate_tags(f"student_view:{submission_group.course_id}")
+        cache.invalidate_tags(f"tutor_view:{submission_group.course_id}")
+        cache.invalidate_tags(f"lecturer_view:{submission_group.course_id}")
+
+    logger.info(
+        "Submission group %s budget override set to %s by user %s",
+        submission_group.id, updates, permissions.user_id,
+    )
+
+    return get_tutor_submission_group(submission_group_id, permissions, db, cache)
 
 
 def _submission_stats_for_groups(group_ids, db: Session) -> dict:
