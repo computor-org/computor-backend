@@ -1,6 +1,6 @@
 """DTOs for tutor submission group endpoints."""
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 
 
@@ -69,6 +69,21 @@ class TutorSubmissionGroupGet(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TutorSubmissionGroupLimitsUpdate(BaseModel):
+    """The per-group budget overrides a tutor is allowed to grant.
+
+    Deliberately narrower than ``SubmissionGroupUpdate``: a tutor may hand one
+    student extra attempts, but must not reach the group's size, repository
+    properties or grading status through the same call.
+
+    Both fields are tri-state. Omitting one leaves the existing override
+    untouched, ``null`` clears it (the group falls back to the assignment, then
+    to the course default), and a number pins it for this group alone.
+    """
+    max_submissions: Optional[int] = Field(default=None, ge=0)
+    max_test_runs: Optional[int] = Field(default=None, ge=0)
 
 
 class TutorSubmissionGroupQuery(BaseModel):
