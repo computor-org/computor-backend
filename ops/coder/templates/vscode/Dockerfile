@@ -49,7 +49,11 @@ FROM computor-code-server:latest
 
 USER root
 
-# Install build dependencies for Python
+# Build dependencies for Python, plus openssh-client: ssh-keygen and ssh let a
+# student generate a key in the workspace and clone their own GitLab/GitHub
+# project over SSH (computor-org/issues#391). Upstream code-server happens to
+# ship the package today — naming it here keeps a base-image bump from quietly
+# taking ssh-keygen away.
 RUN apt-get update && apt-get install -y \
     build-essential \
     libssl-dev \
@@ -65,6 +69,7 @@ RUN apt-get update && apt-get install -y \
     wget \
     curl \
     git \
+    openssh-client \
     socat \
     && rm -rf /var/lib/apt/lists/*
 
