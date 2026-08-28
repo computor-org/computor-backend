@@ -1,23 +1,29 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
-import ListPageLayout, { ScrollPanel, ListLoading } from '@/src/components/ListPageLayout';
+import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
+import Badge from '@/src/components/Badge';
+import EmptyState from '@/src/components/EmptyState';
 import Forbidden from '@/src/components/Forbidden';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
+import Button, { ButtonLink } from '@/src/components/ui/Button';
+import Notice from '@/src/components/ui/Notice';
+import Toolbar from '@/src/components/ui/Toolbar';
+import TreeRow, { TreeRows } from '@/src/components/ui/TreeRow';
 import { CourseGroupsClient } from '@/src/generated/clients/CourseGroupsClient';
 import { CourseMembersClient } from '@/src/generated/clients/CourseMembersClient';
 import type { CourseGroupList } from 'types/generated';
-import { Table, Thead, Tbody, Th } from '@/src/components/ui/Table';
-import { fetchCourseRoster } from '@/src/components/course-members/roster';
+import { buildRoster, fetchCourseRoster } from '@/src/components/course-members/roster';
+import { courseRoleLabel } from '@/src/utils/courseRoles';
+import { memberName } from '@/src/utils/userName';
 
 const groupsClient = new CourseGroupsClient();
 const membersClient = new CourseMembersClient();
@@ -32,12 +38,15 @@ export default function CourseGroupsPage() {
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<CourseGroupList | null>(null);
+  // Collapsed is the default the issue asks for, so this holds what is OPEN.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const { data, loading, error, reload } = useResource(
     async () => {
       const [groups, members] = await Promise.all([
         groupsClient.listCourseGroupsCourseGroupsGet({ courseId, limit: 500 }),
-        // Member counts drive whether a group can be deleted (the FK is RESTRICT).
+        // The roster is both the membership shown under each group and the count
+        // that decides whether a group can be deleted (the FK is RESTRICT).
         fetchCourseRoster(membersClient, courseId),
       ]);
       return { groups, members };
@@ -46,14 +55,18 @@ export default function CourseGroupsPage() {
     { enabled: canManage },
   );
 
-  const groups = data?.groups ?? [];
-  const memberCount = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const m of data?.members ?? []) {
-      if (m.course_group_id) map.set(m.course_group_id, (map.get(m.course_group_id) ?? 0) + 1);
-    }
-    return map;
-  }, [data?.members]);
+  const roster = useMemo(
+    () => buildRoster(data?.groups ?? [], data?.members ?? []),
+    [data?.groups, data?.members],
+  );
+
+  function toggle(key: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  }
 
   async function deleteGroup(group: CourseGroupList) {
     setActionError(null);
@@ -85,12 +98,7 @@ export default function CourseGroupsPage() {
           title="Course groups"
           subtitle="Groups (lab sections, tutorial cohorts) students are assigned to. Every student must belong to a group."
           actions={
-            <Link
-              href={`/courses/${courseId}/lecturer/groups/create`}
-              className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover"
-            >
-              New group
-            </Link>
+            <ButtonLink href={`/courses/${courseId}/lecturer/groups/create`}>New group</ButtonLink>
           }
         />
 
@@ -99,65 +107,110 @@ export default function CourseGroupsPage() {
         {loading ? (
           <ListLoading>Loading groups…</ListLoading>
         ) : (
-          <ScrollPanel>
-            <Table>
-              <Thead>
-                <tr>
-                  <Th>Group</Th>
-                  <Th>Members</Th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </Thead>
-              <Tbody>
-                {groups.map((g) => {
-                  const count = memberCount.get(g.id) ?? 0;
-                  return (
-                    <tr key={g.id} className="hover:bg-canvas">
-                      <td className="px-4 py-3">
-                        <Link
-                          href={`/courses/${courseId}/lecturer/groups/${g.id}/edit`}
-                          className="font-medium text-fg text-sm hover:text-accent-text"
-                        >
-                          {g.title || 'Untitled group'}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted">{count}</td>
-                      <td className="px-4 py-3 text-right space-x-4">
-                        <Link
-                          href={`/courses/${courseId}/lecturer/groups/${g.id}/edit`}
-                          className="text-sm text-accent-text hover:underline"
-                        >
-                          Edit
-                        </Link>
-                        {count === 0 ? (
-                          <button
-                            onClick={() => setToDelete(g)}
-                            className="text-sm text-danger-text hover:underline"
-                          >
-                            Delete
-                          </button>
-                        ) : (
-                          <span
-                            className="text-sm text-faint cursor-not-allowed"
-                            title="Reassign this group's members before deleting it."
-                          >
-                            Delete
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {groups.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="px-4 py-8 text-center text-sm text-muted">
-                      No groups yet. Create one so students can be assigned to it.
-                    </td>
-                  </tr>
+          <ScrollArea spacing="rows">
+            {roster.length === 0 ? (
+              <EmptyState
+                title="No groups yet"
+                description="Create one so students can be assigned to it."
+              />
+            ) : (
+              <>
+                {(data?.groups ?? []).length === 0 && (
+                  <Notice tone="info">
+                    No groups yet — create one so students can be assigned to it.
+                  </Notice>
                 )}
-              </Tbody>
-            </Table>
-          </ScrollPanel>
+
+                <Toolbar>
+                  <Button variant="ghost" size="sm" onClick={() => setExpanded(new Set())}>
+                    Collapse all
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setExpanded(
+                        new Set(roster.filter((r) => r.members.length > 0).map((r) => r.key)),
+                      )
+                    }
+                  >
+                    Expand all
+                  </Button>
+                </Toolbar>
+
+                <TreeRows>
+                  {roster.map(({ group, key, title, members }) => {
+                    const open = expanded.has(key);
+                    return (
+                      <Fragment key={key}>
+                        <TreeRow
+                          depth={0}
+                          expandable={members.length > 0}
+                          expanded={open}
+                          onToggle={() => toggle(key)}
+                          label={title}
+                        >
+                          <Badge tone="muted" className="shrink-0">
+                            {members.length} {members.length === 1 ? 'member' : 'members'}
+                          </Badge>
+                          {/* The unassigned bucket is a view, not a row anyone
+                              can edit or delete — it has no group behind it. */}
+                          {group && (
+                            <ButtonLink
+                              href={`/courses/${courseId}/lecturer/groups/${group.id}/edit`}
+                              variant="ghost"
+                              size="xs"
+                              className="shrink-0"
+                            >
+                              Edit
+                            </ButtonLink>
+                          )}
+                          {group && (
+                            <Button
+                              variant="dangerGhost"
+                              size="xs"
+                              className="shrink-0"
+                              disabled={members.length > 0}
+                              title={
+                                members.length > 0
+                                  ? "Reassign this group's members before deleting it."
+                                  : undefined
+                              }
+                              onClick={() => setToDelete(group)}
+                            >
+                              Delete
+                            </Button>
+                          )}
+                        </TreeRow>
+
+                        {open &&
+                          members.map((m) => (
+                            <TreeRow
+                              key={m.id}
+                              depth={1}
+                              label={
+                                <>
+                                  {memberName(m)}
+                                  {m.user?.email && (
+                                    <span className="ml-2 text-xs font-normal text-muted">
+                                      {m.user.email}
+                                    </span>
+                                  )}
+                                </>
+                              }
+                            >
+                              <Badge tone="muted" className="shrink-0">
+                                {courseRoleLabel(m.course_role_id)}
+                              </Badge>
+                            </TreeRow>
+                          ))}
+                      </Fragment>
+                    );
+                  })}
+                </TreeRows>
+              </>
+            )}
+          </ScrollArea>
         )}
       </ListPageLayout>
 
