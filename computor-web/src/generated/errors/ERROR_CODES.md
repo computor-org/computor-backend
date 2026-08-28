@@ -1,7 +1,7 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Total errors:** 80
+**Total errors:** 81
 
 To regenerate: `bash generate_error_codes.sh`
 
@@ -1814,6 +1814,32 @@ PATCH /course-contents/{id}/move targeted a path whose parent is missing, whose 
 **Resolution Steps:**
 1. Move the content into a unit, or to the course root
 2. Refresh the course tree so the available units are up to date
+
+---
+
+### CONTENT_010 - Content Type In Use
+
+**HTTP Status:** `400`  
+**Severity:** `warning`  
+**Category:** `validation`  
+
+**Description:**  
+DELETE /course-content-types/{id} while course_content (or result) rows still reference it; both FKs are NOT NULL with ondelete=RESTRICT and the ORM relationships have no passive_deletes, so the unguarded attempt surfaced as a NotNullViolation whose raw SQL leaked to the client (computor-org/issues#387)
+
+**User Message:**  
+> Cannot delete this content type because course content still uses it. Reassign or delete that content first.
+
+**Affected Functions:**
+- `_validate_course_content_type_deletion`
+- `delete_entity`
+
+**Common Causes:**
+- Deleting a content type that units or assignments in the course were created with
+- Confusing a content type with the content itself (computor-org/issues#387)
+
+**Resolution Steps:**
+1. Change the listed course contents to another content type of the same kind
+2. Or delete those course contents first, then delete the type
 
 ---
 

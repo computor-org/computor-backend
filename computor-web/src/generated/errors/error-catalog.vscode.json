@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "error_count": 80,
+  "error_count": 81,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -454,6 +454,19 @@
         "plain": "This content cannot be moved to that place in the course. Assignments can only live inside units (or at the course root), and a unit cannot be moved inside an assignment.",
         "markdown": "**Invalid Content Move**\n\nThe target position does not fit the course structure: the parent must exist, it must be a kind that can hold children (a unit), and the moved content must be a kind that may sit inside a parent. Pick a unit as the target, or move the content to the course root.",
         "html": "<strong>Invalid Content Move</strong><p>The target position does not fit the course structure: the parent must exist, it must be a kind that can hold children (a unit), and the moved content must be a kind that may sit inside a parent. Pick a unit as the target, or move the content to the course root.</p>"
+      },
+      "retry_after": null
+    },
+    "CONTENT_010": {
+      "code": "CONTENT_010",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Content Type In Use",
+      "message": {
+        "plain": "Cannot delete this content type because course content still uses it. Reassign or delete that content first.",
+        "markdown": "**Content Type In Use**\n\nThis content type cannot be deleted while course content still refers to it. Change those contents to another type of the same kind, or delete them, and then delete the type.",
+        "html": "<strong>Content Type In Use</strong><p>This content type cannot be deleted while course content still refers to it. Change those contents to another type of the same kind, or delete them, and then delete the type.</p>"
       },
       "retry_after": null
     },

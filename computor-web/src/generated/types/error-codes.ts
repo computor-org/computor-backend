@@ -95,6 +95,7 @@ export const ErrorCodes = {
   CONTENT_007: "CONTENT_007", // Deletion Blocked by Descendant Submissions
   CONTENT_008: "CONTENT_008", // Content Type Kind Change Blocked
   CONTENT_009: "CONTENT_009", // Invalid Content Move
+  CONTENT_010: "CONTENT_010", // Content Type In Use
   VERSION_001: "VERSION_001", // Example Version Already Exists
   DEPLOY_001: "DEPLOY_001", // Assignment Not Released
   DEPLOY_002: "DEPLOY_002", // Deployment Not Found
@@ -650,6 +651,20 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
       plain: "This content cannot be moved to that place in the course. Assignments can only live inside units (or at the course root), and a unit cannot be moved inside an assignment.",
       markdown: "**Invalid Content Move**\n\nThe target position does not fit the course structure: the parent must exist, it must be a kind that can hold children (a unit), and the moved content must be a kind that may sit inside a parent. Pick a unit as the target, or move the content to the course root.",
       html: "<strong>Invalid Content Move</strong><p>The target position does not fit the course structure: the parent must exist, it must be a kind that can hold children (a unit), and the moved content must be a kind that may sit inside a parent. Pick a unit as the target, or move the content to the course root.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: undefined,
+  },
+  CONTENT_010: {
+    code: "CONTENT_010",
+    httpStatus: 400,
+    category: ErrorCategory.VALIDATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Content Type In Use",
+    message: {
+      plain: "Cannot delete this content type because course content still uses it. Reassign or delete that content first.",
+      markdown: "**Content Type In Use**\n\nThis content type cannot be deleted while course content still refers to it. Change those contents to another type of the same kind, or delete them, and then delete the type.",
+      html: "<strong>Content Type In Use</strong><p>This content type cannot be deleted while course content still refers to it. Change those contents to another type of the same kind, or delete them, and then delete the type.</p>",
     },
     retryAfter: undefined,
     documentationUrl: undefined,
