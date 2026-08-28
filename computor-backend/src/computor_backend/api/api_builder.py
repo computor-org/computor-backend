@@ -20,7 +20,7 @@ from computor_backend.permissions.principal import Principal
 from computor_types.base import EntityInterface
 from computor_backend.redis_cache import get_cache
 from fastapi import FastAPI, BackgroundTasks
-from fastapi import Response
+from fastapi import Request, Response
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,7 @@ class CrudRouter:
 
     def create(self):
         async def route(
+                request: Request,
                 background_tasks: BackgroundTasks,
                 permissions: Annotated[Principal, Depends(get_current_principal)],
                 entity: self.dto.create,
@@ -57,6 +58,7 @@ class CrudRouter:
             entity_created = await create_db(permissions, db, entity, self.dto.model, self.dto.get, self.dto.post_create)
 
             self._invalidate_caches_for(entity_created)
+            await self._invalidate_creator_principal(request)
 
             for task in self.on_created:
                 background_tasks.add_task(task, entity_created, permissions)
@@ -237,6 +239,47 @@ class CrudRouter:
         
         return self
     
+    async def _invalidate_creator_principal(self, request: Request) -> None:
+        """Drop the caller's cached Principal after a self-granting create.
+
+        Entities whose interface sets ``grants_creator_scope_role`` enrol their
+        creator as ``_owner`` in ``post_create``, which means this request just
+        changed the caller's own authorization. The Principal is cached per
+        credential for ``AUTH_CACHE_TTL`` and is what ``GET /user/scopes``
+        projects, so a client that re-reads its permissions right after
+        creating an organization / course family / course would otherwise be
+        told it holds no role there for up to fifteen minutes. Same reasoning
+        (and same helper) as the self-enrolment path in ``api/user.py``.
+
+        The credential is re-parsed off the request rather than taken as a
+        route dependency: the cache key is derived from the raw token, which
+        nothing else on the create path carries, and a second *declared*
+        auth dependency would 401 the callers that legitimately override
+        ``get_current_principal`` instead of sending a header.
+
+        Best-effort throughout: a stale cache must never fail a write that
+        already committed.
+        """
+        if not getattr(self.dto, "grants_creator_scope_role", False):
+            return
+        try:
+            from computor_backend.business_logic.auth import (
+                invalidate_principal_cache_for_token,
+            )
+            from computor_backend.permissions.auth import parse_authorization_header
+            from computor_backend.redis_cache import get_redis_client
+
+            token = getattr(parse_authorization_header(request), "token", None)
+            if not token:
+                return
+            await invalidate_principal_cache_for_token(token, await get_redis_client())
+        except Exception:
+            logger.warning(
+                "Principal cache invalidation failed after creating %s",
+                self.dto.model.__tablename__,
+                exc_info=True,
+            )
+
     def _invalidate_caches_for(self, entity) -> None:
         """Invalidate user-view cache tags emitted by the entity's interface.
 

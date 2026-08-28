@@ -59,6 +59,7 @@ class CourseFamilyInterface(CourseFamilyInterfaceBase, BackendEntityInterface):
     model = CourseFamily
     endpoint = "course-families"
     cache_ttl = 600
+    grants_creator_scope_role = True
     post_create = post_create_course_family
 
     @staticmethod
