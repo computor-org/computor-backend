@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import re
+from datetime import datetime
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -53,6 +54,8 @@ from computor_types.coder import (
     ProvisionResult,
     TemplateCatalogEntry,
     TemplateCatalogResponse,
+    TemplateCloneRequest,
+    TemplateDeleteResponse,
     TemplateFile,
     TemplateFileActionResponse,
     TemplateFileUpdateRequest,
@@ -60,6 +63,9 @@ from computor_types.coder import (
     TemplatePreparation,
     TemplatePushRequest,
     TemplateListResponse,
+    TemplateMetadata,
+    TemplateMetadataUpdate,
+    TemplateMetadataUpdateResponse,
     TemplateSettingsListResponse,
     TemplateVariable,
     TemplateVariablesResponse,
@@ -74,7 +80,10 @@ from computor_types.coder import (
     WorkspaceTemplateSettingsUpdate,
 )
 from computor_backend.coder import templates_fs
-from computor_backend.model.workspace import WorkspaceTemplateSettings
+from computor_backend.model.workspace import (
+    CourseWorkspaceTemplate,
+    WorkspaceTemplateSettings,
+)
 from computor_backend.tasks import get_task_executor, TaskSubmission
 from computor_types.tasks import TaskInfo, TaskStatus
 from computor_types.workspace_roles import WorkspaceProvisionRequest
@@ -349,6 +358,14 @@ def _resolve_template_fs(settings: CoderSettings, template_name: str) -> tuple:
             detail=f"Template '{template_name}' not found in the templates directory.",
         )
     return resolved
+
+
+def _manifest_or_empty(path: str) -> dict:
+    """The template's manifest, or {} when unreadable (the caller degrades)."""
+    try:
+        return templates_fs.read_manifest(path)
+    except templates_fs.TemplateFileError:
+        return {}
 
 
 # -----------------------------------------------------------------------------
@@ -1460,6 +1477,7 @@ async def list_template_catalog(
             active_version_id=live.active_version_id if live else None,
             enabled=enabled_by_name.get(name, True),
             customized=templates_fs.is_customized(os.path.join(root, dir_name)),
+            cloned_from=manifest.get("cloned_from") or None,
             workspace_count=workspace_counts.get(live.id, 0) if live else 0,
             running_workspace_count=running_counts.get(live.id, 0) if live else 0,
         ))
@@ -1587,6 +1605,7 @@ async def get_template_files(
         template_name=template_name,
         dir_name=dir_name,
         customized=templates_fs.is_customized(path),
+        cloned_from=_manifest_or_empty(path).get("cloned_from") or None,
         files=[TemplateFile(**f) for f in files],
     )
 
@@ -1637,6 +1656,11 @@ async def restore_template_managed(
     are lost then). Requires workspace:manage."""
     _check_workspace_access(permissions, "manage")
     _dir_name, path = _resolve_template_fs(settings, template_name)
+    if templates_fs.is_clone(_manifest_or_empty(path)):
+        raise BadRequestException(
+            detail="A template created here is never synced from the repo — "
+                   "there is nothing to restore.",
+        )
     try:
         templates_fs.restore_managed(path)
     except OSError as e:
@@ -1679,6 +1703,304 @@ async def get_template_variables(
         dir_name=dir_name,
         customized=templates_fs.is_customized(path),
         variables=variables,
+    )
+
+
+# -----------------------------------------------------------------------------
+# Template lifecycle — clone / display metadata / delete
+#
+# A template is its directory. Display metadata lives in template.json (the
+# push pipeline PATCHes it into Coder from there), so editing it is a file
+# write; cloning is a directory copy; only a clone — a directory with no repo
+# counterpart, which computor.sh therefore never re-seeds — can be deleted.
+# -----------------------------------------------------------------------------
+
+
+def _manifest_datetime(value) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+
+
+def _metadata_from_manifest(
+    template_name: str, dir_name: str, path: str, manifest: dict
+) -> TemplateMetadata:
+    return TemplateMetadata(
+        template_name=manifest.get("coder_template_name") or template_name,
+        dir_name=dir_name,
+        display_name=manifest.get("display_name") or None,
+        description=manifest.get("description") or None,
+        icon=manifest.get("icon") or None,
+        image_name=manifest.get("image_name") or None,
+        cloned_from=manifest.get("cloned_from") or None,
+        created_at=_manifest_datetime(manifest.get("created_at")),
+        customized=templates_fs.is_customized(path),
+    )
+
+
+def _template_fs_error(e: Exception) -> ComputorException:
+    """templates_fs failures as HTTP: taken name 409, bad input 400, I/O 500."""
+    if isinstance(e, templates_fs.TemplateConflictError):
+        return ConflictException(detail=str(e))
+    if isinstance(e, templates_fs.TemplateFileError):
+        return BadRequestException(detail=str(e))
+    return InternalServerException(detail=f"Template directory operation failed: {e}")
+
+
+_TEMPLATE_FS_ERRORS = (
+    templates_fs.TemplateConflictError,
+    templates_fs.TemplateFileError,
+    OSError,
+)
+
+
+@router.post(
+    "/admin/templates",
+    response_model=TemplateMetadata,
+    status_code=201,
+    summary="Create a workspace template as an independent copy of an existing one",
+)
+async def create_template(
+    request: TemplateCloneRequest,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    client: Annotated[CoderClient, Depends(get_coder_client)],
+    db: Annotated[Session, Depends(get_db)],
+) -> TemplateMetadata:
+    """Copy the source template's directory — Terraform, Dockerfile, payload —
+    into a new template named after ``key`` with its own Coder name and image
+    name, and copy the source's settings row (limits, quota, policy, variable
+    overrides) when it has one.
+
+    The new directory exists only in the deployment's templates directory; the
+    repo sync never touches it. Nothing is deployed here — an admin builds and
+    pushes it from the catalog. Requires workspace:manage.
+    """
+    _check_workspace_access(permissions, "manage")
+    source_dir_name, source_path = _resolve_template_fs(settings, request.source)
+    root = templates_fs.resolve_templates_root(settings.templates_dir)
+    try:
+        templates_fs.validate_template_key(request.key)
+    except templates_fs.TemplateFileError as e:
+        raise _template_fs_error(e) from e
+    identity = templates_fs.derive_template_identity(request.key)
+
+    # A live Coder template of that name with no directory here would make the
+    # catalog show the clone as deployed under a stranger's id, and the push
+    # worker would push the clone's Terraform over it. So Coder being down
+    # blocks creation — deliberately.
+    try:
+        live_templates = await client.list_templates()
+    except Exception as e:
+        raise _handle_coder_error(e) from e
+    if any(t.name == identity["coder_template_name"] for t in live_templates):
+        raise ConflictException(
+            detail=f"Coder already has a template named "
+                   f"'{identity['coder_template_name']}' — pick another key.",
+        )
+
+    try:
+        dir_name, manifest = templates_fs.clone_template(
+            root,
+            source_dir_name,
+            request.key,
+            display_name=request.display_name,
+            description=request.description,
+            icon=request.icon,
+        )
+    except _TEMPLATE_FS_ERRORS as e:
+        raise _template_fs_error(e) from e
+
+    source_name = _manifest_or_empty(source_path).get("coder_template_name") or source_dir_name
+    source_row = _template_settings_row(db, source_name)
+    if source_row is not None:
+        db.add(WorkspaceTemplateSettings(
+            template_name=identity["coder_template_name"],
+            enabled=source_row.enabled,
+            memory_mb=source_row.memory_mb,
+            cpu_shares=source_row.cpu_shares,
+            max_running_workspaces=source_row.max_running_workspaces,
+            allow_root=source_row.allow_root,
+            allow_internet=source_row.allow_internet,
+            template_variables=dict(source_row.template_variables or {}),
+            created_by=permissions.user_id,
+        ))
+        db.commit()
+
+    logger.info(
+        "Template %s created from %s by %s",
+        identity["coder_template_name"], source_dir_name, permissions.user_id,
+    )
+    return _metadata_from_manifest(
+        identity["coder_template_name"], dir_name, os.path.join(root, dir_name), manifest,
+    )
+
+
+@router.get(
+    "/admin/templates/{template_name}/metadata",
+    response_model=TemplateMetadata,
+    summary="Read a template's identity and display metadata",
+)
+async def get_template_metadata(
+    template_name: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+) -> TemplateMetadata:
+    """From the manifest alone — no Coder round trip, so it answers while
+    Coder is down. Requires workspace:manage."""
+    _check_workspace_access(permissions, "manage")
+    dir_name, path = _resolve_template_fs(settings, template_name)
+    try:
+        manifest = templates_fs.read_manifest(path)
+    except templates_fs.TemplateFileError as e:
+        raise _template_fs_error(e) from e
+    return _metadata_from_manifest(template_name, dir_name, path, manifest)
+
+
+@router.put(
+    "/admin/templates/{template_name}/metadata",
+    response_model=TemplateMetadataUpdateResponse,
+    summary="Update a template's display name, description and icon",
+)
+async def update_template_metadata(
+    template_name: str,
+    request: TemplateMetadataUpdate,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    client: Annotated[CoderClient, Depends(get_coder_client)],
+) -> TemplateMetadataUpdateResponse:
+    """Writes the manifest (what the next push reads), then patches the live
+    Coder template so the change shows without a rebuild. A repo-managed
+    template becomes customized by this, exactly as a raw file edit would.
+    The manifest write is the committed part: a Coder failure afterwards is
+    reported in the response, never raised. Requires workspace:manage."""
+    _check_workspace_access(permissions, "manage")
+    dir_name, path = _resolve_template_fs(settings, template_name)
+    try:
+        manifest = templates_fs.update_template_metadata(
+            path,
+            display_name=request.display_name,
+            description=request.description,
+            icon=request.icon,
+        )
+    except _TEMPLATE_FS_ERRORS as e:
+        raise _template_fs_error(e) from e
+
+    coder_name = manifest.get("coder_template_name") or template_name
+    coder_updated = False
+    try:
+        live = next(
+            (t for t in await client.list_templates() if t.name == coder_name), None,
+        )
+        if live is None:
+            message = "Saved; it applies when the template is deployed."
+        else:
+            await client.patch_template_meta(
+                live.id,
+                ttl_ms=settings.workspace_ttl_ms,
+                activity_bump_ms=settings.workspace_activity_bump_ms,
+                display_name=manifest.get("display_name", ""),
+                description=manifest.get("description", ""),
+                icon=manifest.get("icon", ""),
+            )
+            coder_updated = True
+            message = "Saved and applied to Coder."
+    except Exception as e:
+        logger.warning(
+            "Template %s: manifest saved but Coder could not be patched: %s", coder_name, e,
+        )
+        message = (
+            "Saved to the template; Coder could not be updated now — the next "
+            "template push applies it."
+        )
+    return TemplateMetadataUpdateResponse(
+        **_metadata_from_manifest(template_name, dir_name, path, manifest).model_dump(),
+        coder_updated=coder_updated,
+        message=message,
+    )
+
+
+@router.delete(
+    "/admin/templates/{template_name}",
+    response_model=TemplateDeleteResponse,
+    summary="Delete a template created here (never a repo-shipped one)",
+)
+async def delete_template(
+    template_name: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    client: Annotated[CoderClient, Depends(get_coder_client)],
+    db: Annotated[Session, Depends(get_db)],
+) -> TemplateDeleteResponse:
+    """Removes the directory, the live Coder template (only when no workspace
+    uses it) and the settings / course assignment rows for the name. Refused
+    for repo-shipped templates — computor.sh would only seed them again — and
+    while a build/push is running, which may be reading the directory. Coder
+    goes first (retryable, nothing lost on failure), then disk, then the DB.
+    Requires workspace:manage."""
+    _check_workspace_access(permissions, "manage")
+    await _reject_conflicting_coder_task()
+    dir_name, path = _resolve_template_fs(settings, template_name)
+    root = templates_fs.resolve_templates_root(settings.templates_dir)
+    try:
+        manifest = templates_fs.read_manifest(path)
+    except templates_fs.TemplateFileError as e:
+        raise _template_fs_error(e) from e
+    if not templates_fs.is_clone(manifest):
+        raise BadRequestException(
+            detail="Only templates created here can be deleted; repo-shipped "
+                   "templates are removed from ops/coder/templates.",
+        )
+    coder_name = manifest.get("coder_template_name") or template_name
+
+    try:
+        live_templates, workspaces = await asyncio.gather(
+            client.list_templates(),
+            client.list_all_workspaces(),
+        )
+    except Exception as e:
+        raise _handle_coder_error(e) from e
+    live = next((t for t in live_templates if t.name == coder_name), None)
+    coder_deleted = False
+    if live is not None:
+        in_use = sum(1 for w in workspaces if w.template_id == live.id)
+        if in_use:
+            raise ConflictException(
+                detail=f"{in_use} workspace(s) still use this template — delete them first.",
+            )
+        try:
+            await client.delete_template(live.id)
+        except Exception as e:
+            raise _handle_coder_error(e) from e
+        coder_deleted = True
+
+    try:
+        templates_fs.delete_template_dir(root, dir_name)
+    except _TEMPLATE_FS_ERRORS as e:
+        raise _template_fs_error(e) from e
+
+    deleted_rows = db.query(WorkspaceTemplateSettings).filter(
+        WorkspaceTemplateSettings.template_name == coder_name
+    ).delete(synchronize_session=False)
+    deleted_rows += db.query(CourseWorkspaceTemplate).filter(
+        CourseWorkspaceTemplate.template_name == coder_name
+    ).delete(synchronize_session=False)
+    db.commit()
+
+    logger.info("Template %s deleted by %s", coder_name, permissions.user_id)
+    image = manifest.get("image_name")
+    return TemplateDeleteResponse(
+        success=True,
+        message=(
+            f"Template '{coder_name}' deleted."
+            + (f" Images '{image}:*' stay in the registry until the next image cleanup."
+               if image else "")
+        ),
+        coder_deleted=coder_deleted,
+        settings_deleted=bool(deleted_rows),
     )
 
 
