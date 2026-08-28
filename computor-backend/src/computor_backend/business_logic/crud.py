@@ -645,22 +645,36 @@ async def delete_entity(
             db.commit()
         except exc.IntegrityError as e:
             db.rollback()
-            # Handle foreign key constraint violations
-            error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
+            # Handle foreign key constraint violations.
+            #
+            # Dispatch on the DBAPI exception *class*, not on the message text:
+            # str(psycopg2.errors.NotNullViolation) is the SQL message alone, so
+            # the old `'NotNullViolation' in error_msg` test never matched and
+            # every not-null violation fell through to the generic branch, which
+            # echoed the raw SQL (column names included) back to the client —
+            # computor-org/issues#387. The message checks stay as a fallback for
+            # drivers that wrap the error differently.
+            orig = getattr(e, 'orig', None)
+            error_msg = str(orig) if orig is not None else str(e)
+            violation = type(orig).__name__ if orig is not None else ''
+            logger.warning(
+                "IntegrityError deleting %s: %s: %s",
+                db_type.__tablename__, violation, error_msg,
+            )
 
-            # Parse the error message to provide user-friendly feedback
-            if 'NotNullViolation' in error_msg:
+            if violation == 'NotNullViolation' or 'violates not-null constraint' in error_msg:
                 # This happens when deleting would cause NULL in a required foreign key
                 if 'course_content_type_id' in error_msg and 'course_content' in error_msg:
                     raise BadRequestException(
+                        error_code="CONTENT_010",
                         detail="Cannot delete this course content type because it is still being used by course content items. Please remove or reassign all course content using this type first."
                     ) from e
                 else:
                     # Generic not null violation message
                     raise BadRequestException(
                         detail="Cannot delete this item because it would violate data integrity constraints. Other records depend on this item."
-                    )
-            elif 'ForeignKeyViolation' in error_msg or 'violates foreign key constraint' in error_msg:
+                    ) from e
+            elif violation == 'ForeignKeyViolation' or 'violates foreign key constraint' in error_msg:
                 # Extract table name if possible for better error message
                 if 'table' in error_msg:
                     # Try to extract table name from error
@@ -670,20 +684,21 @@ async def delete_entity(
                         table_name = table_match.group(1)
                         raise BadRequestException(
                             detail=f"Cannot delete this {db_type.__tablename__.replace('_', ' ')} because it is referenced by records in {table_name.replace('_', ' ')}. Please remove those references first."
-                        )
+                        ) from e
 
                 # Generic foreign key violation message
                 raise BadRequestException(
                     detail=f"Cannot delete this {db_type.__tablename__.replace('_', ' ')} because other records depend on it. Please remove all references to this item first."
-                )
-            elif 'UniqueViolation' in error_msg:
+                ) from e
+            elif violation == 'UniqueViolation' or 'violates unique constraint' in error_msg:
                 # This shouldn't happen on delete, but handle it just in case
-                raise BadRequestException(detail="A unique constraint violation occurred while deleting")
+                raise BadRequestException(detail="A unique constraint violation occurred while deleting") from e
             else:
-                # Generic integrity error
+                # Generic integrity error. The driver's text is logged above, not
+                # returned: it names internal columns and tables.
                 raise BadRequestException(
-                    detail=f"Cannot delete this item due to data integrity constraints. Error: {error_msg.split('DETAIL:')[0] if 'DETAIL:' in error_msg else error_msg}"
-                )
+                    detail=f"Cannot delete this {db_type.__tablename__.replace('_', ' ')} because other records depend on it."
+                ) from e
         except exc.SQLAlchemyError as e:
             db.rollback()
             # Handle other SQLAlchemy errors
