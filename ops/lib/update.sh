@@ -113,17 +113,37 @@ fetch("http://localhost:3000/api/health")
 
 # Rebuild all project images for the CURRENT checkout (used for both the new
 # tree and a rollback — old trees rebuild almost entirely from cache).
+#
+# computor-base is unconditional: the checkout just moved, so its source layer is
+# stale by definition. The standalone base images go through build_base_image, so
+# an update only pays for the ones whose Dockerfile actually changed between the
+# two checkouts — and, unlike the list this replaced, code-server and the MATLAB
+# base are no longer skipped when they DID change.
 build_images() {
     git_build_meta
     ulog "building computor-base (commit ${GIT_COMMIT})"
     (cd "$REPO_ROOT" && docker build -f docker/base/Dockerfile -t computor-base:latest \
         --build-arg GIT_COMMIT="$GIT_COMMIT" --build-arg GIT_BRANCH="$GIT_BRANCH" .) || return 1
-    ulog "building computor-testing-runtimes"
-    (cd "$REPO_ROOT" && docker build -f docker/testing-runtimes/Dockerfile -t computor-testing-runtimes:latest .) || return 1
+
+    ulog "checking computor-testing-runtimes"
+    build_base_image testing-runtimes computor-testing-runtimes:latest \
+        docker/testing-runtimes/Dockerfile . || return 1
+
     if [ "${CODER_ENABLED:-}" = "true" ]; then
-        ulog "building computor-coder-runtime"
-        (cd "$REPO_ROOT" && docker build -f docker/coder-runtime/Dockerfile -t computor-coder-runtime:latest .) || return 1
+        ulog "checking computor-coder-runtime"
+        build_base_image coder-runtime computor-coder-runtime:latest \
+            docker/coder-runtime/Dockerfile . || return 1
+        ulog "checking computor-code-server"
+        build_base_image code-server computor-code-server:latest \
+            docker/code-server-base/Dockerfile docker/code-server-base || return 1
     fi
+
+    if [ "${MATLAB_ENABLED:-}" = "true" ] && [ "${MATLAB_BASE_IMAGE_MANAGED:-}" = "true" ]; then
+        ulog "checking ${MATLAB_BASE_IMAGE}"
+        build_base_image matlab "$MATLAB_BASE_IMAGE" docker/matlab/Dockerfile docker/matlab \
+            --build-arg MATLAB_RELEASE="$MATLAB_RELEASE" || return 1
+    fi
+
     ulog "building compose service images"
     compose build || return 1
 }

@@ -157,6 +157,70 @@ compose() {
     docker compose $COMPOSE_FILES "$@"
 }
 
+# --- standalone base images --------------------------------------------------
+#
+# The slow-changing base images (testing runtimes, coder runtime, patched
+# code-server, MATLAB) are built by us rather than by compose, because compose
+# services are FROM them. They must NOT be rebuilt just because `--build` was
+# passed: `--build` means "rebuild my application code", and forcing the MATLAB
+# base through a rebuild costs a 6.7 GB MathWorks pull plus a full mpm toolbox
+# install the moment BuildKit's cache has been pruned.
+#
+# `docker build` alone cannot decide staleness for us: its layer cache lives in
+# the daemon and `docker builder prune` (or BuildKit's own GC) drops it silently
+# while the tagged image stays behind. So hash the build inputs ourselves, stamp
+# the hash onto the image as a label, and compare it on the next run.
+#
+# The digest covers OUR inputs only — it cannot see upstream drift in
+# mathworks/matlab:<release>, ghcr.io/coder/code-server:latest or python:3.10-slim.
+# Refreshing those is what `--build-base` is for, and it wants `--pull` with it.
+
+# sha256 over the Dockerfile, its context files and the build args.
+base_image_inputs_digest() {
+    local dockerfile=$1 context=$2
+    shift 2
+    {
+        cat "$REPO_ROOT/$dockerfile"
+        printf '%s\0' "$@"
+        # A repo-root context belongs to a Dockerfile that COPYs nothing from it
+        # (true for testing-runtimes and coder-runtime), so hashing the whole repo
+        # would only produce false rebuilds. Dedicated context dirs are tiny and
+        # do carry files: docker/code-server-base ships two patch scripts.
+        if [ "$context" != "." ]; then
+            # Relative paths, so the digest does not change when the repo moves.
+            (cd "$REPO_ROOT/$context" && find . -type f -print0 | sort -z | xargs -0 -r sha256sum)
+        fi
+    } | sha256sum | cut -d' ' -f1
+}
+
+# build_base_image <short-name> <tag> <dockerfile> <context> [docker build args...]
+#
+# Builds only when the inputs changed, or when FORCE_BASE_BUILD asks for it
+# (`all`, or a space-separated list containing <short-name> — set by the
+# --build-base flag). Sets BUILD_BASE_DID_BUILD to true/false so callers can
+# react to an actual rebuild.
+build_base_image() {
+    local name=$1 tag=$2 dockerfile=$3 context=$4
+    shift 4
+    BUILD_BASE_DID_BUILD=false
+
+    local digest stamped
+    digest=$(base_image_inputs_digest "$dockerfile" "$context" "$@")
+
+    if [ "${FORCE_BASE_BUILD:-}" != "all" ] && [[ " ${FORCE_BASE_BUILD:-} " != *" $name "* ]]; then
+        stamped=$(docker image inspect \
+            --format '{{ index .Config.Labels "computor.build-inputs" }}' "$tag" 2>/dev/null || true)
+        if [ -n "$stamped" ] && [ "$stamped" = "$digest" ]; then
+            echo "  $tag up to date (inputs ${digest:0:12}) - skipping"
+            return 0
+        fi
+    fi
+
+    BUILD_BASE_DID_BUILD=true
+    (cd "$REPO_ROOT" && docker build -f "$dockerfile" -t "$tag" \
+        --label "computor.build-inputs=$digest" "$@" "$context")
+}
+
 # Detect the running configuration from container names (used by `down` and
 # `status` when no environment argument is given). Sets ENVIRONMENT and
 # CODER_DETECTED / KEYCLOAK_DETECTED / FORGEJO_DETECTED. Returns 1 when no

@@ -78,26 +78,40 @@ RUN python3.10 -m ensurepip --upgrade \
 RUN cd "$(dirname "$(dirname "$(readlink -f "$(which matlab)")")")/extern/engines/python" \
     && python3.10 setup.py install
 
+# Drop the passwordless-sudo grant the MathWorks image ships and clear the
+# matlab account password. Nothing below uses sudo, so this belongs up here with
+# the other base tweaks instead of after the COPY steps, where it re-ran on every
+# source change. Timezone likewise — it must be set as root, before USER matlab.
+ENV TZ=UTC
+RUN rm /etc/sudoers.d/localsudo \
+    && passwd -d matlab \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone
+
+# Everything above this line depends only on the MATLAB base, so it stays cached
+# across source changes. Keep it that way: the COPY steps below move on every
+# commit, and anything placed after them re-runs with them.
+
+# Own the destination up front. COPY creates missing parents, and a root-owned
+# /home/worker would leave the runtime user unable to write into it.
+RUN install -d -o matlab -g matlab /home/worker
+
 # Bring in the computor packages + their installed third-party deps from the
 # shared base, at the SAME /home/worker path the editable installs were built
 # against (so they resolve). PYTHONUSERBASE points matlab's python3.10 at the
 # copied user-site; the MATLAB engine stays in the system site-packages.
-COPY --from=pybase /home/worker/.local           /home/worker/.local
-COPY --from=pybase /home/worker/computor-types    /home/worker/computor-types
-COPY --from=pybase /home/worker/computor-client   /home/worker/computor-client
-COPY --from=pybase /home/worker/computor-backend  /home/worker/computor-backend
+#
+# --chown rather than a trailing `chmod -R 777`: that chmod rewrote the mode bits
+# of the whole copied tree — ~320 MB — into a fresh layer on top of an 8+ GB base
+# on every single source edit. Setting ownership during the COPY costs nothing and
+# leaves no extra layer. Same approach as docker/temporal-worker-testing/Dockerfile.
+COPY --from=pybase --chown=matlab:matlab /home/worker/.local           /home/worker/.local
+COPY --from=pybase --chown=matlab:matlab /home/worker/computor-types    /home/worker/computor-types
+COPY --from=pybase --chown=matlab:matlab /home/worker/computor-client   /home/worker/computor-client
+COPY --from=pybase --chown=matlab:matlab /home/worker/computor-backend  /home/worker/computor-backend
 
 # Copy the matlab-server.py script
-COPY docker/temporal-worker-matlab/matlab-server.py /home/worker/matlab-server.py
-
-RUN chmod -R 777 /home/worker
-
-RUN rm /etc/sudoers.d/localsudo
-RUN passwd -d matlab
-
-# Set timezone to UTC (must be done as root before switching user)
-ENV TZ=UTC
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+COPY --chown=matlab:matlab docker/temporal-worker-matlab/matlab-server.py /home/worker/matlab-server.py
 
 USER matlab
 WORKDIR /home/matlab

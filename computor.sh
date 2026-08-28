@@ -3,7 +3,8 @@
 # Computor lifecycle CLI — the single entrypoint for operating the stack.
 #
 # Usage:
-#   ./computor.sh up   [dev|prod] [docker-compose-options]   # start the stack
+#   ./computor.sh up   [dev|prod] [--build-base[=name]] [docker-compose-options]
+#                                                            # start the stack
 #   ./computor.sh down [dev|prod] [docker-compose-options]   # stop the stack (auto-detects env)
 #   ./computor.sh status [dev|prod]                          # services + maintenance state
 #   ./computor.sh maintenance enter|exit|status [dev|prod]   # full maintenance mode
@@ -14,9 +15,19 @@
 # Examples:
 #   ./computor.sh up dev -d
 #   ./computor.sh up prod --build -d
+#   ./computor.sh up prod --build --build-base=matlab --pull -d
 #   ./computor.sh down
 #   ./computor.sh maintenance enter prod
 #   ./computor.sh test --unit
+#
+# --build rebuilds the compose service images and computor-base (which carries
+# the project source). The slow-changing base images -- testing-runtimes,
+# coder-runtime, code-server and the MATLAB base -- are rebuilt only when their
+# own Dockerfile or build args actually change, not merely because --build was
+# passed. Use --build-base to force one anyway, e.g. to pick up a new upstream
+# mathworks/matlab or code-server image (pair it with --pull). Names:
+# testing-runtimes, coder-runtime, code-server, matlab. Bare --build-base
+# rebuilds every base image, computor-base included.
 
 set -e
 
@@ -34,10 +45,14 @@ usage() {
 # into DOCKER_ARGS (pass-through to docker compose).
 parse_env_args() {
     DOCKER_ARGS=""
+    FORCE_BASE_BUILD=""
     while [[ $# -gt 0 ]]; do
         case $1 in
             dev|development)  ENVIRONMENT="dev" ;;
             prod|production)  ENVIRONMENT="prod" ;;
+            # Consumed here, never forwarded: docker compose rejects it.
+            --build-base)     FORCE_BASE_BUILD="all" ;;
+            --build-base=*)   FORCE_BASE_BUILD="${FORCE_BASE_BUILD} ${1#*=}" ;;
             *)                DOCKER_ARGS="$DOCKER_ARGS $1" ;;
         esac
         shift
@@ -353,53 +368,57 @@ cmd_up() {
 
     # The Python service images (api + temporal workers) inherit from a shared base
     # image (docker/base/Dockerfile); the matlab worker COPYs from it. Build it first
-    # so their `FROM computor-base:latest` resolves. Rebuild when --build is requested
-    # or when the image is missing (cached/fast otherwise).
-    if [[ "$DOCKER_ARGS" == *"--build"* ]] || ! docker image inspect computor-base:latest >/dev/null 2>&1; then
+    # so their `FROM computor-base:latest` resolves. This one DOES follow --build: it
+    # carries the project source, so every service image built on it would otherwise
+    # be stale.
+    if [[ "$DOCKER_ARGS" == *"--build"* ]] || [ "${FORCE_BASE_BUILD:-}" = "all" ] \
+        || ! docker image inspect computor-base:latest >/dev/null 2>&1; then
         log "\n${GREEN}Building shared base image (computor-base)...${NC}"
         echo "  Baking build provenance: commit=${GIT_COMMIT} branch=${GIT_BRANCH}"
         (cd "$REPO_ROOT" && docker build -f docker/base/Dockerfile -t computor-base:latest \
             --build-arg GIT_COMMIT="$GIT_COMMIT" --build-arg GIT_BRANCH="$GIT_BRANCH" .)
     fi
-    # The testing worker also layers on a heavy, slow-changing language-runtimes
-    # image (Octave/R/Python 3.13/Julia) built independently of the project source.
-    # Cached after the first build (no project files in its context).
-    if [[ "$DOCKER_ARGS" == *"--build"* ]] || ! docker image inspect computor-testing-runtimes:latest >/dev/null 2>&1; then
-        log "\n${GREEN}Building testing runtimes image (computor-testing-runtimes)...${NC}"
-        (cd "$REPO_ROOT" && docker build -f docker/testing-runtimes/Dockerfile -t computor-testing-runtimes:latest .)
+
+    # The remaining base images hold no project source, so --build must NOT drag them
+    # in: build_base_image rebuilds them only when their own Dockerfile/args change
+    # (or when --build-base names them). See ops/lib/common.sh for why an image label
+    # decides this rather than the BuildKit layer cache.
+    log "\n${GREEN}Checking standalone base images...${NC}"
+
+    # The testing worker layers on a heavy language-runtimes image
+    # (Octave/R/Python 3.13/Julia) built independently of the project source.
+    build_base_image testing-runtimes computor-testing-runtimes:latest \
+        docker/testing-runtimes/Dockerfile .
+
+    if [ "${CODER_ENABLED:-}" = "true" ]; then
+        # The coder worker likewise layers its system packages (Docker CLI + coder
+        # CLI) in an independent image so a project source change no longer re-runs
+        # that apt/curl install.
+        build_base_image coder-runtime computor-coder-runtime:latest \
+            docker/coder-runtime/Dockerfile .
+        # Code-server workspace templates build FROM computor-code-server:latest — the
+        # upstream code-server image plus the webview service-worker patch (issue #274).
+        # The temporal worker builds template images on this same docker daemon, so the
+        # local tag resolves without a registry; build it before any template build.
+        build_base_image code-server computor-code-server:latest \
+            docker/code-server-base/Dockerfile docker/code-server-base
     fi
-    # The coder worker likewise layers its system packages (Docker CLI + coder CLI)
-    # in an independent image so a project source change no longer re-runs that
-    # apt/curl install. Built once and cached; only needed when Coder is enabled.
-    if [ "${CODER_ENABLED:-}" = "true" ] && { [[ "$DOCKER_ARGS" == *"--build"* ]] || ! docker image inspect computor-coder-runtime:latest >/dev/null 2>&1; }; then
-        log "\n${GREEN}Building coder runtime image (computor-coder-runtime)...${NC}"
-        (cd "$REPO_ROOT" && docker build -f docker/coder-runtime/Dockerfile -t computor-coder-runtime:latest .)
-    fi
-    # Code-server workspace templates build FROM computor-code-server:latest — the
-    # upstream code-server image plus the webview service-worker patch (issue #274).
-    # The temporal worker builds template images on this same docker daemon, so the
-    # local tag resolves without a registry; build it before any template build.
-    if [ "${CODER_ENABLED:-}" = "true" ] && { [[ "$DOCKER_ARGS" == *"--build"* ]] || ! docker image inspect computor-code-server:latest >/dev/null 2>&1; }; then
-        log "\n${GREEN}Building patched code-server base (computor-code-server)...${NC}"
-        (cd "$REPO_ROOT" && docker build -f docker/code-server-base/Dockerfile -t computor-code-server:latest docker/code-server-base)
-    fi
+
     # The MATLAB grading worker is FROM a MATLAB image carrying the graded
     # toolboxes. Unless .env points MATLAB_BASE_IMAGE at a prebuilt one, that
     # image is ours to build (see assemble_compose_files) and it has to exist
     # before compose builds the worker on top of it. The first build is long —
-    # it pulls the MathWorks base and runs mpm for every toolbox — but it is
-    # cached afterwards and only redone when MATLAB_RELEASE moves.
-    if [ "${MATLAB_ENABLED:-}" = "true" ] && [ "${MATLAB_BASE_IMAGE_MANAGED:-}" = "true" ] \
-        && { [[ "$DOCKER_ARGS" == *"--build"* ]] || ! docker image inspect "$MATLAB_BASE_IMAGE" >/dev/null 2>&1; }; then
-        log "\n${GREEN}Building MATLAB base image (${MATLAB_BASE_IMAGE})...${NC}"
-        echo "  Installs MATLAB ${MATLAB_RELEASE} + the graded toolboxes; the first build takes a while."
+    # it pulls the MathWorks base and runs mpm for every toolbox — so it is
+    # redone only when docker/matlab/Dockerfile or MATLAB_RELEASE actually moves.
+    if [ "${MATLAB_ENABLED:-}" = "true" ] && [ "${MATLAB_BASE_IMAGE_MANAGED:-}" = "true" ]; then
         # Context is docker/matlab only: the Dockerfile COPYs nothing from the repo.
-        (cd "$REPO_ROOT" && docker build -f docker/matlab/Dockerfile -t "$MATLAB_BASE_IMAGE" \
-            --build-arg MATLAB_RELEASE="$MATLAB_RELEASE" docker/matlab)
-        # The worker image sits ON that base, so it is now stale by definition —
-        # and a plain `up` reuses a cached worker image without ever consulting
-        # its base. Rebuild it here, or the release move silently does nothing.
-        if [[ "$DOCKER_ARGS" != *"--build"* ]]; then
+        build_base_image matlab "$MATLAB_BASE_IMAGE" docker/matlab/Dockerfile docker/matlab \
+            --build-arg MATLAB_RELEASE="$MATLAB_RELEASE"
+        # The worker image sits ON that base, so a rebuild leaves it stale by
+        # definition — and a plain `up` reuses a cached worker image without ever
+        # consulting its base. Rebuild it here, or the release move silently does
+        # nothing. Skipped when --build is present: compose covers it below.
+        if [ "$BUILD_BASE_DID_BUILD" = true ] && [[ "$DOCKER_ARGS" != *"--build"* ]]; then
             log "  Rebuilding temporal-worker-matlab onto the new base..."
             compose build temporal-worker-matlab
         fi
