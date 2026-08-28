@@ -219,3 +219,48 @@ test('a finished run keeps its words and drops its bars', async ({ page }) => {
   // ...without a wall of full bars repeating it in the same colour.
   await expect(page.getByRole('progressbar')).toHaveCount(0);
 });
+
+// --- templates created here (clones) ---------------------------------------
+
+/**
+ * 'py-ds' was created from 'vscode' in the UI. It has no repo counterpart, so
+ * the startup sync never touches it — the row says where it came from rather
+ * than "customized", which would suggest a repo template someone edited.
+ */
+const catalogWithClone = {
+  ...catalog,
+  templates: [
+    ...catalog.templates,
+    {
+      dir_name: 'py-ds', name: 'py-ds-workspace', display_name: 'Python DS',
+      description: 'Data science', icon: 'https://example.org/py.svg',
+      image_name: 'computor-workspace-py-ds', deployed: false,
+      template_id: null, active_version_id: null, enabled: true,
+      customized: true, cloned_from: 'vscode', workspace_count: 0,
+      running_workspace_count: 0,
+    },
+  ],
+};
+
+test('a cloned template shows where it came from, not "customized"', async ({ page }) => {
+  await setupWith(page, catalogWithClone);
+  await page.goto('/workspaces/admin?tab=templates');
+
+  const clone = row(page, 'py-ds-workspace');
+  await expect(clone.getByText('cloned from vscode')).toBeVisible();
+  await expect(clone.getByText('customized', { exact: true })).toHaveCount(0);
+  // Undeployed like any other candidate: it still has to be built and pushed.
+  await expect(clone.getByRole('button', { name: 'Deploy' })).toBeVisible();
+});
+
+test('New template lives in the header and Clone carries its source', async ({ page }) => {
+  await setup(page);
+  await page.goto('/workspaces/admin?tab=templates');
+
+  await expect(page.getByRole('link', { name: 'New template' }))
+    .toHaveAttribute('href', '/workspaces/admin/templates/create');
+  await expect(row(page, 'vscode-workspace').getByRole('link', { name: 'Clone' }))
+    .toHaveAttribute('href', '/workspaces/admin/templates/create?from=vscode');
+  // No directory here means nothing to copy.
+  await expect(row(page, 'legacy-workspace').getByRole('link', { name: 'Clone' })).toHaveCount(0);
+});

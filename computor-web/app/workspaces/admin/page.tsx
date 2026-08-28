@@ -7,6 +7,7 @@ import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import Forbidden from '@/src/components/Forbidden';
 import Tabs from '@/src/components/ui/Tabs';
+import { ButtonLink } from '@/src/components/ui/Button';
 import WorkspaceUsersPanel from '@/src/components/workspaces/WorkspaceUsersPanel';
 import WorkspaceFleetPanel from '@/src/components/workspaces/WorkspaceFleetPanel';
 import WorkspaceTemplatesPanel from '@/src/components/workspaces/WorkspaceTemplatesPanel';
@@ -36,6 +37,11 @@ function WorkspaceAdminContent() {
         breadcrumbs={[{ label: 'Workspaces', href: '/workspaces' }, { label: 'Administration' }]}
         title="Workspace administration"
         subtitle="Workspace roles, per-user access, which templates are available, and fleet-wide image rollouts"
+        actions={
+          tab === 'templates' ? (
+            <ButtonLink href="/workspaces/admin/templates/create">New template</ButtonLink>
+          ) : undefined
+        }
       />
 
       <Tabs<AdminTab>

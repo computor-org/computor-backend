@@ -23,8 +23,13 @@ import type {
   TemplateSettingsListResponse,
   WorkspaceCredentialRotationResponse,
   WorkspaceVolumeListResponse,
+  TemplateCloneRequest,
+  TemplateDeleteResponse,
   TemplateFileActionResponse,
   TemplateFilesResponse,
+  TemplateMetadata,
+  TemplateMetadataUpdate,
+  TemplateMetadataUpdateResponse,
   TemplateVariablesResponse,
   WorkspaceTemplateSettings,
   WorkspaceTemplateSettingsUpdate,
@@ -254,6 +259,46 @@ export class CoderClient extends BaseEndpointClient {
   async getTemplateVariables({ templateName }: { templateName: string }): Promise<TemplateVariablesResponse> {
     return this.client.get<TemplateVariablesResponse>(
       this.buildPath('admin', 'templates', templateName, 'variables'),
+    );
+  }
+
+  // --- Admin: template lifecycle — clone / display metadata / delete ---
+
+  /**
+   * Create a template as an independent copy of an existing one. It exists in
+   * this deployment's templates directory only — the repo sync never touches
+   * it — and is not deployed until someone builds and pushes it.
+   */
+  async cloneTemplate({ body }: { body: TemplateCloneRequest }): Promise<TemplateMetadata> {
+    return this.client.post<TemplateMetadata>(this.buildPath('admin', 'templates'), body);
+  }
+
+  /** Identity and display metadata from the template's manifest (no Coder round trip). */
+  async getTemplateMetadata({ templateName }: { templateName: string }): Promise<TemplateMetadata> {
+    return this.client.get<TemplateMetadata>(
+      this.buildPath('admin', 'templates', templateName, 'metadata'),
+    );
+  }
+
+  /**
+   * Rewrite display name / description / icon in the manifest and, when the
+   * template is deployed, patch Coder live — no rebuild needed. Customizes a
+   * repo-managed template, exactly like a raw file edit.
+   */
+  async updateTemplateMetadata({ templateName, body }: {
+    templateName: string;
+    body: TemplateMetadataUpdate;
+  }): Promise<TemplateMetadataUpdateResponse> {
+    return this.client.put<TemplateMetadataUpdateResponse>(
+      this.buildPath('admin', 'templates', templateName, 'metadata'),
+      body,
+    );
+  }
+
+  /** Delete a template created here (never a repo-shipped one); refused while workspaces use it. */
+  async deleteTemplate({ templateName }: { templateName: string }): Promise<TemplateDeleteResponse> {
+    return this.client.delete<TemplateDeleteResponse>(
+      this.buildPath('admin', 'templates', templateName),
     );
   }
 }

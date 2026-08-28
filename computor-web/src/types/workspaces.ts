@@ -33,6 +33,8 @@ import type {
   TemplateCatalogEntry as GenTemplateCatalogEntry,
   TemplateCatalogResponse as GenTemplateCatalogResponse,
   TemplateListResponse as GenTemplateListResponse,
+  TemplateMetadata as GenTemplateMetadata,
+  TemplateMetadataUpdateResponse as GenTemplateMetadataUpdateResponse,
   TemplatePreparation as GenTemplatePreparation,
   TemplateSettingsListResponse as GenTemplateSettingsListResponse,
   WorkspaceListResponse as GenWorkspaceListResponse,
@@ -64,6 +66,9 @@ export type {
   TemplateFileActionResponse,
   TemplateVariable,
   TemplateVariablesResponse,
+  TemplateMetadataUpdate,
+  TemplateCloneRequest,
+  TemplateDeleteResponse,
   WorkspaceVolume,
   WorkspaceVolumeListResponse,
   CourseWorkspaceTemplatePolicy,
@@ -80,6 +85,14 @@ export type WorkspaceTemplateSettings = WorkspaceTemplateSettingsSchema & {
   allow_root: boolean;
   allow_internet: boolean;
   template_variables: Record<string, string>;
+};
+
+// A template's manifest-backed identity/display metadata; the server always
+// serializes the flags codegen marks optional.
+export type TemplateMetadata = GenTemplateMetadata & { customized: boolean };
+export type TemplateMetadataUpdateResponse = GenTemplateMetadataUpdateResponse & {
+  customized: boolean;
+  coder_updated: boolean;
 };
 
 // --- UI-only: agent lifecycle ---
