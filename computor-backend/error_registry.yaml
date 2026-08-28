@@ -814,6 +814,26 @@ errors:
       - "Move the content into a unit, or to the course root"
       - "Refresh the course tree so the available units are up to date"
 
+  - code: CONTENT_010
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Content Type In Use"
+    message:
+      plain: "Cannot delete this content type because course content still uses it. Reassign or delete that content first."
+      markdown: "**Content Type In Use**\n\nThis content type cannot be deleted while course content still refers to it. Change those contents to another type of the same kind, or delete them, and then delete the type."
+      html: "<strong>Content Type In Use</strong><p>This content type cannot be deleted while course content still refers to it. Change those contents to another type of the same kind, or delete them, and then delete the type.</p>"
+    internal_description: "DELETE /course-content-types/{id} while course_content (or result) rows still reference it; both FKs are NOT NULL with ondelete=RESTRICT and the ORM relationships have no passive_deletes, so the unguarded attempt surfaced as a NotNullViolation whose raw SQL leaked to the client (computor-org/issues#387)"
+    affected_functions:
+      - "_validate_course_content_type_deletion"
+      - "delete_entity"
+    common_causes:
+      - "Deleting a content type that units or assignments in the course were created with"
+      - "Confusing a content type with the content itself (computor-org/issues#387)"
+    resolution_steps:
+      - "Change the listed course contents to another content type of the same kind"
+      - "Or delete those course contents first, then delete the type"
+
   # ============================================================================
   # VERSION MANAGEMENT ERRORS (400, 409)
   # ============================================================================
