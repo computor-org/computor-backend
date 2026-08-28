@@ -47,7 +47,7 @@ interface Check {
 function CreateInner() {
   const router = useRouter();
   const familyIdParam = useSearchParam('familyId');
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, refreshPermissions } = useAuth();
   const { canManageHierarchy: canConfigureGit, canCreateCourse } = usePermissions();
 
   const [families, setFamilies] = useState<CourseFamilyList[]>([]);
@@ -228,6 +228,10 @@ function CreateInner() {
         // the file's binding with the manual UI selection (and 409 once the file's
         // binding has materialized a template).
         await triggerDeploy(res.course_id);
+        // The deploy enrolled us as the course's `_owner` (issue #386); re-pull
+        // /user/scopes so the course page gates on the role we now hold. Before
+        // the warnings branch — that one leaves the created course on screen.
+        await refreshPermissions();
         if (res.warnings?.length) {
           // The course was created, but something is off (e.g. a service slug
           // didn't resolve, so assignments have no testing service). Replace the
@@ -253,6 +257,10 @@ function CreateInner() {
       // One step: configure git immediately so a course is never left without it.
       await configureGit(course.id);
       await triggerDeploy(course.id);
+      // Creating a course enrols the creator as its `_owner` (issue #386). The
+      // server has already dropped the stale caches; re-pull /user/scopes so the
+      // course page we are about to open gates on the role we now hold.
+      await refreshPermissions();
       router.push(`/courses/${course.id}`);
     } catch (e) {
       setSaving(false);

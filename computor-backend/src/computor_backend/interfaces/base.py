@@ -51,6 +51,8 @@ class BackendEntityInterface(EntityInterfaceBase):
         search: Search function for filtering queries
         post_create: Hook called after entity creation
         post_update: Hook called after entity update
+        grants_creator_scope_role: True when creating this entity also grants
+            the caller a scoped role on it (see below)
     """
 
     # Backend-specific attributes
@@ -60,6 +62,15 @@ class BackendEntityInterface(EntityInterfaceBase):
     search: Any = None
     post_create: Any = None
     post_update: Any = None
+
+    # Organizations, course families and courses enrol their creator as `_owner`
+    # in ``post_create`` — so the very request that creates one changes the
+    # caller's own authorization. The Principal is cached per credential for
+    # AUTH_CACHE_TTL (900 s) and backs ``GET /user/scopes``, i.e. all
+    # client-side gating, so without dropping it the creator would look
+    # role-less on their brand-new entity for up to fifteen minutes. Set this
+    # and ``CrudRouter.create`` invalidates the caller's cached Principal.
+    grants_creator_scope_role: bool = False
 
     # Custom permission check - when set, replaces generic check_permissions for updates
     # Signature: (permissions: Principal, db: Session, id: UUID, entity: BaseModel) -> Query

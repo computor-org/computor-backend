@@ -49,7 +49,6 @@ from computor_backend.model.course import (
     CourseContentKind,
     CourseContentType,
     CourseFamily,
-    CourseMember,
 )
 from computor_backend.model.example import Example
 from computor_backend.model.organization import Organization
@@ -58,6 +57,7 @@ from computor_backend.permissions.handlers import permission_registry
 from computor_backend.permissions.principal import Principal
 from computor_backend.redis_cache import get_cache
 from computor_backend.repositories.example_version_repo import ExampleVersionRepository
+from computor_backend.business_logic.course_ownership import enroll_course_creator_as_owner
 from computor_backend.business_logic.lecturer_deployment import assign_example_to_content
 
 logger = logging.getLogger(__name__)
@@ -363,15 +363,9 @@ def deploy_course_from_config(
 
     # Enroll the caller as owner so they can manage the course immediately and so
     # the (live, DB-backed) _lecturer gate in assign_example_to_content passes.
-    db.add(
-        CourseMember(
-            course_id=course.id,
-            user_id=permissions.user_id,
-            course_role_id="_owner",
-            created_by=permissions.user_id,
-            updated_by=permissions.user_id,
-        )
-    )
+    # The bootstrap administrator is the one identity that gets no membership
+    # (course_ownership) — it clears that gate through _admin anyway.
+    enroll_course_creator_as_owner(course, db, user_id=permissions.user_id)
 
     ct_rows: Dict[tuple, CourseContentType] = {}
     for ct in ct_configs:

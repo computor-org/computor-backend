@@ -68,6 +68,7 @@ class OrganizationInterface(OrganizationInterfaceBase, BackendEntityInterface):
     model = Organization
     endpoint = "organizations"
     cache_ttl = 600
+    grants_creator_scope_role = True
     post_create = post_create_organization
 
     @staticmethod
