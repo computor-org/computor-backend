@@ -53,12 +53,18 @@ FROM mathworks/matlab:r2025b@sha256:7528b0873df0c6b640013cc37cceb848c60261aa2a7e
 
 USER root
 
+# openssh-client brings ssh-keygen and ssh, so a student can generate a key in
+# the workspace and clone their own GitLab/GitHub project over SSH
+# (computor-org/issues#391). One key covers every workspace they ever open:
+# ~/.ssh sits in the shared per-user home volume. The Debian-based templates
+# already carry the package; the MathWorks base image does not.
 RUN export DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install --yes --no-install-recommends \
         ca-certificates \
         curl \
         git \
+        openssh-client \
         socat \
     && rm -rf /var/lib/apt/lists/*
 

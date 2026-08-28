@@ -61,7 +61,10 @@ All templates mount the **same per-user volume** `coder-home-{owner-uuid}` at `/
 (every workspace image uses uid 1000, user `coder`). Consequences:
 
 - Files and user-space installs are shared across ALL of a user's workspaces:
-  `pip install --user`, virtualenvs/conda in `~`, `npm` prefix in `~`, dotfiles, git config.
+  `pip install --user`, virtualenvs/conda in `~`, `npm` prefix in `~`, dotfiles, git config,
+  and `~/.ssh` — every image ships `ssh-keygen`, so a key a student generates once is the
+  same key in every workspace they open, and one deploy key on their GitLab/GitHub project
+  covers all of them.
 - **System (apt) packages are NOT shared and NOT persistent** — they live in the image or the
   container's ephemeral rootfs and are gone after a rebuild/update. Use the personalize hook for
   anything that must survive:
