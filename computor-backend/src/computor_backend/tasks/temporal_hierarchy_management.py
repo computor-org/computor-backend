@@ -75,20 +75,11 @@ def create_course_activity(
 
             # Enroll the creator as course owner so they can manage the course
             # immediately (assign examples, release, ...). Idempotent on unique
-            # (user_id, course_id).
-            from ..model.course import CourseMember
-            if user_id and (
-                db.query(CourseMember)
-                .filter(CourseMember.course_id == course.id, CourseMember.user_id == user_id)
-                .first()
-            ) is None:
-                db.add(CourseMember(
-                    course_id=course.id,
-                    user_id=user_id,
-                    course_role_id="_owner",
-                    created_by=user_id,
-                    updated_by=user_id,
-                ))
+            # (user_id, course_id), and skips the bootstrap administrator —
+            # see business_logic.course_ownership.
+            from ..business_logic.course_ownership import enroll_course_creator_as_owner
+
+            enroll_course_creator_as_owner(course, db, user_id=user_id)
 
             git_binding = None
             git_cfg = course_config.get("git") or {}

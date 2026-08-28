@@ -41,6 +41,44 @@ async def post_update_course(course, old_course, db):
         )
 
 
+async def post_create_course(course, db: Session):
+    """Enrol the creating user as ``_owner`` of the new course (issue #386).
+
+    ``POST /courses`` was the one course-creation path that did not do this —
+    the deployment apply and the hierarchy Temporal activity always have — so a
+    lecturer who created a course from the web form ended up with no role in
+    it. The rule and its single exception (the bootstrap administrator) live in
+    ``business_logic.course_ownership``.
+
+    Runs after ``create_entity`` has committed the course, so a failure here
+    must not take the request down with it: the course exists either way, and
+    the membership can be added from the roster.
+    """
+    from computor_backend.business_logic.course_ownership import (
+        enroll_course_creator_as_owner,
+        invalidate_creator_caches,
+    )
+
+    try:
+        member = enroll_course_creator_as_owner(course, db)
+        if member is None:
+            return
+        # Read the id off the flushed row first: ``commit()`` expires every
+        # instance, and re-loading it afterwards would be a pointless round
+        # trip.
+        user_id = str(member.user_id)
+        # ``create_entity`` already committed the course, so this row is the
+        # only thing still open; commit it here rather than at request teardown
+        # so the caches dropped below cannot be refilled from a pre-commit read.
+        db.commit()
+        invalidate_creator_caches(user_id)
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "Failed to auto-assign creator as _owner for course %s",
+            getattr(course, "id", None),
+        )
+
+
 # Opening a course for self-registration is held above the _lecturer bar that
 # the rest of Course.update sits on.
 PUBLIC_FLAG_MIN_ROLE = "_maintainer"
@@ -112,6 +150,8 @@ class CourseInterface(CourseInterfaceBase, BackendEntityInterface):
     model = Course
     endpoint = "courses"
     cache_ttl = 300
+    grants_creator_scope_role = True
+    post_create = post_create_course
     post_update = post_update_course
     custom_permissions = custom_permissions_course
 
