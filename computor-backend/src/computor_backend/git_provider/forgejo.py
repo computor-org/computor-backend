@@ -313,6 +313,33 @@ class ForgejoProviderClient:
         )
         return False
 
+    def repo_exists(self, owner: str, repo: str) -> bool:
+        """Whether ``owner/repo`` exists on the server (any visibility the
+        service token can see). Used by the student-repo allocator so a name
+        left behind by a deleted course is skipped, never adopted."""
+        with self._client() as client:
+            r = client.get(f"{_BASE}/repos/{owner}/{repo}")
+        if r.status_code == 200:
+            return True
+        if r.status_code == 404:
+            return False
+        r.raise_for_status()
+        return True
+
+    def delete_repo(self, owner: str, repo: str) -> bool:
+        """Delete one repository. Only ever called for a course's own
+        ``template`` / ``reference`` repos when the course is deleted — student
+        repositories are never passed here. A 404 counts as success: the repo
+        already being gone is the state we wanted."""
+        with self._client() as client:
+            r = client.delete(f"{_BASE}/repos/{owner}/{repo}")
+        if r.status_code in (204, 404):
+            return True
+        logger.warning(
+            "Forgejo: could not delete repo %s/%s (status %s)", owner, repo, r.status_code,
+        )
+        return False
+
     def remove_collaborator(self, owner: str, repo: str, username: str) -> bool:
         """Revoke a user's collaborator access on a repo.
 

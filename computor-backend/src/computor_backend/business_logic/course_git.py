@@ -9,7 +9,8 @@ the API; the backend never reads a student's repo. See COURSE_LEVEL_GIT_REFACTOR
 """
 import logging
 import re
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -35,6 +36,7 @@ from computor_backend.model.git_server import (
 )
 from computor_backend.utils.forgejo_naming import (
     allocate_course_org_name,
+    allocate_free_name,
     student_repo_name_in_org,
 )
 from computor_backend.permissions.core import check_course_permissions
@@ -461,6 +463,21 @@ def _apply_course_git_binding(
                 )
             course_slug = str(course.path).replace(".", "-")
             client = _get_gitlab_client(server, gl_token)
+            existing_gl = ((binding.properties or {}).get("gitlab") or {}) if binding is not None else {}
+            if existing_gl.get("course_group_id"):
+                # Re-apply: reattach to this course's own group, whatever it was named.
+                stored_leaf = str(existing_gl.get("course_group_path") or "").rsplit("/", 1)[-1]
+                course_slug = stored_leaf or course_slug
+            else:
+                # First bind: a subgroup already sitting at this slug is not ours —
+                # typically the group of a deleted course whose student forks are
+                # deliberately kept. ``ensure_course_structure`` would adopt it,
+                # students subgroup and all, so allocate a free slug instead.
+                course_slug = allocate_free_name(
+                    course_slug,
+                    str(course.id),
+                    is_free=lambda slug: not client.subgroup_exists(parent_group_id, slug),
+                )
             try:
                 gitlab_structure = client.ensure_course_structure(
                     parent_group_id, course_slug, course.title or course_slug
@@ -974,9 +991,20 @@ def _provision_forgejo(
     # just the realm-unique handle; legacy bindings keep the {base}-{handle} form.
     layout = (binding.properties or {}).get("forgejo", {}).get("layout")
     if layout == "course_org":
-        new_name = student_repo_name_in_org(handle)
+        base_name = student_repo_name_in_org(handle)
     else:
-        new_name = student_repo_name(repo, handle)
+        base_name = student_repo_name(repo, handle)
+    client = get_provider_client_for_server(server)
+    # Never adopt a repository the database does not track for this member. We
+    # only get here when the member has no repo record, so anything already at
+    # the target name on the server is someone else's — in the legacy flat
+    # namespace typically the fork of a deleted course with the same path, whose
+    # student repositories are deliberately kept. Take the next free name.
+    new_name = allocate_free_name(
+        base_name,
+        str(member.id),
+        is_free=lambda name: not client.repo_exists(owner, name),
+    )
     repo_ref = f"{owner}/{new_name}"
     # Identity guard (defends the legacy flat namespace): never adopt a repo that
     # already belongs to a *different* course member. Collisions are impossible in
@@ -994,7 +1022,6 @@ def _provision_forgejo(
         raise ConflictException(
             detail=f"Forgejo repository '{repo_ref}' is already in use by another course member"
         )
-    client = get_provider_client_for_server(server)
     result = client.provision_student_fork(owner, repo, owner, new_name, student_username=handle)
     rec = CourseMemberGitRepository(
         course_member_id=member.id,
@@ -1036,6 +1063,15 @@ def _provision_gitlab_managed(
     handle = _resolve_oidc_handle(user_id, db) or str(member.id)
     slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", handle).strip("-._") or str(member.id)
     client = get_gitlab_client_for_binding(binding, server)
+    # Same rule as Forgejo: a project already at this path in the students
+    # subgroup is not ours (no repo record exists for this member), so never
+    # adopt it — a legacy-adopted structure can still hold the forks of a
+    # deleted course. Take the next free path.
+    slug = allocate_free_name(
+        slug,
+        str(member.id),
+        is_free=lambda path: not client.project_exists_in_namespace(students_group_id, path),
+    )
     result = client.provision_student_fork(template_project_id, students_group_id, slug)
     full_path = (result.properties.get("gitlab") or {}).get("full_path")
     rec = CourseMemberGitRepository(
@@ -1528,6 +1564,139 @@ def get_template_archive_source(
         raise NotFoundException(error_code="GIT_002", detail="You are not a member of this course")
 
     return resolve_template_archive_source(course_id, db)
+
+
+# ---------------------------------------------------------------------------
+# Course deletion: tear down the course's OWN repos, keep the students'
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class CourseGitTeardownPlan:
+    """What deleting a course removes from its git server — and what it keeps.
+
+    Built from the binding BEFORE the database cascade (the binding row goes
+    with the course and every loaded ORM instance expires on commit), holding
+    plain values only. ``repos`` are ``(label, ref)`` pairs: the label is what
+    a client shows (``"forgejo:itpcp-2027/template"``), the ref is what the
+    provider deletes (a Forgejo ``owner/repo`` or a GitLab project id).
+
+    Never in this plan: the students' repositories, the per-course Forgejo org
+    that holds them, its ``graders`` team, the per-user clone tokens, and the
+    GitLab ``students`` subgroup + course group. Those are kept on purpose so a
+    student's work outlives the course; ``student_repositories_kept`` reports
+    how many there are.
+    """
+
+    git_server_id: Optional[str] = None
+    server_type: Optional[str] = None
+    token: Optional[str] = None  # GitLab only: the binding's own token
+    repos: List[Tuple[str, str]] = field(default_factory=list)
+    student_repositories_kept: int = 0
+
+    @property
+    def repo_labels(self) -> List[str]:
+        return [label for label, _ in self.repos]
+
+
+def plan_course_git_teardown(course_id: UUID | str, db: Session) -> CourseGitTeardownPlan:
+    """Resolve the template + reference repos a course delete will remove.
+
+    Pure: no network. A course with no git binding, download-only delivery or
+    no bound server yields an empty plan — in particular legacy org-level
+    GitLab courses (no ``CourseGitBinding``) get no teardown, because there is
+    no course-scoped credential to do it with.
+    """
+    plan = CourseGitTeardownPlan()
+    plan.student_repositories_kept = (
+        db.query(CourseMemberGitRepository)
+        .join(CourseMember, CourseMember.id == CourseMemberGitRepository.course_member_id)
+        .filter(CourseMember.course_id == str(course_id))
+        .count()
+    )
+    binding = (
+        db.query(CourseGitBinding)
+        .filter(CourseGitBinding.course_id == str(course_id))
+        .first()
+    )
+    if binding is None or binding.delivery != "git" or not binding.git_server_id:
+        return plan
+    server = db.query(GitServer).filter(GitServer.id == binding.git_server_id).first()
+    if server is None:
+        return plan
+
+    plan.git_server_id = str(server.id)
+    plan.server_type = server.type
+    if server.type == "forgejo":
+        template = (binding.template_repo or "").strip()
+        reference = _reference_repo_ref(binding)
+        for ref in (template, reference):
+            if ref and "/" in ref:
+                plan.repos.append((f"forgejo:{ref}", ref))
+    elif server.type == "gitlab":
+        from computor_backend.git_provider.token_resolution import resolve_binding_token
+
+        plan.token = resolve_binding_token(binding, server)
+        gl = (binding.properties or {}).get("gitlab") or {}
+        for id_key, path_key, fallback in (
+            ("template_project_id", "template_path", binding.template_repo),
+            ("reference_project_id", "reference_path", None),
+        ):
+            ref = gl.get(id_key) or gl.get(path_key) or fallback
+            if ref:
+                label = gl.get(path_key) or str(ref)
+                plan.repos.append((f"gitlab:{label}", str(ref)))
+    return plan
+
+
+def execute_course_git_teardown(
+    plan: CourseGitTeardownPlan, db: Session
+) -> Tuple[List[str], List[str]]:
+    """Delete the repos in ``plan``; returns ``(deleted_labels, errors)``.
+
+    Best effort by contract: runs AFTER the database cascade committed, so a
+    git server that is down leaves orphaned template/reference repos (reported
+    in ``errors``, recoverable by hand) rather than a half-deleted course.
+    Nothing here can reach a student repository.
+    """
+    deleted: List[str] = []
+    errors: List[str] = []
+    if not plan.repos or not plan.git_server_id:
+        return deleted, errors
+
+    server = db.query(GitServer).filter(GitServer.id == plan.git_server_id).first()
+    if server is None:
+        return deleted, [f"git server {plan.git_server_id} not found; repos not deleted"]
+
+    try:
+        if plan.server_type == "forgejo":
+            client = get_provider_client_for_server(server)
+        elif plan.server_type == "gitlab":
+            if not plan.token:
+                return deleted, ["no GitLab credential on the course binding; repos not deleted"]
+            client = _get_gitlab_client(server, plan.token)
+        else:
+            return deleted, [f"unsupported git server type {plan.server_type!r}"]
+    except Exception as exc:  # noqa: BLE001
+        return deleted, [f"could not connect to the git server: {exc}"]
+
+    for label, ref in plan.repos:
+        try:
+            if plan.server_type == "forgejo":
+                owner, _, repo = ref.partition("/")
+                ok = client.delete_repo(owner, repo)
+            else:
+                ok = client.delete_project(ref)
+        except Exception as exc:  # noqa: BLE001
+            ok = False
+            logger.warning("Git teardown of %s failed: %s", label, exc)
+        if ok:
+            deleted.append(label)
+        else:
+            errors.append(f"could not delete {label}")
+    if deleted:
+        logger.info("Deleted course git repos: %s", ", ".join(deleted))
+    return deleted, errors
 
 
 def revoke_course_member_git_access(member, permissions, db: Session) -> None:

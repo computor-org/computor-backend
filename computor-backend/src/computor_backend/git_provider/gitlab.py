@@ -301,6 +301,38 @@ class GitLabProviderClient:
     # ints while a freshly resolved namespace id may be a str.
     # ------------------------------------------------------------------
 
+    def subgroup_exists(self, parent_id, path) -> bool:
+        """Whether ``parent_id`` already has a direct subgroup at ``path``.
+        Lets a first-time course binding skip a course group left behind by a
+        deleted course instead of adopting it (and its old student forks)."""
+        gl = self._gl()
+        parent = gl.groups.get(parent_id)
+        return any(sg.path == path for sg in parent.subgroups.list(search=path, all=True))
+
+    def project_exists_in_namespace(self, namespace_id, path) -> bool:
+        """Whether a project at ``path`` already exists directly under
+        ``namespace_id`` — the student-fork allocator's ``is_free`` probe."""
+        return self._find_project_in_namespace(self._gl(), namespace_id, path) is not None
+
+    def delete_project(self, project_ref) -> bool:
+        """Delete one project. Only ever called for a course's own ``template``
+        / ``reference`` projects when the course is deleted — student forks are
+        never passed here. A 404 counts as success. GitLab performs the delete
+        asynchronously, so the path may stay reserved for a while."""
+        try:
+            self._gl().projects.delete(project_ref)
+            return True
+        except GitlabHttpError as exc:
+            if getattr(exc, "response_code", None) == 404:
+                return True
+            logger.warning("GitLab: could not delete project %s: %s", project_ref, exc)
+            return False
+        except Exception as exc:  # noqa: BLE001 - best effort by contract
+            if "404" in str(exc):
+                return True
+            logger.warning("GitLab: could not delete project %s: %s", project_ref, exc)
+            return False
+
     def resolve_project(self, ref):
         """An existing project by numeric id or ``group/sub/project`` full path.
 

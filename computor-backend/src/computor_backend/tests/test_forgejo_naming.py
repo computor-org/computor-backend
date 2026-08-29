@@ -119,3 +119,71 @@ class TestStudentRepoName:
 
     def test_distinct_handles_distinct_repos(self):
         assert student_repo_name_in_org("alice") != student_repo_name_in_org("bob")
+
+
+class TestFreeNameAllocation:
+    """``allocate_free_name`` — the provisioning-side collision guard.
+
+    A deleted course keeps its student repositories on the git server, so a
+    re-created course (same path, same students) must never adopt them: the
+    allocator asks the server and walks to the next free name.
+    """
+
+    def test_base_verbatim_when_free(self):
+        from computor_backend.utils.forgejo_naming import allocate_free_name
+
+        assert allocate_free_name("Math-2027-mmusterm", "m-1", _free_set(set())) == "Math-2027-mmusterm"
+
+    def test_numeric_suffix_when_taken(self):
+        from computor_backend.utils.forgejo_naming import allocate_free_name
+
+        taken = {"mmusterm", "mmusterm-2"}
+        assert allocate_free_name("mmusterm", "m-1", _free_set(taken)) == "mmusterm-3"
+
+    def test_hash_after_the_numeric_ladder(self):
+        from computor_backend.utils.forgejo_naming import allocate_free_name
+
+        taken = {"mmusterm"} | {f"mmusterm-{n}" for n in range(2, 10)}
+        name = allocate_free_name("mmusterm", "member-xyz", _free_set(taken))
+        assert name.startswith("mmusterm-") and name not in taken
+        assert len(name) == len("mmusterm-") + 6
+
+    def test_hash_is_stable_per_seed(self):
+        from computor_backend.utils.forgejo_naming import allocate_free_name
+
+        taken = {"h"} | {f"h-{n}" for n in range(2, 10)}
+        a = allocate_free_name("h", "seed-a", _free_set(taken))
+        b = allocate_free_name("h", "seed-a", _free_set(taken))
+        c = allocate_free_name("h", "seed-b", _free_set(taken))
+        assert a == b and a != c
+
+    def test_respects_the_length_cap(self):
+        from computor_backend.utils.forgejo_naming import (
+            REPO_NAME_MAX,
+            allocate_free_name,
+        )
+
+        base = "x" * (REPO_NAME_MAX + 20)
+        taken = {base[:REPO_NAME_MAX]}
+        name = allocate_free_name(base, "m-1", _free_set(taken))
+        assert len(name) <= REPO_NAME_MAX and name not in taken
+
+    def test_gives_up_loudly(self):
+        from computor_backend.utils.forgejo_naming import allocate_free_name
+
+        import pytest
+
+        with pytest.raises(ValueError):
+            allocate_free_name("h", "seed", lambda _n: False)
+
+
+class TestSurvivingOrgIsSkipped:
+    """The org of a deleted course stays on Forgejo (it holds the student
+    repos). ``allocate_course_org_name`` only accepts names the predicate
+    reports free, so a re-created course lands on the next candidate."""
+
+    def test_recreated_course_gets_family_qualified_org(self):
+        dead = allocate_course_org_name("itpcp", "matlab", "2027", "old-id", _free_set(set()))
+        fresh = allocate_course_org_name("itpcp", "matlab", "2027", "new-id", _free_set({dead}))
+        assert dead == "itpcp-2027"
+        assert fresh == "itpcp-matlab-2027"
