@@ -3,6 +3,7 @@ Plugin registry for managing authentication plugins.
 """
 
 import asyncio
+import time
 from typing import Dict, List, Optional, Set
 from pathlib import Path
 import json
@@ -28,7 +29,14 @@ class PluginRegistry:
     Manages plugin lifecycle, configuration, and provides a unified interface
     for authentication operations.
     """
-    
+
+    # A provider whose service was unreachable at startup stays registered but
+    # unusable; ensure_plugin_ready retries it on demand. Bounded on both sides
+    # so a provider that is genuinely down cannot turn every login into a stall:
+    # at most one attempt per cooldown window, each capped by the timeout.
+    READINESS_RETRY_COOLDOWN = 30.0
+    READINESS_RETRY_TIMEOUT = 15.0
+
     def __init__(self, config_file: Optional[str] = None):
         """
         Initialize plugin registry.
@@ -41,7 +49,10 @@ class PluginRegistry:
         self._enabled_plugins: Set[str] = set()
         self._config_file = config_file or self._get_default_config_path()
         self._configs: Dict[str, PluginConfig] = {}
-        
+        # Per-plugin on-demand re-initialization state (see ensure_plugin_ready).
+        self._readiness_locks: Dict[str, asyncio.Lock] = {}
+        self._last_readiness_attempt: Dict[str, float] = {}
+
     def _get_default_config_path(self) -> str:
         """Get default configuration file path."""
         return str(Path(__file__).parent.parent.parent.parent / "data" / "auth_plugins.json")
@@ -210,7 +221,75 @@ class PluginRegistry:
             Plugin instance or None if not loaded
         """
         return self._plugins.get(plugin_name)
-    
+
+    def plugin_is_usable(self, plugin: AuthenticationPlugin) -> bool:
+        """Whether a loaded plugin can actually serve requests.
+
+        Providers that depend on an external service expose ``is_available``
+        (Keycloak reports False until it has fetched its OIDC configuration).
+        Providers that don't are usable as soon as they are loaded.
+        """
+        return bool(getattr(plugin, "is_available", True))
+
+    async def ensure_plugin_ready(self, plugin_name: str) -> Optional[AuthenticationPlugin]:
+        """Return a plugin that is ready to serve requests, or None.
+
+        An enabled plugin can be unusable in two ways: never loaded, or loaded
+        while its backing service was down. The second one used to be permanent.
+        ``KeycloakAuthPlugin.initialize`` deliberately swallows transport errors
+        so the API can start without Keycloak, which leaves the plugin registered
+        but holding no OIDC configuration — and nothing ever retried it, so every
+        login failed with "Plugin not initialized" until the API was restarted.
+
+        Retry here instead, on the request that needs the provider. One attempt
+        at a time, at most one per cooldown window, each capped by a timeout: a
+        provider that is really down returns None quickly rather than making the
+        caller wait out the plugin's own connect retries.
+        """
+        if plugin_name not in self._enabled_plugins:
+            return None
+
+        plugin = self._plugins.get(plugin_name)
+        if plugin is not None and self.plugin_is_usable(plugin):
+            return plugin
+
+        lock = self._readiness_locks.setdefault(plugin_name, asyncio.Lock())
+        async with lock:
+            # A concurrent request may have healed it while we waited.
+            plugin = self._plugins.get(plugin_name)
+            if plugin is not None and self.plugin_is_usable(plugin):
+                return plugin
+
+            now = time.monotonic()
+            last_attempt = self._last_readiness_attempt.get(plugin_name)
+            if last_attempt is not None and now - last_attempt < self.READINESS_RETRY_COOLDOWN:
+                return None
+            self._last_readiness_attempt[plugin_name] = now
+
+            try:
+                if plugin is None:
+                    load = (
+                        self.load_builtin_provider(plugin_name)
+                        if plugin_name in BUILTIN_PROVIDERS
+                        else self.load_plugin(plugin_name)
+                    )
+                    await asyncio.wait_for(load, self.READINESS_RETRY_TIMEOUT)
+                else:
+                    await asyncio.wait_for(plugin.initialize(), self.READINESS_RETRY_TIMEOUT)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    f"Timed out re-initializing auth provider {plugin_name} "
+                    f"after {self.READINESS_RETRY_TIMEOUT}s"
+                )
+            except Exception as e:
+                logger.warning(f"Auth provider {plugin_name} is still unavailable: {e}")
+
+            plugin = self._plugins.get(plugin_name)
+            if plugin is not None and self.plugin_is_usable(plugin):
+                logger.info(f"Auth provider {plugin_name} is ready again (recovered on demand)")
+                return plugin
+            return None
+
     def get_enabled_plugins(self) -> List[str]:
         """Get list of enabled plugin names."""
         return list(self._enabled_plugins)

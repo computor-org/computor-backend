@@ -15,6 +15,7 @@ from computor_backend.exceptions import (
     BadRequestException,
     NotFoundException,
     ForbiddenException,
+    ServiceUnavailableException,
 )
 from computor_backend.business_logic.instance_limits import (
     enforce_login_cap,
@@ -408,6 +409,13 @@ async def handle_sso_callback(
     registry = get_plugin_registry()
     redis_client = await get_redis_client()
 
+    # The provider may have been unreachable when the API started, or restarted
+    # since — re-initialize it on demand rather than dropping the user on a 500.
+    if await registry.ensure_plugin_ready(provider) is None:
+        raise ServiceUnavailableException(
+            detail=f"Authentication provider '{provider}' is currently unreachable"
+        )
+
     # Handle callback with provider
     auth_result = await registry.handle_callback(provider, code, state, callback_url)
 
@@ -675,10 +683,13 @@ async def refresh_sso_token(
     if provider not in registry.get_enabled_plugins():
         raise BadRequestException(detail=f"Authentication provider not enabled: {provider}")
 
-    # Get the plugin
-    plugin = registry.get_plugin(provider)
+    # Get the plugin, re-initializing it if the provider was unreachable when the
+    # API started (or has been restarted since).
+    plugin = await registry.ensure_plugin_ready(provider)
     if not plugin:
-        raise NotFoundException(detail=f"Authentication provider not found: {provider}")
+        raise ServiceUnavailableException(
+            detail=f"Authentication provider '{provider}' is currently unreachable"
+        )
 
     # Use the plugin's refresh token method
     if hasattr(plugin, "refresh_token"):

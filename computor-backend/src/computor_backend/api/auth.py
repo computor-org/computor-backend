@@ -27,6 +27,7 @@ from computor_backend.exceptions import (
     UnauthorizedException,
     BadRequestException,
     NotFoundException,
+    ServiceUnavailableException,
 )
 from computor_backend.permissions.principal import Principal
 from computor_backend.plugins import PluginMetadata
@@ -92,13 +93,18 @@ async def initiate_login(
     if provider not in registry.get_enabled_plugins():
         raise NotFoundException(detail=f"Authentication provider not found or not enabled: {provider}")
 
-    # If the plugin is enabled but not yet loaded (e.g. Keycloak wasn't ready at startup), try now
-    if registry.get_plugin(provider) is None:
-        try:
-            await registry.load_builtin_provider(provider)
-            logger.info(f"Lazily loaded provider: {provider}")
-        except Exception as e:
-            logger.warning(f"Could not lazily load provider {provider}: {e}")
+    # An enabled provider is not necessarily usable: it may never have loaded, or
+    # it loaded while its service was down and is still holding no OIDC config.
+    # Give it a chance to come good on this request; answer 503 if it can't, so
+    # the failure reads as "Keycloak unreachable" instead of an opaque 500.
+    if await registry.ensure_plugin_ready(provider) is None:
+        logger.error(f"Authentication provider {provider} is enabled but not reachable")
+        raise ServiceUnavailableException(
+            detail=(
+                f"Authentication provider '{provider}' is currently unreachable. "
+                "Please try again in a moment."
+            )
+        )
 
     # Generate state for CSRF protection
     state = secrets.token_urlsafe(32)
