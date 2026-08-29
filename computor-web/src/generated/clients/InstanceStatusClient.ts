@@ -15,9 +15,12 @@ export class InstanceStatusClient extends BaseEndpointClient {
   /**
    * Get Instance Status
    * When this API last restarted and what it is running (#350).
-   * Admin-only. Nothing here is a secret in itself — a commit hash and two
-   * timestamps — but it describes the deployment rather than serving the user,
-   * and the operator asking for it is the only one it helps.
+   * Readable by any authenticated user: "the server restarted an hour ago" is
+   * the answer to a question every user asks when something breaks under them,
+   * and refusing it only makes them ask an admin.
+   * The commit is the exception, and is redacted rather than split into a second
+   * endpoint — a full SHA names the exact source of a public repository, which
+   * describes the deployment rather than serving the user.
    */
   async getInstanceStatusInstanceStatusGet(): Promise<InstanceStatusGet> {
     return this.client.get<InstanceStatusGet>(this.basePath);

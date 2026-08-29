@@ -67,10 +67,16 @@ class InstanceInfoGet(BaseModel):
 
 
 class InstanceStatusGet(BaseModel):
-    """Runtime state of the running API (#350) — admin-only.
+    """Runtime state of the running API (#350).
 
     Answers "when did this last restart, and what is it running", which nothing
     in the UI could say before.
+
+    Readable by any authenticated user, with one field redacted rather than a
+    second response shape: ``commit`` is admin-only. A restart time, an uptime
+    and a branch name are a version label — the sidebar already shows the web
+    image's own commit to everyone — but the full SHA pins the exact source of a
+    public repository, which is the operator's business and nobody else's.
 
     The issue also asks for system and workspace memory. That is deliberately
     absent rather than null: the API holds no docker socket and there is no
@@ -86,8 +92,10 @@ class InstanceStatusGet(BaseModel):
     uptime_seconds: int = Field(
         description="Seconds since started_at, so a client need not trust its own clock.",
     )
-    commit: str = Field(
-        description="Commit hash of the running code; 'unknown' if it cannot be determined.",
+    commit: Optional[str] = Field(
+        None,
+        description="Commit hash of the running code; 'unknown' if it cannot be "
+        "determined, and null for a non-admin reader, who is not shown it.",
     )
     branch: str = Field(
         description="Branch the running code was built from; 'unknown' if undeterminable.",
