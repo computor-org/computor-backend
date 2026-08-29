@@ -283,7 +283,8 @@ def publish_course_updated(
 
     Args:
         course_id: Course UUID string
-        change_type: One of "updated", "visibility_changed"
+        change_type: One of "updated", "visibility_changed", "archived",
+            "unarchived", "deleted"
     """
     _invalidate_cache_tags(f"course_id:{course_id}")
 

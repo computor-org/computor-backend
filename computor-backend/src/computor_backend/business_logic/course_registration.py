@@ -42,14 +42,18 @@ SELF_REGISTRATION_GROUP_TITLE = "default"
 def _catalog_query(db: Session):
     """Courses that are open for self-registration, joined to their org.
 
-    ``Course`` has no ``archived_at``, but ``Organization`` does — a course
-    under an archived organization must not stay joinable, so the predicate
-    lives here and both the catalog and the registration lookup use it.
+    Neither an archived course nor a course under an archived organization
+    may stay joinable, so the predicate lives here and both the catalog and
+    the registration lookup use it.
     """
     return (
         db.query(Course, Organization.title)
         .join(Organization, Organization.id == Course.organization_id)
-        .filter(Course.public.is_(True), Organization.archived_at.is_(None))
+        .filter(
+            Course.public.is_(True),
+            Course.archived_at.is_(None),
+            Organization.archived_at.is_(None),
+        )
     )
 
 
