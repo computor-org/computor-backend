@@ -11,12 +11,11 @@ import { apiFetch, API_BASE_URL } from './apiClient';
  * `path` is relative to API_BASE_URL.
  *
  * PREFER the generated clients in `src/generated/clients/*` for new code — this
- * helper is retained only for the three endpoints without a usable generated
- * method: the two ambiguous dual-route deletes `DELETE /organizations/{id}` and
- * `DELETE /course-families/{id}` (left hand-typed to preserve the exact route
- * the backend matches), and `DELETE /examples/{id}` (the backend emits no
+ * helper is retained only for `DELETE /examples/{id}` (the backend emits no
  * single-id example delete). Everything else — including all `/user*` and
- * `/consent/*` calls — now uses generated clients.
+ * `/consent/*` calls and the three hierarchy deletes, which the backend now
+ * registers once (the generic CRUD delete is skipped for them) — uses
+ * generated clients.
  */
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {

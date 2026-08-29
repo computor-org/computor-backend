@@ -1,18 +1,19 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { api } from '@/src/utils/api';
+import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useCascadeDelete } from '@/src/hooks/useCascadeDelete';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
+import CascadeDeletePreview from '@/src/components/CascadeDeletePreview';
+import Button, { ButtonLink } from '@/src/components/ui/Button';
 import { displayName } from '@/src/utils/displayName';
-import type { OrganizationGet, CourseFamilyList } from 'types/generated';
 import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
 import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
 
@@ -22,8 +23,8 @@ const courseFamiliesClient = new CourseFamiliesClient();
 export default function OrganizationDetailPage() {
   const orgId = useParams().id as string;
   const router = useRouter();
-  const { canManageHierarchy: canManage, canCreateCourseFamily } = usePermissions();
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const { refreshPermissions } = useAuth();
+  const { canManageHierarchy: canManage, canCreateCourseFamily, canDeleteOrganization } = usePermissions();
 
   const { data, loading, error } = useResource(
     async () => ({
@@ -36,10 +37,17 @@ export default function OrganizationDetailPage() {
   const families = data?.families ?? [];
   const orgName = displayName(org, 'Organization');
 
-  async function doDelete() {
-    await api.del(`/organizations/${orgId}`);
-    router.push('/organizations');
-  }
+  // Preview (dry run) first, then the real delete behind the typed-path dialog.
+  // Deleting removes the caller's own _owner role, so the cached scopes are
+  // refreshed before navigating — otherwise the list would still offer it.
+  const del = useCascadeDelete(
+    () => organizationsClient.deleteOrganizationEndpointOrganizationsOrganizationIdDelete({ organizationId: orgId, dryRun: true }),
+    () => organizationsClient.deleteOrganizationEndpointOrganizationsOrganizationIdDelete({ organizationId: orgId, dryRun: false }),
+    async () => {
+      await refreshPermissions();
+      router.push('/organizations');
+    },
+  );
 
   return (
     <AuthenticatedLayout>
@@ -49,10 +57,16 @@ export default function OrganizationDetailPage() {
           title={orgName}
           subtitle={org && <span className="text-sm text-muted">{org.organization_type}</span>}
           actions={
-            org && canManage ? (
+            org ? (
               <>
-                <Link href={`/organizations/${org.id}/edit`} className="px-3 py-2 text-sm font-medium text-body border border-rule-strong rounded-lg hover:bg-canvas">Edit</Link>
-                <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-danger-text border border-danger-line rounded-lg hover:bg-danger-wash">Delete</button>
+                {canManage && (
+                  <ButtonLink href={`/organizations/${org.id}/edit`} variant="secondary">Edit</ButtonLink>
+                )}
+                {canDeleteOrganization(orgId) && (
+                  <Button variant="dangerGhost" onClick={del.begin} loading={del.opening} loadingLabel="Delete">
+                    Delete
+                  </Button>
+                )}
               </>
             ) : undefined
           }
@@ -98,13 +112,15 @@ export default function OrganizationDetailPage() {
         ) : null}
       </ListPageLayout>
 
-      {confirmDelete && org && (
+      {del.preview && org && (
         <ConfirmDeleteDialog
           title={`Delete organization “${orgName}”?`}
           message="This permanently deletes the organization and is irreversible. It must have no course families first."
-          confirmWord={orgName}
-          onConfirm={doDelete}
-          onClose={() => setConfirmDelete(false)}
+          confirmWord={org.path}
+          preview={<CascadeDeletePreview result={del.preview} />}
+          blockedReason={del.preview.blocked_reason}
+          onConfirm={del.confirm}
+          onClose={del.close}
         />
       )}
     </AuthenticatedLayout>
