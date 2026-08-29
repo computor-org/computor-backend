@@ -1238,6 +1238,29 @@ errors:
   # TASK EXECUTION ERRORS (404, 500)
   # ============================================================================
 
+
+  - code: SUBMIT_013
+    http_status: 400
+    category: validation
+    severity: warning
+    title: "Course Archived"
+    message:
+      plain: "This course has been archived. Submissions and test runs are closed."
+      markdown: "**Course Archived**\n\nThis course has been archived. Submissions and test runs are closed. Your existing work and submissions are untouched."
+      html: "<strong>Course Archived</strong><p>This course has been archived. Submissions and test runs are closed. Your existing work and submissions are untouched.</p>"
+    internal_description: "The course's archived_at is set. The whole content tree is hidden from students through the visibility veto and every student write is refused. Staff are exempt."
+    affected_functions:
+      - "create_test_run"
+      - "upload_submission_artifact"
+      - "update_artifact"
+      - "create_test_result"
+      - "enforce_content_visible"
+    common_causes:
+      - "An owner archived the course after the student's tree was cached"
+      - "The client acted on a stale tree that still listed the course"
+    resolution_steps:
+      - "Nothing to do: the course is over. Ask the lecturer if you believe it was archived by mistake"
+    documentation_url: "/docs/courses#archive"
   - code: TASK_001
     http_status: 404
     category: not_found

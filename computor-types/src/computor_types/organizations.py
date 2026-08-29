@@ -106,6 +106,7 @@ class OrganizationGet(BaseEntityGet):
     locality: Optional[str] = Field(None, description="City/locality")
     region: Optional[str] = Field(None, description="State/region")
     country: Optional[str] = Field(None, description="Country")
+    archived_at: Optional[datetime] = Field(None, description="Set once the organization is archived (PATCH /organizations/{id}/archive)")
     
     @field_validator('path', mode='before')
     @classmethod
@@ -141,6 +142,7 @@ class OrganizationList(BaseEntityList):
     organization_type: OrganizationType = Field(description="Type of organization")
     user_id: Optional[str] = Field(None, description="Associated user ID")
     email: Optional[EmailStr] = Field(None, description="Contact email")
+    archived_at: Optional[datetime] = Field(None, description="Set once the organization is archived")
     
     @field_validator('path', mode='before')
     @classmethod

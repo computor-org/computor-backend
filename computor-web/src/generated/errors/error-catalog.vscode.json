@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "error_count": 81,
+  "error_count": 82,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -701,6 +701,19 @@
         "plain": "This assignment is not currently available. Your lecturer has hidden it.",
         "markdown": "**Assignment Not Available**\n\nThis assignment is not currently available because your lecturer has hidden it. Your existing work and submissions are untouched and will reappear if it is made visible again.",
         "html": "<strong>Assignment Not Available</strong><p>This assignment is not currently available because your lecturer has hidden it. Your existing work and submissions are untouched and will reappear if it is made visible again.</p>"
+      },
+      "retry_after": null
+    },
+    "SUBMIT_013": {
+      "code": "SUBMIT_013",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Course Archived",
+      "message": {
+        "plain": "This course has been archived. Submissions and test runs are closed.",
+        "markdown": "**Course Archived**\n\nThis course has been archived. Submissions and test runs are closed. Your existing work and submissions are untouched.",
+        "html": "<strong>Course Archived</strong><p>This course has been archived. Submissions and test runs are closed. Your existing work and submissions are untouched.</p>"
       },
       "retry_after": null
     },

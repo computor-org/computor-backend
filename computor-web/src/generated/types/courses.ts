@@ -1316,6 +1316,7 @@ export interface CourseGet {
   created_by?: string | null;
   updated_by?: string | null;
   organization_id: string;
+  archived_at?: string | null;
   course_family?: CourseFamilyGet | null;
 }
 
@@ -1332,6 +1333,7 @@ export interface CourseList {
   max_submissions?: number | null;
   visible?: boolean | null;
   public?: boolean | null;
+  archived_at?: string | null;
 }
 
 export interface CourseUpdate {
@@ -1360,6 +1362,7 @@ export interface CourseQuery {
   max_submissions?: number | null;
   visible?: boolean | null;
   public?: boolean | null;
+  archived?: boolean | null;
 }
 
 /**

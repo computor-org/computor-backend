@@ -1,5 +1,6 @@
 from pydantic import BaseModel, field_validator, ConfigDict
 from typing import Optional
+from datetime import datetime
 
 
     
@@ -71,6 +72,10 @@ class CourseGet(BaseEntityGet,CourseCreate):
     # DEFAULT false; Optional here so an omitted key takes the server default
     # and a partially-loaded row still validates.
     public: Optional[bool] = None
+    # Set once an owner archives the course: hidden from students and tutors,
+    # submissions and test runs closed, reversible. Read-only here; use
+    # ``PATCH /courses/{id}/archive`` / ``/unarchive``.
+    archived_at: Optional[datetime] = None
 
     course_family: Optional[CourseFamilyGet] = None
 
@@ -105,6 +110,10 @@ class CourseList(BaseModel):
     # DEFAULT false; Optional here so an omitted key takes the server default
     # and a partially-loaded row still validates.
     public: Optional[bool] = None
+    # See ``CourseGet.archived_at``. Lists include archived courses for staff so
+    # they can be badged, unarchived or deleted; students and tutors never get
+    # them (filtered server-side).
+    archived_at: Optional[datetime] = None
 
     @field_validator('path', mode='before')
     @classmethod
@@ -146,6 +155,13 @@ class CourseQuery(ListQuery):
     max_submissions: Optional[int] = None
     visible: Optional[bool] = None
     public: Optional[bool] = None
+    # Tri-state lifecycle filter: None (default) returns live AND archived
+    # courses, True only archived, False only live. The default deliberately
+    # INCLUDES archived courses — unlike ``CourseContentQuery.archived`` — because
+    # the staff surfaces that list courses (web list, extension tree) must keep
+    # showing an archived course so it can be badged, unarchived or deleted.
+    # Students and tutors never see archived courses regardless of this flag.
+    archived: Optional[bool] = None
 
 
 class CoursePublicList(BaseModel):
