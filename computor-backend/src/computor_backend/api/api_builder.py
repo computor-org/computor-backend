@@ -24,6 +24,43 @@ from fastapi import Request, Response
 
 logger = logging.getLogger(__name__)
 
+
+async def invalidate_request_principal(request: Request, *, what: str = "this request") -> None:
+    """Drop the caller's cached Principal after a request changed their own roles.
+
+    The Principal is cached per credential for ``AUTH_CACHE_TTL`` and is what
+    ``GET /user/scopes`` projects, so a client that re-reads its permissions
+    right after creating (self-enrolled as ``_owner``) or deleting (membership
+    gone) an organization / course family / course would otherwise be told the
+    stale answer for up to fifteen minutes. Same reasoning (and same helper)
+    as the self-enrolment path in ``api/user.py``.
+
+    The credential is re-parsed off the request rather than taken as a route
+    dependency: the cache key is derived from the raw token, which nothing
+    else on these paths carries, and a second *declared* auth dependency would
+    401 the callers that legitimately override ``get_current_principal``
+    instead of sending a header.
+
+    Best-effort throughout: a stale cache must never fail a write that already
+    committed.
+    """
+    try:
+        from computor_backend.business_logic.auth import (
+            invalidate_principal_cache_for_token,
+        )
+        from computor_backend.permissions.auth import parse_authorization_header
+        from computor_backend.redis_cache import get_redis_client
+
+        token = getattr(parse_authorization_header(request), "token", None)
+        if not token:
+            return
+        await invalidate_principal_cache_for_token(token, await get_redis_client())
+    except Exception:
+        logger.warning(
+            "Principal cache invalidation failed after %s", what, exc_info=True,
+        )
+
+
 class CrudRouter:
 
     id_type = "id"
@@ -44,6 +81,7 @@ class CrudRouter:
         self.on_updated = []
         self.on_deleted = []
         self.on_archived = []
+        self.on_unarchived = []
         self.pre_archive = []  # sync guards: (entity, permissions, db) -> None, raise to block
         self.pre_delete = []  # sync guards: (entity, permissions, db) -> None, raise to block
 
@@ -156,11 +194,16 @@ class CrudRouter:
     def unarchive(self):
         if hasattr(self.dto.model, "archived_at"):
             async def route(
+                    background_tasks: BackgroundTasks,
                     permissions: Annotated[Principal, Depends(get_current_principal)],
                     id: UUID | str,
                     db: Session = Depends(get_db)
             ):
                 entity = await get_id_db(permissions, db, id, self.dto)
+
+                for task in self.on_unarchived:
+                    background_tasks.add_task(task, entity, permissions)
+
                 result = await unarchive_db(permissions, db, id, self.dto.model)
                 self._invalidate_caches_for(entity)
                 return result
@@ -244,41 +287,14 @@ class CrudRouter:
 
         Entities whose interface sets ``grants_creator_scope_role`` enrol their
         creator as ``_owner`` in ``post_create``, which means this request just
-        changed the caller's own authorization. The Principal is cached per
-        credential for ``AUTH_CACHE_TTL`` and is what ``GET /user/scopes``
-        projects, so a client that re-reads its permissions right after
-        creating an organization / course family / course would otherwise be
-        told it holds no role there for up to fifteen minutes. Same reasoning
-        (and same helper) as the self-enrolment path in ``api/user.py``.
-
-        The credential is re-parsed off the request rather than taken as a
-        route dependency: the cache key is derived from the raw token, which
-        nothing else on the create path carries, and a second *declared*
-        auth dependency would 401 the callers that legitimately override
-        ``get_current_principal`` instead of sending a header.
-
-        Best-effort throughout: a stale cache must never fail a write that
-        already committed.
+        changed the caller's own authorization. See
+        :func:`invalidate_request_principal` for why and how.
         """
         if not getattr(self.dto, "grants_creator_scope_role", False):
             return
-        try:
-            from computor_backend.business_logic.auth import (
-                invalidate_principal_cache_for_token,
-            )
-            from computor_backend.permissions.auth import parse_authorization_header
-            from computor_backend.redis_cache import get_redis_client
-
-            token = getattr(parse_authorization_header(request), "token", None)
-            if not token:
-                return
-            await invalidate_principal_cache_for_token(token, await get_redis_client())
-        except Exception:
-            logger.warning(
-                "Principal cache invalidation failed after creating %s",
-                self.dto.model.__tablename__,
-                exc_info=True,
-            )
+        await invalidate_request_principal(
+            request, what=f"creating {self.dto.model.__tablename__}"
+        )
 
     def _invalidate_caches_for(self, entity) -> None:
         """Invalidate user-view cache tags emitted by the entity's interface.

@@ -98,6 +98,8 @@ export interface OrganizationGet {
   region?: string | null;
   /** Country */
   country?: string | null;
+  /** Set once the organization is archived (PATCH /organizations/{id}/archive) */
+  archived_at?: string | null;
 }
 
 export interface OrganizationList {
@@ -117,6 +119,8 @@ export interface OrganizationList {
   user_id?: string | null;
   /** Contact email */
   email?: any | null;
+  /** Set once the organization is archived */
+  archived_at?: string | null;
 }
 
 export interface OrganizationUpdate {

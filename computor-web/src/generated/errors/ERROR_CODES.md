@@ -1,7 +1,7 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Total errors:** 81
+**Total errors:** 82
 
 To regenerate: `bash generate_error_codes.sh`
 
@@ -2171,6 +2171,35 @@ Effective visibility resolved to false for the course content (own flag or an an
 **Resolution Steps:**
 1. Refresh the assignment tree; hidden content is removed from it
 2. Ask the lecturer when the assignment will be released
+
+---
+
+### SUBMIT_013 - Course Archived
+
+**HTTP Status:** `400`  
+**Severity:** `warning`  
+**Category:** `validation`  
+**Documentation:** [/docs/courses#archive](/docs/courses#archive)  
+
+**Description:**  
+The course's archived_at is set. The whole content tree is hidden from students through the visibility veto and every student write is refused. Staff are exempt.
+
+**User Message:**  
+> This course has been archived. Submissions and test runs are closed.
+
+**Affected Functions:**
+- `create_test_run`
+- `upload_submission_artifact`
+- `update_artifact`
+- `create_test_result`
+- `enforce_content_visible`
+
+**Common Causes:**
+- An owner archived the course after the student's tree was cached
+- The client acted on a stale tree that still listed the course
+
+**Resolution Steps:**
+1. Nothing to do: the course is over. Ask the lecturer if you believe it was archived by mistake
 
 ---
 

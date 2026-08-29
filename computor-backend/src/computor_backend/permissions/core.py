@@ -150,6 +150,30 @@ def check_permissions(permissions: Principal, entity: Any, action: str, db: Sess
     return permission_registry.check_permissions(permissions, entity, action, db)
 
 
+def can_perform_action(
+    permissions: Principal,
+    entity: Any,
+    action: str,
+    resource_id: Optional[str] = None,
+    context: Optional[dict] = None,
+) -> bool:
+    """Yes/no counterpart of :func:`check_permissions` for one resource.
+
+    ``check_permissions`` answers "which rows may this principal touch" as a
+    filtered query — the right shape for reads and for CRUD writes that filter
+    by id. Hand-written endpoints that act on ONE named resource (the cascade
+    deletes) need a plain boolean instead, and used to invent their own role
+    checks for it. This routes the question through the entity's registered
+    handler (``ACTION_ROLE_MAP`` and all), so the answer is the same one the
+    generic routes would give. Admin-only when no handler is registered, like
+    the registry's own fallback.
+    """
+    handler = permission_registry.get_handler(entity)
+    if handler is None:
+        return bool(permissions.is_admin)
+    return bool(handler.can_perform_action(permissions, action, resource_id, context))
+
+
 def get_permitted_course_ids(permissions: Principal, minimum_role: str, db: Session) -> List[str]:
     """Get list of course IDs where user has at least the minimum role"""
     if permissions.is_admin:

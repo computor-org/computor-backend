@@ -44,6 +44,11 @@ class EntityDeleteCount(BaseModel):
     example_versions: int = 0
     example_dependencies: int = 0
     student_profiles: int = 0
+    # Submission artifacts whose submission group has at least one ``_student``
+    # member. This — not the raw ``submission_artifacts`` — is what decides
+    # whether a course may be deleted at all (owners never, admins after
+    # archiving). Lecturer/tutor self-test uploads do not count.
+    student_submissions: int = 0
 
 
 class CascadeDeletePreview(BaseModel):
@@ -76,6 +81,23 @@ class CascadeDeleteResult(BaseModel):
     errors: List[str] = Field(
         default_factory=list,
         description="Errors encountered during deletion"
+    )
+    # Course deletes only. The template and reference repositories that will be
+    # (dry run) / were (real run) removed from the git server, as
+    # ``"{server_type}:{ref}"``. Student repositories are never in this list:
+    # they are kept, and ``student_repositories_kept`` says how many.
+    git_repositories: List[str] = Field(
+        default_factory=list,
+        description="Template/reference git repositories deleted (or to be deleted on dry run)"
+    )
+    student_repositories_kept: int = Field(
+        0, description="Student repositories left untouched on the git server"
+    )
+    # Set on a dry run when the real delete would be refused (409): the exact
+    # message the real call would return, so a client can explain the block
+    # before asking for confirmation instead of failing afterwards.
+    blocked_reason: Optional[str] = Field(
+        None, description="Why the real delete would be refused, if it would"
     )
 
 

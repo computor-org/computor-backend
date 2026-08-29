@@ -177,6 +177,14 @@ class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     # Same shape as CourseContent.is_submittable.
     public = Column(Boolean, nullable=False, server_default=text("false"))
 
+    # Lifecycle: set when an owner archives the course. Archived courses vanish
+    # from the student and tutor views and from the public catalog, and every
+    # student write (submission, test run) is refused through the same veto as
+    # ``visible`` (business_logic.content_visibility). Reversible. Deleting a
+    # course that holds student submissions requires it to be archived first,
+    # and even then only an administrator may do it.
+    archived_at = Column(DateTime(timezone=True))
+
     # Relationships
     course_family = relationship('CourseFamily', back_populates='courses')
     organization = relationship('Organization', back_populates='courses')

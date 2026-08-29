@@ -225,6 +225,8 @@
 | `applyCourseWorkspacePolicyEndpointCoursesCourseIdWorkspaceSettingsApplyPolicyPost` | POST | `/courses/{course_id}/workspace-settings/apply-policy` | — | `StudentWorkspaceProvisionResponse` |
 | `getCoursesCoursesIdGet` | GET | `/courses/{id}` | — | `CourseGet` |
 | `updateCoursesCoursesIdPatch` | PATCH | `/courses/{id}` | `CourseUpdate` | `CourseGet` |
+| `routeCoursesCoursesIdArchivePatch` | PATCH | `/courses/{id}/archive` | — | `void` |
+| `unarchiveCoursesCoursesIdUnarchivePatch` | PATCH | `/courses/{id}/unarchive` | — | `void` |
 
 ## DocumentsClient
 - Base path: `/documents`

@@ -201,5 +201,11 @@ class CourseInterface(CourseInterfaceBase, BackendEntityInterface):
             query = query.filter(Course.visible.is_(params.visible))
         if params.public is not None:
             query = query.filter(Course.public.is_(params.public))
+        # Tri-state: None includes archived courses (staff must keep seeing them
+        # to unarchive or delete), True = only archived, False = only live.
+        if params.archived is True:
+            query = query.filter(Course.archived_at.isnot(None))
+        elif params.archived is False:
+            query = query.filter(Course.archived_at.is_(None))
 
         return query

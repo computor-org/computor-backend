@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "error_count": 81,
+  "error_count": 82,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -1503,6 +1503,35 @@
       "resolution_steps": [
         "Refresh the assignment tree; hidden content is removed from it",
         "Ask the lecturer when the assignment will be released"
+      ]
+    },
+    "SUBMIT_013": {
+      "code": "SUBMIT_013",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Course Archived",
+      "message": {
+        "plain": "This course has been archived. Submissions and test runs are closed.",
+        "markdown": "**Course Archived**\n\nThis course has been archived. Submissions and test runs are closed. Your existing work and submissions are untouched.",
+        "html": "<strong>Course Archived</strong><p>This course has been archived. Submissions and test runs are closed. Your existing work and submissions are untouched.</p>"
+      },
+      "retry_after": null,
+      "documentation_url": "/docs/courses#archive",
+      "internal_description": "The course's archived_at is set. The whole content tree is hidden from students through the visibility veto and every student write is refused. Staff are exempt.",
+      "affected_functions": [
+        "create_test_run",
+        "upload_submission_artifact",
+        "update_artifact",
+        "create_test_result",
+        "enforce_content_visible"
+      ],
+      "common_causes": [
+        "An owner archived the course after the student's tree was cached",
+        "The client acted on a stale tree that still listed the course"
+      ],
+      "resolution_steps": [
+        "Nothing to do: the course is over. Ask the lecturer if you believe it was archived by mistake"
       ]
     },
     "TASK_001": {

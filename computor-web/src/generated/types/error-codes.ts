@@ -114,6 +114,7 @@ export const ErrorCodes = {
   SUBMIT_010: "SUBMIT_010", // Test and Submission Limits Exhausted
   SUBMIT_011: "SUBMIT_011", // Submission Cannot Be Withdrawn
   SUBMIT_012: "SUBMIT_012", // Assignment Not Available
+  SUBMIT_013: "SUBMIT_013", // Course Archived
   TASK_001: "TASK_001", // Task Not Found
   TASK_002: "TASK_002", // Task Submission Failed
   TASK_003: "TASK_003", // Unsupported Execution Backend
@@ -920,6 +921,20 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
     },
     retryAfter: undefined,
     documentationUrl: "/docs/testing#visibility",
+  },
+  SUBMIT_013: {
+    code: "SUBMIT_013",
+    httpStatus: 400,
+    category: ErrorCategory.VALIDATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Course Archived",
+    message: {
+      plain: "This course has been archived. Submissions and test runs are closed.",
+      markdown: "**Course Archived**\n\nThis course has been archived. Submissions and test runs are closed. Your existing work and submissions are untouched.",
+      html: "<strong>Course Archived</strong><p>This course has been archived. Submissions and test runs are closed. Your existing work and submissions are untouched.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/courses#archive",
   },
   TASK_001: {
     code: "TASK_001",

@@ -15,8 +15,9 @@ export class CoursesClient extends BaseEndpointClient {
   /**
    * List Courses
    */
-  async listCoursesCoursesGet({ courseFamilyId, description, fullPath, id, languageCode, limit, maxSubmissions, maxTestRuns, organizationId, path, providerUrl, public_value, skip, title, userId, visible }: { courseFamilyId?: string | null; description?: string | null; fullPath?: string | null; id?: string | null; languageCode?: string | null; limit?: number | null; maxSubmissions?: number | null; maxTestRuns?: number | null; organizationId?: string | null; path?: string | null; providerUrl?: string | null; public_value?: boolean | null; skip?: number | null; title?: string | null; userId?: string | null; visible?: boolean | null }): Promise<CourseList[]> {
+  async listCoursesCoursesGet({ archived, courseFamilyId, description, fullPath, id, languageCode, limit, maxSubmissions, maxTestRuns, organizationId, path, providerUrl, public_value, skip, title, userId, visible }: { archived?: boolean | null; courseFamilyId?: string | null; description?: string | null; fullPath?: string | null; id?: string | null; languageCode?: string | null; limit?: number | null; maxSubmissions?: number | null; maxTestRuns?: number | null; organizationId?: string | null; path?: string | null; providerUrl?: string | null; public_value?: boolean | null; skip?: number | null; title?: string | null; userId?: string | null; visible?: boolean | null }): Promise<CourseList[]> {
     const queryParams: Record<string, unknown> = {
+      archived,
       course_family_id: courseFamilyId,
       description,
       full_path: fullPath,
@@ -79,7 +80,14 @@ export class CoursesClient extends BaseEndpointClient {
    * - All submission groups and their artifacts
    * - All results and grades
    * - All messages targeted to the course
-   * **WARNING**: This is a destructive operation. Use dry_run=true to preview.
+   * - The course's template and reference repositories on the git server
+   * Student repositories on the git server are KEPT (see
+   * `student_repositories_kept` in the result).
+   * Only a course `_owner` or an administrator may call this. A course that
+   * holds submissions from students is refused (409) for owners; an
+   * administrator may delete it once it has been archived.
+   * **WARNING**: This is a destructive operation. Use dry_run=true to preview;
+   * a preview reports `blocked_reason` when the real call would be refused.
    */
   async deleteCourseEndpointCoursesCourseIdDelete({ courseId, dryRun, userId }: { courseId: string; dryRun?: boolean; userId?: string | null }): Promise<CascadeDeleteResult> {
     const queryParams: Record<string, unknown> = {
@@ -212,5 +220,25 @@ export class CoursesClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.patch<CourseGet>(this.buildPath(id), body, { params: queryParams });
+  }
+
+  /**
+   * Route Courses
+   */
+  async routeCoursesCoursesIdArchivePatch({ id, userId }: { id: string | string; userId?: string | null }): Promise<void> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.patch<void>(this.buildPath(id, 'archive'), { params: queryParams });
+  }
+
+  /**
+   * Unarchive Courses
+   */
+  async unarchiveCoursesCoursesIdUnarchivePatch({ id, userId }: { id: string | string; userId?: string | null }): Promise<void> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.patch<void>(this.buildPath(id, 'unarchive'), { params: queryParams });
   }
 }

@@ -1748,6 +1748,7 @@ export interface EntityDeleteCount {
   example_versions?: number;
   example_dependencies?: number;
   student_profiles?: number;
+  student_submissions?: number;
 }
 
 /**
@@ -1782,6 +1783,12 @@ export interface CascadeDeleteResult {
   minio_objects_deleted?: number;
   /** Errors encountered during deletion */
   errors?: string[];
+  /** Template/reference git repositories deleted (or to be deleted on dry run) */
+  git_repositories?: string[];
+  /** Student repositories left untouched on the git server */
+  student_repositories_kept?: number;
+  /** Why the real delete would be refused, if it would */
+  blocked_reason?: string | null;
 }
 
 /**

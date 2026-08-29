@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -8,15 +9,25 @@ import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import EmptyState from '@/src/components/EmptyState';
+import Badge from '@/src/components/Badge';
 import CourseCard, { CourseCardSkeleton, ViewCourseLink } from '@/src/components/courses/CourseCard';
 import { ButtonLink } from '@/src/components/ui/Button';
+import Toggle from '@/src/components/ui/Toggle';
 
 const coursesClient = new CoursesClient();
 
 export default function CoursesPage() {
-  const { courseRole, canCreateCourse } = usePermissions();
+  const { courseRole, canCreateCourse, hasView, isAdmin } = usePermissions();
   const { data, loading, error } = useResource(() => coursesClient.listCoursesCoursesGet({}), []);
-  const courses = data ?? [];
+  // The server includes archived courses for staff (students never get them),
+  // so staff can still reach one to unarchive or delete it. They are folded
+  // away by default: an archived course is over, and the list is for the ones
+  // that are not.
+  const [showArchived, setShowArchived] = useState(false);
+  const isStaff = isAdmin || hasView('lecturer');
+  const all = data ?? [];
+  const courses = showArchived ? all : all.filter((c) => !c.archived_at);
+  const archivedCount = all.length - all.filter((c) => !c.archived_at).length;
 
   return (
     <AuthenticatedLayout>
@@ -31,6 +42,12 @@ export default function CoursesPage() {
           }
           actions={
             <>
+              {isStaff && (
+                <label className="flex items-center gap-2 text-sm text-muted mr-2">
+                  <span>Show archived{archivedCount > 0 ? ` (${archivedCount})` : ''}</span>
+                  <Toggle checked={showArchived} onChange={setShowArchived} label="Show archived courses" />
+                </label>
+              )}
               <ButtonLink href="/courses/catalog" variant="secondary">
                 Browse catalog
               </ButtonLink>
@@ -73,6 +90,14 @@ export default function CoursesPage() {
                 key={course.id}
                 course={course}
                 role={courseRole(course.id)}
+                badge={
+                  course.archived_at ? (
+                    <span className="flex items-center gap-1 shrink-0">
+                      <Badge tone="muted">Archived</Badge>
+                      {courseRole(course.id) && <Badge tone="info">{courseRole(course.id)}</Badge>}
+                    </span>
+                  ) : undefined
+                }
                 href={`/courses/${course.id}`}
                 footer={<ViewCourseLink courseId={course.id} />}
               />
