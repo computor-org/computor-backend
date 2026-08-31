@@ -20,9 +20,10 @@ from computor_backend.exceptions import (
 )
 from computor_backend.model.auth import User
 from computor_backend.model.invite import InviteLink
-from computor_backend.model.role import UserRole
+from computor_backend.model.role import Role, UserRole
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
+from computor_backend.permissions.roles import grants_system_admin
 from computor_types.invites import (
     InviteAccept,
     InviteLinkCreate,
@@ -60,6 +61,27 @@ async def create_invite(
 ) -> InviteLinkGet:
     """Create a new invite link (admin or _user_manager)."""
     _require_invite_manager(principal, db)
+
+    requested_roles = payload.roles or []
+    if requested_roles:
+        # Unknown role ids would only surface as an FK error when the
+        # invite is accepted — reject them up front instead.
+        known = {row[0] for row in db.query(Role.id).filter(Role.id.in_(requested_roles))}
+        unknown = [r for r in requested_roles if r not in known]
+        if unknown:
+            raise BadRequestException(
+                detail=f"Unknown role(s): {', '.join(sorted(unknown))}",
+            )
+
+        # Acceptance assigns the invite's roles directly, bypassing the
+        # UserRolePermissionHandler escalation guard — so the same rule
+        # must hold here: only admins may hand out admin roles.
+        if not principal.is_admin and any(grants_system_admin(r) for r in requested_roles):
+            raise ForbiddenException(
+                error_code="AUTHZ_005",
+                detail="Only administrators can create invites that grant the admin role",
+                context={"roles": requested_roles},
+            )
 
     expires_at = datetime.now(timezone.utc) + timedelta(days=payload.expires_in_days)
 
@@ -184,8 +206,20 @@ async def accept_invite(
     db.add(user)
     db.flush()
 
-    # Assign roles from invite
-    for role_id in (invite.roles or []):
+    # Assign roles from invite. Admin-conferring roles are re-checked
+    # against the creator's CURRENT roles: create_invite already blocks
+    # non-admins from minting such invites, but an invite predating that
+    # guard (or whose creator has since lost admin) must not remain a
+    # stored escalation. The other roles are still granted.
+    roles_to_grant = list(invite.roles or [])
+    admin_roles = [r for r in roles_to_grant if grants_system_admin(r)]
+    if admin_roles and not _creator_is_admin(invite, db):
+        logger.warning(
+            f"Invite {invite.id}: skipping admin role(s) {admin_roles} — "
+            f"creator {invite.created_by} is not an admin"
+        )
+        roles_to_grant = [r for r in roles_to_grant if not grants_system_admin(r)]
+    for role_id in roles_to_grant:
         db.add(UserRole(user_id=str(user.id), role_id=role_id))
 
     # Consume invite
@@ -203,6 +237,14 @@ async def accept_invite(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _creator_is_admin(invite: InviteLink, db: Session) -> bool:
+    """True if the invite's creator currently holds an admin-conferring role."""
+    if not invite.created_by:
+        return False
+    rows = db.query(UserRole.role_id).filter(UserRole.user_id == invite.created_by).all()
+    return any(grants_system_admin(row[0]) for row in rows)
+
 
 def _resolve_token(token: str, db: Session) -> InviteLink:
     """Validate a token and return the InviteLink, raising on any problem."""
