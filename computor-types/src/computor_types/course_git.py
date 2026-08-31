@@ -93,6 +93,13 @@ class CourseGitBindingGet(BaseModel):
     )
     template_repo: Optional[str] = None
     template_url: Optional[str] = None
+    web_url: Optional[str] = Field(
+        None,
+        description="Browser-audience URL of the template repository (no .git suffix), "
+        "always on the public git host. template_url stays the clone URL for the "
+        "requesting audience (a workspace gets its internal host there), so anything "
+        "that opens a browser tab must use web_url instead.",
+    )
     default_branch: Optional[str] = None
     student_repo_modes: List[str] = Field(default_factory=list)
     locked: bool = Field(
