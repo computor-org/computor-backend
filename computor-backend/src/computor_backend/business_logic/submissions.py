@@ -492,6 +492,16 @@ async def upload_submission_artifact(
         format_bytes(total_filtered_size),
     )
 
+    if submit:
+        # A direct submit skipped the editor's test-first flow; the test must
+        # still run or the submission has no result to grade (#311, #271).
+        # Best-effort: the submission itself stands either way.
+        from computor_backend.business_logic.testing_orchestration import (
+            dispatch_submission_test,
+        )
+
+        await dispatch_submission_test(created_artifact, db)
+
     return SubmissionUploadResponseModel(
         artifacts=[created_artifact.id],
         submission_group_id=submission_group.id,
