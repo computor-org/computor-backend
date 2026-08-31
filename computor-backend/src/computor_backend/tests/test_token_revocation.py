@@ -38,6 +38,9 @@ class FakeRedis:
     async def get(self, key):
         return self.values.get(key)
 
+    async def mget(self, *keys):
+        return [self.values.get(key) for key in keys]
+
     async def set(self, key, value, ex=None):
         self.values[key] = value
         self.sets.append((key, value, ex))
@@ -72,8 +75,7 @@ async def test_cached_principal_is_rejected_for_a_revoked_token():
         f"{REVOKED_FLAG_PREFIX}{TOKEN_HASH_HEX}": "1",
     })
     with patch("computor_backend.permissions.auth.get_redis_client", AsyncMock(return_value=redis)), \
-         patch("computor_backend.redis_cache.get_redis_client", AsyncMock(return_value=redis)), \
-         patch("computor_backend.permissions.auth.is_user_banned_cached", AsyncMock(return_value=False)):
+         patch("computor_backend.redis_cache.get_redis_client", AsyncMock(return_value=redis)):
         with pytest.raises(UnauthorizedException):
             await _get_cached_principal(CACHE_KEY, TOKEN_HASH_HEX)
 
@@ -82,8 +84,7 @@ async def test_cached_principal_is_rejected_for_a_revoked_token():
 async def test_cached_principal_still_served_for_a_live_token():
     redis = FakeRedis({CACHE_KEY: _principal_json()})
     with patch("computor_backend.permissions.auth.get_redis_client", AsyncMock(return_value=redis)), \
-         patch("computor_backend.redis_cache.get_redis_client", AsyncMock(return_value=redis)), \
-         patch("computor_backend.permissions.auth.is_user_banned_cached", AsyncMock(return_value=False)):
+         patch("computor_backend.redis_cache.get_redis_client", AsyncMock(return_value=redis)):
         principal = await _get_cached_principal(CACHE_KEY, TOKEN_HASH_HEX)
 
     assert principal is not None
