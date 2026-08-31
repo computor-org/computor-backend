@@ -146,3 +146,25 @@ def to_public_git_url(url: Optional[str]) -> Optional[str]:
         if internal != public and url.startswith(internal):
             return public + url[len(internal):]
     return url
+
+
+def to_browser_git_url(url: Optional[str]) -> Optional[str]:
+    """Rewrite a stored git URL to the host a *browser* can reach — always.
+
+    :func:`to_public_git_url` answers for the requesting audience, so a
+    workspace client gets the workspace-internal host (right for git, dead in
+    a browser tab: the workspace host resolves nowhere outside the workspace
+    networks). URLs that are opened with ``openExternal`` / ``window.open``
+    always land in the user's browser regardless of who asked, so they must
+    always carry the public host. Ignores the request audience on purpose.
+    """
+    if not url:
+        return url
+    cfg = get_git_server_settings()
+    public = (cfg.public_url or "").rstrip("/")
+    if not public:
+        return url
+    for internal in [*cfg.internal_hosts, WORKSPACE_GIT_URL]:
+        if internal and internal != public and url.startswith(internal):
+            return public + url[len(internal):]
+    return url

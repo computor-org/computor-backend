@@ -25,7 +25,7 @@ from computor_backend.git_provider import (
     backend_reachable_base_url,
     get_provider_client_for_server,
 )
-from computor_backend.git_server.config import to_public_git_url
+from computor_backend.git_server.config import to_browser_git_url, to_public_git_url
 from computor_backend.model.auth import Account
 from computor_backend.model.course import Course, CourseFamily, CourseMember
 from computor_backend.model.organization import Organization
@@ -325,6 +325,13 @@ def _binding_to_get(b: CourseGitBinding, db: Session) -> CourseGitBindingGet:
         template_repo=b.template_repo,
         # Stored URL uses the backend-internal git host; surface the public one.
         template_url=to_public_git_url(b.template_url),
+        # For browser tabs. A workspace client gets a workspace-internal host in
+        # template_url (right for git, dead in a browser — issue #356), so the
+        # browser-audience URL is a separate field that ignores the audience.
+        web_url=(
+            re.sub(r"\.git$", "", to_browser_git_url(b.template_url))
+            if b.template_url else None
+        ),
         default_branch=b.default_branch,
         student_repo_modes=list(b.student_repo_modes or []),
         locked=locked,
