@@ -470,6 +470,15 @@ async def update_submission_artifact(
         cache=cache,
     )
 
+    if update_data.submit and artifact.submit:
+        # Marking an untested artifact as submitted must still test it
+        # (#311, #271); a no-op when a result already exists.
+        from computor_backend.business_logic.testing_orchestration import (
+            dispatch_submission_test,
+        )
+
+        await dispatch_submission_test(artifact, db)
+
     return get_artifact_with_details(artifact)
 
 @submissions_router.get(
