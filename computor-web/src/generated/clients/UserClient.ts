@@ -3,7 +3,7 @@
  * Endpoint: /user
  */
 
-import type { CourseGitDescriptor, CourseMemberGet, CourseMemberProviderAccountUpdate, CourseMemberReadinessStatus, CourseMemberRepositoryGet, CourseMemberRepositoryRegister, CourseMemberValidationRequest, StudentRepositoryProvisioned, TemplateAccessGet, UserGet, UserScopes } from 'types/generated';
+import type { CourseGitDescriptor, CourseMemberGet, CourseMemberProviderAccountUpdate, CourseMemberReadinessStatus, CourseMemberRepositoryGet, CourseMemberRepositoryRegister, CourseMemberValidationRequest, PersonalCloneCredentialGet, StudentRepositoryProvisioned, TemplateAccessGet, UserGet, UserScopes } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -21,6 +21,26 @@ export class UserClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.get<UserGet>(this.basePath, { params: queryParams });
+  }
+
+  /**
+   * Personal Clone Credential Endpoint
+   * A clone credential for working OUTSIDE the managed workspace (#342).
+   * Deliberately not the workspace's own token: that one (`computor-vscode`)
+   * is re-minted by every credential repair, which silently invalidated
+   * whatever a student had copied off the course page. This mints a second
+   * Forgejo token named `computor-cli` — rotation is keyed by name, so the two
+   * never invalidate each other. Returned unchanged on later calls; pass
+   * `rotate=true` to revoke it and mint a fresh one. Requires the student's
+   * repository to exist (Check access / opening the course in the workspace
+   * creates it).
+   */
+  async personalCloneCredentialEndpointUserCoursesCourseIdCloneCredentialPost({ courseId, rotate, userId }: { courseId: string | string; rotate?: boolean; userId?: string | null }): Promise<PersonalCloneCredentialGet> {
+    const queryParams: Record<string, unknown> = {
+      rotate,
+      user_id: userId,
+    };
+    return this.client.post<PersonalCloneCredentialGet>(this.buildPath('courses', courseId, 'clone-credential'), { params: queryParams });
   }
 
   /**

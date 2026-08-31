@@ -24,7 +24,7 @@ import Button, { ButtonLink } from '@/src/components/ui/Button';
 import Notice from '@/src/components/ui/Notice';
 import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import { displayName } from '@/src/utils/displayName';
-import type { StudentRepositoryProvisioned } from 'types/generated';
+import type { PersonalCloneCredentialGet } from 'types/generated';
 
 const coursesClient = new CoursesClient();
 const courseFamiliesClient = new CourseFamiliesClient();
@@ -149,7 +149,7 @@ export default function CoursePage() {
       router.push('/courses');
     },
   );
-  const [provisioned, setProvisioned] = useState<StudentRepositoryProvisioned | null>(null);
+  const [personalCred, setPersonalCred] = useState<PersonalCloneCredentialGet | null>(null);
   // Fully controlled rather than an `open` attribute derived from `provisioned`:
   // any unrelated re-render would otherwise snap the disclosure shut under the
   // reader while they are copying out of it.
@@ -157,15 +157,21 @@ export default function CoursePage() {
 
   async function ensureGitAccess() {
     setEnsuring(true);
-    setProvisioned(null);
+    setPersonalCred(null);
     try {
-      const r = await userClient.provisionStudentRepositoryEndpointUserCoursesCourseIdProvisionRepositoryPost(
+      await userClient.provisionStudentRepositoryEndpointUserCoursesCourseIdProvisionRepositoryPost(
         { courseId },
       );
-      setProvisioned(r);
+      // A credential of the reader's own, NOT the workspace-managed token: that
+      // one is re-minted by every workspace credential repair, which silently
+      // killed whatever a student had copied from this page (#342).
+      const cred = await userClient
+        .personalCloneCredentialEndpointUserCoursesCourseIdCloneCredentialPost({ courseId })
+        .catch(() => null);
+      setPersonalCred(cred);
       // The credential is only reachable from inside the disclosure, so open it
       // rather than leaving the freshly-fetched token hidden behind a summary.
-      if (r.clone_token) setCloneOpen(true);
+      if (cred?.clone_token) setCloneOpen(true);
       notify('Git access checked — your repository is reachable.', 'success');
       await reload(); // refresh the persisted repository details below
     } catch (e) {
@@ -396,23 +402,27 @@ export default function CoursePage() {
                     ])}
                   />
                 )}
-                {provisioned?.clone_token && (
+                {personalCred?.clone_token && (
                   <Notice tone="warning">
                     <p className="font-medium">
-                      Your git credential for this server — treat it like a password.
+                      Your personal git credential — treat it like a password.
                     </p>
                     <p className="mt-1">
-                      It is the same credential your workspace already uses, so it is shown again
-                      whenever you check access; it is not a one-time secret.
+                      It is independent of the credential your workspace manages, so it keeps
+                      working no matter what the workspace does; checking access again shows the
+                      same one. Clone in one step:
                     </p>
+                    <div className="mt-2">
+                      {personalCred.clone_command && <CopyValue value={personalCred.clone_command} />}
+                    </div>
                     <dl className="mt-2 space-y-1">
                       <div className="flex gap-2">
                         <dt className="w-20 shrink-0">Username</dt>
-                        <dd><CopyValue value={provisioned.clone_username ?? ''} /></dd>
+                        <dd><CopyValue value={personalCred.clone_username ?? ''} /></dd>
                       </div>
                       <div className="flex gap-2">
                         <dt className="w-20 shrink-0">Token</dt>
-                        <dd><CopyValue value={provisioned.clone_token} /></dd>
+                        <dd><CopyValue value={personalCred.clone_token} /></dd>
                       </div>
                     </dl>
                   </Notice>
