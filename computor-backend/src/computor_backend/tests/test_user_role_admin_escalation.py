@@ -76,14 +76,14 @@ def handler():
 
     ``__tablename__`` drives ``check_general_permission``'s claim name
     lookup (``user_role:<action>``). ``role_id`` is referenced by
-    ``build_query`` for the ``!= "_admin"`` filter; SQLAlchemy
-    expression objects are not needed since we never execute the query
-    here — we only assert it was filtered.
+    ``build_query`` for the ``NOT ... endswith('_admin')`` filter; a
+    MagicMock stands in since we never execute the query here — we only
+    assert it was filtered.
     """
     fake_model = SimpleNamespace(
         __tablename__="user_role",
         __name__="UserRole",
-        role_id=SimpleNamespace(__ne__=lambda other: ("role_id != ", other)),
+        role_id=MagicMock(),
     )
     return UserRolePermissionHandler(fake_model)
 
@@ -129,10 +129,25 @@ class TestCreateAdminEscalationBlocked:
         ) is True
 
     def test_user_manager_cannot_grant_admin(self, handler):
-        # The vulnerability the report flagged.
-        assert handler.can_perform_action(
-            _user_manager(), "create", context={"role_id": "_admin"}
-        ) is False
+        # The vulnerability the report flagged. The denial is a
+        # descriptive 403 (AUTHZ_005), not a bool: user-role rows are
+        # openly readable, and the bare 404 the CRUD layer emitted for
+        # a False return read as a system bug to reporters (#403).
+        from computor_backend.exceptions import ForbiddenException
+        with pytest.raises(ForbiddenException) as exc:
+            handler.can_perform_action(
+                _user_manager(), "create", context={"role_id": "_admin"}
+            )
+        assert exc.value.status_code == 403
+
+    def test_user_manager_cannot_grant_custom_admin_suffix_role(self, handler):
+        # Principal treats ANY ``*_admin`` role id as admin, so the
+        # guard must match that predicate, not just the builtin id.
+        from computor_backend.exceptions import ForbiddenException
+        with pytest.raises(ForbiddenException):
+            handler.can_perform_action(
+                _user_manager(), "create", context={"role_id": "billing_admin"}
+            )
 
     def test_outsider_cannot_grant_anything(self, handler):
         # Regression: a non-admin without the claim still gets nothing.
