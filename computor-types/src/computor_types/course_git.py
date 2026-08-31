@@ -112,6 +112,32 @@ class CourseGitBindingGet(BaseModel):
     )
 
 
+class PersonalCloneCredentialGet(BaseModel):
+    """A clone credential for working OUTSIDE the managed workspace.
+
+    Deliberately a different Forgejo token than the one the workspace manages
+    (rotation is keyed by token name): a workspace credential repair re-mints
+    its own token and would silently invalidate anything a student copied off
+    the course page (#342). This one is minted once and only re-minted when
+    the caller explicitly asks to rotate it.
+    """
+
+    clone_username: Optional[str] = None
+    clone_token: Optional[str] = Field(
+        None,
+        description="Repo-scoped personal token — treat it like a password. "
+        "Null when the student has no Forgejo identity yet.",
+    )
+    http_url: Optional[str] = Field(
+        None, description="Public HTTPS clone URL of the student's repository."
+    )
+    clone_command: Optional[str] = Field(
+        None,
+        description="Complete `git clone` command with the credential embedded, "
+        "ready to paste into a terminal.",
+    )
+
+
 class CourseMemberRepositoryGet(BaseModel):
     """A student's repository for a course (the result of provisioning, or the
     recorded BYO location). Tracking only — never read for grading."""

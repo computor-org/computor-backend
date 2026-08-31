@@ -48,6 +48,7 @@ from computor_types.course_git import (
     CourseMemberRepositoryGet,
     CourseMemberRepositoryRegister,
     GitTemplateRef,
+    PersonalCloneCredentialGet,
     StudentRepositoryProvisioned,
     TemplateAccessGet,
 )
@@ -756,6 +757,130 @@ def get_student_repository(
         .first()
     )
     return _member_repo_to_get(rec) if rec is not None else None
+
+
+_PERSONAL_CLONE_TOKEN_PROP = "forgejo_personal_clone_tokens"
+
+
+def personal_clone_credential(
+    course_id: UUID | str,
+    permissions: Principal,
+    db: Session,
+    rotate: bool = False,
+) -> PersonalCloneCredentialGet:
+    """A clone credential for working outside the managed workspace (#342).
+
+    The workspace's own token (``computor-vscode``) is re-minted by every
+    credential repair, which silently killed whatever a student had copied off
+    the course page. Forgejo rotation is keyed by token *name*, so a second
+    token named ``computor-cli`` coexists untouched: minted once, remembered
+    encrypted next to the managed one, re-minted only on explicit ``rotate``.
+    """
+    user_id = permissions.get_user_id()
+    if not user_id:
+        raise NotFoundException()
+
+    member = (
+        check_course_permissions(permissions, CourseMember, "_student", db)
+        .filter(CourseMember.course_id == course_id, CourseMember.user_id == user_id)
+        .first()
+    )
+    if member is None:
+        raise NotFoundException(error_code="GIT_002", detail="You are not a member of this course")
+
+    rec = (
+        db.query(CourseMemberGitRepository)
+        .filter(CourseMemberGitRepository.course_member_id == member.id)
+        .first()
+    )
+    if rec is None:
+        raise BadRequestException(
+            detail="You have no repository for this course yet. Open the course "
+            "in the workspace once, or use Check access, to create it first."
+        )
+    if rec.mode != "managed" or not rec.git_server_id:
+        raise BadRequestException(
+            detail="This course's repositories are not on the managed git server, "
+            "so there is no server-issued credential to hand out. Clone with "
+            "your own git credentials."
+        )
+
+    server = db.query(GitServer).filter(GitServer.id == rec.git_server_id).first()
+    handle = _resolve_oidc_handle(user_id, db)
+    creds = _forgejo_admin_basic_auth_for(server) if server is not None else None
+    if server is None or not handle or not creds:
+        raise BadRequestException(
+            detail="No Forgejo identity is recorded for you yet; sign in once "
+            "via SSO before requesting a credential."
+        )
+
+    # Serialize per (user, server): minting deletes the same-named token first,
+    # so two concurrent calls would revoke each other's fresh token.
+    _lock_clone_token(user_id, f"cli:{rec.git_server_id}", db)
+
+    token = None
+    if not rotate:
+        token = _stored_personal_clone_token(user_id, rec.git_server_id, db)
+    if not token:
+        client = get_provider_client_for_server(server)
+        if hasattr(client, "mint_user_clone_token"):
+            token = client.mint_user_clone_token(
+                handle, creds[0], creds[1], name="computor-cli"
+            )
+            if token:
+                _remember_personal_clone_token(user_id, rec.git_server_id, token, db)
+    if not token:
+        raise BadRequestException(
+            detail="The git server would not issue a credential for you yet. "
+            "This usually means your Forgejo account is not fully created; "
+            "try again after opening the course in the workspace once."
+        )
+
+    http_url = to_public_git_url(rec.http_url)
+    clone_command = None
+    if http_url:
+        from urllib.parse import quote, urlsplit, urlunsplit
+
+        parts = urlsplit(http_url)
+        netloc = f"{quote(handle, safe='')}:{quote(token, safe='')}@{parts.netloc}"
+        clone_command = "git clone " + urlunsplit(
+            (parts.scheme, netloc, parts.path, "", "")
+        )
+
+    return PersonalCloneCredentialGet(
+        clone_username=handle,
+        clone_token=token,
+        http_url=http_url,
+        clone_command=clone_command,
+    )
+
+
+def _stored_personal_clone_token(user_id: str, server_id, db: Session):
+    account = _oidc_account(user_id, db)
+    if account is None:
+        return None
+    stored = ((account.properties or {}).get(_PERSONAL_CLONE_TOKEN_PROP) or {}).get(str(server_id))
+    if not stored:
+        return None
+    try:
+        return decrypt_secret(stored)
+    except Exception:
+        logger.warning(
+            "Stored personal clone token for user %s on server %s does not decrypt; minting a fresh one",
+            user_id, server_id,
+        )
+        return None
+
+
+def _remember_personal_clone_token(user_id: str, server_id, token: str, db: Session) -> None:
+    account = _oidc_account(user_id, db)
+    if account is None:
+        return
+    props = account.properties or {}
+    tokens = {**(props.get(_PERSONAL_CLONE_TOKEN_PROP) or {}), str(server_id): encrypt_secret(token)}
+    account.properties = {**props, _PERSONAL_CLONE_TOKEN_PROP: tokens}
+    account.updated_by = user_id
+    db.commit()
 
 
 def _forgejo_admin_basic_auth_for(server: GitServer):
