@@ -80,6 +80,68 @@ def _run_post_commit_callbacks(session: Session) -> None:
 def _drop_post_commit_callbacks(session: Session) -> None:
     session.info.pop(_POST_COMMIT_KEY, None)
 
+
+# ---------------------------------------------------------------------------
+# Permission-affecting writes (#384).
+#
+# The Principal cache is keyed by the raw credential token, so a mutation of
+# SOMEONE ELSE's permissions cannot delete the affected entries directly.
+# Instead: any ORM flush that touches a membership table records the affected
+# user ids here, and after the commit lands each of those users gets a
+# per-user stale stamp + a ``permissions:updated`` websocket push (see
+# permissions/principal_invalidation.py). Hooking the session — rather than
+# each endpoint — covers CrudRouter, invites, member import and Temporal
+# activities in every process that uses this session factory. Bulk
+# ``query(...).update()`` writes bypass flush events and must invalidate
+# explicitly (business_logic/user_connect.py does).
+# ---------------------------------------------------------------------------
+
+_PERMISSION_STALE_KEY = "permission_stale_user_ids"
+
+
+def _permission_membership_models() -> tuple:
+    # Imported lazily: model modules import heavily and importing them at
+    # database-module import time would create a cycle.
+    from computor_backend.model.course import CourseFamilyMember, CourseMember
+    from computor_backend.model.organization import OrganizationMember
+    from computor_backend.model.role import UserRole
+
+    return (UserRole, CourseMember, OrganizationMember, CourseFamilyMember)
+
+
+@event.listens_for(SessionLocal, "after_flush")
+def _track_permission_membership_writes(session: Session, flush_context) -> None:
+    # ``new``/``dirty``/``deleted`` still show the pre-flush state here.
+    membership_models = _permission_membership_models()
+    affected = None
+    for obj in session.new.union(session.dirty).union(session.deleted):
+        if isinstance(obj, membership_models):
+            user_id = getattr(obj, "user_id", None)
+            if user_id is not None:
+                if affected is None:
+                    affected = session.info.setdefault(_PERMISSION_STALE_KEY, set())
+                affected.add(str(user_id))
+
+
+@event.listens_for(SessionLocal, "after_commit")
+def _invalidate_stale_principals(session: Session) -> None:
+    user_ids = session.info.pop(_PERMISSION_STALE_KEY, None)
+    if not user_ids:
+        return
+    try:
+        from computor_backend.permissions.principal_invalidation import (
+            invalidate_user_principals,
+        )
+
+        invalidate_user_principals(user_ids)
+    except Exception:  # cache invalidation must never break the request
+        logger.warning("Principal invalidation after commit failed", exc_info=True)
+
+
+@event.listens_for(SessionLocal, "after_rollback")
+def _drop_stale_principal_tracking(session: Session) -> None:
+    session.info.pop(_PERMISSION_STALE_KEY, None)
+
 def _get_db(user_id: str | None = None) -> Generator[Session, None, None]:
     """
     Internal database session generator with transaction management.

@@ -486,6 +486,16 @@ def connect_users(
     db.commit()
     db.expire_all()
 
+    # The membership moves above are bulk ``query(...).update()`` writes, which
+    # bypass the ORM flush events that normally stamp affected users stale
+    # (database.py, #384) — invalidate the keeper explicitly so a logged-in
+    # target sees the absorbed memberships without a re-login.
+    from computor_backend.permissions.principal_invalidation import (
+        invalidate_user_principals,
+    )
+
+    invalidate_user_principals([target_user_id])
+
     logger.info(
         "Connected pre-provisioned user %s (%s) into %s: %d membership(s), %d profile(s), %d role(s)",
         source_user_id,

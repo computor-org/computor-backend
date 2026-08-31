@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { AuthUser, AuthResponse } from '@/src/types/auth';
 import { UserScopes } from '@/src/generated/types/users';
 import { ssoAuthService } from '@/src/services/authInstances';
@@ -42,7 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Fetch the authoritative per-scope role maps + view list from the backend.
   // `/user/scopes` (is_admin + organization/course_family/course role maps) and
   // `/user/views` (lecturer/student/tutor/user_manager) drive all role-gated UI.
+  const lastPermissionsLoadRef = useRef(0);
   const loadPermissions = useCallback(async () => {
+    lastPermissionsLoadRef.current = Date.now();
     try {
       const [viewsRes, scopesRes] = await Promise.all([
         apiFetch(`${API_BASE_URL}/user/views`),
@@ -118,6 +120,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         response = await ssoAuthService.refreshSession();
         if (response?.success) {
           setViews(ssoAuthService.getCurrentViews());
+          // A refreshed token gets a fresh backend Principal, so this is the
+          // natural moment to pick up role changes made by someone else
+          // (#384) — previously only `views` was re-read here, leaving the
+          // scope maps (course role badges, gating) stale until a re-login.
+          await loadPermissions();
         }
       }
 
@@ -148,7 +155,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
-  }, []);
+  }, [loadPermissions]);
+
+  // Returning to the tab is the moment a stale role is actually noticed (#384:
+  // a lecturer promotes the user, who then switches back to their window).
+  // Event-driven — no polling — and throttled so rapid tab-switching doesn't
+  // hammer /user/scopes; the backend drops its Principal cache on the change,
+  // so this re-read gets the fresh roles.
+  useEffect(() => {
+    if (!user) return;
+
+    const FOCUS_REFRESH_MIN_MS = 30 * 1000;
+    const onReturnToTab = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastPermissionsLoadRef.current < FOCUS_REFRESH_MIN_MS) return;
+      void loadPermissions();
+    };
+
+    document.addEventListener('visibilitychange', onReturnToTab);
+    window.addEventListener('focus', onReturnToTab);
+    return () => {
+      document.removeEventListener('visibilitychange', onReturnToTab);
+      window.removeEventListener('focus', onReturnToTab);
+    };
+  }, [user, loadPermissions]);
 
   // Proactive token refresh. This MUST fire well within Keycloak's SSO Session
   // Idle (30 min on the computor realm): only /auth/refresh resets that idle timer

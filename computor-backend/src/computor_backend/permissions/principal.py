@@ -178,10 +178,16 @@ def build_claims(claim_values: List[Tuple[str, str]]) -> Claims:
 
 class Principal(BaseModel):
     """Enhanced Principal class with improved permission evaluation"""
-    
+
     is_admin: bool = False
     is_service: bool = False  # User.is_service (system / worker accounts)
     user_id: Optional[str] = None
+
+    # Epoch seconds captured BEFORE the claim queries ran (permissions/auth.py:
+    # PrincipalBuilder.build). Compared against the per-user stale stamp on the
+    # principal-cache hit path; None (pre-upgrade cache entries) is treated as
+    # older than any stamp.
+    built_at: Optional[float] = None
 
     roles: List[str] = Field(default_factory=list)
     claims: Claims = Field(default_factory=Claims)
