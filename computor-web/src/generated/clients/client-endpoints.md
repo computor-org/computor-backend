@@ -242,6 +242,7 @@
 | `renameDocumentFileDocumentsFilesPatch` | PATCH | `/documents/files` | `DocumentRename` | `DocumentGet` |
 | `uploadDocumentFileDocumentsFilesPost` | POST | `/documents/files` | — | `DocumentGet` |
 | `listDocumentsDirectoryDocumentsListGet` | GET | `/documents/list` | — | `DocumentList[]` |
+| `getDocumentsPermissionsDocumentsPermissionsGet` | GET | `/documents/permissions` | — | `DocumentPermissionsGet` |
 
 ## ExampleRepositoriesClient
 - Base path: `/example-repositories`
