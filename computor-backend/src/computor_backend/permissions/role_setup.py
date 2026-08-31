@@ -54,6 +54,11 @@ def claims_user_manager() -> List[Tuple[str, str]]:
     claims.extend(StudentProfileInterface().claim_values())
     claims.extend(RoleClaimInterface().claim_values())
     claims.extend(UserRoleInterface().claim_values())
+    # ``claim_values()`` iterates ACTIONS, which has no "delete" entry, so
+    # a user manager could seat roles but never unseat them — every removal
+    # 403'd (#403). Admin rows stay protected by UserRolePermissionHandler
+    # regardless of this claim.
+    claims.append(("permissions", f"{UserRoleInterface.model.__tablename__}:delete"))
 
     return claims
 
