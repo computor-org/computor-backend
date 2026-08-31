@@ -1130,6 +1130,25 @@ export interface CourseGitBindingGet {
 }
 
 /**
+ * A clone credential for working OUTSIDE the managed workspace.
+ * 
+ * Deliberately a different Forgejo token than the one the workspace manages
+ * (rotation is keyed by token name): a workspace credential repair re-mints
+ * its own token and would silently invalidate anything a student copied off
+ * the course page (#342). This one is minted once and only re-minted when
+ * the caller explicitly asks to rotate it.
+ */
+export interface PersonalCloneCredentialGet {
+  clone_username?: string | null;
+  /** Repo-scoped personal token — treat it like a password. Null when the student has no Forgejo identity yet. */
+  clone_token?: string | null;
+  /** Public HTTPS clone URL of the student's repository. */
+  http_url?: string | null;
+  /** Complete `git clone` command with the credential embedded, ready to paste into a terminal. */
+  clone_command?: string | null;
+}
+
+/**
  * A student's repository for a course (the result of provisioning, or the
  * recorded BYO location). Tracking only — never read for grading.
  */

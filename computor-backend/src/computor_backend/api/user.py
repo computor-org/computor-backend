@@ -17,6 +17,7 @@ from computor_types.course_git import (
     CourseMemberRepositoryRegister,
     StudentRepositoryProvisioned,
     TemplateAccessGet,
+    PersonalCloneCredentialGet,
 )
 from computor_backend.permissions.auth import (
     ApiTokenCredentials,
@@ -52,6 +53,7 @@ from computor_backend.business_logic.course_git import (
     get_student_repository,
     get_template_access,
     get_template_archive_source,
+    personal_clone_credential,
     provision_student_repository,
     register_byo_repository,
     register_gitlab_managed_access,
@@ -209,6 +211,33 @@ async def provision_student_repository_endpoint(
     # stall every other request this worker is serving for that whole time.
     return await run_in_threadpool(
         provision_student_repository, course_id, permissions, db, rotate=rotate
+    )
+
+
+@user_router.post(
+    "/courses/{course_id}/clone-credential",
+    response_model=PersonalCloneCredentialGet,
+)
+async def personal_clone_credential_endpoint(
+    course_id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    rotate: bool = False,
+    db: Session = Depends(get_db),
+):
+    """A clone credential for working OUTSIDE the managed workspace (#342).
+
+    Deliberately not the workspace's own token: that one (`computor-vscode`)
+    is re-minted by every credential repair, which silently invalidated
+    whatever a student had copied off the course page. This mints a second
+    Forgejo token named `computor-cli` — rotation is keyed by name, so the two
+    never invalidate each other. Returned unchanged on later calls; pass
+    `rotate=true` to revoke it and mint a fresh one. Requires the student's
+    repository to exist (Check access / opening the course in the workspace
+    creates it).
+    """
+    # Off the event loop: mints via blocking HTTP to the git server.
+    return await run_in_threadpool(
+        personal_clone_credential, course_id, permissions, db, rotate=rotate
     )
 
 
