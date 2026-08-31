@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, Query
 from computor_backend.permissions.handlers import PermissionHandler
 from computor_backend.permissions.principal import Principal
 from computor_backend.exceptions import ForbiddenException
-from computor_backend.permissions.roles import CourseRole
+from computor_backend.permissions.roles import CourseRole, grants_system_admin
 
 __all__ = [
     "ReadOnlyPermissionHandler",
@@ -68,21 +68,25 @@ class UserRolePermissionHandler(PermissionHandler):
     claim — held by the ``_user_manager`` role today.
 
     Critical extra rule: even with the claim, non-admins cannot
-    create / update / delete a row whose ``role_id`` is ``_admin``.
-    Without this, anyone with ``_user_manager`` could grant themselves
-    or others the ``_admin`` system role and escalate. Mirrors the
+    create / update / delete a row whose ``role_id`` confers admin
+    (``grants_system_admin`` — ``_admin`` or any ``*_admin``-suffixed
+    role, matching ``Principal.set_is_admin_from_roles``). Without
+    this, anyone with ``_user_manager`` could grant themselves or
+    others the ``_admin`` system role and escalate. Mirrors the
     ``_manager``-can't-promote-to-``_owner`` pattern that landed for
     scoped roles in PR #112.
 
     The ``context`` dict that ``business_logic/crud.py::create_entity``
     builds from the request payload includes ``role_id`` (any
     ``*_id`` field is folded in), so the create path sees the target
-    role before it commits. The ``build_query`` path filters out admin
-    rows for non-admins so update / delete URLs that target an admin
-    row resolve to ``NotFound`` rather than succeed silently.
+    role before it commits. A blocked grant raises a descriptive 403
+    (AUTHZ_005) rather than returning False: user-role rows are openly
+    readable, so existence hiding does not apply, and the generic 404
+    the CRUD layer would emit sent reporters chasing phantom bugs
+    (issue #403). The ``build_query`` path filters out admin rows for
+    non-admins so update / delete URLs that target an admin row
+    resolve to ``NotFound`` rather than succeed silently.
     """
-
-    PROTECTED_ROLE_ID = "_admin"
 
     def can_perform_action(
         self,
@@ -102,9 +106,14 @@ class UserRolePermissionHandler(PermissionHandler):
         if not self.check_general_permission(principal, action):
             return False
 
-        # Even with the claim, only admins may grant ``_admin``.
-        if context and context.get("role_id") == self.PROTECTED_ROLE_ID:
-            return False
+        # Even with the claim, only admins may grant an admin role.
+        target_role = context.get("role_id") if context else None
+        if target_role and grants_system_admin(target_role):
+            raise ForbiddenException(
+                error_code="AUTHZ_005",
+                detail="Only administrators can grant the admin role",
+                context={"role_id": target_role},
+            )
 
         return True
 
@@ -120,7 +129,7 @@ class UserRolePermissionHandler(PermissionHandler):
             # admin assignment by (user_id, role_id) get a clean
             # NotFound, not a successful update / delete.
             return db.query(self.entity).filter(
-                self.entity.role_id != self.PROTECTED_ROLE_ID
+                ~self.entity.role_id.endswith("_admin", autoescape=True)
             )
 
         raise ForbiddenException(detail={"entity": self.resource_name})

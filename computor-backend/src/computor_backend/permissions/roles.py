@@ -47,6 +47,17 @@ class SystemRole(str, Enum):
     ADMIN = "_admin"
 
 
+def grants_system_admin(role_id: str) -> bool:
+    """True if holding ``role_id`` makes a principal a system admin.
+
+    ``Principal.set_is_admin_from_roles`` flags ANY role id ending in
+    ``_admin`` — not just the builtin ``SystemRole.ADMIN`` — so every
+    guard that protects admin-role assignment must use this same
+    predicate, or a custom ``*_admin`` role becomes an escalation path.
+    """
+    return role_id.endswith(SystemRole.ADMIN.value)
+
+
 def _course_roles_at_or_above(role: CourseRole) -> Tuple[str, ...]:
     return tuple(course_role_hierarchy.get_allowed_roles(role.value))
 
