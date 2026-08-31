@@ -3,7 +3,7 @@
  * Endpoint: /documents
  */
 
-import type { DocumentDelete, DocumentDirectoryCreate, DocumentDirectoryDelete, DocumentDirectoryGet, DocumentDirectoryRename, DocumentGet, DocumentList, DocumentRename } from 'types/generated';
+import type { DocumentDelete, DocumentDirectoryCreate, DocumentDirectoryDelete, DocumentDirectoryGet, DocumentDirectoryRename, DocumentGet, DocumentList, DocumentPermissionsGet, DocumentRename } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -126,5 +126,20 @@ export class DocumentsClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.get<DocumentList[]>(this.buildPath('list'), { params: queryParams });
+  }
+
+  /**
+   * Get Documents Permissions
+   * Whether the caller may write in a documents scope.
+   * Evaluates exactly the checks the write endpoints enforce, so a client can
+   * withhold upload/rename/delete instead of offering actions that end in a
+   * 403 (issue #361). Reading needs only authentication and is not reported.
+   */
+  async getDocumentsPermissionsDocumentsPermissionsGet({ scope, scopeId }: { scope: 'system' | 'organization' | 'course_family' | 'course'; scopeId?: string | null }): Promise<DocumentPermissionsGet> {
+    const queryParams: Record<string, unknown> = {
+      scope,
+      scope_id: scopeId,
+    };
+    return this.client.get<DocumentPermissionsGet>(this.buildPath('permissions'), { params: queryParams });
   }
 }
