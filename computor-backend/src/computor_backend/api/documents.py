@@ -43,6 +43,7 @@ from computor_backend.database import get_db
 from computor_backend.exceptions import (
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     NotFoundException,
 )
 from computor_backend.permissions.auth import get_current_principal
@@ -57,6 +58,7 @@ from computor_types.documents import (
     DocumentDirectoryRename,
     DocumentGet,
     DocumentList,
+    DocumentPermissionsGet,
     DocumentRename,
 )
 
@@ -413,6 +415,26 @@ async def rename_document_directory(
         path=payload.new_path,
         created=False,
     )
+
+
+@documents_router.get("/permissions", response_model=DocumentPermissionsGet)
+async def get_documents_permissions(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    scope: Annotated[DocumentScope, Query()],
+    scope_id: Annotated[Optional[UUID], Query()] = None,
+) -> DocumentPermissionsGet:
+    """Whether the caller may write in a documents scope.
+
+    Evaluates exactly the checks the write endpoints enforce, so a client can
+    withhold upload/rename/delete instead of offering actions that end in a
+    403 (issue #361). Reading needs only authentication and is not reported.
+    """
+    can_write = True
+    try:
+        check_documents_write_permission(permissions, scope, scope_id)
+    except ForbiddenException:
+        can_write = False
+    return DocumentPermissionsGet(scope=scope, scope_id=scope_id, can_write=can_write)
 
 
 @documents_router.get("/list", response_model=list[DocumentList])

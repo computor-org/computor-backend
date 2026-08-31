@@ -109,6 +109,21 @@ class DocumentDirectoryGet(BaseModel):
     created: bool = Field(description="False if the directory already existed.")
 
 
+class DocumentPermissionsGet(BaseModel):
+    """Answer to ``GET /documents/permissions``: may the caller write here?
+
+    Reading needs only authentication, so ``can_write`` is the one question a
+    client UI has before showing upload/rename/delete for a scope — showing an
+    action the server would refuse just trades a click for a 403 (#361).
+    """
+    scope: DocumentScopeName
+    scope_id: Optional[UUID] = None
+    can_write: bool = Field(
+        description="True when the write endpoints would accept this caller "
+                    "for this scope (admin, or the scope-specific role)."
+    )
+
+
 class DocumentList(BaseModel):
     """One entry in a ``GET /documents/list`` response.
 
