@@ -34,7 +34,6 @@ from computor_backend.model.artifact import (
     SubmissionReview,
 )
 from computor_backend.model.auth import Account, StudentProfile, User
-from computor_backend.model.consent import UserConsent
 from computor_backend.model.course import (
     Course,
     CourseFamilyMember,
@@ -49,7 +48,7 @@ from computor_backend.model.message_audit import MessageAuditLog
 from computor_backend.model.organization import Organization, OrganizationMember
 from computor_backend.model.result import Result
 from computor_backend.model.role import UserRole
-from computor_backend.model.service import ApiToken
+from computor_backend.business_logic.user_lifecycle import login_evidence
 from computor_types.users import (
     UserConnectCourseMove,
     UserConnectProfileMove,
@@ -62,24 +61,15 @@ logger = logging.getLogger(__name__)
 def _assert_source_never_logged_in(source_id: str, db: Session) -> None:
     """Refuse unless the source user has never authenticated.
 
-    Both the Keycloak account and the git-server account are created only
-    inside the SSO login flow with ``builtin=True``, so a builtin account is
-    proof of a login. API tokens and consent records are additional
-    authentication evidence (the consent gate is only ever passed by a
-    signed-in person), so they block too.
+    ``login_evidence`` (user_lifecycle.py) is the shared definition of what
+    counts as a login: a builtin account (created only by the SSO login flow),
+    an API token, or an accepted consent policy.
     """
-    if db.query(Account).filter(Account.user_id == source_id, Account.builtin.is_(True)).first():
+    evidence = login_evidence(source_id, db)
+    if evidence:
         raise ConflictException(
-            detail="The user to absorb has already signed in (an SSO/git identity is linked). "
+            detail=f"The user to absorb has already authenticated ({evidence}). "
             "Only users that never logged in can be connected into another account."
-        )
-    if db.query(ApiToken).filter(ApiToken.user_id == source_id).first():
-        raise ConflictException(
-            detail="The user to absorb holds API tokens and therefore counts as a real account."
-        )
-    if db.query(UserConsent).filter(UserConsent.user_id == source_id).first():
-        raise ConflictException(
-            detail="The user to absorb has accepted a consent policy, which requires a login."
         )
 
 
