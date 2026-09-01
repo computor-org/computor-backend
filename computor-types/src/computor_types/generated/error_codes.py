@@ -66,6 +66,7 @@ class ErrorCode(str, Enum):
     SUBMIT_011 = "SUBMIT_011"  # Submission Cannot Be Withdrawn
     SUBMIT_012 = "SUBMIT_012"  # Assignment Not Available
     SUBMIT_013 = "SUBMIT_013"  # Course Archived
+    SUBMIT_014 = "SUBMIT_014"  # Nothing to Submit
     TASK_001 = "TASK_001"  # Task Not Found
     TASK_002 = "TASK_002"  # Task Submission Failed
     TASK_003 = "TASK_003"  # Unsupported Execution Backend
@@ -166,6 +167,7 @@ ERROR_CATEGORIES = {
     ErrorCode.SUBMIT_011: "authorization",
     ErrorCode.SUBMIT_012: "validation",
     ErrorCode.SUBMIT_013: "validation",
+    ErrorCode.SUBMIT_014: "validation",
     ErrorCode.TASK_001: "not_found",
     ErrorCode.TASK_002: "internal",
     ErrorCode.TASK_003: "validation",

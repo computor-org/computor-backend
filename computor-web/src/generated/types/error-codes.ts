@@ -115,6 +115,7 @@ export const ErrorCodes = {
   SUBMIT_011: "SUBMIT_011", // Submission Cannot Be Withdrawn
   SUBMIT_012: "SUBMIT_012", // Assignment Not Available
   SUBMIT_013: "SUBMIT_013", // Course Archived
+  SUBMIT_014: "SUBMIT_014", // Nothing to Submit
   TASK_001: "TASK_001", // Task Not Found
   TASK_002: "TASK_002", // Task Submission Failed
   TASK_003: "TASK_003", // Unsupported Execution Backend
@@ -935,6 +936,20 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
     },
     retryAfter: undefined,
     documentationUrl: "/docs/courses#archive",
+  },
+  SUBMIT_014: {
+    code: "SUBMIT_014",
+    httpStatus: 400,
+    category: ErrorCategory.VALIDATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Nothing to Submit",
+    message: {
+      plain: "This assignment has no work to submit yet. Write your solution first, then submit again.",
+      markdown: "**Nothing to Submit**\n\nThis assignment has no work to submit yet. All files are empty or nothing submittable was found. Write your solution first, then submit again.",
+      html: "<strong>Nothing to Submit</strong><p>This assignment has no work to submit yet. All files are empty or nothing submittable was found. Write your solution first, then submit again.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/submissions#empty",
   },
   TASK_001: {
     code: "TASK_001",

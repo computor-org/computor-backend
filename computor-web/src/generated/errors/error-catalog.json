@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "error_count": 82,
+  "error_count": 83,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -1532,6 +1532,31 @@
       ],
       "resolution_steps": [
         "Nothing to do: the course is over. Ask the lecturer if you believe it was archived by mistake"
+      ]
+    },
+    "SUBMIT_014": {
+      "code": "SUBMIT_014",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Nothing to Submit",
+      "message": {
+        "plain": "This assignment has no work to submit yet. Write your solution first, then submit again.",
+        "markdown": "**Nothing to Submit**\n\nThis assignment has no work to submit yet. All files are empty or nothing submittable was found. Write your solution first, then submit again.",
+        "html": "<strong>Nothing to Submit</strong><p>This assignment has no work to submit yet. All files are empty or nothing submittable was found. Write your solution first, then submit again.</p>"
+      },
+      "retry_after": null,
+      "documentation_url": "/docs/submissions#empty",
+      "internal_description": "The uploaded submission archive is effectively empty: it contains no files, only zero-byte files, or only files removed by the skip filter (system/VCS/IDE files, README, etc.). Raised by the upload flow before anything is stored.",
+      "affected_functions": [
+        "upload_submission_artifact"
+      ],
+      "common_causes": [
+        "The student submitted an assignment they have not worked on yet, so only the empty stub files were packaged",
+        "The assignment directory contains only filtered files such as README.md or dotfiles"
+      ],
+      "resolution_steps": [
+        "Open the assignment, write your solution into the provided files, save, then submit again"
       ]
     },
     "TASK_001": {

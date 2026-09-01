@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "error_count": 82,
+  "error_count": 83,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -714,6 +714,19 @@
         "plain": "This course has been archived. Submissions and test runs are closed.",
         "markdown": "**Course Archived**\n\nThis course has been archived. Submissions and test runs are closed. Your existing work and submissions are untouched.",
         "html": "<strong>Course Archived</strong><p>This course has been archived. Submissions and test runs are closed. Your existing work and submissions are untouched.</p>"
+      },
+      "retry_after": null
+    },
+    "SUBMIT_014": {
+      "code": "SUBMIT_014",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Nothing to Submit",
+      "message": {
+        "plain": "This assignment has no work to submit yet. Write your solution first, then submit again.",
+        "markdown": "**Nothing to Submit**\n\nThis assignment has no work to submit yet. All files are empty or nothing submittable was found. Write your solution first, then submit again.",
+        "html": "<strong>Nothing to Submit</strong><p>This assignment has no work to submit yet. All files are empty or nothing submittable was found. Write your solution first, then submit again.</p>"
       },
       "retry_after": null
     },
