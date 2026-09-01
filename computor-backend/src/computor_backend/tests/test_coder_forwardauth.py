@@ -20,11 +20,12 @@ class _FakeURL:
 
 
 class _FakeRequest:
-    """Minimal stand-in for starlette Request: only .headers and .url are used."""
+    """Minimal stand-in for starlette Request: only .headers, .url and .method are used."""
 
-    def __init__(self, forwarded_uri, path="/"):
-        self.headers = {"X-Forwarded-Uri": forwarded_uri}
+    def __init__(self, forwarded_uri, path="/", headers=None, method="GET"):
+        self.headers = {"X-Forwarded-Uri": forwarded_uri, **(headers or {})}
         self.url = _FakeURL(path)
+        self.method = method
 
 
 # A backend user UUID and the Coder username derived from it.
@@ -112,3 +113,48 @@ async def test_malformed_url_is_rejected():
     resp = await verify_coder_access(_FakeRequest("/coder/onlyowner"), _user())
     assert resp.status_code == 403
     assert _body(resp)["detail"] == "Invalid workspace URL format"
+
+
+# --- No live session (#379): navigations recover via coder-reauth, XHRs 401 ---
+
+_NAV_HEADERS = {"Accept": "text/html,application/xhtml+xml", "X-Forwarded-Method": "GET"}
+
+
+@pytest.mark.asyncio
+async def test_unauthenticated_browser_navigation_redirects_to_reauth():
+    resp = await verify_coder_access(
+        _FakeRequest("/coder/%s/workspace/" % USER_OWNER, headers=_NAV_HEADERS), None
+    )
+    assert resp.status_code == 302
+    location = resp.headers["location"]
+    assert "/auth/coder-reauth?" in location
+    assert "next=%2Fcoder%2F" in location
+
+
+@pytest.mark.asyncio
+async def test_unauthenticated_xhr_still_gets_401():
+    # code-server's own requests advertise no text/html and must keep failing
+    # fast — a redirect would only confuse its reconnect logic.
+    resp = await verify_coder_access(
+        _FakeRequest("/coder/%s/workspace/" % USER_OWNER, headers={"Accept": "*/*"}), None
+    )
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_unauthenticated_non_get_gets_401():
+    resp = await verify_coder_access(
+        _FakeRequest(
+            "/coder/%s/workspace/" % USER_OWNER,
+            headers={"Accept": "text/html", "X-Forwarded-Method": "POST"},
+        ),
+        None,
+    )
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_unauthenticated_navigation_to_non_workspace_path_gets_401():
+    # Only clean /coder/{owner}/{workspace} paths are worth a reauth round-trip.
+    resp = await verify_coder_access(_FakeRequest("/coder/onlyowner", headers=_NAV_HEADERS), None)
+    assert resp.status_code == 401

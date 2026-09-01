@@ -551,10 +551,10 @@ async def refresh_token(
     return TokenRefreshResponse(**result)
 
 
-# A browser-visible workspace path: /coder/{owner}/{workspace}[/...]. The two
-# named segments are constrained (no slashes, so "//host" cannot pass) and the
-# tail excludes CR/LF so a matched value is safe to place in a Location header.
-_WORKSPACE_PATH = re.compile(r"^/coder/[A-Za-z0-9._~-]+/[A-Za-z0-9._~-]+(?:/[^\r\n]*)?$")
+# A browser-visible workspace path: /coder/{owner}/{workspace}[/...][?...].
+# The two named segments are constrained (no slashes, so "//host" cannot pass)
+# and the tail excludes CR/LF so a matched value is safe in a Location header.
+_WORKSPACE_PATH = re.compile(r"^/coder/[A-Za-z0-9._~-]+/[A-Za-z0-9._~-]+(?:[/?][^\r\n]*)?$")
 
 
 def _public_api_base() -> str:
