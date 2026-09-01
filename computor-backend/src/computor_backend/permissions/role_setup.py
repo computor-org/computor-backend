@@ -59,6 +59,11 @@ def claims_user_manager() -> List[Tuple[str, str]]:
     # 403'd (#403). Admin rows stay protected by UserRolePermissionHandler
     # regardless of this claim.
     claims.append(("permissions", f"{UserRoleInterface.model.__tablename__}:delete"))
+    # Same ACTIONS gap for users themselves (#382): user managers may delete
+    # pre-provisioned rows that never authenticated. UserPermissionHandler
+    # already excludes admins and service accounts from their delete query,
+    # and guard_user_delete restricts users with a login history to admins.
+    claims.append(("permissions", f"{UserInterface.model.__tablename__}:delete"))
 
     return claims
 

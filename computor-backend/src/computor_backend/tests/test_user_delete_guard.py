@@ -120,6 +120,15 @@ def test_logged_in_archived_needs_full_admin(world, session):
     guard_user_delete(_entity(user, archived=True), _admin(), session)  # must not raise
 
 
+def test_user_manager_role_carries_the_delete_claim():
+    """ACTIONS has no "delete" entry, so claim_values() never emits user:delete —
+    without the explicit append a user manager's delete 403s at the permission
+    layer before the guard even runs (same footgun as user_role:delete, #403)."""
+    from computor_backend.permissions.role_setup import claims_user_manager
+
+    assert ("permissions", "user:delete") in claims_user_manager()
+
+
 def test_graded_work_always_blocks(world, session):
     user = world.user(f"graded_{world.sfx}@example.test")
     cm = world.member(user, group=world.group)
