@@ -1,7 +1,7 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Total errors:** 82
+**Total errors:** 83
 
 To regenerate: `bash generate_error_codes.sh`
 
@@ -2200,6 +2200,31 @@ The course's archived_at is set. The whole content tree is hidden from students 
 
 **Resolution Steps:**
 1. Nothing to do: the course is over. Ask the lecturer if you believe it was archived by mistake
+
+---
+
+### SUBMIT_014 - Nothing to Submit
+
+**HTTP Status:** `400`  
+**Severity:** `warning`  
+**Category:** `validation`  
+**Documentation:** [/docs/submissions#empty](/docs/submissions#empty)  
+
+**Description:**  
+The uploaded submission archive is effectively empty: it contains no files, only zero-byte files, or only files removed by the skip filter (system/VCS/IDE files, README, etc.). Raised by the upload flow before anything is stored.
+
+**User Message:**  
+> This assignment has no work to submit yet. Write your solution first, then submit again.
+
+**Affected Functions:**
+- `upload_submission_artifact`
+
+**Common Causes:**
+- The student submitted an assignment they have not worked on yet, so only the empty stub files were packaged
+- The assignment directory contains only filtered files such as README.md or dotfiles
+
+**Resolution Steps:**
+1. Open the assignment, write your solution into the provided files, save, then submit again
 
 ---
 
