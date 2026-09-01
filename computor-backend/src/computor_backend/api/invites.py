@@ -10,6 +10,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from computor_backend.database import get_db
@@ -176,6 +177,12 @@ async def accept_invite(
     The invite token is the authorization proof. We create the Keycloak user
     (with the chosen password) first, then create the computor User. On first
     SSO login Keycloak links to this pre-created account by email.
+
+    A pre-provisioned user (admin-created or roster-imported, never signed in)
+    with the same email is ADOPTED instead of rejected — the invite becomes
+    the activation path for the existing row, keeping its memberships and
+    profile (computor-org/issues#382). Only a user with real login evidence
+    blocks the email.
     """
     invite = _resolve_token(token, db)
 
@@ -183,9 +190,25 @@ async def accept_invite(
     if invite.email and invite.email.lower() != payload.email.lower():
         raise BadRequestException(detail="This invite is restricted to a different email address")
 
-    # Duplicate email check
-    if db.query(User).filter(User.email == payload.email).first():
-        raise BadRequestException(detail=f"Email '{payload.email}' is already registered")
+    from computor_backend.business_logic.user_lifecycle import login_evidence
+
+    # Case-insensitive: the SSO first-login join lowercases both sides, so an
+    # admin-typed "Name@mac.com" row must count as the same identity here too.
+    existing = db.query(User).filter(
+        func.lower(User.email) == payload.email.lower()
+    ).first()
+    if existing:
+        if login_evidence(str(existing.id), db):
+            raise BadRequestException(
+                detail=f"An account for '{payload.email}' already exists and has been "
+                "signed in to. Please sign in instead of using the invite."
+            )
+        if existing.banned_at is not None:
+            raise BadRequestException(detail="This account is banned and cannot be activated")
+        if existing.archived_at is not None:
+            raise BadRequestException(
+                detail="This account is archived. Ask an administrator to unarchive it first."
+            )
 
     # Provision the Keycloak login first (invite token is the authorization
     # proof). If this fails we neither create the user nor consume the invite.
@@ -197,14 +220,23 @@ async def accept_invite(
         family_name=payload.family_name,
     )
 
-    # Create user (email-only, no local password — authentication is via Keycloak)
-    user = User(
-        email=payload.email,
-        given_name=payload.given_name,
-        family_name=payload.family_name,
-    )
-    db.add(user)
-    db.flush()
+    if existing:
+        # Adopt the pre-provisioned row: the person registering owns the
+        # identity now, so their chosen name wins over imported placeholders.
+        user = existing
+        if payload.given_name:
+            user.given_name = payload.given_name
+        if payload.family_name:
+            user.family_name = payload.family_name
+    else:
+        # Create user (email-only, no local password — authentication is via Keycloak)
+        user = User(
+            email=payload.email,
+            given_name=payload.given_name,
+            family_name=payload.family_name,
+        )
+        db.add(user)
+        db.flush()
 
     # Assign roles from invite. Admin-conferring roles are re-checked
     # against the creator's CURRENT roles: create_invite already blocks
@@ -219,18 +251,27 @@ async def accept_invite(
             f"creator {invite.created_by} is not an admin"
         )
         roles_to_grant = [r for r in roles_to_grant if not grants_system_admin(r)]
+    held = {
+        row[0]
+        for row in db.query(UserRole.role_id).filter(UserRole.user_id == str(user.id))
+    }
     for role_id in roles_to_grant:
-        db.add(UserRole(user_id=str(user.id), role_id=role_id))
+        if role_id not in held:
+            db.add(UserRole(user_id=str(user.id), role_id=role_id))
 
     # Consume invite
     invite.use_count += 1
     db.commit()
 
-    logger.info(f"User {user.id} ({user.email}) pre-created via invite {invite.id}")
+    if existing:
+        logger.info(f"User {user.id} ({user.email}) adopted via invite {invite.id}")
+    else:
+        logger.info(f"User {user.id} ({user.email}) pre-created via invite {invite.id}")
 
     return {
         "user_id": str(user.id),
         "email": payload.email,
+        "adopted": existing is not None,
     }
 
 
