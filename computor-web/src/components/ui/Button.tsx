@@ -8,7 +8,7 @@ import Link from 'next/link';
  * that were previously copy-pasted across pages — use this instead of raw
  * class strings so the palette stays in one place.
  */
-export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'dangerGhost' | 'ghost';
+export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'dangerGhost' | 'accentGhost' | 'ghost';
 export type ButtonSize = 'xs' | 'sm' | 'md';
 
 const VARIANT_CLS: Record<ButtonVariant, string> = {
@@ -18,6 +18,9 @@ const VARIANT_CLS: Record<ButtonVariant, string> = {
   // Low-emphasis destructive action (e.g. Delete in a table row) — red text
   // without the solid fill that would shout from every row.
   dangerGhost: 'text-danger-text hover:bg-danger-wash',
+  // Accent twin of dangerGhost: the row's main action (Copy Link, Open) as
+  // accent text without a fill.
+  accentGhost: 'text-accent-text hover:bg-accent-wash',
   ghost: 'text-muted hover:bg-sunken',
 };
 
