@@ -455,8 +455,10 @@ def _guard_no_archive_admin(entity, permissions, db):
     if is_admin_target:
         raise ForbiddenException(detail="Admin users cannot be archived")
 
+from computor_backend.business_logic.user_lifecycle import guard_user_delete
 _user_router = CrudRouter(UserInterface)
 _user_router.pre_archive.append(_guard_no_archive_admin)
+_user_router.pre_delete.append(guard_user_delete)
 _user_router.register_routes(app)
 # Ban / unban lifecycle endpoints (PATCH /users/{id}/ban|unban). Distinct paths
 # from the CrudRouter, gated on admin / _user_manager inside the handlers.
