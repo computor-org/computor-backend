@@ -60,7 +60,7 @@ export default function UserCreatePage() {
       <FormPanel
         breadcrumbs={[{ label: 'Users', href: '/admin/users' }, { label: 'New' }]}
         title="New user"
-        description="The user will have no password — send them an invite link to set one."
+        description="The user cannot sign in yet. Create an invite link afterwards and share it with them yourself — Computor does not send emails."
         error={error}
         submitting={saving}
         disabled={!email.trim()}
