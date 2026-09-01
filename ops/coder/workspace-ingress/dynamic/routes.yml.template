@@ -40,6 +40,22 @@ http:
       service: workspace-git
       priority: 1000
 
+    # A workspace path with no live workspace behind it (#379). A stopped
+    # container's docker-provider router does not exist, so before this rule a
+    # reloaded tab of an auto-stopped workspace fell through to workspace-denied
+    # and died on a bare 403 "Forbidden". Rewrite such paths to the backend's
+    # workspace-unavailable endpoint instead: browsers get bounced to the web
+    # app's launch page (which starts the workspace and re-enters it), other
+    # requests get a plain 503. Priority sits above workspace-denied (1) and
+    # below every docker workspace router (default priority = rule length,
+    # always longer than this rule) — a RUNNING workspace still wins.
+    workspace-stopped:
+      rule: "PathRegexp(`^/coder/[^/]+/[^/]+`)"
+      entryPoints: [web]
+      service: workspace-api
+      middlewares: [workspace-stopped-rewrite]
+      priority: 10
+
     # Anything else asked of this proxy. Without it a stray request would fall
     # through to whatever router matched most loosely; with it the answer is an
     # explicit, greppable 403.
@@ -59,6 +75,15 @@ http:
       headers:
         customRequestHeaders:
           X-Computor-Client: "workspace"
+
+    # Maps /coder/{owner}/{workspace}[/...] onto the backend's stopped-workspace
+    # handler. The router's PathRegexp guarantees the regex matches, so nothing
+    # ever reaches the backend under its original /coder path (which would hit
+    # the coder API surface instead).
+    workspace-stopped-rewrite:
+      replacePathRegex:
+        regex: "^/coder/([^/]+)/([^/]+).*"
+        replacement: "/auth/workspace-unavailable/$1/$2"
 
     workspace-deny:
       ipAllowList:

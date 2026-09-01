@@ -335,6 +335,10 @@ if [ "$SKIP_COMMON" != true ]; then
         fi
         # Browser-facing API URL (web runs locally in dev).
         set_env_var NEXT_PUBLIC_API_URL http://localhost:8000
+        # Browser-facing web app URL. In prod this is the root of PUBLIC_DOMAIN;
+        # in dev the web runs on its own port, so backend-issued redirects into
+        # the web app (e.g. the stopped-workspace fallback, #379) need it spelled out.
+        set_env_var WEB_APP_URL http://localhost:3000
         # Backend reaches Coder on localhost; workspaces call back to the host.
         set_env_var CODER_URL http://localhost:7080
         set_env_var BACKEND_EXTERNAL_URL http://host.docker.internal:8000

@@ -656,7 +656,7 @@ async def handle_sso_callback(
 async def refresh_sso_token(
     refresh_token: str,
     provider: str,
-    principal: Principal,
+    principal: Optional[Principal],
     db: Session,
 ) -> Dict[str, Any]:
     """
@@ -665,7 +665,9 @@ async def refresh_sso_token(
     Args:
         refresh_token: Refresh token from provider
         provider: Authentication provider name
-        principal: Current authenticated principal
+        principal: Current authenticated principal, or None when the caller has
+            no live session (the coder-reauth flow) — then the provider-validated
+            refresh token is itself the credential, as in /auth/refresh/local
         db: Database session
 
     Returns:
@@ -721,7 +723,7 @@ async def refresh_sso_token(
         user = account.user
 
         # Verify the account belongs to the authenticated user
-        if str(user.id) != str(principal.user_id):
+        if principal is not None and str(user.id) != str(principal.user_id):
             raise UnauthorizedException(detail="Refresh token does not belong to authenticated user")
 
         # Generate new API session token
