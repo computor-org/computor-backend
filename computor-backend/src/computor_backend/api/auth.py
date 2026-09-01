@@ -581,6 +581,16 @@ def _workspace_public_origin() -> str:
     return ""
 
 
+def _web_app_base() -> str:
+    """Public base URL of the web app; empty means same-origin relative URLs.
+
+    Same source as GET /instance-info: WEB_APP_URL for split/dev deployments,
+    else the root of PUBLIC_DOMAIN.
+    """
+    from computor_backend.api.instance import _normalize_url
+    return _normalize_url(settings.WEB_APP_URL or settings.PUBLIC_DOMAIN) or ""
+
+
 def _default_sso_provider() -> str:
     """The provider the cookie session came from — keycloak unless it is off."""
     try:
@@ -808,6 +818,37 @@ async def coder_reauth(
     return_to = f"{_public_api_base()}/auth/coder-reauth?{urlencode({'next': next_path, 'retried': 'true'})}"
     login = f"{_public_api_base()}/auth/{_default_sso_provider()}/login?{urlencode({'redirect_uri': return_to})}"
     return RedirectResponse(url=login, status_code=302)
+
+
+@auth_router.get("/workspace-unavailable/{owner}/{workspace_name}")
+async def workspace_unavailable(
+    request: Request,
+    owner: str,
+    workspace_name: str,
+) -> Response:
+    """
+    Where a workspace path lands when no workspace is listening on it (#379).
+
+    A stopped workspace has no container, so its docker-provider router on the
+    workspace ingress does not exist and the request would fall through to the
+    catch-all deny — the bare "Forbidden" of the original report. The ingress
+    instead rewrites unmatched /coder/{owner}/{workspace} paths here.
+
+    Browser navigations are sent to the web app's launch page, which (behind
+    its own login) starts the stopped workspace and redirects back into it —
+    so reloading a dead tab becomes the recovery, not a dead end. Everything
+    else (code-server's own XHR reconnect probes) gets a plain 503.
+
+    Unauthenticated by design: it discloses nothing beyond a generic redirect,
+    and the launch page enforces login itself.
+    """
+    if _is_browser_navigation(request):
+        launch = f"{_web_app_base()}/workspaces/launch?{urlencode({'owner': owner, 'name': workspace_name})}"
+        return RedirectResponse(url=launch, status_code=302)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "This workspace is not running."},
+    )
 
 
 @auth_router.get("/verify-documents-access")

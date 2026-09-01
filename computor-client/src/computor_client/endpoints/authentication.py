@@ -132,6 +132,16 @@ class AuthenticationClient:
         response = await self._http.get("/auth/verify-documents-access", params=kwargs)
         return response.json()
 
+    async def get_auth_workspace_unavailable(
+        self,
+        owner: str,
+        workspace_name: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Workspace Unavailable"""
+        response = await self._http.get(f"/auth/workspace-unavailable/{quote_path(owner)}/{quote_path(workspace_name)}", params=kwargs)
+        return response.json()
+
     async def get_auth_callback(
         self,
         provider: str,
