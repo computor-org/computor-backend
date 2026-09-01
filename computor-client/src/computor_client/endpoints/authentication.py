@@ -63,6 +63,14 @@ class AuthenticationClient:
         response = await self._http.post(f"/auth/admin/plugins/{quote_path(plugin_name)}/enable", params=kwargs)
         return response.json()
 
+    async def get_auth_coder_reauth(
+        self,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Coder Reauth"""
+        response = await self._http.get("/auth/coder-reauth", params=kwargs)
+        return response.json()
+
     async def auth_logout(
         self,
         **kwargs: Any,

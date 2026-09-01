@@ -9,9 +9,10 @@ This module provides:
 import json
 import logging
 import os
+import re
 import secrets
 from typing import List, Optional
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import RedirectResponse, JSONResponse
@@ -21,7 +22,7 @@ from sqlalchemy.orm import Session
 from computor_backend.coder.keepalive import bump_workspace_activity
 from computor_backend.coder.naming import coder_username_matches_user
 from computor_backend.database import get_db
-from computor_backend.permissions.auth import get_current_principal
+from computor_backend.permissions.auth import get_current_principal, parse_authorization_header
 from computor_backend.exceptions import (
     ComputorException,
     UnauthorizedException,
@@ -550,11 +551,77 @@ async def refresh_token(
     return TokenRefreshResponse(**result)
 
 
+# A browser-visible workspace path: /coder/{owner}/{workspace}[/...]. The two
+# named segments are constrained (no slashes, so "//host" cannot pass) and the
+# tail excludes CR/LF so a matched value is safe to place in a Location header.
+_WORKSPACE_PATH = re.compile(r"^/coder/[A-Za-z0-9._~-]+/[A-Za-z0-9._~-]+(?:/[^\r\n]*)?$")
+
+
+def _public_api_base() -> str:
+    """Public base URL of this API; empty means same-origin relative URLs."""
+    return os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
+
+
+def _workspace_public_origin() -> str:
+    """Origin (scheme://host[:port]) browsers use for workspace URLs.
+
+    Derived from CODER_WORKSPACE_BASE_URL because in dev the API
+    (localhost:8000) and the workspace ingress (Traefik) are different origins.
+    Empty when unset or unparseable, which keeps redirects same-origin relative
+    (correct for the prod layout, where everything shares PUBLIC_DOMAIN).
+    """
+    try:
+        from computor_backend.coder.config import get_coder_settings
+        base = get_coder_settings().workspace_base_url or ""
+    except Exception:
+        return ""
+    parsed = urlparse(base)
+    if parsed.scheme and parsed.netloc:
+        return f"{parsed.scheme}://{parsed.netloc}"
+    return ""
+
+
+def _default_sso_provider() -> str:
+    """The provider the cookie session came from — keycloak unless it is off."""
+    try:
+        enabled = get_plugin_registry().get_enabled_plugins()
+    except Exception:
+        return "keycloak"
+    if "keycloak" in enabled or not enabled:
+        return "keycloak"
+    return enabled[0]
+
+
+def _is_browser_navigation(request: Request) -> bool:
+    """A top-level browser navigation (tab load/reload), as opposed to the
+    XHR/websocket traffic code-server itself generates. On the ForwardAuth path
+    the original method arrives in X-Forwarded-Method (the auth sub-request is
+    always GET)."""
+    method = request.headers.get("X-Forwarded-Method") or request.method
+    if method.upper() != "GET":
+        return False
+    return "text/html" in request.headers.get("Accept", "")
+
+
+async def _coder_request_principal(request: Request) -> Optional[Principal]:
+    """get_current_principal, degraded to None on 401 instead of raising.
+
+    Hand-rolled rather than get_current_principal_optional because this sits on
+    the ForwardAuth hot path: the optional variant skips the principal cache
+    and opens a DB session on every call. A ForbiddenException (banned user)
+    still propagates — a ban must not turn into a re-login loop.
+    """
+    try:
+        return await get_current_principal(parse_authorization_header(request))
+    except UnauthorizedException:
+        return None
+
+
 @auth_router.get("/verify-coder-access")
 async def verify_coder_access(
     request: Request,
-    principal: Principal = Depends(get_current_principal)
-) -> JSONResponse:
+    principal: Optional[Principal] = Depends(_coder_request_principal)
+) -> Response:
     """
     Traefik ForwardAuth endpoint for Coder workspace access control.
 
@@ -570,13 +637,25 @@ async def verify_coder_access(
 
     Returns:
     - 200 OK: User is authorized to access this workspace
-    - 401 Unauthorized: User is not authenticated
+    - 302 Found: browser navigation without a live session — sent through
+      /auth/coder-reauth, which renews the session from the HttpOnly refresh
+      cookie (or a full SSO round-trip) and returns to the workspace (#379)
+    - 401 Unauthorized: User is not authenticated (non-navigation requests)
     - 403 Forbidden: User is authenticated but not authorized for this workspace
     """
-    import re
-
     # Get the original URI from Traefik headers
     original_uri = request.headers.get("X-Forwarded-Uri", request.url.path)
+
+    if principal is None:
+        # No live session — the 1h ct_access_token cookie and the sliding Redis
+        # session both die during exactly the idle period that also auto-stops
+        # the workspace. Traefik forwards a non-2xx ForwardAuth response to the
+        # client verbatim, so a redirect here reaches the browser: send tab
+        # (re)loads through the reauth hop instead of dead-ending on a bare 401.
+        if _is_browser_navigation(request) and _WORKSPACE_PATH.match(original_uri):
+            reauth = f"{_public_api_base()}/auth/coder-reauth?{urlencode({'next': original_uri})}"
+            return RedirectResponse(url=reauth, status_code=302)
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
 
     # Debug: Log all headers to understand the authentication flow
     logger.info("=== ForwardAuth Debug ===")
@@ -651,6 +730,84 @@ async def verify_coder_access(
         status_code=200,
         content={"status": "authorized", "user_id": principal.user_id, "workspace": workspace_name}
     )
+
+
+@auth_router.get("/coder-reauth")
+async def coder_reauth(
+    request: Request,
+    next_path: str = Query(..., alias="next", description="Workspace path to return to (/coder/{owner}/{workspace}/...)"),
+    retried: bool = Query(False, description="Set after a full SSO round-trip, to stop redirect loops"),
+    principal: Optional[Principal] = Depends(_coder_request_principal),
+    db: Session = Depends(get_db),
+) -> RedirectResponse:
+    """
+    Renew the browser session for a workspace tab whose credential expired (#379).
+
+    A workspace tab is pure code-server — none of our JavaScript runs in it, so
+    unlike the web UI it can never call /auth/refresh. After an hour idle the
+    ct_access_token cookie (max_age 3600) and the sliding Redis session are both
+    gone and every reload dead-ends. verify-coder-access sends browser
+    navigations here instead; this endpoint recovers, in order of preference:
+
+    1. Session still valid (e.g. renewed by another tab) — bounce straight back.
+    2. The 7-day HttpOnly ct_refresh_token cookie is valid — mint a fresh
+       session at the provider, re-set both cookies, bounce back. Invisible.
+    3. Full SSO round-trip via /auth/{provider}/login with this URL (plus
+       retried=true) as the redirect target. With a live IdP session this is
+       silent; otherwise the user gets the login page and then lands back in
+       the workspace. The callback appends its usual token query params, which
+       are simply ignored here.
+    """
+    if not _WORKSPACE_PATH.match(next_path):
+        raise BadRequestException(detail="next must be a /coder/{owner}/{workspace} path")
+
+    target = f"{_workspace_public_origin()}{next_path}"
+
+    if principal is not None:
+        return RedirectResponse(url=target, status_code=302)
+
+    refresh_token_value = request.cookies.get("ct_refresh_token")
+    if refresh_token_value:
+        from computor_backend.business_logic.auth import refresh_sso_token
+        try:
+            result = await refresh_sso_token(
+                refresh_token=refresh_token_value,
+                provider=_default_sso_provider(),
+                principal=None,
+                db=db,
+            )
+        except ComputorException as e:
+            logger.info(f"coder-reauth cookie refresh failed, falling back to SSO login: {getattr(e, 'detail', e)}")
+            result = None
+        if result:
+            response = RedirectResponse(url=target, status_code=302)
+            response.set_cookie(
+                key="ct_access_token",
+                value=result["access_token"],
+                httponly=True,
+                secure=_COOKIE_SECURE,
+                samesite="lax",
+                max_age=3600,
+            )
+            if result.get("refresh_token"):
+                response.set_cookie(
+                    key="ct_refresh_token",
+                    value=result["refresh_token"],
+                    httponly=True,
+                    secure=_COOKIE_SECURE,
+                    samesite="lax",
+                    max_age=604800,
+                )
+            return response
+
+    if retried:
+        # Came back from a full login round-trip and there is still no session:
+        # something is genuinely broken, and another redirect would just loop.
+        raise UnauthorizedException(detail="Could not re-authenticate for this workspace. Please sign in to the web app and reopen it.")
+
+    return_to = f"{_public_api_base()}/auth/coder-reauth?{urlencode({'next': next_path, 'retried': 'true'})}"
+    login = f"{_public_api_base()}/auth/{_default_sso_provider()}/login?{urlencode({'redirect_uri': return_to})}"
+    return RedirectResponse(url=login, status_code=302)
 
 
 @auth_router.get("/verify-documents-access")
