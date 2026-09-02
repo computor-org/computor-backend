@@ -28,7 +28,12 @@ RUN apt-get update && apt-get install -y git \
 RUN git init extension \
     && cd extension \
     && git remote add origin "${EXTENSION_REPO_URL}" \
-    && git fetch --depth 1 origin "${EXTENSION_REPO_SHA:-${EXTENSION_REPO_REF}}" \
+    && for attempt in 1 2 3; do \
+        GIT_TERMINAL_PROMPT=0 git -c http.version=HTTP/1.1 fetch --depth 1 origin "${EXTENSION_REPO_SHA:-${EXTENSION_REPO_REF}}" \
+          && break; \
+        test "$attempt" -lt 3 || exit 1; \
+        sleep $((attempt * 2)); \
+      done \
     && git checkout --detach FETCH_HEAD
 
 WORKDIR /build/extension
