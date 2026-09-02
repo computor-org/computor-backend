@@ -91,9 +91,19 @@ if [ ! -f "$SETTINGS_FILE" ]; then
     "*.webp": "computor.imagePreview",
     "*.svg": "computor.imagePreview"
   },
-  "workbench.editor.closeEmptyGroups": false,
-  "extensions.autoCheckUpdates": false,
-  "extensions.autoUpdate": false
+    "workbench.editor.closeEmptyGroups": false,
+    "extensions.autoCheckUpdates": false,
+    "extensions.autoUpdate": false,
+    "extensions.ignoreRecommendations": true,
+    "extensions.showRecommendationsOnlyOnDemand": true,
+    "security.workspace.trust.enabled": false,
+    "security.workspace.trust.startupPrompt": "never",
+    "security.workspace.trust.banner": "never",
+    "security.workspace.trust.untrustedFiles": "open",
+    "update.mode": "none",
+    "update.showReleaseNotes": false,
+    "workbench.startupEditor": "none",
+    "workbench.welcomePage.walkthroughs.openOnInstall": false
 }
 SETTINGS_EOF
 else
@@ -127,6 +137,20 @@ wanted = {
     # bumping the pins in the Dockerfile.
     "extensions.autoCheckUpdates": False,
     "extensions.autoUpdate": False,
+    "extensions.ignoreRecommendations": True,
+    "extensions.showRecommendationsOnlyOnDemand": True,
+    # These are managed course workspaces. Trust prompts only put the editor in
+    # Restricted Mode and disable the teaching extension students came to use.
+    "security.workspace.trust.enabled": False,
+    "security.workspace.trust.startupPrompt": "never",
+    "security.workspace.trust.banner": "never",
+    "security.workspace.trust.untrustedFiles": "open",
+    # Releases carry a tested code-server + extension set. Upstream prompts are
+    # noise here and inviting an in-place update makes the image irreproducible.
+    "update.mode": "none",
+    "update.showReleaseNotes": False,
+    "workbench.startupEditor": "none",
+    "workbench.welcomePage.walkthroughs.openOnInstall": False,
 }
 
 try:
@@ -174,6 +198,8 @@ fi
 export HASHED_PASSWORD='${app_hash}'
 code-server \
   --auth password \
+  --disable-update-check \
+  --disable-workspace-trust \
   --bind-addr 0.0.0.0:${code_server_port} \
   --abs-proxy-base-path "${coder_base_path}/${owner_name}/${workspace_name}" \
   --extensions-dir /opt/code-server/extensions \
@@ -185,6 +211,8 @@ echo "WARNING: no workspace app secret was issued — the editor is reachable" \
      "by any other workspace on this network." >&2
 code-server \
   --auth none \
+  --disable-update-check \
+  --disable-workspace-trust \
   --bind-addr 0.0.0.0:${code_server_port} \
   --abs-proxy-base-path "${coder_base_path}/${owner_name}/${workspace_name}" \
   --extensions-dir /opt/code-server/extensions \
