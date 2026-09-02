@@ -510,6 +510,14 @@ async def push_coder_template(
     if coder_url_override is not None:
         coder_url = coder_url_override
 
+    # The workflow parameters are assembled by the API on the control plane,
+    # where http://uvicorn:8000 is valid. Template ingress runs on the worker,
+    # so prefer that worker's explicit backend route (the WireGuard address in
+    # split-host production) for ForwardAuth.
+    worker_backend_url = get_worker_settings().backend_external_url
+    if worker_backend_url:
+        backend_internal_url = worker_backend_url.rstrip("/")
+
     image_ref = f"{registry_host}/{info['image_name']}:{image_tag}"
 
     # Route login and template GET/PATCH through CoderClient instead of raw

@@ -98,6 +98,14 @@ class WorkerSettings(BaseSettings):
         default=100, validation_alias="TEMPORAL_ACTIVITY_EXECUTOR_MAX_WORKERS"
     )
 
+    # --- Coder template routing ------------------------------------------
+    # On a split-host deployment, workspace-ingress must call ForwardAuth on
+    # the control plane over WireGuard; the API-side default (uvicorn:8000) is
+    # only resolvable on the control-plane Docker network.
+    backend_external_url: Optional[str] = Field(
+        default=None, validation_alias="BACKEND_EXTERNAL_URL"
+    )
+
     # Cap on activities a worker runs at once. Unset means the SDK default of
     # 100, which is right for workers whose activities are independent. It is
     # wrong for a queue that fronts a single non-reentrant resource: the MATLAB
