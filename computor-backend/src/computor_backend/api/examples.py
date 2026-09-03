@@ -918,11 +918,15 @@ async def upload_example(
         # Update existing version — refresh every promoted column so
         # we don't end up with a stale title / exec-backend / file
         # list hanging off a re-uploaded version.
-        for field, value in promoted.items():
-            setattr(existing_version, field, value)
-        existing_version.testing_service_id = testing_service_id
-        existing_version.updated_at = func.now()
-        version = version_repo.update(existing_version)
+        # ExampleVersionRepository.update takes an entity id and an update
+        # mapping.  Passing the already-loaded entity here used to raise a
+        # TypeError on every ``update_existing`` upload, after MinIO had
+        # already been overwritten.  Keep the repository as the single write
+        # path so its cache/deployment invalidation hooks still run.
+        updates = dict(promoted)
+        updates["testing_service_id"] = testing_service_id
+        updates["updated_at"] = func.now()
+        version = version_repo.update(existing_version.id, updates)
         cache.invalidate_tags(f"example_version:{version.id}")
     else:
         # Create new version
