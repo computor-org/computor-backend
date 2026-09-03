@@ -22,7 +22,7 @@
 #     ct-julia \
 #     jltester run -t /sandbox/submission -T /sandbox/tests/test.yaml
 
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 LABEL maintainer="Computor Testing Framework"
 LABEL description="Julia sandbox for testing student code"

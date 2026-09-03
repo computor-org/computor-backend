@@ -12,7 +12,7 @@
 #                    pyproject.toml changes.
 #   2. source layer — copy the real source and re-install it editable with
 #                    --no-deps. Cheap; rebuilds on every source change.
-FROM python:3.10-slim
+FROM python:3.14-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         postgresql-client \
