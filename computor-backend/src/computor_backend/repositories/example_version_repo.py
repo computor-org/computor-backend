@@ -156,13 +156,15 @@ class ExampleVersionRepository(BaseRepository[ExampleVersion]):
         import logging
         logger = logging.getLogger(__name__)
 
-        # Get the entity before update to check if it affects deployments
-        entity = self.get_by_id(entity_id)
+        # Read directly from this session.  ``get_by_id`` may deserialize a
+        # Redis-cached row into a detached model, which cannot be refreshed by
+        # SQLAlchemy during an update.
+        entity = self.db.query(self.model).filter(self.model.id == entity_id).first()
         if not entity:
             raise ValueError(f"ExampleVersion {entity_id} not found")
 
         # Update using parent's method (handles normal cache invalidation)
-        result = super().update(entity_id, updates)
+        result = super().update_entity(entity, updates)
 
         # CRITICAL: Cascade invalidation to course_content deployments if relevant fields changed
         # (e.g., version_tag, status, storage_path)
