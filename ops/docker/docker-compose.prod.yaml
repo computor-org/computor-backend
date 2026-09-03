@@ -87,6 +87,9 @@ services:
       DEPLOYMENTS_DIR: /deployments
       API_ADMIN_EMAIL: ${API_ADMIN_EMAIL}
       API_ADMIN_PASSWORD: ${API_ADMIN_PASSWORD}
+      # Bootstrap uses the same pinned secret as the testing worker to create
+      # or repair its service token. It is never written to deployment YAML.
+      TESTING_WORKER_TOKEN: ${TESTING_WORKER_TOKEN:-}
       # Read-only: the backend only compares it against API_ADMIN_EMAIL and warns
       # when they collide (a shared address means the platform admin can never
       # get a git-server account). The Forgejo admin itself is created by the
