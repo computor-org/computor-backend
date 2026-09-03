@@ -119,7 +119,15 @@ services:
       KEYCLOAK_ENABLED: ${KEYCLOAK_ENABLED:-true}
       ENABLE_KEYCLOAK: ${ENABLE_KEYCLOAK:-true}
       AUTH_PLUGINS_CONFIG: ${AUTH_PLUGINS_CONFIG:-}
-      KEYCLOAK_SERVER_URL: ${KEYCLOAK_SERVER_URL:-http://keycloak:8080/auth}
+      # Backend-reachable Keycloak, over the docker network. Deliberately NOT
+      # ${KEYCLOAK_SERVER_URL}: that variable is dev-scoped --
+      # .env.common.template ships it as http://localhost:8180 for the host-run
+      # backend -- so taking it here means uvicorn silently points at its own
+      # localhost and every login answers EXT_006 "provider unreachable". The
+      # keycloak-prod overlay sets the same value; this makes the base prod
+      # stack correct on its own rather than dependent on that overlay being
+      # included, and :? fails loudly instead of falling back to a wrong host.
+      KEYCLOAK_SERVER_URL: ${KEYCLOAK_SERVER_URL_INTERNAL:?}
       KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-computor}
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-computor-backend}
