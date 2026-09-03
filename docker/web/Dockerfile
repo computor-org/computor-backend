@@ -2,7 +2,7 @@
 # Optimized for minimal image size and security
 
 # Stage 1: Dependencies
-FROM node:20-alpine AS deps
+FROM node:26-alpine AS deps
 
 # Install dependencies only when needed
 WORKDIR /app
@@ -15,7 +15,7 @@ RUN yarn install --frozen-lockfile && \
     yarn cache clean
 
 # Stage 2: Builder
-FROM node:20-alpine AS builder
+FROM node:26-alpine AS builder
 
 WORKDIR /app
 
@@ -40,7 +40,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN yarn build
 
 # Stage 3: Production Runner
-FROM node:20-alpine AS runner
+FROM node:26-alpine AS runner
 
 WORKDIR /app
 

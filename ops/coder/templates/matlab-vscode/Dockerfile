@@ -1,5 +1,5 @@
 # MATLAB R2025b with browser-based VS Code, Computor and MathWorks extensions.
-FROM node:20-bookworm AS vsix-builder
+FROM node:26-bookworm AS vsix-builder
 
 ARG EXTENSION_REPO_URL=https://github.com/computor-org/computor-vscode.git
 ARG EXTENSION_REPO_REF="release/2026.10"
@@ -49,7 +49,7 @@ FROM computor-code-server:latest AS code-server
 # MathWorks extension talks to MATLAB directly), so matlab-proxy#88 never
 # applied to it; see matlab-ui's Dockerfile for how that bug was retested
 # before this bump.
-FROM mathworks/matlab:r2025b@sha256:7528b0873df0c6b640013cc37cceb848c60261aa2a7e44bd64387be7678b0ff0
+FROM mathworks/matlab:r2025b@sha256:35f5695df6f748d52b914cd63872c742e5ca1e14d2968a93cc95fd97130601cf
 
 USER root
 
