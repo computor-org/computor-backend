@@ -159,11 +159,17 @@ services:
       GIT_SERVER: ${GIT_SERVER}
       GIT_SERVER_URL: ${GIT_SERVER_URL_INTERNAL}
       # User-reachable git URL, used to rewrite template/clone links in API
-      # responses (the internal host is not reachable from a browser). Optional:
-      # setup-env.sh never writes GIT_SERVER_URL for prod, and the backend falls
-      # back to FORGEJO_ROOT_URL below, so leaving it unset is the normal case —
-      # hence :- rather than a bare ${} that warns on every compose command.
-      GIT_SERVER_URL_PUBLIC: ${GIT_SERVER_URL:-}
+      # responses (the internal host is not reachable from a browser). Normally
+      # unset: the backend falls back to FORGEJO_ROOT_URL below.
+      #
+      # Deliberately NOT mapped from GIT_SERVER_URL. That variable is
+      # dev-scoped -- .env.common.template ships it as http://localhost:3030 for
+      # the host-run backend -- and a prod .env derived from that template
+      # therefore carried the dev value into this field, where it shadowed the
+      # FORGEJO_ROOT_URL fallback and stamped "http://localhost:3030/..." into
+      # every clone URL the API handed a student. Set GIT_SERVER_URL_PUBLIC
+      # explicitly if a deployment really needs to override FORGEJO_ROOT_URL.
+      GIT_SERVER_URL_PUBLIC: ${GIT_SERVER_URL_PUBLIC:-}
       GIT_SERVER_ADMIN_USERNAME: ${GIT_SERVER_ADMIN_USERNAME}
       GIT_SERVER_ADMIN_PASSWORD: ${GIT_SERVER_ADMIN_PASSWORD}
       # Public Forgejo URL — the backend reconciles the 'forgejo' Keycloak client's
