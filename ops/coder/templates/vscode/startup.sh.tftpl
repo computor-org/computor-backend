@@ -103,7 +103,10 @@ if [ ! -f "$SETTINGS_FILE" ]; then
     "update.mode": "none",
     "update.showReleaseNotes": false,
     "workbench.startupEditor": "none",
-    "workbench.welcomePage.walkthroughs.openOnInstall": false
+    "workbench.welcomePage.walkthroughs.openOnInstall": false,
+    "workbench.colorTheme": "Default Dark Modern",
+    "chat.commandCenter.enabled": false,
+    "chat.disableAIFeatures": true
 }
 SETTINGS_EOF
 else
@@ -151,6 +154,15 @@ wanted = {
     "update.showReleaseNotes": False,
     "workbench.startupEditor": "none",
     "workbench.welcomePage.walkthroughs.openOnInstall": False,
+    # Dark by default (computor-org/issues#405). Add-if-missing, so a student
+    # who has already picked a theme keeps it.
+    "workbench.colorTheme": "Default Dark Modern",
+    # No AI entry points in a course workspace (computor-org/issues#406). We
+    # install no such extension; what a student sees comes from whatever the
+    # code-server base image bundles, so this suppresses the UI rather than
+    # removing a package.
+    "chat.commandCenter.enabled": False,
+    "chat.disableAIFeatures": True,
 }
 
 try:
