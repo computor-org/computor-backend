@@ -1077,7 +1077,8 @@
         "lineCount",
         "regexpMultiline",
         "numericOutput",
-        "exitCode"
+        "exitCode",
+        "plotJudge"
       ],
       "title": "QualificationEnum",
       "type": "string"

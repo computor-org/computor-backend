@@ -4485,7 +4485,7 @@ export type GroupType = "fixed" | "dynamic";
 
 export type MergeMethod = "rebase_merge" | "merge" | "ff";
 
-export type QualificationEnum = "verifyEqual" | "matches" | "contains" | "startsWith" | "endsWith" | "count" | "regexp" | "matchesLine" | "containsLine" | "lineCount" | "regexpMultiline" | "numericOutput" | "exitCode";
+export type QualificationEnum = "verifyEqual" | "matches" | "contains" | "startsWith" | "endsWith" | "count" | "regexp" | "matchesLine" | "containsLine" | "lineCount" | "regexpMultiline" | "numericOutput" | "exitCode" | "plotJudge";
 
 export type TypeEnum = "variable" | "graphics" | "structural" | "linting" | "exist" | "error" | "warning" | "help" | "stdout" | "stderr" | "stdio" | "exitcode" | "compile" | "runtime" | "wordcount" | "paragraphcount" | "section" | "linkcount" | "keyword" | "uniquewords" | "linecount" | "charcount" | "sentencecount" | "headingcount" | "imagecount" | "codeblockcount" | "listitemcount" | "pattern";
 

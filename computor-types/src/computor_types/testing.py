@@ -54,6 +54,8 @@ class QualificationEnum(str, Enum):
     regexpMultiline = "regexpMultiline"
     numericOutput = "numericOutput"
     exitCode = "exitCode"
+    # Graphics: optional external plot judge (testers/tests/plot_judge.py)
+    plotJudge = "plotJudge"
 
 
 class TypeEnum(str, Enum):

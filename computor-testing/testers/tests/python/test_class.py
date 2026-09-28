@@ -26,6 +26,7 @@ from ctcore.models import (
     QualificationEnum,
 )
 from .conftest import report_key, Solution
+from ..plot_judge import check_plot_judge
 from ctcore.helpers import get_property_as_list, token_exchange
 from testers.executors.python import PyExecutor, PyExecutionError
 from ..test_base import (
@@ -458,6 +459,13 @@ class TestComputorPython:
                     val_student = eval(sub.name, solution_student)
                 except Exception:
                     pytest.fail(f"Variable `{sub.name}` not found in student namespace")
+
+            # Optional external plot judge on a figure (plot_judge.py)
+            if (testtype == TypeEnum.graphics
+                    and sub.qualification == QualificationEnum.plotJudge):
+                check_plot_judge(val_student, solution_reference.get(sub.name),
+                                 sub.name)
+                return
 
             # Get reference value for verifyEqual
             val_reference = None
