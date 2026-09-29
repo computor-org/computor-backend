@@ -50,12 +50,3 @@ resource "coder_agent" "main" {
     timeout      = 1
   }
 }
-
-module "jetbrains" {
-  count      = data.coder_workspace.me.start_count
-  source     = "registry.coder.com/coder/jetbrains/coder"
-  version    = "~> 1.1"
-  agent_id   = coder_agent.main.id
-  agent_name = "main"
-  folder     = "/home/coder"
-}

@@ -84,7 +84,7 @@ services:
 
   # Redis cache
   redis:
-    image: "redis:alpine"
+    image: "redis:8.10.2-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0"
     security_opt:
       - "no-new-privileges:true"
     logging:
@@ -175,7 +175,10 @@ services:
 
   # MinIO Object Storage
   minio:
-    image: minio/minio:latest
+    # minio/minio was removed from Docker Hub upstream; this pins the last
+    # published release by the digest of the image already present on hosts.
+    # A fresh host cannot pull it: mirror it into a registry you control.
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     security_opt:
       - "no-new-privileges:true"
     logging:
@@ -216,7 +219,7 @@ services:
   # scope-checked in the API. Workspaces cannot reach this at all: they are
   # behind workspace-ingress, whose allowlist covers only the API and git.
   static-server:
-    image: halverneus/static-file-server:latest
+    image: halverneus/static-file-server:v1.8.12@sha256:48c3f4139614c377ad9f29273c465c04671a338a296d40e0ebee626178800072
     security_opt:
       - "no-new-privileges:true"
     logging:
