@@ -11,7 +11,7 @@ WORKDIR /app
 COPY computor-web/package.json computor-web/yarn.lock ./
 
 # Install all dependencies (including dev deps needed for build)
-RUN yarn install --frozen-lockfile && \
+RUN yarn install --frozen-lockfile --ignore-scripts && \
     yarn cache clean
 
 # Stage 2: Builder
