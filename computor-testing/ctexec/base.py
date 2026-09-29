@@ -46,7 +46,10 @@ def sandbox_command_prefix(
     # child's HOME (and thus Python's user-site) is redirected away from where
     # the sandbox package is installed.
     from sandbox import launch as _launch
-    argv = [sys.executable, os.path.abspath(_launch.__file__), "--required"]
+    # The launcher is exec'd directly by this (harness) process, so it can
+    # verify that the harness is still its parent once PDEATHSIG is armed.
+    argv = [sys.executable, os.path.abspath(_launch.__file__), "--required",
+            "--expected-parent-pid", str(os.getpid())]
     if workdir:
         argv += ["--workdir", workdir]
     for path in rw_paths or []:

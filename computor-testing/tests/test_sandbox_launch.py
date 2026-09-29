@@ -27,6 +27,7 @@ def test_prefix_wraps_when_enabled(monkeypatch):
     # Invoked by file path (not -m), so a redirected HOME cannot hide the module.
     assert prefix[1].endswith("launch.py")
     assert prefix[2] == "--required"
+    assert prefix[prefix.index("--expected-parent-pid") + 1] == str(os.getpid())
     assert "--workdir" in prefix and "/work" in prefix
     assert prefix[prefix.index("--rw") + 1] == "/scratch"
     assert prefix[prefix.index("--ro") + 1] == "/ref"

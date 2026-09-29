@@ -714,9 +714,14 @@ def test_job_dies_with_its_harness(tmp_path, sandboxed):
     job = (f"import subprocess, time; p = subprocess.Popen(['setsid', 'sleep', '1000']); "
            f"open({str(pid_file)!r}, 'w').write(str(p.pid)); time.sleep(1000)")
     cmd = sandbox_command_prefix(str(work)) + [sys.executable, "-c", job]
+    # The launcher checks it was started by the pid the prefix names; here
+    # the intermediate process is the harness, so it names itself.
+    cmd[cmd.index("--expected-parent-pid") + 1] = "HARNESS_PID"
     harness = subprocess.Popen(
         [sys.executable, "-c",
-         f"import subprocess; subprocess.Popen({cmd!r}).wait()"])
+         "import os, subprocess\n"
+         f"cmd = [str(os.getpid()) if a == 'HARNESS_PID' else a for a in {cmd!r}]\n"
+         "subprocess.Popen(cmd).wait()"])
     deadline = time.monotonic() + 20
     while not (pid_file.exists() and pid_file.read_text()) and time.monotonic() < deadline:
         time.sleep(0.05)
@@ -779,3 +784,50 @@ def test_structural_check_still_counts_regular_files(tmp_path, language):
                           allowedOccuranceRange=None, countRequirement=3)
     cls()._test_structural({"sub": sub, "file": "solution.txt",
                             "dir_student": str(student)})
+
+
+# --- 17. a job never starts after its harness is gone ----------------------
+
+def _launcher():
+    from sandbox import launch
+    return [sys.executable, os.path.abspath(launch.__file__)]
+
+
+def test_launcher_refuses_wrong_expected_parent(tmp_path):
+    import subprocess
+    marker = tmp_path / "ran"
+    result = subprocess.run(
+        _launcher() + ["--workdir", str(tmp_path), "--expected-parent-pid",
+                       str(os.getpid() + 1_000_000), "--",
+                       "touch", str(marker)],
+        capture_output=True, text=True, timeout=30)
+    assert result.returncode == 125
+    assert "harness" in result.stderr
+    assert not marker.exists()
+
+
+def test_launcher_started_after_harness_death_does_not_run(tmp_path):
+    """The harness names itself, forks, and dies before the launcher starts:
+    PDEATHSIG would never fire, so the launcher must notice and refuse."""
+    import subprocess
+    marker = tmp_path / "ran"
+    log = tmp_path / "launcher.log"
+    harness = (
+        "import os, sys, time\n"
+        "me = os.getpid()\n"
+        "if os.fork() == 0:\n"
+        "    time.sleep(1.0)  # harness exits meanwhile\n"
+        f"    fd = os.open({str(log)!r}, os.O_WRONLY | os.O_CREAT)\n"
+        "    os.dup2(fd, 2)\n"
+        f"    os.execv(sys.executable, {_launcher()!r} + ['--workdir', "
+        f"{str(tmp_path)!r}, '--expected-parent-pid', str(me), '--', "
+        f"'touch', {str(marker)!r}])\n"
+        "os._exit(0)\n")
+    subprocess.run([sys.executable, "-c", harness], timeout=30)
+    deadline = time.monotonic() + 10
+    while "harness" not in (log.read_text() if log.exists() else "") \
+            and time.monotonic() < deadline:
+        time.sleep(0.05)
+    time.sleep(0.5)
+    assert "is gone" in log.read_text()
+    assert not marker.exists()

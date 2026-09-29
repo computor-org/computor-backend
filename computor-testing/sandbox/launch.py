@@ -425,7 +425,7 @@ def _supervise(child: int, parent: int) -> int:
     # The harness dying (killed on a worker timeout) must not orphan the job.
     _libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM, 0, 0, 0)
     signal.pthread_sigmask(signal.SIG_UNBLOCK, _HANDLED_SIGNALS)
-    if os.getppid() != parent:  # the parent died before PDEATHSIG was set
+    if os.getppid() != parent:  # the harness died while we were setting up
         _on_signal(signal.SIGTERM, None)
 
     status = None
@@ -474,6 +474,9 @@ def main() -> int:
                         help="do not restrict the network")
     parser.add_argument("--required", action="store_true",
                         help="fail (exit 125) unless the full sandbox (ABI >= 6) applies")
+    parser.add_argument("--expected-parent-pid", type=int, default=None,
+                        help="pid of the harness that launched us; exit 125 "
+                             "if it is no longer our parent")
     parser.add_argument("--probe", action="store_true",
                         help="print a capability report and exit")
     parser.add_argument("cmd", nargs=argparse.REMAINDER,
@@ -492,6 +495,18 @@ def main() -> int:
 
     if os.environ.get("COMPUTOR_SANDBOX_DISABLE") == "1":
         os.execvp(cmd[0], cmd)
+
+    # Harness supervision is armed before anything else (#237). PDEATHSIG is
+    # not retroactive: if the harness already died, we have been reparented
+    # and would never be signalled. So arm it first, then check that our
+    # parent is still the harness the caller named; otherwise refuse to run.
+    _libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM, 0, 0, 0)
+    parent = (args.expected_parent_pid if args.expected_parent_pid is not None
+              else os.getppid())
+    if os.getppid() != parent:
+        print(f"sandbox.launch: harness {parent} is gone (parent is now "
+              f"{os.getppid()}); not starting the job", file=sys.stderr)
+        return 125
 
     ro_paths = _existing(_runtime_ro_paths() + args.ro)
     rw_paths = _existing(list(DEFAULT_RW) + args.rw
@@ -520,9 +535,12 @@ def main() -> int:
                 print(f"sandbox.launch: cannot scope the job: {exc}",
                       file=sys.stderr)
                 return 125
+    if os.getppid() != parent:  # harness died during sandbox setup
+        print("sandbox.launch: harness is gone; not starting the job",
+              file=sys.stderr)
+        return 125
     if supervised:
         signal.pthread_sigmask(signal.SIG_BLOCK, _HANDLED_SIGNALS)
-        parent = os.getppid()
         child = os.fork()
         if child:
             return _supervise(child, parent)
