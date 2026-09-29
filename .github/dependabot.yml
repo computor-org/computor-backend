@@ -11,12 +11,43 @@
 #     (never `main`), so version PRs are only useful there.
 #
 # When the release branch rolls over, update every `target-branch` below.
+#
+# Supply-chain policy (cooldown):
+#   * Every entry sets `cooldown`, so a freshly published release is not
+#     proposed as a *version* update until it has aged (patch 7 d, minor 14 d,
+#     major 30 d; ecosystems without SemVer support use default-days 7).
+#     This limits exposure to compromised-then-yanked releases.
+#   * Per GitHub docs, `cooldown` applies only to version updates; *security*
+#     updates (Dependabot security PRs against `main`) are never delayed.
+#   * Security fixes needed on the release branch are cherry-picked by hand
+#     from the alert; do not wait for the cooldown.
 
 version: 2
 updates:
+  # computor-backend is managed by uv (uv.lock); Dependabot's `uv` ecosystem
+  # updates pyproject.toml and uv.lock together.
+  - package-ecosystem: uv
+    directory: /computor-backend
+    target-branch: release/2026.10
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+      semver-minor-days: 14
+      semver-patch-days: 7
+    groups:
+      # One PR per concern keeps review cheap; test tooling churns most.
+      python-test-tooling:
+        patterns: ["pytest*", "coverage*", "mypy", "ruff"]
+      python-runtime:
+        patterns: ["*"]
+        exclude-patterns: ["pytest*", "coverage*", "mypy", "ruff"]
+
+  # Packages without a uv.lock (requirements / plain pyproject).
   - package-ecosystem: pip
     directories:
-      - /computor-backend
       - /computor-types
       - /computor-client
       - /computor-testing
@@ -25,6 +56,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+      semver-minor-days: 14
+      semver-patch-days: 7
     groups:
       # One PR per concern keeps review cheap; test tooling churns most.
       python-test-tooling:
@@ -39,6 +75,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+      semver-minor-days: 14
+      semver-patch-days: 7
     groups:
       # `next` drags sharp/postcss with it — never split those across PRs.
       next:
@@ -80,6 +121,59 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
     groups:
       docker-base-images:
+        patterns: ["*"]
+
+  # Service images referenced from compose files (deployed stack + integration
+  # tests). Pins themselves live in the compose files; this only proposes bumps.
+  - package-ecosystem: docker-compose
+    directories:
+      - /ops/docker
+      - /integration-tests
+    target-branch: release/2026.10
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    groups:
+      compose-images:
+        patterns: ["*"]
+
+  # Coder workspace templates: Terraform providers (coder/coder, kreuzwerker/
+  # docker). Provider bumps are proposed only after the cooldown; the
+  # .terraform.lock.hcl hashes are the enforcement point.
+  - package-ecosystem: terraform
+    directories:
+      - /ops/coder/templates/bash
+      - /ops/coder/templates/jupyter
+      - /ops/coder/templates/matlab-ui
+      - /ops/coder/templates/matlab-vscode
+      - /ops/coder/templates/ubuntu-desktop
+      - /ops/coder/templates/vscode
+    target-branch: release/2026.10
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    cooldown:
+      default-days: 7
+    groups:
+      terraform-providers:
+        patterns: ["*"]
+
+  # Workflow actions are pinned to full commit SHAs; Dependabot bumps the SHA
+  # and the trailing version comment together.
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: release/2026.10
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
         patterns: ["*"]
