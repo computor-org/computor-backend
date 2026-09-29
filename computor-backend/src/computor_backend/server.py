@@ -16,6 +16,7 @@ from computor_backend.api.api_builder import CrudRouter, LookUpRouter
 from computor_backend.api.tests import tests_router
 from computor_backend.permissions.auth import get_current_principal, get_current_principal_optional
 from computor_backend.api.auth import auth_router
+from computor_backend.api.public_catalog import public_catalog_router
 from computor_backend.api.sessions import session_router
 from computor_backend.plugins.registry import initialize_plugin_registry
 from sqlalchemy.orm import Session
@@ -469,6 +470,8 @@ app.include_router(user_connect_router, tags=["users", "admin"])
 # accounts_router must be registered before CrudRouter(AccountInterface) so that
 # GET /accounts/providers is matched before the authenticated GET /accounts/{id} route.
 app.include_router(accounts_router, tags=["accounts"])
+# Anonymous landing-page catalog (issue #415); no auth dependency.
+app.include_router(public_catalog_router)
 CrudRouter(AccountInterface).register_routes(app)
 CrudRouter(GroupInterface).register_routes(app)
 # ProfileInterface and StudentProfileInterface use custom routers for fine-grained permissions

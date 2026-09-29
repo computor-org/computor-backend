@@ -18,7 +18,8 @@ ops/
 │   └── .env.common.template   # All variables; setup-env.sh generates .env from it
 │
 ├── keycloak/                  # IdP registration one-shot (stdlib-only python),
-│                              # mounted by docker-compose.keycloak.yaml
+│                              # mounted by docker-compose.keycloak.yaml; plus
+│                              # setup_terms.py (computor.at only, see below)
 │
 ├── lib/                       # Shared bash library for ./computor.sh
 │   ├── common.sh              # env loading, COMPOSE_FILES assembly, maintenance
@@ -119,6 +120,52 @@ separate env file.
 - Docker registry
 - Workspace builders
 - Template provisioning
+
+## Legal profile and Keycloak terms (per deployment)
+
+The web build bakes in `NEXT_PUBLIC_LEGAL_PROFILE` (set it in `.env` before
+`computor.sh` builds the web image):
+
+| Deployment | `NEXT_PUBLIC_LEGAL_PROFILE` | Effect |
+|---|---|---|
+| computor.at | `computor-at` | Own pages `/impressum`, `/privacy`, `/terms`, `/accessibility`, `/report` (from `computor-web/content/legal/`), footer links to them |
+| code.tugraz.at | `tugraz-internal` | Footer links to TU Graz's Impressum, Datenschutzerklärung and Barrierefreiheitserklärung; no own legal pages |
+| any other install | `none` (default) | No legal links, legal routes return 404 |
+
+`ops/keycloak/setup_terms.py` sets the realm localization texts
+`termsTitle`/`termsText`/`doAccept`/`doDecline` (de, en) in realm `computor`
+from `ops/keycloak/computor-at-terms.json`, reads them back, and only if both
+locales verify makes the required action "Terms and Conditions" a default
+action. Any failure aborts before that step, so nobody is asked to accept
+Keycloak's placeholder text. It is idempotent (reads first, writes only
+differences; a second run reports 0 changes). Tests: `ops/keycloak/test_setup_terms.py`.
+
+**Run it for computor.at only.** Never run it for code.tugraz.at: that
+instance is covered by TU Graz's own terms and must not ask users to accept
+computor.at's. The script refuses to run unless `COMPUTOR_LEGAL_PROFILE=computor-at`
+is set. On the computor.at host, from the repository root:
+
+```bash
+# Preview, then apply (Keycloak URL and admin credentials come from .env)
+docker run --rm --network computor-network --env-file .env \
+  -e COMPUTOR_LEGAL_PROFILE=computor-at \
+  -v "$PWD/ops/keycloak:/kc:ro" python:3.13-slim \
+  python3 /kc/setup_terms.py --dry-run
+# ...same command without --dry-run to apply.
+```
+
+Existing accounts are not gated by a default action, and the script does not
+modify users: rewriting a user's `requiredActions` from a listing snapshot can
+drop an action added concurrently (e.g. a forced `UPDATE_PASSWORD`). To ask
+existing accounts once, do it only in a maintenance window with Keycloak
+logins blocked (no admin changes running in parallel), per user in the admin
+console (Users → user → Required user actions → add "Terms and Conditions"),
+which keeps the user's other required actions.
+
+After applying, verify on staging that the GitHub first-broker-login flow shows
+the terms page before any token is issued. For a new terms version, update
+`computor-at-terms.json` and the texts in `computor-web/content/legal/`, run the
+script, then re-ask existing users in a maintenance window as above.
 
 ## Notes
 

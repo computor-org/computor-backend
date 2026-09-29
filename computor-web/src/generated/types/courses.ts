@@ -1412,6 +1412,20 @@ export interface CoursePublicList {
   full?: boolean;
 }
 
+/**
+ * One row of the anonymous course catalog (GET /public/courses, issue #415).
+ * 
+ * Narrower than ``CoursePublicList``: this is read by visitors who are not
+ * signed in, so it carries no path, organization, or caller-relative data.
+ * ``id`` stays because it is what the register call takes after sign-in.
+ */
+export interface CoursePublicCatalogEntry {
+  id: string;
+  title?: string | null;
+  description?: string | null;
+  language_code?: string | null;
+}
+
 export interface CoursePublicQuery {
   skip?: number | null;
   limit?: number | null;

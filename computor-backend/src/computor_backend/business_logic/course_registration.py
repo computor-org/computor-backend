@@ -33,7 +33,11 @@ from computor_backend.exceptions import (
 from computor_backend.model.course import Course, CourseGroup, CourseMember
 from computor_backend.model.organization import Organization
 from computor_backend.permissions.principal import Principal
-from computor_types.courses import CoursePublicList, CoursePublicQuery
+from computor_types.courses import (
+    CoursePublicCatalogEntry,
+    CoursePublicList,
+    CoursePublicQuery,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +145,40 @@ def list_public_courses(
             )
         )
     return items, total
+
+
+# Upper bound for the anonymous catalog: it is a landing-page teaser, not a
+# search API, and an unauthenticated endpoint must stay cheap per request.
+ANONYMOUS_CATALOG_LIMIT = 200
+
+
+def list_anonymous_catalog(db: Session) -> list[CoursePublicCatalogEntry]:
+    """The catalog as shown to visitors who are not signed in (issue #415).
+
+    Same predicate as the signed-in catalog (public, course and organization
+    not archived) and additionally hides courses whose ``visible`` is False:
+    a lecturer who hid a course from students has not advertised it. No
+    membership lookup, so there is nothing caller-relative to leak.
+    """
+    rows = (
+        _catalog_query(db)
+        .filter(Course.visible.isnot(False))
+        .with_entities(Course.id, Course.title, Course.description, Course.language_code)
+        .order_by(Course.title.asc(), Course.id.asc())
+        .limit(ANONYMOUS_CATALOG_LIMIT)
+        .all()
+    )
+    # Explicit constructor, as in list_public_courses: a new Course column
+    # cannot reach anonymous visitors by accident.
+    return [
+        CoursePublicCatalogEntry(
+            id=str(course_id),
+            title=title,
+            description=description,
+            language_code=language_code,
+        )
+        for course_id, title, description, language_code in rows
+    ]
 
 
 def get_public_course_or_404(course_id: UUID | str, db: Session) -> Course:
