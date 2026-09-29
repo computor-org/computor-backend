@@ -45,8 +45,8 @@ def ensure_role(conn, role: str, password: str, database: str) -> list:
     """Reconcile the role to exactly the definition below, in ONE transaction.
 
     Runs on an open psycopg2 connection (autocommit off) as the app owner.
-    Returns warnings for the hardening steps the connecting user was not
-    allowed to perform (non-superuser owner on a managed Postgres).
+    Returns a list of warnings (currently always empty: every step is
+    mandatory and a failure raises).
 
     - CREATE/ALTER with fixed attributes and the password.
     - Every membership of the role is revoked (pg_read_all_data & co. could
@@ -57,6 +57,12 @@ def ensure_role(conn, role: str, password: str, database: str) -> list:
     - PUBLIC loses CREATE on schema public and TEMPORARY on the database (the
       app owner keeps both as owner; migrations run as the owner), and EXECUTE
       on the large-object *creation* functions (re-granted to the app owner).
+    - PUBLIC and the role lose CONNECT on every OTHER database of the cluster.
+      Equivalent at the connection layer (alternative for shared clusters):
+      pg_hba.conf ``host <appdb> <role> <net> scram-sha-256`` followed by
+      ``host all <role> all reject``.
+    - Any failure raises (the caller sets the role NOLOGIN via disable_login):
+      nothing is best-effort any more.
     - Then exactly: CONNECT, USAGE on public, SELECT (id,
       workspace_app_key_version) on "user"; default_transaction_read_only on.
 
@@ -102,14 +108,26 @@ def ensure_role(conn, role: str, password: str, database: str) -> list:
         cur.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC")
         cur.execute(sql.SQL("REVOKE TEMPORARY ON DATABASE {} FROM PUBLIC").format(db))
         for fn in _LO_CREATE_FUNCTIONS:
-            cur.execute("SAVEPOINT lo_acl")
-            try:
-                cur.execute(f"REVOKE EXECUTE ON FUNCTION pg_catalog.{fn} FROM PUBLIC")
-                cur.execute(f"GRANT EXECUTE ON FUNCTION pg_catalog.{fn} TO CURRENT_USER")
-                cur.execute("RELEASE SAVEPOINT lo_acl")
-            except Exception as e:  # not the function owner (managed Postgres)
-                cur.execute("ROLLBACK TO SAVEPOINT lo_acl")
-                warnings.append(f"could not revoke EXECUTE on {fn} from PUBLIC: {e}")
+            cur.execute(f"REVOKE EXECUTE ON FUNCTION pg_catalog.{fn} FROM PUBLIC")
+            cur.execute(f"GRANT EXECUTE ON FUNCTION pg_catalog.{fn} TO CURRENT_USER")
+
+        # The login is for the app database only: PUBLIC's default CONNECT on
+        # every other database of the cluster (postgres, template1, ...) would
+        # let it write large objects/temp data there. Superusers and database
+        # owners are unaffected.
+        cur.execute(
+            "SELECT datname FROM pg_database WHERE datallowconn AND datname <> %s",
+            (database,),
+        )
+        for (other,) in cur.fetchall():
+            cur.execute(
+                sql.SQL("REVOKE CONNECT ON DATABASE {} FROM PUBLIC").format(
+                    sql.Identifier(other)
+                )
+            )
+            cur.execute(
+                sql.SQL("REVOKE ALL ON DATABASE {} FROM {}").format(sql.Identifier(other), r)
+            )
 
         cur.execute(sql.SQL("GRANT CONNECT ON DATABASE {} TO {}").format(db, r))
         cur.execute(sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(r))
@@ -121,8 +139,88 @@ def ensure_role(conn, role: str, password: str, database: str) -> list:
                     r,
                 )
             )
+        _verify_postconditions(cur, role, database)
     conn.commit()
     return warnings
+
+
+def _verify_postconditions(cur, role: str, database: str) -> None:
+    """Re-check the result inside the same transaction. REVOKE by a user who
+    lacks the grant option only WARNS ("no privileges could be revoked"), so
+    success of the statements above proves nothing on a non-superuser owner."""
+    problems = []
+    cur.execute(
+        "SELECT count(*) FROM pg_auth_members m JOIN pg_roles u ON u.oid = m.member"
+        " WHERE u.rolname = %s",
+        (role,),
+    )
+    if cur.fetchone()[0]:
+        problems.append("still a member of other roles")
+    cur.execute(
+        "SELECT datname FROM pg_database WHERE datallowconn AND datname <> %s"
+        " AND has_database_privilege(%s, datname, 'CONNECT')",
+        (database, role),
+    )
+    others = [row[0] for row in cur.fetchall()]
+    if others:
+        problems.append(f"can connect to {', '.join(others)}")
+    cur.execute("SELECT has_database_privilege(%s, %s, 'TEMP')", (role, database))
+    if cur.fetchone()[0]:
+        problems.append("can create temporary tables")
+    cur.execute("SELECT has_schema_privilege(%s, 'public', 'CREATE')", (role,))
+    if cur.fetchone()[0]:
+        problems.append("can create in schema public")
+    for fn in _LO_CREATE_FUNCTIONS:
+        cur.execute("SELECT has_function_privilege(%s, %s, 'EXECUTE')", (role, f"pg_catalog.{fn}"))
+        if cur.fetchone()[0]:
+            problems.append(f"can execute {fn}")
+    allowed = {(t, c) for t, cols in READABLE_COLUMNS for c in cols}
+    cur.execute(
+        "SELECT c.relname, a.attname, p.priv FROM pg_class c"
+        " JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = 'public'"
+        " JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped"
+        " CROSS JOIN (VALUES ('SELECT'), ('INSERT'), ('UPDATE'), ('REFERENCES')) p(priv)"
+        " WHERE c.relkind IN ('r', 'v', 'm', 'p', 'f')"
+        " AND has_column_privilege(%s, c.oid, a.attnum, p.priv)",
+        (role,),
+    )
+    extra = sorted(
+        f"{t}.{c}:{p}" for t, c, p in cur.fetchall() if not (p == "SELECT" and (t, c) in allowed)
+    )
+    if extra:
+        problems.append("unexpected column privileges " + ", ".join(extra[:10]))
+    cur.execute(
+        "SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace"
+        " WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')"
+        " AND c.relkind IN ('r', 'p', 'S') AND (has_table_privilege(%s, c.oid, 'DELETE')"
+        " OR has_table_privilege(%s, c.oid, 'TRUNCATE'))",
+        (role, role),
+    )
+    writable = [row[0] for row in cur.fetchall()]
+    cur.execute(
+        "SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace"
+        " WHERE c.relkind = 'S' AND (has_sequence_privilege(%s, c.oid, 'USAGE')"
+        " OR has_sequence_privilege(%s, c.oid, 'UPDATE'))",
+        (role, role),
+    )
+    writable += [row[0] for row in cur.fetchall()]
+    if writable:
+        problems.append("can delete/truncate " + ", ".join(writable[:10]))
+    if problems:
+        raise RuntimeError(f"role '{role}' reconciliation incomplete: " + "; ".join(problems))
+
+
+def disable_login(conn, role: str) -> None:
+    """Fail closed: if reconciliation did not complete, the worker must not be
+    able to log in with whatever the role held before."""
+    from psycopg2 import sql
+
+    conn.rollback()
+    with conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (role,))
+        if cur.fetchone():
+            cur.execute(sql.SQL("ALTER ROLE {} NOLOGIN").format(sql.Identifier(role)))
+    conn.commit()
 
 
 def role_ready(conn, role: str) -> bool:
@@ -154,10 +252,13 @@ def main() -> int:
     try:
         warnings = ensure_role(conn, role, password, database)
     except Exception:
-        conn.rollback()
+        try:
+            disable_login(conn, role)
+            logger.error(f"Reconciliation failed; role '{role}' set NOLOGIN (fail closed).")
+        finally:
+            conn.close()
         raise
-    finally:
-        conn.close()
+    conn.close()
     for warning in warnings:
         logger.warning(f"WARNING: {warning}")
     logger.info(f"Coder worker DB role '{role}' ensured (SELECT on user.id, "

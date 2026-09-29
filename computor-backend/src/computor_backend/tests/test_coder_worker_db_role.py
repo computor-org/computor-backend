@@ -14,6 +14,8 @@ psycopg2 = pytest.importorskip("psycopg2")
 from psycopg2 import errors, sql  # noqa: E402
 
 from computor_backend.scripts.ensure_coder_worker_db_role import (  # noqa: E402
+    _verify_postconditions,
+    disable_login,
     ensure_role,
     role_ready,
 )
@@ -131,4 +133,81 @@ def test_password_rotation_and_app_owner_unaffected(env):
     with owner.cursor() as cur:  # owner still creates tables and large objects
         cur.execute("CREATE TABLE owner_ok (i int)")
         cur.execute("SELECT lo_create(0)")
+    owner.rollback()
+
+
+def test_login_is_confined_to_the_app_database(env):
+    _connect(env["db"], env["role"], PASSWORD).close()
+    for other in ("postgres", "template1"):
+        with pytest.raises(psycopg2.OperationalError, match="permission denied"):
+            _connect(other, env["role"], PASSWORD)
+
+
+def test_failed_reconciliation_fails_closed(env):
+    """A non-superuser owner cannot revoke CONNECT on 'postgres': the run must
+    raise and leave the role unable to log in."""
+    admin = _connect()
+    admin.autocommit = True
+    weak = f"rt_weak_{uuid.uuid4().hex[:6]}"
+    with admin.cursor() as cur:
+        cur.execute(sql.SQL("CREATE ROLE {} LOGIN CREATEROLE PASSWORD 'weak'").format(
+            sql.Identifier(weak)))
+        cur.execute(sql.SQL("ALTER DATABASE {} OWNER TO {}").format(
+            sql.Identifier(env["db"]), sql.Identifier(weak)))
+        cur.execute(sql.SQL("GRANT {} TO {} WITH ADMIN OPTION").format(
+            sql.Identifier(env["role"]), sql.Identifier(weak)))
+    conn = _connect(env["db"], weak, "weak")
+    try:
+        with pytest.raises((psycopg2.Error, RuntimeError)) as excinfo:
+            ensure_role(conn, env["role"], PASSWORD, env["db"])
+        print("reconciliation failed as expected:", excinfo.value)
+        disable_login(conn, env["role"])
+    finally:
+        conn.close()
+    assert not role_ready(env["owner"], env["role"])
+    env["owner"].rollback()
+    with pytest.raises(psycopg2.OperationalError):
+        _connect(env["db"], env["role"], PASSWORD)
+    with admin.cursor() as cur:
+        cur.execute(sql.SQL("ALTER DATABASE {} OWNER TO CURRENT_USER").format(
+            sql.Identifier(env["db"])))
+        cur.execute(sql.SQL("DROP OWNED BY {}").format(sql.Identifier(weak)))
+        cur.execute(sql.SQL("DROP ROLE {}").format(sql.Identifier(weak)))
+    admin.close()
+
+
+def test_stray_sequence_and_temp_grants_are_removed(env):
+    owner, role, db = env["owner"], env["role"], env["db"]
+    with owner.cursor() as cur:
+        cur.execute(sql.SQL("GRANT USAGE, UPDATE ON SEQUENCE api_token_id_seq TO {}").format(
+            sql.Identifier(role)))
+        cur.execute(sql.SQL("GRANT TEMP ON DATABASE {} TO {}").format(
+            sql.Identifier(db), sql.Identifier(role)))
+    owner.commit()
+    ensure_role(owner, role, PASSWORD, db)
+    conn = _worker(env)
+    with conn.cursor() as cur:
+        cur.execute("SET default_transaction_read_only = off")
+    _denied(conn, "SELECT nextval('api_token_id_seq')")
+    _denied(conn, "CREATE TEMP TABLE t (i int)")
+
+
+@pytest.mark.parametrize(
+    "grant, expected",
+    [
+        ("GRANT CONNECT ON DATABASE postgres TO {r}", "can connect to postgres"),
+        ("GRANT pg_read_all_data TO {r}", "member of other roles"),
+        ("GRANT CREATE ON SCHEMA public TO {r}", "schema public"),
+        ("GRANT EXECUTE ON FUNCTION pg_catalog.lo_create(oid) TO {r}", "lo_create"),
+        ('GRANT SELECT (email) ON "user" TO {r}', "user.email:SELECT"),
+        ("GRANT DELETE ON api_token TO {r}", "delete/truncate api_token"),
+    ],
+)
+def test_postcondition_check_catches_what_a_silent_revoke_would_leave(env, grant, expected):
+    """REVOKE without grant option only warns; the verifier is what fails closed."""
+    owner, role = env["owner"], env["role"]
+    with owner.cursor() as cur:
+        cur.execute(sql.SQL(grant.replace("{r}", "{}")).format(sql.Identifier(role)))
+        with pytest.raises(RuntimeError, match=expected):
+            _verify_postconditions(cur, role, env["db"])
     owner.rollback()
