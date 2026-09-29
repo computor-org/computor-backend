@@ -149,6 +149,10 @@ def test_no_keycloak_change_keeps_ordinary_rollback(tmp_path, tags, enabled):
     ("26.7.4", "26.7.4", "true", "none"),
     ("25.0.6", "26.7.4", "", "none"),
     ("", "26.7.4", "true", "none"),           # Keycloak newly added: nothing to protect
+    ("26.7.4", "25.0.6", "true", "downgrade"),
+    ("26.7.4", "26.7.3", "true", "downgrade"),
+    ("26.10.0", "26.9.1", "true", "downgrade"),  # version order, not string order
+    ("26.9.1", "26.10.0", "true", "guard"),
 ])
 def test_decision_table(from_tag, to_tag, enabled, expected):
     out = subprocess.run(["bash", "-c", f'source {UPDATE_SH}; keycloak_update_decision "$1" "$2" "$3"',
@@ -173,3 +177,13 @@ def test_verified_shutdown_precedes_dump(tmp_path, state):
     origin, deploy, a, b = _make_repos(tmp_path, "25.0.6", "26.7.4")
     p, calls = _run_update(tmp_path, origin, deploy, a, COMPLETE_DUMP, kc_state=state)
     assert calls.index("compose stop keycloak") < calls.index("docker ps -a") < calls.index("pg_dumpall")
+
+
+def test_keycloak_downgrade_is_refused_without_touching_anything(tmp_path):
+    origin, deploy, a, b = _make_repos(tmp_path, "26.7.4", "25.0.6")
+    p, calls = _run_update(tmp_path, origin, deploy, a, COMPLETE_DUMP)
+    assert p.returncode != 0
+    assert _git(deploy, "rev-parse", "HEAD") == a
+    assert "build " not in calls and "maintenance 1" not in calls
+    assert "pg_dumpall" not in calls and "compose up" not in calls
+    assert "Refusing automated Keycloak downgrade 26.7.4 -> 25.0.6" in calls

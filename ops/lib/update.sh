@@ -76,10 +76,14 @@ keycloak_image_tag_at() { # git-ref -> Keycloak image tag in that tree ("" if no
         | head -n 1
 }
 
-keycloak_update_decision() { # from-tag to-tag keycloak-enabled -> none|guard
+keycloak_update_decision() { # from-tag to-tag keycloak-enabled -> none|guard|downgrade
     local from="$1" to="$2" enabled="$3"
     if [ "$enabled" != "true" ] || [ -z "$from" ] || [ -z "$to" ] || [ "$from" = "$to" ]; then
         echo none
+    elif [ "$(printf '%s\n%s\n' "$from" "$to" | sort -V | tail -n 1)" = "$from" ]; then
+        # Target is older: the DB is (or may be) migrated past it. A dump taken now
+        # would be of the newer schema, so only a restore of a pre-upgrade dump is safe.
+        echo downgrade
     else
         echo guard
     fi
@@ -394,6 +398,9 @@ cmd_update_exec() {
     kc_from=$(keycloak_image_tag_at "$from_commit")
     kc_to=$(keycloak_image_tag_at "$to_commit")
     kc_decision=$(keycloak_update_decision "$kc_from" "$kc_to" "${KEYCLOAK_ENABLED:-}")
+    if [ "$kc_decision" = "downgrade" ]; then
+        fail_update "Refusing automated Keycloak downgrade ${kc_from} -> ${kc_to} (target ${to_commit}): Keycloak cannot run on a database migrated by a newer version. Nothing was changed. Restore a pre-upgrade dump of the Keycloak DB taken on ${kc_to} (see the updater's restore procedure / './computor.sh update recover prod'), then deploy ${to_commit} manually."
+    fi
     if [ "$kc_decision" = "guard" ]; then
         ulog "Keycloak image changes ${kc_from} -> ${kc_to}: a verified DB dump is taken before start; no automatic rollback after it"
         set_update_state keycloak_from "$kc_from" keycloak_to "$kc_to"
