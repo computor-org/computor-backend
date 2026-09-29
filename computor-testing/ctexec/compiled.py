@@ -16,7 +16,14 @@ from .base import BaseExecutor, ExecutorResult, sandbox_command_prefix
 from .environment import get_safe_env, filter_env
 from .exceptions import CompilationError, ExecutionError, ExecutionTimeoutError
 from .process import run_bounded
+from .safe_io import has_symlink_component
 from .resources import make_preexec_fn
+
+
+def _is_beneath(path: str, root: str) -> bool:
+    """Lexically beneath ``root`` (no resolution: Landlock resolves later)."""
+    rel = os.path.relpath(os.path.abspath(path), os.path.abspath(root))
+    return rel != os.pardir and not rel.startswith(os.pardir + os.sep)
 
 
 @dataclass
@@ -186,14 +193,31 @@ class CompiledExecutor(BaseExecutor):
 
         # The compiler digests student-controlled input (#include of any
         # path, macro/template bombs), so it runs under the same sandbox as
-        # the program: working dir and build dir writable, the named sources
-        # and -I dirs readable, nothing else (no reference cache, no network).
+        # the program: working dir and build dir writable, nothing else (no
+        # reference cache, no network). Sources and -I dirs inside the working
+        # dir need no grant; one outside it (a harness-provided test driver) is
+        # granted individually, and only if no component of it is a symlink —
+        # Landlock follows symlinks when a rule is created, so a symlinked
+        # path would grant an otherwise excluded target.
         include_dirs = [f[2:] for f in actual_flags
                         if f.startswith("-I") and len(f) > 2]
+        extra_ro = []
+        for path in resolved + include_dirs:
+            if _is_beneath(path, self.working_dir):
+                continue
+            if has_symlink_component(path):
+                self.last_compilation = CompilationResult(
+                    success=False,
+                    stderr=f"Refusing symlinked build input outside the "
+                           f"working directory: {path}",
+                    return_code=-1,
+                )
+                return self.last_compilation
+            extra_ro.append(path)
         prefix = sandbox_command_prefix(
             self.working_dir,
             rw_paths=[self.temp_dir],
-            ro_paths=resolved + include_dirs,
+            ro_paths=extra_ro,
         )
         env = None
         if prefix:

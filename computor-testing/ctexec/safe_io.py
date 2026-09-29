@@ -47,6 +47,26 @@ def report_limit() -> int:
     return _limit(REPORT_LIMIT_ENV, DEFAULT_REPORT_LIMIT)
 
 
+def has_symlink_component(path) -> bool:
+    """True if any component of the absolute ``path`` is a symlink.
+
+    Used before granting a harness-provided path to the sandbox: Landlock
+    rules follow symlinks when they are created, so a symlinked path would
+    grant its (possibly excluded) target.
+    """
+    current = os.sep
+    for part in os.path.abspath(path).split(os.sep):
+        if not part:
+            continue
+        current = os.path.join(current, part)
+        try:
+            if stat.S_ISLNK(os.lstat(current).st_mode):
+                return True
+        except FileNotFoundError:
+            return False
+    return False
+
+
 def _open_beneath(root, path, leaf_flags: int) -> int:
     """Open ``path`` beneath the trusted directory ``root``, following no
     symlink in any component below it.

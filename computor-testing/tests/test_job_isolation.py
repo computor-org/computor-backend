@@ -501,3 +501,38 @@ def test_symlinked_directory_in_student_path_is_refused(tmp_path):
         read_untrusted_text(str(student / ".." / "reference" / "solution.py"),
                             root=str(student))
     assert read_untrusted_text(str(student / "ok.py"), root=str(student)) == "x = 1"
+
+
+# --- 10. compile grants never follow symlinks -------------------------------
+
+def test_symlinked_source_in_workdir_grants_nothing(tmp_path, sandboxed):
+    secret = tmp_path / "reference_solution.c"
+    secret.write_text("TOPSECRET_REFERENCE_LINE\n")
+    executor = _c_executor(tmp_path, "int main(void) { return 0; }\n")
+    (tmp_path / "work" / "main.c").unlink()
+    (tmp_path / "work" / "main.c").symlink_to(secret)
+    compiled = executor.compile(["main.c"])
+    assert not compiled.success
+    assert "TOPSECRET" not in compiled.stderr + compiled.stdout
+
+
+def test_symlinked_build_input_outside_workdir_is_refused(tmp_path, sandboxed):
+    reference = tmp_path / "reference"
+    reference.mkdir()
+    (reference / "driver.c").write_text("int main(void) { return 0; }\n")
+    (tmp_path / "drivers").symlink_to(reference)   # symlinked directory
+    executor = _c_executor(tmp_path, "int helper(void) { return 1; }\n")
+    compiled = executor.compile(["main.c", str(tmp_path / "drivers" / "driver.c")])
+    assert not compiled.success
+    assert "symlinked" in compiled.stderr
+
+
+def test_real_build_input_outside_workdir_is_granted(tmp_path, sandboxed):
+    drivers = tmp_path / "drivers"
+    drivers.mkdir()
+    (drivers / "driver.c").write_text(
+        "int helper(void);\nint main(void) { return helper() - 1; }\n")
+    executor = _c_executor(tmp_path, "int helper(void) { return 1; }\n")
+    compiled = executor.compile(["main.c", str(drivers / "driver.c")])
+    assert compiled.success, compiled.stderr
+    assert executor.run().return_code == 0
