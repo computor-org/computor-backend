@@ -337,3 +337,41 @@ def test_old_landlock_fails_closed(monkeypatch):
     monkeypatch.setattr(launch, "_landlock_abi", lambda: 3)
     with pytest.raises(OSError, match="cannot restrict TCP"):
         launch.apply_landlock([], [], allow_net=False)
+
+
+# --- 5. compile step under the sandbox --------------------------------------
+
+def _c_executor(tmp_path, source):
+    import shutil
+    if not shutil.which("gcc"):
+        pytest.skip("gcc not installed")
+    from testers.executors.c import CExecutor
+    work = tmp_path / "work"
+    work.mkdir(exist_ok=True)
+    (work / "main.c").write_text(textwrap.dedent(source))
+    return CExecutor(working_dir=str(work))
+
+
+def test_sandboxed_c_compile_and_run(tmp_path, sandboxed):
+    executor = _c_executor(tmp_path, """
+        #include <stdio.h>
+        int main(void) { int x; if (scanf("%d", &x) != 1) return 3;
+                         printf("got %d\\n", 2 * x); return 0; }
+    """)
+    assert executor.compile(["main.c"]).success
+    result = executor.run(stdin="21")
+    assert result.return_code == 0, result.stderr
+    assert result.stdout == "got 42\n"
+
+
+def test_compiler_cannot_include_worker_files(tmp_path, sandboxed):
+    secret = tmp_path / "reference_solution.c"
+    secret.write_text("TOPSECRET_REFERENCE_LINE\n")
+    executor = _c_executor(tmp_path, f"""
+        #include "{secret}"
+        int main(void) {{ return 0; }}
+    """)
+    compiled = executor.compile(["main.c"])
+    assert not compiled.success
+    assert "TOPSECRET" not in compiled.stderr + compiled.stdout
+    assert "Permission denied" in compiled.stderr

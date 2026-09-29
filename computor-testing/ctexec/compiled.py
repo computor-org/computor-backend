@@ -184,6 +184,23 @@ class CompiledExecutor(BaseExecutor):
         if linker_flags:
             cmd.extend(linker_flags)
 
+        # The compiler digests student-controlled input (#include of any
+        # path, macro/template bombs), so it runs under the same sandbox as
+        # the program: working dir and build dir writable, the named sources
+        # and -I dirs readable, nothing else (no reference cache, no network).
+        include_dirs = [f[2:] for f in actual_flags
+                        if f.startswith("-I") and len(f) > 2]
+        prefix = sandbox_command_prefix(
+            self.working_dir,
+            rw_paths=[self.temp_dir],
+            ro_paths=resolved + include_dirs,
+        )
+        env = None
+        if prefix:
+            env = self._get_env()
+            env["TMPDIR"] = self.temp_dir  # compiler scratch files
+        cmd = prefix + cmd
+
         # Run compilation
         try:
             # The compiler digests untrusted source (template/macro bombs), so
@@ -191,6 +208,7 @@ class CompiledExecutor(BaseExecutor):
             result = run_bounded(
                 cmd,
                 cwd=self.working_dir,
+                env=env,
                 timeout=self.compile_timeout,
                 preexec_fn=make_preexec_fn(self.resource_limits),
             )
@@ -257,7 +275,11 @@ class CompiledExecutor(BaseExecutor):
 
         # Sandbox the student binary when the worker enables it: its own
         # working dir stays read/write, the reference cache is bound nowhere.
-        cmd = sandbox_command_prefix(self.working_dir) + [self.executable_path]
+        # The binary lives in the private build dir: readable/executable, not
+        # writable, and the only extra path bound besides the working dir.
+        cmd = sandbox_command_prefix(
+            self.working_dir, ro_paths=[self.temp_dir]
+        ) + [self.executable_path]
         if args:
             cmd.extend(args)
 
