@@ -273,7 +273,7 @@ async def accept_invite(
     invite issued for exactly this email, a row that has never signed in,
     holds no staff role, and is neither banned nor archived; the row itself
     is left untouched. Existing Keycloak credentials are never reset, and a
-    Keycloak user created here is removed again if the user insert fails.
+    Keycloak user created here is never deleted again by this path.
 
     Database work runs in the threadpool, and no transaction is open while
     Keycloak is called (see the phases below).
@@ -292,8 +292,8 @@ async def accept_invite(
     #   1. check + spend the invite, COMMIT;
     #   2. create the Keycloak login (no transaction open);
     #   3. re-check under the locks + insert/adopt, COMMIT.
-    # A failure after 1 refunds the invite; a failure in 3 also deletes the
-    # Keycloak user created in 2.
+    # A failure after 1 refunds the invite; the Keycloak user created in 2
+    # is kept (see the handler below).
 
     def _admit():
         invite = _resolve_token(token, db)
@@ -410,10 +410,17 @@ async def accept_invite(
     try:
         user_id = await _in_transaction(_finish)
     except BaseException:
-        # Remove the Keycloak login THIS request created, so no credential
-        # survives for an address the user row does not own, and give the
-        # invite back.
-        await _delete_created_keycloak_user(kc_user_id)
+        # Give the invite back. The Keycloak login created above is left in
+        # place on purpose: by now its owner may have verified the address and
+        # completed an SSO login that linked it (which is exactly why the final
+        # check can fail), and deleting it would destroy a live account — a
+        # lookup first would still race. It is unverified until its mailbox
+        # owner confirms it, so it grants nothing; orphans are cleaned up
+        # deliberately, not here.
+        logger.warning(
+            f"Invite acceptance failed after creating Keycloak user {kc_user_id}; "
+            "left in place"
+        )
         await _refund()
         raise
 
@@ -510,19 +517,6 @@ def _user_owning_email(email: str, db: Session) -> Optional[User]:
     if owners:
         return db.query(User).filter(User.id == next(iter(owners))).first()
     return None
-
-
-async def _delete_created_keycloak_user(kc_user_id: Optional[str]) -> None:
-    """Best-effort removal of a Keycloak user created by this very request."""
-    if not kc_user_id:
-        return
-    from computor_backend.auth.keycloak_admin import KeycloakAdminClient
-
-    try:
-        await KeycloakAdminClient().delete_user(kc_user_id)
-        logger.info(f"Removed Keycloak user {kc_user_id} after a failed invite acceptance")
-    except Exception as exc:  # noqa: BLE001 - the original error matters more
-        logger.error(f"Could not remove Keycloak user {kc_user_id}: {exc}")
 
 
 def _creator_is_admin(invite: InviteLink, db: Session) -> bool:

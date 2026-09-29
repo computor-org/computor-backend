@@ -838,7 +838,9 @@ def test_password_invites_never_create_verified_logins(env, recording_kc):
     assert created.requiredActions == ["VERIFY_EMAIL"]
 
 
-def test_failed_user_insert_removes_only_the_keycloak_user_it_created(env, recording_kc, monkeypatch):
+def test_failed_user_insert_refunds_the_invite_and_deletes_no_keycloak_user(
+    env, recording_kc, monkeypatch
+):
     import computor_backend.api.invites as invites_api
     from computor_types.invites import InviteAccept
 
@@ -854,9 +856,50 @@ def test_failed_user_insert_removes_only_the_keycloak_user_it_created(env, recor
             email=f"rollback.{env.suffix}@test.local", password="x",
             given_name="R", family_name="B"), s))
     s.close()
-    assert recording_kc.deleted == ["kc-created-1"]
+    assert recording_kc.deleted == []
     assert env.user("rollback") is None
     assert env.invite(token).use_count == 0
+
+
+def test_sso_linking_while_acceptance_awaits_keycloak_keeps_the_linked_account(
+    env, recording_kc, monkeypatch
+):
+    """Reviewer repro r4: the pre-provisioned owner verifies and completes SSO
+    while password acceptance is still awaiting Keycloak's create response.
+    The final check then refuses (the row now has login evidence) — and the
+    old cleanup deleted the Keycloak subject that SSO had just linked."""
+    from computor_backend.api.invites import accept_invite
+    from computor_backend.exceptions import BadRequestException
+    from computor_types.invites import InviteAccept
+
+    env.settings(registration_mode="open")
+    email = f"interleave.{env.suffix}@test.local"
+    env.make_user("interleave")
+    token = env.make_invite(email=email)
+    real_create = recording_kc.create_user
+
+    async def _create_then_owner_signs_in(self, user):
+        kc_id = await real_create(self, user)
+        # The owner verifies the address and signs in via SSO right now
+        # (its own thread and event loop, like a second request).
+        box = {}
+        t = threading.Thread(target=lambda: box.update(r=env.login("interleave", verified=True)))
+        t.start()
+        t.join(timeout=20)
+        assert isinstance(box.get("r"), dict), box
+        return kc_id
+
+    monkeypatch.setattr(recording_kc, "create_user", _create_then_owner_signs_in)
+    s = env.Session()
+    with pytest.raises(BadRequestException):
+        asyncio.run(accept_invite(token, InviteAccept(
+            email=email, password="x", given_name="I", family_name="L"), s))
+    s.close()
+    assert recording_kc.deleted == []
+    assert env.invite(token).use_count == 0
+    again = env.login("interleave", verified=True)
+    assert isinstance(again, dict) and again["is_new_user"] is False
+
 
 
 @pytest.mark.parametrize("admin_action", ["limits", "revoke"])
