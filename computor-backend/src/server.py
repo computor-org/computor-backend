@@ -3,6 +3,7 @@ import logging
 import sys
 import uvicorn
 from computor_backend.settings import settings
+from computor_backend.utils.log_redaction import RedactQueryCredentialsFilter
 
 
 class ColoredFormatter(logging.Formatter):
@@ -78,6 +79,10 @@ def setup_logging():
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     handler.setFormatter(formatter)
+    # Request targets carry SSO codes and tokens in their query (HTTP lines on
+    # uvicorn.access, WebSocket handshakes on uvicorn.error): redact them on the
+    # handler so every logger routed through it is covered.
+    handler.addFilter(RedactQueryCredentialsFilter())
 
     # Set handler to root logger
     root.addHandler(handler)
@@ -176,6 +181,10 @@ if __name__ == "__main__":
         "filters": {
             "suppress_ok": {
                 "()": SuppressSuccessfulRequests
+            },
+            # Request targets include the query string: redact SSO codes/tokens.
+            "redact_credentials": {
+                "()": RedactQueryCredentialsFilter
             }
         },
         "formatters": {
@@ -194,13 +203,15 @@ if __name__ == "__main__":
             "default": {
                 "class": "logging.StreamHandler",
                 "formatter": "colored",
-                "stream": "ext://sys.stdout"
+                "stream": "ext://sys.stdout",
+                # uvicorn.error logs WebSocket handshakes as "WebSocket /ws?token=...".
+                "filters": ["redact_credentials"]
             },
             "access": {
                 "class": "logging.StreamHandler",
                 "formatter": "access",
                 "stream": "ext://sys.stdout",
-                "filters": ["suppress_ok"]
+                "filters": ["suppress_ok", "redact_credentials"]
             }
         },
         "loggers": {

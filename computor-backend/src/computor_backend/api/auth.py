@@ -12,7 +12,7 @@ import os
 import re
 import secrets
 from typing import List, Optional
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlencode, urlparse, urlsplit
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.responses import RedirectResponse, JSONResponse
@@ -51,6 +51,81 @@ logger = logging.getLogger(__name__)
 # but NOT in dev where the app is plain http://localhost — a Secure cookie set
 # over http is silently dropped by the browser, breaking local login.
 _COOKIE_SECURE = settings.DEBUG_MODE == "production"
+
+# --- Post-login / post-logout redirect allowlist -------------------------------
+#
+# The SSO callback hands a fresh session to wherever the login was started for,
+# so the destination must be one of ours. Allowed:
+#   * a same-origin relative path ("/..." but not "//..." or "/\\...");
+#   * an absolute http(s) URL whose origin (scheme, host, port) is one of the
+#     deployment's public origins: PUBLIC_DOMAIN, WEB_APP_URL, NEXT_PUBLIC_API_URL
+#     and SSO_REDIRECT_ALLOWED_ORIGINS (plus http://localhost:3000 outside
+#     production, the dev web app);
+#   * for login only, the VS Code extension's RFC 8252 loopback receiver,
+#     http://127.0.0.1:<port>/... (the only target that still gets tokens in
+#     the query; everything else authenticates through the HttpOnly cookies).
+_REDIRECT_RELATIVE = "relative"
+_REDIRECT_ORIGIN = "origin"
+_REDIRECT_LOOPBACK = "loopback"
+_LOOPBACK_HOST = "127.0.0.1"
+_DEV_WEB_APP_ORIGIN = "http://localhost:3000"
+
+
+def _url_origin(url: str) -> Optional[str]:
+    """Normalized scheme://host:port of an http(s) URL without userinfo, else None."""
+    try:
+        parts = urlsplit(url)
+        port = parts.port
+    except ValueError:
+        return None
+    scheme = parts.scheme.lower()
+    if scheme not in ("http", "https") or not parts.hostname or "@" in parts.netloc:
+        return None
+    if port is None:
+        port = 443 if scheme == "https" else 80
+    return f"{scheme}://{parts.hostname.lower()}:{port}"
+
+
+def _allowed_redirect_origins() -> set:
+    from computor_backend.api.instance import _normalize_url
+    candidates = [settings.PUBLIC_DOMAIN, settings.WEB_APP_URL, _public_api_base()]
+    candidates += (getattr(settings, "SSO_REDIRECT_ALLOWED_ORIGINS", "") or "").split(",")
+    if settings.DEBUG_MODE != "production":
+        # Dev default: the web app runs on its own port (web.sh / the env
+        # template's layout) while NEXT_PUBLIC_API_URL is localhost:8000.
+        candidates.append(_DEV_WEB_APP_ORIGIN)
+    origins = set()
+    for candidate in candidates:
+        normalized = _normalize_url(candidate)
+        origin = _url_origin(normalized) if normalized else None
+        if origin:
+            origins.add(origin)
+    return origins
+
+
+def _classify_redirect_target(target) -> Optional[str]:
+    """Which allowlist entry ``target`` falls under, or None if it is not allowed."""
+    if not isinstance(target, str) or not target:
+        return None
+    # Backslashes are read as "/" by browsers ("/\\evil" == "//evil"); control
+    # characters and whitespace get stripped or split headers. Refuse both.
+    if "\\" in target or any(ord(c) <= 0x20 or ord(c) == 0x7F for c in target):
+        return None
+    if target.startswith("/"):
+        return None if target.startswith("//") else _REDIRECT_RELATIVE
+    origin = _url_origin(target)
+    if origin is None:
+        return None
+    parts = urlsplit(target)
+    if parts.scheme.lower() == "http" and parts.hostname == _LOOPBACK_HOST and parts.port:
+        return _REDIRECT_LOOPBACK
+    return _REDIRECT_ORIGIN if origin in _allowed_redirect_origins() else None
+
+
+def _default_post_login_redirect() -> str:
+    """Where a login lands when its stored destination is missing or not allowed."""
+    return f"{_web_app_base()}/auth/success"
+
 
 auth_router = APIRouter(prefix="/auth")
 
@@ -93,6 +168,11 @@ async def initiate_login(
     # Check if provider exists and is enabled
     if provider not in registry.get_enabled_plugins():
         raise NotFoundException(detail=f"Authentication provider not found or not enabled: {provider}")
+
+    # The callback sends a fresh session to this destination: only our own origins
+    # (and the extension's loopback receiver) qualify. See _classify_redirect_target.
+    if redirect_uri is not None and _classify_redirect_target(redirect_uri) is None:
+        raise BadRequestException(detail="redirect_uri is not an allowed sign-in destination")
 
     # An enabled provider is not necessarily usable: it may never have loaded, or
     # it loaded while its service was down and is still holding no OIDC config.
@@ -150,11 +230,27 @@ async def initiate_login(
         from computor_backend.exceptions import InternalServerException
         raise InternalServerException(detail=f"Failed to initiate login: {str(e)}") from e
 
+def _post_login_target(state_data: dict) -> tuple:
+    """Validated (destination, kind) for the callback's redirect.
+
+    Re-checked here, not only at initiation: state written before this check
+    existed, or by any other path into Redis, must not pick the destination.
+    """
+    target = state_data.get("redirect_uri")
+    kind = _classify_redirect_target(target)
+    if kind is None:
+        if target:
+            logger.warning("SSO callback: stored redirect target not allowed; using default")
+        target = _default_post_login_redirect()
+        kind = _classify_redirect_target(target) or _REDIRECT_RELATIVE
+    return target, kind
+
+
 @auth_router.get("/{provider}/callback", name="handle_callback")
 async def handle_callback(
     provider: str,
     code: str = Query(..., description="Authorization code"),
-    state: Optional[str] = Query(None, description="State parameter"),
+    state: str = Query(..., description="State parameter (required, single-use)"),
     request: Request = None,
     db: Session = Depends(get_db)
 ) -> RedirectResponse:
@@ -168,34 +264,34 @@ async def handle_callback(
 
     redis_client = await get_redis_client()
 
-    # Validate state parameter
-    state_data = {}
-    if state:
-        state_key = f"sso_state:{state}"
-        state_data_raw = await redis_client.get(state_key)
+    # The state is mandatory: it binds this callback to a login this backend
+    # started (CSRF / login fixation) and carries the validated destination.
+    if not state:
+        raise BadRequestException(detail="Missing state parameter")
 
-        if not state_data_raw:
-            # State expired or already consumed — e.g. a slow first-login
-            # required-action flow that outran the TTL, or a duplicate callback
-            # (the first one succeeded and deleted the single-use state). The auth
-            # cookies were typically already set by that first callback, so send
-            # the user to the app home instead of a raw 4xx: they land logged in,
-            # or the app bounces them to a fresh login. Avoids the scary error page.
-            logger.warning("SSO callback with missing/expired state — redirecting to app home")
-            from urllib.parse import urlparse
-            _api_base = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
-            _parsed = urlparse(_api_base) if _api_base else None
-            home = f"{_parsed.scheme}://{_parsed.netloc}/" if _parsed and _parsed.scheme and _parsed.netloc else "/"
-            return RedirectResponse(url=home, status_code=302)
+    # Read and consume in one step (GETDEL): with a separate GET and DELETE two
+    # callbacks racing on the same state (a replayed redirect) could both pass.
+    state_key = f"sso_state:{state}"
+    state_data_raw = await redis_client.getdel(state_key)
 
-        state_data = json.loads(state_data_raw)
+    if not state_data_raw:
+        # State expired or already consumed — e.g. a slow first-login
+        # required-action flow that outran the TTL, or a duplicate callback
+        # (the first one succeeded and consumed the single-use state). The auth
+        # cookies were typically already set by that first callback, so send
+        # the user to the app home instead of a raw 4xx: they land logged in,
+        # or the app bounces them to a fresh login. Avoids the scary error page.
+        logger.warning("SSO callback with missing/expired state — redirecting to app home")
+        _api_base = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
+        _parsed = urlparse(_api_base) if _api_base else None
+        home = f"{_parsed.scheme}://{_parsed.netloc}/" if _parsed and _parsed.scheme and _parsed.netloc else "/"
+        return RedirectResponse(url=home, status_code=302)
 
-        # Delete state to prevent replay attacks
-        await redis_client.delete(state_key)
+    state_data = json.loads(state_data_raw)
 
-        # Validate provider matches
-        if state_data["provider"] != provider:
-            raise BadRequestException(detail="Provider mismatch in state parameter")
+    # Validate provider matches
+    if state_data.get("provider") != provider:
+        raise BadRequestException(detail="Provider mismatch in state parameter")
 
     try:
         _api_base = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
@@ -214,17 +310,20 @@ async def handle_callback(
             db=db
         )
 
-        # Get redirect URI from state or use default
-        redirect_uri = state_data.get("redirect_uri", "/")
+        redirect_uri, redirect_kind = _post_login_target(state_data)
 
-        # Redirect with encoded response
         params = {
             "user_id": result["user_id"],
             "account_id": result["account_id"],
             "is_new_user": str(result["is_new_user"]).lower(),
-            "token": result["token"],
-            "refresh_token": result["refresh_token"]
         }
+        # Only the native-app loopback receiver needs the tokens in the URL; the
+        # web app and the coder-reauth hop authenticate via the HttpOnly cookies
+        # set below, so browser-visible URLs (history, Referer, access logs)
+        # never carry credentials.
+        if redirect_kind == _REDIRECT_LOOPBACK:
+            params["token"] = result["token"]
+            params["refresh_token"] = result["refresh_token"]
 
         if "?" in redirect_uri:
             redirect_url = f"{redirect_uri}&{urlencode(params)}"
@@ -260,7 +359,7 @@ async def handle_callback(
         # straight to Keycloak again and would loop the refusal forever).
         detail = getattr(e, "detail", None) or str(e)
         logger.info(f"Refused sign-in via {provider}: {detail}")
-        target = state_data.get("redirect_uri") or "/"
+        target, _ = _post_login_target(state_data)
         params = {"error": "sign_in_refused", "error_description": detail}
         sep = "&" if "?" in target else "?"
         return RedirectResponse(url=f"{target}{sep}{urlencode(params)}", status_code=302)
@@ -326,6 +425,14 @@ async def sso_logout(
     end_session_endpoint = None
     if plugin is not None and getattr(plugin, "_oidc_config", None):
         end_session_endpoint = plugin._oidc_config.get("end_session_endpoint")
+
+    # Same allowlist as login (minus the loopback receiver, which never logs out
+    # through here); anything else is dropped rather than failing the logout.
+    if post_logout_redirect_uri is not None and _classify_redirect_target(
+        post_logout_redirect_uri
+    ) not in (_REDIRECT_RELATIVE, _REDIRECT_ORIGIN):
+        logger.warning("SSO logout: post_logout_redirect_uri not allowed; ignoring it")
+        post_logout_redirect_uri = None
 
     target = post_logout_redirect_uri or "/"
     if end_session_endpoint:
@@ -557,6 +664,19 @@ async def refresh_token(
 _WORKSPACE_PATH = re.compile(r"^/coder/[A-Za-z0-9._~-]+/[A-Za-z0-9._~-]+(?:[/?][^\r\n]*)?$")
 
 
+# Owner and workspace segments of a /coder/{owner}/{workspace}[/...] path. Applied
+# to the path only (query and fragment stripped first) and restricted to Coder's
+# name alphabet, so nothing from a query string can end up in a logged segment.
+_CODER_WORKSPACE_SEGMENTS = re.compile(r"^/coder/([A-Za-z0-9._~-]+)/([A-Za-z0-9._~-]+)(?:/.*)?$")
+
+
+def _coder_workspace_segments(uri: str) -> Optional[tuple]:
+    """(owner, workspace) from a forwarded URI's path, or None if it is not one."""
+    path = uri.split("#", 1)[0].split("?", 1)[0]
+    match = _CODER_WORKSPACE_SEGMENTS.match(path)
+    return (match.group(1), match.group(2)) if match else None
+
+
 def _public_api_base() -> str:
     """Public base URL of this API; empty means same-origin relative URLs."""
     return os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
@@ -667,37 +787,30 @@ async def verify_coder_access(
             return RedirectResponse(url=reauth, status_code=302)
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
 
-    # Debug: Log all headers to understand the authentication flow
-    logger.info("=== ForwardAuth Debug ===")
-    logger.info(f"ForwardAuth request for: {original_uri}")
-    logger.info(f"Authenticated user: {principal.user_id}")
-    logger.info("Headers received:")
-    for header_name, header_value in request.headers.items():
-        # Mask sensitive values
-        if header_name.lower() in ["authorization", "cookie", "x-api-key"]:
-            logger.info(f"  {header_name}: {header_value[:20]}..." if len(header_value) > 20 else f"  {header_name}: ***")
-        else:
-            logger.info(f"  {header_name}: {header_value}")
-    logger.info("=========================")
+    # Extract owner + workspace from the URL *path* only: /coder/{owner}/{workspace}/...
+    # The forwarded URI can carry a query string with credentials (the SSO callback
+    # appends token/refresh_token to its redirect), so the raw URI is never logged
+    # and the query never leaks into the parsed segments. Regular users get a Coder
+    # username of u{backend_uuid}; the shared admin/service account keeps its plain
+    # username (e.g. "admin"). Accept any owner segment here and decide below.
+    segments = _coder_workspace_segments(original_uri)
 
-    # Extract owner + workspace from the URL path: /coder/{owner}/{workspace}/...
-    # Regular users get a Coder username of u{backend_uuid}; the shared admin/service
-    # account keeps its plain username (e.g. "admin"), which is not the u{uuid} form.
-    # Accept any owner segment here and decide authorization below.
-    pattern = r"/coder/([^/]+)/([^/]+)"
-    match = re.match(pattern, original_uri)
-
-    if not match:
-        logger.warning(f"Invalid Coder URL format: {original_uri}")
+    if segments is None:
+        logger.warning(
+            "Rejected ForwardAuth request from user %s: malformed workspace URL",
+            principal.user_id,
+        )
         return JSONResponse(
             status_code=403,
             content={"detail": "Invalid workspace URL format"}
         )
 
-    url_owner = match.group(1)  # e.g. "u0232de59-..." (regular user) or "admin"
-    workspace_name = match.group(2)
+    url_owner, workspace_name = segments  # owner e.g. "u0232de59-..." or "admin"
 
-    logger.debug(f"URL owner: {url_owner}, workspace: {workspace_name}")
+    logger.debug(
+        "ForwardAuth request for workspace %s/%s by user %s",
+        url_owner, workspace_name, principal.user_id,
+    )
 
     # Admins may access any workspace. This also covers the admin/service account,
     # whose Coder username is not the u{uuid} form and so would never match the
@@ -765,8 +878,8 @@ async def coder_reauth(
     3. Full SSO round-trip via /auth/{provider}/login with this URL (plus
        retried=true) as the redirect target. With a live IdP session this is
        silent; otherwise the user gets the login page and then lands back in
-       the workspace. The callback appends its usual token query params, which
-       are simply ignored here.
+       the workspace. The callback sets the session cookies; it does not put
+       tokens in this (non-loopback) redirect URL.
     """
     if not _WORKSPACE_PATH.match(next_path):
         raise BadRequestException(detail="next must be a /coder/{owner}/{workspace} path")
