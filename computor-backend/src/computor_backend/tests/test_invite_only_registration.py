@@ -696,8 +696,8 @@ def test_two_password_accepts_of_a_single_use_invite_admit_exactly_one(env, monk
     """Reviewer repro: both accepted and use_count stayed 1.
 
     The first accept is held inside Keycloak provisioning — after the invite
-    is spent, before commit. The second must wait on the invite row and then
-    be refused; exactly one user may exist afterwards.
+    is spent (and committed; no lock is held across the network call). The
+    second is refused without waiting; exactly one user exists afterwards.
     """
     from computor_backend.api.invites import accept_invite
     from computor_backend.exceptions import BadRequestException
@@ -733,8 +733,9 @@ def test_two_password_accepts_of_a_single_use_invite_admit_exactly_one(env, monk
         a.start()
         assert held.wait(timeout=10), "first accept never reached provisioning"
         b.start()
-        b.join(timeout=2)
-        assert b.is_alive(), "second accept must wait on the spent invite row"
+        b.join(timeout=5)
+        assert not b.is_alive(), "second accept must not wait on the first's network call"
+        assert isinstance(results["pwrace2"], BadRequestException), results["pwrace2"]
     finally:
         release.set()
         a.join(timeout=10)
@@ -856,3 +857,65 @@ def test_failed_user_insert_removes_only_the_keycloak_user_it_created(env, recor
     assert recording_kc.deleted == ["kc-created-1"]
     assert env.user("rollback") is None
     assert env.invite(token).use_count == 0
+
+
+@pytest.mark.parametrize("admin_action", ["limits", "revoke"])
+def test_admin_write_during_password_provisioning_does_not_stall_the_worker(
+    env, monkeypatch, admin_action
+):
+    """Reviewer repro r3: acceptance held DB locks across its Keycloak await
+    while PUT /system/limits (or revocation) waited on them synchronously on
+    the same event loop — the worker could never resume the lock holder.
+
+    One event loop, like the single production worker. A 2 s lock_timeout on
+    the admin session turns the former deadlock into a visible error.
+    """
+    from sqlalchemy import text
+
+    from computor_backend.api import invites as invites_api
+    from computor_backend.api import system_limits
+    from computor_backend.permissions.principal import Principal
+    from computor_types.invites import InviteAccept
+    from computor_types.system_limits import InstanceLimitsUpdate
+
+    env.settings(registration_mode="invite_only")
+    admin_id = env.make_user("operator", role="_admin")
+    email = f"concurrent.{env.suffix}@test.local"
+    token = env.make_invite(email=email)
+    invite_id = env.invite(token).id
+    db, admin_db = env.Session(), env.Session()
+    admin_db.execute(text("SET lock_timeout = '2s'"))
+
+    async def _response(*args):
+        return {}
+
+    monkeypatch.setattr(system_limits, "_limits_response", _response)
+
+    async def scenario():
+        entered = asyncio.Event()
+
+        async def provision(**kwargs):
+            entered.set()
+            await asyncio.sleep(0.05)
+            return "fake-kc-user", True
+
+        monkeypatch.setattr(auth_mod, "provision_keycloak_login", provision)
+        accepting = asyncio.create_task(invites_api.accept_invite(token, InviteAccept(
+            given_name="C", family_name="P", email=email, password="x"), db))
+        await asyncio.wait_for(entered.wait(), timeout=5)
+        principal = Principal(user_id=admin_id, is_admin=True)
+        if admin_action == "limits":
+            await system_limits.update_instance_limits(
+                InstanceLimitsUpdate(registration_mode="invite_only", max_registered_users=None),
+                principal, admin_db, None)
+        else:
+            await invites_api.revoke_invite(invite_id, principal, admin_db)
+        return await asyncio.wait_for(accepting, timeout=5)
+
+    try:
+        result = asyncio.run(asyncio.wait_for(scenario(), timeout=20))
+        assert result["user_id"]
+        assert env.user("concurrent") is not None
+    finally:
+        db.close()
+        admin_db.close()

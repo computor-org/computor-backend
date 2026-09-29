@@ -178,6 +178,16 @@ def consume_invite(db: Session, code: str, email: Optional[str]) -> Optional[Tup
     return str(row[0]), (str(row[1]) if row[1] is not None else None)
 
 
+def refund_invite(db: Session, invite_id: str) -> None:
+    """Give back one use spent by ``consume_invite`` whose admission failed."""
+    db.execute(
+        update(InviteLink)
+        .where(InviteLink.id == invite_id, InviteLink.use_count > 0)
+        .values(use_count=InviteLink.use_count - 1)
+        .execution_options(synchronize_session=False)
+    )
+
+
 def admit_new_user(
     db: Session,
     *,

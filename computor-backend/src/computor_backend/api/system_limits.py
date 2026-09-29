@@ -18,6 +18,7 @@ import logging
 from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from computor_backend.business_logic.instance_limits import (
@@ -99,6 +100,23 @@ async def update_instance_limits(
             detail="Only administrators may change the instance limits.",
         )
 
+    # The whole transaction runs in the threadpool: waiting on the
+    # instance_settings row lock (held by a concurrent admission) must not
+    # block the event loop that admission needs in order to finish.
+    def _write():
+        try:
+            return _write_limits(request, permissions, db)
+        except BaseException:
+            db.rollback()
+            raise
+
+    row = await run_in_threadpool(_write)
+    return await _limits_response(row, db, client)
+
+
+def _write_limits(
+    request: InstanceLimitsUpdate, permissions: Principal, db: Session
+) -> InstanceSettings:
     row = instance_settings_row(db)
     if row is None:
         row = InstanceSettings(singleton=1, created_by=permissions.user_id)
@@ -120,8 +138,7 @@ async def update_instance_limits(
     row.updated_by = permissions.user_id
     db.commit()
     db.refresh(row)
-
-    return await _limits_response(row, db, client)
+    return row
 
 
 def _validated_course_ids(course_ids: List[str], db: Session) -> List[str]:
