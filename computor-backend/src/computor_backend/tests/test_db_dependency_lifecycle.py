@@ -51,9 +51,7 @@ def _app(engine, scope):
     ran = {"task": False, "checked_out_while_streaming": None}
 
     @app.post("/conflict")
-    def conflict(
-        tasks: BackgroundTasks, db=Depends(get_db, scope=scope)
-    ):
+    def conflict(tasks: BackgroundTasks, db=Depends(get_db, scope=scope)):
         db.add(Row(id=1))  # duplicate PK: fails only at the deferred commit
         tasks.add_task(lambda: ran.__setitem__("task", True))
         return {"ok": True}
