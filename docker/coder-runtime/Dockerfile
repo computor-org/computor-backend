@@ -11,7 +11,7 @@
 #
 # python:3.10-slim base (same as computor-base) so the copied CPython-3.10
 # computor env is ABI-compatible.
-FROM python:3.10-slim
+FROM python:3.10-slim@sha256:31dd4d9529d02d7436659061cb7564cd4733fc90e5e152709a942d53382ec8d0
 
 # git: the task registry imports EVERY task module on every worker, and
 # git_ops imports GitPython, which refuses to import without a git binary —
