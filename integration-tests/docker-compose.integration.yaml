@@ -128,15 +128,21 @@ services:
     entrypoint: ["sh", "-c"]
     command:
       - |
-        if [ "$$(stat -c %u:%g /data)" != 65532:65532 ]; then
-          for p in /data/* /data/.[!.]*; do
-            [ -e "$$p" ] && chown -R 65532:65532 "$$p"
-          done
-          chown 65532:65532 /data
-          echo "minio-init: /data chowned to 65532:65532"
-        else
+        set -eu
+        if [ "$$(stat -c %u:%g /data)" = 65532:65532 ]; then
           echo "minio-init: /data ownership ok"
+          exit 0
         fi
+        for p in /data/* /data/.[!.]* /data/..?*; do
+          [ -e "$$p" ] || [ -L "$$p" ] || continue
+          if ! chown -R 65532:65532 "$$p"; then
+            echo "minio-init: chown failed for $$p; /data left unmarked" >&2
+            exit 1
+          fi
+        done
+        # The parent is the "done" marker: only after every child succeeded.
+        chown 65532:65532 /data
+        echo "minio-init: /data chowned to 65532:65532"
     volumes:
       - minio-data:/data
     restart: "no"
