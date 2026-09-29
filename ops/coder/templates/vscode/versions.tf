@@ -8,6 +8,13 @@ terraform {
       source  = "kreuzwerker/docker"
       version = "4.6.0"
     }
+    # Only so Terraform can plan the removal of the resources the retired
+    # registry.coder.com jetbrains module left in existing workspaces' state
+    # (it used hashicorp/http). Nothing in this template uses it.
+    http = {
+      source  = "hashicorp/http"
+      version = "3.6.1"
+    }
   }
 }
 
