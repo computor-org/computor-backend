@@ -178,3 +178,69 @@ def test_response_is_cached_and_marked_cacheable(world, client):
     public_catalog.clear_public_catalog_cache()
     third = client.get("/public/courses")
     assert len(_ours(third, world["suffix"])) == 2
+
+
+# --- Cache freshness and refresh coalescing (PR #244 review, finding 4) ------
+# DB-free: the query is replaced by a counting fake, so these always run.
+
+
+def _entry(title):
+    from computor_types.courses import CoursePublicCatalogEntry
+
+    return CoursePublicCatalogEntry(id=str(uuid.uuid4()), title=title)
+
+
+@pytest.fixture
+def fake_catalog(monkeypatch):
+    state = {"calls": 0, "rows": [_entry("A")], "delay": 0.0}
+
+    def _list(db):
+        state["calls"] += 1
+        if state["delay"]:
+            import time
+
+            time.sleep(state["delay"])
+        return list(state["rows"])
+
+    clock = {"now": 1000.0}
+    monkeypatch.setattr(public_catalog, "list_anonymous_catalog", _list)
+    monkeypatch.setattr(public_catalog, "_clock", lambda: clock["now"])
+    public_catalog.clear_public_catalog_cache()
+    yield state, clock
+    public_catalog.clear_public_catalog_cache()
+
+
+def _call():
+    from fastapi import Response
+
+    response = Response()
+    items = public_catalog.list_public_catalog(response, db=None)
+    return [i.title for i in items], response.headers["cache-control"]
+
+
+def test_downstream_max_age_never_outlives_the_server_snapshot(fake_catalog):
+    state, clock = fake_catalog
+
+    assert _call() == (["A"], "public, max-age=60")      # t=0: fresh snapshot
+    state["rows"] = [_entry("B")]                         # t=1: course set changes
+    clock["now"] += 59
+    titles, header = _call()                              # t=59: stale-but-valid
+    assert titles == ["A"]
+    assert header == "public, max-age=1"                  # expires with the snapshot
+    clock["now"] += 0.5
+    assert _call()[1] == "public, max-age=0"
+    clock["now"] += 0.5                                   # t=60: refreshed
+    assert _call() == (["B"], "public, max-age=60")
+    assert state["calls"] == 2
+
+
+def test_concurrent_cold_requests_share_one_query(fake_catalog):
+    from concurrent.futures import ThreadPoolExecutor
+
+    state, _ = fake_catalog
+    state["delay"] = 0.2
+    with ThreadPoolExecutor(max_workers=20) as pool:
+        results = list(pool.map(lambda _: _call(), range(20)))
+
+    assert state["calls"] == 1
+    assert all(titles == ["A"] for titles, _ in results)
