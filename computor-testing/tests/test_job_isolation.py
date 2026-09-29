@@ -728,3 +728,54 @@ def test_job_dies_with_its_harness(tmp_path, sandboxed):
     while alive(escaped) and time.monotonic() < deadline:
         time.sleep(0.05)
     assert not alive(escaped)
+
+
+# --- 16. R/Julia structural checks read student files safely ---------------
+
+@pytest.mark.parametrize("language", ["r", "julia"])
+@pytest.mark.parametrize("plant", ["symlink", "fifo", "huge", "dir_symlink"])
+def test_structural_check_refuses_planted_files(tmp_path, no_hang, language, plant):
+    from types import SimpleNamespace
+    import importlib
+    module = importlib.import_module(f"testers.tests.{language}.test_class")
+    cls = next(v for k, v in vars(module).items()
+               if k.startswith("TestComputor") and isinstance(v, type))
+    ext = {"r": "R", "julia": "jl"}[language]
+    secret_dir = tmp_path / "reference"
+    secret_dir.mkdir()
+    (secret_dir / f"solution.{ext}").write_text("TOPSECRET TOPSECRET")
+    student = tmp_path / "student"
+    student.mkdir()
+    target = student / f"solution.{ext}"
+    file = target.name
+    if plant == "symlink":
+        target.symlink_to(secret_dir / f"solution.{ext}")
+    elif plant == "fifo":
+        os.mkfifo(target)
+    elif plant == "huge":
+        with open(target, "wb") as f:
+            f.truncate(1 << 30)
+    else:
+        (student / "src").symlink_to(secret_dir)
+        file = f"src/solution.{ext}"
+    sub = SimpleNamespace(name="TOPSECRET", pattern=None,
+                          allowedOccuranceRange=None, countRequirement=2)
+    with pytest.raises(pytest.fail.Exception, match="rejected"):
+        cls()._test_structural({"sub": sub, "file": file,
+                                "dir_student": str(student)})
+
+
+@pytest.mark.parametrize("language", ["r", "julia"])
+def test_structural_check_still_counts_regular_files(tmp_path, language):
+    from types import SimpleNamespace
+    import importlib
+    module = importlib.import_module(f"testers.tests.{language}.test_class")
+    cls = next(v for k, v in vars(module).items()
+               if k.startswith("TestComputor") and isinstance(v, type))
+    student = tmp_path / "student"
+    student.mkdir()
+    (student / "solution.txt").write_text("for for for")
+    sub = SimpleNamespace(name="for", pattern=None,
+                          allowedOccuranceRange=None, countRequirement=3)
+    cls()._test_structural({"sub": sub, "file": "solution.txt",
+                            "dir_student": str(student)})
