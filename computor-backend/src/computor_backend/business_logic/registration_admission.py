@@ -55,7 +55,7 @@ _MESSAGES = {
     "Open the invite link you were given and sign in from there.",
     REASON_INVITE_INVALID: "This invite link is invalid, already used, or expired.",
     REASON_EMAIL_UNVERIFIED: "Please verify your email address first, "
-    "then open your invite link again.",
+    "then sign in again (from your invite link, if you have one).",
 }
 
 
@@ -175,6 +175,8 @@ def admit_new_user(
         return None
     row = lock_instance_settings(db)
     mode = row.registration_mode if row is not None else "open"
+    # handle_sso_callback already refuses an unverified email in every mode
+    # before getting here; this still covers identities that carry no email.
     if mode != "open" and not email_verified:
         raise RegistrationRefused(REASON_EMAIL_UNVERIFIED)
     check_registration_capacity(db)

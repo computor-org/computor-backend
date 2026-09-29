@@ -137,7 +137,7 @@ async def test_unverified_email_is_not_linked_to_an_existing_user(db, login_as):
         await login_as(db, email=victim.email.upper(), email_verified=False)
 
     assert err.value.status_code == 403
-    assert "not verified" in str(err.value.detail)
+    assert "verify your email address first" in str(err.value.detail)
     assert _accounts_of(db, victim) == 0
 
 
@@ -168,7 +168,7 @@ async def test_unverified_email_cannot_create_a_user_either(db, login_as):
     with pytest.raises(ForbiddenException) as err:
         await login_as(db, email=email, email_verified=False)
 
-    assert "Verify your email address first" in str(err.value.detail)
+    assert "verify your email address first" in str(err.value.detail)
     assert db.query(User).filter(User.email == email).count() == 0
 
 

@@ -371,13 +371,22 @@ def test_keycloak_administrators_are_admitted_without_code_when_full(env):
     assert env.user("kcadmin") is not None
 
 
-def test_open_mode_is_unchanged_without_settings_or_verification(env):
+def test_open_mode_is_unchanged_without_settings(env):
     env.no_settings()
-    result = env.login("oldstyle", verified=False)
+    result = env.login("oldstyle", verified=True)
     assert not isinstance(result, RegistrationRefused), result
     assert env.user("oldstyle") is not None
     env.settings(registration_mode="open")
-    assert not isinstance(env.login("oldstyle2", verified=False), RegistrationRefused)
+    assert not isinstance(env.login("oldstyle2", verified=True), RegistrationRefused)
+
+
+def test_open_mode_still_refuses_an_unverified_email(env):
+    """An unverified address must never become a user's email (PR #242)."""
+    env.settings(registration_mode="open")
+    result = env.login("openunverified", verified=False)
+    assert isinstance(result, RegistrationRefused) and result.reason == "email_unverified"
+    assert env.user("openunverified") is None
+    assert env.kc_deleted == []
 
 
 # ---------------------------------------------------------------------------

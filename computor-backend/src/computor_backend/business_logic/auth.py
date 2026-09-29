@@ -32,6 +32,7 @@ from computor_backend.plugins.registry import get_plugin_registry
 from computor_backend.plugins import AuthStatus
 from computor_backend.auth.keycloak_admin import KeycloakAdminClient, KeycloakUser
 from computor_backend.business_logic.registration_admission import (
+    REASON_EMAIL_UNVERIFIED,
     RegistrationRefused,
     admit_new_user,
     enroll_in_pilot_courses,
@@ -514,19 +515,11 @@ async def handle_sso_callback(
             # email enrols them in the real owner's place. Refuse rather than
             # create a user without the email: that would silently fork the
             # person's identity. An identity without any email is unaffected.
-            if normalized_email and (user_info.attributes or {}).get(
-                "email_verified"
-            ) is not True:
-                raise ForbiddenException(
-                    detail=(
-                        "Verify your email address first. Your identity provider "
-                        f"has not verified '{user_info.email}', and Computor only "
-                        "accepts a first sign-in with a verified address. Verify "
-                        "it with your identity provider and sign in again, or ask "
-                        "an administrator."
-                    ),
-                    context={"provider": provider},
-                )
+            # Raised as the admission refusal so it takes the /join/refused
+            # path and keeps the Keycloak account (the person only has to
+            # verify), in every registration mode, open included.
+            if normalized_email and not email_verified:
+                raise RegistrationRefused(REASON_EMAIL_UNVERIFIED)
 
             user = None
             if normalized_email:
