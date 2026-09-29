@@ -79,6 +79,10 @@ def setup_logging():
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     handler.setFormatter(formatter)
+    # Request targets carry SSO codes and tokens in their query (HTTP lines on
+    # uvicorn.access, WebSocket handshakes on uvicorn.error): redact them on the
+    # handler so every logger routed through it is covered.
+    handler.addFilter(RedactQueryCredentialsFilter())
 
     # Set handler to root logger
     root.addHandler(handler)
@@ -90,7 +94,6 @@ def setup_logging():
     access_logger.addHandler(handler)  # Use our handler with colors
     access_logger.setLevel(logging.INFO)  # Keep access logs at INFO
     access_logger.addFilter(SuppressSuccessfulRequests())
-    access_logger.addFilter(RedactQueryCredentialsFilter())
 
     # Configure uvicorn.error to use our formatter
     error_logger = logging.getLogger("uvicorn.error")
@@ -179,7 +182,7 @@ if __name__ == "__main__":
             "suppress_ok": {
                 "()": SuppressSuccessfulRequests
             },
-            # Request lines include the query string: redact SSO codes/tokens.
+            # Request targets include the query string: redact SSO codes/tokens.
             "redact_credentials": {
                 "()": RedactQueryCredentialsFilter
             }
@@ -200,7 +203,9 @@ if __name__ == "__main__":
             "default": {
                 "class": "logging.StreamHandler",
                 "formatter": "colored",
-                "stream": "ext://sys.stdout"
+                "stream": "ext://sys.stdout",
+                # uvicorn.error logs WebSocket handshakes as "WebSocket /ws?token=...".
+                "filters": ["redact_credentials"]
             },
             "access": {
                 "class": "logging.StreamHandler",
