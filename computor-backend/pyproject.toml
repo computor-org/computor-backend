@@ -45,11 +45,11 @@ dependencies = [
     "psycopg2-binary==2.9.9",
     "keycove==0.3.5",
     "argon2-cffi>=23.1.0",  # Secure password hashing (Argon2id)
-    "fastapi==0.109.0",
+    "fastapi==0.141.1",
     "sqlalchemy_utils==0.41.2",
-    "click==8.1.7",
+    "click==8.5.0",
     "alive-progress==3.2.0",
-    "gitpython==3.1.59",
+    "gitpython==3.1.62",
     "redis==6.4.0",
     "SQLAlchemy==1.4.54",
     "minio==7.2.5",
@@ -88,6 +88,13 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[dependency-groups]
+# Installed only into the testing worker image (docker/temporal-worker-testing),
+# so computor-testing's dependencies are resolved and hash-locked together with
+# the backend's in uv.lock instead of floating on its version ranges.
+testing-worker = ["computor-testing"]
+
 [tool.uv.sources]
 computor-client = { path = "../computor-client" }
 computor-types = { path = "../computor-types" }
+computor-testing = { path = "../computor-testing" }
