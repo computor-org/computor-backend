@@ -251,17 +251,18 @@ async def accept_invite(
     The invite token is the authorization proof for a NEW account: we spend
     the invite (atomically, inside the admission transaction), create the
     Keycloak login with the chosen password, then create the computor User.
-    On first SSO login Keycloak links to this pre-created account by email.
+    The login is always created UNVERIFIED with the VERIFY_EMAIL required
+    action: Keycloak issues no tokens until the address is confirmed, and
+    only then does the first SSO login link to this account by email.
 
-    An existing Computor user is never adopted on the invite alone
-    (computor-org/issues#382 made that possible, and it let any invite holder
-    take over an unused pre-provisioned account, admins included). Adoption
-    needs all of: an invite issued for exactly this email, a row that has
-    never signed in, holds no staff role, and is neither banned nor archived.
-    Even then the Keycloak login is created UNVERIFIED with the VERIFY_EMAIL
-    required action and the row itself is left untouched — only whoever can
-    read that mailbox gets tokens, and only a verified email links a first
-    SSO login to the row. Existing Keycloak credentials are never reset.
+    An existing Computor user — owning the address as primary OR student
+    email — is never adopted on the invite alone (computor-org/issues#382
+    made that possible, and it let any invite holder take over an unused
+    pre-provisioned account, admins included). Adoption needs all of: an
+    invite issued for exactly this email, a row that has never signed in,
+    holds no staff role, and is neither banned nor archived; the row itself
+    is left untouched. Existing Keycloak credentials are never reset, and a
+    Keycloak user created here is removed again if the user insert fails.
 
     All database work runs in the threadpool: the invite row and the
     instance_settings row stay locked across the Keycloak call, and a
@@ -290,7 +291,7 @@ async def accept_invite(
                 detail="This invite is restricted to a different email address"
             )
 
-        existing = db.query(User).filter(func.lower(User.email) == email).first()
+        existing = _user_owning_email(email, db)
         if existing:
             if not invite.email:
                 raise BadRequestException(
@@ -346,12 +347,15 @@ async def accept_invite(
     from computor_backend.business_logic.auth import provision_keycloak_login
 
     try:
-        await provision_keycloak_login(
+        # Never verified: whoever typed the address has not shown they can read
+        # it. Keycloak withholds tokens until the VERIFY_EMAIL action is done,
+        # and only then can a first SSO login link to or create the account.
+        kc_user_id, _ = await provision_keycloak_login(
             email=payload.email,
             password=payload.password,
             given_name=payload.given_name,
             family_name=payload.family_name,
-            email_verified=existing_id is None,
+            email_verified=False,
         )
     except BaseException:
         await run_in_threadpool(db.rollback)
@@ -398,7 +402,14 @@ async def accept_invite(
         db.commit()
         return user_id
 
-    user_id = await _in_transaction(_finish)
+    try:
+        user_id = await _in_transaction(_finish)
+    except BaseException:
+        # The Computor side failed (e.g. the email-uniqueness trigger): remove
+        # the Keycloak login THIS request created, so no credential survives
+        # for an address the user row does not own.
+        await _delete_created_keycloak_user(kc_user_id)
+        raise
 
     if existing_id:
         logger.info(f"User {user_id} adopted via invite {invite.id} (pending email verification)")
@@ -415,6 +426,46 @@ async def accept_invite(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _user_owning_email(email: str, db: Session) -> Optional[User]:
+    """The user that owns ``email`` as primary OR student-profile address.
+
+    Mirrors the SSO first-login lookup (and the case-insensitive uniqueness
+    trigger across both columns): an address that is some user's student
+    email belongs to that user, and must get the same protection.
+    """
+    from computor_backend.model.auth import StudentProfile
+
+    user = db.query(User).filter(func.lower(User.email) == email).first()
+    if user is not None:
+        return user
+    owners = {
+        uid
+        for (uid,) in db.query(StudentProfile.user_id)
+        .filter(func.lower(StudentProfile.student_email) == email)
+        .distinct()
+    }
+    if len(owners) > 1:
+        raise BadRequestException(
+            detail="This email address is ambiguous; ask an administrator."
+        )
+    if owners:
+        return db.query(User).filter(User.id == next(iter(owners))).first()
+    return None
+
+
+async def _delete_created_keycloak_user(kc_user_id: Optional[str]) -> None:
+    """Best-effort removal of a Keycloak user created by this very request."""
+    if not kc_user_id:
+        return
+    from computor_backend.auth.keycloak_admin import KeycloakAdminClient
+
+    try:
+        await KeycloakAdminClient().delete_user(kc_user_id)
+        logger.info(f"Removed Keycloak user {kc_user_id} after a failed invite acceptance")
+    except Exception as exc:  # noqa: BLE001 - the original error matters more
+        logger.error(f"Could not remove Keycloak user {kc_user_id}: {exc}")
+
 
 def _creator_is_admin(invite: InviteLink, db: Session) -> bool:
     """True if the invite's creator currently holds an admin-conferring role."""

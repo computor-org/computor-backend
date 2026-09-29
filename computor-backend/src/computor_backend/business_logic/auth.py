@@ -874,7 +874,7 @@ async def provision_keycloak_login(
     password: str,
     given_name: str = "",
     family_name: str = "",
-    email_verified: bool = True,
+    email_verified: bool = False,
 ) -> Tuple[str, bool]:
     """Create a Keycloak login for ``email`` with ``password``.
 

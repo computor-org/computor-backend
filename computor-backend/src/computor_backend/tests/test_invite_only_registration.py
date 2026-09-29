@@ -743,3 +743,116 @@ def test_two_password_accepts_of_a_single_use_invite_admit_exactly_one(env, monk
     assert isinstance(results["pwrace2"], BadRequestException), results["pwrace2"]
     assert env.user("pwrace1") is not None and env.user("pwrace2") is None
     assert env.invite(token).use_count == 1
+
+
+# ---------------------------------------------------------------------------
+# Password path: student-email ownership and Keycloak credential hygiene
+# ---------------------------------------------------------------------------
+
+
+class _RecordingKeycloak:
+    """Fake admin client for the REAL provision_keycloak_login."""
+
+    created: list = []
+    deleted: list = []
+
+    async def _get_user_id_by_email(self, email):
+        return None
+
+    async def generate_unique_username(self, *args):
+        return f"handle{len(self.created)}"
+
+    async def create_user(self, user):
+        _RecordingKeycloak.created.append(user)
+        return f"kc-created-{len(_RecordingKeycloak.created)}"
+
+    async def delete_user(self, user_id):
+        _RecordingKeycloak.deleted.append(user_id)
+
+
+@pytest.fixture
+def recording_kc(monkeypatch):
+    import computor_backend.auth.keycloak_admin as kc_mod
+
+    _RecordingKeycloak.created, _RecordingKeycloak.deleted = [], []
+    monkeypatch.setattr(auth_mod, "KeycloakAdminClient", _RecordingKeycloak)
+    monkeypatch.setattr(kc_mod, "KeycloakAdminClient", _RecordingKeycloak)
+    return _RecordingKeycloak
+
+
+def test_invite_bound_to_an_admins_student_email_mints_no_credential(env, recording_kc):
+    """Reviewer repro r3: the alias was not recognised as the admin's address,
+    a VERIFIED Keycloak login was minted for it, and the failed user insert
+    left that credential behind to sign in as the admin."""
+    from sqlalchemy_utils import Ltree
+
+    from computor_backend.api.invites import accept_invite
+    from computor_backend.exceptions import BadRequestException
+    from computor_backend.model.auth import StudentProfile
+    from computor_backend.model.organization import Organization
+    from computor_types.invites import InviteAccept
+
+    env.settings(registration_mode="invite_only")
+    victim_id = env.make_user("aliasvictim", role="_admin")
+    alias = f"alias.{env.suffix}@test.local"
+    s = env.Session()
+    org = Organization(title="Alias org", organization_type="organization",
+                       path=Ltree(f"alias_{env.suffix}"), properties={})
+    s.add(org)
+    s.flush()
+    org_id = str(org.id)
+    s.add(StudentProfile(user_id=victim_id, organization_id=org.id, student_email=alias))
+    s.commit()
+    s.close()
+    token = env.make_invite(email=alias)
+    s = env.Session()
+    try:
+        with pytest.raises(BadRequestException):
+            asyncio.run(accept_invite(token, InviteAccept(
+                email=alias, password="x", given_name="A", family_name="B"), s))
+        assert recording_kc.created == []
+        assert env.invite(token).use_count == 0
+    finally:
+        s.rollback()
+        s.query(StudentProfile).filter(StudentProfile.user_id == victim_id).delete(
+            synchronize_session=False)
+        s.query(Organization).filter(Organization.id == org_id).delete(
+            synchronize_session=False)
+        s.commit()
+        s.close()
+
+
+def test_password_invites_never_create_verified_logins(env, recording_kc):
+    from computor_backend.api.invites import accept_invite
+    from computor_types.invites import InviteAccept
+
+    env.settings(registration_mode="open")
+    s = env.Session()
+    asyncio.run(accept_invite(env.make_invite(), InviteAccept(
+        email=f"unverified.{env.suffix}@test.local", password="x",
+        given_name="U", family_name="V"), s))
+    s.close()
+    (created,) = recording_kc.created
+    assert created.emailVerified is False
+    assert created.requiredActions == ["VERIFY_EMAIL"]
+
+
+def test_failed_user_insert_removes_only_the_keycloak_user_it_created(env, recording_kc, monkeypatch):
+    import computor_backend.api.invites as invites_api
+    from computor_types.invites import InviteAccept
+
+    def _boom(user, consumed):
+        raise RuntimeError("insert failed")
+
+    monkeypatch.setattr(invites_api, "record_invite", _boom)
+    env.settings(registration_mode="open")
+    token = env.make_invite()
+    s = env.Session()
+    with pytest.raises(RuntimeError):
+        asyncio.run(invites_api.accept_invite(token, InviteAccept(
+            email=f"rollback.{env.suffix}@test.local", password="x",
+            given_name="R", family_name="B"), s))
+    s.close()
+    assert recording_kc.deleted == ["kc-created-1"]
+    assert env.user("rollback") is None
+    assert env.invite(token).use_count == 0
