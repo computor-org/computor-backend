@@ -7,8 +7,10 @@ with an in-memory Redis, a mocked provider registry and a mocked identity
 exchange, and use distinctive synthetic credential values.
 """
 
+import asyncio
 import json
 import logging
+from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 from urllib.parse import parse_qs, urlsplit
 
@@ -63,6 +65,7 @@ def deployment(monkeypatch):
     monkeypatch.setattr(
         settings, "SSO_REDIRECT_ALLOWED_ORIGINS", "https://code.tugraz.at", raising=False
     )
+    monkeypatch.setattr(settings, "DEBUG_MODE", "production", raising=False)
     monkeypatch.setenv("NEXT_PUBLIC_API_URL", "https://computor.at/api")
 
 
@@ -74,7 +77,12 @@ class _Redis:
         self.data[key] = value
 
     async def get(self, key):
-        return self.data.get(key)
+        value = self.data.get(key)
+        await asyncio.sleep(0)  # a network round-trip: other requests interleave
+        return value
+
+    async def getdel(self, key):
+        return self.data.pop(key, None)  # atomic, like Redis GETDEL
 
     async def delete(self, key):
         return self.data.pop(key, None)
@@ -262,3 +270,47 @@ async def test_logout_keeps_first_party_post_logout_redirect():
     resp = await _logout("https://computor.at/", "https://idp.invalid/logout")
     params = parse_qs(urlsplit(resp.headers["location"]).query)
     assert params["post_logout_redirect_uri"] == ["https://computor.at/"]
+
+
+# --- shipped development defaults ----------------------------------------------------
+
+
+def _template_values():
+    repo = Path(__file__).resolve().parents[4]
+    values = {}
+    for line in (repo / "ops/environments/.env.common.template").read_text().splitlines():
+        key, sep, value = line.partition("=")
+        if sep and not key.startswith("#"):
+            values[key.strip()] = value.strip()
+    return values
+
+
+@pytest.fixture
+def shipped_defaults(monkeypatch):
+    env = _template_values()
+    monkeypatch.setattr(settings, "PUBLIC_DOMAIN", env.get("PUBLIC_DOMAIN") or None)
+    monkeypatch.setattr(settings, "WEB_APP_URL", env.get("WEB_APP_URL") or None)
+    monkeypatch.setattr(settings, "SSO_REDIRECT_ALLOWED_ORIGINS",
+                        env.get("SSO_REDIRECT_ALLOWED_ORIGINS", ""), raising=False)
+    monkeypatch.setattr(settings, "DEBUG_MODE", env.get("DEBUG_MODE", "development"))
+    monkeypatch.setenv("NEXT_PUBLIC_API_URL", env["NEXT_PUBLIC_API_URL"])
+
+
+@pytest.mark.asyncio
+async def test_dev_web_login_and_logout_work_with_shipped_defaults(shipped_defaults):
+    # computor-web builds these from window.location.origin (localhost:3000 in dev).
+    redis = _Redis()
+    resp = await _initiate("http://localhost:3000/auth/success", redis)
+    assert resp.status_code == 302
+    (state_key,) = redis.data
+    resp = await _callback(redis, state_key.split(":", 1)[1])
+    assert resp.headers["location"].startswith("http://localhost:3000/auth/success")
+    resp = await _logout("http://localhost:3000/", "https://idp.invalid/logout")
+    params = parse_qs(urlsplit(resp.headers["location"]).query)
+    assert params["post_logout_redirect_uri"] == ["http://localhost:3000/"]
+
+
+@pytest.mark.asyncio
+async def test_shipped_defaults_still_reject_foreign_origins(shipped_defaults):
+    with pytest.raises(BadRequestException):
+        await _initiate("http://localhost:3001/auth/success", _Redis())

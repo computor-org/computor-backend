@@ -59,7 +59,8 @@ _COOKIE_SECURE = settings.DEBUG_MODE == "production"
 #   * a same-origin relative path ("/..." but not "//..." or "/\\...");
 #   * an absolute http(s) URL whose origin (scheme, host, port) is one of the
 #     deployment's public origins: PUBLIC_DOMAIN, WEB_APP_URL, NEXT_PUBLIC_API_URL
-#     and SSO_REDIRECT_ALLOWED_ORIGINS;
+#     and SSO_REDIRECT_ALLOWED_ORIGINS (plus http://localhost:3000 outside
+#     production, the dev web app);
 #   * for login only, the VS Code extension's RFC 8252 loopback receiver,
 #     http://127.0.0.1:<port>/... (the only target that still gets tokens in
 #     the query; everything else authenticates through the HttpOnly cookies).
@@ -67,6 +68,7 @@ _REDIRECT_RELATIVE = "relative"
 _REDIRECT_ORIGIN = "origin"
 _REDIRECT_LOOPBACK = "loopback"
 _LOOPBACK_HOST = "127.0.0.1"
+_DEV_WEB_APP_ORIGIN = "http://localhost:3000"
 
 
 def _url_origin(url: str) -> Optional[str]:
@@ -88,6 +90,10 @@ def _allowed_redirect_origins() -> set:
     from computor_backend.api.instance import _normalize_url
     candidates = [settings.PUBLIC_DOMAIN, settings.WEB_APP_URL, _public_api_base()]
     candidates += (getattr(settings, "SSO_REDIRECT_ALLOWED_ORIGINS", "") or "").split(",")
+    if settings.DEBUG_MODE != "production":
+        # Dev default: the web app runs on its own port (web.sh / the env
+        # template's layout) while NEXT_PUBLIC_API_URL is localhost:8000.
+        candidates.append(_DEV_WEB_APP_ORIGIN)
     origins = set()
     for candidate in candidates:
         normalized = _normalize_url(candidate)
