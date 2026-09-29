@@ -406,16 +406,15 @@ async def handle_callback(
 def _registration_refused_redirect(provider: str, refusal: RegistrationRefused) -> RedirectResponse:
     """Send a refused first login to /join/refused, signed out of Keycloak.
 
-    When the Keycloak account was deleted its sessions went with it, so the
-    browser goes straight to the page. Otherwise (email not yet verified) it
-    goes through Keycloak's end-session endpoint first, which returns to the
-    page with the reason in ``state``. That URI is registered on the client at
-    startup (server.py), as Keycloak requires for post-logout redirects.
+    Goes through Keycloak's end-session endpoint, which returns to the page
+    with the reason in ``state``; that URI is registered on the client at
+    startup (server.py), as Keycloak requires for post-logout redirects. The
+    Keycloak account itself is kept (see RegistrationRefused).
     """
     target = _registration_refused_url()
     plugin = get_plugin_registry().get_plugin(provider)
     end_session = None
-    if not refusal.discard_identity and getattr(plugin, "_oidc_config", None):
+    if getattr(plugin, "_oidc_config", None):
         end_session = plugin._oidc_config.get("end_session_endpoint")
     if end_session:
         params = {

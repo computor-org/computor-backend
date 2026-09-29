@@ -24,7 +24,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
-from sqlalchemy import exists, func, select, update
+from sqlalchemy import exists, func, select, text, update
 from sqlalchemy.orm import Session
 
 from computor_backend.business_logic.instance_limits import STAFF_BYPASS_ROLES
@@ -62,9 +62,10 @@ _MESSAGES = {
 class RegistrationRefused(ForbiddenException):
     """A first login that may not create a user. Nothing has been written.
 
-    ``discard_identity`` tells the login path to delete the Keycloak account
-    that was created for this attempt (its only purpose was this login). Not
-    for an unverified email: that person just has to click the link.
+    The Keycloak account behind the attempt is left alone: the login path only
+    ends the browser's Keycloak session. Deleting it was unsafe — nothing
+    proves this attempt created it (a concurrent first login of the same
+    identity, or a long-standing Keycloak account without a Computor row).
     """
 
     def __init__(self, reason: str):
@@ -74,9 +75,29 @@ class RegistrationRefused(ForbiddenException):
             context={"registration_refused": reason},
         )
         self.reason = reason
-        self.discard_identity = reason != REASON_EMAIL_UNVERIFIED
         # Filled in by the login path for the Keycloak logout redirect.
         self.id_token: Optional[str] = None
+
+
+def lock_first_login(db: Session, provider: str, subject: str, email: Optional[str]) -> None:
+    """Serialise first logins per identity and per email for this transaction.
+
+    Two first logins of the same identity (a double-clicked callback, two
+    tabs) would otherwise both miss the account lookup and race to create
+    it. Taken before the lookups, which the caller must (re)do afterwards.
+    Always identity first, then email, so two transactions never wait on each
+    other in a cycle. Transaction-scoped advisory locks: released on commit
+    or rollback. PostgreSQL only; a no-op elsewhere.
+    """
+    if db.get_bind().dialect.name != "postgresql":
+        return
+    keys = [f"first_login:{provider}:{subject}"]
+    if email:
+        keys.append(f"first_login_email:{email.lower()}")
+    for key in keys:
+        db.execute(
+            text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), {"key": key}
+        )
 
 
 def _staff_user_ids():
