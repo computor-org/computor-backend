@@ -89,6 +89,10 @@ DEFAULT_SAFE_ENV: Dict[str, str] = {
 }
 
 
+# Thread-pool sizes of the common math runtimes, pinned per job.
+_THREAD_VARS = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
+
+
 # Language-specific environment additions
 _LANGUAGE_ENV: Dict[str, Dict[str, str]] = {
     "python": {
@@ -140,6 +144,14 @@ def get_safe_env(
         Dictionary of safe environment variables
     """
     env = DEFAULT_SAFE_ENV.copy()
+
+    # One math-library thread per job by default. The worker runs several jobs
+    # at once on a CPU-limited container, and every thread counts against the
+    # UID-wide RLIMIT_NPROC (see resources.py), so BLAS/OpenMP pools sized to
+    # the host core count would only oversubscribe and eat the process budget.
+    threads = os.environ.get("COMPUTOR_JOB_THREADS", "1").strip() or "1"
+    for var in _THREAD_VARS:
+        env[var] = threads
 
     # Add language-specific variables
     lang_lower = language.lower()

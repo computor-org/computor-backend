@@ -181,7 +181,7 @@ class InterpretedExecutor(BaseExecutor):
                 env["TMPDIR"] = sandbox_dir
                 if env.get("HOME") in (None, "/tmp"):
                     env["HOME"] = sandbox_dir
-            preexec_fn = make_preexec_fn(self.resource_limits) if self.resource_limits else None
+            preexec_fn = make_preexec_fn(self.resource_limits)
 
             start_time = time.perf_counter()
             try:

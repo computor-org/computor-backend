@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 # switches the student sandbox on. See computor-testing/sandbox/launch.py.
 _HARNESS_BLOCKED_ENV = {"API_TOKEN", "TESTING_WORKER_TOKEN"}
 _HARNESS_KEEP_COMPUTOR = {"COMPUTOR_SANDBOX_ENABLE", "COMPUTOR_SANDBOX_DISABLE"}
+# Per-job resource limits (ctexec/resources.py) are harness config, not secrets.
+_HARNESS_KEEP_COMPUTOR_PREFIX = "COMPUTOR_JOB_"
 
 
 def _harness_env() -> Dict[str, str]:
@@ -31,7 +33,11 @@ def _harness_env() -> Dict[str, str]:
         k: v
         for k, v in os.environ.items()
         if k not in _HARNESS_BLOCKED_ENV
-        and not (k.startswith("COMPUTOR_") and k not in _HARNESS_KEEP_COMPUTOR)
+        and not (
+            k.startswith("COMPUTOR_")
+            and k not in _HARNESS_KEEP_COMPUTOR
+            and not k.startswith(_HARNESS_KEEP_COMPUTOR_PREFIX)
+        )
     }
 
 

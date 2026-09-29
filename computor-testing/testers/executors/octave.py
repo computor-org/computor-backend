@@ -297,14 +297,9 @@ fclose(__fid__);
         """
         cmd = self._get_interpreter_command() + [script_path]
 
-        # Set up preexec for resource limits (Unix only)
-        limits = ResourceLimits(
-            timeout=self.timeout,
-            cpu_seconds=int(self.timeout),
-            memory_bytes=512 * 1024 * 1024,  # 512 MB for Octave
-            max_processes=10,
-        )
-        preexec = make_preexec_fn(limits)
+        # Per-job resource limits (Unix only): the shared defaults, as for
+        # every other executor.
+        preexec = make_preexec_fn(self.resource_limits)
 
         env = self._get_env()
 

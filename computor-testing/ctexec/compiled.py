@@ -194,6 +194,9 @@ class CompiledExecutor(BaseExecutor):
                 capture_output=True,
                 text=True,
                 timeout=self.compile_timeout,
+                # The compiler digests untrusted source (template/macro
+                # bombs), so it gets the same per-job bounds as the run.
+                preexec_fn=make_preexec_fn(self.resource_limits),
             )
             duration = time.perf_counter() - start_time
 
@@ -265,7 +268,7 @@ class CompiledExecutor(BaseExecutor):
 
         env = self._get_env()
         actual_timeout = timeout or self.timeout
-        preexec_fn = make_preexec_fn(self.resource_limits) if self.resource_limits else None
+        preexec_fn = make_preexec_fn(self.resource_limits)
 
         start_time = time.perf_counter()
         try:
