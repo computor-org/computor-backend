@@ -5,8 +5,10 @@ Provides a flexible system to execute tests using different approaches (subproce
 
 import json
 import os
+import signal
 import socket
 import subprocess
+import threading
 import logging
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
@@ -39,6 +41,71 @@ def _harness_env() -> Dict[str, str]:
             and not k.startswith(_HARNESS_KEEP_COMPUTOR_PREFIX)
         )
     }
+
+
+# The harness's own stdout/stderr is only logged; keep at most this much of
+# each (it echoes student output, which the student controls).
+_HARNESS_MAX_OUTPUT = 1024 * 1024
+
+
+class _HarnessResult:
+    def __init__(self, returncode: int, stdout: str, stderr: str):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+def _drain(stream, limit: int, sink: list) -> None:
+    """Read a pipe to EOF, keeping the first ``limit`` bytes."""
+    kept = 0
+    try:
+        for chunk in iter(lambda: stream.read1(65536), b""):
+            if kept < limit:
+                sink.append(chunk[: limit - kept])
+                kept += len(sink[-1])
+    except (OSError, ValueError):
+        pass
+
+
+def _run_harness(cmd, env, timeout: float) -> _HarnessResult:
+    """Run the test harness in its own session with bounded output capture.
+
+    The worker runs activities in threads, so no ``preexec_fn`` here; a new
+    session is set up by the C fork path. On timeout the whole process group
+    is SIGKILLed — the harness and anything it left in its group — and a
+    sandboxed job's launcher sees its parent die (PR_SET_PDEATHSIG) and tears
+    down its own domain (#237). Raises ``subprocess.TimeoutExpired``.
+    """
+    proc = subprocess.Popen(
+        cmd,
+        env=env,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+    out, err = [], []
+    readers = [
+        threading.Thread(target=_drain, args=(proc.stdout, _HARNESS_MAX_OUTPUT, out), daemon=True),
+        threading.Thread(target=_drain, args=(proc.stderr, _HARNESS_MAX_OUTPUT, err), daemon=True),
+    ]
+    for reader in readers:
+        reader.start()
+    try:
+        proc.wait(timeout=timeout)
+    finally:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+        proc.wait()
+        for reader in readers:
+            reader.join(5)
+
+    def _text(parts):
+        return b"".join(parts).decode("utf-8", errors="replace")
+
+    return _HarnessResult(proc.returncode, _text(out), _text(err))
 
 
 class TestingBackend(ABC):
@@ -281,12 +348,10 @@ class ComputorTestingBackend(TestingBackend):
             # so nothing in a path is ever re-interpreted — and a scrubbed
             # environment so the worker's API token (and any COMPUTOR_* secret)
             # is not inherited by the harness or anything it spawns (#241).
-            result = subprocess.run(
+            result = _run_harness(
                 cmd_parts,
                 env=_harness_env(),
-                capture_output=True,
-                text=True,
-                timeout=backend_properties.get("timeout_seconds", 300)
+                timeout=backend_properties.get("timeout_seconds", 300),
             )
 
             # Log output for debugging
