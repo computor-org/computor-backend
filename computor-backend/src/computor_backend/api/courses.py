@@ -105,7 +105,7 @@ async def list_public_courses(
     response: Response,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: Annotated[CoursePublicQuery, Depends()],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Courses a lecturer has opened for student self-registration.
 
@@ -131,7 +131,7 @@ async def list_public_courses(
 async def download_course_template(
     course_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache=Depends(get_redis_client),
     hierarchical: bool = Query(
         default=False,
@@ -225,7 +225,7 @@ async def delete_course_endpoint(
     course_id: UUID,
     request: Request,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     dry_run: bool = Query(
         default=False,
         description="If true, only returns preview without deleting"

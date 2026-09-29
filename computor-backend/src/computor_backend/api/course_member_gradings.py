@@ -62,7 +62,7 @@ async def list_course_member_gradings_endpoint(
     course_id: str = Query(..., description="Course ID (required)"),
     permissions: Annotated[Principal, Depends(get_current_principal)] = None,
     params: CourseMemberGradingsQuery = Depends(),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
 ) -> List[CourseMemberGradingsList]:
     """
@@ -116,7 +116,7 @@ async def get_course_member_gradings_endpoint(
     course_member_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: CourseMemberGradingsQuery = Depends(),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
 ) -> CourseMemberGradingsGet:
     """

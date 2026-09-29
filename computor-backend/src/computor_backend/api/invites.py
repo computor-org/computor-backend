@@ -70,7 +70,7 @@ def _require_invite_manager(principal: Principal, db: Session) -> None:
 async def create_invite(
     payload: InviteLinkCreate,
     principal: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> InviteLinkGet:
     """Create a new invite link (admin or _user_manager)."""
     _require_invite_manager(principal, db)
@@ -119,7 +119,7 @@ async def create_invite(
 @invites_router.get("/admin/invites", response_model=List[InviteLinkList])
 async def list_invites(
     principal: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> List[InviteLinkList]:
     """List all invite links (admin or _user_manager)."""
     _require_invite_manager(principal, db)
@@ -131,7 +131,7 @@ async def list_invites(
 async def get_invite(
     invite_id: str,
     principal: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> InviteLinkGet:
     """Get a single invite link (admin or _user_manager)."""
     _require_invite_manager(principal, db)
@@ -145,7 +145,7 @@ async def get_invite(
 async def revoke_invite(
     invite_id: str,
     principal: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> None:
     """Revoke an invite link (admin or _user_manager)."""
     # In the threadpool: the UPDATE may wait on the invite row lock of a
@@ -206,7 +206,7 @@ async def _throttle_public_invite(request: Optional[Request], cache, bucket: str
 async def get_invite_status(
     token: str,
     request: Request,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache=Depends(get_redis_client),
 ) -> InviteStatusPublic:
     """Whether a /join code can still be used (public, no auth, rate-limited).
@@ -231,7 +231,7 @@ async def get_invite_status(
 async def get_invite_public(
     token: str,
     request: Request = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache=Depends(get_redis_client),
 ) -> InviteLinkPublic:
     """Get invite metadata for the registration page (public, no auth, rate-limited)."""
@@ -252,7 +252,7 @@ async def get_invite_public(
 async def accept_invite(
     token: str,
     payload: InviteAccept,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     request: Request = None,
     cache=Depends(get_redis_client),
 ) -> dict:

@@ -70,7 +70,7 @@ async def _workspace_user_count(client: CoderClient) -> Optional[int]:
 @system_limits_router.get("", response_model=InstanceLimitsGet)
 async def get_instance_limits(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
     client: Annotated[CoderClient, Depends(get_coder_client)],
 ) -> InstanceLimitsGet:
     """The configured limits and what they currently measure.
@@ -85,7 +85,7 @@ async def get_instance_limits(
 async def update_instance_limits(
     request: InstanceLimitsUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
     client: Annotated[CoderClient, Depends(get_coder_client)],
 ) -> InstanceLimitsGet:
     """Replace the stored limits. Admin only; effective on the next request.

@@ -117,7 +117,7 @@ async def _enforce_rate_limit(user_id: str, cache) -> None:
 async def create_issue_report(
     description: Annotated[str, Form()],
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache=Depends(get_redis_client),
     title: Annotated[str | None, Form()] = None,
     expected: Annotated[str | None, Form()] = None,
@@ -158,7 +158,7 @@ async def create_issue_report(
 async def get_issue_report(
     report_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> IssueReportGet:
     """Resolve a report id to the person who filed it.
 

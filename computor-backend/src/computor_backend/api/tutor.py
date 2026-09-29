@@ -90,7 +90,7 @@ async def tutor_update_course_contents_endpoint(
     course_member_id: UUID | str,
     grade_data: TutorGradeCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache)
 ):
     """Update grade for a course content as a tutor."""
@@ -128,7 +128,7 @@ def tutor_list_courses_endpoint(
 def tutor_get_course_members_endpoint(
     course_member_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache)
 ):
     """Get a course member with unreviewed course contents."""
@@ -138,7 +138,7 @@ def tutor_get_course_members_endpoint(
 def tutor_list_course_members_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: CourseMemberQuery = Depends(),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache)
 ):
     """List course members for tutors."""
@@ -150,7 +150,7 @@ def tutor_list_course_members_endpoint(
 def tutor_get_submission_group_endpoint(
     submission_group_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache)
 ):
     """Get a submission group with detailed information for tutors."""
@@ -161,7 +161,7 @@ def tutor_update_submission_group_limits_endpoint(
     submission_group_id: UUID | str,
     limits: TutorSubmissionGroupLimitsUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache)
 ):
     """Grant one submission group extra test runs or submissions.
@@ -178,7 +178,7 @@ def tutor_update_submission_group_limits_endpoint(
 def tutor_list_submission_groups_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: TutorSubmissionGroupQuery = Depends(),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache)
 ):
     """List submission groups for tutors with filtering options.
@@ -299,7 +299,7 @@ async def _get_example_version_for_course_content(
 async def download_course_content_reference(
     course_content_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
     storage_service = Depends(get_storage_service),
 ):
@@ -402,7 +402,7 @@ async def download_course_content_reference(
 async def download_course_content_description(
     course_content_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
     storage_service = Depends(get_storage_service),
 ):
@@ -575,7 +575,7 @@ async def create_tutor_test(
     file: UploadFile = File(..., description="ZIP file containing tutor's code"),
     config: Optional[str] = Form(None, description="Optional JSON configuration"),
     permissions: Annotated[Principal, Depends(get_current_principal)] = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
     redis = Depends(get_redis_client),
 ):

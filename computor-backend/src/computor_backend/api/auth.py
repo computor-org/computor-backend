@@ -280,7 +280,7 @@ async def handle_callback(
     code: str = Query(..., description="Authorization code"),
     state: str = Query(..., description="State parameter (required, single-use)"),
     request: Request = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ) -> RedirectResponse:
     """
     Handle OAuth callback from provider.
@@ -524,7 +524,7 @@ async def logout(
     request: Request,
     response: Response,
     principal: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache = Depends(get_redis_client)
 ) -> LogoutResponse:
     """
@@ -651,7 +651,7 @@ async def reload_plugins(principal: Principal = Depends(get_current_principal)) 
 @auth_router.post("/refresh/local", response_model=LocalTokenRefreshResponse)
 async def refresh_local_token(
     request: LocalTokenRefreshRequest,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache = Depends(get_redis_client)
 ) -> LocalTokenRefreshResponse:
     """
@@ -679,7 +679,7 @@ async def refresh_token(
     request: Request,
     response: Response,
     principal: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ) -> TokenRefreshResponse:
     """
     Refresh SSO access token using refresh token.
@@ -939,7 +939,7 @@ async def coder_reauth(
     next_path: str = Query(..., alias="next", description="Workspace path to return to (/coder/{owner}/{workspace}/...)"),
     retried: bool = Query(False, description="Set after a full SSO round-trip, to stop redirect loops"),
     principal: Optional[Principal] = Depends(_coder_request_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> RedirectResponse:
     """
     Renew the browser session for a workspace tab whose credential expired (#379).

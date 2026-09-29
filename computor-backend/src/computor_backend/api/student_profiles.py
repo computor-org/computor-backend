@@ -28,7 +28,7 @@ async def list_student_profiles(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     response: Response,
     params: StudentProfileQuery = Depends(),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """List student profiles - admins/_user_manager see all, users see only their own"""
     profiles, total = list_profiles(permissions, params, db)
@@ -38,7 +38,7 @@ async def list_student_profiles(
 async def get_student_profile(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     id: UUID | str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """Get a student profile by ID - users can only get their own, admins/_user_manager can get any"""
     return get_profile(id, permissions, db)
@@ -47,7 +47,7 @@ async def get_student_profile(
 async def create_student_profile(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     data: StudentProfileCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """Create a student profile - users can create for themselves (user_id optional), admins/_user_manager can create for anyone"""
     return create_profile(data, permissions, db)
@@ -57,7 +57,7 @@ async def update_student_profile(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     id: UUID | str,
     data: StudentProfileUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """Update a student profile - users can only update their own, admins/_user_manager can update any"""
     return update_profile(id, data, permissions, db)
@@ -66,7 +66,7 @@ async def update_student_profile(
 async def delete_student_profile(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     id: UUID | str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """Delete a student profile - users can only delete their own, admins/_user_manager can delete any"""
     delete_profile(id, permissions, db)

@@ -28,7 +28,7 @@ git_servers_router = APIRouter(prefix="/git-servers")
 def create_git_server_endpoint(
     data: GitServerCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Register a git server instance (the service token is stored encrypted)."""
     return create_git_server(data, permissions, db)
@@ -37,7 +37,7 @@ def create_git_server_endpoint(
 @git_servers_router.get("", response_model=List[GitServerGet])
 def list_git_servers_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     return list_git_servers(permissions, db)
 
@@ -46,7 +46,7 @@ def list_git_servers_endpoint(
 def get_git_server_endpoint(
     server_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     return get_git_server(server_id, permissions, db)
 
@@ -56,7 +56,7 @@ def update_git_server_endpoint(
     server_id: UUID,
     data: GitServerUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     return update_git_server(server_id, data, permissions, db)
 
@@ -65,6 +65,6 @@ def update_git_server_endpoint(
 def delete_git_server_endpoint(
     server_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     delete_git_server(server_id, permissions, db)

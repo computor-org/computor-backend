@@ -67,7 +67,7 @@ user_router = APIRouter()
 @user_router.get("", response_model=UserGet)
 def get_current_user_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """Get the current authenticated user."""
     return get_current_user(permissions.user_id, db)
@@ -79,7 +79,7 @@ def get_current_user_endpoint(
 )
 def get_referral_invites(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """The caller's single-use referral invites, created on first read.
 
@@ -166,7 +166,7 @@ async def get_course_views_for_current_user(
 async def get_course_views_for_current_user_by_course(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Get available views based on role for a specific course for the current user.
 
@@ -195,7 +195,7 @@ async def get_course_views_for_current_user_by_course(
 async def get_course_git_descriptor_endpoint(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """How the current user obtains their repository for a course.
 
@@ -214,7 +214,7 @@ async def get_course_git_descriptor_endpoint(
 async def get_student_repository_endpoint(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """The current student's repository for a course, or ``null`` if none yet.
 
@@ -233,7 +233,7 @@ async def provision_student_repository_endpoint(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     rotate: bool = False,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Babysat Forgejo provisioning for the current student.
 
@@ -268,7 +268,7 @@ async def personal_clone_credential_endpoint(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     rotate: bool = False,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """A clone credential for working OUTSIDE the managed workspace (#342).
 
@@ -295,7 +295,7 @@ async def register_student_repository_endpoint(
     course_id: UUID | str,
     payload: CourseMemberRepositoryRegister,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Record where the current student's BYO repository lives (e.g. a GitLab
     repo created by the VSCode extension with the student's own PAT).
@@ -314,7 +314,7 @@ async def register_gitlab_managed_endpoint(
     course_id: UUID | str,
     payload: CourseMemberValidationRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Register the current student's GitLab PAT for a managed-GitLab course and
     grant them access to their repository.
@@ -341,7 +341,7 @@ async def register_gitlab_managed_endpoint(
 async def template_access_endpoint(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Mint a one-time READ-ONLY git credential for the course's template.
 
@@ -360,7 +360,7 @@ async def template_access_endpoint(
 async def download_template_archive_endpoint(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Download the course template as a ZIP (download mode / external-repo seed).
 
@@ -391,7 +391,7 @@ async def validate_current_user_course(
     course_id: UUID | str,
     validation: CourseMemberValidationRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Validate user's course membership and provider account."""
     return validate_user_course(
@@ -409,7 +409,7 @@ async def register_current_user_course_account(
     course_id: UUID | str,
     payload: CourseMemberProviderAccountUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Register user's provider account for a course."""
     return register_user_course_account(
@@ -461,7 +461,7 @@ async def enroll_in_public_course(
         SSOAuthCredentials | ApiTokenCredentials,
         Depends(parse_authorization_header),
     ],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache=Depends(get_redis_client),
 ):
     """Create your own ``_student`` membership in a public course.

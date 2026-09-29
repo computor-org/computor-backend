@@ -26,7 +26,7 @@ session_router = APIRouter(prefix="/sessions", tags=["sessions"])
 @session_router.get("/me", response_model=List[SessionList])
 async def list_my_sessions(
     principal: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache = Depends(get_redis_client),
 ):
     """
@@ -43,7 +43,7 @@ async def list_my_sessions(
 async def get_current_session(
     request: Request,
     principal: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache = Depends(get_redis_client),
 ):
     """Get details of the current session (based on access token)."""
@@ -76,7 +76,7 @@ async def revoke_all_my_sessions(
     request: Request,
     include_current: bool = Query(False, description="Also revoke current session"),
     principal: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache = Depends(get_redis_client),
 ):
     """
@@ -125,7 +125,7 @@ async def revoke_all_my_sessions(
 async def revoke_my_session(
     session_id: str,
     principal: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache = Depends(get_redis_client),
 ):
     """
@@ -164,7 +164,7 @@ async def list_user_sessions_admin(
     user_id: str,
     active_only: bool = Query(True, description="Only show active sessions"),
     principal: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache = Depends(get_redis_client),
 ):
     """List sessions for any user (admin only)."""
@@ -190,7 +190,7 @@ async def revoke_session_admin(
     session_id: str,
     reason: str = Query("Admin revoked", description="Reason for revocation"),
     principal: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache = Depends(get_redis_client),
 ):
     """Force revoke any session (admin only)."""
@@ -231,7 +231,7 @@ async def revoke_all_user_sessions_admin(
     user_id: str,
     reason: str = Query("Admin action", description="Reason for mass revocation"),
     principal: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache = Depends(get_redis_client),
 ):
     """Revoke all sessions for a user (admin only)."""
@@ -266,7 +266,7 @@ async def revoke_all_user_sessions_admin(
 @session_router.get("/admin/stats")
 async def get_session_stats(
     principal: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Get session statistics (admin only)."""
     if "_admin" not in principal.roles:
