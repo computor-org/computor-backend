@@ -1,7 +1,7 @@
 # JupyterLab workspace served in the browser. The workspace app is JupyterLab
 # itself (no code-server, no desktop). No sudo — students add Python packages
 # with `pip install --user`, which persists in the shared /home/coder volume.
-FROM python:3.12-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 

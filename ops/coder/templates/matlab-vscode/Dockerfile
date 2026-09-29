@@ -1,5 +1,5 @@
 # MATLAB R2025b with browser-based VS Code, Computor and MathWorks extensions.
-FROM node:20-bookworm AS vsix-builder
+FROM node:26-bookworm AS vsix-builder
 
 ARG EXTENSION_REPO_URL=https://github.com/computor-org/computor-vscode.git
 ARG EXTENSION_REPO_REF="release/2026.10"

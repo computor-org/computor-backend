@@ -6,7 +6,7 @@
 # this image only provides the tools (git, docker CLI + compose, redis-cli) and
 # the ~40-line watcher loop. That keeps "an old updater driving a new repo"
 # safe — the contract is just `cmd_update_exec prod`.
-FROM alpine:3.20
+FROM alpine:3.24
 
 RUN apk add --no-cache bash git curl redis docker-cli docker-cli-compose docker-cli-buildx
 

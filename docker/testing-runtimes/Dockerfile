@@ -10,7 +10,7 @@
 #
 # python:3.10-slim base (same as computor-base) so the copied CPython-3.10
 # computor env is ABI-compatible.
-FROM python:3.10-slim
+FROM python:3.14-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
