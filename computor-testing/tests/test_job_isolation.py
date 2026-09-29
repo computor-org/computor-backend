@@ -658,3 +658,26 @@ def test_octave_execute_code_is_sandboxed(tmp_path, sandboxed):
     assert values["y"] == 42
     assert values["s"] == "DENIED"
     assert values["k"] != "KILLED"
+
+
+# --- 14. Julia gets the shared thread limits --------------------------------
+
+def test_julia_env_pins_threads_and_starts_under_limits(tmp_path, monkeypatch):
+    import shutil
+    if not shutil.which("julia"):
+        pytest.skip("julia not installed")
+    from ctexec.process import run_bounded
+    from ctexec.resources import make_preexec_fn
+    from testers.executors.julia import JuliaExecutor
+    monkeypatch.setenv("COMPUTOR_SECRET_TOKEN", "x")
+    executor = JuliaExecutor(working_dir=str(tmp_path), check_runtime=False)
+    env = executor._get_env()
+    assert env["OPENBLAS_NUM_THREADS"] == "1"
+    assert "COMPUTOR_SECRET_TOKEN" not in env
+    result = run_bounded(
+        ["julia", "--startup-file=no", "-e",
+         "using LinearAlgebra; print(BLAS.get_num_threads(), ' ', sum(rand(200,200)*rand(200,200)) > 0)"],
+        env=env, timeout=300,
+        preexec_fn=make_preexec_fn(executor.resource_limits))
+    assert result.returncode == 0, result.stderr[-2000:]
+    assert result.stdout.strip() == "1 true"
