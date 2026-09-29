@@ -597,7 +597,7 @@ async def provision_workspace(
             ttl_days=settings.workspace_token_ttl_days,
         )
         if workspace_token:
-            logger.info(f"Token minted (prefix: {workspace_token[:15]}..., length: {len(workspace_token)})")
+            logger.info(f"Token minted (prefix: {workspace_token[:12]}..., length: {len(workspace_token)})")
         else:
             logger.error("Token minting returned None!")
 
