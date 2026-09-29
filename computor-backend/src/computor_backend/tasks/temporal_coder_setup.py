@@ -40,7 +40,10 @@ IMAGE_VERSIONS_TO_KEEP = 2
 # Auto-generated tag shape ("v" + workflow.now timestamp). Only tags matching
 # this are ever cleanup candidates — :latest, admin-chosen custom tags and
 # foreign repos are never touched.
-_VERSION_TAG_RE = re.compile(r"^v\d{8}-\d{6}$")
+# The optional 6-hex suffix (workflow.uuid4) keeps two runs in the same second
+# from overwriting each other's tag; the timestamp prefix keeps lexical order
+# chronological.
+_VERSION_TAG_RE = re.compile(r"^v\d{8}-\d{6}(-[0-9a-f]{6})?$")
 
 _REGISTRY_REPO_ROOT = "/var/lib/registry/docker/registry/v2/repositories"
 
@@ -176,6 +179,24 @@ def _resolve_templates(
 # ---------------------------------------------------------------------------
 
 
+_PUSH_DIGEST_RE = re.compile(r"^(?P<tag>\S+): digest: (?P<digest>sha256:[0-9a-f]{64})\b")
+
+
+def _pushed_digest(chunk: Dict[str, Any], tag: str) -> Optional[str]:
+    """The manifest digest a docker push progress chunk reports for ``tag``.
+
+    The classic engine sends it as ``aux.Digest``; the containerd image store
+    only in the final status line ``"<tag>: digest: sha256:... size: N"``.
+    """
+    aux = chunk.get("aux") or {}
+    if aux.get("Digest") and aux.get("Tag", tag) == tag:
+        return aux["Digest"]
+    m = _PUSH_DIGEST_RE.match(chunk.get("status") or "")
+    if m and m.group("tag") == tag:
+        return m.group("digest")
+    return None
+
+
 @activity.defn(name="build_workspace_image")
 def build_workspace_image(
     template_key: str,
@@ -192,10 +213,10 @@ def build_workspace_image(
     thread pool (Worker(activity_executor=...)) instead of on the event loop.
 
     Pushes two tags: the moving ``:latest`` and an immutable ``:<image_tag>``.
-    The versioned tag is what a Coder template version pins to, so rebuilt
-    workspaces actually pull the new image (a moved ``:latest`` would not be
-    re-pulled by the docker provider's ``keep_locally`` image resource) and a
-    rollback target exists.
+    The versioned tag is the rollback/cleanup handle; what a Coder template
+    version pins to is the manifest digest the registry reported for it
+    (returned as ``digest``), so rebuilt workspaces actually pull the new image
+    and a re-pushed tag cannot change an existing version.
 
     Templates that build from an external repo declare it under ``source_repos``
     and get its current commit injected as a build arg, so the layer that checks
@@ -282,7 +303,10 @@ def build_workspace_image(
             image.tag(repo, tag=extra)
 
         # Push every tag, streaming for the same heartbeat reason — a multi-GB
-        # MATLAB layer push is minutes on its own.
+        # MATLAB layer push is minutes on its own. The registry reports the
+        # manifest digest it stored in the final "aux" chunk; that digest (not
+        # a tag, which can be re-pushed) is what the template version pins.
+        digests: Dict[str, str] = {}
         for t in push_tags:
             for push_chunk in client.images.push(repo, tag=t, stream=True, decode=True):
                 activity.heartbeat()
@@ -290,13 +314,25 @@ def build_workspace_image(
                     raise RuntimeError(
                         f"push failed for {repo}:{t}: {push_chunk['error']}"
                     )
-            logger.info(f"Pushed {repo}:{t}")
+                digest = _pushed_digest(push_chunk, t)
+                if digest:
+                    digests[t] = digest
+            if t not in digests:
+                # Engines that report neither form: ask the registry for what
+                # it now serves under the tag this run just pushed.
+                digests[t] = client.images.get_registry_data(f"{repo}:{t}").id
+            logger.info(f"Pushed {repo}:{t} ({digests[t]})")
+        pinned_digest = digests.get(push_tags[-1])
+        if not pinned_digest or not pinned_digest.startswith("sha256:"):
+            raise RuntimeError(f"registry reported no digest for {repo}:{push_tags[-1]}")
 
         return {
             "success": True,
             "template": template_key,
             "image": f"{repo}:{image_tag}",
             "tags": push_tags,
+            "digest": pinned_digest,
+            "image_ref": f"{repo}@{pinned_digest}",
             # Which commit of each tracked repo went in, so the operator can
             # confirm a change shipped without inspecting the image.
             "source_revisions": source_revisions,
@@ -430,8 +466,8 @@ def cleanup_stale_workspace_images(
     return result
 
 
-def _latest_registry_digest(repo: str) -> str:
-    """Return the immutable ``sha256:`` digest the registry serves for ``repo:latest``.
+def _registry_digest(repo: str, tag: str) -> str:
+    """Return the immutable ``sha256:`` digest the registry serves for ``repo:tag``.
 
     Asked through the worker's Docker daemon, which is the same path the build
     activity pushes through, so it reaches the registry under the same host.
@@ -442,24 +478,30 @@ def _latest_registry_digest(repo: str) -> str:
         base_url="unix://" + get_worker_settings().docker_socket_path
     )
     try:
-        return client.images.get_registry_data(f"{repo}:latest").id
+        return client.images.get_registry_data(f"{repo}:{tag}").id
     finally:
         client.close()
 
 
 def _workspace_image_ref(
-    registry_host: str, image_name: str, image_tag: str, resolve_digest
+    registry_host: str,
+    image_name: str,
+    image_tag: str,
+    image_digest: Optional[str],
+    resolve_digest,
 ) -> str:
-    """The ``workspace_image`` a template version is pinned to.
+    """The ``workspace_image`` a template version is pinned to: always
+    ``<registry>/<image>@sha256:...``, never a tag (every tag can be re-pushed).
 
-    A versioned tag from this run's build is used as is. ``latest`` (a template
-    push without a build) is a moving tag, so it is resolved to the digest the
-    registry holds right now and pinned as ``<registry>/<image>@sha256:...``;
-    ``resolve_digest(repo)`` does the lookup and may raise.
+    ``image_digest`` is the digest this run's build pushed; without a build,
+    whatever tag was selected (``latest`` or an explicit one) is resolved to the
+    digest the registry holds right now via ``resolve_digest(image_name, tag)``,
+    which may raise.
     """
-    if image_tag != "latest":
-        return f"{registry_host}/{image_name}:{image_tag}"
-    return f"{registry_host}/{image_name}@{resolve_digest(image_name)}"
+    digest = image_digest or resolve_digest(image_name, image_tag)
+    if not isinstance(digest, str) or not digest.startswith("sha256:"):
+        raise ValueError(f"not an image digest: {digest!r}")
+    return f"{registry_host}/{image_name}@{digest}"
 
 
 def _template_declares_variable(template_dir: str, name: str) -> bool:
@@ -583,13 +625,16 @@ async def push_coder_template(
     registry_host: str = "localhost:5000",
     image_tag: str = "latest",
     template_variables: Optional[Dict[str, str]] = None,
+    image_digest: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Push a Coder template (Terraform config) using the coder CLI,
     then set TTL via the Coder REST API.
 
     Pins the template's ``workspace_image`` variable to the immutable
-    ``<registry>/<image>:<image_tag>`` ref so this new template version is tied
+    ``<registry>/<image>@sha256:...`` ref (``image_digest`` from this run's
+    build, else the registry's digest for ``image_tag``) so this new template
+    version is tied
     to a specific image build (and so rolling workspaces onto it actually
     changes the running image). ``registry_host`` here is the provisioner's view
     of the registry (matches the template's default host), NOT the worker's push
@@ -641,13 +686,13 @@ async def push_coder_template(
     push_host = get_worker_settings().coder_registry_host or registry_host
     try:
         image_ref = _workspace_image_ref(
-            registry_host, info["image_name"], image_tag,
-            lambda name: _latest_registry_digest(f"{push_host}/{name}"),
+            registry_host, info["image_name"], image_tag, image_digest,
+            lambda name, tag: _registry_digest(f"{push_host}/{name}", tag),
         )
     except Exception as e:
         return {
             "success": False, "template": template_key,
-            "error": f"Cannot pin {info['image_name']}:latest to a digest "
+            "error": f"Cannot pin {info['image_name']}:{image_tag} to a digest "
                      f"(build the image first): {e}",
         }
 
@@ -820,7 +865,10 @@ class BuildWorkspaceImagesWorkflow(BaseWorkflow):
         registry_host = parameters.get("registry_host", "localhost:5000")
         requested = parameters.get("templates")
         # One immutable image tag per run; workflow.now() is replay-deterministic.
-        image_tag = parameters.get("image_tag") or ("v" + workflow.now().strftime("%Y%m%d-%H%M%S"))
+        image_tag = parameters.get("image_tag") or (
+            "v" + workflow.now().strftime("%Y%m%d-%H%M%S")
+            + "-" + workflow.uuid4().hex[:6]
+        )
         no_cache = bool(parameters.get("no_cache", False))
         self._progress.update({"phase": "discovering", "image_tag": image_tag})
 
@@ -969,6 +1017,7 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
         if not image_tag:
             image_tag = (
                 "v" + workflow.now().strftime("%Y%m%d-%H%M%S")
+                + "-" + workflow.uuid4().hex[:6]
                 if build_images
                 else "latest"
             )
@@ -1094,6 +1143,9 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
                     registry_host,
                     image_tag,
                     {**template_variables, **overrides},
+                    # The digest this run's build pushed; None without a build
+                    # (the activity then resolves the selected tag).
+                    (build_result or {}).get("digest"),
                 ],
                 start_to_close_timeout=timedelta(minutes=10),
                 retry_policy=RetryPolicy(
