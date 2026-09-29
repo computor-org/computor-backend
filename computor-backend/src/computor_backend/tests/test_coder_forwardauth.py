@@ -160,21 +160,84 @@ async def test_unauthenticated_navigation_to_non_workspace_path_gets_401():
     assert resp.status_code == 401
 
 
+# Distinctive synthetic credential values: asserting the complete value (not a
+# header prefix) catches a log line that prints a parsed-out bare token too.
+ACCESS = "fa_access_7c1e9d0b5a3f42e8"
+REFRESH = "fa_refresh_b84d2f6e19a0c357"
+API_TOKEN = "ctp_fa_apitoken_5e0a9c3b71d2"
+API_KEY = "fa_apikey_d93b6c20e7f41a58"
+_ALL_SECRETS = (ACCESS, REFRESH, API_TOKEN, API_KEY)
+
+
+def _assert_no_secret_logged(caplog):
+    logged = "\n".join(r.getMessage() for r in caplog.records)
+    for value in _ALL_SECRETS:
+        assert value not in logged
+
+
 @pytest.mark.asyncio
 async def test_credentials_never_reach_the_log(caplog):
     # Every workspace request passes through here; credential headers must not
-    # be logged, not even as a prefix.
-    secrets = {
-        "X-API-Token": "ctp_supersecretapitoken0123456789",
-        "Cookie": "ct_access_token=eyJhbGciOiJSUzI1NiJ9.secretpayload",
-        "Authorization": "Bearer eyJhbGciOiJSUzI1NiJ9.othersecret",
-        "X-API-Key": "key_0123456789abcdefghijklmnop",
+    # be logged, neither whole nor as the bare token behind "Bearer "/"name=".
+    headers = {
+        "X-API-Token": API_TOKEN,
+        "Cookie": f"ct_access_token={ACCESS}; ct_refresh_token={REFRESH}",
+        "Authorization": f"Bearer {ACCESS}",
+        "X-API-Key": API_KEY,
     }
-    caplog.set_level("DEBUG")
+    caplog.set_level("DEBUG", logger="computor_backend.api.auth")
     resp = await verify_coder_access(
-        _FakeRequest("/coder/%s/workspace/" % USER_OWNER, headers=secrets), _user()
+        _FakeRequest("/coder/%s/workspace/" % USER_OWNER, headers=headers), _user()
     )
     assert resp.status_code == 200
-    logged = caplog.text
-    for value in secrets.values():
-        assert value[:12] not in logged
+    _assert_no_secret_logged(caplog)
+
+
+_QUERY = f"?token={ACCESS}&refresh_token={REFRESH}&user_id=x"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("principal_factory", [_user, _admin])
+@pytest.mark.parametrize(
+    "uri",
+    [
+        f"/coder/{USER_OWNER}/workspace{_QUERY}",  # no trailing slash
+        f"/coder/{USER_OWNER}/workspace/{_QUERY}",  # trailing slash
+        f"/coder/{USER_OWNER}/workspace/proxy/8080/{_QUERY}#frag",
+    ],
+)
+async def test_query_credentials_in_workspace_url_never_logged(caplog, uri, principal_factory):
+    # The SSO callback redirect puts token/refresh_token into the workspace URL
+    # query; ForwardAuth sees it in X-Forwarded-Uri on every request.
+    caplog.set_level("DEBUG", logger="computor_backend.api.auth")
+    resp = await verify_coder_access(_FakeRequest(uri), principal_factory())
+    assert resp.status_code == 200
+    # The query is not part of the workspace identity.
+    assert _body(resp)["workspace"] == "workspace"
+    _assert_no_secret_logged(caplog)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "uri",
+    [
+        f"/invalid{_QUERY}",
+        f"/coder/{USER_OWNER}{_QUERY}",  # owner only, query right after it
+        f"/coder/{USER_OWNER}/{_QUERY}",
+        f"/coder/{USER_OWNER}/work%3Fspace{_QUERY}",  # encoded "?" in the segment
+    ],
+)
+async def test_rejected_workspace_url_is_not_echoed_to_the_log(caplog, uri):
+    caplog.set_level("DEBUG", logger="computor_backend.api.auth")
+    resp = await verify_coder_access(_FakeRequest(uri), _user())
+    assert resp.status_code == 403
+    _assert_no_secret_logged(caplog)
+
+
+@pytest.mark.asyncio
+async def test_foreign_workspace_with_query_credentials_never_logged(caplog):
+    caplog.set_level("DEBUG", logger="computor_backend.api.auth")
+    other = encode_coder_username("11111111-2222-3333-4444-555555555555")
+    resp = await verify_coder_access(_FakeRequest(f"/coder/{other}/ws/{_QUERY}"), _user())
+    assert resp.status_code == 403
+    _assert_no_secret_logged(caplog)

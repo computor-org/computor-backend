@@ -3,6 +3,7 @@ import logging
 import sys
 import uvicorn
 from computor_backend.settings import settings
+from computor_backend.utils.log_redaction import RedactQueryCredentialsFilter
 
 
 class ColoredFormatter(logging.Formatter):
@@ -89,6 +90,7 @@ def setup_logging():
     access_logger.addHandler(handler)  # Use our handler with colors
     access_logger.setLevel(logging.INFO)  # Keep access logs at INFO
     access_logger.addFilter(SuppressSuccessfulRequests())
+    access_logger.addFilter(RedactQueryCredentialsFilter())
 
     # Configure uvicorn.error to use our formatter
     error_logger = logging.getLogger("uvicorn.error")
@@ -176,6 +178,10 @@ if __name__ == "__main__":
         "filters": {
             "suppress_ok": {
                 "()": SuppressSuccessfulRequests
+            },
+            # Request lines include the query string: redact SSO codes/tokens.
+            "redact_credentials": {
+                "()": RedactQueryCredentialsFilter
             }
         },
         "formatters": {
@@ -200,7 +206,7 @@ if __name__ == "__main__":
                 "class": "logging.StreamHandler",
                 "formatter": "access",
                 "stream": "ext://sys.stdout",
-                "filters": ["suppress_ok"]
+                "filters": ["suppress_ok", "redact_credentials"]
             }
         },
         "loggers": {

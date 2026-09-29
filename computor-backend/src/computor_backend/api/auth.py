@@ -557,6 +557,19 @@ async def refresh_token(
 _WORKSPACE_PATH = re.compile(r"^/coder/[A-Za-z0-9._~-]+/[A-Za-z0-9._~-]+(?:[/?][^\r\n]*)?$")
 
 
+# Owner and workspace segments of a /coder/{owner}/{workspace}[/...] path. Applied
+# to the path only (query and fragment stripped first) and restricted to Coder's
+# name alphabet, so nothing from a query string can end up in a logged segment.
+_CODER_WORKSPACE_SEGMENTS = re.compile(r"^/coder/([A-Za-z0-9._~-]+)/([A-Za-z0-9._~-]+)(?:/.*)?$")
+
+
+def _coder_workspace_segments(uri: str) -> Optional[tuple]:
+    """(owner, workspace) from a forwarded URI's path, or None if it is not one."""
+    path = uri.split("#", 1)[0].split("?", 1)[0]
+    match = _CODER_WORKSPACE_SEGMENTS.match(path)
+    return (match.group(1), match.group(2)) if match else None
+
+
 def _public_api_base() -> str:
     """Public base URL of this API; empty means same-origin relative URLs."""
     return os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
@@ -667,26 +680,30 @@ async def verify_coder_access(
             return RedirectResponse(url=reauth, status_code=302)
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
 
-    logger.debug("ForwardAuth request for %s by user %s", original_uri, principal.user_id)
+    # Extract owner + workspace from the URL *path* only: /coder/{owner}/{workspace}/...
+    # The forwarded URI can carry a query string with credentials (the SSO callback
+    # appends token/refresh_token to its redirect), so the raw URI is never logged
+    # and the query never leaks into the parsed segments. Regular users get a Coder
+    # username of u{backend_uuid}; the shared admin/service account keeps its plain
+    # username (e.g. "admin"). Accept any owner segment here and decide below.
+    segments = _coder_workspace_segments(original_uri)
 
-    # Extract owner + workspace from the URL path: /coder/{owner}/{workspace}/...
-    # Regular users get a Coder username of u{backend_uuid}; the shared admin/service
-    # account keeps its plain username (e.g. "admin"), which is not the u{uuid} form.
-    # Accept any owner segment here and decide authorization below.
-    pattern = r"/coder/([^/]+)/([^/]+)"
-    match = re.match(pattern, original_uri)
-
-    if not match:
-        logger.warning(f"Invalid Coder URL format: {original_uri}")
+    if segments is None:
+        logger.warning(
+            "Rejected ForwardAuth request from user %s: malformed workspace URL",
+            principal.user_id,
+        )
         return JSONResponse(
             status_code=403,
             content={"detail": "Invalid workspace URL format"}
         )
 
-    url_owner = match.group(1)  # e.g. "u0232de59-..." (regular user) or "admin"
-    workspace_name = match.group(2)
+    url_owner, workspace_name = segments  # owner e.g. "u0232de59-..." or "admin"
 
-    logger.debug(f"URL owner: {url_owner}, workspace: {workspace_name}")
+    logger.debug(
+        "ForwardAuth request for workspace %s/%s by user %s",
+        url_owner, workspace_name, principal.user_id,
+    )
 
     # Admins may access any workspace. This also covers the admin/service account,
     # whose Coder username is not the u{uuid} form and so would never match the
