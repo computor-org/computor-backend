@@ -423,7 +423,8 @@ def check_octave_installed() -> Tuple[bool, str]:
     return OctaveExecutor.check_installed()
 
 
-def run_structural_analysis(file_path: str, keywords: List[str]) -> Dict[str, int]:
+def run_structural_analysis(file_path: str, keywords: List[str],
+                            root: Optional[str] = None) -> Dict[str, int]:
     """
     Analyze Octave file for structural elements (keywords).
 
@@ -436,7 +437,7 @@ def run_structural_analysis(file_path: str, keywords: List[str]) -> Dict[str, in
     """
     try:
         # Student-controlled: no symlinks/FIFOs, size-capped (#237).
-        content = read_untrusted_text(file_path)
+        content = read_untrusted_text(file_path, root=root)
     except Exception as e:
         logger.error(f"Failed to read file {file_path}: {e}")
         return {kw: 0 for kw in keywords}

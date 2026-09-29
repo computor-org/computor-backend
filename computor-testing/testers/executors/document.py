@@ -126,7 +126,7 @@ class DocumentAnalyzer(BaseExecutor):
         return True, "Built-in text analyzer"
 
     @classmethod
-    def from_file(cls, file_path: str) -> "DocumentAnalyzer":
+    def from_file(cls, file_path: str, root: Optional[str] = None) -> "DocumentAnalyzer":
         """
         Create a DocumentAnalyzer from a file path.
 
@@ -141,7 +141,7 @@ class DocumentAnalyzer(BaseExecutor):
         analyzer._is_markdown = path.suffix.lower() in ('.md', '.markdown', '.mdown')
 
         # Student-controlled: no symlinks/FIFOs, size-capped (#237).
-        analyzer._content = read_untrusted_text(file_path)
+        analyzer._content = read_untrusted_text(file_path, root=root)
 
         return analyzer
 
@@ -183,7 +183,7 @@ class DocumentAnalyzer(BaseExecutor):
             self._is_markdown = path.suffix.lower() in ('.md', '.markdown', '.mdown')
 
             # Student-controlled: no symlinks/FIFOs, size-capped (#237).
-            self._content = read_untrusted_text(source_path)
+            self._content = read_untrusted_text(source_path, root=self.working_dir)
 
             # Analyze
             metrics = self.analyze()

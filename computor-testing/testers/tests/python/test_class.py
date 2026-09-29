@@ -81,20 +81,21 @@ def _tokenize_name(name: str):
     return pieces or None
 
 
-def _read_tokens(file_path: str):
+def _read_tokens(file_path: str, root=None):
     """Tokenize a student file, failing the test if it cannot be parsed."""
     try:
         # Student-controlled: no symlinks/FIFOs, size-capped (#237).
-        data = read_untrusted_bytes(file_path)
+        data = read_untrusted_bytes(file_path, root=root)
         return list(tokenize.tokenize(io.BytesIO(data).readline))
     except (tokenize.TokenError, SyntaxError, IndentationError) as e:
         pytest.fail(f"Could not tokenize student file: {e}")
 
 
-def _count_single_token(file_path: str, name: str, occurance_type=None) -> int:
+def _count_single_token(file_path: str, name: str, occurance_type=None,
+                        root=None) -> int:
     """Count tokens whose text equals `name`, optionally filtered by token type."""
     count = 0
-    for _token in _read_tokens(file_path):
+    for _token in _read_tokens(file_path, root):
         if occurance_type:
             c_type = getattr(token, occurance_type, None)
             if c_type and _token.type == c_type and _token.string == name:
@@ -104,7 +105,7 @@ def _count_single_token(file_path: str, name: str, occurance_type=None) -> int:
     return count
 
 
-def _count_token_sequence(file_path: str, name: str) -> int:
+def _count_token_sequence(file_path: str, name: str, root=None) -> int:
     """
     Count non-overlapping occurrences of `name` as a token sequence.
 
@@ -114,12 +115,12 @@ def _count_token_sequence(file_path: str, name: str) -> int:
     """
     needle = _tokenize_name(name)
     if needle is None:
-        return _count_single_token(file_path, name)
+        return _count_single_token(file_path, name, root=root)
     if len(needle) == 1:
-        return _count_single_token(file_path, needle[0])
+        return _count_single_token(file_path, needle[0], root=root)
 
     hay = [
-        t.string for t in _read_tokens(file_path)
+        t.string for t in _read_tokens(file_path, root)
         if t.type not in _HAYSTACK_SKIP_TYPES
     ]
 
@@ -542,17 +543,18 @@ class TestComputorPython:
 
             if sub.pattern:
                 # Student-controlled: no symlinks/FIFOs, size-capped (#237).
-                source = read_untrusted_text(file_path)
+                source = read_untrusted_text(file_path, root=dir_student)
                 try:
                     count = len(safe_regex_findall(sub.pattern, source))
                 except RegexTimeoutError:
                     pytest.fail(f"Pattern `{sub.pattern}` timed out (possible ReDoS)")
             elif sub.occuranceType:
                 count = _count_single_token(
-                    file_path, sub.name, occurance_type=sub.occuranceType
+                    file_path, sub.name, occurance_type=sub.occuranceType,
+                    root=dir_student,
                 )
             else:
-                count = _count_token_sequence(file_path, sub.name)
+                count = _count_token_sequence(file_path, sub.name, root=dir_student)
 
             if sub.allowedOccuranceRange is not None:
                 check_occurrence_range(

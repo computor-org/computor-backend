@@ -209,7 +209,7 @@ def check_c_installed() -> Tuple[bool, str]:
     return CExecutor.check_installed()
 
 
-def analyze_source(source_path: str) -> Dict[str, Any]:
+def analyze_source(source_path: str, root: Optional[str] = None) -> Dict[str, Any]:
     """
     Perform basic static analysis on C/C++ source code.
 
@@ -221,7 +221,7 @@ def analyze_source(source_path: str) -> Dict[str, Any]:
     """
     try:
         # Student-controlled: no symlinks/FIFOs, size-capped (#237).
-        content = read_untrusted_text(source_path)
+        content = read_untrusted_text(source_path, root=root)
     except Exception as e:
         return {"error": str(e)}
 

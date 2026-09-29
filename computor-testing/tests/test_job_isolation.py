@@ -482,3 +482,22 @@ def test_required_mode_refuses_partial_isolation(monkeypatch, capsys, abi):
     assert launch.main() == 125
     assert not executed
     assert "required" in capsys.readouterr().err
+
+
+# --- 9. no symlink in any path component ------------------------------------
+
+def test_symlinked_directory_in_student_path_is_refused(tmp_path):
+    from ctexec.safe_io import UnsafeFileError, read_untrusted_text
+    reference = tmp_path / "reference"
+    reference.mkdir()
+    (reference / "solution.py").write_text("TOPSECRET")
+    student = tmp_path / "student"
+    student.mkdir()
+    (student / "src").symlink_to(reference)          # directory symlink
+    (student / "ok.py").write_text("x = 1")
+    with pytest.raises(UnsafeFileError, match="symlink"):
+        read_untrusted_text(str(student / "src" / "solution.py"), root=str(student))
+    with pytest.raises(UnsafeFileError, match="beneath"):
+        read_untrusted_text(str(student / ".." / "reference" / "solution.py"),
+                            root=str(student))
+    assert read_untrusted_text(str(student / "ok.py"), root=str(student)) == "x = 1"

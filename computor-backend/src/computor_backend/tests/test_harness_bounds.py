@@ -91,3 +91,41 @@ def test_harness_leader_unreaped_until_group_killed(monkeypatch, script, timeout
     except subprocess.TimeoutExpired:
         assert timeout == 1
     assert seen and all(seen)
+
+
+# --- testSummary.json ingestion (#237) --------------------------------------
+
+from computor_backend.tasks.temporal_student_testing import (  # noqa: E402
+    UnsafeReportError,
+    _read_test_report,
+)
+
+
+def test_report_reads_regular_json(tmp_path):
+    (tmp_path / "testSummary.json").write_text('{"passed": 3}')
+    assert _read_test_report(str(tmp_path), "testSummary.json") == {"passed": 3}
+
+
+def test_report_symlink_to_worker_file_is_refused(tmp_path):
+    secret = tmp_path / "worker_only.json"
+    secret.write_text('{"passed": 99, "leak": "TOPSECRET"}')
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "testSummary.json").symlink_to(secret)
+    with pytest.raises(UnsafeReportError, match="symlink"):
+        _read_test_report(str(out), "testSummary.json")
+
+
+def test_report_fifo_does_not_block(tmp_path):
+    os.mkfifo(tmp_path / "testSummary.json")
+    start = time.monotonic()
+    with pytest.raises(UnsafeReportError, match="regular"):
+        _read_test_report(str(tmp_path), "testSummary.json")
+    assert time.monotonic() - start < 5
+
+
+def test_report_size_is_capped(tmp_path):
+    with open(tmp_path / "testSummary.json", "wb") as f:
+        f.truncate(1 << 30)  # 1 GiB, sparse
+    with pytest.raises(UnsafeReportError, match="too large"):
+        _read_test_report(str(tmp_path), "testSummary.json")

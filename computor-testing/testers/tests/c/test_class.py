@@ -208,7 +208,7 @@ class TestComputorC(CompiledTestClass):
         if not file_path or not os.path.exists(file_path):
             pytest.fail("Source file not found for structural test")
 
-        analysis = analyze_source(file_path)
+        analysis = analyze_source(file_path, root=dir_student)
 
         if "error" in analysis:
             pytest.fail(f"Analysis failed: {analysis['error']}")
@@ -234,7 +234,7 @@ class TestComputorC(CompiledTestClass):
         else:
             # Check if it's in the source
             # Student-controlled: no symlinks/FIFOs, size-capped (#237).
-            content = read_untrusted_text(file_path)
+            content = read_untrusted_text(file_path, root=dir_student)
 
             if pattern:
                 try:
