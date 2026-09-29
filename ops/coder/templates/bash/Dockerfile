@@ -1,6 +1,6 @@
 # Minimal Debian workspace with a browser terminal (ttyd).
 # No code-server, no VSIX — the workspace app is the terminal itself.
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
@@ -19,9 +19,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # ttyd is not packaged in bookworm — install the official static binary
+# Bump TTYD_VERSION and TTYD_SHA256 together (sha256 of ttyd.x86_64, matches the
+# release SHA256SUMS).
 ARG TTYD_VERSION=1.7.7
+ARG TTYD_SHA256=8a217c968aba172e0dbf3f34447218dc015bc4d5e59bf51db2f2cd12b7be4f55
 RUN curl -fsSL -o /usr/local/bin/ttyd \
     "https://github.com/tsl0922/ttyd/releases/download/${TTYD_VERSION}/ttyd.x86_64" \
+    && echo "${TTYD_SHA256}  /usr/local/bin/ttyd" | sha256sum -c - \
     && chmod +x /usr/local/bin/ttyd
 
 # UTF-8 locale for a sane terminal experience

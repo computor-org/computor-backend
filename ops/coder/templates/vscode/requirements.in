@@ -1,0 +1,6 @@
+# Top-level packages for the vscode workspace image (Python 3.13 built in the
+# Dockerfile). Regenerate the lock with (7-day cooldown: timestamp one week ago):
+#   uv pip compile requirements.in --generate-hashes --python-version 3.13 \
+#     --python-platform x86_64-manylinux_2_28 --exclude-newer <UTC ts> -o requirements.lock
+matplotlib
+ipykernel

@@ -430,6 +430,38 @@ def cleanup_stale_workspace_images(
     return result
 
 
+def _latest_registry_digest(repo: str) -> str:
+    """Return the immutable ``sha256:`` digest the registry serves for ``repo:latest``.
+
+    Asked through the worker's Docker daemon, which is the same path the build
+    activity pushes through, so it reaches the registry under the same host.
+    """
+    import docker as docker_sdk
+
+    client = docker_sdk.DockerClient(
+        base_url="unix://" + get_worker_settings().docker_socket_path
+    )
+    try:
+        return client.images.get_registry_data(f"{repo}:latest").id
+    finally:
+        client.close()
+
+
+def _workspace_image_ref(
+    registry_host: str, image_name: str, image_tag: str, resolve_digest
+) -> str:
+    """The ``workspace_image`` a template version is pinned to.
+
+    A versioned tag from this run's build is used as is. ``latest`` (a template
+    push without a build) is a moving tag, so it is resolved to the digest the
+    registry holds right now and pinned as ``<registry>/<image>@sha256:...``;
+    ``resolve_digest(repo)`` does the lookup and may raise.
+    """
+    if image_tag != "latest":
+        return f"{registry_host}/{image_name}:{image_tag}"
+    return f"{registry_host}/{image_name}@{resolve_digest(image_name)}"
+
+
 def _template_declares_variable(template_dir: str, name: str) -> bool:
     """True if any .tf file in the template declares `variable "<name>"`.
 
@@ -604,7 +636,20 @@ async def push_coder_template(
     if worker_backend_url:
         backend_internal_url = worker_backend_url.rstrip("/")
 
-    image_ref = f"{registry_host}/{info['image_name']}:{image_tag}"
+    # Resolve through the worker's push host (as the build activity does); the
+    # digest is host-independent, so the ref keeps the provisioner's host.
+    push_host = get_worker_settings().coder_registry_host or registry_host
+    try:
+        image_ref = _workspace_image_ref(
+            registry_host, info["image_name"], image_tag,
+            lambda name: _latest_registry_digest(f"{push_host}/{name}"),
+        )
+    except Exception as e:
+        return {
+            "success": False, "template": template_key,
+            "error": f"Cannot pin {info['image_name']}:latest to a digest "
+                     f"(build the image first): {e}",
+        }
 
     # Route login and template GET/PATCH through CoderClient instead of raw
     # httpx. The client is configured with this activity's resolved url and
@@ -916,7 +961,9 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
         # Without a build there is nothing to give a fresh tag to, and pinning
         # the template to one would produce a version whose every workspace
         # fails with "unable to pull image ...:vYYYYMMDD-HHMMSS". Fall back to
-        # the tag the last build published instead.
+        # the image the last build published: push_coder_template resolves
+        # "latest" to its current registry digest, so the version is still
+        # pinned immutably.
         no_cache = bool(parameters.get("no_cache", False))
         image_tag = parameters.get("image_tag")
         if not image_tag:
