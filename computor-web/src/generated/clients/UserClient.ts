@@ -3,7 +3,7 @@
  * Endpoint: /user
  */
 
-import type { CourseGitDescriptor, CourseMemberGet, CourseMemberProviderAccountUpdate, CourseMemberReadinessStatus, CourseMemberRepositoryGet, CourseMemberRepositoryRegister, CourseMemberValidationRequest, PersonalCloneCredentialGet, StudentRepositoryProvisioned, TemplateAccessGet, UserGet, UserScopes } from 'types/generated';
+import type { CourseGitDescriptor, CourseMemberGet, CourseMemberProviderAccountUpdate, CourseMemberReadinessStatus, CourseMemberRepositoryGet, CourseMemberRepositoryRegister, CourseMemberValidationRequest, PersonalCloneCredentialGet, ReferralInviteList, StudentRepositoryProvisioned, TemplateAccessGet, UserGet, UserScopes } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -57,7 +57,8 @@ export class UserClient extends BaseEndpointClient {
    * clicks Enrol is not demoted. There is no matching DELETE; course staff
    * remove members.
    * 404 when the course does not exist *or* is not public: a private course
-   * must not be distinguishable from a missing one.
+   * must not be distinguishable from a missing one. 409 (``CONFLICT_003``) when
+   * the course's ``max_self_registrations`` cap is reached.
    */
   async enrollInPublicCourseUserCoursesCourseIdEnrollPost({ courseId, userId }: { courseId: string | string; userId?: string | null }): Promise<CourseMemberGet> {
     const queryParams: Record<string, unknown> = {
@@ -200,6 +201,20 @@ export class UserClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.post<CourseMemberReadinessStatus>(this.buildPath('courses', courseId, 'validate'), body, { params: queryParams });
+  }
+
+  /**
+   * Your invite-a-friend links
+   * The caller's single-use referral invites, created on first read.
+   * Only while registration is ``invite_only`` are new ones minted (up to
+   * ``referral_invites_per_user``); staff and service accounts get none —
+   * they hand out invites through the admin invite page instead.
+   */
+  async getReferralInvitesUserReferralInvitesGet({ userId }: { userId?: string | null }): Promise<ReferralInviteList> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.get<ReferralInviteList>(this.buildPath('referral-invites'), { params: queryParams });
   }
 
   /**

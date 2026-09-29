@@ -41,6 +41,7 @@
 | `reloadPluginsAuthAdminPluginsReloadPost` | POST | `/auth/admin/plugins/reload` | — | `Record<string, unknown> & Record<string, unknown>` |
 | `disablePluginAuthAdminPluginsPluginNameDisablePost` | POST | `/auth/admin/plugins/{plugin_name}/disable` | — | `Record<string, unknown> & Record<string, unknown>` |
 | `enablePluginAuthAdminPluginsPluginNameEnablePost` | POST | `/auth/admin/plugins/{plugin_name}/enable` | — | `Record<string, unknown> & Record<string, unknown>` |
+| `coderReauthAuthCoderReauthGet` | GET | `/auth/coder-reauth` | — | `void` |
 | `logoutAuthLogoutPost` | POST | `/auth/logout` | — | `LogoutResponse` |
 | `listProvidersAuthProvidersGet` | GET | `/auth/providers` | — | `ProviderInfo[]` |
 | `refreshTokenAuthRefreshPost` | POST | `/auth/refresh` | `TokenRefreshRequest` | `TokenRefreshResponse` |
@@ -48,6 +49,7 @@
 | `ssoSuccessAuthSuccessGet` | GET | `/auth/success` | — | `void` |
 | `verifyCoderAccessAuthVerifyCoderAccessGet` | GET | `/auth/verify-coder-access` | — | `void` |
 | `verifyDocumentsAccessAuthVerifyDocumentsAccessGet` | GET | `/auth/verify-documents-access` | — | `void` |
+| `workspaceUnavailableAuthWorkspaceUnavailableOwnerWorkspaceNameGet` | GET | `/auth/workspace-unavailable/{owner}/{workspace_name}` | — | `void` |
 | `handleCallbackAuthProviderCallbackGet` | GET | `/auth/{provider}/callback` | — | `void` |
 | `initiateLoginAuthProviderLoginGet` | GET | `/auth/{provider}/login` | — | `void` |
 | `ssoLogoutAuthProviderLogoutGet` | GET | `/auth/{provider}/logout` | — | `void` |
@@ -353,6 +355,7 @@
 | --- | --- | --- | --- | --- |
 | `getInvitePublicInvitesTokenGet` | GET | `/invites/{token}` | — | `InviteLinkPublic` |
 | `acceptInviteInvitesTokenAcceptPost` | POST | `/invites/{token}/accept` | `InviteAccept` | `Record<string, unknown> & Record<string, unknown>` |
+| `getInviteStatusInvitesTokenStatusGet` | GET | `/invites/{token}/status` | — | `InviteStatusPublic` |
 
 ## IssueReportsClient
 - Base path: `/issue-reports`
@@ -734,6 +737,7 @@
 | `templateAccessEndpointUserCoursesCourseIdTemplateAccessPost` | POST | `/user/courses/{course_id}/template-access` | — | `TemplateAccessGet` |
 | `downloadTemplateArchiveEndpointUserCoursesCourseIdTemplateArchiveGet` | GET | `/user/courses/{course_id}/template/archive` | — | `void` |
 | `validateCurrentUserCourseUserCoursesCourseIdValidatePost` | POST | `/user/courses/{course_id}/validate` | `CourseMemberValidationRequest` | `CourseMemberReadinessStatus` |
+| `getReferralInvitesUserReferralInvitesGet` | GET | `/user/referral-invites` | — | `ReferralInviteList` |
 | `getCurrentUserScopesUserScopesGet` | GET | `/user/scopes` | — | `UserScopes` |
 | `getCourseViewsForCurrentUserUserViewsGet` | GET | `/user/views` | — | `string[]` |
 | `getCourseViewsForCurrentUserByCourseUserViewsCourseIdGet` | GET | `/user/views/{course_id}` | — | `string[]` |
