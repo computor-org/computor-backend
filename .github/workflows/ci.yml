@@ -31,6 +31,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_coder_source_repo_pinning.py
           computor-backend/src/computor_backend/tests/test_coder_workspace_image_pinning.py
           computor-backend/src/computor_backend/tests/test_db_dependency_lifecycle.py
+          computor-backend/src/computor_backend/tests/test_keycloak_healthcheck.py
           computor-backend/src/computor_backend/tests/test_log_redaction.py
           computor-backend/src/computor_backend/tests/test_password_hashing.py
           computor-backend/src/computor_backend/tests/test_route_shadowing.py
