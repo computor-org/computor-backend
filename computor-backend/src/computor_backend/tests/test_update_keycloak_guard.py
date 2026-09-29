@@ -55,7 +55,8 @@ def _make_repos(tmp_path, from_tag, to_tag):
     return origin, deploy, a, b
 
 
-def _run_update(tmp_path, origin, deploy, a, dump_body, keycloak_enabled="true"):
+def _run_update(tmp_path, origin, deploy, a, dump_body, keycloak_enabled="true",
+                kc_state="exited", stop_fails=False, docker_ps_fails=False):
     calls = tmp_path / "calls.log"
     script = textwrap.dedent(f"""
         set -u
@@ -78,7 +79,17 @@ def _run_update(tmp_path, origin, deploy, a, dump_body, keycloak_enabled="true")
         sleep() {{ :; }}
         compose() {{
             echo "compose $*" >> "$CALLS"
-            case "$*" in *pg_dumpall*) printf '%b' '{dump_body}';; esac
+            case "$*" in
+                *pg_dumpall*) printf '%b' '{dump_body}';;
+                "stop keycloak") [ "{int(stop_fails)}" = 1 ] && return 1;;
+            esac
+            return 0
+        }}
+        docker() {{
+            echo "docker $*" >> "$CALLS"
+            case "$1" in
+                ps) [ "{int(docker_ps_fails)}" = 1 ] && return 1; echo "{kc_state}";;
+            esac
             return 0
         }}
         # The API only comes up healthy on the OLD commit.
@@ -143,3 +154,22 @@ def test_decision_table(from_tag, to_tag, enabled, expected):
     out = subprocess.run(["bash", "-c", f'source {UPDATE_SH}; keycloak_update_decision "$1" "$2" "$3"',
                           "_", from_tag, to_tag, enabled], capture_output=True, text=True, check=True)
     assert out.stdout.strip() == expected
+
+
+@pytest.mark.parametrize("kw", [dict(kc_state="running"), dict(stop_fails=True),
+                                dict(docker_ps_fails=True), dict(kc_state="restarting")])
+def test_unverified_keycloak_shutdown_aborts_before_dump_and_new_start(tmp_path, kw):
+    origin, deploy, a, b = _make_repos(tmp_path, "25.0.6", "26.7.4")
+    p, calls = _run_update(tmp_path, origin, deploy, a, COMPLETE_DUMP, **kw)
+    assert p.returncode == 0, p.stdout + p.stderr          # ordinary safe rollback
+    assert "pg_dumpall" not in calls                         # no dump of a live DB
+    assert calls.count("compose up -d\n") == 1              # only the rollback start
+    assert _git(deploy, "rev-parse", "HEAD") == a
+    assert "did not stop cleanly" in calls
+
+
+@pytest.mark.parametrize("state", ["exited", ""])
+def test_verified_shutdown_precedes_dump(tmp_path, state):
+    origin, deploy, a, b = _make_repos(tmp_path, "25.0.6", "26.7.4")
+    p, calls = _run_update(tmp_path, origin, deploy, a, COMPLETE_DUMP, kc_state=state)
+    assert calls.index("compose stop keycloak") < calls.index("docker ps -a") < calls.index("pg_dumpall")
