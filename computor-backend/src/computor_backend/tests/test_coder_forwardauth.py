@@ -1,8 +1,9 @@
 """Unit tests for the Coder ForwardAuth endpoint (verify_coder_access).
 
 Covers the workspace-access authorization gate Traefik calls before forwarding to a
-code-server workspace, including the admin bypass that lets the shared admin/service
-account (Coder username "admin", not the u{uuid} form) reach its workspace.
+code-server workspace, including the narrow admin exception that lets admins reach the shared
+admin/service account's workspace (Coder username "admin", not the u{uuid}
+form) but never another user's workspace.
 """
 
 import json
@@ -54,9 +55,30 @@ async def test_admin_can_access_admin_owned_workspace():
 
 
 @pytest.mark.asyncio
-async def test_admin_can_access_any_user_workspace():
+async def test_admin_cannot_access_other_user_workspace():
+    # Workspaces run on the app origin: an admin opening a user's workspace
+    # would execute that workspace's JS under the admin session.
     resp = await verify_coder_access(_FakeRequest("/coder/%s/workspace/" % USER_OWNER), _admin())
+    assert resp.status_code == 403
+    assert "administrators do not" in _body(resp)["detail"]
+
+
+@pytest.mark.asyncio
+async def test_admin_can_access_own_workspace():
+    admin_uuid = "9f1c2d3e-4a5b-4c6d-8e7f-001122334455"
+    admin = Principal(user_id=admin_uuid, roles=["_admin"])
+    owner = encode_coder_username(admin_uuid)
+    resp = await verify_coder_access(_FakeRequest("/coder/%s/workspace/" % owner), admin)
     assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_admin_service_account_name_follows_env(monkeypatch):
+    monkeypatch.setenv("CODER_ADMIN_USERNAME", "svc")
+    ok = await verify_coder_access(_FakeRequest("/coder/svc/workspace/"), _admin())
+    assert ok.status_code == 200
+    denied = await verify_coder_access(_FakeRequest("/coder/admin/workspace/"), _admin())
+    assert denied.status_code == 403
 
 
 @pytest.mark.asyncio

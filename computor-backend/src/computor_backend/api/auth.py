@@ -812,10 +812,13 @@ async def verify_coder_access(
         url_owner, workspace_name, principal.user_id,
     )
 
-    # Admins may access any workspace. This also covers the admin/service account,
-    # whose Coder username is not the u{uuid} form and so would never match the
-    # owner check below. Consistent with the system-wide is_admin bypass.
-    if principal.is_admin:
+    # Workspaces are served on the app origin, so a workspace page runs with the
+    # viewer's app session. Admins therefore get NO bypass for other users'
+    # workspaces: a malicious workspace must never execute JS under an admin
+    # session. The only extra an admin gets is the shared admin/service
+    # account's workspaces, whose Coder username (CODER_ADMIN_USERNAME, default
+    # "admin") is not the u{uuid} form and so never matches the owner check.
+    if principal.is_admin and url_owner == os.environ.get("CODER_ADMIN_USERNAME", "admin"):
         logger.info(f"Admin {principal.user_id} authorized for workspace {url_owner}/{workspace_name}")
         bump_workspace_activity(url_owner, workspace_name)
         return JSONResponse(
@@ -834,7 +837,12 @@ async def verify_coder_access(
         return JSONResponse(
             status_code=403,
             content={
-                "detail": "You are not authorized to access this workspace",
+                "detail": (
+                    "You are not authorized to access this workspace. Workspaces "
+                    "can only be opened by their owner; administrators do not "
+                    "get access to other users' workspaces (they run on the "
+                    "application origin)."
+                ),
                 "workspace_owner": url_owner,
                 "authenticated_user": principal.user_id
             }
