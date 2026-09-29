@@ -7,6 +7,9 @@ import { CourseProvider } from '@/src/contexts/CourseContext';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import MaintenanceBanner from './MaintenanceBanner';
+import LegalLinks from './LegalLinks';
+import NetideeNotice from './NetideeNotice';
+import { LEGAL_LINKS } from '@/src/config/legal';
 import { API_BASE_URL, apiGet, redirectToConsent } from '@/src/utils/apiClient';
 import type { ConsentStatusGet as ConsentStatus } from 'types/generated';
 
@@ -83,6 +86,15 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
         <main className="flex-1 overflow-y-auto min-h-0 scroll-slim">
           {children}
         </main>
+
+        {/* Compact legal footer, outside the scroll container so it never
+            covers page content. Absent under NEXT_PUBLIC_LEGAL_PROFILE=none. */}
+        {LEGAL_LINKS.length > 0 && (
+          <footer className="shrink-0 border-t border-rule bg-surface px-4 py-1.5 text-xs text-muted flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+            <LegalLinks />
+            <NetideeNotice compact />
+          </footer>
+        )}
       </div>
     </div>
     </CourseProvider>
