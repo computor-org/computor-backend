@@ -3,20 +3,17 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { safeInternalPath } from '@/src/utils/safeRedirect';
 
 /**
- * Optional `?next=/path` target (e.g. the landing page's catalog CTA). Only
- * same-origin absolute paths; /auth/success re-validates before redirecting.
- * Read from window.location instead of useSearchParams so the page needs no
- * Suspense boundary.
+ * Optional `?next=/path` target (e.g. the landing page's catalog CTA), reduced
+ * to a canonical same-origin path by safeInternalPath. /auth/success validates
+ * the stored value again. Read from window.location instead of useSearchParams
+ * so the page needs no Suspense boundary.
  */
 function nextPath(): string | undefined {
   const next = new URLSearchParams(window.location.search).get('next');
-  // "/\\host" is treated like "//host" by browsers, so reject backslashes too.
-  if (!next || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) {
-    return undefined;
-  }
-  return next;
+  return safeInternalPath(next, window.location.origin) ?? undefined;
 }
 
 export default function LoginPage() {
