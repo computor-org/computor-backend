@@ -20,7 +20,7 @@ networks:
 
 services:
   forgejo-keycloak-setup:
-    image: codeberg.org/forgejo/forgejo:9
+    image: codeberg.org/forgejo/forgejo:9.0.3@sha256:3c34f11fe8b9983096eef3f8f25c2d2c21c4ae7504960cb203f0b075d1d8ed73
     container_name: computor-forgejo-keycloak-setup
     # Run as the image's git user: the forgejo CLI (admin auth add-oauth)
     # refuses to run as root, and the overridden entrypoint skips the image's

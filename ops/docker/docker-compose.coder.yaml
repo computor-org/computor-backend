@@ -10,7 +10,7 @@ services:
   # `socket-proxy`, so dev and prod are wired identically and the ingress never
   # needs the raw socket.
   coder-socket-proxy:
-    image: tecnativa/docker-socket-proxy:0.3.0
+    image: tecnativa/docker-socket-proxy:0.3.0@sha256:9e4b9e7517a6b660f2cc903a19b257b1852d5b3344794e3ea334ff00ae677ac2
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-socket-proxy
     networks:
       - computor-network
@@ -45,7 +45,7 @@ services:
   # to the public domain, and the public domain never has to resolve inside
   # a workspace.
   workspace-ingress:
-    image: traefik:v3.6.6
+    image: traefik:v3.7.13@sha256:24841fe2de7304c149343d877d2923b4c8800a38ba015dea9174c23b20e344a0
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}workspace-ingress
     restart: unless-stopped
     security_opt:
@@ -95,7 +95,7 @@ services:
 
   # Dedicated PostgreSQL database for Coder (separate from main DB)
   coder-postgres:
-    image: postgres:16
+    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
     networks:
       - computor-network
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-postgres
