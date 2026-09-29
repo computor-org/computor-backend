@@ -1,0 +1,11 @@
+# Top-level packages for the jupyter workspace image. Regenerate the lock with
+# (7-day cooldown: pass a timestamp one week in the past):
+#   uv pip compile requirements.in --generate-hashes --python-version 3.12 \
+#     --python-platform x86_64-manylinux_2_28 --exclude-newer <UTC ts> -o requirements.lock
+jupyterlab
+numpy
+pandas
+matplotlib
+scipy
+sympy
+ipywidgets

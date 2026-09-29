@@ -1,5 +1,5 @@
 # Ubuntu XFCE desktop workspace served in the browser via KasmVNC.
-FROM ubuntu:24.04
+FROM ubuntu:24.04@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -31,9 +31,12 @@ RUN sed -i 's/^# *en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen
 ENV LANG=en_US.UTF-8
 
 # KasmVNC server (web-native VNC: built-in webserver + websocket transport)
+# Bump KASMVNC_VERSION and KASMVNC_SHA256 together (sha256 of the noble amd64 .deb).
 ARG KASMVNC_VERSION=1.3.4
+ARG KASMVNC_SHA256=b222f104a839b1ec6ac4a28f5f2876463204e3c2ba3724a31c3fb59e1a780740
 RUN curl -fsSL -o /tmp/kasmvncserver.deb \
     "https://github.com/kasmtech/KasmVNC/releases/download/v${KASMVNC_VERSION}/kasmvncserver_noble_${KASMVNC_VERSION}_amd64.deb" \
+    && echo "${KASMVNC_SHA256}  /tmp/kasmvncserver.deb" | sha256sum -c - \
     && apt-get update \
     && apt-get install -y --no-install-recommends /tmp/kasmvncserver.deb \
     && rm /tmp/kasmvncserver.deb \
