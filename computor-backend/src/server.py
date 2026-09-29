@@ -233,6 +233,8 @@ if __name__ == "__main__":
         }
     }
 
+    from computor_backend.utils.client_info import forwarded_allow_ips
+
     is_production = settings.DEBUG_MODE == "production"
     uvicorn.run(
         "computor_backend.server:app",
@@ -246,5 +248,8 @@ if __name__ == "__main__":
         # callback URIs). forwarded_allow_ips lets uvicorn trust Traefik's
         # X-Forwarded-Proto so generated URLs use https, not http.
         root_path="/api" if is_production else "",
-        forwarded_allow_ips="*" if is_production else None,
+        # Only the actual proxies (FORWARDED_ALLOW_IPS, default the Docker
+        # networks Traefik uses), never "*": with a wildcard Uvicorn takes the
+        # client-written leftmost X-Forwarded-For entry as the client address.
+        forwarded_allow_ips=forwarded_allow_ips() if is_production else None,
     )

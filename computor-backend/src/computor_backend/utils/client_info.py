@@ -132,20 +132,30 @@ def make_device_label(user_agent: str) -> str:
         return user_agent[:100]  # Truncate long user agents
 
 
-# Direct peers whose X-Real-IP header is believed. Mirrors the Traefik
-# ``forwardedHeaders.trustedIPs`` of the compose files: on computor.at nginx
-# sets X-Real-IP to $remote_addr, Traefik (a trusted hop) keeps it, and the API
-# port is only bound to 127.0.0.1. Override with TRUSTED_PROXY_CIDRS.
-DEFAULT_TRUSTED_PROXY_CIDRS = "127.0.0.1/32,::1/128,172.16.0.0/12,192.168.0.0/16"
+# Proxies whose forwarding headers are believed — by Uvicorn's
+# ProxyHeadersMiddleware (server.py passes this as forwarded_allow_ips) and by
+# trusted_client_ip below. The default mirrors the Traefik
+# ``forwardedHeaders.trustedIPs`` of the compose files (the Docker networks
+# Traefik and nginx reach the API from); the API port itself is bound to
+# 127.0.0.1. Never "*": Uvicorn would then take the LEFTMOST X-Forwarded-For
+# entry, which the client writes. Same variable Uvicorn reads by default.
+DEFAULT_FORWARDED_ALLOW_IPS = "127.0.0.1,::1,172.16.0.0/12,192.168.0.0/16"
+
+
+def forwarded_allow_ips() -> str:
+    import os
+
+    value = os.environ.get("FORWARDED_ALLOW_IPS", "").strip()
+    if not value or value == "*":
+        return DEFAULT_FORWARDED_ALLOW_IPS
+    return value
 
 
 def _trusted_proxy_networks():
     import ipaddress
-    import os
 
-    raw = os.environ.get("TRUSTED_PROXY_CIDRS", DEFAULT_TRUSTED_PROXY_CIDRS)
     networks = []
-    for part in raw.split(","):
+    for part in forwarded_allow_ips().split(","):
         part = part.strip()
         if part:
             try:
@@ -158,9 +168,12 @@ def _trusted_proxy_networks():
 def trusted_client_ip(request: Request) -> str:
     """Client IP for security decisions (rate limits), not spoofable by the client.
 
-    Unlike ``get_client_ip`` this never reads Forwarded / X-Forwarded-For,
-    which the client controls. It uses X-Real-IP only when the direct TCP
-    peer is a trusted proxy (which overwrites that header), else the peer.
+    Unlike ``get_client_ip`` this never reads Forwarded / X-Forwarded-For
+    itself. ``request.client`` is the TCP peer, or — behind Uvicorn's
+    ProxyHeadersMiddleware limited to forwarded_allow_ips() — the rightmost
+    X-Forwarded-For hop that is not a trusted proxy, i.e. the address the
+    edge proxy saw. If that is still a trusted proxy (no XFF), X-Real-IP set
+    by the edge is used.
     """
     import ipaddress
 
