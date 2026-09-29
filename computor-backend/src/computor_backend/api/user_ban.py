@@ -99,7 +99,7 @@ async def ban_user(
     user_id: str,
     principal: Annotated[Principal, Depends(get_current_principal)],
     payload: Optional[UserBanRequest] = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> UserGet:
     """Ban a user, blocking them from authenticating (admin or _user_manager).
 
@@ -139,7 +139,7 @@ async def ban_user(
 async def unban_user(
     user_id: str,
     principal: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> UserGet:
     """Lift a user's ban (admin or _user_manager)."""
     _require_user_manager(principal, db)

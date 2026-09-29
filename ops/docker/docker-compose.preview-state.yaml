@@ -3,7 +3,7 @@
 
 services:
   keycloak-db:
-    image: postgres:16
+    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
     networks:
       - computor-network
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}keycloak-db
@@ -26,7 +26,7 @@ services:
       retries: 12
 
   keycloak:
-    image: quay.io/keycloak/keycloak:25.0.6
+    image: quay.io/keycloak/keycloak:25.0.6@sha256:82c5b7a110456dbd42b86ea572e728878549954cc8bd03cd65410d75328095d2
     networks:
       - computor-network
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}keycloak

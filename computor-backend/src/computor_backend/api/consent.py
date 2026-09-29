@@ -51,7 +51,7 @@ consent_router = APIRouter()
 @consent_router.get("/status", response_model=ConsentStatusGet)
 async def get_consent_status(
     principal: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> ConsentStatusGet:
     """Current policy version and whether the caller has consented to it."""
     required_version = await resolve_current_policy_version()
@@ -64,7 +64,7 @@ async def give_consent(
     payload: ConsentCreate,
     request: Request,
     principal: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> ConsentStatusGet:
     """Record the caller's consent for the current policy version.
 
@@ -94,7 +94,7 @@ async def give_consent(
 @consent_router.post("/withdraw", response_model=ConsentStatusGet)
 async def withdraw_consent(
     principal: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> ConsentStatusGet:
     """Withdraw consent (GDPR Art. 7(3)). The caller is gated again afterwards."""
     required_version = await resolve_current_policy_version()
@@ -114,7 +114,7 @@ async def withdraw_consent(
 async def get_policy_text(
     principal: Annotated[Principal, Depends(get_current_principal)],
     lang: Optional[str] = Query(None, description="Preferred language code, e.g. 'de'"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> PolicyTextGet:
     """Current policy version + Markdown notice text, with language fallback."""
     required_version = await resolve_current_policy_version()
@@ -129,7 +129,7 @@ async def get_policy_text(
 @consent_router.get("/policy-versions", response_model=List[PolicyVersionGet])
 async def list_policy_versions(
     principal: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> List[PolicyVersionGet]:
     """List all policy versions (admin)."""
     if not principal.is_admin:
@@ -142,7 +142,7 @@ async def list_policy_versions(
 async def publish_policy_version(
     payload: PolicyVersionCreate,
     principal: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> PolicyVersionGet:
     """Publish a new policy version (admin).
 

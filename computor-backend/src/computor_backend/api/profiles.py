@@ -28,7 +28,7 @@ async def list_profiles_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     response: Response,
     params: ProfileQuery = Depends(),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """List profiles - admins/_user_manager see all, users see only their own."""
 
@@ -39,7 +39,7 @@ async def list_profiles_endpoint(
 async def get_profile_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     id: UUID | str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """Get a profile by ID - users can only get their own, admins/_user_manager can get any."""
 
@@ -50,7 +50,7 @@ async def get_profile_endpoint(
 async def create_profile_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     data: ProfileCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """Create a profile - users can create for themselves, admins/_user_manager can create for anyone."""
 
@@ -62,7 +62,7 @@ async def update_profile_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     id: UUID | str,
     data: ProfileUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """Update a profile - users can only update their own, admins/_user_manager can update any."""
 
@@ -74,7 +74,7 @@ async def update_profile_endpoint(
 async def delete_profile_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     id: UUID | str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """Delete a profile - users can only delete their own, admins/_user_manager can delete any."""
 

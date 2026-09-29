@@ -45,7 +45,7 @@ course_workspaces_router = APIRouter()
 async def get_course_workspace_settings_endpoint(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
     client: Annotated[CoderClient, Depends(get_coder_client)],
     coder_settings: Annotated[CoderSettings, Depends(get_coder_settings)],
 ) -> CourseWorkspaceSettingsGet:
@@ -63,7 +63,7 @@ async def update_course_workspace_settings_endpoint(
     course_id: UUID | str,
     data: CourseWorkspaceSettingsUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
     client: Annotated[CoderClient, Depends(get_coder_client)],
     coder_settings: Annotated[CoderSettings, Depends(get_coder_settings)],
 ) -> CourseWorkspaceSettingsGet:
@@ -80,7 +80,7 @@ async def update_course_workspace_settings_endpoint(
 async def apply_course_workspace_policy_endpoint(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
     client: Annotated[CoderClient, Depends(get_coder_client)],
 ) -> StudentWorkspaceProvisionResponse:
     """Push the course's current root/internet policy onto its RUNNING
@@ -100,7 +100,7 @@ async def provision_student_workspaces_endpoint(
     course_id: UUID | str,
     data: StudentWorkspaceProvisionRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
     cache: Annotated[object, Depends(get_cache)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
     coder_settings: Annotated[CoderSettings, Depends(get_coder_settings)],
@@ -118,7 +118,7 @@ async def provision_student_workspaces_endpoint(
 async def list_student_workspaces_endpoint(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
     client: Annotated[CoderClient, Depends(get_coder_client)],
 ) -> CourseStudentWorkspacesResponse:
     """Course members' workspaces on course-allowed templates (lecturer view)."""
@@ -134,7 +134,7 @@ async def delete_student_workspace_endpoint(
     username: str,
     workspace_name: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
     client: Annotated[CoderClient, Depends(get_coder_client)],
 ) -> WorkspaceActionResponse:
     """Delete a member's throwaway workspace (lecturers: scratch-home only)."""

@@ -3,7 +3,7 @@
 # Container for testing Julia code submissions.
 #
 # Usage:
-#   docker build -f docker/Dockerfile.julia -t ct-julia .
+#   docker build -f computor-testing/docker/Dockerfile.julia -t ct-julia .   (from the repo root)
 #
 #   docker run --rm \
 #     --user 1000:1000 \
@@ -22,7 +22,7 @@
 #     ct-julia \
 #     jltester run -t /sandbox/submission -T /sandbox/tests/test.yaml
 
-FROM python:3.12-slim
+FROM python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
 
 LABEL maintainer="Computor Testing Framework"
 LABEL description="Julia sandbox for testing student code"
@@ -35,10 +35,11 @@ RUN useradd -m -u 1000 -s /bin/bash sandbox
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     ca-certificates \
-    && wget -q https://julialang-s3.julialang.org/bin/linux/x64/1.10/julia-1.10.0-linux-x86_64.tar.gz \
-    && tar -xzf julia-1.10.0-linux-x86_64.tar.gz -C /opt \
-    && ln -s /opt/julia-1.10.0/bin/julia /usr/local/bin/julia \
-    && rm julia-1.10.0-linux-x86_64.tar.gz \
+    && wget -q https://julialang-s3.julialang.org/bin/linux/x64/1.10/julia-1.10.12-linux-x86_64.tar.gz \
+    && echo "b0c50dfe349d76ffc8580d24e0c0be623988a6d91ed57ad8b73c0137fd27bc0d  julia-1.10.12-linux-x86_64.tar.gz" | sha256sum -c - \
+    && tar -xzf julia-1.10.12-linux-x86_64.tar.gz -C /opt \
+    && ln -s /opt/julia-1.10.12/bin/julia /usr/local/bin/julia \
+    && rm julia-1.10.12-linux-x86_64.tar.gz \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -47,8 +48,16 @@ RUN julia -e 'using Pkg; Pkg.add(["JSON", "LinearAlgebra", "Statistics"]); Pkg.p
 
 # Copy and install the testing framework
 WORKDIR /opt/ct-testing
+# Third-party deps from the hashed lock (computor-testing/requirements-py312.lock,
+# which also covers computor-types' deps and the build backend), then the two
+# local packages with --no-deps / --no-build-isolation so nothing floats.
+COPY computor-testing/requirements-py312.lock /tmp/requirements-py312.lock
+RUN pip install --no-cache-dir --require-hashes --only-binary :all: -r /tmp/requirements-py312.lock \
+    && rm /tmp/requirements-py312.lock
+COPY computor-types /opt/computor-types/
 COPY computor-testing /opt/ct-testing/
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir --no-deps --no-build-isolation /opt/computor-types -e . \
+    && MPLBACKEND=Agg python /opt/ct-testing/scripts/import_smoke.py
 
 # Create sandbox structure
 RUN mkdir -p /sandbox/submission /sandbox/tests /sandbox/output \

@@ -16,7 +16,8 @@ jobs:
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           enable-cache: true
-      - run: uv sync --project computor-backend --python 3.12 --frozen --extra dev
+      - run: uv lock --project computor-backend --check
+      - run: uv sync --project computor-backend --python 3.12 --locked --extra dev
       - name: Behavioral unit tests
         env:
           # Coder settings validate these at import; dummy values suffice here.
@@ -28,9 +29,13 @@ jobs:
           computor-backend/src/computor_backend/tests/test_coder_forwardauth.py
           computor-backend/src/computor_backend/tests/test_coder_image_cleanup.py
           computor-backend/src/computor_backend/tests/test_coder_source_repo_pinning.py
+          computor-backend/src/computor_backend/tests/test_coder_workspace_image_pinning.py
+          computor-backend/src/computor_backend/tests/test_db_dependency_lifecycle.py
           computor-backend/src/computor_backend/tests/test_log_redaction.py
           computor-backend/src/computor_backend/tests/test_password_hashing.py
+          computor-backend/src/computor_backend/tests/test_route_shadowing.py
           computor-backend/src/computor_backend/tests/test_sso_redirect_allowlist.py
+          computor-backend/src/computor_backend/tests/test_upload_limiter.py
           computor-backend/src/computor_backend/tests/test_version_constraints.py
           computor-backend/src/computor_backend/tests/test_harness_bounds.py
           computor-backend/src/computor_backend/tests/test_compose_testing_bounds.py

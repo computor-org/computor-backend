@@ -44,7 +44,7 @@ services_router = APIRouter()
 @services_router.get("/me", response_model=ServiceGet)
 async def get_service_me(
     principal: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
 ):
     """
@@ -105,7 +105,7 @@ async def get_service_me(
 def create_service_endpoint(
     service_data: ServiceCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Create a new service account."""
     return create_service_account(service_data, permissions, db)
@@ -115,7 +115,7 @@ def create_service_endpoint(
 def list_services_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     query: ServiceQuery = Depends(),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """List all service accounts with optional filtering."""
     return list_service_accounts(permissions, db, query)
@@ -125,7 +125,7 @@ def list_services_endpoint(
 def get_service_endpoint(
     service_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Get service account details by ID."""
     return get_service_account(service_id, permissions, db)
@@ -136,7 +136,7 @@ def update_service_endpoint(
     service_id: UUID | str,
     service_data: ServiceUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     force: bool = Query(
         False,
         description=(
@@ -154,7 +154,7 @@ def update_service_endpoint(
 def service_heartbeat_endpoint(
     service_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Update service last_seen_at timestamp (heartbeat)."""
     update_service_heartbeat(service_id, permissions, db)
@@ -164,7 +164,7 @@ def service_heartbeat_endpoint(
 def delete_service_endpoint(
     service_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     force: bool = Query(
         False,
         description=(

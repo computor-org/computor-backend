@@ -231,7 +231,7 @@ async def check_for_update(
 @update_router.post("", response_model=SystemUpdateTriggerResponse)
 async def trigger_update(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """
     Queue a self-update run.
@@ -297,7 +297,7 @@ async def trigger_update(
 async def schedule_update(
     request: SystemUpdateScheduleRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """
     Schedule a one-shot self-update at a future time.

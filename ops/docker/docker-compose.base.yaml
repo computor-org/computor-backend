@@ -28,7 +28,7 @@ services:
   # Docker-provider command flags and socket access live in dev/prod overlays:
   # dev mounts the socket directly; prod proxies it via tecnativa/docker-socket-proxy.
   traefik:
-    image: traefik:v3.6.6
+    image: traefik:v3.7.13@sha256:24841fe2de7304c149343d877d2923b4c8800a38ba015dea9174c23b20e344a0
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
@@ -52,7 +52,7 @@ services:
 
   # PostgreSQL with multiple databases support
   postgres:
-    image: postgres:16
+    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
@@ -109,7 +109,7 @@ services:
 
   # Temporal PostgreSQL database
   temporal-postgres:
-    image: postgres:16
+    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
     security_opt:
       - "no-new-privileges:true"
     logging:
@@ -139,7 +139,7 @@ services:
 
   # Temporal server
   temporal:
-    image: temporalio/auto-setup:1.27.0
+    image: temporalio/auto-setup:1.27.0@sha256:501a883b1c4a4168eb5000c368495e7eb7106dbadefc75b7fd886be0108456b9
     security_opt:
       - "no-new-privileges:true"
     logging:

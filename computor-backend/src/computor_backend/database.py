@@ -201,7 +201,7 @@ def get_db(user_id: str | None = None) -> Generator[Session, None, None]:
     Usage:
         # Without user tracking
         @router.get("/public")
-        async def public_endpoint(db: Session = Depends(get_db)):
+        async def public_endpoint(db: Session = Depends(get_db, scope="function")):
             ...
 
         # With user tracking (for audit logging)
@@ -247,7 +247,7 @@ def set_db_user(db: Session, user_id: str | None):
         async def create_resource(
             permissions: Annotated[Principal, Depends(get_current_principal)],
             data: ResourceCreate,
-            db: Session = Depends(get_db)
+            db: Session = Depends(get_db, scope="function")
         ):
             # Set user context for this session
             set_db_user(db, permissions.user_id)

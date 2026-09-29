@@ -37,7 +37,7 @@ async def delete_course_family_endpoint(
     course_family_id: UUID,
     request: Request,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     dry_run: bool = Query(
         default=False,
         description="If true, only returns preview without deleting"

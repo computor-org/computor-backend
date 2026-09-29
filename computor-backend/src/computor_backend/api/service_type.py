@@ -38,7 +38,7 @@ service_type_router = APIRouter()
 async def create_service_type(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     entity: ServiceTypeCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """
     Create a new service type.
@@ -63,7 +63,7 @@ async def create_service_type(
 async def get_service_type(
     entity_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """
     Get a single service type by UUID.
@@ -81,7 +81,7 @@ async def list_service_types(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     response: Response,
     params: ServiceTypeQuery = Depends(),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """
     List service types with filtering.
@@ -112,7 +112,7 @@ async def update_service_type(
     entity_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     entity: ServiceTypeUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """
     Update an existing service type.

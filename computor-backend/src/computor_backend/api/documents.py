@@ -139,7 +139,7 @@ async def upload_document_file(
     path: Annotated[str, Form()],
     file: Annotated[UploadFile, File()],
     scope_id: Annotated[Optional[UUID], Form()] = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> DocumentGet:
     """Create or overwrite a documents file at the given scope and path."""
     payload = DocumentCreate(scope=scope, scope_id=scope_id, path=path)
@@ -184,7 +184,7 @@ async def upload_document_file(
 async def delete_document_file(
     payload: DocumentDelete,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> None:
     """Delete a documents file."""
     check_documents_write_permission(permissions, payload.scope, payload.scope_id)
@@ -220,7 +220,7 @@ async def delete_document_file(
 async def create_document_directory(
     payload: DocumentDirectoryCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> DocumentDirectoryGet:
     """Create a documents directory (idempotent — returns ``created=False``
     when it already existed).
@@ -262,7 +262,7 @@ async def create_document_directory(
 async def delete_document_directory(
     payload: DocumentDirectoryDelete,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> None:
     """Delete a documents directory recursively.
 
@@ -299,7 +299,7 @@ async def delete_document_directory(
 async def rename_document_file(
     payload: DocumentRename,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> DocumentGet:
     """Rename a documents file inside the same scope.
 
@@ -358,7 +358,7 @@ async def rename_document_file(
 async def rename_document_directory(
     payload: DocumentDirectoryRename,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> DocumentDirectoryGet:
     """Rename a documents directory inside the same scope.
 
@@ -443,7 +443,7 @@ async def list_documents_directory(
     scope: Annotated[DocumentScope, Query()],
     scope_id: Annotated[Optional[UUID], Query()] = None,
     path: Annotated[Optional[str], Query()] = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> list[DocumentList]:
     """List entries in a documents directory.
 
@@ -507,7 +507,7 @@ async def get_document_file(
     path: Annotated[str, Query()],
     scope_id: Annotated[Optional[UUID], Query()] = None,
     if_none_match: Annotated[Optional[str], Header(alias="if-none-match")] = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> Response:
     """Fetch a documents file. Available to any authenticated user.
 

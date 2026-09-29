@@ -4,7 +4,7 @@
 # Use language-specific images for smaller footprint.
 #
 # Usage:
-#   docker build -f docker/Dockerfile.full -t ct-full .
+#   docker build -f computor-testing/docker/Dockerfile.full -t ct-full .   (from the repo root)
 #
 #   docker run --rm \
 #     --user 1000:1000 \
@@ -23,7 +23,7 @@
 #     ct-full \
 #     pytester run -t /sandbox/submission -T /sandbox/tests/test.yaml
 
-FROM python:3.12-slim
+FROM python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
 
 LABEL maintainer="Computor Testing Framework"
 LABEL description="Full sandbox with all supported languages"
@@ -63,10 +63,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean
 
 # Install Julia
-RUN wget -q https://julialang-s3.julialang.org/bin/linux/x64/1.10/julia-1.10.0-linux-x86_64.tar.gz \
-    && tar -xzf julia-1.10.0-linux-x86_64.tar.gz -C /opt \
-    && ln -s /opt/julia-1.10.0/bin/julia /usr/local/bin/julia \
-    && rm julia-1.10.0-linux-x86_64.tar.gz
+RUN wget -q https://julialang-s3.julialang.org/bin/linux/x64/1.10/julia-1.10.12-linux-x86_64.tar.gz \
+    && echo "b0c50dfe349d76ffc8580d24e0c0be623988a6d91ed57ad8b73c0137fd27bc0d  julia-1.10.12-linux-x86_64.tar.gz" | sha256sum -c - \
+    && tar -xzf julia-1.10.12-linux-x86_64.tar.gz -C /opt \
+    && ln -s /opt/julia-1.10.12/bin/julia /usr/local/bin/julia \
+    && rm julia-1.10.12-linux-x86_64.tar.gz
 
 # Install R packages
 RUN R -e "install.packages(c('jsonlite', 'tidyverse'), repos='https://cloud.r-project.org/')"
@@ -74,18 +75,21 @@ RUN R -e "install.packages(c('jsonlite', 'tidyverse'), repos='https://cloud.r-pr
 # Install Julia packages
 RUN julia -e 'using Pkg; Pkg.add(["JSON", "LinearAlgebra", "Statistics"]); Pkg.precompile()'
 
-# Install Python packages for student code
-RUN pip install --no-cache-dir \
-    numpy \
-    scipy \
-    matplotlib \
-    pandas \
-    sympy
+# Student-code packages (numpy, scipy, matplotlib, pandas, sympy, ...) come
+# from the hashed lock installed with the framework below.
 
 # Copy and install the testing framework
 WORKDIR /opt/ct-testing
+# Third-party deps from the hashed lock (computor-testing/requirements-py312.lock,
+# which also covers computor-types' deps and the build backend), then the two
+# local packages with --no-deps / --no-build-isolation so nothing floats.
+COPY computor-testing/requirements-py312.lock /tmp/requirements-py312.lock
+RUN pip install --no-cache-dir --require-hashes --only-binary :all: -r /tmp/requirements-py312.lock \
+    && rm /tmp/requirements-py312.lock
+COPY computor-types /opt/computor-types/
 COPY computor-testing /opt/ct-testing/
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir --no-deps --no-build-isolation /opt/computor-types -e . \
+    && MPLBACKEND=Agg python /opt/ct-testing/scripts/import_smoke.py
 
 # Create sandbox structure
 RUN mkdir -p /sandbox/submission /sandbox/tests /sandbox/output \

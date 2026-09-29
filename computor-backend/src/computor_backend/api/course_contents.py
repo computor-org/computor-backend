@@ -169,7 +169,7 @@ course_content_router.on_created.append(provision_submission_groups_wrapper)
 async def unassign_example_from_content(
     content_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Annotated[aioredis.Redis, Depends(get_redis_client)] = None
 ):
     """
@@ -255,7 +255,7 @@ async def unassign_example_from_content(
 async def get_deployment_status_with_workflow(
     content_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """
     Get detailed deployment status including Temporal workflow information.
@@ -420,7 +420,7 @@ async def get_deployment_status_with_workflow(
 async def get_course_deployment_summary(
     course_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Annotated[aioredis.Redis, Depends(get_redis_client)] = None
 ):
     """
@@ -498,7 +498,7 @@ async def get_course_deployment_summary(
 async def get_content_deployment(
     content_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """
     Get deployment information for specific course content.
@@ -555,7 +555,7 @@ async def move_course_content(
     content_id: str,
     move_request: CourseContentMoveRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Annotated[aioredis.Redis, Depends(get_redis_client)] = None
 ):
     """

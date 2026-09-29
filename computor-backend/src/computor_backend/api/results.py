@@ -39,7 +39,7 @@ async def list_results(
     response: Response,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: ResultQuery = Depends(),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> list[ResultList]:
     results, total = await list_db(permissions, db, params, ResultInterface)
     return paginated_list(results, total, response=response)
@@ -48,7 +48,7 @@ async def list_results(
 async def get_result(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     result_id: UUID | str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> ResultGet:
     # Get the base result from database
     result = await get_id_db(permissions, db, result_id, ResultInterface)
@@ -85,7 +85,7 @@ async def get_result(
 async def create_result(
     payload: ResultCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> ResultGet:
     return await create_db(
         permissions,
@@ -101,7 +101,7 @@ async def update_result(
     result_id: UUID | str,
     payload: ResultUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
 ) -> ResultGet:
     """
@@ -159,7 +159,7 @@ async def update_result(
 async def delete_result(
     result_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     await delete_db(permissions, db, result_id, ResultInterface.model)
 
@@ -167,7 +167,7 @@ async def delete_result(
 async def result_status(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     result_id: UUID | str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Get the current status of a test result."""
     return await get_result_status(result_id, permissions, db)
@@ -185,7 +185,7 @@ from typing import List
 async def list_result_artifacts_endpoint(
     result_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> List[ResultArtifactListItem]:
     """
     List all artifacts associated with a result.
@@ -229,7 +229,7 @@ async def list_result_artifacts_endpoint(
 async def download_result_artifacts(
     result_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """
     Download all artifacts for a result as a ZIP file.
@@ -281,7 +281,7 @@ async def upload_result_artifacts(
     result_id: UUID | str,
     file: Annotated[bytes, File()],
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """
     Upload artifacts as a ZIP archive.

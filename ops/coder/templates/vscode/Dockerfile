@@ -1,7 +1,7 @@
 # =========================
 # Stage 1: Build VSIX extension
 # =========================
-FROM node:20-bookworm AS vsix-builder
+FROM node:20-bookworm@sha256:8f693eaa7e0a8e71560c9a82b55fd54c2ae920a2ba5d2cde28bac7d1c01c9ba5 AS vsix-builder
 
 ARG EXTENSION_REPO_URL=https://github.com/computor-org/computor-vscode.git
 ARG EXTENSION_REPO_REF="release/2026.10"
@@ -39,11 +39,12 @@ RUN git init extension \
 WORKDIR /build/extension
 
 # Build and package extension
+# vsce comes from the extension's own package-lock.json (a devDependency
+# installed by `npm ci`), not a floating global `npm install -g`.
 RUN npm ci \
     && npm run compile --if-present \
     && npm run build --if-present \
-    && npm install -g @vscode/vsce \
-    && vsce package --out /tmp/extension.vsix
+    && ./node_modules/.bin/vsce package --out /tmp/extension.vsix
 
 # =========================
 # Stage 2: Runtime image with code-server
@@ -79,9 +80,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python 3.13 from source
+# Bump PYTHON_VERSION and PYTHON_SHA256 together (sha256 of Python-<ver>.tgz).
 ARG PYTHON_VERSION=3.13.1
+ARG PYTHON_SHA256=1513925a9f255ef0793dbf2f78bb4533c9f184bdd0ad19763fd7f47a400a7c55
 RUN cd /tmp \
     && wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz \
+    && echo "${PYTHON_SHA256}  Python-${PYTHON_VERSION}.tgz" | sha256sum -c - \
     && tar -xzf Python-${PYTHON_VERSION}.tgz \
     && cd Python-${PYTHON_VERSION} \
     && ./configure --enable-optimizations --with-ensurepip=install \
@@ -108,7 +112,10 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
 # get nothing from plt.show(). computor_figures renders with Agg and publishes
 # each figure into COMPUTOR_FIGURES_DIR, where the Computor extension picks it
 # up. See docs/figures.md.
-RUN pip install --no-cache-dir matplotlib ipykernel
+# Hash-locked (see requirements.in for how to regenerate the lock).
+COPY requirements.lock /tmp/requirements.lock
+RUN pip install --no-cache-dir --require-hashes --only-binary :all: -r /tmp/requirements.lock \
+    && rm /tmp/requirements.lock
 
 COPY figures/computor_figures.py /tmp/computor_figures.py
 RUN python3 -c "import shutil, sysconfig; shutil.copy('/tmp/computor_figures.py', sysconfig.get_paths()['purelib'])" \
