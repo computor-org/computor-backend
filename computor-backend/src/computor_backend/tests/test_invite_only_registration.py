@@ -1010,3 +1010,63 @@ def test_legacy_invite_lookup_reveals_only_a_masked_address(env):
     s.close()
     assert public.email == "j***@test.local"
     assert public.roles == [] and public.note is None
+
+
+def test_password_invite_users_join_pilot_courses_on_first_verified_login(
+    env, recording_kc, monkeypatch
+):
+    """Reviewer repro r4: the password flow pre-creates the User, so the first
+    SSO login linked it (created_user False) and never enrolled it."""
+    from sqlalchemy_utils import Ltree
+
+    import computor_backend.business_logic.course_member_post_create as hook_mod
+    from computor_backend.api.invites import accept_invite
+    from computor_backend.model.course import Course, CourseFamily, CourseGroup, CourseMember
+    from computor_backend.model.organization import Organization
+    from computor_types.invites import InviteAccept
+
+    async def _hook(member, db, permissions=None):
+        return None
+
+    monkeypatch.setattr(hook_mod, "course_member_post_create", _hook)
+    s = env.Session()
+    org = Organization(title="Pw Pilot Org", organization_type="organization",
+                       path=Ltree(f"pwpilot_{env.suffix}"), properties={})
+    s.add(org)
+    s.flush()
+    family = CourseFamily(title="F", path=Ltree(f"pwpilot_{env.suffix}.family"),
+                          organization_id=org.id)
+    s.add(family)
+    s.flush()
+    course = Course(title="C", path=Ltree(f"pwpilot_{env.suffix}.family.course"),
+                    course_family_id=family.id, organization_id=org.id, public=True,
+                    max_self_registrations=5)
+    s.add(course)
+    s.commit()
+    course_id, ids = str(course.id), (org.id, family.id)
+    s.close()
+    try:
+        env.settings(registration_mode="open", pilot_course_ids=[course_id])
+        s = env.Session()
+        asyncio.run(accept_invite(env.make_invite(), InviteAccept(
+            email=f"pwpilot.{env.suffix}@test.local", password="x",
+            given_name="P", family_name="P"), s))
+        s.close()
+        first = env.login("pwpilot", verified=True)
+        assert isinstance(first, dict) and first["is_new_user"] is True
+        again = env.login("pwpilot", verified=True)
+        assert isinstance(again, dict) and again["is_new_user"] is False
+        s = env.Session()
+        members = [str(m.user_id) for m in s.query(CourseMember).filter(
+            CourseMember.course_id == course_id)]
+        s.close()
+        assert members == [env.user("pwpilot").id]
+    finally:
+        s = env.Session()
+        s.query(CourseMember).filter(CourseMember.course_id == course_id).delete()
+        s.query(CourseGroup).filter(CourseGroup.course_id == course_id).delete()
+        s.query(Course).filter(Course.id == course_id).delete()
+        s.query(CourseFamily).filter(CourseFamily.id == ids[1]).delete()
+        s.query(Organization).filter(Organization.id == ids[0]).delete()
+        s.commit()
+        s.close()

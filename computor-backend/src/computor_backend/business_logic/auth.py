@@ -648,8 +648,15 @@ async def handle_sso_callback(
             "given_name": user.given_name,
             "family_name": user.family_name,
         }
+        # Pilot courses go to users who joined through registration: created
+        # right here, or pre-created by a password invite and now signing in
+        # (verified) for the first time — is_new_user is the first link of an
+        # SSO identity to the row. Enrolment is idempotent and cap-checked.
+        enroll = created_user or (
+            is_new_user and user.registered_via_invite_id is not None
+        )
         db.commit()
-        return is_new_user, created_user, user_primitives
+        return is_new_user, enroll, user_primitives
 
     def _find_or_create_account_or_roll_back():
         try:
@@ -661,7 +668,7 @@ async def handle_sso_callback(
             raise
 
     try:
-        is_new_user, created_user, user_primitives = await run_in_threadpool(
+        is_new_user, enroll_pilot, user_primitives = await run_in_threadpool(
             _find_or_create_account_or_roll_back
         )
     except RegistrationRefused as refusal:
@@ -707,7 +714,7 @@ async def handle_sso_callback(
     # login that fails between the two does not leave a seat held by nobody.
     await touch_login_seat(user_primitives["id"], login_idle_seconds(db))
 
-    if created_user:
+    if enroll_pilot:
         await enroll_in_pilot_courses(db, user_primitives["id"])
 
     # Store tokens in Redis if available
