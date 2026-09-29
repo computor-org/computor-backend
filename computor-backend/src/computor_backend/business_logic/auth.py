@@ -461,6 +461,23 @@ async def handle_sso_callback(
                 ),
             }
 
+            # User.email is deliberately NOT rewritten from the token (another
+            # user may own the new address, and the email is the join key for
+            # git and imports). A mismatch is not silent though: before the
+            # first-login email check, an identity could reserve someone else's
+            # unverified address as User.email. The stored ``email`` above is
+            # what scripts/audit_unverified_sso_users.py compares against.
+            token_email = (user_info.email or "").strip().lower()
+            if token_email and token_email != (user.email or "").strip().lower():
+                logger.warning(
+                    "SSO login for user %s via %s carries an email that differs "
+                    "from User.email (token email_verified=%s); run "
+                    "scripts/audit_unverified_sso_users.py",
+                    user.id,
+                    provider,
+                    (user_info.attributes or {}).get("email_verified"),
+                )
+
         else:
             # New keycloak account — link to an existing user if we recognise the
             # email, otherwise create a fresh user.
@@ -473,6 +490,29 @@ async def handle_sso_callback(
             normalized_email = (
                 user_info.email.strip().lower() if user_info.email else None
             )
+
+            # A first login either links to the user that owns this email or
+            # creates one that owns it from now on. Both hand the identity the
+            # address, so the IdP must have verified it. Otherwise anyone who
+            # can get an unverified address into a token (open Keycloak
+            # registration, a broker with trustEmail off) takes over the
+            # account that owns it, or reserves it so a later staff import by
+            # email enrols them in the real owner's place. Refuse rather than
+            # create a user without the email: that would silently fork the
+            # person's identity. An identity without any email is unaffected.
+            if normalized_email and (user_info.attributes or {}).get(
+                "email_verified"
+            ) is not True:
+                raise ForbiddenException(
+                    detail=(
+                        "Verify your email address first. Your identity provider "
+                        f"has not verified '{user_info.email}', and Computor only "
+                        "accepts a first sign-in with a verified address. Verify "
+                        "it with your identity provider and sign in again, or ask "
+                        "an administrator."
+                    ),
+                    context={"provider": provider},
+                )
 
             user = None
             if normalized_email:

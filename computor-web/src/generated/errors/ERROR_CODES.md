@@ -1,7 +1,7 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Total errors:** 83
+**Total errors:** 84
 
 To regenerate: `bash generate_error_codes.sh`
 
@@ -495,6 +495,31 @@ Optimistic locking failure - resource modified since read
 1. Refresh resource data
 2. Retry operation
 3. Merge changes if appropriate
+
+---
+
+### CONFLICT_003 - Course Full
+
+**HTTP Status:** `409`  
+**Severity:** `info`  
+**Category:** `conflict`  
+**Documentation:** [/docs/api/conflicts](/docs/api/conflicts)  
+
+**Description:**  
+Self-registration refused: the course's max_self_registrations cap is reached
+
+**User Message:**  
+> This course is full.
+
+**Affected Functions:**
+- `register_in_public_course`
+
+**Common Causes:**
+- Every self-registration seat in the public course is taken
+- Another student took the last seat first
+
+**Resolution Steps:**
+1. Ask the course staff to raise the cap or enrol you directly
 
 ---
 

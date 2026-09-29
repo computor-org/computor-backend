@@ -543,6 +543,25 @@ errors:
       - "Merge changes if appropriate"
     documentation_url: "/docs/api/concurrency"
 
+  - code: CONFLICT_003
+    http_status: 409
+    category: conflict
+    severity: info
+    title: "Course Full"
+    message:
+      plain: "This course is full."
+      markdown: "**Course Full**\n\nThis course is full. No self-registration seats are left."
+      html: "<strong>Course Full</strong><p>This course is full. No self-registration seats are left.</p>"
+    internal_description: "Self-registration refused: the course's max_self_registrations cap is reached"
+    affected_functions:
+      - "register_in_public_course"
+    common_causes:
+      - "Every self-registration seat in the public course is taken"
+      - "Another student took the last seat first"
+    resolution_steps:
+      - "Ask the course staff to raise the cap or enrol you directly"
+    documentation_url: "/docs/api/conflicts"
+
   # ============================================================================
   # RATE LIMITING ERRORS (429)
   # ============================================================================

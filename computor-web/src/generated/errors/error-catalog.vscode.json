@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "error_count": 83,
+  "error_count": 84,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -298,6 +298,19 @@
         "plain": "The resource was modified by another user. Please refresh and try again.",
         "markdown": "**Concurrent Modification**\n\nThe resource was modified by another user. Please refresh and try again.",
         "html": "<strong>Concurrent Modification</strong><p>The resource was modified by another user. Please refresh and try again.</p>"
+      },
+      "retry_after": null
+    },
+    "CONFLICT_003": {
+      "code": "CONFLICT_003",
+      "http_status": 409,
+      "category": "conflict",
+      "severity": "info",
+      "title": "Course Full",
+      "message": {
+        "plain": "This course is full.",
+        "markdown": "**Course Full**\n\nThis course is full. No self-registration seats are left.",
+        "html": "<strong>Course Full</strong><p>This course is full. No self-registration seats are left.</p>"
       },
       "retry_after": null
     },
