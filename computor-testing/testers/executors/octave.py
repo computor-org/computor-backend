@@ -9,6 +9,7 @@ leaking secrets to Octave processes.
 """
 
 import os
+import shutil
 import re
 import json
 import time
@@ -19,6 +20,7 @@ from typing import Dict, Any, Optional, List, Tuple
 import numpy as np
 
 from ctexec import InterpretedExecutor, ExecutorResult, make_preexec_fn
+from ctexec.base import sandbox_command_prefix
 from ctexec.process import run_bounded
 from ctexec.safe_io import (
     UnsafeFileError, read_untrusted_bytes, read_untrusted_text, result_limit,
@@ -252,9 +254,10 @@ fclose(__fid__);
         """
         variables_to_extract = variables_to_extract or []
 
-        # Create result file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as result_file:
-            result_path = result_file.name
+        # Script and result live in a private dir: under the sandbox it is the
+        # only writable place besides the working dir (#237).
+        sandbox_dir = tempfile.mkdtemp(prefix="ctsbx_oct_")
+        result_path = os.path.join(sandbox_dir, "result.json")
 
         # Build script
         script_lines = [
@@ -265,13 +268,13 @@ fclose(__fid__);
         ]
 
         # Write script
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.m', delete=False) as script_file:
+        script_path = os.path.join(sandbox_dir, "script.m")
+        with open(script_path, 'w') as script_file:
             script_file.write('\n'.join(script_lines))
-            script_path = script_file.name
 
         try:
             start_time = time.time()
-            success = self._run_octave(script_path)
+            success = self._run_octave(script_path, sandbox_dir=sandbox_dir)
             self.execution_time = time.time() - start_time
 
             if success and os.path.lexists(result_path):
@@ -284,14 +287,10 @@ fclose(__fid__);
             return success
 
         finally:
-            for path in [script_path, result_path]:
-                if path and os.path.exists(path):
-                    try:
-                        os.unlink(path)
-                    except OSError:
-                        pass
+            shutil.rmtree(sandbox_dir, ignore_errors=True)
 
-    def _run_octave(self, script_path: str, input_path: str = None) -> bool:
+    def _run_octave(self, script_path: str, input_path: str = None,
+                    sandbox_dir: Optional[str] = None) -> bool:
         """
         Run Octave with the given script.
 
@@ -302,13 +301,21 @@ fclose(__fid__);
         Returns:
             True if execution succeeded, False otherwise
         """
-        cmd = self._get_interpreter_command() + [script_path]
+        # Same kernel sandbox as every other executor when the worker enables
+        # it: working dir and the private dir writable, nothing else, no
+        # network, signal-scoped, torn down as a whole (#237).
+        prefix = sandbox_command_prefix(
+            self.working_dir, rw_paths=[sandbox_dir] if sandbox_dir else [])
+        cmd = prefix + self._get_interpreter_command() + [script_path]
 
         # Per-job resource limits (Unix only): the shared defaults, as for
         # every other executor.
         preexec = make_preexec_fn(self.resource_limits)
 
         env = self._get_env()
+        if prefix and sandbox_dir:
+            env["TMPDIR"] = sandbox_dir
+            env["HOME"] = sandbox_dir
 
         try:
             stdin_data = None

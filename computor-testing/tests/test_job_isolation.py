@@ -634,3 +634,27 @@ def test_hostile_graphics_student_cannot_kill_the_harness(tmp_path):
     proc, out = _run_harness_cli(tmp_path, hostile, sandbox=True)
     assert proc.returncode != -9
     assert re.search(r"= 3 passed in", out), out[-3000:]
+
+
+# --- 13. Octave code path goes through the launcher -------------------------
+
+def test_octave_execute_code_is_sandboxed(tmp_path, sandboxed):
+    import shutil
+    if not shutil.which("octave"):
+        pytest.skip("octave not installed")
+    from testers.executors.octave import OctaveExecutor
+    secret = tmp_path / "reference.m"
+    secret.write_text("TOPSECRET")
+    work = tmp_path / "work"
+    work.mkdir()
+    executor = OctaveExecutor(working_dir=str(work), timeout=120)
+    ok = executor.execute_code(
+        f"try; s = fileread('{secret}'); catch; s = 'DENIED'; end\n"
+        "try; kill(getppid(), 9); k = 'KILLED'; catch; k = 'REFUSED'; end\n"
+        "y = 6 * 7;",
+        ["s", "k", "y"])
+    assert ok, executor.error
+    values = executor.namespace["variables"]
+    assert values["y"] == 42
+    assert values["s"] == "DENIED"
+    assert values["k"] != "KILLED"
