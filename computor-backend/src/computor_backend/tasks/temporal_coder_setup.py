@@ -19,6 +19,7 @@ import logging
 import os
 import re
 import subprocess
+import uuid
 from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
@@ -179,22 +180,21 @@ def _resolve_templates(
 # ---------------------------------------------------------------------------
 
 
-_PUSH_DIGEST_RE = re.compile(r"^(?P<tag>\S+): digest: (?P<digest>sha256:[0-9a-f]{64})\b")
-
-
-def _pushed_digest(chunk: Dict[str, Any], tag: str) -> Optional[str]:
-    """The manifest digest a docker push progress chunk reports for ``tag``.
-
-    The classic engine sends it as ``aux.Digest``; the containerd image store
-    only in the final status line ``"<tag>: digest: sha256:... size: N"``.
-    """
-    aux = chunk.get("aux") or {}
-    if aux.get("Digest") and aux.get("Tag", tag) == tag:
-        return aux["Digest"]
-    m = _PUSH_DIGEST_RE.match(chunk.get("status") or "")
-    if m and m.group("tag") == tag:
-        return m.group("digest")
+def _repo_digest_of(repo_digests: List[str], repo: str) -> Optional[str]:
+    """The ``sha256:`` digest ``repo`` holds for an image, from its RepoDigests."""
+    for ref in repo_digests:
+        name, _, digest = ref.partition("@")
+        if name == repo and digest.startswith("sha256:"):
+            return digest
     return None
+
+
+def _generated_version_tag() -> str:
+    """A fresh ``v<UTC timestamp>-<6 hex>`` tag (cleanup recognises the shape)."""
+    from datetime import datetime, timezone
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    return f"v{stamp}-{uuid.uuid4().hex[:6]}"
 
 
 @activity.defn(name="build_workspace_image")
@@ -251,6 +251,12 @@ def build_workspace_image(
     push_tags = ["latest"]
     if image_tag and image_tag != "latest":
         push_tags.append(image_tag)
+    else:
+        # Always publish one tag no concurrent build shares, so this build's
+        # own image reaches the registry even if another build moves :latest.
+        push_tags.append(_generated_version_tag())
+    # Local-only identity for this build; never shared, removed afterwards.
+    build_tag = f"build-{uuid.uuid4().hex[:12]}"
 
     # Collect build args from environment variables
     buildargs = {}
@@ -280,9 +286,10 @@ def build_workspace_image(
         # result and rebuilt the identical image. Heartbeating per output
         # chunk keeps the activity provably alive, and the log shows progress
         # while it happens instead of one dump at the end.
+        built_id: Optional[str] = None
         for chunk in client.api.build(
             path=build_dir,
-            tag=f"{repo}:{push_tags[0]}",
+            tag=f"{repo}:{build_tag}",
             rm=True,
             buildargs=buildargs or None,
             nocache=no_cache,
@@ -291,22 +298,21 @@ def build_workspace_image(
             activity.heartbeat()
             if chunk.get("error"):
                 raise docker_sdk.errors.BuildError(chunk["error"], build_log=None)
+            built_id = (chunk.get("aux") or {}).get("ID") or built_id
             if "stream" in chunk:
                 line = chunk["stream"].strip()
                 if line:
                     logger.info(f"[build:{template_key}] {line}")
 
-        # The build applied the first tag; resolve the image through it and
-        # apply the remaining tags to the same id so every tag is identical.
-        image = client.images.get(f"{repo}:{push_tags[0]}")
-        for extra in push_tags[1:]:
-            image.tag(repo, tag=extra)
+        # Identity of THIS build: the image ID the build reported (else the
+        # unique build tag). Every later step goes through the ID, never
+        # through a tag another concurrent build could move.
+        image_id = built_id or client.images.get(f"{repo}:{build_tag}").id
+        for t in push_tags:
+            client.api.tag(image_id, repo, tag=t)
 
         # Push every tag, streaming for the same heartbeat reason — a multi-GB
-        # MATLAB layer push is minutes on its own. The registry reports the
-        # manifest digest it stored in the final "aux" chunk; that digest (not
-        # a tag, which can be re-pushed) is what the template version pins.
-        digests: Dict[str, str] = {}
+        # MATLAB layer push is minutes on its own.
         for t in push_tags:
             for push_chunk in client.images.push(repo, tag=t, stream=True, decode=True):
                 activity.heartbeat()
@@ -314,17 +320,20 @@ def build_workspace_image(
                     raise RuntimeError(
                         f"push failed for {repo}:{t}: {push_chunk['error']}"
                     )
-                digest = _pushed_digest(push_chunk, t)
-                if digest:
-                    digests[t] = digest
-            if t not in digests:
-                # Engines that report neither form: ask the registry for what
-                # it now serves under the tag this run just pushed.
-                digests[t] = client.images.get_registry_data(f"{repo}:{t}").id
-            logger.info(f"Pushed {repo}:{t} ({digests[t]})")
-        pinned_digest = digests.get(push_tags[-1])
-        if not pinned_digest or not pinned_digest.startswith("sha256:"):
-            raise RuntimeError(f"registry reported no digest for {repo}:{push_tags[-1]}")
+            logger.info(f"Pushed {repo}:{t}")
+
+        # The digest the template version pins is the one the daemon recorded
+        # for pushing this image ID to this repo (RepoDigests) — not a lookup
+        # of a tag, which a concurrent build may have re-pushed meanwhile.
+        pinned_digest = _repo_digest_of(
+            client.images.get(image_id).attrs.get("RepoDigests") or [], repo
+        )
+        if not pinned_digest:
+            raise RuntimeError(f"registry reported no digest for {repo} image {image_id}")
+        try:
+            client.images.remove(f"{repo}:{build_tag}", noprune=True)
+        except Exception:  # noqa: BLE001 - only a local helper tag
+            logger.warning(f"Could not remove local tag {repo}:{build_tag}")
 
         return {
             "success": True,
