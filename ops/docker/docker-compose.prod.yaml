@@ -151,6 +151,9 @@ services:
       CODER_ENABLED: ${API_CODER_ENABLED:-${CODER_ENABLED:-false}}
       CODER_URL: ${CODER_URL}
       CODER_WORKSPACE_BASE_URL: ${CODER_WORKSPACE_BASE_URL:-}
+      # Coder service-account username: the only non-owner workspace admins
+      # may open (api/auth.py verify_coder_access); also used at startup.
+      CODER_ADMIN_USERNAME: ${CODER_ADMIN_USERNAME:-admin}
       CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
       CODER_ADMIN_API_SECRET: ${CODER_ADMIN_API_SECRET}
