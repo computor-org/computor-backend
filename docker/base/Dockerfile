@@ -22,8 +22,8 @@
 
 # ---------------------------------------------------------------------------
 # Stage: export uv.lock to hashed requirements files (uv never reaches the
-# runtime image). Refresh the lock with a cooldown, e.g.
-#   uv lock --upgrade --exclude-newer "$(date -u -d '7 days ago' +%FT%TZ)"
+# runtime image). The 7-day cooldown lives in computor-backend/pyproject.toml
+# ([tool.uv] exclude-newer), with the refresh procedure next to it.
 # ---------------------------------------------------------------------------
 FROM ghcr.io/astral-sh/uv:0.12.17@sha256:10787c682e4184e4f290de1171fd4703dc63de99221f10fe1c99002ce7fa9acc AS uv
 
@@ -35,9 +35,9 @@ COPY computor-client/pyproject.toml   computor-client/
 COPY computor-testing/pyproject.toml  computor-testing/
 COPY computor-backend/pyproject.toml computor-backend/uv.lock computor-backend/
 # --no-emit-local drops the computor-* path packages (installed from source
-# below); --frozen fails the build if uv.lock does not match pyproject.toml.
+# below); --locked fails the build if uv.lock does not match pyproject.toml.
 RUN mkdir /locks \
-    && EXPORT="uv export --project computor-backend --frozen --no-emit-project \
+    && EXPORT="uv export --project computor-backend --locked --no-emit-project \
                --no-emit-local --format requirements-txt --no-header" \
     && $EXPORT --no-dev                       -o /locks/runtime.txt \
     && $EXPORT --only-group testing-worker    -o /locks/testing-worker.txt
@@ -66,13 +66,15 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 # ---------------------------------------------------------------------------
 # Layer 1: third-party dependencies, exactly as locked (hash-checked)
 # ---------------------------------------------------------------------------
-# Builds (the sdist-only grapheme/stopit and the local packages) use
-# --no-build-isolation with the setuptools/wheel shipped in the digest-pinned
-# python image, so pip never fetches an unpinned build backend. The exported
+# Only wheels are accepted except for grapheme (sdist-only, pulled in by
+# alive-progress). It and the local packages build with --no-build-isolation
+# against the setuptools/wheel shipped in the digest-pinned python image, so
+# pip never fetches an unpinned build backend. The exported
 # files stay in the image for the testing worker (testing-worker.txt).
 COPY --from=lock-export --chown=worker:worker /locks /home/worker/.computor-locks
 RUN pip install --user --no-warn-script-location --no-cache-dir \
         --require-hashes --no-deps --no-build-isolation \
+        --only-binary :all: --no-binary grapheme \
         -r .computor-locks/runtime.txt
 
 # ---------------------------------------------------------------------------

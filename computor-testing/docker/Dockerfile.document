@@ -37,11 +37,12 @@ WORKDIR /opt/ct-testing
 # which also covers computor-types' deps and the build backend), then the two
 # local packages with --no-deps / --no-build-isolation so nothing floats.
 COPY computor-testing/requirements-py312.lock /tmp/requirements-py312.lock
-RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements-py312.lock \
+RUN pip install --no-cache-dir --require-hashes --only-binary :all: -r /tmp/requirements-py312.lock \
     && rm /tmp/requirements-py312.lock
 COPY computor-types /opt/computor-types/
 COPY computor-testing /opt/ct-testing/
-RUN pip install --no-cache-dir --no-deps --no-build-isolation /opt/computor-types -e .
+RUN pip install --no-cache-dir --no-deps --no-build-isolation /opt/computor-types -e . \
+    && MPLBACKEND=Agg python /opt/ct-testing/scripts/import_smoke.py
 
 # Create sandbox structure
 RUN mkdir -p /sandbox/submission /sandbox/tests /sandbox/output \

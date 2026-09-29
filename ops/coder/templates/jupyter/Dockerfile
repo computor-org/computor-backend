@@ -28,7 +28,7 @@ ENV LANG=en_US.UTF-8
 # Installed from a hash-locked requirements file (see requirements.in for how
 # to regenerate it) so a rebuild never pulls a newer or tampered release.
 COPY requirements.lock /tmp/requirements.lock
-RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock \
+RUN pip install --no-cache-dir --require-hashes --only-binary :all: -r /tmp/requirements.lock \
     && rm /tmp/requirements.lock
 
 # uid 1000 'coder' with home at /home/coder — must match the other workspace
