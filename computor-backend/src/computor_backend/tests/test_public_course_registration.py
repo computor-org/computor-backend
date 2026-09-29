@@ -13,6 +13,7 @@ Session cannot see any of it.
 
 import os
 import uuid
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine
@@ -526,15 +527,15 @@ async def test_catalog_reports_seats_left_and_full(world, db):
     assert rows[str(full.id)].full is True
 
 
-@pytest.mark.asyncio
-async def test_two_students_racing_for_the_last_seat_do_not_both_get_it(monkeypatch):
-    """Real concurrency on committed rows, not the rollback fixture.
+@pytest.fixture
+def race(monkeypatch):
+    """Committed rows and real connections for lock tests (not the rollback fixture).
 
-    Student A registers and is held *after* its membership is flushed but
-    before commit (inside the post-create hook). Student B then registers in
-    another connection. Under READ COMMITTED B cannot see A's uncommitted row,
-    so without the course row lock B would count zero students and take the
-    seat too. With the lock B waits for A's commit, recounts, and gets 409.
+    A capped public course with one seat and two users, both committed so
+    separate connections see them. ``run(name, user_id)`` registers in its own
+    session on a thread; the post-create hook holds the *first* registration
+    open (after its membership is flushed, before commit) until ``release``.
+    Everything created is deleted afterwards.
     """
     import asyncio
     import threading
@@ -578,62 +579,106 @@ async def test_two_students_racing_for_the_last_seat_do_not_both_get_it(monkeypa
     ]
     setup.add_all(users)
     setup.commit()
-    course_id = course.id
-    alice_id, bob_id = (str(u.id) for u in users)
-    ids = {"org": org.id, "family": family.id, "users": [u.id for u in users]}
+    ids = {
+        "course": course.id,
+        "org": org.id,
+        "family": family.id,
+        "users": [u.id for u in users],
+    }
     setup.close()
 
-    a_holds_lock = threading.Event()
-    release_a = threading.Event()
+    first_holds_lock = threading.Event()
+    release = threading.Event()
+    held = {"done": False}
 
     async def _hook(member, db, permissions=None):
-        if str(member.user_id) == alice_id:
-            a_holds_lock.set()
-            release_a.wait(timeout=30)
+        if not held["done"]:
+            held["done"] = True
+            first_holds_lock.set()
+            release.wait(timeout=30)
 
     monkeypatch.setattr(hook_mod, "course_member_post_create", _hook)
-
     results: dict[str, object] = {}
 
     def _register(name: str, user_id: str) -> None:
         session = Session()
         try:
             member, created = asyncio.run(
-                register_in_public_course(course_id, Principal(user_id=user_id), session)
+                register_in_public_course(ids["course"], Principal(user_id=user_id), session)
             )
-            results[name] = created
+            results[name] = (str(member.id), created)
         except Exception as exc:  # noqa: BLE001 - the outcome is the assertion
             session.rollback()
             results[name] = exc
         finally:
             session.close()
 
+    def run(name: str, user_id: str) -> threading.Thread:
+        thread = threading.Thread(target=_register, args=(name, user_id))
+        thread.start()
+        return thread
+
     try:
-        a = threading.Thread(target=_register, args=("alice", alice_id))
-        a.start()
-        assert a_holds_lock.wait(timeout=10), "alice never reached the hook"
-
-        b = threading.Thread(target=_register, args=("bob", bob_id))
-        b.start()
-        b.join(timeout=2)
-        assert b.is_alive(), "bob must wait on the course row lock while alice is open"
-
-        release_a.set()
-        a.join(timeout=10)
-        b.join(timeout=10)
-
-        assert results["alice"] is True
-        assert isinstance(results["bob"], ConflictException)
-        assert results["bob"].status_code == 409
+        yield SimpleNamespace(
+            users=[str(u) for u in ids["users"]],
+            run=run,
+            first_holds_lock=first_holds_lock,
+            release=release,
+            results=results,
+        )
     finally:
-        release_a.set()
+        release.set()
         cleanup = Session()
-        cleanup.query(CourseMember).filter(CourseMember.course_id == course_id).delete()
-        cleanup.query(CourseGroup).filter(CourseGroup.course_id == course_id).delete()
-        cleanup.query(Course).filter(Course.id == course_id).delete()
+        cleanup.query(CourseMember).filter(CourseMember.course_id == ids["course"]).delete()
+        cleanup.query(CourseGroup).filter(CourseGroup.course_id == ids["course"]).delete()
+        cleanup.query(Course).filter(Course.id == ids["course"]).delete()
         cleanup.query(CourseFamily).filter(CourseFamily.id == ids["family"]).delete()
         cleanup.query(Organization).filter(Organization.id == ids["org"]).delete()
         cleanup.query(User).filter(User.id.in_(ids["users"])).delete()
         cleanup.commit()
         cleanup.close()
         engine.dispose()
+
+
+def test_two_students_racing_for_the_last_seat_do_not_both_get_it(race):
+    """Under READ COMMITTED bob cannot see alice's uncommitted row, so without
+    the course row lock he would count zero students and take the seat too.
+    With the lock he waits for alice's commit, recounts, and gets 409.
+    """
+    alice_id, bob_id = race.users
+    a = race.run("alice", alice_id)
+    assert race.first_holds_lock.wait(timeout=10), "alice never reached the hook"
+
+    b = race.run("bob", bob_id)
+    b.join(timeout=2)
+    assert b.is_alive(), "bob must wait on the course row lock while alice is open"
+
+    race.release.set()
+    a.join(timeout=10)
+    b.join(timeout=10)
+
+    assert race.results["alice"][1] is True
+    assert isinstance(race.results["bob"], ConflictException)
+    assert race.results["bob"].status_code == 409
+
+
+def test_a_concurrent_retry_by_the_same_student_gets_their_seat_not_409(race):
+    """Both requests pass the pre-lock membership check; the retry then waits
+    on the lock while the first takes the last seat. It must return that
+    membership (created=False), not report the course full.
+    """
+    alice_id, _ = race.users
+    first = race.run("first", alice_id)
+    assert race.first_holds_lock.wait(timeout=10), "first request never reached the hook"
+
+    retry = race.run("retry", alice_id)
+    retry.join(timeout=2)
+    assert retry.is_alive(), "the retry must wait on the course row lock"
+
+    race.release.set()
+    first.join(timeout=10)
+    retry.join(timeout=10)
+
+    member_id, created = race.results["first"]
+    assert created is True
+    assert race.results["retry"] == (member_id, False), race.results

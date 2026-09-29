@@ -219,16 +219,22 @@ def resolve_registration_group(
         return group
 
 
-def _ensure_seat_available(course: Course, db: Session) -> None:
+def _ensure_seat_available(
+    course: Course, user_id: str, db: Session
+) -> Optional[CourseMember]:
     """Raise 409 when the course's self-registration cap is reached.
 
     Locks the course row (``FOR UPDATE`` on ``course`` only) before counting,
     so two students racing for the last seat serialize here: the second one
     counts after the first has committed and sees the course full. The lock is
     held until the caller's commit. Uncapped courses skip the lock entirely.
+
+    Returns the caller's membership if one appeared while waiting for the
+    lock: a retried request from the same user must get that back, not a 409
+    for a seat they already hold. The caller's pre-lock check is stale then.
     """
     if course.max_self_registrations is None:
-        return
+        return None
     cap = (
         db.query(Course.max_self_registrations)
         .filter(Course.id == course.id)
@@ -236,7 +242,14 @@ def _ensure_seat_available(course: Course, db: Session) -> None:
         .scalar()
     )
     if cap is None:
-        return
+        return None
+    existing = (
+        db.query(CourseMember)
+        .filter(CourseMember.course_id == course.id, CourseMember.user_id == user_id)
+        .first()
+    )
+    if existing is not None:
+        return existing
     students = (
         db.query(func.count(CourseMember.id))
         .filter(
@@ -251,6 +264,7 @@ def _ensure_seat_available(course: Course, db: Session) -> None:
             detail="This course is full.",
             context={"course_id": str(course.id), "max_self_registrations": cap},
         )
+    return None
 
 
 async def register_in_public_course(
@@ -283,7 +297,9 @@ async def register_in_public_course(
     if existing is not None:
         return existing, False
 
-    _ensure_seat_available(course, db)
+    existing = _ensure_seat_available(course, user_id, db)
+    if existing is not None:
+        return existing, False
 
     group = resolve_registration_group(course, permissions, db)
 
