@@ -399,7 +399,7 @@ cmd_update_exec() {
     kc_to=$(keycloak_image_tag_at "$to_commit")
     kc_decision=$(keycloak_update_decision "$kc_from" "$kc_to" "${KEYCLOAK_ENABLED:-}")
     if [ "$kc_decision" = "downgrade" ]; then
-        fail_update "Refusing automated Keycloak downgrade ${kc_from} -> ${kc_to} (target ${to_commit}): Keycloak cannot run on a database migrated by a newer version. Nothing was changed. Restore a pre-upgrade dump of the Keycloak DB taken on ${kc_to} (see the updater's restore procedure / './computor.sh update recover prod'), then deploy ${to_commit} manually."
+        fail_update "Refusing automated Keycloak downgrade ${kc_from} -> ${kc_to} (target ${to_commit}): Keycloak cannot run on a database migrated by a newer version. Nothing was changed. Restore a pre-upgrade dump of the Keycloak DB taken on ${kc_to} (restore procedure: see the Keycloak rollback section of PR #255 / the update log), then deploy ${to_commit} manually."
     fi
     if [ "$kc_decision" = "guard" ]; then
         ulog "Keycloak image changes ${kc_from} -> ${kc_to}: a verified DB dump is taken before start; no automatic rollback after it"
