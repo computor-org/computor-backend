@@ -7,9 +7,7 @@ running executables, and capturing stdout/stderr.
 
 import os
 import shutil
-import subprocess
 import tempfile
-import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -17,6 +15,7 @@ from typing import Any, Dict, List, Optional
 from .base import BaseExecutor, ExecutorResult, sandbox_command_prefix
 from .environment import get_safe_env, filter_env
 from .exceptions import CompilationError, ExecutionError, ExecutionTimeoutError
+from .process import run_bounded
 from .resources import make_preexec_fn
 
 
@@ -186,19 +185,24 @@ class CompiledExecutor(BaseExecutor):
             cmd.extend(linker_flags)
 
         # Run compilation
-        start_time = time.perf_counter()
         try:
-            result = subprocess.run(
+            # The compiler digests untrusted source (template/macro bombs), so
+            # it runs as a bounded job like the program itself.
+            result = run_bounded(
                 cmd,
                 cwd=self.working_dir,
-                capture_output=True,
-                text=True,
                 timeout=self.compile_timeout,
-                # The compiler digests untrusted source (template/macro
-                # bombs), so it gets the same per-job bounds as the run.
                 preexec_fn=make_preexec_fn(self.resource_limits),
             )
-            duration = time.perf_counter() - start_time
+            duration = result.duration
+            if result.timed_out:
+                self.last_compilation = CompilationResult(
+                    success=False,
+                    stderr=f"Compilation timed out after {self.compile_timeout}s",
+                    return_code=-1,
+                    duration=duration,
+                )
+                return self.last_compilation
 
             warnings, errors = self._parse_compiler_output(result.stderr)
 
@@ -211,15 +215,6 @@ class CompiledExecutor(BaseExecutor):
                 duration=duration,
                 warnings=warnings,
                 errors=errors,
-            )
-
-        except subprocess.TimeoutExpired:
-            duration = time.perf_counter() - start_time
-            self.last_compilation = CompilationResult(
-                success=False,
-                stderr=f"Compilation timed out after {self.compile_timeout}s",
-                return_code=-1,
-                duration=duration,
             )
 
         except FileNotFoundError:
@@ -270,39 +265,33 @@ class CompiledExecutor(BaseExecutor):
         actual_timeout = timeout or self.timeout
         preexec_fn = make_preexec_fn(self.resource_limits)
 
-        start_time = time.perf_counter()
         try:
-            result = subprocess.run(
+            # Own process group, whole tree killed at the end, output capped.
+            result = run_bounded(
                 cmd,
                 cwd=self.working_dir,
-                input=stdin,
-                capture_output=True,
-                text=True,
-                timeout=actual_timeout,
                 env=env,
+                input=stdin,
+                timeout=actual_timeout,
                 preexec_fn=preexec_fn,
             )
-            duration = time.perf_counter() - start_time
-
+            if result.timed_out:
+                return ExecutorResult(
+                    success=False,
+                    stdout=result.stdout,
+                    stderr=result.stderr,
+                    duration=result.duration,
+                    return_code=-1,
+                    timed_out=True,
+                    error_message=f"Execution timed out after {actual_timeout}s",
+                    error_type="TimeoutError",
+                )
             return ExecutorResult(
                 success=True,  # Process completed (may have non-zero exit)
                 stdout=result.stdout,
                 stderr=result.stderr,
-                duration=duration,
+                duration=result.duration,
                 return_code=result.returncode,
-            )
-
-        except subprocess.TimeoutExpired as e:
-            duration = time.perf_counter() - start_time
-            return ExecutorResult(
-                success=False,
-                stdout=e.stdout.decode() if e.stdout else "",
-                stderr=e.stderr.decode() if e.stderr else "",
-                duration=duration,
-                return_code=-1,
-                timed_out=True,
-                error_message=f"Execution timed out after {actual_timeout}s",
-                error_type="TimeoutError",
             )
 
         except Exception as e:
