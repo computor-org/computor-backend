@@ -68,6 +68,7 @@ set_phase() { # phase [message]
 KEYCLOAK_COMPOSE_REL="ops/docker/docker-compose.keycloak.yaml"
 KEYCLOAK_DB_SERVICE="keycloak-db"
 KEYCLOAK_DB_CONTAINER="computor-keycloak-db"
+KEYCLOAK_CONTAINER="computor-keycloak"
 
 keycloak_image_tag_at() { # git-ref -> Keycloak image tag in that tree ("" if none)
     git -C "$REPO_ROOT" show "$1:$KEYCLOAK_COMPOSE_REL" 2>/dev/null \
@@ -90,6 +91,17 @@ keycloak_dump_is_complete() { # dump.sql.gz -> 0 if a complete pg_dumpall with t
     gzip -t "$f" 2>/dev/null || return 1
     gzip -dc "$f" | grep -q '^CREATE DATABASE keycloak ' || return 1
     gzip -dc "$f" | tail -n 5 | grep -q 'PostgreSQL database cluster dump complete' || return 1
+}
+
+keycloak_stop_verified() { # stop Keycloak; 0 only if it is verifiably not running
+    local state
+    compose stop keycloak >/dev/null 2>&1 || return 1
+    # docker ps fails (non-zero) if the daemon cannot answer: never read that as "absent".
+    state=$(docker ps -a --filter "name=^/${KEYCLOAK_CONTAINER}\$" --format '{{.State}}') || return 1
+    case "$state" in
+        exited|created|"") return 0 ;;   # "" = no container at all: nothing can write
+        *) return 1 ;;
+    esac
 }
 
 keycloak_predump() { # dest.sql.gz ; Keycloak itself must already be stopped
@@ -420,6 +432,8 @@ cmd_update_exec() {
         kc_dump="${SYSTEM_DEPLOYMENT_PATH}/backups/keycloak/keycloak-pre-${kc_from}-to-${kc_to}-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
         set_phase keycloak_backup "Dumping the Keycloak DB before ${kc_from} -> ${kc_to}"
         # Nothing has run on the new Keycloak yet, so a plain rollback is still safe here.
+        # A dump is only consistent if the old Keycloak can no longer write.
+        keycloak_stop_verified || do_rollback "Keycloak did not stop cleanly; refusing to dump a live database"
         keycloak_predump "$kc_dump" || do_rollback "Keycloak pre-upgrade DB dump failed or incomplete"
         ulog "Keycloak DB dump verified: ${kc_dump}"
         set_update_state keycloak_dump "$kc_dump"
