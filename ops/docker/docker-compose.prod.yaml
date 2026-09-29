@@ -162,6 +162,9 @@ services:
       MATLAB_MLM_LICENSE_FILE: ${MATLAB_MLM_LICENSE_FILE:-}
       BACKEND_EXTERNAL_URL: ${BACKEND_EXTERNAL_URL:-}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?}
+      # Extra origins SSO login/logout may redirect to (comma-separated);
+      # the NEXT_PUBLIC_API_URL origin is always allowed.
+      SSO_REDIRECT_ALLOWED_ORIGINS: ${SSO_REDIRECT_ALLOWED_ORIGINS:-}
       # Git server integration (if enabled) — uses the internal container URL
       # since uvicorn reaches Forgejo over computor-network, not localhost.
       GIT_SERVER: ${GIT_SERVER}
