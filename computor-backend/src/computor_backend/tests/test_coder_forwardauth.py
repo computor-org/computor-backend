@@ -233,9 +233,14 @@ async def test_query_credentials_in_workspace_url_never_logged(caplog, uri, prin
     # query; ForwardAuth sees it in X-Forwarded-Uri on every request.
     caplog.set_level("DEBUG", logger="computor_backend.api.auth")
     resp = await verify_coder_access(_FakeRequest(uri), principal_factory())
-    assert resp.status_code == 200
-    # The query is not part of the workspace identity.
-    assert _body(resp)["workspace"] == "workspace"
+    # Admins may no longer open other users' workspaces (403); the owner may.
+    # Either way no credential from the query may reach the log.
+    if principal_factory is _user:
+        assert resp.status_code == 200
+        # The query is not part of the workspace identity.
+        assert _body(resp)["workspace"] == "workspace"
+    else:
+        assert resp.status_code == 403
     _assert_no_secret_logged(caplog)
 
 
