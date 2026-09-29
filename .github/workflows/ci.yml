@@ -18,12 +18,19 @@ jobs:
           enable-cache: true
       - run: uv sync --project computor-backend --python 3.12 --frozen --extra dev
       - name: Behavioral unit tests
+        env:
+          # Coder settings validate these at import; dummy values suffice here.
+          CODER_ADMIN_EMAIL: ci@example.org
+          CODER_ADMIN_PASSWORD: ci-dummy-password
         run: >-
           uv run --project computor-backend --python 3.12 pytest -q
           computor-backend/src/computor_backend/tests/test_canonical_zip_hash.py
+          computor-backend/src/computor_backend/tests/test_coder_forwardauth.py
           computor-backend/src/computor_backend/tests/test_coder_image_cleanup.py
           computor-backend/src/computor_backend/tests/test_coder_source_repo_pinning.py
+          computor-backend/src/computor_backend/tests/test_log_redaction.py
           computor-backend/src/computor_backend/tests/test_password_hashing.py
+          computor-backend/src/computor_backend/tests/test_sso_redirect_allowlist.py
           computor-backend/src/computor_backend/tests/test_version_constraints.py
 
   web:
