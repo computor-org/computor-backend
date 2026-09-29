@@ -43,6 +43,7 @@ Env:
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -99,21 +100,46 @@ def _parse(raw):
         return raw.decode("utf-8", "replace")
 
 
-def get_admin_token(base, realm_user, realm_pass):
+def get_admin_token(base, realm_user, realm_pass, timeout_s=None, sleep=time.sleep,
+                    clock=time.monotonic):
+    """Obtain a master-realm admin token, retrying with exponential backoff.
+
+    Keycloak can still be starting (connection refused, 5xx, or 404 while realms
+    load) when this one-shot runs, so any failure is retried until ``timeout_s``
+    (env IDP_SETUP_AUTH_TIMEOUT, default 300 s) elapses; only then does it exit.
+    """
+    if timeout_s is None:
+        timeout_s = float(os.environ.get("IDP_SETUP_AUTH_TIMEOUT", "300"))
     url = f"{base}/realms/master/protocol/openid-connect/token"
-    status, body = _request(
-        "POST",
-        url,
-        form_body={
-            "grant_type": "password",
-            "username": realm_user,
-            "password": realm_pass,
-            "client_id": "admin-cli",
-        },
-    )
-    if status != 200 or not isinstance(body, dict):
-        raise SystemExit(f"Keycloak admin auth failed: {status} {body}")
-    return body["access_token"]
+    deadline = clock() + timeout_s
+    delay = 2.0
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            status, body = _request(
+                "POST",
+                url,
+                form_body={
+                    "grant_type": "password",
+                    "username": realm_user,
+                    "password": realm_pass,
+                    "client_id": "admin-cli",
+                },
+            )
+        except (urllib.error.URLError, OSError) as e:
+            status, body = None, f"transport error: {e}"
+        if status == 200 and isinstance(body, dict) and body.get("access_token"):
+            return body["access_token"]
+        remaining = deadline - clock()
+        if remaining <= 0:
+            raise SystemExit(
+                f"Keycloak admin auth failed after {attempt} attempt(s): {status} {body}"
+            )
+        wait = min(delay, 30.0, remaining)
+        _log(f"admin auth not possible yet ({status}); retrying in {wait:.0f}s")
+        sleep(wait)
+        delay *= 2
 
 
 def import_oidc_config(base, realm, token, discovery_url):

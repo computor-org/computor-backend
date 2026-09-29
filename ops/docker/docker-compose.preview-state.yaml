@@ -26,7 +26,7 @@ services:
       retries: 12
 
   keycloak:
-    image: quay.io/keycloak/keycloak:25.0.6@sha256:82c5b7a110456dbd42b86ea572e728878549954cc8bd03cd65410d75328095d2
+    image: quay.io/keycloak/keycloak:26.7.4@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
     networks:
       - computor-network
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}keycloak
@@ -34,14 +34,13 @@ services:
     security_opt:
       - "no-new-privileges:true"
     environment:
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?must be set in .env.preview}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?must be set in .env.preview}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5438/keycloak
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?must be set in .env.preview}
       KC_HOSTNAME_STRICT: "false"
-      KC_HOSTNAME_STRICT_HTTPS: "false"
       # Pin the externally visible HTTP origin for LAN previews. Without an
       # explicit origin Keycloak treats a non-local Host header as HTTPS-only.
       KC_HOSTNAME: ${KEYCLOAK_HOSTNAME:?KEYCLOAK_HOSTNAME must be set in .env.preview}
@@ -58,7 +57,7 @@ services:
         - >-
           bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9000;
           printf "GET /auth/health/ready HTTP/1.0\r\nHost: localhost\r\n\r\n" >&3;
-          grep -q "200" <&3'
+          IFS= read -r s <&3; case "$${s%$$(printf "\r")}" in "HTTP/1."?" 200"|"HTTP/1."?" 200 "*) exit 0;; esac; exit 1'
       interval: 5s
       timeout: 5s
       start_period: 10s
