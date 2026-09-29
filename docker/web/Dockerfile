@@ -32,6 +32,9 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 # Build provenance (set by computor.sh) — shown in the sidebar footer.
 ARG GIT_COMMIT=
 ENV NEXT_PUBLIC_GIT_COMMIT=$GIT_COMMIT
+# Legal footer/pages profile: computor-at | tugraz-internal | none (default).
+ARG NEXT_PUBLIC_LEGAL_PROFILE=none
+ENV NEXT_PUBLIC_LEGAL_PROFILE=$NEXT_PUBLIC_LEGAL_PROFILE
 
 # Disable Next.js telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
