@@ -513,6 +513,27 @@ async def handle_sso_callback(
                             "accounts; SSO login cannot be resolved automatically."
                         )
 
+            # Linking by email hands this identity an existing account, so the
+            # email must be one the IdP has verified. Otherwise anyone who can
+            # get an unverified address into a token (open Keycloak
+            # registration, a broker with trustEmail off) takes over the
+            # account that owns it. Refuse rather than create a second user:
+            # the DB allows one user per email, and a user without the email
+            # would silently fork the person's identity.
+            if user is not None and (user_info.attributes or {}).get(
+                "email_verified"
+            ) is not True:
+                raise ForbiddenException(
+                    detail=(
+                        "Your identity provider has not verified the email address "
+                        f"'{user_info.email}', so this sign-in cannot be linked to "
+                        "the existing Computor account that uses it. Verify the "
+                        "address with your identity provider, or ask an "
+                        "administrator."
+                    ),
+                    context={"provider": provider, "user_id": str(user.id)},
+                )
+
             if user is None:
                 user = User(
                     given_name=user_info.given_name or "",
