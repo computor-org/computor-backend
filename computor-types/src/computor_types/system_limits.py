@@ -14,9 +14,11 @@ models a hard external constraint (MATLAB licence seats) and binds everyone.
 ``null`` means unlimited on both, matching the per-template quota.
 """
 
-from typing import Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
+
+RegistrationMode = Literal["open", "invite_only", "closed"]
 
 
 class InstanceLimitsUsage(BaseModel):
@@ -28,6 +30,11 @@ class InstanceLimitsUsage(BaseModel):
     login_seats: int = Field(
         description="Distinct users holding a login seat — one per user however "
         "many tabs or devices they are signed in from.",
+    )
+    registered_users: Optional[int] = Field(
+        None,
+        description="Non-staff, non-service, non-archived users — what "
+        "max_registered_users counts.",
     )
     workspace_users_available: Optional[bool] = Field(
         None,
@@ -57,6 +64,24 @@ class InstanceLimitsGet(BaseModel):
         description="Download URL for the local VS Code extension, quoted in both "
         "refusals; null when EXTENSION_PUBLIC_DOWNLOAD_URL is unset.",
     )
+    registration_mode: RegistrationMode = Field(
+        "open",
+        description="Who may create an account on first sign-in: open, "
+        "invite_only (valid invite code required) or closed.",
+    )
+    max_registered_users: Optional[int] = Field(
+        None,
+        description="Hard cap on non-staff users; null = unlimited.",
+    )
+    referral_invites_per_user: int = Field(
+        2,
+        description="Single-use referral invites each non-staff user gets "
+        "(invite_only mode).",
+    )
+    pilot_course_ids: List[str] = Field(
+        default_factory=list,
+        description="Public courses a new user is enrolled in on registration.",
+    )
     usage: Optional[InstanceLimitsUsage] = Field(
         None,
         description="Current usage of both limits.",
@@ -82,4 +107,25 @@ class InstanceLimitsUpdate(BaseModel):
         description="Idle window for a login seat, in minutes. Keep it above 15: "
         "an active client re-authenticates (and so refreshes its seat) at most "
         "every 15 minutes, so a shorter window evicts users mid-session.",
+    )
+    registration_mode: RegistrationMode = Field(
+        "open",
+        description="Who may create an account on first sign-in: open, "
+        "invite_only (valid invite code required) or closed.",
+    )
+    max_registered_users: Optional[int] = Field(
+        None,
+        ge=0,
+        description="Hard cap on non-staff users; null = unlimited.",
+    )
+    referral_invites_per_user: int = Field(
+        2,
+        ge=0,
+        le=100,
+        description="Single-use referral invites each non-staff user gets "
+        "(invite_only mode).",
+    )
+    pilot_course_ids: List[str] = Field(
+        default_factory=list,
+        description="Public courses a new user is enrolled in on registration.",
     )

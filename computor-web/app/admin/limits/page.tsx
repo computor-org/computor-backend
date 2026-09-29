@@ -20,7 +20,19 @@ interface FormState {
   maxWorkspaceUsers: string;
   maxConcurrentLogins: string;
   idleMinutes: string;
+  registrationMode: RegistrationMode;
+  maxRegisteredUsers: string;
+  referralInvitesPerUser: string;
+  pilotCourseIds: string;
 }
+
+type RegistrationMode = 'open' | 'invite_only' | 'closed';
+
+const REGISTRATION_MODES: { value: RegistrationMode; label: string }[] = [
+  { value: 'open', label: 'Open — anyone who signs in gets an account' },
+  { value: 'invite_only', label: 'Invite only — a valid invite link is required' },
+  { value: 'closed', label: 'Closed — no new accounts' },
+];
 
 /** '' → null, otherwise a non-negative integer (throws a user message). */
 function parseLimit(label: string, raw: string): number | null {
@@ -72,6 +84,12 @@ export default function InstanceLimitsPage() {
       maxConcurrentLogins:
         data?.max_concurrent_logins != null ? String(data.max_concurrent_logins) : '',
       idleMinutes: data?.login_idle_minutes != null ? String(data.login_idle_minutes) : '30',
+      registrationMode: data?.registration_mode ?? 'open',
+      maxRegisteredUsers:
+        data?.max_registered_users != null ? String(data.max_registered_users) : '',
+      referralInvitesPerUser:
+        data?.referral_invites_per_user != null ? String(data.referral_invites_per_user) : '2',
+      pilotCourseIds: (data?.pilot_course_ids ?? []).join(', '),
     }),
     [data],
   );
@@ -91,10 +109,18 @@ export default function InstanceLimitsPage() {
       if (idle == null || idle < 1) {
         throw new Error('Login idle window must be at least 1 minute.');
       }
+      const referrals = parseLimit('Referral invites per user', form.referralInvitesPerUser);
       await limitsClient.update({
         max_workspace_users: parseLimit('Max workspace users', form.maxWorkspaceUsers),
         max_concurrent_logins: parseLimit('Max concurrent logins', form.maxConcurrentLogins),
         login_idle_minutes: idle,
+        registration_mode: form.registrationMode,
+        max_registered_users: parseLimit('Max registered users', form.maxRegisteredUsers),
+        referral_invites_per_user: referrals ?? 0,
+        pilot_course_ids: form.pilotCourseIds
+          .split(/[\s,]+/)
+          .map((id) => id.trim())
+          .filter(Boolean),
       });
       notify('Limits saved. They apply to the next sign-in or workspace launch.', 'success');
       setDraft(null);
@@ -155,7 +181,27 @@ export default function InstanceLimitsPage() {
                   </p>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="bg-sunken rounded p-4">
+                    <div className="text-xs font-medium text-muted">Registered users</div>
+                    <div className="mt-1 flex items-baseline gap-2">
+                      <span className="text-3xl font-bold text-fg">
+                        {usage?.registered_users ?? 0}
+                      </span>
+                      <span className="text-sm text-muted">
+                        of {data.max_registered_users ?? '∞'}
+                      </span>
+                      <Badge
+                        tone={usageTone(usage?.registered_users ?? 0, data.max_registered_users)}
+                        pill
+                      >
+                        {data.registration_mode === 'invite_only'
+                          ? 'invite only'
+                          : data.registration_mode ?? 'open'}
+                      </Badge>
+                    </div>
+                  </div>
+
                   <div className="bg-sunken rounded p-4">
                     <div className="text-xs font-medium text-muted">Signed in</div>
                     <div className="mt-1 flex items-baseline gap-2">
@@ -264,6 +310,90 @@ export default function InstanceLimitsPage() {
                       Keep this above 15. An active client re-checks its credentials at most
                       every 15 minutes, so a shorter window would release the seats of people
                       who are still working.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t border-rule pt-4">
+                  <h3 className="text-sm font-semibold text-fg">Registration</h3>
+                  <p className="text-sm text-muted mt-1">
+                    Who may create an account on first sign-in (GitHub or email). Existing
+                    users always sign in. The user cap is hard and counts everyone except
+                    staff, service accounts and archived users.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="reg-mode" className="block text-xs font-medium text-body mb-1">
+                      Registration mode
+                    </label>
+                    <select
+                      id="reg-mode"
+                      value={form.registrationMode}
+                      onChange={(event) =>
+                        update({ registrationMode: event.target.value as RegistrationMode })
+                      }
+                      className={inputCls}
+                    >
+                      {REGISTRATION_MODES.map((mode) => (
+                        <option key={mode.value} value={mode.value}>
+                          {mode.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="reg-cap" className="block text-xs font-medium text-body mb-1">
+                      Max registered users
+                    </label>
+                    <input
+                      id="reg-cap"
+                      value={form.maxRegisteredUsers}
+                      onChange={(event) => update({ maxRegisteredUsers: event.target.value })}
+                      placeholder="unlimited"
+                      className={inputCls}
+                    />
+                    <p className="text-xs text-muted mt-1">
+                      Applies in every mode, even to a valid invite.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="reg-referrals"
+                      className="block text-xs font-medium text-body mb-1"
+                    >
+                      Referral invites per user
+                    </label>
+                    <input
+                      id="reg-referrals"
+                      value={form.referralInvitesPerUser}
+                      onChange={(event) => update({ referralInvitesPerUser: event.target.value })}
+                      placeholder="2"
+                      className={inputCls}
+                    />
+                    <p className="text-xs text-muted mt-1">
+                      Single-use invite links each user can share (invite-only mode). Seed
+                      invites for the first users come from the invite admin page.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="reg-courses" className="block text-xs font-medium text-body mb-1">
+                      Pilot course ids
+                    </label>
+                    <input
+                      id="reg-courses"
+                      value={form.pilotCourseIds}
+                      onChange={(event) => update({ pilotCourseIds: event.target.value })}
+                      placeholder="none"
+                      className={inputCls}
+                    />
+                    <p className="text-xs text-muted mt-1">
+                      Public courses every new user is enrolled in, comma separated. Each
+                      course&apos;s own seat cap still applies.
                     </p>
                   </div>
                 </div>

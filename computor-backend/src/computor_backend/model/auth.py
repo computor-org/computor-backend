@@ -40,6 +40,14 @@ class User(Base):
     workspace_app_key_version = Column(Integer, nullable=False, server_default=text("1"))
     workspace_app_key_rotated_at = Column(DateTime(timezone=True))
 
+    # Which invite admitted this user at registration, and whose it was — for
+    # referral analytics. NULL for users created before invite-only
+    # registration existed or while registration was open without a code.
+    registered_via_invite_id = Column(
+        ForeignKey('invite_link.id', ondelete='SET NULL', use_alter=True,
+                   name='user_registered_via_invite_id_fkey'))
+    referred_by_user_id = Column(ForeignKey('user.id', ondelete='SET NULL'))
+
     # Relationships.
     #
     # The database owns the delete semantics for everything hanging off a user

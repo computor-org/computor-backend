@@ -59,7 +59,7 @@ export interface ISSOAuthProvider extends IAuthProvider {
    * Initiate SSO login flow
    * Redirects to SSO provider
    */
-  initiateSSO(provider?: string, returnTo?: string): void;
+  initiateSSO(provider?: string, returnTo?: string, extraParams?: Record<string, string>): void;
 
   /**
    * Handle SSO callback after redirect

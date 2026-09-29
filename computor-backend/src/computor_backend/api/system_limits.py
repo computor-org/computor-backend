@@ -15,7 +15,7 @@ The enforcement of both limits lives in
 ``business_logic/instance_limits.py``; this module only stores and reports.
 """
 import logging
-from typing import Annotated, Optional
+from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -27,10 +27,14 @@ from computor_backend.business_logic.instance_limits import (
     instance_settings_row,
     local_install_url,
 )
+from computor_backend.business_logic.registration_admission import (
+    count_registered_users,
+)
 from computor_backend.coder.client import CoderClient, get_coder_client
 from computor_backend.coder.config import get_coder_settings
 from computor_backend.database import get_db
-from computor_backend.exceptions import ForbiddenException
+from computor_backend.exceptions import BadRequestException, ForbiddenException
+from computor_backend.model.course import Course
 from computor_backend.model.instance import InstanceSettings
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.core import check_admin
@@ -73,20 +77,7 @@ async def get_instance_limits(
     Any authenticated user may read this — it is the explanation behind a
     refusal, and withholding it would leave the refusal looking like a bug.
     """
-    row = instance_settings_row(db)
-    idle_minutes = row.login_idle_minutes if row is not None else DEFAULT_LOGIN_IDLE_MINUTES
-    workspace_users = await _workspace_user_count(client)
-    return InstanceLimitsGet(
-        max_workspace_users=row.max_workspace_users if row is not None else None,
-        max_concurrent_logins=row.max_concurrent_logins if row is not None else None,
-        login_idle_minutes=int(idle_minutes),
-        local_install_url=local_install_url(),
-        usage=InstanceLimitsUsage(
-            workspace_users=workspace_users or 0,
-            workspace_users_available=workspace_users is not None,
-            login_seats=await count_login_seats(int(idle_minutes) * 60),
-        ),
-    )
+    return await _limits_response(instance_settings_row(db), db, client)
 
 
 @system_limits_router.put("", response_model=InstanceLimitsGet)
@@ -115,19 +106,65 @@ async def update_instance_limits(
     row.max_workspace_users = request.max_workspace_users
     row.max_concurrent_logins = request.max_concurrent_logins
     row.login_idle_minutes = request.login_idle_minutes
+    # The registration fields are replaced only when sent, so a client that
+    # predates them cannot silently reopen registration with a PUT.
+    sent = request.model_fields_set
+    if "registration_mode" in sent:
+        row.registration_mode = request.registration_mode
+    if "max_registered_users" in sent:
+        row.max_registered_users = request.max_registered_users
+    if "referral_invites_per_user" in sent:
+        row.referral_invites_per_user = request.referral_invites_per_user
+    if "pilot_course_ids" in sent:
+        row.pilot_course_ids = _validated_course_ids(request.pilot_course_ids, db)
     row.updated_by = permissions.user_id
     db.commit()
     db.refresh(row)
 
+    return await _limits_response(row, db, client)
+
+
+def _validated_course_ids(course_ids: List[str], db: Session) -> List[str]:
+    """Reject unknown or non-public pilot courses now rather than at sign-up."""
+    ids = list(dict.fromkeys(str(c) for c in course_ids))
+    if not ids:
+        return []
+    try:
+        found = {
+            str(c)
+            for (c,) in db.query(Course.id).filter(Course.id.in_(ids), Course.public.is_(True))
+        }
+    except Exception:
+        db.rollback()
+        found = set()
+    missing = [c for c in ids if c not in found]
+    if missing:
+        raise BadRequestException(
+            detail=f"Pilot courses must exist and be public: {', '.join(missing)}",
+        )
+    return ids
+
+
+async def _limits_response(
+    row: Optional[InstanceSettings], db: Session, client: CoderClient
+) -> InstanceLimitsGet:
+    idle_minutes = row.login_idle_minutes if row is not None else DEFAULT_LOGIN_IDLE_MINUTES
     workspace_users = await _workspace_user_count(client)
     return InstanceLimitsGet(
-        max_workspace_users=row.max_workspace_users,
-        max_concurrent_logins=row.max_concurrent_logins,
-        login_idle_minutes=int(row.login_idle_minutes),
+        max_workspace_users=row.max_workspace_users if row is not None else None,
+        max_concurrent_logins=row.max_concurrent_logins if row is not None else None,
+        login_idle_minutes=int(idle_minutes),
         local_install_url=local_install_url(),
+        registration_mode=row.registration_mode if row is not None else "open",
+        max_registered_users=row.max_registered_users if row is not None else None,
+        referral_invites_per_user=(
+            int(row.referral_invites_per_user) if row is not None else 2
+        ),
+        pilot_course_ids=[str(c) for c in (row.pilot_course_ids or [])] if row is not None else [],
         usage=InstanceLimitsUsage(
             workspace_users=workspace_users or 0,
             workspace_users_available=workspace_users is not None,
-            login_seats=await count_login_seats(int(row.login_idle_minutes) * 60),
+            login_seats=await count_login_seats(int(idle_minutes) * 60),
+            registered_users=count_registered_users(db),
         ),
     )

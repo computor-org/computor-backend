@@ -229,6 +229,7 @@ export interface InviteLinkGet {
   expires_at: string;
   roles?: string[];
   note?: string | null;
+  kind?: string;
   revoked_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -243,6 +244,7 @@ export interface InviteLinkList {
   expires_at: string;
   roles?: string[];
   note?: string | null;
+  kind?: string;
   revoked_at?: string | null;
   created_at?: string | null;
 }
@@ -256,6 +258,33 @@ export interface InviteLinkPublic {
   roles?: string[];
   expires_at: string;
   note?: string | null;
+}
+
+/**
+ * What the public /join page may learn about a code — never who issued it.
+ */
+export interface InviteStatusPublic {
+  /** valid | used | expired | invalid */
+  status: string;
+  /** open | invite_only | closed */
+  registration_mode: string;
+  /** True when the user cap is reached */
+  full?: boolean;
+}
+
+export interface ReferralInvite {
+  token: string;
+  /** Share link: <web>/join/<token> */
+  url: string;
+  used: boolean;
+  /** valid | used | expired | invalid */
+  status: string;
+  expires_at: string;
+}
+
+export interface ReferralInviteList {
+  registration_mode: string;
+  invites?: ReferralInvite[];
 }
 
 export interface InviteAccept {
@@ -2590,6 +2619,8 @@ export interface InstanceLimitsUsage {
   workspace_users: number;
   /** Distinct users holding a login seat — one per user however many tabs or devices they are signed in from. */
   login_seats: number;
+  /** Non-staff, non-service, non-archived users — what max_registered_users counts. */
+  registered_users?: number | null;
   /** False when the workspace-user count could not be read (Coder unreachable or disabled); the number above is then meaningless. */
   workspace_users_available?: boolean | null;
 }
@@ -2606,6 +2637,14 @@ export interface InstanceLimitsGet {
   login_idle_minutes: number;
   /** Download URL for the local VS Code extension, quoted in both refusals; null when EXTENSION_PUBLIC_DOWNLOAD_URL is unset. */
   local_install_url?: string | null;
+  /** Who may create an account on first sign-in: open, invite_only (valid invite code required) or closed. */
+  registration_mode?: "open" | "invite_only" | "closed";
+  /** Hard cap on non-staff users; null = unlimited. */
+  max_registered_users?: number | null;
+  /** Single-use referral invites each non-staff user gets (invite_only mode). */
+  referral_invites_per_user?: number;
+  /** Public courses a new user is enrolled in on registration. */
+  pilot_course_ids?: string[];
   /** Current usage of both limits. */
   usage?: InstanceLimitsUsage | null;
 }
@@ -2620,6 +2659,14 @@ export interface InstanceLimitsUpdate {
   max_concurrent_logins?: number | null;
   /** Idle window for a login seat, in minutes. Keep it above 15: an active client re-authenticates (and so refreshes its seat) at most every 15 minutes, so a shorter window evicts users mid-session. */
   login_idle_minutes?: number;
+  /** Who may create an account on first sign-in: open, invite_only (valid invite code required) or closed. */
+  registration_mode?: "open" | "invite_only" | "closed";
+  /** Hard cap on non-staff users; null = unlimited. */
+  max_registered_users?: number | null;
+  /** Single-use referral invites each non-staff user gets (invite_only mode). */
+  referral_invites_per_user?: number;
+  /** Public courses a new user is enrolled in on registration. */
+  pilot_course_ids?: string[];
 }
 
 /**
