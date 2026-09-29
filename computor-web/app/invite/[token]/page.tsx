@@ -99,7 +99,8 @@ export default function InvitePage() {
           <div className="text-4xl mb-4">✅</div>
           <h1 className="text-xl font-semibold text-fg mb-2">Account ready</h1>
           <p className="text-sm text-muted mb-6">
-            Sign in with <strong>{form.email}</strong> and the password you just chose.
+            Sign in with <strong>{form.email}</strong> and the password you just chose. If
+            you are asked to verify your email address, use the link we send there first.
           </p>
           <button
             onClick={() => loginWithSSO('keycloak')}

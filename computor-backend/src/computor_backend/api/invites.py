@@ -12,6 +12,7 @@ from typing import Annotated, List, Optional
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from computor_backend.database import get_db
 from computor_backend.business_logic.registration_admission import (
@@ -235,118 +236,166 @@ async def accept_invite(
     """
     Accept an invite, provision a Keycloak login, and pre-create the user.
 
-    The invite token is the authorization proof. We create the Keycloak user
-    (with the chosen password) first, then create the computor User. On first
-    SSO login Keycloak links to this pre-created account by email.
+    The invite token is the authorization proof for a NEW account: we spend
+    the invite (atomically, inside the admission transaction), create the
+    Keycloak login with the chosen password, then create the computor User.
+    On first SSO login Keycloak links to this pre-created account by email.
 
-    A pre-provisioned user (admin-created or roster-imported, never signed in)
-    with the same email is ADOPTED instead of rejected — the invite becomes
-    the activation path for the existing row, keeping its memberships and
-    profile (computor-org/issues#382). Only a user with real login evidence
-    blocks the email.
+    An existing Computor user is never adopted on the invite alone
+    (computor-org/issues#382 made that possible, and it let any invite holder
+    take over an unused pre-provisioned account, admins included). Adoption
+    needs all of: an invite issued for exactly this email, a row that has
+    never signed in, holds no staff role, and is neither banned nor archived.
+    Even then the Keycloak login is created UNVERIFIED with the VERIFY_EMAIL
+    required action and the row itself is left untouched — only whoever can
+    read that mailbox gets tokens, and only a verified email links a first
+    SSO login to the row. Existing Keycloak credentials are never reset.
+
+    All database work runs in the threadpool: the invite row and the
+    instance_settings row stay locked across the Keycloak call, and a
+    concurrent accept waiting on those locks must not block the event loop.
     """
-    invite = _resolve_token(token, db)
-
-    # A referral invite admits through /join (SSO), where the email must be
-    # IdP-verified. This path provisions a Keycloak login with emailVerified
-    # set, so accepting a referral code here would skip that check.
-    if invite.kind == "referral":
-        raise BadRequestException(
-            detail="This invite is used by signing in from its /join link."
-        )
-
-    # Email restriction check
-    if invite.email and invite.email.lower() != payload.email.lower():
-        raise BadRequestException(detail="This invite is restricted to a different email address")
-
+    from computor_backend.business_logic.registration_admission import (
+        consume_invite,
+        user_is_staff,
+    )
     from computor_backend.business_logic.user_lifecycle import login_evidence
 
-    # Case-insensitive: the SSO first-login join lowercases both sides, so an
-    # admin-typed "Name@mac.com" row must count as the same identity here too.
-    existing = db.query(User).filter(
-        func.lower(User.email) == payload.email.lower()
-    ).first()
-    if existing:
-        if login_evidence(str(existing.id), db):
-            raise BadRequestException(
-                detail=f"An account for '{payload.email}' already exists and has been "
-                "signed in to. Please sign in instead of using the invite."
-            )
-        if existing.banned_at is not None:
-            raise BadRequestException(detail="This account is banned and cannot be activated")
-        if existing.archived_at is not None:
-            raise BadRequestException(
-                detail="This account is archived. Ask an administrator to unarchive it first."
-            )
-    else:
-        # A brand-new user: registration mode and the hard user cap apply here
-        # exactly as on the first-SSO-login path. Locks instance_settings until
-        # the commit below.
-        check_registration_capacity(db)
+    email = payload.email.lower()
 
-    # Provision the Keycloak login first (invite token is the authorization
-    # proof). If this fails we neither create the user nor consume the invite.
+    def _admit():
+        invite = _resolve_token(token, db)
+
+        # A referral invite admits through /join (SSO), where the email must
+        # be IdP-verified; this path would skip that check.
+        if invite.kind == "referral":
+            raise BadRequestException(
+                detail="This invite is used by signing in from its /join link."
+            )
+        if invite.email and invite.email.lower() != email:
+            raise BadRequestException(
+                detail="This invite is restricted to a different email address"
+            )
+
+        existing = db.query(User).filter(func.lower(User.email) == email).first()
+        if existing:
+            if not invite.email:
+                raise BadRequestException(
+                    detail="An account for this email address already exists. Only an "
+                    "invite issued for this address can activate it; ask an administrator."
+                )
+            if login_evidence(str(existing.id), db):
+                raise BadRequestException(
+                    detail=f"An account for '{payload.email}' already exists and has been "
+                    "signed in to. Please sign in instead of using the invite."
+                )
+            if existing.banned_at is not None:
+                raise BadRequestException(detail="This account is banned and cannot be activated")
+            if existing.archived_at is not None:
+                raise BadRequestException(
+                    detail="This account is archived. Ask an administrator to unarchive it first."
+                )
+            if user_is_staff(db, str(existing.id)):
+                raise BadRequestException(
+                    detail="This account cannot be activated through an invite."
+                )
+        else:
+            # A brand-new user: registration mode and the hard user cap apply
+            # exactly as on the first-SSO-login path (locks instance_settings).
+            row = check_registration_capacity(db)
+            # While registration is gated, an invite not bound to an address
+            # must go through /join, where the IdP verifies the email: here
+            # the typed address is trusted as verified.
+            if row is not None and row.registration_mode != "open" and not invite.email:
+                raise BadRequestException(
+                    detail="This invite is used by signing in from its /join link."
+                )
+
+        # Spend the invite now, before Keycloak: one conditional UPDATE, so
+        # two concurrent accepts of a single-use invite cannot both pass.
+        if consume_invite(db, token, email) is None:
+            raise BadRequestException(
+                detail="This invite has already been used the maximum number of times"
+            )
+        return invite, (str(existing.id) if existing else None)
+
+    async def _in_transaction(fn):
+        try:
+            return await run_in_threadpool(fn)
+        except BaseException:
+            await run_in_threadpool(db.rollback)
+            raise
+
+    invite, existing_id = await _in_transaction(_admit)
+
+    # Provision the Keycloak login (refused if one exists for this email). If
+    # this fails the transaction rolls back: no user, invite not spent.
     from computor_backend.business_logic.auth import provision_keycloak_login
-    await provision_keycloak_login(
-        email=payload.email,
-        password=payload.password,
-        given_name=payload.given_name,
-        family_name=payload.family_name,
-    )
 
-    if existing:
-        # Adopt the pre-provisioned row: the person registering owns the
-        # identity now, so their chosen name wins over imported placeholders.
-        user = existing
-        if payload.given_name:
-            user.given_name = payload.given_name
-        if payload.family_name:
-            user.family_name = payload.family_name
-    else:
-        # Create user (email-only, no local password — authentication is via Keycloak)
-        user = User(
+    try:
+        await provision_keycloak_login(
             email=payload.email,
+            password=payload.password,
             given_name=payload.given_name,
             family_name=payload.family_name,
+            email_verified=existing_id is None,
         )
-        record_invite(user, (str(invite.id), str(invite.created_by) if invite.created_by else None))
-        db.add(user)
-        db.flush()
+    except BaseException:
+        await run_in_threadpool(db.rollback)
+        raise
 
-    # Assign roles from invite. Admin-conferring roles are re-checked
-    # against the creator's CURRENT roles: create_invite already blocks
-    # non-admins from minting such invites, but an invite predating that
-    # guard (or whose creator has since lost admin) must not remain a
-    # stored escalation. The other roles are still granted.
-    roles_to_grant = list(invite.roles or [])
-    admin_roles = [r for r in roles_to_grant if grants_system_admin(r)]
-    if admin_roles and not _creator_is_admin(invite, db):
-        logger.warning(
-            f"Invite {invite.id}: skipping admin role(s) {admin_roles} — "
-            f"creator {invite.created_by} is not an admin"
-        )
-        roles_to_grant = [r for r in roles_to_grant if not grants_system_admin(r)]
-    held = {
-        row[0]
-        for row in db.query(UserRole.role_id).filter(UserRole.user_id == str(user.id))
-    }
-    for role_id in roles_to_grant:
-        if role_id not in held:
-            db.add(UserRole(user_id=str(user.id), role_id=role_id))
+    def _finish():
+        if existing_id:
+            # Left untouched until its owner proves the address; see above.
+            user = db.query(User).filter(User.id == existing_id).one()
+        else:
+            # Email-only, no local password — authentication is via Keycloak.
+            user = User(
+                email=payload.email,
+                given_name=payload.given_name,
+                family_name=payload.family_name,
+            )
+            record_invite(
+                user, (str(invite.id), str(invite.created_by) if invite.created_by else None)
+            )
+            db.add(user)
+            db.flush()
 
-    # Consume invite
-    invite.use_count += 1
-    db.commit()
+        # Assign roles from invite. Admin-conferring roles are re-checked
+        # against the creator's CURRENT roles: create_invite already blocks
+        # non-admins from minting such invites, but an invite predating that
+        # guard (or whose creator has since lost admin) must not remain a
+        # stored escalation. The other roles are still granted.
+        roles_to_grant = list(invite.roles or [])
+        admin_roles = [r for r in roles_to_grant if grants_system_admin(r)]
+        if admin_roles and not _creator_is_admin(invite, db):
+            logger.warning(
+                f"Invite {invite.id}: skipping admin role(s) {admin_roles} — "
+                f"creator {invite.created_by} is not an admin"
+            )
+            roles_to_grant = [r for r in roles_to_grant if not grants_system_admin(r)]
+        held = {
+            row[0]
+            for row in db.query(UserRole.role_id).filter(UserRole.user_id == str(user.id))
+        }
+        for role_id in roles_to_grant:
+            if role_id not in held:
+                db.add(UserRole(user_id=str(user.id), role_id=role_id))
+        user_id = str(user.id)
+        db.commit()
+        return user_id
 
-    if existing:
-        logger.info(f"User {user.id} ({user.email}) adopted via invite {invite.id}")
+    user_id = await _in_transaction(_finish)
+
+    if existing_id:
+        logger.info(f"User {user_id} adopted via invite {invite.id} (pending email verification)")
     else:
-        logger.info(f"User {user.id} ({user.email}) pre-created via invite {invite.id}")
+        logger.info(f"User {user_id} pre-created via invite {invite.id}")
 
     return {
-        "user_id": str(user.id),
+        "user_id": user_id,
         "email": payload.email,
-        "adopted": existing is not None,
+        "adopted": existing_id is not None,
     }
 
 
