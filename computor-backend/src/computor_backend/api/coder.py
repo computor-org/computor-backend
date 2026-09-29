@@ -1221,9 +1221,30 @@ def _per_template_variables(db: Session) -> dict:
     return overrides
 
 
+def _require_public_workspace_limits() -> None:
+    """Refuse template workflows on a public deployment without the aggregate
+    workspace slice. The docker provider has no per-container pids limit, so
+    the slice (TasksMax/MemoryMax/CPUQuota, ops/coder/systemd) is the only
+    fork-bomb and aggregate bound; COMPUTOR_PUBLIC_DEPLOYMENT=true makes it
+    mandatory instead of optional."""
+    import os
+
+    public = os.environ.get("COMPUTOR_PUBLIC_DEPLOYMENT", "").strip().lower() == "true"
+    if public and not os.environ.get("CODER_WORKSPACE_CGROUP_PARENT", "").strip():
+        raise ServiceUnavailableException(
+            detail=(
+                "COMPUTOR_PUBLIC_DEPLOYMENT=true requires CODER_WORKSPACE_CGROUP_PARENT "
+                "(e.g. computor-workspaces.slice, see ops/coder/systemd) before "
+                "workspace templates can be built, pushed or rolled out."
+            )
+        )
+
+
 def _build_template_parameters(settings: CoderSettings) -> dict:
     """Build common parameters for coder template workflows from settings and env."""
     import os
+
+    _require_public_workspace_limits()
 
     debug_mode = os.environ.get("DEBUG_MODE", "development")
     if debug_mode == "production":
