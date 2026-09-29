@@ -7,6 +7,7 @@ worker) is unharmed. Linux-only.
 """
 
 import os
+import re
 import sys
 import textwrap
 import time
@@ -553,3 +554,83 @@ def test_print_flood_beyond_memory_limit_is_capped_in_the_job(tmp_path):
     assert result.namespace["finished"] is True
     assert len(result.stdout.encode()) < MIB + 200
     assert "output truncated" in result.stdout
+
+
+# --- 12. graphics tests run as a bounded job, not inside the harness -------
+
+GRAPHICS_TEST_YAML = """
+type: python
+name: graphics
+version: '1.0'
+properties:
+  tests:
+  - type: graphics
+    name: plot
+    entryPoint: plot.py
+    tests:
+    - name: gca().get_title()
+    - name: gca().get_xlabel()
+    - name: gca().lines[0].get_ydata()
+"""
+
+PLOT = """
+import os
+import matplotlib.pyplot as plt
+with open(os.path.join(os.path.dirname(__file__), "pid.txt"), "w") as f:
+    f.write(str(os.getpid()))
+plt.plot([0, 1, 2], [0, 1, 4])
+plt.title("squares")
+plt.xlabel("x")
+plt.show()
+"""
+
+
+def _run_harness_cli(tmp_path, student_code, sandbox):
+    import json
+    import subprocess
+    for sub in ("student", "reference", "output", "artifacts", "testprograms"):
+        (tmp_path / sub).mkdir()
+    (tmp_path / "student" / "plot.py").write_text(student_code)
+    (tmp_path / "reference" / "plot.py").write_text(PLOT)
+    (tmp_path / "test.yaml").write_text(GRAPHICS_TEST_YAML)
+    spec = {f"{k}Directory": str(tmp_path / v) for k, v in {
+        "student": "student", "reference": "reference", "output": "output",
+        "artifact": "artifacts", "test": "testprograms"}.items()}
+    spec["storeGraphicsArtifacts"] = True
+    (tmp_path / "spec.yaml").write_text(json.dumps(spec))  # JSON is YAML
+    env = dict(os.environ, COMPUTOR_SANDBOX_ENABLE="1" if sandbox else "0")
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "testers.cli", "python", "run",
+         "-T", str(tmp_path / "test.yaml"), "-s", str(tmp_path / "spec.yaml")],
+        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    out, _ = proc.communicate(timeout=300)
+    return proc, out
+
+
+@pytest.mark.parametrize("sandbox", [False, True])
+def test_graphics_tests_run_outside_the_harness(tmp_path, sandbox):
+    pytest.importorskip("matplotlib")
+    if sandbox and _landlock_abi() < 6:
+        pytest.skip("needs Landlock ABI >= 6")
+    proc, out = _run_harness_cli(tmp_path, PLOT, sandbox)
+    assert re.search(r"= 3 passed in", out), out[-3000:]
+    # The student code ran in its own process, not in the harness.
+    assert int((tmp_path / "student" / "pid.txt").read_text()) != proc.pid
+    # (the prefix renders the Solution enum; its str() differs across Pythons)
+    figures = sorted(p.name for p in (tmp_path / "artifacts").iterdir())
+    assert len(figures) == 2
+    assert "reference_test_0_figure_1.png" in figures[0]
+    assert "student_test_0_figure_1.png" in figures[1]
+    assert all((tmp_path / "artifacts" / f).read_bytes()[:4] == b"\x89PNG"
+               for f in figures)
+
+
+def test_hostile_graphics_student_cannot_kill_the_harness(tmp_path):
+    pytest.importorskip("matplotlib")
+    if _landlock_abi() < 6:
+        pytest.skip("needs Landlock ABI >= 6")
+    hostile = "import os, signal\ntry:\n    os.kill(os.getppid(), signal.SIGKILL)\nexcept OSError:\n    pass\n" + PLOT
+    proc, out = _run_harness_cli(tmp_path, hostile, sandbox=True)
+    assert proc.returncode != -9
+    assert re.search(r"= 3 passed in", out), out[-3000:]

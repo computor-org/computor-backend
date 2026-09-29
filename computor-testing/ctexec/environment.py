@@ -99,6 +99,7 @@ _LANGUAGE_ENV: Dict[str, Dict[str, str]] = {
         "PYTHONHASHSEED": "0",  # Reproducible hashing
         "PYTHONDONTWRITEBYTECODE": "1",  # Don't create .pyc files
         "PYTHONUNBUFFERED": "1",  # Unbuffered output
+        "MPLBACKEND": "Agg",  # headless plotting; plt.show() is a no-op
     },
     "octave": {
         "OCTAVE_HISTFILE": "/dev/null",  # No history file

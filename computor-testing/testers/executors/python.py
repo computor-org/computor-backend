@@ -8,6 +8,7 @@ exec() to provide isolation between the testing framework and student code.
 """
 
 import os
+import re
 import sys
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -16,7 +17,7 @@ import numpy as np
 from ctexec.process import max_output_bytes
 from ctexec import InterpretedExecutor, ExecutorResult
 from ctexec.exceptions import ExecutionError
-from ctexec.safe_io import read_untrusted_text
+from ctexec.safe_io import read_untrusted_bytes, read_untrusted_text
 
 # Import sandbox security analysis
 try:
@@ -29,6 +30,11 @@ except ImportError:
 class PyExecutionError(ExecutionError):
     """Exception raised when Python execution fails."""
     pass
+
+
+FIGURE_SUBDIR = "figures"
+MAX_FIGURES = 20
+_FIGURE_NAME = re.compile(r"figure_\d{1,4}\.png")
 
 
 class PyExecutor(InterpretedExecutor):
@@ -53,6 +59,9 @@ class PyExecutor(InterpretedExecutor):
         use_sandbox: bool = True,
         security_check: bool = False,
         check_runtime: bool = False,  # Python is always available
+        graphics: bool = False,
+        figure_dir: Optional[str] = None,
+        figure_prefix: str = "",
     ):
         """
         Initialize the Python executor.
@@ -67,6 +76,13 @@ class PyExecutor(InterpretedExecutor):
         super().__init__(working_dir, timeout, use_safe_env=True, check_runtime=check_runtime)
         self.use_sandbox = use_sandbox and SANDBOX_AVAILABLE
         self.security_check = security_check
+        # Graphics tests (#237): evaluated inside the job, never in the
+        # harness. `plt` is bound in the job's namespace so `plt.<expr>`
+        # names extract like variables; figures are saved into the private
+        # result dir and copied out (size-capped, no symlinks) to figure_dir.
+        self.graphics = graphics
+        self.figure_dir = figure_dir
+        self.figure_prefix = figure_prefix
 
     def _get_interpreter_command(self) -> List[str]:
         """
@@ -232,6 +248,17 @@ class PyExecutor(InterpretedExecutor):
             "",
         ])
 
+        if self.graphics:
+            lines.extend([
+                "# Graphics test: expose pyplot for plt.<expr> extraction",
+                "try:",
+                "    import matplotlib.pyplot as _ct_plt",
+                "    namespace['plt'] = _ct_plt",
+                "except Exception as e:",
+                "    result['warnings'].append('matplotlib unavailable: %s' % e)",
+                "",
+            ])
+
         # Extract variables
         if variables_to_extract:
             lines.append("# Extract requested variables")
@@ -277,6 +304,21 @@ class PyExecutor(InterpretedExecutor):
                 ])
             lines.append("")
 
+        if self.graphics and self.figure_dir:
+            escaped_figs = self.escape_path(
+                os.path.join(os.path.dirname(result_path), FIGURE_SUBDIR))
+            lines.extend([
+                "# Save open figures for the harness to collect",
+                "try:",
+                "    import matplotlib.pyplot as _ct_plt",
+                f"    os.makedirs('{escaped_figs}', exist_ok=True)",
+                f"    for _ct_n in _ct_plt.get_fignums()[:{MAX_FIGURES}]:",
+                f"        _ct_plt.figure(_ct_n).savefig(os.path.join('{escaped_figs}', 'figure_%d.png' % _ct_n))",
+                "except Exception as e:",
+                "    result['warnings'].append('could not save figures: %s' % e)",
+                "",
+            ])
+
         lines.extend([
             "# Write result to file",
             f"with open('{escaped_result}', 'w') as f:",
@@ -284,6 +326,29 @@ class PyExecutor(InterpretedExecutor):
         ])
 
         return "\n".join(lines)
+
+    def _collect_artifacts(self, sandbox_dir: str) -> None:
+        """Copy saved figures out of the job's private dir (#237).
+
+        Only ``figure_<n>.png`` regular files directly in the figures dir are
+        taken, read without following symlinks and capped in size.
+        """
+        if not (self.graphics and self.figure_dir):
+            return
+        figures = os.path.join(sandbox_dir, FIGURE_SUBDIR)
+        if not os.path.isdir(figures) or os.path.islink(figures):
+            return
+        for name in sorted(os.listdir(figures))[:MAX_FIGURES]:
+            if not _FIGURE_NAME.fullmatch(name):
+                continue
+            try:
+                data = read_untrusted_bytes(os.path.join(figures, name),
+                                            root=sandbox_dir)
+            except OSError:
+                continue
+            target = os.path.join(self.figure_dir, f"{self.figure_prefix}_{name}")
+            with open(target, "wb") as f:
+                f.write(data)
 
     def execute_script(
         self,

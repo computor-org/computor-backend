@@ -135,6 +135,7 @@ class InterpretedExecutor(BaseExecutor):
         # Create temp files
         wrapper_path = None
         result_path = None
+        sandbox_dir = None
 
         try:
             # Wrapper and result files live in a private dir, not the shared
@@ -230,7 +231,16 @@ class InterpretedExecutor(BaseExecutor):
             )
 
         finally:
+            if sandbox_dir:
+                try:
+                    self._collect_artifacts(sandbox_dir)
+                except Exception:
+                    pass  # artifacts are best effort, never fail the job
             self._cleanup_temp_files()
+
+    def _collect_artifacts(self, sandbox_dir: str) -> None:
+        """Hook: copy job-produced files out of the private dir before it is
+        removed. Anything read from there is student-controlled (#237)."""
 
     def _read_result_file(self, result_path: str) -> Dict[str, Any]:
         """Read and parse the JSON result file.
