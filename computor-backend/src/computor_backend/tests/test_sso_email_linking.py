@@ -162,11 +162,134 @@ async def test_verified_email_links_to_the_existing_user(db, login_as):
 
 
 @pytest.mark.asyncio
-async def test_unverified_email_without_an_existing_user_still_signs_up(db, login_as):
+async def test_unverified_email_cannot_create_a_user_either(db, login_as):
     email = _email()
 
-    result = await login_as(db, email=email, email_verified=False)
+    with pytest.raises(ForbiddenException) as err:
+        await login_as(db, email=email, email_verified=False)
+
+    assert "Verify your email address first" in str(err.value.detail)
+    assert db.query(User).filter(User.email == email).count() == 0
+
+
+@pytest.mark.asyncio
+async def test_verified_email_without_an_existing_user_signs_up(db, login_as):
+    email = _email()
+
+    result = await login_as(db, email=email, email_verified=True)
 
     assert result["is_new_user"] is True
     created = db.query(User).filter(User.id == result["user_id"]).one()
     assert created.email == email
+
+
+@pytest.mark.asyncio
+async def test_a_returning_identity_is_not_rechecked(db, login_as):
+    """The guard is for first logins; an existing Account keeps working."""
+    sub = f"kc-{uuid.uuid4().hex}"
+    first = await login_as(db, email=_email(), email_verified=True, sub=sub)
+
+    again = await login_as(db, email=_email(), email_verified=False, sub=sub)
+
+    assert again["user_id"] == first["user_id"]
+    assert again["is_new_user"] is False
+
+
+@pytest.mark.asyncio
+async def test_unverified_claim_cannot_capture_a_later_staff_import(db, login_as, monkeypatch):
+    """Signup with someone else's unverified email, then staff import that email.
+
+    Before the fix the signup created a User owning the victim's address, and
+    the import (which resolves users by email) enrolled the attacker in the
+    victim's private course.
+    """
+    from sqlalchemy_utils import Ltree
+
+    import computor_backend.business_logic.course_member_post_create as hook_mod
+    from computor_backend.business_logic.course_member_import import import_course_member
+    from computor_backend.model.course import Course, CourseFamily
+    from computor_backend.model.organization import Organization
+    from computor_backend.permissions.principal import Principal
+    from computor_types.course_member_import import CourseMemberImportRequest
+
+    async def _no_external_services(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(hook_mod, "course_member_post_create", _no_external_services)
+
+    victim_email = _email()
+    attacker_sub = f"attacker-{uuid.uuid4().hex}"
+    with pytest.raises(ForbiddenException):
+        await login_as(db, email=victim_email, email_verified=False, sub=attacker_sub)
+
+    tag = f"ssoimport_{uuid.uuid4().hex[:10]}"
+    org = Organization(
+        title="Import Org", organization_type="organization", path=Ltree(tag), properties={}
+    )
+    db.add(org)
+    db.flush()
+    family = CourseFamily(title="Family", path=Ltree(f"{tag}.family"), organization_id=org.id)
+    db.add(family)
+    db.flush()
+    course = Course(
+        title="Private",
+        path=Ltree(f"{tag}.family.private"),
+        course_family_id=family.id,
+        organization_id=org.id,
+        public=False,
+    )
+    staff = User(given_name="Staff", family_name="Member", email=f"staff.{tag}@test.local")
+    db.add_all([course, staff])
+    db.flush()
+
+    result = await import_course_member(
+        course.id,
+        CourseMemberImportRequest(
+            email=victim_email,
+            given_name="Intended",
+            family_name="Victim",
+            course_role_id="_student",
+            course_group_title="Class",
+        ),
+        Principal(user_id=str(staff.id), is_admin=True, roles=["_admin"]),
+        db,
+    )
+
+    assert result.success, result.message
+    enrolled = db.query(User).filter(User.id == result.course_member["user_id"]).one()
+    attacker_accounts = db.query(Account).filter(
+        Account.provider_account_id == attacker_sub
+    )
+    assert attacker_accounts.count() == 0
+    assert enrolled.given_name == "Intended"
+
+
+def test_audit_counts_users_whose_sso_email_was_never_verified(db):
+    from computor_backend.scripts.audit_unverified_sso_users import audit
+
+    before = audit(db)
+
+    def _sso_user(flag):
+        user = _existing_user(db, _email())
+        attributes = {} if flag is None else {"email_verified": flag}
+        db.add(
+            Account(
+                provider="keycloak",
+                type="oidc",
+                provider_account_id=f"kc-{uuid.uuid4().hex}",
+                user_id=user.id,
+                builtin=True,
+                properties={"attributes": attributes},
+            )
+        )
+        db.flush()
+
+    _sso_user(True)
+    _sso_user(False)
+    _sso_user(None)
+    after = audit(db)
+
+    assert after["sso_users_with_email"] - before["sso_users_with_email"] == 3
+    assert after["unverified_total"] - before["unverified_total"] == 2
+    assert after["unverified_email_verified_false"] - before["unverified_email_verified_false"] == 1
+    assert after["unverified_claim_missing"] - before["unverified_claim_missing"] == 1

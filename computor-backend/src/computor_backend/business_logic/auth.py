@@ -474,6 +474,29 @@ async def handle_sso_callback(
                 user_info.email.strip().lower() if user_info.email else None
             )
 
+            # A first login either links to the user that owns this email or
+            # creates one that owns it from now on. Both hand the identity the
+            # address, so the IdP must have verified it. Otherwise anyone who
+            # can get an unverified address into a token (open Keycloak
+            # registration, a broker with trustEmail off) takes over the
+            # account that owns it, or reserves it so a later staff import by
+            # email enrols them in the real owner's place. Refuse rather than
+            # create a user without the email: that would silently fork the
+            # person's identity. An identity without any email is unaffected.
+            if normalized_email and (user_info.attributes or {}).get(
+                "email_verified"
+            ) is not True:
+                raise ForbiddenException(
+                    detail=(
+                        "Verify your email address first. Your identity provider "
+                        f"has not verified '{user_info.email}', and Computor only "
+                        "accepts a first sign-in with a verified address. Verify "
+                        "it with your identity provider and sign in again, or ask "
+                        "an administrator."
+                    ),
+                    context={"provider": provider},
+                )
+
             user = None
             if normalized_email:
                 # 1) Primary email on the User record (e.g. from an invite).
@@ -512,27 +535,6 @@ async def handle_sso_callback(
                             detail=f"Email '{user_info.email}' is associated with multiple "
                             "accounts; SSO login cannot be resolved automatically."
                         )
-
-            # Linking by email hands this identity an existing account, so the
-            # email must be one the IdP has verified. Otherwise anyone who can
-            # get an unverified address into a token (open Keycloak
-            # registration, a broker with trustEmail off) takes over the
-            # account that owns it. Refuse rather than create a second user:
-            # the DB allows one user per email, and a user without the email
-            # would silently fork the person's identity.
-            if user is not None and (user_info.attributes or {}).get(
-                "email_verified"
-            ) is not True:
-                raise ForbiddenException(
-                    detail=(
-                        "Your identity provider has not verified the email address "
-                        f"'{user_info.email}', so this sign-in cannot be linked to "
-                        "the existing Computor account that uses it. Verify the "
-                        "address with your identity provider, or ask an "
-                        "administrator."
-                    ),
-                    context={"provider": provider, "user_id": str(user.id)},
-                )
 
             if user is None:
                 user = User(
