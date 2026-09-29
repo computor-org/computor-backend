@@ -18,8 +18,23 @@ binds admins as well — exempting them there would just move the failure into
 the licence server. Keeping the two apart is the whole point of #351.
 
 NULL means unlimited, matching the per-template quota's convention.
+
+Registration admission (the invite-only pilot) lives here too, for the same
+reason — an operator closes or opens sign-up without a redeploy:
+
+- ``registration_mode`` decides whether a first SSO login may create a user at
+  all: ``open`` (anyone, the behaviour before this column existed),
+  ``invite_only`` (only with a valid unused invite code carried through the
+  login), ``closed`` (nobody). Existing users always sign in.
+- ``max_registered_users`` is a HARD cap on non-staff users, checked under a
+  lock on this row whenever a new user would be created, in every mode.
+- ``referral_invites_per_user`` single-use invites each non-staff user gets in
+  ``invite_only`` mode, created lazily on first read.
+- ``pilot_course_ids`` public courses a newly created user is enrolled in,
+  subject to each course's own seat cap.
 """
-from sqlalchemy import BigInteger, CheckConstraint, Column, Integer, text
+from sqlalchemy import BigInteger, CheckConstraint, Column, Integer, String, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from .base import Base, UUIDPkMixin, VersionedMixin, AuditMixin
 
@@ -41,6 +56,12 @@ class InstanceSettings(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
                         name='instance_settings_logins_check'),
         CheckConstraint('login_idle_minutes >= 1',
                         name='instance_settings_idle_check'),
+        CheckConstraint("registration_mode IN ('open', 'invite_only', 'closed')",
+                        name='instance_settings_registration_mode_check'),
+        CheckConstraint('max_registered_users IS NULL OR max_registered_users >= 0',
+                        name='instance_settings_registered_users_check'),
+        CheckConstraint('referral_invites_per_user >= 0',
+                        name='instance_settings_referral_invites_check'),
     )
 
     singleton = Column(Integer, nullable=False, unique=True, server_default=text('1'),
@@ -57,3 +78,14 @@ class InstanceSettings(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     # seat is refreshed — a window below that would evict users mid-session.
     login_idle_minutes = Column(Integer, nullable=False, server_default=text('30'),
                                 default=30)
+    # Who may create an account on first login: open | invite_only | closed.
+    registration_mode = Column(String(16), nullable=False,
+                               server_default=text("'open'"), default='open')
+    # Hard cap on non-staff, non-service, non-archived users. NULL = unlimited.
+    max_registered_users = Column(BigInteger)
+    # Single-use referral invites per non-staff user (invite_only mode only).
+    referral_invites_per_user = Column(Integer, nullable=False,
+                                       server_default=text('2'), default=2)
+    # Public course ids a new user is auto-enrolled in (seat caps still apply).
+    pilot_course_ids = Column(JSONB, nullable=False,
+                              server_default=text("'[]'::jsonb"), default=list)

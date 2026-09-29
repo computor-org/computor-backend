@@ -31,6 +31,12 @@ from computor_backend.redis_cache import get_redis_client
 from computor_backend.plugins.registry import get_plugin_registry
 from computor_backend.plugins import AuthStatus
 from computor_backend.auth.keycloak_admin import KeycloakAdminClient, KeycloakUser
+from computor_backend.business_logic.registration_admission import (
+    RegistrationRefused,
+    admit_new_user,
+    enroll_in_pilot_courses,
+    record_invite,
+)
 from computor_types.auth import (
     LocalTokenRefreshRequest,
     LocalTokenRefreshResponse,
@@ -429,9 +435,17 @@ async def handle_sso_callback(
     if not user_info:
         raise BadRequestException(detail="No user information received from provider")
 
+    # Membership of the Keycloak "administrators" group makes this identity
+    # staff: bootstrapped to _admin below, and never refused registration.
+    groups = user_info.groups or []
+    is_kc_admin = any(g.strip("/").split("/")[-1] == "administrators" for g in groups)
+    invite_code = (state_data or {}).get("invite_code")
+    email_verified = (user_info.attributes or {}).get("email_verified") is True
+
     # Find or create user account (wrap blocking DB operations)
     def _find_or_create_account():
         nonlocal user_info, provider, registry
+        created_user = False
 
         account = (
             db.query(Account)
@@ -554,13 +568,25 @@ async def handle_sso_callback(
                         )
 
             if user is None:
+                # The one place a first login creates a Computor user, for
+                # GitHub-brokered and email-registered identities alike: gate
+                # it on registration mode, the user cap and the invite.
+                consumed = admit_new_user(
+                    db,
+                    invite_code=invite_code,
+                    email=normalized_email,
+                    email_verified=email_verified,
+                    is_staff=is_kc_admin,
+                )
                 user = User(
                     given_name=user_info.given_name or "",
                     family_name=user_info.family_name or "",
                     email=normalized_email,
                 )
+                record_invite(user, consumed)
                 db.add(user)
                 db.flush()
+                created_user = True
 
             # Create account
             account = Account(
@@ -585,8 +611,6 @@ async def handle_sso_callback(
         # Bootstrap _admin from the Keycloak "administrators" group.
         # Additive only: membership grants _admin, but we never revoke — admin
         # can also be granted manually in the computor DB, which stays authoritative.
-        groups = user_info.groups or []
-        is_kc_admin = any(g.strip("/").split("/")[-1] == "administrators" for g in groups)
         if is_kc_admin:
             from computor_backend.model.role import UserRole
             existing_admin = (
@@ -623,9 +647,31 @@ async def handle_sso_callback(
             "family_name": user.family_name,
         }
         db.commit()
-        return is_new_user, user_primitives
+        return is_new_user, created_user, user_primitives
 
-    is_new_user, user_primitives = await run_in_threadpool(_find_or_create_account)
+    def _find_or_create_account_or_roll_back():
+        try:
+            return _find_or_create_account()
+        except RegistrationRefused:
+            # Release the instance_settings lock now; nothing was written and
+            # the invite (if any) is not spent.
+            db.rollback()
+            raise
+
+    try:
+        is_new_user, created_user, user_primitives = await run_in_threadpool(
+            _find_or_create_account_or_roll_back
+        )
+    except RegistrationRefused as refusal:
+        refusal.id_token = (auth_result.session_data or {}).get("id_token")
+        if refusal.discard_identity:
+            refusal.discard_identity = await _discard_keycloak_identity(
+                provider, user_info.provider_id
+            )
+        logger.info(
+            f"Registration refused ({refusal.reason}) for a new {provider} identity"
+        )
+        raise
 
     # Concurrent-login cap (#351). Checked before any session is minted and
     # before the git account is provisioned, so a refused login leaves nothing
@@ -663,6 +709,9 @@ async def handle_sso_callback(
     # login that fails between the two does not leave a seat held by nobody.
     await touch_login_seat(user_primitives["id"], login_idle_seconds(db))
 
+    if created_user:
+        await enroll_in_pilot_courses(db, user_primitives["id"])
+
     # Store tokens in Redis if available
     if auth_result.access_token:
         token_key = f"sso_token:{provider}:{user_primitives['id']}"
@@ -691,6 +740,27 @@ async def handle_sso_callback(
         "refresh_token": auth_result.refresh_token if auth_result.refresh_token else "",
         "is_new_user": is_new_user,
     }
+
+
+async def _discard_keycloak_identity(provider: str, keycloak_user_id: Optional[str]) -> bool:
+    """Delete the Keycloak account behind a refused first login.
+
+    Keycloak creates the account (its own registration form, or the first
+    GitHub broker login) before Computor sees the identity, so a refusal would
+    otherwise leave an orphan that can never sign in to Computor. Deleting it
+    also ends its Keycloak sessions. Best effort: returns False if it could
+    not be deleted, in which case the caller still logs the browser out.
+    """
+    # Only the Keycloak plugin's subject is a Keycloak user id.
+    if provider != "keycloak" or not keycloak_user_id:
+        return False
+    try:
+        await KeycloakAdminClient().delete_user(keycloak_user_id)
+        logger.info(f"Deleted Keycloak user {keycloak_user_id} after a refused registration")
+        return True
+    except Exception as exc:  # noqa: BLE001 - refusal must not turn into a 500
+        logger.warning(f"Could not delete Keycloak user {keycloak_user_id}: {exc}")
+        return False
 
 
 async def refresh_sso_token(

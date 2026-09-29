@@ -11,6 +11,7 @@ from computor_types.course_member_accounts import (
     CourseMemberValidationRequest,
 )
 from computor_types.users import UserGet, UserScopes
+from computor_types.invites import ReferralInvite, ReferralInviteList
 from computor_types.course_git import (
     CourseGitDescriptor,
     CourseMemberRepositoryGet,
@@ -70,6 +71,51 @@ def get_current_user_endpoint(
 ):
     """Get the current authenticated user."""
     return get_current_user(permissions.user_id, db)
+
+@user_router.get(
+    "/referral-invites",
+    response_model=ReferralInviteList,
+    summary="Your invite-a-friend links",
+)
+def get_referral_invites(
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db),
+):
+    """The caller's single-use referral invites, created on first read.
+
+    Only while registration is ``invite_only`` are new ones minted (up to
+    ``referral_invites_per_user``); staff and service accounts get none —
+    they hand out invites through the admin invite page instead.
+    """
+    from computor_backend.api.instance import _normalize_url
+    from computor_backend.business_logic.instance_limits import principal_is_staff
+    from computor_backend.business_logic.registration_admission import (
+        ensure_referral_invites,
+        invite_public_status,
+    )
+    from computor_backend.model.instance import InstanceSettings
+    from computor_backend.settings import settings
+
+    row = db.query(InstanceSettings).first()
+    mode = row.registration_mode if row is not None else "open"
+    if principal_is_staff(permissions):
+        return ReferralInviteList(registration_mode=mode, invites=[])
+    invites = ensure_referral_invites(db, permissions.get_user_id_or_throw())
+    base = _normalize_url(settings.WEB_APP_URL or settings.PUBLIC_DOMAIN) or ""
+    return ReferralInviteList(
+        registration_mode=mode,
+        invites=[
+            ReferralInvite(
+                token=i.token,
+                url=f"{base}/join/{i.token}",
+                used=i.use_count >= i.max_uses,
+                status=invite_public_status(i),
+                expires_at=i.expires_at,
+            )
+            for i in invites
+        ],
+    )
+
 
 @user_router.get(
     "/scopes",

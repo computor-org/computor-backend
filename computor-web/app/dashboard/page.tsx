@@ -15,6 +15,7 @@ import NeedsAttention, {
   DEFAULT_REASONS,
   selectNeedsAttention,
 } from '@/src/components/dashboard/NeedsAttention';
+import InviteFriendCard from '@/src/components/dashboard/InviteFriendCard';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
@@ -199,6 +200,8 @@ export default function DashboardPage() {
                 <NeedsAttention items={attention} />
               </section>
             )}
+
+            <InviteFriendCard />
 
             {runningWorkspaces.length > 0 && (
               <section>

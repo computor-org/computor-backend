@@ -9,28 +9,39 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from computor_backend.database import get_db
+from computor_backend.business_logic.registration_admission import (
+    check_registration_capacity,
+    count_registered_users,
+    invite_public_status,
+    record_invite,
+)
 from computor_backend.exceptions import (
     BadRequestException,
     ForbiddenException,
     NotFoundException,
+    RateLimitException,
 )
+from computor_backend.model.instance import InstanceSettings
 from computor_backend.model.auth import User
 from computor_backend.model.invite import InviteLink
 from computor_backend.model.role import Role, UserRole
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.roles import grants_system_admin
+from computor_backend.redis_cache import get_redis_client
+from computor_backend.utils.client_info import get_client_ip
 from computor_types.invites import (
     InviteAccept,
     InviteLinkCreate,
     InviteLinkGet,
     InviteLinkList,
     InviteLinkPublic,
+    InviteStatusPublic,
 )
 
 logger = logging.getLogger(__name__)
@@ -149,6 +160,56 @@ async def revoke_invite(
 # Public endpoints (no authentication required)
 # ---------------------------------------------------------------------------
 
+# Per client IP, fixed window. Bounds guessing at codes through the status
+# endpoint; codes are 256-bit random, so this is about load, not secrecy.
+INVITE_STATUS_LIMIT = 30
+INVITE_STATUS_WINDOW = 600
+
+
+async def _invite_status_rate_limited(ip: str, cache) -> bool:
+    """True once this IP has spent its budget. Fails open, like the others."""
+    key = f"rate_limit:invite_status:{ip}"
+    try:
+        count = await cache.incr(key)
+        if count == 1:
+            await cache.expire(key, INVITE_STATUS_WINDOW)
+        return count > INVITE_STATUS_LIMIT
+    except Exception as e:
+        logger.error(f"Invite status rate limit check failed: {e}")
+        return False
+
+
+@invites_router.get("/invites/{token}/status", response_model=InviteStatusPublic)
+async def get_invite_status(
+    token: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    cache=Depends(get_redis_client),
+) -> InviteStatusPublic:
+    """Whether a /join code can still be used (public, no auth, rate-limited).
+
+    Reveals only valid/used/expired/invalid plus whether registration is open
+    at all — never who issued the code, its email restriction or its roles.
+    """
+    ip = get_client_ip(request)
+    if await _invite_status_rate_limited(ip, cache):
+        raise RateLimitException(
+            error_code="RATE_001",
+            detail="Too many invite checks. Please wait before trying again.",
+            retry_after=INVITE_STATUS_WINDOW,
+        )
+    invite = db.query(InviteLink).filter(InviteLink.token == token[:128]).first()
+    row = db.query(InstanceSettings).first()
+    full = False
+    if row is not None and row.max_registered_users is not None:
+        full = count_registered_users(db) >= row.max_registered_users
+    return InviteStatusPublic(
+        status=invite_public_status(invite),
+        registration_mode=row.registration_mode if row is not None else "open",
+        full=full,
+    )
+
+
 @invites_router.get("/invites/{token}", response_model=InviteLinkPublic)
 async def get_invite_public(
     token: str,
@@ -186,6 +247,14 @@ async def accept_invite(
     """
     invite = _resolve_token(token, db)
 
+    # A referral invite admits through /join (SSO), where the email must be
+    # IdP-verified. This path provisions a Keycloak login with emailVerified
+    # set, so accepting a referral code here would skip that check.
+    if invite.kind == "referral":
+        raise BadRequestException(
+            detail="This invite is used by signing in from its /join link."
+        )
+
     # Email restriction check
     if invite.email and invite.email.lower() != payload.email.lower():
         raise BadRequestException(detail="This invite is restricted to a different email address")
@@ -209,6 +278,11 @@ async def accept_invite(
             raise BadRequestException(
                 detail="This account is archived. Ask an administrator to unarchive it first."
             )
+    else:
+        # A brand-new user: registration mode and the hard user cap apply here
+        # exactly as on the first-SSO-login path. Locks instance_settings until
+        # the commit below.
+        check_registration_capacity(db)
 
     # Provision the Keycloak login first (invite token is the authorization
     # proof). If this fails we neither create the user nor consume the invite.
@@ -235,6 +309,7 @@ async def accept_invite(
             given_name=payload.given_name,
             family_name=payload.family_name,
         )
+        record_invite(user, (str(invite.id), str(invite.created_by) if invite.created_by else None))
         db.add(user)
         db.flush()
 
@@ -316,6 +391,7 @@ def _to_get(invite: InviteLink) -> InviteLinkGet:
         expires_at=invite.expires_at,
         roles=invite.roles or [],
         note=invite.note,
+        kind=invite.kind or "admin",
         revoked_at=invite.revoked_at,
         created_at=invite.created_at,
         updated_at=invite.updated_at,
@@ -332,6 +408,7 @@ def _to_list(invite: InviteLink) -> InviteLinkList:
         expires_at=invite.expires_at,
         roles=invite.roles or [],
         note=invite.note,
+        kind=invite.kind or "admin",
         revoked_at=invite.revoked_at,
         created_at=invite.created_at,
     )
