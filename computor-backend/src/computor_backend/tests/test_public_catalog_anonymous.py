@@ -16,7 +16,6 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy_utils import Ltree
 
 from computor_backend.api import public_catalog
-from computor_backend.database import get_db
 from computor_backend.model.auth import User
 from computor_backend.model.course import Course, CourseFamily, CourseGroup, CourseMember
 from computor_backend.model.organization import Organization
@@ -89,18 +88,22 @@ def world(db):
 
 
 @pytest.fixture
-def client(db):
+def client(db, monkeypatch):
+    from contextlib import contextmanager
+
     from computor_backend.server import app
 
-    def _override():
+    @contextmanager
+    def _session():
         yield db
 
+    # The route opens its own session on refresh (no request DB dependency);
+    # bind that to the rolled-back test session.
+    monkeypatch.setattr(public_catalog, "_session_factory", _session)
     public_catalog.clear_public_catalog_cache()
-    app.dependency_overrides[get_db] = _override
     try:
         yield TestClient(app)  # no `with`: lifespan (Temporal, Coder, ...) not started
     finally:
-        app.dependency_overrides.pop(get_db, None)
         public_catalog.clear_public_catalog_cache()
 
 
@@ -203,7 +206,10 @@ def fake_catalog(monkeypatch):
         return list(state["rows"])
 
     clock = {"now": 1000.0}
+    from contextlib import nullcontext
+
     monkeypatch.setattr(public_catalog, "list_anonymous_catalog", _list)
+    monkeypatch.setattr(public_catalog, "_session_factory", nullcontext)
     monkeypatch.setattr(public_catalog, "_clock", lambda: clock["now"])
     public_catalog.clear_public_catalog_cache()
     yield state, clock
@@ -214,7 +220,7 @@ def _call():
     from fastapi import Response
 
     response = Response()
-    items = public_catalog.list_public_catalog(response, db=None)
+    items = public_catalog.list_public_catalog(response)
     return [i.title for i in items], response.headers["cache-control"]
 
 
@@ -244,3 +250,89 @@ def test_concurrent_cold_requests_share_one_query(fake_catalog):
 
     assert state["calls"] == 1
     assert all(titles == ["A"] for titles, _ in results)
+
+
+# --- Pool starvation (PR #244 re-review) --------------------------------------
+# Through the real ASGI app and the real PostgreSQL pool (no session binding).
+# The request that owns the cache lock is held right after acquiring it until
+# the contenders have had the chance to check out pool connections through a
+# request DB dependency (`?user_id=` makes get_db() connect eagerly with SET
+# LOCAL). If they could, all of them would sit on connections while queued on
+# the lock, and the owner's refresh would time out on the exhausted pool (503
+# after the 30 s pool timeout). With no request DB dependency, nobody holds a
+# connection while waiting and everything completes promptly.
+
+
+def test_lock_waiters_do_not_starve_the_pool(monkeypatch):
+    import asyncio
+    import threading
+    import time
+
+    import httpx
+    from sqlalchemy import event
+
+    from computor_backend import database
+    from computor_backend.server import app
+
+    try:
+        with database._engine.connect():
+            pass
+    except Exception as exc:  # pragma: no cover - environment-dependent
+        pytest.skip(f"Postgres not reachable: {exc}")
+
+    pool = database._engine.pool
+    contenders_n = pool.size() + pool._max_overflow  # every connection the pool has
+    eager_checkouts = {"n": 0}
+    all_checked_out = threading.Event()
+    owner_claimed = threading.Event()
+    claim = threading.Lock()
+
+    def on_sql(conn, cursor, statement, *args):
+        if statement.startswith("SET LOCAL app.user_id"):
+            with claim:
+                eager_checkouts["n"] += 1
+                if eager_checkouts["n"] >= contenders_n:
+                    all_checked_out.set()
+
+    def clock():
+        with claim:
+            first = not owner_claimed.is_set()
+            owner_claimed.set()
+        if first:
+            # Give contenders time to grab connections if the route lets them.
+            all_checked_out.wait(3)
+        return time.monotonic()
+
+    event.listen(database._engine, "after_cursor_execute", on_sql)
+    monkeypatch.setattr(public_catalog, "_clock", clock)
+    public_catalog.clear_public_catalog_cache()
+
+    async def scenario():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            start = time.monotonic()
+            owner = asyncio.create_task(client.get("/public/courses"))
+            assert await asyncio.to_thread(owner_claimed.wait, 10)
+            contenders = [
+                asyncio.create_task(client.get(
+                    "/public/courses",
+                    params={"user_id": "00000000-0000-0000-0000-000000000001"},
+                ))
+                for _ in range(contenders_n)
+            ]
+            first = await owner
+            elapsed = time.monotonic() - start
+            rest = await asyncio.gather(*contenders)
+            return first, elapsed, rest
+
+    try:
+        first, elapsed, rest = asyncio.run(scenario())
+    finally:
+        event.remove(database._engine, "after_cursor_execute", on_sql)
+        public_catalog.clear_public_catalog_cache()
+
+    assert first.status_code == 200, (first.status_code, round(elapsed, 1))
+    assert elapsed < 10
+    assert eager_checkouts["n"] == 0
+    assert {r.status_code for r in rest} == {200}
+    assert pool.checkedout() == 0

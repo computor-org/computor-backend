@@ -12,17 +12,22 @@ the snapshot's *remaining* freshness (``max-age`` counts down to 0), so a
 response served from an old snapshot cannot be kept past the snapshot's own
 expiry. Refreshes are coalesced under the lock, so a burst of cold requests
 costs one query, not one per request.
+
+The route deliberately has no DB dependency: a request-scoped ``get_db()``
+would let every waiter hold a pooled connection (``get_db`` even connects
+eagerly when a caller passes ``?user_id=``) while it queues on the lock, and
+enough waiters starve the pool the refresh itself needs. Only the request that
+actually refreshes opens a short-lived session, and only for the query.
 """
 
 import math
 import threading
 import time
 
-from fastapi import APIRouter, Depends, Response
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Response
 
 from computor_backend.business_logic.course_registration import list_anonymous_catalog
-from computor_backend.database import get_db
+from computor_backend.database import get_db_session
 from computor_types.courses import CoursePublicCatalogEntry
 
 PUBLIC_CATALOG_TTL = 60.0
@@ -31,8 +36,9 @@ public_catalog_router = APIRouter(prefix="/public", tags=["public"])
 
 _lock = threading.Lock()
 _cache: tuple[float, list[CoursePublicCatalogEntry]] | None = None
-# Indirection so tests can drive the clock.
+# Indirections so tests can drive the clock and bind the session.
 _clock = time.monotonic
+_session_factory = get_db_session
 
 
 def clear_public_catalog_cache() -> None:
@@ -47,19 +53,17 @@ def clear_public_catalog_cache() -> None:
     response_model=list[CoursePublicCatalogEntry],
     summary="Public course catalog for visitors who are not signed in",
 )
-def list_public_catalog(
-    response: Response,
-    db: Session = Depends(get_db),
-) -> list[CoursePublicCatalogEntry]:
+def list_public_catalog(response: Response) -> list[CoursePublicCatalogEntry]:
     """Courses open for self-registration. No authentication, no member data."""
     global _cache
     # Held across the refresh on purpose: concurrent misses wait for the one
-    # query in flight and then read its result. The session connects lazily,
-    # so a cache hit costs no DB round trip.
+    # query in flight and then read its result. Waiters hold no connection.
     with _lock:
         now = _clock()
         if _cache is None or now - _cache[0] >= PUBLIC_CATALOG_TTL:
-            _cache = (now, list_anonymous_catalog(db))
+            with _session_factory() as db:
+                items = list_anonymous_catalog(db)
+            _cache = (now, items)
         fetched_at, items = _cache
     remaining = max(0, math.floor(PUBLIC_CATALOG_TTL - (now - fetched_at)))
     response.headers["Cache-Control"] = f"public, max-age={remaining}"
