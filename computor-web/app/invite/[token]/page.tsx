@@ -33,7 +33,7 @@ export default function InvitePage() {
   useEffect(() => {
     if (!token) return;
     invitesClient.getInvitePublicInvitesTokenGet({ token })
-      .then(data => { setInvite(data); setForm(f => ({ ...f, email: data.email ?? '' })); })
+      .then(data => setInvite(data))
       .catch(e => setLoadError(e instanceof Error ? e.message : 'Invalid or expired invite link'))
       .finally(() => setLoading(false));
   }, [token]);
@@ -128,11 +128,11 @@ export default function InvitePage() {
           {/* Invite metadata */}
           <div className="bg-accent-wash border border-accent-line rounded-lg p-3 mb-6 text-xs text-accent-text space-y-1">
             <div>Expires: <strong>{formatDate(invite.expires_at)}</strong></div>
-            {invite.email && <div>This invite is restricted to <strong>{invite.email}</strong></div>}
-            {invite.roles && invite.roles.length > 0 && (
-              <div>Roles granted: <strong>{invite.roles.join(', ')}</strong></div>
+            {invite.email && (
+              <div>
+                This invite is for <strong>{invite.email}</strong> — enter that full address.
+              </div>
             )}
-            {invite.note && <div>Note: {invite.note}</div>}
           </div>
         </div>
 
@@ -171,11 +171,9 @@ export default function InvitePage() {
               type="email"
               required
               value={form.email}
-              readOnly={!!invite.email}
               onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-              className={`w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent ${invite.email ? 'bg-canvas cursor-not-allowed' : ''}`}
+              className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
             />
-            {invite.email && <p className="mt-1 text-xs text-muted">Email is fixed by the invite restriction.</p>}
           </div>
 
           <div>

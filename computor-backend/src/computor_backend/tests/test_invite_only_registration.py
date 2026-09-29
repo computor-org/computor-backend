@@ -953,3 +953,17 @@ def test_migration_downgrade_refuses_while_admission_is_protecting_anything(env,
     s.commit()
     s.close()
     _check()  # open, uncapped, no live referrals: allowed
+
+
+def test_legacy_invite_lookup_reveals_only_a_masked_address(env):
+    from computor_backend.api.invites import get_invite_public
+
+    token = env.make_invite(email=f"jane.doe.{env.suffix}@test.local")
+    s = env.Session()
+    inv = s.query(InviteLink).filter(InviteLink.token == token).one()
+    inv.roles, inv.note = ["_workspace_user"], "internal: VIP from ACME"
+    s.commit()
+    public = asyncio.run(get_invite_public(token, db=s))
+    s.close()
+    assert public.email == "j***@test.local"
+    assert public.roles == [] and public.note is None

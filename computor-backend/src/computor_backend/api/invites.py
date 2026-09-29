@@ -239,10 +239,12 @@ async def get_invite_public(
     invite = _resolve_token(token, db)
     return InviteLinkPublic(
         id=str(invite.id),
-        email=invite.email,
-        roles=invite.roles or [],
+        # Only what the accept page needs. A code holder learns neither the
+        # full bound address, nor the roles, nor the issuer's internal note.
+        email=_mask_email(invite.email),
+        roles=[],
         expires_at=invite.expires_at,
-        note=invite.note,
+        note=None,
     )
 
 
@@ -473,6 +475,14 @@ def _check_admission(invite: InviteLink, email: str, typed_email: str, db: Sessi
             detail="This invite is used by signing in from its /join link."
         )
     return None
+
+
+def _mask_email(email: Optional[str]) -> Optional[str]:
+    """'jane.doe@example.org' -> 'j***@example.org' (None stays None)."""
+    if not email:
+        return None
+    local, _, domain = email.partition("@")
+    return f"{local[:1]}***@{domain}" if domain else "***"
 
 
 def _user_owning_email(email: str, db: Session) -> Optional[User]:
