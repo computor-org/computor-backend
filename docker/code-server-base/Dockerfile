@@ -11,7 +11,8 @@
 # images against the same host docker daemon, so the local tag resolves
 # without a registry — but template builds fail if computor.sh has not built
 # this image first.
-FROM ghcr.io/coder/code-server:latest
+# Pinned by version + digest (supply chain, GHSA-vx42-ghc9-gw65); bump deliberately.
+FROM ghcr.io/coder/code-server:4.139.1@sha256:0c067c3cf09ed1830ce282387826be8feefef8a5828f462791c2df3f1007ee17
 
 USER root
 COPY patch-webview-host.js /tmp/patch-webview-host.js
