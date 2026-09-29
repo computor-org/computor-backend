@@ -68,6 +68,7 @@ export default function CourseEditPage() {
   const [isPublic, setIsPublic] = useState(false);
   // Self-registration seat cap; empty = unlimited, same convention as budgets.
   const [maxSelfRegistrations, setMaxSelfRegistrations] = useState('');
+  const [seatsError, setSeatsError] = useState<string | null>(null);
   // Course-wide budget defaults. Held as strings so an empty field can mean
   // "unlimited" rather than collapsing to 0.
   const [maxTestRuns, setMaxTestRuns] = useState('');
@@ -139,6 +140,16 @@ export default function CourseEditPage() {
   }, [authLoading, isAuthenticated, canEdit, load]);
 
   async function saveGeneral() {
+    // Unlike the budget fields, parseLimit's "unparseable = unlimited" is not
+    // acceptable here: a typo would silently open the course to everyone.
+    // Only an explicitly blank field means unlimited.
+    const seats = maxSelfRegistrations.trim();
+    const seatCap = parseLimit(seats);
+    if (seats && seatCap === null) {
+      setSeatsError('Enter a whole number of 0 or more, or leave it empty for unlimited.');
+      return;
+    }
+    setSeatsError(null);
     setSavingGeneral(true);
     setGeneralMsg(null);
     try {
@@ -152,7 +163,7 @@ export default function CourseEditPage() {
           // the field being present at all, so a lecturer including it — even
           // unchanged — would have their whole save rejected.
           ...(canSetPublic ? { public: isPublic } : {}),
-          max_self_registrations: parseLimit(maxSelfRegistrations),
+          max_self_registrations: seatCap,
           max_test_runs: parseLimit(maxTestRuns),
           max_submissions: parseLimit(maxSubmissions),
           visible,
@@ -296,15 +307,22 @@ export default function CourseEditPage() {
                   hint="Maximum number of students; counts everyone enrolled as a student, however they joined. Empty = unlimited."
                 >
                   <input
-                    type="number"
-                    min={0}
                     inputMode="numeric"
                     value={maxSelfRegistrations}
-                    onChange={(e) => setMaxSelfRegistrations(e.target.value)}
+                    onChange={(e) => {
+                      setMaxSelfRegistrations(e.target.value);
+                      setSeatsError(null);
+                    }}
                     placeholder="unlimited"
+                    aria-invalid={seatsError ? true : undefined}
                     className={inputCls}
                   />
                 </Field>
+                {seatsError && (
+                  <p role="alert" className="-mt-2 text-xs text-danger-text">
+                    {seatsError} Nothing was saved.
+                  </p>
+                )}
                 <div className="flex items-center gap-3">
                   <Button onClick={saveGeneral} loading={savingGeneral} loadingLabel="Saving…">
                     Save
