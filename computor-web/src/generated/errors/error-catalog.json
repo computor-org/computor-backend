@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "error_count": 83,
+  "error_count": 84,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -644,6 +644,31 @@
         "Refresh resource data",
         "Retry operation",
         "Merge changes if appropriate"
+      ]
+    },
+    "CONFLICT_003": {
+      "code": "CONFLICT_003",
+      "http_status": 409,
+      "category": "conflict",
+      "severity": "info",
+      "title": "Course Full",
+      "message": {
+        "plain": "This course is full.",
+        "markdown": "**Course Full**\n\nThis course is full. No self-registration seats are left.",
+        "html": "<strong>Course Full</strong><p>This course is full. No self-registration seats are left.</p>"
+      },
+      "retry_after": null,
+      "documentation_url": "/docs/api/conflicts",
+      "internal_description": "Self-registration refused: the course's max_self_registrations cap is reached",
+      "affected_functions": [
+        "register_in_public_course"
+      ],
+      "common_causes": [
+        "Every self-registration seat in the public course is taken",
+        "Another student took the last seat first"
+      ],
+      "resolution_steps": [
+        "Ask the course staff to raise the cap or enrol you directly"
       ]
     },
     "RATE_001": {

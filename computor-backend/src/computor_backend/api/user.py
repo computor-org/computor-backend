@@ -433,7 +433,8 @@ async def enroll_in_public_course(
     remove members.
 
     404 when the course does not exist *or* is not public: a private course
-    must not be distinguishable from a missing one.
+    must not be distinguishable from a missing one. 409 (``CONFLICT_003``) when
+    the course's ``max_self_registrations`` cap is reached.
     """
     user_id = permissions.get_user_id_or_throw()
     if await check_registration_rate_limit(str(user_id), cache):

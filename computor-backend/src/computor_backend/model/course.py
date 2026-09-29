@@ -177,6 +177,12 @@ class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     # Same shape as CourseContent.is_submittable.
     public = Column(Boolean, nullable=False, server_default=text("false"))
 
+    # Upper bound on the _student members a public course accepts through
+    # self-registration. NULL means unlimited. Counts every _student member,
+    # however they were enrolled, so a lecturer import uses up seats too; it
+    # never blocks a lecturer from enrolling past the cap by hand.
+    max_self_registrations = Column(Integer)
+
     # Lifecycle: set when an owner archives the course. Archived courses vanish
     # from the student and tutor views and from the public catalog, and every
     # student write (submission, test run) is refused through the same veto as

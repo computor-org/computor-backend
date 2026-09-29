@@ -66,6 +66,8 @@ export default function CourseEditPage() {
   const [description, setDescription] = useState('');
   const [language, setLanguage] = useState('');
   const [isPublic, setIsPublic] = useState(false);
+  // Self-registration seat cap; empty = unlimited, same convention as budgets.
+  const [maxSelfRegistrations, setMaxSelfRegistrations] = useState('');
   // Course-wide budget defaults. Held as strings so an empty field can mean
   // "unlimited" rather than collapsing to 0.
   const [maxTestRuns, setMaxTestRuns] = useState('');
@@ -98,6 +100,9 @@ export default function CourseEditPage() {
       setDescription(c.description || '');
       setLanguage(c.language_code || '');
       setIsPublic(c.public ?? false);
+      setMaxSelfRegistrations(
+        c.max_self_registrations != null ? String(c.max_self_registrations) : '',
+      );
       setMaxTestRuns(c.max_test_runs != null ? String(c.max_test_runs) : '');
       setMaxSubmissions(c.max_submissions != null ? String(c.max_submissions) : '');
       setVisible(c.visible ?? null);
@@ -147,6 +152,7 @@ export default function CourseEditPage() {
           // the field being present at all, so a lecturer including it — even
           // unchanged — would have their whole save rejected.
           ...(canSetPublic ? { public: isPublic } : {}),
+          max_self_registrations: parseLimit(maxSelfRegistrations),
           max_test_runs: parseLimit(maxTestRuns),
           max_submissions: parseLimit(maxSubmissions),
           visible,
@@ -283,6 +289,20 @@ export default function CourseEditPage() {
                     value={isPublic}
                     onChange={setIsPublic}
                     disabled={!canSetPublic}
+                  />
+                </Field>
+                <Field
+                  label="Self-registration seats"
+                  hint="Maximum number of students; counts everyone enrolled as a student, however they joined. Empty = unlimited."
+                >
+                  <input
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={maxSelfRegistrations}
+                    onChange={(e) => setMaxSelfRegistrations(e.target.value)}
+                    placeholder="unlimited"
+                    className={inputCls}
                   />
                 </Field>
                 <div className="flex items-center gap-3">

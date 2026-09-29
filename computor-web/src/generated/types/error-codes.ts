@@ -83,6 +83,7 @@ export const ErrorCodes = {
   NF_010: "NF_010", // Service Record Not Found
   CONFLICT_001: "CONFLICT_001", // Resource Already Exists
   CONFLICT_002: "CONFLICT_002", // Concurrent Modification
+  CONFLICT_003: "CONFLICT_003", // Course Full
   RATE_001: "RATE_001", // Rate Limit Exceeded
   RATE_002: "RATE_002", // Login Rate Limit Exceeded
   RATE_003: "RATE_003", // Test Request Rate Limit Exceeded
@@ -488,6 +489,20 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
     },
     retryAfter: undefined,
     documentationUrl: "/docs/api/concurrency",
+  },
+  CONFLICT_003: {
+    code: "CONFLICT_003",
+    httpStatus: 409,
+    category: ErrorCategory.CONFLICT,
+    severity: ErrorSeverity.INFO,
+    title: "Course Full",
+    message: {
+      plain: "This course is full.",
+      markdown: "**Course Full**\n\nThis course is full. No self-registration seats are left.",
+      html: "<strong>Course Full</strong><p>This course is full. No self-registration seats are left.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/api/conflicts",
   },
   RATE_001: {
     code: "RATE_001",

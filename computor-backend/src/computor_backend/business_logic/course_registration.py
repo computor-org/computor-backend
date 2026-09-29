@@ -22,10 +22,14 @@ import logging
 from typing import Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import exc
+from sqlalchemy import exc, func
 from sqlalchemy.orm import Session
 
-from computor_backend.exceptions import ForbiddenException, PermissionDeniedAsNotFound
+from computor_backend.exceptions import (
+    ConflictException,
+    ForbiddenException,
+    PermissionDeniedAsNotFound,
+)
 from computor_backend.model.course import Course, CourseGroup, CourseMember
 from computor_backend.model.organization import Organization
 from computor_backend.permissions.principal import Principal
@@ -96,20 +100,46 @@ def list_public_courses(
             )
         }
 
+    # Seats for the capped courses on this page, again in one query.
+    capped_ids = [
+        str(course.id) for course, _ in rows if course.max_self_registrations is not None
+    ]
+    students: dict[str, int] = {}
+    if capped_ids:
+        students = {
+            str(course_id): count
+            for course_id, count in db.query(CourseMember.course_id, func.count())
+            .filter(
+                CourseMember.course_id.in_(capped_ids),
+                CourseMember.course_role_id == "_student",
+            )
+            .group_by(CourseMember.course_id)
+        }
+
+    def _seats_left(course: Course) -> Optional[int]:
+        if course.max_self_registrations is None:
+            return None
+        used = students.get(str(course.id), 0)
+        return max(course.max_self_registrations - used, 0)
+
     # Built field by field on purpose: an explicit constructor is what
     # guarantees a future column on Course cannot leak into the catalog.
-    items = [
-        CoursePublicList(
-            id=str(course.id),
-            title=course.title,
-            description=course.description,
-            path=str(course.path),
-            language_code=course.language_code,
-            organization_title=organization_title,
-            enrolled=str(course.id) in enrolled,
+    items = []
+    for course, organization_title in rows:
+        seats_left = _seats_left(course)
+        items.append(
+            CoursePublicList(
+                id=str(course.id),
+                title=course.title,
+                description=course.description,
+                path=str(course.path),
+                language_code=course.language_code,
+                organization_title=organization_title,
+                enrolled=str(course.id) in enrolled,
+                seats_left=seats_left,
+                full=seats_left == 0,
+            )
         )
-        for course, organization_title in rows
-    ]
     return items, total
 
 
@@ -189,6 +219,40 @@ def resolve_registration_group(
         return group
 
 
+def _ensure_seat_available(course: Course, db: Session) -> None:
+    """Raise 409 when the course's self-registration cap is reached.
+
+    Locks the course row (``FOR UPDATE`` on ``course`` only) before counting,
+    so two students racing for the last seat serialize here: the second one
+    counts after the first has committed and sees the course full. The lock is
+    held until the caller's commit. Uncapped courses skip the lock entirely.
+    """
+    if course.max_self_registrations is None:
+        return
+    cap = (
+        db.query(Course.max_self_registrations)
+        .filter(Course.id == course.id)
+        .with_for_update(of=Course)
+        .scalar()
+    )
+    if cap is None:
+        return
+    students = (
+        db.query(func.count(CourseMember.id))
+        .filter(
+            CourseMember.course_id == course.id,
+            CourseMember.course_role_id == "_student",
+        )
+        .scalar()
+    )
+    if students >= cap:
+        raise ConflictException(
+            error_code="CONFLICT_003",
+            detail="This course is full.",
+            context={"course_id": str(course.id), "max_self_registrations": cap},
+        )
+
+
 async def register_in_public_course(
     course_id: UUID | str,
     permissions: Principal,
@@ -218,6 +282,8 @@ async def register_in_public_course(
     )
     if existing is not None:
         return existing, False
+
+    _ensure_seat_available(course, db)
 
     group = resolve_registration_group(course, permissions, db)
 

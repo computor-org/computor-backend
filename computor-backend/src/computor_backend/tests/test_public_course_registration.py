@@ -26,7 +26,11 @@ from computor_backend.business_logic.course_registration import (
     register_in_public_course,
     resolve_registration_group,
 )
-from computor_backend.exceptions import ForbiddenException, NotFoundException
+from computor_backend.exceptions import (
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+)
 from computor_backend.model.auth import User
 from computor_backend.model.course import Course, CourseFamily, CourseGroup, CourseMember
 from computor_backend.model.organization import Organization
@@ -108,7 +112,9 @@ def world(db):
 
     counter = {"n": 0}
 
-    def course(*, public: bool, title: str = "Course") -> Course:
+    def course(
+        *, public: bool, title: str = "Course", max_self_registrations: int | None = None
+    ) -> Course:
         counter["n"] += 1
         c = Course(
             title=title,
@@ -116,6 +122,7 @@ def world(db):
             course_family_id=family.id,
             organization_id=org.id,
             public=public,
+            max_self_registrations=max_self_registrations,
         )
         db.add(c)
         db.flush()
@@ -212,6 +219,8 @@ def test_catalog_row_carries_no_course_internals():
         "language_code",
         "organization_title",
         "enrolled",
+        "seats_left",
+        "full",
     }
 
 
@@ -414,3 +423,217 @@ async def test_service_accounts_cannot_self_register(world, db):
 
     with pytest.raises(ForbiddenException):
         await register_in_public_course(course.id, principal, db)
+
+
+# ---------------------------------------------------------------------------
+# Self-registration cap (max_self_registrations)
+# ---------------------------------------------------------------------------
+
+def _add_student(world, db, course: Course, name: str) -> CourseMember:
+    student = world["user"](name)
+    group = resolve_registration_group(course, _principal(student), db)
+    member = CourseMember(
+        user_id=student.id,
+        course_id=course.id,
+        course_group_id=group.id,
+        course_role_id="_student",
+    )
+    db.add(member)
+    db.flush()
+    return member
+
+
+@pytest.mark.asyncio
+async def test_registration_is_refused_with_409_when_the_course_is_full(world, db):
+    course = world["course"](public=True, max_self_registrations=1)
+    await register_in_public_course(course.id, _principal(world["user"]("first")), db)
+
+    with pytest.raises(ConflictException) as err:
+        await register_in_public_course(course.id, _principal(world["user"]("second")), db)
+
+    assert err.value.status_code == 409
+    assert "This course is full" in str(err.value.detail)
+    students = (
+        db.query(CourseMember)
+        .filter(CourseMember.course_id == course.id, CourseMember.course_role_id == "_student")
+        .count()
+    )
+    assert students == 1
+
+
+@pytest.mark.asyncio
+async def test_students_enrolled_by_staff_use_up_seats(world, db):
+    course = world["course"](public=True, max_self_registrations=2)
+    _add_student(world, db, course, "imported1")
+    _add_student(world, db, course, "imported2")
+
+    with pytest.raises(ConflictException):
+        await register_in_public_course(course.id, _principal(world["user"]("late")), db)
+
+
+@pytest.mark.asyncio
+async def test_non_student_members_do_not_use_up_seats(world, db):
+    course = world["course"](public=True, max_self_registrations=1)
+    tutor = world["user"]("tutor")
+    db.add(CourseMember(user_id=tutor.id, course_id=course.id, course_role_id="_tutor"))
+    db.flush()
+
+    _, created = await register_in_public_course(course.id, _principal(world["user"]("s")), db)
+    assert created is True
+
+
+@pytest.mark.asyncio
+async def test_a_null_cap_means_unlimited(world, db):
+    course = world["course"](public=True, max_self_registrations=None)
+    for i in range(5):
+        _, created = await register_in_public_course(
+            course.id, _principal(world["user"](f"s{i}")), db
+        )
+        assert created is True
+
+
+@pytest.mark.asyncio
+async def test_an_existing_member_of_a_full_course_still_gets_their_membership(world, db):
+    course = world["course"](public=True, max_self_registrations=1)
+    caller = world["user"]("insider")
+    first, _ = await register_in_public_course(course.id, _principal(caller), db)
+
+    again, created = await register_in_public_course(course.id, _principal(caller), db)
+
+    assert created is False
+    assert str(again.id) == str(first.id)
+
+
+@pytest.mark.asyncio
+async def test_catalog_reports_seats_left_and_full(world, db):
+    tag = f"seats-{uuid.uuid4().hex[:8]}"
+    open_course = world["course"](public=True, title=f"{tag} open")
+    roomy = world["course"](public=True, title=f"{tag} roomy", max_self_registrations=3)
+    full = world["course"](public=True, title=f"{tag} tight", max_self_registrations=1)
+    _add_student(world, db, roomy, "r1")
+    _add_student(world, db, full, "f1")
+
+    items, _ = list_public_courses(
+        CoursePublicQuery(title=tag), _principal(world["user"]("browser")), db
+    )
+    rows = {item.id: item for item in items}
+
+    assert rows[str(open_course.id)].seats_left is None
+    assert rows[str(open_course.id)].full is False
+    assert rows[str(roomy.id)].seats_left == 2
+    assert rows[str(roomy.id)].full is False
+    assert rows[str(full.id)].seats_left == 0
+    assert rows[str(full.id)].full is True
+
+
+@pytest.mark.asyncio
+async def test_two_students_racing_for_the_last_seat_do_not_both_get_it(monkeypatch):
+    """Real concurrency on committed rows, not the rollback fixture.
+
+    Student A registers and is held *after* its membership is flushed but
+    before commit (inside the post-create hook). Student B then registers in
+    another connection. Under READ COMMITTED B cannot see A's uncommitted row,
+    so without the course row lock B would count zero students and take the
+    seat too. With the lock B waits for A's commit, recounts, and gets 409.
+    """
+    import asyncio
+    import threading
+
+    import computor_backend.business_logic.course_member_post_create as hook_mod
+
+    try:
+        engine = create_engine(_database_url())
+        engine.connect().close()
+    except Exception as exc:  # pragma: no cover - environment-dependent
+        pytest.skip(f"Postgres not reachable: {exc}")
+    Session = sessionmaker(bind=engine)
+    suffix = uuid.uuid4().hex[:10]
+
+    setup = Session()
+    org = Organization(
+        title="Race Org",
+        organization_type="organization",
+        path=Ltree(f"pubrace_{suffix}"),
+        properties={},
+    )
+    setup.add(org)
+    setup.flush()
+    family = CourseFamily(
+        title="Race Family", path=Ltree(f"pubrace_{suffix}.family"), organization_id=org.id
+    )
+    setup.add(family)
+    setup.flush()
+    course = Course(
+        title="Race Course",
+        path=Ltree(f"pubrace_{suffix}.family.course"),
+        course_family_id=family.id,
+        organization_id=org.id,
+        public=True,
+        max_self_registrations=1,
+    )
+    setup.add(course)
+    users = [
+        User(given_name=n, family_name="Race", email=f"{n}.{suffix}@test.local")
+        for n in ("alice", "bob")
+    ]
+    setup.add_all(users)
+    setup.commit()
+    course_id = course.id
+    alice_id, bob_id = (str(u.id) for u in users)
+    ids = {"org": org.id, "family": family.id, "users": [u.id for u in users]}
+    setup.close()
+
+    a_holds_lock = threading.Event()
+    release_a = threading.Event()
+
+    async def _hook(member, db, permissions=None):
+        if str(member.user_id) == alice_id:
+            a_holds_lock.set()
+            release_a.wait(timeout=30)
+
+    monkeypatch.setattr(hook_mod, "course_member_post_create", _hook)
+
+    results: dict[str, object] = {}
+
+    def _register(name: str, user_id: str) -> None:
+        session = Session()
+        try:
+            member, created = asyncio.run(
+                register_in_public_course(course_id, Principal(user_id=user_id), session)
+            )
+            results[name] = created
+        except Exception as exc:  # noqa: BLE001 - the outcome is the assertion
+            session.rollback()
+            results[name] = exc
+        finally:
+            session.close()
+
+    try:
+        a = threading.Thread(target=_register, args=("alice", alice_id))
+        a.start()
+        assert a_holds_lock.wait(timeout=10), "alice never reached the hook"
+
+        b = threading.Thread(target=_register, args=("bob", bob_id))
+        b.start()
+        b.join(timeout=2)
+        assert b.is_alive(), "bob must wait on the course row lock while alice is open"
+
+        release_a.set()
+        a.join(timeout=10)
+        b.join(timeout=10)
+
+        assert results["alice"] is True
+        assert isinstance(results["bob"], ConflictException)
+        assert results["bob"].status_code == 409
+    finally:
+        release_a.set()
+        cleanup = Session()
+        cleanup.query(CourseMember).filter(CourseMember.course_id == course_id).delete()
+        cleanup.query(CourseGroup).filter(CourseGroup.course_id == course_id).delete()
+        cleanup.query(Course).filter(Course.id == course_id).delete()
+        cleanup.query(CourseFamily).filter(CourseFamily.id == ids["family"]).delete()
+        cleanup.query(Organization).filter(Organization.id == ids["org"]).delete()
+        cleanup.query(User).filter(User.id.in_(ids["users"])).delete()
+        cleanup.commit()
+        cleanup.close()
+        engine.dispose()

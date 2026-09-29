@@ -1316,6 +1316,7 @@ export interface CourseCreate {
   max_submissions?: number | null;
   visible?: boolean | null;
   public?: boolean | null;
+  max_self_registrations?: number | null;
 }
 
 export interface CourseGet {
@@ -1330,6 +1331,7 @@ export interface CourseGet {
   max_submissions?: number | null;
   visible?: boolean | null;
   public?: boolean | null;
+  max_self_registrations?: number | null;
   /** Creation timestamp */
   created_at?: string | null;
   /** Update timestamp */
@@ -1365,6 +1367,7 @@ export interface CourseUpdate {
   max_submissions?: number | null;
   visible?: boolean | null;
   public?: boolean | null;
+  max_self_registrations?: number | null;
 }
 
 export interface CourseQuery {
@@ -1405,6 +1408,8 @@ export interface CoursePublicList {
   language_code?: string | null;
   organization_title?: string | null;
   enrolled?: boolean;
+  seats_left?: number | null;
+  full?: boolean;
 }
 
 export interface CoursePublicQuery {

@@ -34,6 +34,7 @@ class ErrorCode(str, Enum):
     NF_010 = "NF_010"  # Service Record Not Found
     CONFLICT_001 = "CONFLICT_001"  # Resource Already Exists
     CONFLICT_002 = "CONFLICT_002"  # Concurrent Modification
+    CONFLICT_003 = "CONFLICT_003"  # Course Full
     RATE_001 = "RATE_001"  # Rate Limit Exceeded
     RATE_002 = "RATE_002"  # Login Rate Limit Exceeded
     RATE_003 = "RATE_003"  # Test Request Rate Limit Exceeded
@@ -135,6 +136,7 @@ ERROR_CATEGORIES = {
     ErrorCode.NF_010: "not_found",
     ErrorCode.CONFLICT_001: "conflict",
     ErrorCode.CONFLICT_002: "conflict",
+    ErrorCode.CONFLICT_003: "conflict",
     ErrorCode.RATE_001: "rate_limit",
     ErrorCode.RATE_002: "rate_limit",
     ErrorCode.RATE_003: "rate_limit",

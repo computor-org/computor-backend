@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional
 from datetime import datetime
 
@@ -47,6 +47,9 @@ class CourseCreate(BaseModel):
     # DEFAULT false; Optional here so an omitted key takes the server default
     # and a partially-loaded row still validates.
     public: Optional[bool] = None
+    # Cap on _student members for self-registration (GET /courses/public).
+    # None means unlimited.
+    max_self_registrations: Optional[int] = Field(default=None, ge=0)
 
 class CourseGet(BaseEntityGet,CourseCreate):
     id: str
@@ -72,6 +75,9 @@ class CourseGet(BaseEntityGet,CourseCreate):
     # DEFAULT false; Optional here so an omitted key takes the server default
     # and a partially-loaded row still validates.
     public: Optional[bool] = None
+    # Cap on _student members for self-registration (GET /courses/public).
+    # None means unlimited.
+    max_self_registrations: Optional[int] = Field(default=None, ge=0)
     # Set once an owner archives the course: hidden from students and tutors,
     # submissions and test runs closed, reversible. Read-only here; use
     # ``PATCH /courses/{id}/archive`` / ``/unarchive``.
@@ -139,6 +145,8 @@ class CourseUpdate(BaseModel):
     # column is NOT NULL, so an explicit ``null`` is rejected rather than
     # meaning "unset".
     public: Optional[bool] = None
+    # Explicit ``null`` removes the cap (unlimited); omit to leave it alone.
+    max_self_registrations: Optional[int] = Field(default=None, ge=0)
 
 
 class CourseQuery(ListQuery):
@@ -187,6 +195,11 @@ class CoursePublicList(BaseModel):
     # Lets the catalog render "Open" instead of "Register" without a second
     # round trip, and without consulting the 15-minute-stale principal claims.
     enrolled: bool = False
+    # Free self-registration seats; None when the course has no cap. ``full``
+    # is true when a cap is set and no seat is left, so the catalog can
+    # disable Register without doing arithmetic on a nullable.
+    seats_left: Optional[int] = None
+    full: bool = False
 
     @field_validator('path', mode='before')
     @classmethod
