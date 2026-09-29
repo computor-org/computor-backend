@@ -38,12 +38,10 @@ export default function PublicCourseCatalog({ signedIn }: { signedIn: boolean })
 
   if (courses.length === 0) return null;
 
-  // computor.at signs in through GitHub only; other deployments use their own IdP.
-  const ctaLabel = signedIn
-    ? 'Zum Kurskatalog / Open the catalog'
-    : LEGAL_PROFILE === 'computor-at'
-      ? 'Mit GitHub anmelden / Sign in with GitHub'
-      : 'Anmelden / Sign in';
+  // computor.at runs an invite-only pilot: existing users sign in (GitHub or
+  // email), new participants need an invite link (/join/<code>).
+  const isPublicPilot = LEGAL_PROFILE === 'computor-at';
+  const ctaLabel = signedIn ? 'Zum Kurskatalog / Open the catalog' : 'Anmelden / Sign in';
   const ctaHref = signedIn ? CATALOG_PATH : `/login?next=${encodeURIComponent(CATALOG_PATH)}`;
 
   return (
@@ -54,7 +52,9 @@ export default function PublicCourseCatalog({ signedIn }: { signedIn: boolean })
             Kurse / Courses
           </h3>
           <p className="text-muted mt-1">
-            Offen zur Anmeldung / Open for registration
+            {isPublicPilot
+              ? 'Pilotbetrieb – Teilnahme mit Einladungslink / Pilot – join with an invite link'
+              : 'Offen zur Anmeldung / Open for registration'}
           </p>
         </div>
         <div className="flex flex-col items-start sm:items-end gap-1">
