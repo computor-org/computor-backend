@@ -919,3 +919,37 @@ def test_admin_write_during_password_provisioning_does_not_stall_the_worker(
     finally:
         db.close()
         admin_db.close()
+
+
+def test_migration_downgrade_refuses_while_admission_is_protecting_anything(env, monkeypatch):
+    """Downgrade would reopen registration and make referral links admin invites."""
+    import importlib
+
+    mig = importlib.import_module(
+        "computor_backend.alembic.versions.d9e1f3a5b7c9_invite_only_registration"
+    )
+    engine = env.Session.kw["bind"]
+
+    def _check():
+        with engine.connect() as conn:
+            monkeypatch.setattr(mig, "op", SimpleNamespace(get_bind=lambda: conn))
+            mig._refuse_unsafe_downgrade()
+
+    env.settings(registration_mode="invite_only", max_registered_users=30)
+    with pytest.raises(RuntimeError, match="Refusing to downgrade"):
+        _check()
+    env.settings(registration_mode="open")
+    inviter = env.make_user("dginviter")
+    env.settings(registration_mode="invite_only")
+    s = env.Session()
+    ensure_referral_invites(s, inviter)
+    s.close()
+    env.settings(registration_mode="open")
+    with pytest.raises(RuntimeError, match="referral"):
+        _check()
+    s = env.Session()
+    s.query(InviteLink).filter(InviteLink.created_by == inviter).update(
+        {"revoked_at": datetime.now(timezone.utc)}, synchronize_session=False)
+    s.commit()
+    s.close()
+    _check()  # open, uncapped, no live referrals: allowed

@@ -64,7 +64,38 @@ def upgrade() -> None:
         ['referred_by_user_id'], ['id'], ondelete='SET NULL')
 
 
+def _refuse_unsafe_downgrade() -> None:
+    """Refuse to drop the admission policy while it is protecting anything.
+
+    The downgrade drops registration_mode, max_registered_users and
+    invite_link.kind: a gated instance would silently reopen, the cap would
+    vanish, and surviving referral links would turn into ordinary admin
+    invites redeemable through the password path.
+    """
+    bind = op.get_bind()
+    gated = bind.execute(sa.text(
+        "SELECT count(*) FROM instance_settings "
+        "WHERE registration_mode <> 'open' OR max_registered_users IS NOT NULL"
+    )).scalar()
+    referrals = bind.execute(sa.text(
+        "SELECT count(*) FROM invite_link WHERE kind = 'referral' AND revoked_at IS NULL"
+    )).scalar()
+    if gated or referrals:
+        raise RuntimeError(
+            "Refusing to downgrade d9e1f3a5b7c9: registration is gated "
+            f"(instance_settings rows with a mode other than 'open' or a user cap: {gated}) "
+            f"and/or {referrals} unrevoked referral invite(s) exist. This downgrade "
+            "would reopen registration, drop the user cap and turn referral links into "
+            "password-redeemable admin invites. First set registration_mode='open' and "
+            "max_registered_users=NULL, and revoke the referral invites "
+            "(UPDATE invite_link SET revoked_at = now() WHERE kind = 'referral'), "
+            "then run the downgrade again."
+        )
+
+
 def downgrade() -> None:
+    _refuse_unsafe_downgrade()
+
     op.drop_constraint('user_referred_by_user_id_fkey', 'user', type_='foreignkey')
     op.drop_constraint('user_registered_via_invite_id_fkey', 'user', type_='foreignkey')
     op.drop_column('user', 'referred_by_user_id')
