@@ -16,5 +16,16 @@
       "familyName": "family_name",
       "username": "preferred_username"
     }
+  },
+  {
+    "alias": "github",
+    "displayName": "GitHub",
+    "enabled": false,
+    "providerId": "github",
+    "clientId": "CHANGE_ME_GITHUB_OAUTH_APP_CLIENT_ID",
+    "clientSecretEnv": "IDP_GITHUB_CLIENT_SECRET",
+    "defaultScopes": "user:email",
+    "trustEmail": false,
+    "syncMode": "IMPORT"
   }
 ]
