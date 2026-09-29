@@ -858,3 +858,50 @@ def test_empty_writes_do_not_accumulate(tmp_path):
     assert result.success, result.error_message
     assert result.namespace["stored"] == 1
     assert result.stdout == "x"
+
+
+# --- 19. figure collection is bounded ---------------------------------------
+
+def test_figure_collection_examines_bounded_entries(tmp_path, monkeypatch):
+    pytest.importorskip("matplotlib")
+    from testers.executors import python as pyexec
+    calls = []  # entries yielded per scandir() call, in call order
+    real_scandir = os.scandir
+
+    class CountingScandir:
+        def __init__(self, target):
+            self._it = real_scandir(target)
+            self._count = len(calls)
+            calls.append(0)
+        def __enter__(self):
+            return self
+        def __exit__(self, *exc):
+            self._it.close()
+        def __iter__(self):
+            for entry in self._it:
+                calls[self._count] += 1
+                yield entry
+    monkeypatch.setattr(pyexec.os, "scandir", CountingScandir)
+    work = tmp_path / "work"
+    work.mkdir()
+    art = tmp_path / "artifacts"
+    art.mkdir()
+    (work / "plot.py").write_text(textwrap.dedent("""
+        import glob, os, sys
+        import matplotlib.pyplot as plt
+        plt.plot([1, 2, 3])
+        figs = os.path.join(os.path.dirname(sys.argv[0]), "figures")
+        os.makedirs(figs, exist_ok=True)
+        for i in range(20000):                    # flood the figures dir
+            open(os.path.join(figs, "junk_%d" % i), "w").close()
+    """))
+    executor = pyexec.PyExecutor(working_dir=str(work), timeout=120,
+                                 graphics=True, figure_dir=str(art),
+                                 figure_prefix="s")
+    start = time.monotonic()
+    result = executor.execute("plot.py", [])
+    assert result.success, result.error_message
+    # The first scandir after the run is the figure collection (the later
+    # ones are the harness's own cleanup of the private dir).
+    assert calls and calls[0] <= pyexec.MAX_FIGURE_DIR_ENTRIES + 1
+    assert time.monotonic() - start < 60

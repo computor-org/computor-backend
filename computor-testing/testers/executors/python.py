@@ -34,7 +34,8 @@ class PyExecutionError(ExecutionError):
 
 FIGURE_SUBDIR = "figures"
 MAX_FIGURES = 20
-_FIGURE_NAME = re.compile(r"figure_\d{1,4}\.png")
+MAX_FIGURE_DIR_ENTRIES = 1000
+_FIGURE_NAME = re.compile(r"figure_(\d{1,4})\.png")
 
 
 class PyExecutor(InterpretedExecutor):
@@ -347,11 +348,28 @@ class PyExecutor(InterpretedExecutor):
         if not (self.graphics and self.figure_dir):
             return
         figures = os.path.join(sandbox_dir, FIGURE_SUBDIR)
-        if not os.path.isdir(figures) or os.path.islink(figures):
+        # The job controls this directory: open it without following a
+        # symlink and examine a bounded number of entries, keeping only the
+        # MAX_FIGURES lowest-numbered candidates (no full listing or sort).
+        try:
+            dir_fd = os.open(figures, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        except OSError:
             return
-        for name in sorted(os.listdir(figures))[:MAX_FIGURES]:
-            if not _FIGURE_NAME.fullmatch(name):
-                continue
+        candidates = []  # (figure number, name), at most MAX_FIGURES
+        try:
+            with os.scandir(dir_fd) as entries:
+                for examined, entry in enumerate(entries):
+                    if examined >= MAX_FIGURE_DIR_ENTRIES:
+                        break
+                    match = _FIGURE_NAME.fullmatch(entry.name)
+                    if not match:
+                        continue
+                    candidates.append((int(match.group(1)), entry.name))
+                    if len(candidates) > MAX_FIGURES:
+                        candidates.remove(max(candidates))
+        finally:
+            os.close(dir_fd)
+        for _number, name in sorted(candidates):
             try:
                 data = read_untrusted_bytes(os.path.join(figures, name),
                                             root=sandbox_dir)
