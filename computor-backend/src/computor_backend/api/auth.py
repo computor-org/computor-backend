@@ -11,7 +11,7 @@ import logging
 import os
 import re
 import secrets
-from typing import List, Optional
+from typing import Annotated, List, Optional
 from urllib.parse import urlencode, urlparse, urlsplit
 
 from fastapi import APIRouter, Depends, Query, Request, Response
@@ -45,7 +45,12 @@ from computor_types.auth import (
     TokenRefreshResponse,
 )
 
+from computor_backend.business_logic.registration_admission import RegistrationRefused
+
 logger = logging.getLogger(__name__)
+
+# Web page explaining a refused registration (computor-web app/join/refused).
+REGISTRATION_REFUSED_PATH = "/join/refused"
 
 # SSO cookies must be marked Secure in production (served over HTTPS via nginx),
 # but NOT in dev where the app is plain http://localhost — a Secure cookie set
@@ -156,12 +161,26 @@ async def list_providers() -> List[ProviderInfo]:
 async def initiate_login(
     provider: str,
     redirect_uri: Optional[str] = Query(None, description="Redirect URI after authentication"),
-    request: Request = None
+    request: Request = None,
+    invite: Annotated[Optional[str], Query(
+        max_length=128,
+        description="Invite code, checked if this login creates a new user",
+    )] = None,
+    action: Annotated[Optional[str], Query(
+        pattern="^register$",
+        description="'register' opens Keycloak's email registration form",
+    )] = None,
+    idp_hint: Annotated[Optional[str], Query(
+        pattern="^[A-Za-z0-9_-]{1,64}$",
+        description="Keycloak identity provider alias to go straight to (kc_idp_hint)",
+    )] = None,
 ) -> RedirectResponse:
     """
     Initiate SSO login for a specific provider.
 
-    Redirects the user to the provider's login page.
+    Redirects the user to the provider's login page. ``invite`` rides along in
+    the server-side state (never in a URL the provider sees) and is what the
+    callback checks when registration is invite-only.
     """
     registry = get_plugin_registry()
 
@@ -196,7 +215,8 @@ async def initiate_login(
     state_data = {
         "provider": provider,
         "redirect_uri": redirect_uri or str(request.url_for("sso_success")),
-        "timestamp": str(request.headers.get("date", ""))
+        "timestamp": str(request.headers.get("date", "")),
+        "invite_code": invite,
     }
     await redis_client.set(
         f"sso_state:{state}",
@@ -219,7 +239,15 @@ async def initiate_login(
     try:
         # Get login URL from provider
         login_url = registry.get_login_url(provider, callback_url, state)
-        
+        if action == "register":
+            # Keycloak's registration form lives next to the authorization
+            # endpoint and takes the same parameters.
+            login_url = login_url.replace(
+                "/protocol/openid-connect/auth?", "/protocol/openid-connect/registrations?", 1
+            )
+        if idp_hint:
+            login_url = f"{login_url}&{urlencode({'kc_idp_hint': idp_hint})}"
+
         # Redirect to provider login
         return RedirectResponse(url=login_url, status_code=302)
         
@@ -351,6 +379,9 @@ async def handle_callback(
         )
         return redirect_response
 
+    except RegistrationRefused as e:
+        return _registration_refused_redirect(provider, e)
+
     except ComputorException as e:
         # A deliberate refusal — the concurrent-login cap (#351), a ban, a
         # revoked consent. These carry a message written for the user, and the
@@ -371,6 +402,45 @@ async def handle_callback(
         error_params = {"error": str(e), "provider": provider}
         error_url = f"/?{urlencode(error_params)}"
         return RedirectResponse(url=error_url, status_code=302)
+
+def _registration_refused_redirect(provider: str, refusal: RegistrationRefused) -> RedirectResponse:
+    """Send a refused first login to /join/refused, signed out of Keycloak.
+
+    Goes through Keycloak's end-session endpoint, which returns to the page
+    with the reason in ``state``; that URI is registered on the client at
+    startup (server.py), as Keycloak requires for post-logout redirects. The
+    Keycloak account itself is kept (see RegistrationRefused).
+    """
+    target = _registration_refused_url()
+    plugin = get_plugin_registry().get_plugin(provider)
+    end_session = None
+    if getattr(plugin, "_oidc_config", None):
+        end_session = plugin._oidc_config.get("end_session_endpoint")
+    if end_session:
+        params = {
+            "client_id": os.environ.get("KEYCLOAK_CLIENT_ID", "computor-backend"),
+            "post_logout_redirect_uri": target,
+            "state": refusal.reason,
+        }
+        if refusal.id_token:
+            params["id_token_hint"] = refusal.id_token
+        url = f"{end_session}?{urlencode(params)}"
+    else:
+        url = f"{target}?{urlencode({'reason': refusal.reason})}"
+    response = RedirectResponse(url=url, status_code=302)
+    response.delete_cookie(key="ct_access_token", samesite="lax", secure=_COOKIE_SECURE)
+    response.delete_cookie(key="ct_refresh_token", samesite="lax", secure=_COOKIE_SECURE)
+    return response
+
+
+def _registration_refused_url() -> str:
+    """Absolute URL of the web page explaining a refused registration."""
+    api_base = _public_api_base()
+    parsed = urlparse(api_base) if api_base else None
+    if parsed and parsed.scheme and parsed.netloc:
+        return f"{parsed.scheme}://{parsed.netloc}{REGISTRATION_REFUSED_PATH}"
+    return REGISTRATION_REFUSED_PATH
+
 
 @auth_router.get("/success", name="sso_success")
 async def sso_success():

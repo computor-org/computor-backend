@@ -219,6 +219,7 @@ async def startup_logic():
                         redirect_uris=[
                             f"{api_public_url}/auth/keycloak/callback",  # SSO login callback
                             f"{origin}/",                                # post-logout redirect target
+                            f"{origin}/join/refused",                    # refused-registration logout target
                         ],
                         web_origins=[origin],
                     )

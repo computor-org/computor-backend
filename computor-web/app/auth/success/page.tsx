@@ -46,7 +46,7 @@ export default function AuthSuccessPage() {
         // used"), and login/register/auth pages are meaningless once logged in.
         // Land on the dashboard instead. Genuine deep links (e.g. /courses/123)
         // are preserved.
-        if (/^\/(invite|login|register|auth)(\/|$)/.test(redirect)) {
+        if (/^\/(invite|join|login|register|auth)(\/|$)/.test(redirect)) {
           redirect = '/dashboard';
         }
         window.location.replace(redirect);

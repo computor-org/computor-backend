@@ -84,7 +84,9 @@ server {
         # break (login "session not found" loops).
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
-        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        # Overwrite, never append: an appended X-Forwarded-For keeps whatever
+        # the client sent, and rate limits would then key on attacker text.
+        proxy_set_header X-Forwarded-For   $remote_addr;
         proxy_set_header X-Forwarded-Proto https;
         proxy_set_header X-Forwarded-Host  $host;
         proxy_set_header X-Forwarded-Port  443;

@@ -16,6 +16,7 @@ from computor_backend.exceptions import (
     NotFoundException,
     ForbiddenException,
     ServiceUnavailableException,
+    ConflictException,
 )
 from computor_backend.business_logic.instance_limits import (
     enforce_login_cap,
@@ -31,6 +32,14 @@ from computor_backend.redis_cache import get_redis_client
 from computor_backend.plugins.registry import get_plugin_registry
 from computor_backend.plugins import AuthStatus
 from computor_backend.auth.keycloak_admin import KeycloakAdminClient, KeycloakUser
+from computor_backend.business_logic.registration_admission import (
+    REASON_EMAIL_UNVERIFIED,
+    RegistrationRefused,
+    admit_new_user,
+    lock_first_login,
+    enroll_in_pilot_courses,
+    record_invite,
+)
 from computor_types.auth import (
     LocalTokenRefreshRequest,
     LocalTokenRefreshResponse,
@@ -429,9 +438,24 @@ async def handle_sso_callback(
     if not user_info:
         raise BadRequestException(detail="No user information received from provider")
 
+    # Membership of the Keycloak "administrators" group makes this identity
+    # staff: bootstrapped to _admin below, and never refused registration.
+    groups = user_info.groups or []
+    is_kc_admin = any(g.strip("/").split("/")[-1] == "administrators" for g in groups)
+    invite_code = (state_data or {}).get("invite_code")
+    email_verified = (user_info.attributes or {}).get("email_verified") is True
+
     # Find or create user account (wrap blocking DB operations)
     def _find_or_create_account():
         nonlocal user_info, provider, registry
+        created_user = False
+
+        # Serialise concurrent first logins of this identity (and email) so
+        # the lookups below see the other attempt's committed rows.
+        lock_first_login(
+            db, provider, user_info.provider_id,
+            user_info.email.strip().lower() if user_info.email else None,
+        )
 
         account = (
             db.query(Account)
@@ -500,19 +524,11 @@ async def handle_sso_callback(
             # email enrols them in the real owner's place. Refuse rather than
             # create a user without the email: that would silently fork the
             # person's identity. An identity without any email is unaffected.
-            if normalized_email and (user_info.attributes or {}).get(
-                "email_verified"
-            ) is not True:
-                raise ForbiddenException(
-                    detail=(
-                        "Verify your email address first. Your identity provider "
-                        f"has not verified '{user_info.email}', and Computor only "
-                        "accepts a first sign-in with a verified address. Verify "
-                        "it with your identity provider and sign in again, or ask "
-                        "an administrator."
-                    ),
-                    context={"provider": provider},
-                )
+            # Raised as the admission refusal so it takes the /join/refused
+            # path and keeps the Keycloak account (the person only has to
+            # verify), in every registration mode, open included.
+            if normalized_email and not email_verified:
+                raise RegistrationRefused(REASON_EMAIL_UNVERIFIED)
 
             user = None
             if normalized_email:
@@ -554,13 +570,25 @@ async def handle_sso_callback(
                         )
 
             if user is None:
+                # The one place a first login creates a Computor user, for
+                # GitHub-brokered and email-registered identities alike: gate
+                # it on registration mode, the user cap and the invite.
+                consumed = admit_new_user(
+                    db,
+                    invite_code=invite_code,
+                    email=normalized_email,
+                    email_verified=email_verified,
+                    is_staff=is_kc_admin,
+                )
                 user = User(
                     given_name=user_info.given_name or "",
                     family_name=user_info.family_name or "",
                     email=normalized_email,
                 )
+                record_invite(user, consumed)
                 db.add(user)
                 db.flush()
+                created_user = True
 
             # Create account
             account = Account(
@@ -585,8 +613,6 @@ async def handle_sso_callback(
         # Bootstrap _admin from the Keycloak "administrators" group.
         # Additive only: membership grants _admin, but we never revoke — admin
         # can also be granted manually in the computor DB, which stays authoritative.
-        groups = user_info.groups or []
-        is_kc_admin = any(g.strip("/").split("/")[-1] == "administrators" for g in groups)
         if is_kc_admin:
             from computor_backend.model.role import UserRole
             existing_admin = (
@@ -622,10 +648,35 @@ async def handle_sso_callback(
             "given_name": user.given_name,
             "family_name": user.family_name,
         }
+        # Pilot courses go to users who joined through registration: created
+        # right here, or pre-created by a password invite and now signing in
+        # (verified) for the first time — is_new_user is the first link of an
+        # SSO identity to the row. Enrolment is idempotent and cap-checked.
+        enroll = created_user or (
+            is_new_user and user.registered_via_invite_id is not None
+        )
         db.commit()
-        return is_new_user, user_primitives
+        return is_new_user, enroll, user_primitives
 
-    is_new_user, user_primitives = await run_in_threadpool(_find_or_create_account)
+    def _find_or_create_account_or_roll_back():
+        try:
+            return _find_or_create_account()
+        except RegistrationRefused:
+            # Release the instance_settings lock now; nothing was written and
+            # the invite (if any) is not spent.
+            db.rollback()
+            raise
+
+    try:
+        is_new_user, enroll_pilot, user_primitives = await run_in_threadpool(
+            _find_or_create_account_or_roll_back
+        )
+    except RegistrationRefused as refusal:
+        refusal.id_token = (auth_result.session_data or {}).get("id_token")
+        logger.info(
+            f"Registration refused ({refusal.reason}) for a new {provider} identity"
+        )
+        raise
 
     # Concurrent-login cap (#351). Checked before any session is minted and
     # before the git account is provisioned, so a refused login leaves nothing
@@ -662,6 +713,9 @@ async def handle_sso_callback(
     # Take the login seat the cap above counts. After the session exists, so a
     # login that fails between the two does not leave a seat held by nobody.
     await touch_login_seat(user_primitives["id"], login_idle_seconds(db))
+
+    if enroll_pilot:
+        await enroll_in_pilot_courses(db, user_primitives["id"])
 
     # Store tokens in Redis if available
     if auth_result.access_token:
@@ -827,26 +881,35 @@ async def provision_keycloak_login(
     password: str,
     given_name: str = "",
     family_name: str = "",
+    email_verified: bool = False,
 ) -> Tuple[str, bool]:
-    """Create (or password-reset) a Keycloak login for ``email``.
+    """Create a Keycloak login for ``email`` with ``password``.
 
-    Username == email is the single matching key across systems. If the Keycloak
-    user already exists its password is reset; otherwise it is created with the
-    password live (no temporary flag, no email round-trip).
+    Never touches an existing Keycloak user: if one already has this email
+    the call is refused (ConflictException). Resetting its password here
+    handed any invite holder the account behind a victim's email.
+
+    ``email_verified=False`` creates the login with the VERIFY_EMAIL required
+    action, so Keycloak will not issue tokens until the address is confirmed
+    — the proof of ownership an adopted pre-provisioned user needs before the
+    first SSO login links to it by email.
 
     This performs NO identity verification — the caller must first establish
-    authorization (a verified GitLab PAT, or a valid invite token).
+    authorization (a valid invite token).
 
-    Returns ``(keycloak_user_id, created)``.
+    Returns ``(keycloak_user_id, True)``.
     """
     kc = KeycloakAdminClient()
 
     # Match existing users by email — the Keycloak username is a generated handle,
     # not the email, so it can't be used as the lookup key.
-    existing_id = await kc._get_user_id_by_email(email)
-    if existing_id:
-        await kc.set_user_password(existing_id, password, temporary=False)
-        return existing_id, False
+    if await kc._get_user_id_by_email(email):
+        raise ConflictException(
+            detail=(
+                "A login for this email address already exists. Sign in, or use "
+                "'Forgot password' on the sign-in page."
+            )
+        )
 
     # Username is a generated, Forgejo-safe handle (never the email) so that
     # Forgejo's OIDC preferred_username maps to a valid Forgejo account name.
@@ -867,7 +930,8 @@ async def provision_keycloak_login(
                 firstName=given_name or email.split("@")[0],
                 lastName=family_name or "User",
                 enabled=True,
-                emailVerified=True,
+                emailVerified=email_verified,
+                requiredActions=None if email_verified else ["VERIFY_EMAIL"],
                 credentials=[{"type": "password", "value": password, "temporary": False}],
             ))
             return kc_user_id, True

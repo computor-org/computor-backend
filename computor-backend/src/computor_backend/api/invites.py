@@ -9,28 +9,40 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from computor_backend.database import get_db
+from computor_backend.business_logic.registration_admission import (
+    check_registration_capacity,
+    count_registered_users,
+    invite_public_status,
+    record_invite,
+)
 from computor_backend.exceptions import (
     BadRequestException,
     ForbiddenException,
     NotFoundException,
+    RateLimitException,
 )
+from computor_backend.model.instance import InstanceSettings
 from computor_backend.model.auth import User
 from computor_backend.model.invite import InviteLink
 from computor_backend.model.role import Role, UserRole
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.roles import grants_system_admin
+from computor_backend.redis_cache import get_redis_client
+from computor_backend.utils.client_info import trusted_client_ip
 from computor_types.invites import (
     InviteAccept,
     InviteLinkCreate,
     InviteLinkGet,
     InviteLinkList,
     InviteLinkPublic,
+    InviteStatusPublic,
 )
 
 logger = logging.getLogger(__name__)
@@ -136,12 +148,21 @@ async def revoke_invite(
     db: Session = Depends(get_db),
 ) -> None:
     """Revoke an invite link (admin or _user_manager)."""
-    _require_invite_manager(principal, db)
-    invite = db.query(InviteLink).filter(InviteLink.id == invite_id).first()
-    if not invite:
-        raise NotFoundException(detail="Invite not found")
-    invite.revoked_at = datetime.now(timezone.utc)
-    db.commit()
+    # In the threadpool: the UPDATE may wait on the invite row lock of a
+    # concurrent acceptance, which must not block the event loop.
+    def _revoke():
+        try:
+            _require_invite_manager(principal, db)
+            invite = db.query(InviteLink).filter(InviteLink.id == invite_id).first()
+            if not invite:
+                raise NotFoundException(detail="Invite not found")
+            invite.revoked_at = datetime.now(timezone.utc)
+            db.commit()
+        except BaseException:
+            db.rollback()
+            raise
+
+    await run_in_threadpool(_revoke)
     logger.info(f"Invite {invite_id} revoked by {principal.user_id}")
 
 
@@ -149,19 +170,81 @@ async def revoke_invite(
 # Public endpoints (no authentication required)
 # ---------------------------------------------------------------------------
 
+# Per client IP, fixed windows, on every public invite endpoint. Codes are
+# 256-bit random, so this bounds load and abuse, not secrecy. The IP comes
+# from trusted_client_ip, which ignores client-supplied forwarding headers.
+INVITE_LOOKUP_LIMIT = 30
+INVITE_ACCEPT_LIMIT = 10
+INVITE_WINDOW = 600
+
+
+async def _throttle_public_invite(request: Optional[Request], cache, bucket: str, limit: int) -> None:
+    """Raise RateLimitException once this client spent ``limit`` in the window.
+
+    Fails open on Redis errors, like the other limiters. Skipped when called
+    outside a request (direct calls in tests).
+    """
+    if request is None:
+        return
+    key = f"rate_limit:{bucket}:{trusted_client_ip(request)}"
+    try:
+        count = await cache.incr(key)
+        if count == 1:
+            await cache.expire(key, INVITE_WINDOW)
+    except Exception as e:
+        logger.error(f"Invite rate limit check failed: {e}")
+        return
+    if count > limit:
+        raise RateLimitException(
+            error_code="RATE_001",
+            detail="Too many invite requests. Please wait before trying again.",
+            retry_after=INVITE_WINDOW,
+        )
+
+
+@invites_router.get("/invites/{token}/status", response_model=InviteStatusPublic)
+async def get_invite_status(
+    token: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    cache=Depends(get_redis_client),
+) -> InviteStatusPublic:
+    """Whether a /join code can still be used (public, no auth, rate-limited).
+
+    Reveals only valid/used/expired/invalid plus whether registration is open
+    at all — never who issued the code, its email restriction or its roles.
+    """
+    await _throttle_public_invite(request, cache, "invite_lookup", INVITE_LOOKUP_LIMIT)
+    invite = db.query(InviteLink).filter(InviteLink.token == token[:128]).first()
+    row = db.query(InstanceSettings).first()
+    full = False
+    if row is not None and row.max_registered_users is not None:
+        full = count_registered_users(db) >= row.max_registered_users
+    return InviteStatusPublic(
+        status=invite_public_status(invite),
+        registration_mode=row.registration_mode if row is not None else "open",
+        full=full,
+    )
+
+
 @invites_router.get("/invites/{token}", response_model=InviteLinkPublic)
 async def get_invite_public(
     token: str,
+    request: Request = None,
     db: Session = Depends(get_db),
+    cache=Depends(get_redis_client),
 ) -> InviteLinkPublic:
-    """Get invite metadata for the registration page (public, no auth)."""
+    """Get invite metadata for the registration page (public, no auth, rate-limited)."""
+    await _throttle_public_invite(request, cache, "invite_lookup", INVITE_LOOKUP_LIMIT)
     invite = _resolve_token(token, db)
     return InviteLinkPublic(
         id=str(invite.id),
-        email=invite.email,
-        roles=invite.roles or [],
+        # Only what the accept page needs. A code holder learns neither the
+        # full bound address, nor the roles, nor the issuer's internal note.
+        email=_mask_email(invite.email),
+        roles=[],
         expires_at=invite.expires_at,
-        note=invite.note,
+        note=None,
     )
 
 
@@ -170,37 +253,212 @@ async def accept_invite(
     token: str,
     payload: InviteAccept,
     db: Session = Depends(get_db),
+    request: Request = None,
+    cache=Depends(get_redis_client),
 ) -> dict:
     """
     Accept an invite, provision a Keycloak login, and pre-create the user.
 
-    The invite token is the authorization proof. We create the Keycloak user
-    (with the chosen password) first, then create the computor User. On first
-    SSO login Keycloak links to this pre-created account by email.
+    The invite token is the authorization proof for a NEW account: we spend
+    the invite (atomically, inside the admission transaction), create the
+    Keycloak login with the chosen password, then create the computor User.
+    The login is always created UNVERIFIED with the VERIFY_EMAIL required
+    action: Keycloak issues no tokens until the address is confirmed, and
+    only then does the first SSO login link to this account by email.
 
-    A pre-provisioned user (admin-created or roster-imported, never signed in)
-    with the same email is ADOPTED instead of rejected — the invite becomes
-    the activation path for the existing row, keeping its memberships and
-    profile (computor-org/issues#382). Only a user with real login evidence
-    blocks the email.
+    An existing Computor user — owning the address as primary OR student
+    email — is never adopted on the invite alone (computor-org/issues#382
+    made that possible, and it let any invite holder take over an unused
+    pre-provisioned account, admins included). Adoption needs all of: an
+    invite issued for exactly this email, a row that has never signed in,
+    holds no staff role, and is neither banned nor archived; the row itself
+    is left untouched. Existing Keycloak credentials are never reset, and a
+    Keycloak user created here is never deleted again by this path.
+
+    Database work runs in the threadpool, and no transaction is open while
+    Keycloak is called (see the phases below).
     """
-    invite = _resolve_token(token, db)
+    from computor_backend.business_logic.registration_admission import (
+        consume_invite,
+        refund_invite,
+    )
 
-    # Email restriction check
-    if invite.email and invite.email.lower() != payload.email.lower():
-        raise BadRequestException(detail="This invite is restricted to a different email address")
+    await _throttle_public_invite(request, cache, "invite_accept", INVITE_ACCEPT_LIMIT)
+    email = payload.email.lower()
 
+    # Three phases so that no database lock is ever held across the Keycloak
+    # call (a lock holder suspended on the network, while another request
+    # waits on that lock, stalls the worker):
+    #   1. check + spend the invite, COMMIT;
+    #   2. create the Keycloak login (no transaction open);
+    #   3. re-check under the locks + insert/adopt, COMMIT.
+    # A failure after 1 refunds the invite; the Keycloak user created in 2
+    # is kept (see the handler below).
+
+    def _admit():
+        invite = _resolve_token(token, db)
+
+        # A referral invite admits through /join (SSO), where the email must
+        # be IdP-verified; this path would skip that check.
+        if invite.kind == "referral":
+            raise BadRequestException(
+                detail="This invite is used by signing in from its /join link."
+            )
+        if invite.email and invite.email.lower() != email:
+            raise BadRequestException(
+                detail="This invite is restricted to a different email address"
+            )
+        existing = _check_admission(invite, email, payload.email, db)
+
+        # Spend the invite now, before Keycloak: one conditional UPDATE, so
+        # two concurrent accepts of a single-use invite cannot both pass.
+        if consume_invite(db, token, email) is None:
+            raise BadRequestException(
+                detail="This invite has already been used the maximum number of times"
+            )
+        result = invite.id, invite.created_by, list(invite.roles or []), (
+            str(existing.id) if existing else None
+        )
+        db.commit()
+        return result
+
+    async def _in_transaction(fn):
+        try:
+            return await run_in_threadpool(fn)
+        except BaseException:
+            await run_in_threadpool(db.rollback)
+            raise
+
+    async def _refund():
+        def _do():
+            refund_invite(db, str(invite_id))
+            db.commit()
+        try:
+            await _in_transaction(_do)
+        except Exception as exc:  # noqa: BLE001 - keep the original error
+            logger.error(f"Could not refund invite {invite_id}: {exc}")
+
+    invite_id, created_by, invite_roles, existing_id = await _in_transaction(_admit)
+
+    # Provision the Keycloak login (refused if one exists for this email).
+    from computor_backend.business_logic.auth import provision_keycloak_login
+
+    try:
+        # Never verified: whoever typed the address has not shown they can read
+        # it. Keycloak withholds tokens until the VERIFY_EMAIL action is done,
+        # and only then can a first SSO login link to or create the account.
+        kc_user_id, _ = await provision_keycloak_login(
+            email=payload.email,
+            password=payload.password,
+            given_name=payload.given_name,
+            family_name=payload.family_name,
+            email_verified=False,
+        )
+    except BaseException:
+        await _refund()
+        raise
+
+    def _finish():
+        invite = db.query(InviteLink).filter(InviteLink.id == invite_id).one()
+        # Re-check under the locks: the cap or the existing row may have
+        # changed while Keycloak was being called.
+        existing = _check_admission(invite, email, payload.email, db)
+        if (existing is None) != (existing_id is None) or (
+            existing is not None and str(existing.id) != existing_id
+        ):
+            raise BadRequestException(detail="The account changed meanwhile; try again.")
+        if existing is not None:
+            # Left untouched until its owner proves the address; see above.
+            user = existing
+        else:
+            # Email-only, no local password — authentication is via Keycloak.
+            user = User(
+                email=payload.email,
+                given_name=payload.given_name,
+                family_name=payload.family_name,
+            )
+            record_invite(
+                user, (str(invite_id), str(created_by) if created_by else None)
+            )
+            db.add(user)
+            db.flush()
+
+        # Assign roles from invite. Admin-conferring roles are re-checked
+        # against the creator's CURRENT roles: create_invite already blocks
+        # non-admins from minting such invites, but an invite predating that
+        # guard (or whose creator has since lost admin) must not remain a
+        # stored escalation. The other roles are still granted.
+        roles_to_grant = list(invite_roles)
+        admin_roles = [r for r in roles_to_grant if grants_system_admin(r)]
+        if admin_roles and not _creator_is_admin(invite, db):
+            logger.warning(
+                f"Invite {invite_id}: skipping admin role(s) {admin_roles} — "
+                f"creator {created_by} is not an admin"
+            )
+            roles_to_grant = [r for r in roles_to_grant if not grants_system_admin(r)]
+        held = {
+            row[0]
+            for row in db.query(UserRole.role_id).filter(UserRole.user_id == str(user.id))
+        }
+        for role_id in roles_to_grant:
+            if role_id not in held:
+                db.add(UserRole(user_id=str(user.id), role_id=role_id))
+        user_id = str(user.id)
+        db.commit()
+        return user_id
+
+    try:
+        user_id = await _in_transaction(_finish)
+    except BaseException:
+        # Give the invite back. The Keycloak login created above is left in
+        # place on purpose: by now its owner may have verified the address and
+        # completed an SSO login that linked it (which is exactly why the final
+        # check can fail), and deleting it would destroy a live account — a
+        # lookup first would still race. It is unverified until its mailbox
+        # owner confirms it, so it grants nothing; orphans are cleaned up
+        # deliberately, not here.
+        logger.warning(
+            f"Invite acceptance failed after creating Keycloak user {kc_user_id}; "
+            "left in place"
+        )
+        await _refund()
+        raise
+
+    if existing_id:
+        logger.info(f"User {user_id} adopted via invite {invite_id} (pending email verification)")
+    else:
+        logger.info(f"User {user_id} pre-created via invite {invite_id}")
+
+    return {
+        "user_id": user_id,
+        "email": payload.email,
+        "adopted": existing_id is not None,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _check_admission(invite: InviteLink, email: str, typed_email: str, db: Session) -> Optional[User]:
+    """Refuse unless this invite may create (or adopt) the owner of ``email``.
+
+    Returns the existing user to adopt, or None for a brand-new account (for
+    which instance_settings is locked and the mode/cap checked).
+    """
+    from computor_backend.business_logic.registration_admission import user_is_staff
     from computor_backend.business_logic.user_lifecycle import login_evidence
 
-    # Case-insensitive: the SSO first-login join lowercases both sides, so an
-    # admin-typed "Name@mac.com" row must count as the same identity here too.
-    existing = db.query(User).filter(
-        func.lower(User.email) == payload.email.lower()
-    ).first()
+    existing = _user_owning_email(email, db)
     if existing:
+        if not invite.email:
+            raise BadRequestException(
+                detail="An account for this email address already exists. Only an "
+                "invite issued for this address can activate it; ask an administrator."
+            )
         if login_evidence(str(existing.id), db):
             raise BadRequestException(
-                detail=f"An account for '{payload.email}' already exists and has been "
+                detail=f"An account for '{typed_email}' already exists and has been "
                 "signed in to. Please sign in instead of using the invite."
             )
         if existing.banned_at is not None:
@@ -209,75 +467,57 @@ async def accept_invite(
             raise BadRequestException(
                 detail="This account is archived. Ask an administrator to unarchive it first."
             )
-
-    # Provision the Keycloak login first (invite token is the authorization
-    # proof). If this fails we neither create the user nor consume the invite.
-    from computor_backend.business_logic.auth import provision_keycloak_login
-    await provision_keycloak_login(
-        email=payload.email,
-        password=payload.password,
-        given_name=payload.given_name,
-        family_name=payload.family_name,
-    )
-
-    if existing:
-        # Adopt the pre-provisioned row: the person registering owns the
-        # identity now, so their chosen name wins over imported placeholders.
-        user = existing
-        if payload.given_name:
-            user.given_name = payload.given_name
-        if payload.family_name:
-            user.family_name = payload.family_name
-    else:
-        # Create user (email-only, no local password — authentication is via Keycloak)
-        user = User(
-            email=payload.email,
-            given_name=payload.given_name,
-            family_name=payload.family_name,
+        if user_is_staff(db, str(existing.id)):
+            raise BadRequestException(
+                detail="This account cannot be activated through an invite."
+            )
+        return existing
+    # A brand-new user: registration mode and the hard user cap apply exactly
+    # as on the first-SSO-login path (locks instance_settings).
+    row = check_registration_capacity(db)
+    # While registration is gated, an invite not bound to an address must go
+    # through /join, where the IdP verifies the email.
+    if row is not None and row.registration_mode != "open" and not invite.email:
+        raise BadRequestException(
+            detail="This invite is used by signing in from its /join link."
         )
-        db.add(user)
-        db.flush()
+    return None
 
-    # Assign roles from invite. Admin-conferring roles are re-checked
-    # against the creator's CURRENT roles: create_invite already blocks
-    # non-admins from minting such invites, but an invite predating that
-    # guard (or whose creator has since lost admin) must not remain a
-    # stored escalation. The other roles are still granted.
-    roles_to_grant = list(invite.roles or [])
-    admin_roles = [r for r in roles_to_grant if grants_system_admin(r)]
-    if admin_roles and not _creator_is_admin(invite, db):
-        logger.warning(
-            f"Invite {invite.id}: skipping admin role(s) {admin_roles} — "
-            f"creator {invite.created_by} is not an admin"
+
+def _mask_email(email: Optional[str]) -> Optional[str]:
+    """'jane.doe@example.org' -> 'j***@example.org' (None stays None)."""
+    if not email:
+        return None
+    local, _, domain = email.partition("@")
+    return f"{local[:1]}***@{domain}" if domain else "***"
+
+
+def _user_owning_email(email: str, db: Session) -> Optional[User]:
+    """The user that owns ``email`` as primary OR student-profile address.
+
+    Mirrors the SSO first-login lookup (and the case-insensitive uniqueness
+    trigger across both columns): an address that is some user's student
+    email belongs to that user, and must get the same protection.
+    """
+    from computor_backend.model.auth import StudentProfile
+
+    user = db.query(User).filter(func.lower(User.email) == email).first()
+    if user is not None:
+        return user
+    owners = {
+        uid
+        for (uid,) in db.query(StudentProfile.user_id)
+        .filter(func.lower(StudentProfile.student_email) == email)
+        .distinct()
+    }
+    if len(owners) > 1:
+        raise BadRequestException(
+            detail="This email address is ambiguous; ask an administrator."
         )
-        roles_to_grant = [r for r in roles_to_grant if not grants_system_admin(r)]
-    held = {
-        row[0]
-        for row in db.query(UserRole.role_id).filter(UserRole.user_id == str(user.id))
-    }
-    for role_id in roles_to_grant:
-        if role_id not in held:
-            db.add(UserRole(user_id=str(user.id), role_id=role_id))
+    if owners:
+        return db.query(User).filter(User.id == next(iter(owners))).first()
+    return None
 
-    # Consume invite
-    invite.use_count += 1
-    db.commit()
-
-    if existing:
-        logger.info(f"User {user.id} ({user.email}) adopted via invite {invite.id}")
-    else:
-        logger.info(f"User {user.id} ({user.email}) pre-created via invite {invite.id}")
-
-    return {
-        "user_id": str(user.id),
-        "email": payload.email,
-        "adopted": existing is not None,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _creator_is_admin(invite: InviteLink, db: Session) -> bool:
     """True if the invite's creator currently holds an admin-conferring role."""
@@ -316,6 +556,7 @@ def _to_get(invite: InviteLink) -> InviteLinkGet:
         expires_at=invite.expires_at,
         roles=invite.roles or [],
         note=invite.note,
+        kind=invite.kind or "admin",
         revoked_at=invite.revoked_at,
         created_at=invite.created_at,
         updated_at=invite.updated_at,
@@ -332,6 +573,7 @@ def _to_list(invite: InviteLink) -> InviteLinkList:
         expires_at=invite.expires_at,
         roles=invite.roles or [],
         note=invite.note,
+        kind=invite.kind or "admin",
         revoked_at=invite.revoked_at,
         created_at=invite.created_at,
     )
