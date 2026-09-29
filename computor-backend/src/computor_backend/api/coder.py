@@ -514,6 +514,7 @@ async def provision_workspace(
         # Self-provisioned workspaces always use the template's default
         # (shared) home; scratch homes are a lecturer/maintainer feature.
         request.home_mode = None
+    await _require_verified_workspace_limits()
     try:
         # Verify template exists in Coder before minting a token
         template = request.template or settings.default_template
@@ -791,6 +792,7 @@ async def start_workspace(
 ) -> WorkspaceActionResponse:
     """Start a stopped workspace."""
     _check_workspace_access_or_course_member(permissions, "start", db, username=username)
+    await _require_verified_workspace_limits()
     try:
         # Admission (template quota + instance workspace-user cap) — the
         # workspace being started never counts itself (it is stopped, but its
@@ -1221,6 +1223,39 @@ def _per_template_variables(db: Session) -> dict:
     return overrides
 
 
+# Last successful slice verification (monotonic seconds); see
+# _require_verified_workspace_limits.
+_SLICE_VERIFIED_AT: Optional[float] = None
+_SLICE_VERIFY_TTL_S = 300.0
+
+
+async def _require_verified_workspace_limits() -> None:
+    """Public deployments: refuse workspace creation/start and template
+    push/rollout unless the coder worker has verified, within the last five
+    minutes, that the workspace slice really carries memory, CPU and pids
+    limits. Only the worker has the docker socket, so the check is a Temporal
+    round trip; failures (including a missing worker) fail closed."""
+    global _SLICE_VERIFIED_AT
+    import time
+
+    _require_public_workspace_limits()
+    public = os.environ.get("COMPUTOR_PUBLIC_DEPLOYMENT", "").strip().lower() == "true"
+    if not public:
+        return
+    now = time.monotonic()
+    if _SLICE_VERIFIED_AT is not None and now - _SLICE_VERIFIED_AT < _SLICE_VERIFY_TTL_S:
+        return
+    try:
+        await _run_volume_task("verify_slice")
+    except Exception as e:  # noqa: BLE001 - fail closed on any error
+        _SLICE_VERIFIED_AT = None
+        detail = getattr(e, "detail", None) or str(e)
+        raise ServiceUnavailableException(
+            detail=f"Workspace resource limits are not verified: {detail}",
+        )
+    _SLICE_VERIFIED_AT = now
+
+
 def _require_public_workspace_limits() -> None:
     """Refuse template workflows on a public deployment without the aggregate
     workspace slice. The docker provider has no per-container pids limit, so
@@ -1356,6 +1391,7 @@ async def push_coder_templates(
     Optionally builds images first. Requires workspace:manage permission.
     """
     _check_workspace_access(permissions, "manage")
+    await _require_verified_workspace_limits()
     await _reject_conflicting_coder_task()
 
     executor = get_task_executor()
@@ -1402,6 +1438,7 @@ async def rollout_workspaces_endpoint(
     """
     _check_workspace_access(permissions, "manage")
     _require_worker_db_role(db)
+    await _require_verified_workspace_limits()
     await _reject_conflicting_coder_task()
 
     executor = get_task_executor()

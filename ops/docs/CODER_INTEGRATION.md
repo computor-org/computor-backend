@@ -169,6 +169,15 @@ that can be enforced is in place.
 The kreuzwerker/docker provider has no per-container pids limit and dockerd has
 no default one, so the slice's `TasksMax` is the fork-bomb bound.
 
+A slice name alone proves nothing: Docker creates an unknown slice on the fly
+with no limits. With `COMPUTOR_PUBLIC_DEPLOYMENT=true`, the coder worker starts
+a throwaway container in the slice and reads the slice's `memory.max`,
+`cpu.max` and `pids.max`. Template push and rollout, as well as workspace
+provisioning and start in the API (the verification is cached for 5 minutes),
+are refused unless all three are limited. Any error also refuses. Coder's own
+autostart schedule bypasses the API gate, so do not enable autostart on public
+templates.
+
 Install on the worker host:
 
 ```bash

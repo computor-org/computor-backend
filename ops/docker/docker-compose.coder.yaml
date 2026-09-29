@@ -277,6 +277,10 @@ services:
       # above cannot read those ciphertexts, so here it only yields workspace
       # app secrets, which this worker's Coder admin login can read anyway.
       TOKEN_SECRET: ${TOKEN_SECRET:?must be set in .env}
+      # Public deployments: push/rollout verify the workspace slice's real
+      # memory/cpu/pids limits through this worker's docker socket first.
+      COMPUTOR_PUBLIC_DEPLOYMENT: ${COMPUTOR_PUBLIC_DEPLOYMENT:-false}
+      CODER_WORKSPACE_CGROUP_PARENT: ${CODER_WORKSPACE_CGROUP_PARENT:-}
       DEBUG_MODE: ${DEBUG_MODE:-development}
       BACKEND_EXTERNAL_URL: ${BACKEND_EXTERNAL_URL:-http://host.docker.internal:8000}
       DEV_FORWARD_PORTS: ${DEV_FORWARD_PORTS:-}

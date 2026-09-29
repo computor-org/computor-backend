@@ -572,6 +572,10 @@ async def push_coder_template(
     from computor_backend.coder.config import CoderSettings
 
     # Discover template from filesystem
+    slice_error = await asyncio.to_thread(public_slice_error)
+    if slice_error:
+        return {"success": False, "template": template_key, "error": slice_error}
+
     discovered = _discover_templates(templates_dir)
     info = discovered.get(template_key)
     if not info:
@@ -1164,6 +1168,10 @@ async def rollout_template_workspaces(
     """
     from computor_backend.coder.client import CoderClient
 
+    slice_error = await asyncio.to_thread(public_slice_error)
+    if slice_error:
+        return {"success": False, "template": template_key, "error": slice_error}
+
     discovered = _discover_templates(templates_dir)
     info = discovered.get(template_key)
     if not info:
@@ -1483,6 +1491,102 @@ def delete_workspace_volume(name: str) -> Dict[str, Any]:
     return {"success": True, "message": f"Volume '{name}' deleted"}
 
 
+# Aggregate workspace limits (public deployments). The docker provider has no
+# per-container pids limit, so the systemd slice every workspace is placed in
+# (Terraform cgroup_parent) is the process-count and aggregate bound. Docker
+# silently creates a missing slice with NO limits, so a configured name proves
+# nothing: a throwaway container is started in the slice with the host cgroup
+# namespace and reads the slice's own memory.max / cpu.max / pids.max.
+_SLICE_CHECK_SCRIPT = (
+    'c=$(sed -n "s/^0:://p" /proc/self/cgroup); '
+    'd=/sys/fs/cgroup$(dirname "$c"); '
+    'echo "path=$(dirname "$c")"; '
+    'for f in memory.max cpu.max pids.max; do '
+    'echo "$f=$(cat "$d/$f" 2>/dev/null || echo missing)"; done'
+)
+
+
+def public_deployment() -> bool:
+    return os.environ.get("COMPUTOR_PUBLIC_DEPLOYMENT", "").strip().lower() == "true"
+
+
+def parse_slice_limits(output: str) -> Dict[str, Any]:
+    """Judge the check container's output. Fails closed on anything unexpected."""
+    values: Dict[str, str] = {}
+    for line in output.splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip()
+    problems = []
+    path = values.get("path", "")
+    if not path or path in ("/", "."):
+        problems.append("container is not below a cgroup parent (cgroup v2 + systemd driver required)")
+    memory = values.get("memory.max", "missing")
+    if not memory.isdigit() or int(memory) <= 0:
+        problems.append(f"memory.max is {memory!r}")
+    cpu = values.get("cpu.max", "missing").split()
+    if not cpu or not cpu[0].isdigit():
+        problems.append(f"cpu.max is {' '.join(cpu) or 'missing'!r}")
+    pids = values.get("pids.max", "missing")
+    if not pids.isdigit() or int(pids) <= 0:
+        problems.append(f"pids.max is {pids!r}")
+    return {
+        "success": not problems,
+        "limits": values,
+        "error": "; ".join(problems) if problems else None,
+    }
+
+
+def verify_workspace_slice_limits(cgroup_parent: Optional[str] = None) -> Dict[str, Any]:
+    """Verify the configured workspace slice has memory, CPU and pids limits."""
+    import docker as docker_sdk
+
+    cgroup_parent = (
+        cgroup_parent
+        if cgroup_parent is not None
+        else os.environ.get("CODER_WORKSPACE_CGROUP_PARENT", "")
+    ).strip()
+    if not cgroup_parent:
+        return {"success": False, "limits": {}, "error": "CODER_WORKSPACE_CGROUP_PARENT is not set"}
+    settings = get_worker_settings()
+    try:
+        client = docker_sdk.DockerClient(base_url="unix://" + settings.docker_socket_path)
+        output = client.containers.run(
+            REPAIR_IMAGE,
+            command=["sh", "-c", _SLICE_CHECK_SCRIPT],
+            cgroup_parent=cgroup_parent,
+            cgroupns="host",
+            remove=True,
+            network_disabled=True,
+            read_only=True,
+        )
+    except Exception as e:  # noqa: BLE001 - any failure means "not verified"
+        return {"success": False, "limits": {}, "error": f"slice check failed: {e}"}
+    if isinstance(output, bytes):
+        output = output.decode("utf-8", "replace")
+    result = parse_slice_limits(output)
+    result["cgroup_parent"] = cgroup_parent
+    if result["error"]:
+        result["error"] = f"workspace slice '{cgroup_parent}' is not limited: {result['error']}"
+    return result
+
+
+def public_slice_error() -> Optional[str]:
+    """None when not public or the slice is verified; else why it is refused."""
+    if not public_deployment():
+        return None
+    result = verify_workspace_slice_limits()
+    return None if result["success"] else (
+        "COMPUTOR_PUBLIC_DEPLOYMENT=true: " + (result.get("error") or "slice not verified")
+    )
+
+
+@activity.defn(name="verify_workspace_slice")
+def verify_workspace_slice() -> Dict[str, Any]:
+    """Temporal entry point for the API's provisioning gate."""
+    return verify_workspace_slice_limits()
+
+
 @activity.defn(name="repair_volume_ownership")
 def repair_volume_ownership(name: str) -> Dict[str, Any]:
     """Give a volume's contents back to uid 1000 from outside the workspace.
@@ -1545,6 +1649,11 @@ class WorkspaceVolumesWorkflow(BaseWorkflow):
                 list_workspace_volumes,
                 start_to_close_timeout=timedelta(minutes=5),
             )
+        elif action == "verify_slice":
+            result = await workflow.execute_activity(
+                verify_workspace_slice,
+                start_to_close_timeout=timedelta(minutes=2),
+            )
         elif action in ("delete", "repair"):
             if not volume:
                 return WorkflowResult(
@@ -1583,4 +1692,5 @@ ACTIVITIES = [
     push_coder_template,
     repair_volume_ownership,
     rollout_template_workspaces,
+    verify_workspace_slice,
 ]
