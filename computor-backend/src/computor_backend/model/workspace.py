@@ -54,8 +54,8 @@ class WorkspaceTemplateSettings(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     # is max_running_workspaces = 0.
     enabled = Column(Boolean, nullable=False, server_default=text('true'))
     # Container caps, pushed as Terraform --variable memory_mb / cpu_shares.
-    # NULL (or 0) = unlimited / Docker default — the variable is then simply
-    # not passed and the template's own default (0) applies.
+    # NULL (or 0) = the variable is simply not passed and the template's own
+    # default applies (a hard cap, e.g. 3072 MiB; see the template variables.tf).
     memory_mb = Column(BigInteger)
     cpu_shares = Column(BigInteger)
     # Max concurrently running/starting workspaces of this template across ALL

@@ -151,6 +151,9 @@ services:
       CODER_ENABLED: ${API_CODER_ENABLED:-${CODER_ENABLED:-false}}
       CODER_URL: ${CODER_URL}
       CODER_WORKSPACE_BASE_URL: ${CODER_WORKSPACE_BASE_URL:-}
+      # Coder service-account username: the only non-owner workspace admins
+      # may open (api/auth.py verify_coder_access); also used at startup.
+      CODER_ADMIN_USERNAME: ${CODER_ADMIN_USERNAME:-admin}
       CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
       CODER_ADMIN_API_SECRET: ${CODER_ADMIN_API_SECRET}
@@ -160,6 +163,15 @@ services:
       # Read by the API when pushing Coder templates (matlab_license_file
       # template variable) — must reach this container, not just the host env.
       MATLAB_MLM_LICENSE_FILE: ${MATLAB_MLM_LICENSE_FILE:-}
+      # Aggregate parent slice for workspace containers (Terraform cgroup_parent).
+      CODER_WORKSPACE_CGROUP_PARENT: ${CODER_WORKSPACE_CGROUP_PARENT:-}
+      # true = public deployment: template workflows refuse to run without
+      # CODER_WORKSPACE_CGROUP_PARENT (aggregate slice incl. TasksMax).
+      COMPUTOR_PUBLIC_DEPLOYMENT: ${COMPUTOR_PUBLIC_DEPLOYMENT:-false}
+      # Creates/refreshes the coder worker's restricted DB role at startup
+      # (scripts/ensure_coder_worker_db_role.py; no-op when empty).
+      CODER_WORKER_DB_USER: ${CODER_WORKER_DB_USER:-computor_coder_worker}
+      CODER_WORKER_DB_PASSWORD: ${CODER_WORKER_DB_PASSWORD:-}
       BACKEND_EXTERNAL_URL: ${BACKEND_EXTERNAL_URL:-}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?}
       # Extra origins SSO login/logout may redirect to (comma-separated);

@@ -84,7 +84,7 @@ services:
 
   # Redis cache
   redis:
-    image: "redis:alpine"
+    image: "redis:8.10.2-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0"
     security_opt:
       - "no-new-privileges:true"
     logging:
@@ -174,8 +174,46 @@ services:
       retries: 5
 
   # MinIO Object Storage
+  # One-shot, idempotent: the Chainguard MinIO image runs as uid 65532, while
+  # data written by the old minio/minio image (root) is root-owned. Chowns
+  # /data once (top level last, so an interrupted run is simply repeated) and
+  # is a no-op afterwards. Same pinned image, run as root, only for chown.
+  minio-init:
+    image: cgr.dev/chainguard/minio:latest@sha256:71674988a1c7ddd5724928633199152b11e4ddefd6c6ce2d60772ff4a8f22ca9
+    security_opt:
+      - "no-new-privileges:true"
+    network_mode: none
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}minio-init
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -eu
+        if [ "$$(stat -c %u:%g /data)" = 65532:65532 ]; then
+          echo "minio-init: /data ownership ok"
+          exit 0
+        fi
+        for p in /data/* /data/.[!.]* /data/..?*; do
+          [ -e "$$p" ] || [ -L "$$p" ] || continue
+          if ! chown -R 65532:65532 "$$p"; then
+            echo "minio-init: chown failed for $$p; /data left unmarked" >&2
+            exit 1
+          fi
+        done
+        # The parent is the "done" marker: only after every child succeeded.
+        chown 65532:65532 /data
+        echo "minio-init: /data chowned to 65532:65532"
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/minio/data:/data
+    restart: "no"
+
   minio:
-    image: minio/minio:latest
+    # minio/minio images are no longer published (Docker Hub/quay). Chainguard's
+    # build, pinned by digest; signature verified with cosign against
+    # github.com/chainguard-images/images. Runs as uid 65532 (see minio-init);
+    # entrypoint is the minio binary, so `command` is unchanged. `mc` ships in
+    # the image, so the `mc ready local` healthcheck keeps working.
+    image: cgr.dev/chainguard/minio:latest@sha256:71674988a1c7ddd5724928633199152b11e4ddefd6c6ce2d60772ff4a8f22ca9
     security_opt:
       - "no-new-privileges:true"
     logging:
@@ -197,6 +235,9 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?must be set in .env}
       MINIO_DEFAULT_BUCKETS: ${MINIO_DEFAULT_BUCKETS:-computor-storage}
     command: server /data --console-address ":9001"
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 5s
@@ -216,7 +257,7 @@ services:
   # scope-checked in the API. Workspaces cannot reach this at all: they are
   # behind workspace-ingress, whose allowlist covers only the API and git.
   static-server:
-    image: halverneus/static-file-server:latest
+    image: halverneus/static-file-server:v1.8.12@sha256:48c3f4139614c377ad9f29273c465c04671a338a296d40e0ebee626178800072
     security_opt:
       - "no-new-privileges:true"
     logging:

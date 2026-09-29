@@ -117,8 +117,38 @@ services:
     depends_on:
       - temporal
 
+  # One-shot, idempotent: the Chainguard MinIO image runs as uid 65532, while
+  # data written by the old minio/minio image (root) is root-owned. Chowns
+  # /data once (top level last, so an interrupted run is simply repeated) and
+  # is a no-op afterwards. Same pinned image, run as root, only for chown.
+  minio-init:
+    image: cgr.dev/chainguard/minio:latest@sha256:71674988a1c7ddd5724928633199152b11e4ddefd6c6ce2d60772ff4a8f22ca9
+    network_mode: none
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -eu
+        if [ "$$(stat -c %u:%g /data)" = 65532:65532 ]; then
+          echo "minio-init: /data ownership ok"
+          exit 0
+        fi
+        for p in /data/* /data/.[!.]* /data/..?*; do
+          [ -e "$$p" ] || [ -L "$$p" ] || continue
+          if ! chown -R 65532:65532 "$$p"; then
+            echo "minio-init: chown failed for $$p; /data left unmarked" >&2
+            exit 1
+          fi
+        done
+        # The parent is the "done" marker: only after every child succeeded.
+        chown 65532:65532 /data
+        echo "minio-init: /data chowned to 65532:65532"
+    volumes:
+      - minio-data:/data
+    restart: "no"
+
   minio:
-    image: minio/minio:latest
+    image: cgr.dev/chainguard/minio:latest@sha256:71674988a1c7ddd5724928633199152b11e4ddefd6c6ce2d60772ff4a8f22ca9
     networks: [computor-it]
     ports:
       - "${IT_MINIO_API_PORT:-19000}:9000"
@@ -130,6 +160,9 @@ services:
     volumes:
       - minio-data:/data
     command: server /data --console-address ":9001"
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 5s

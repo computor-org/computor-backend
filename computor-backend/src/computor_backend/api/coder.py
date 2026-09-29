@@ -514,6 +514,7 @@ async def provision_workspace(
         # Self-provisioned workspaces always use the template's default
         # (shared) home; scratch homes are a lecturer/maintainer feature.
         request.home_mode = None
+    await _require_verified_workspace_limits()
     try:
         # Verify template exists in Coder before minting a token
         template = request.template or settings.default_template
@@ -597,7 +598,7 @@ async def provision_workspace(
             ttl_days=settings.workspace_token_ttl_days,
         )
         if workspace_token:
-            logger.info(f"Token minted (prefix: {workspace_token[:15]}..., length: {len(workspace_token)})")
+            logger.info(f"Token minted (prefix: {workspace_token[:12]}..., length: {len(workspace_token)})")
         else:
             logger.error("Token minting returned None!")
 
@@ -791,6 +792,7 @@ async def start_workspace(
 ) -> WorkspaceActionResponse:
     """Start a stopped workspace."""
     _check_workspace_access_or_course_member(permissions, "start", db, username=username)
+    await _require_verified_workspace_limits()
     try:
         # Admission (template quota + instance workspace-user cap) — the
         # workspace being started never counts itself (it is stopped, but its
@@ -1182,11 +1184,15 @@ def _deployment_template_variables() -> dict:
 
     matlab_license_file: MATLAB site license (port@host or in-container
     path); empty falls back to in-browser MathWorks sign-in.
+
+    cgroup_parent: parent cgroup (e.g. computor-workspaces.slice) that puts
+    every workspace container under one aggregate systemd slice limit.
     """
     import os
 
     return {
         "matlab_license_file": os.environ.get("MATLAB_MLM_LICENSE_FILE", ""),
+        "cgroup_parent": os.environ.get("CODER_WORKSPACE_CGROUP_PARENT", ""),
     }
 
 
@@ -1197,6 +1203,9 @@ def _per_template_variables(db: Session) -> dict:
     overrides: dict = {}
     for row in db.query(WorkspaceTemplateSettings).all():
         variables: dict = {}
+        # 0/NULL is not sent; the push activity then passes the template's
+        # positive default explicitly (never unlimited, see
+        # temporal_coder_setup._effective_resource_caps).
         if row.memory_mb:
             variables["memory_mb"] = str(row.memory_mb)
         if row.cpu_shares:
@@ -1214,9 +1223,86 @@ def _per_template_variables(db: Session) -> dict:
     return overrides
 
 
+# Last successful slice verification (monotonic seconds); see
+# _require_verified_workspace_limits.
+_SLICE_VERIFIED_AT: Optional[float] = None
+_SLICE_VERIFY_TTL_S = 300.0
+
+
+async def _require_verified_workspace_limits() -> None:
+    """Public deployments: refuse workspace creation/start and template
+    push/rollout unless the coder worker has verified, within the last five
+    minutes, that the workspace slice really carries memory, CPU and pids
+    limits. Only the worker has the docker socket, so the check is a Temporal
+    round trip; failures (including a missing worker) fail closed."""
+    global _SLICE_VERIFIED_AT
+    import time
+
+    _require_public_workspace_limits()
+    public = os.environ.get("COMPUTOR_PUBLIC_DEPLOYMENT", "").strip().lower() == "true"
+    if not public:
+        return
+    now = time.monotonic()
+    if _SLICE_VERIFIED_AT is not None and now - _SLICE_VERIFIED_AT < _SLICE_VERIFY_TTL_S:
+        return
+    try:
+        await _run_volume_task("verify_slice")
+    except Exception as e:  # noqa: BLE001 - fail closed on any error
+        _SLICE_VERIFIED_AT = None
+        detail = getattr(e, "detail", None) or str(e)
+        raise ServiceUnavailableException(
+            detail=f"Workspace resource limits are not verified: {detail}",
+        )
+    _SLICE_VERIFIED_AT = now
+
+
+def _require_public_workspace_limits() -> None:
+    """Refuse template workflows on a public deployment without the aggregate
+    workspace slice. The docker provider has no per-container pids limit, so
+    the slice (TasksMax/MemoryMax/CPUQuota, ops/coder/systemd) is the only
+    fork-bomb and aggregate bound; COMPUTOR_PUBLIC_DEPLOYMENT=true makes it
+    mandatory instead of optional."""
+    import os
+
+    public = os.environ.get("COMPUTOR_PUBLIC_DEPLOYMENT", "").strip().lower() == "true"
+    if public and not os.environ.get("CODER_WORKSPACE_CGROUP_PARENT", "").strip():
+        raise ServiceUnavailableException(
+            detail=(
+                "COMPUTOR_PUBLIC_DEPLOYMENT=true requires CODER_WORKSPACE_CGROUP_PARENT "
+                "(e.g. computor-workspaces.slice, see ops/coder/systemd) before "
+                "workspace templates can be built, pushed or rolled out."
+            )
+        )
+
+
+def _require_worker_db_role(db: Session) -> None:
+    """A forced rollout re-derives app credentials on the coder worker, which
+    reads the DB as the restricted role (scripts/ensure_coder_worker_db_role).
+    Refuse the rollout until that role exists, instead of letting the worker
+    fail authentication and silently carry stale credentials forward."""
+    import os
+
+    from sqlalchemy import text
+
+    role = os.environ.get("CODER_WORKER_DB_USER") or "computor_coder_worker"
+    ready = db.execute(
+        text("SELECT rolcanlogin FROM pg_roles WHERE rolname = :role"), {"role": role}
+    ).scalar()
+    if not ready:
+        raise ServiceUnavailableException(
+            detail=(
+                f"The coder worker database role '{role}' does not exist yet. Set "
+                "CODER_WORKER_DB_PASSWORD and restart the API (it creates the role "
+                "after migrations) before rolling out workspaces."
+            )
+        )
+
+
 def _build_template_parameters(settings: CoderSettings) -> dict:
     """Build common parameters for coder template workflows from settings and env."""
     import os
+
+    _require_public_workspace_limits()
 
     debug_mode = os.environ.get("DEBUG_MODE", "development")
     if debug_mode == "production":
@@ -1305,6 +1391,7 @@ async def push_coder_templates(
     Optionally builds images first. Requires workspace:manage permission.
     """
     _check_workspace_access(permissions, "manage")
+    await _require_verified_workspace_limits()
     await _reject_conflicting_coder_task()
 
     executor = get_task_executor()
@@ -1340,6 +1427,7 @@ async def rollout_workspaces_endpoint(
     request: WorkspaceRolloutRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> CoderAdminTaskResponse:
     """
     Roll every existing workspace onto its template's active version — running
@@ -1349,6 +1437,8 @@ async def rollout_workspaces_endpoint(
     their owners to restart them. Requires workspace:manage permission.
     """
     _check_workspace_access(permissions, "manage")
+    _require_worker_db_role(db)
+    await _require_verified_workspace_limits()
     await _reject_conflicting_coder_task()
 
     executor = get_task_executor()
@@ -1516,8 +1606,8 @@ async def list_template_settings(
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     db: Annotated[Session, Depends(get_db)],
 ) -> TemplateSettingsListResponse:
-    """All stored settings rows; templates without a row use the defaults
-    (unlimited). Requires workspace:manage permission."""
+    """All stored settings rows; templates without a row use the template
+    file defaults (hard memory/CPU caps). Requires workspace:manage permission."""
     _check_workspace_access(permissions, "manage")
     rows = db.query(WorkspaceTemplateSettings).order_by(
         WorkspaceTemplateSettings.template_name

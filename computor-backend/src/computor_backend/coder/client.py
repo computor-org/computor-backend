@@ -883,7 +883,7 @@ class CoderClient:
                 "name": "computor_auth_token",
                 "value": workspace_data.computor_auth_token,
             })
-            logger.info(f"Adding computor_auth_token to workspace (prefix: {workspace_data.computor_auth_token[:15]}...)")
+            logger.info(f"Adding computor_auth_token to workspace (prefix: {workspace_data.computor_auth_token[:12]}...)")
         else:
             logger.warning("No computor_auth_token provided for workspace creation!")
         if workspace_data.home_mode:
@@ -1636,7 +1636,7 @@ class CoderClient:
                     ),
                 )
             if computor_auth_token:
-                logger.info(f"Workspace exists, updating with new token (prefix: {computor_auth_token[:15]}...)")
+                logger.info(f"Workspace exists, updating with new token (prefix: {computor_auth_token[:12]}...)")
                 # Replace the app credential rather than carrying the previous
                 # build's: after a rotation the carried value is the revoked
                 # one, and re-provisioning would quietly reinstate it.

@@ -454,6 +454,88 @@ def _template_declares_variable(template_dir: str, name: str) -> bool:
     return False
 
 
+# Hard workspace caps. Coder carries a template variable's PREVIOUS value
+# forward when a push omits it — including the old "0" (unlimited) default —
+# so every push passes these explicitly. 0/empty/invalid never means
+# unlimited here: it falls back to the template file's own positive default,
+# then to the deployment default.
+_RESOURCE_CAP_DEFAULTS = {
+    "memory_mb": ("CODER_WORKSPACE_DEFAULT_MEMORY_MB", "3072"),
+    "cpus": ("CODER_WORKSPACE_DEFAULT_CPUS", "2"),
+}
+
+
+def _positive_number(value: Any) -> Optional[str]:
+    """``value`` as a canonical positive number string, else None."""
+    try:
+        number = float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    if not number > 0 or number != number or number == float("inf"):
+        return None
+    return str(int(number)) if number.is_integer() else str(number)
+
+
+def _template_variable_default(template_dir: str, name: str) -> Optional[str]:
+    """The literal ``default`` of ``variable "<name>"`` in the template's .tf files."""
+    pattern = re.compile(
+        r'variable\s+"' + re.escape(name) + r'"\s*\{[^}]*?default\s*=\s*"?([^"\n]*)"?',
+        re.S,
+    )
+    try:
+        entries = sorted(os.listdir(template_dir))
+    except OSError:
+        return None
+    for fn in entries:
+        if not fn.endswith(".tf"):
+            continue
+        try:
+            with open(os.path.join(template_dir, fn), "r", encoding="utf-8") as f:
+                match = pattern.search(f.read())
+        except OSError:
+            continue
+        if match:
+            return match.group(1).strip()
+    return None
+
+
+def _effective_resource_caps(
+    template_dir: str, variables: Optional[Dict[str, str]]
+) -> Dict[str, str]:
+    """Explicit positive memory/CPU caps for every cap the template declares."""
+    variables = variables or {}
+    caps: Dict[str, str] = {}
+    for name, (env_name, fallback) in _RESOURCE_CAP_DEFAULTS.items():
+        if not _template_declares_variable(template_dir, name):
+            continue
+        caps[name] = (
+            _positive_number(variables.get(name))
+            or _positive_number(_template_variable_default(template_dir, name))
+            or _positive_number(os.environ.get(env_name))
+            or fallback
+        )
+    return caps
+
+
+def _optional_push_variable_args(
+    template_dir: str, template_variables: Optional[Dict[str, str]]
+) -> List[str]:
+    """``--variable`` args beyond the always-pushed wiring.
+
+    Optional deployment-wide and per-template variables (e.g. the MATLAB
+    license) are applied only to templates that declare them — `coder
+    templates push` rejects undeclared variables (see
+    _template_declares_variable). Resource caps are always included.
+    """
+    merged = dict(template_variables or {})
+    merged.update(_effective_resource_caps(template_dir, merged))
+    args: List[str] = []
+    for name, value in merged.items():
+        if value and _template_declares_variable(template_dir, name):
+            args += ["--variable", f"{name}={value}"]
+    return args
+
+
 @activity.defn(name="push_coder_template")
 async def push_coder_template(
     template_key: str,
@@ -490,6 +572,10 @@ async def push_coder_template(
     from computor_backend.coder.config import CoderSettings
 
     # Discover template from filesystem
+    slice_error = await asyncio.to_thread(public_slice_error)
+    if slice_error:
+        return {"success": False, "template": template_key, "error": slice_error}
+
     discovered = _discover_templates(templates_dir)
     info = discovered.get(template_key)
     if not info:
@@ -552,14 +638,12 @@ async def push_coder_template(
             "--variable", f"dev_forward_ports={dev_forward_ports}",
             "--variable", f"workspace_image={image_ref}",
         ]
-        # Optional deployment-wide variables (e.g. the MATLAB license) are
-        # applied only to templates that declare them — `coder templates push`
-        # rejects undeclared variables. See _template_declares_variable.
-        for name, value in (template_variables or {}).items():
-            if value and _template_declares_variable(template_dir, name):
-                cmd += ["--variable", f"{name}={value}"]
+        cmd += _optional_push_variable_args(template_dir, template_variables)
         cmd += ["--yes"]
-        logger.info(f"Running: {' '.join(cmd)}")
+        # Variable values may be deployment secrets (license servers, manager
+        # overrides): log the names only.
+        logged = [a.split("=", 1)[0] + "=***" if "=" in a else a for a in cmd]
+        logger.info(f"Running: {' '.join(logged)}")
 
         try:
             # Offload the blocking coder CLI subprocess to a thread so the
@@ -1084,6 +1168,10 @@ async def rollout_template_workspaces(
     """
     from computor_backend.coder.client import CoderClient
 
+    slice_error = await asyncio.to_thread(public_slice_error)
+    if slice_error:
+        return {"success": False, "template": template_key, "error": slice_error}
+
     discovered = _discover_templates(templates_dir)
     info = discovered.get(template_key)
     if not info:
@@ -1403,6 +1491,102 @@ def delete_workspace_volume(name: str) -> Dict[str, Any]:
     return {"success": True, "message": f"Volume '{name}' deleted"}
 
 
+# Aggregate workspace limits (public deployments). The docker provider has no
+# per-container pids limit, so the systemd slice every workspace is placed in
+# (Terraform cgroup_parent) is the process-count and aggregate bound. Docker
+# silently creates a missing slice with NO limits, so a configured name proves
+# nothing: a throwaway container is started in the slice with the host cgroup
+# namespace and reads the slice's own memory.max / cpu.max / pids.max.
+_SLICE_CHECK_SCRIPT = (
+    'c=$(sed -n "s/^0:://p" /proc/self/cgroup); '
+    'd=/sys/fs/cgroup$(dirname "$c"); '
+    'echo "path=$(dirname "$c")"; '
+    'for f in memory.max cpu.max pids.max; do '
+    'echo "$f=$(cat "$d/$f" 2>/dev/null || echo missing)"; done'
+)
+
+
+def public_deployment() -> bool:
+    return os.environ.get("COMPUTOR_PUBLIC_DEPLOYMENT", "").strip().lower() == "true"
+
+
+def parse_slice_limits(output: str) -> Dict[str, Any]:
+    """Judge the check container's output. Fails closed on anything unexpected."""
+    values: Dict[str, str] = {}
+    for line in output.splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip()
+    problems = []
+    path = values.get("path", "")
+    if not path or path in ("/", "."):
+        problems.append("container is not below a cgroup parent (cgroup v2 + systemd driver required)")
+    memory = values.get("memory.max", "missing")
+    if not memory.isdigit() or int(memory) <= 0:
+        problems.append(f"memory.max is {memory!r}")
+    cpu = values.get("cpu.max", "missing").split()
+    if not cpu or not cpu[0].isdigit():
+        problems.append(f"cpu.max is {' '.join(cpu) or 'missing'!r}")
+    pids = values.get("pids.max", "missing")
+    if not pids.isdigit() or int(pids) <= 0:
+        problems.append(f"pids.max is {pids!r}")
+    return {
+        "success": not problems,
+        "limits": values,
+        "error": "; ".join(problems) if problems else None,
+    }
+
+
+def verify_workspace_slice_limits(cgroup_parent: Optional[str] = None) -> Dict[str, Any]:
+    """Verify the configured workspace slice has memory, CPU and pids limits."""
+    import docker as docker_sdk
+
+    cgroup_parent = (
+        cgroup_parent
+        if cgroup_parent is not None
+        else os.environ.get("CODER_WORKSPACE_CGROUP_PARENT", "")
+    ).strip()
+    if not cgroup_parent:
+        return {"success": False, "limits": {}, "error": "CODER_WORKSPACE_CGROUP_PARENT is not set"}
+    settings = get_worker_settings()
+    try:
+        client = docker_sdk.DockerClient(base_url="unix://" + settings.docker_socket_path)
+        output = client.containers.run(
+            REPAIR_IMAGE,
+            command=["sh", "-c", _SLICE_CHECK_SCRIPT],
+            cgroup_parent=cgroup_parent,
+            cgroupns="host",
+            remove=True,
+            network_disabled=True,
+            read_only=True,
+        )
+    except Exception as e:  # noqa: BLE001 - any failure means "not verified"
+        return {"success": False, "limits": {}, "error": f"slice check failed: {e}"}
+    if isinstance(output, bytes):
+        output = output.decode("utf-8", "replace")
+    result = parse_slice_limits(output)
+    result["cgroup_parent"] = cgroup_parent
+    if result["error"]:
+        result["error"] = f"workspace slice '{cgroup_parent}' is not limited: {result['error']}"
+    return result
+
+
+def public_slice_error() -> Optional[str]:
+    """None when not public or the slice is verified; else why it is refused."""
+    if not public_deployment():
+        return None
+    result = verify_workspace_slice_limits()
+    return None if result["success"] else (
+        "COMPUTOR_PUBLIC_DEPLOYMENT=true: " + (result.get("error") or "slice not verified")
+    )
+
+
+@activity.defn(name="verify_workspace_slice")
+def verify_workspace_slice() -> Dict[str, Any]:
+    """Temporal entry point for the API's provisioning gate."""
+    return verify_workspace_slice_limits()
+
+
 @activity.defn(name="repair_volume_ownership")
 def repair_volume_ownership(name: str) -> Dict[str, Any]:
     """Give a volume's contents back to uid 1000 from outside the workspace.
@@ -1465,6 +1649,11 @@ class WorkspaceVolumesWorkflow(BaseWorkflow):
                 list_workspace_volumes,
                 start_to_close_timeout=timedelta(minutes=5),
             )
+        elif action == "verify_slice":
+            result = await workflow.execute_activity(
+                verify_workspace_slice,
+                start_to_close_timeout=timedelta(minutes=2),
+            )
         elif action in ("delete", "repair"):
             if not volume:
                 return WorkflowResult(
@@ -1503,4 +1692,5 @@ ACTIVITIES = [
     push_coder_template,
     repair_volume_ownership,
     rollout_template_workspaces,
+    verify_workspace_slice,
 ]
