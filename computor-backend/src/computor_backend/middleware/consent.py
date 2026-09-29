@@ -62,6 +62,7 @@ EXEMPT_PATHS_EXACT = (
     "/openapi.json",
     "/extensions-public",
     "/extensions-getting-started",
+    "/public/courses",     # anonymous catalog; same answer for everyone
 )
 
 EXEMPT_PATH_PREFIXES = (
