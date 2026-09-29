@@ -4,6 +4,21 @@ import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 
+/**
+ * Optional `?next=/path` target (e.g. the landing page's catalog CTA). Only
+ * same-origin absolute paths; /auth/success re-validates before redirecting.
+ * Read from window.location instead of useSearchParams so the page needs no
+ * Suspense boundary.
+ */
+function nextPath(): string | undefined {
+  const next = new URLSearchParams(window.location.search).get('next');
+  // "/\\host" is treated like "//host" by browsers, so reject backslashes too.
+  if (!next || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) {
+    return undefined;
+  }
+  return next;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { loginWithSSO, isAuthenticated, isLoading } = useAuth();
@@ -12,14 +27,14 @@ export default function LoginPage() {
   useEffect(() => {
     if (isLoading) return;
     if (isAuthenticated) {
-      router.push('/dashboard');
+      router.push(nextPath() ?? '/dashboard');
       return;
     }
     // Keycloak is the only identity provider — go straight there instead of
     // showing an intermediate button. Guard against double-trigger in StrictMode.
     if (!triggered.current) {
       triggered.current = true;
-      loginWithSSO('keycloak');
+      loginWithSSO('keycloak', nextPath());
     }
   }, [isAuthenticated, isLoading, loginWithSSO, router]);
 
@@ -29,7 +44,7 @@ export default function LoginPage() {
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto" />
         <p className="mt-4 text-muted">Redirecting to sign-in…</p>
         <button
-          onClick={() => loginWithSSO('keycloak')}
+          onClick={() => loginWithSSO('keycloak', nextPath())}
           className="mt-4 text-sm text-accent-text hover:underline"
         >
           Click here if you are not redirected automatically
