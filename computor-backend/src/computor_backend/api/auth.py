@@ -11,7 +11,7 @@ import logging
 import os
 import re
 import secrets
-from typing import List, Optional
+from typing import Annotated, List, Optional
 from urllib.parse import urlencode, urlparse, urlsplit
 
 from fastapi import APIRouter, Depends, Query, Request, Response
@@ -161,19 +161,19 @@ async def list_providers() -> List[ProviderInfo]:
 async def initiate_login(
     provider: str,
     redirect_uri: Optional[str] = Query(None, description="Redirect URI after authentication"),
-    invite: Optional[str] = Query(
-        None, max_length=128,
+    request: Request = None,
+    invite: Annotated[Optional[str], Query(
+        max_length=128,
         description="Invite code, checked if this login creates a new user",
-    ),
-    action: Optional[str] = Query(
-        None, pattern="^register$",
+    )] = None,
+    action: Annotated[Optional[str], Query(
+        pattern="^register$",
         description="'register' opens Keycloak's email registration form",
-    ),
-    idp_hint: Optional[str] = Query(
-        None, pattern="^[A-Za-z0-9_-]{1,64}$",
+    )] = None,
+    idp_hint: Annotated[Optional[str], Query(
+        pattern="^[A-Za-z0-9_-]{1,64}$",
         description="Keycloak identity provider alias to go straight to (kc_idp_hint)",
-    ),
-    request: Request = None
+    )] = None,
 ) -> RedirectResponse:
     """
     Initiate SSO login for a specific provider.
