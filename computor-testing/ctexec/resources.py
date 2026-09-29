@@ -124,6 +124,13 @@ def set_resource_limits(limits: ResourceLimits) -> None:
             _clamp_setrlimit(resource, which, int(value))
     # Never write core dumps of student processes.
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    # Under container memory pressure the OOM killer should take student
+    # processes, not the worker (raising one's own score is unprivileged).
+    try:
+        with open("/proc/self/oom_score_adj", "w") as f:
+            f.write("1000")
+    except OSError:
+        pass
 
 
 def make_preexec_fn(limits: ResourceLimits):

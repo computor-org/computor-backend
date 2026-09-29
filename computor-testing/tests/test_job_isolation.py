@@ -681,3 +681,11 @@ def test_julia_env_pins_threads_and_starts_under_limits(tmp_path, monkeypatch):
         preexec_fn=make_preexec_fn(executor.resource_limits))
     assert result.returncode == 0, result.stderr[-2000:]
     assert result.stdout.strip() == "1 true"
+
+
+def test_jobs_are_preferred_oom_victims(tmp_path):
+    result = run_student(tmp_path, """
+        adj = int(open("/proc/self/oom_score_adj").read())
+    """, ["adj"])
+    assert result.success, result.error_message
+    assert result.namespace["adj"] == 1000
