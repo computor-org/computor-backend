@@ -199,7 +199,10 @@ cmd_up() {
     # scripts/ensure_coder_worker_db_role.py). Self-heals older .env files on
     # the control plane; a split worker host (WORKERHOST_CONTROL_ADDR set) must
     # copy the control plane's value instead of inventing its own.
-    if [ "${CODER_ENABLED:-}" = "true" ] && [ -z "${CODER_WORKER_DB_PASSWORD:-}" ] && [ -z "${WORKERHOST_CONTROL_ADDR:-}" ]; then
+    # Effective API Coder support counts: a split control plane runs
+    # CODER_ENABLED=false with API_CODER_ENABLED=true and still owns the role.
+    if { [ "${CODER_ENABLED:-}" = "true" ] || [ "${API_CODER_ENABLED:-}" = "true" ]; } \
+        && [ -z "${CODER_WORKER_DB_PASSWORD:-}" ] && [ -z "${WORKERHOST_CONTROL_ADDR:-}" ]; then
         CODER_WORKER_DB_PASSWORD=$(openssl rand -hex 24 2>/dev/null || head -c 24 /dev/urandom | xxd -p -c 256)
         sed -i.bak '/^CODER_WORKER_DB_PASSWORD=/d' "${REPO_ROOT}/.env" && rm -f "${REPO_ROOT}/.env.bak"
         printf 'CODER_WORKER_DB_PASSWORD=%s\n' "$CODER_WORKER_DB_PASSWORD" >> "${REPO_ROOT}/.env"
