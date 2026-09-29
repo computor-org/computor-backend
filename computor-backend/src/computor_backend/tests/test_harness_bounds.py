@@ -73,3 +73,21 @@ def test_harness_output_is_capped(tmp_path):
     assert result.returncode == 0
     assert len(result.stdout) == backends._HARNESS_MAX_OUTPUT
     assert len(result.stderr) == backends._HARNESS_MAX_OUTPUT
+
+
+@pytest.mark.parametrize("script,timeout", [("exit 0", 10), ("sleep 30", 1)])
+def test_harness_leader_unreaped_until_group_killed(monkeypatch, script, timeout):
+    """No pid-reuse window: the leader (pid == pgid) is still held at killpg."""
+    import subprocess
+    seen = []
+    real_killpg = os.killpg
+
+    def killpg(pgid, sig):
+        seen.append(os.path.exists(f"/proc/{pgid}"))
+        return real_killpg(pgid, sig)
+    monkeypatch.setattr(os, "killpg", killpg)
+    try:
+        _run_harness(["sh", "-c", script], env=dict(os.environ), timeout=timeout)
+    except subprocess.TimeoutExpired:
+        assert timeout == 1
+    assert seen and all(seen)

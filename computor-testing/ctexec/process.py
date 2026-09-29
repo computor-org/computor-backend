@@ -166,8 +166,10 @@ def run_bounded(
     try:
         if not leader_exited.wait(timeout):
             timed_out = True
+            # os.kill, not Popen.send_signal: the latter polls and may reap
+            # the leader, freeing its pid (== pgid) for reuse before killpg.
             try:
-                proc.send_signal(signal.SIGTERM)
+                os.kill(proc.pid, signal.SIGTERM)
             except ProcessLookupError:
                 pass
             leader_exited.wait(TERM_GRACE_SECONDS)

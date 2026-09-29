@@ -441,3 +441,26 @@ def test_symlinked_student_source_is_not_read(tmp_path):
     link.symlink_to(secret)
     with pytest.raises(UnsafeFileError, match="symlink"):
         read_untrusted_text(str(link))
+
+
+# --- 7. no pid-reuse window before the group kill ---------------------------
+
+def _record_killpg(monkeypatch):
+    """Record, at each killpg, whether the pgid's leader still holds its pid."""
+    seen = []
+    real_killpg = os.killpg
+
+    def killpg(pgid, sig):
+        seen.append(os.path.exists(f"/proc/{pgid}"))
+        return real_killpg(pgid, sig)
+    monkeypatch.setattr(os, "killpg", killpg)
+    return seen
+
+
+@pytest.mark.parametrize("script,timeout", [("exit 0", 10), ("sleep 30", 1)])
+def test_leader_unreaped_until_group_killed(monkeypatch, script, timeout):
+    from ctexec.process import run_bounded
+    seen = _record_killpg(monkeypatch)
+    result = run_bounded(["sh", "-c", script], timeout=timeout)
+    assert result.timed_out == (timeout == 1)
+    assert seen and all(seen)

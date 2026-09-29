@@ -91,13 +91,29 @@ def _run_harness(cmd, env, timeout: float) -> _HarnessResult:
     ]
     for reader in readers:
         reader.start()
+
+    # Wait for the leader WITHOUT reaping it (WNOWAIT): its pid is the pgid,
+    # and it must stay reserved until the group has been signalled, or a
+    # recycled pid could make killpg hit an unrelated process group.
+    leader_exited = threading.Event()
+
+    def _wait_leader() -> None:
+        try:
+            os.waitid(os.P_PID, proc.pid, os.WEXITED | os.WNOWAIT)
+        except ChildProcessError:
+            pass
+        leader_exited.set()
+
+    threading.Thread(target=_wait_leader, daemon=True).start()
     try:
-        proc.wait(timeout=timeout)
+        if not leader_exited.wait(timeout):
+            raise subprocess.TimeoutExpired(cmd, timeout)
     finally:
         try:
             os.killpg(proc.pid, signal.SIGKILL)
         except (ProcessLookupError, PermissionError):
             pass
+        leader_exited.wait()
         proc.wait()
         for reader in readers:
             reader.join(5)
