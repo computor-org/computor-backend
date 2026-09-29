@@ -454,6 +454,88 @@ def _template_declares_variable(template_dir: str, name: str) -> bool:
     return False
 
 
+# Hard workspace caps. Coder carries a template variable's PREVIOUS value
+# forward when a push omits it — including the old "0" (unlimited) default —
+# so every push passes these explicitly. 0/empty/invalid never means
+# unlimited here: it falls back to the template file's own positive default,
+# then to the deployment default.
+_RESOURCE_CAP_DEFAULTS = {
+    "memory_mb": ("CODER_WORKSPACE_DEFAULT_MEMORY_MB", "3072"),
+    "cpus": ("CODER_WORKSPACE_DEFAULT_CPUS", "2"),
+}
+
+
+def _positive_number(value: Any) -> Optional[str]:
+    """``value`` as a canonical positive number string, else None."""
+    try:
+        number = float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    if not number > 0 or number != number or number == float("inf"):
+        return None
+    return str(int(number)) if number.is_integer() else str(number)
+
+
+def _template_variable_default(template_dir: str, name: str) -> Optional[str]:
+    """The literal ``default`` of ``variable "<name>"`` in the template's .tf files."""
+    pattern = re.compile(
+        r'variable\s+"' + re.escape(name) + r'"\s*\{[^}]*?default\s*=\s*"?([^"\n]*)"?',
+        re.S,
+    )
+    try:
+        entries = sorted(os.listdir(template_dir))
+    except OSError:
+        return None
+    for fn in entries:
+        if not fn.endswith(".tf"):
+            continue
+        try:
+            with open(os.path.join(template_dir, fn), "r", encoding="utf-8") as f:
+                match = pattern.search(f.read())
+        except OSError:
+            continue
+        if match:
+            return match.group(1).strip()
+    return None
+
+
+def _effective_resource_caps(
+    template_dir: str, variables: Optional[Dict[str, str]]
+) -> Dict[str, str]:
+    """Explicit positive memory/CPU caps for every cap the template declares."""
+    variables = variables or {}
+    caps: Dict[str, str] = {}
+    for name, (env_name, fallback) in _RESOURCE_CAP_DEFAULTS.items():
+        if not _template_declares_variable(template_dir, name):
+            continue
+        caps[name] = (
+            _positive_number(variables.get(name))
+            or _positive_number(_template_variable_default(template_dir, name))
+            or _positive_number(os.environ.get(env_name))
+            or fallback
+        )
+    return caps
+
+
+def _optional_push_variable_args(
+    template_dir: str, template_variables: Optional[Dict[str, str]]
+) -> List[str]:
+    """``--variable`` args beyond the always-pushed wiring.
+
+    Optional deployment-wide and per-template variables (e.g. the MATLAB
+    license) are applied only to templates that declare them — `coder
+    templates push` rejects undeclared variables (see
+    _template_declares_variable). Resource caps are always included.
+    """
+    merged = dict(template_variables or {})
+    merged.update(_effective_resource_caps(template_dir, merged))
+    args: List[str] = []
+    for name, value in merged.items():
+        if value and _template_declares_variable(template_dir, name):
+            args += ["--variable", f"{name}={value}"]
+    return args
+
+
 @activity.defn(name="push_coder_template")
 async def push_coder_template(
     template_key: str,
@@ -552,12 +634,7 @@ async def push_coder_template(
             "--variable", f"dev_forward_ports={dev_forward_ports}",
             "--variable", f"workspace_image={image_ref}",
         ]
-        # Optional deployment-wide variables (e.g. the MATLAB license) are
-        # applied only to templates that declare them — `coder templates push`
-        # rejects undeclared variables. See _template_declares_variable.
-        for name, value in (template_variables or {}).items():
-            if value and _template_declares_variable(template_dir, name):
-                cmd += ["--variable", f"{name}={value}"]
+        cmd += _optional_push_variable_args(template_dir, template_variables)
         cmd += ["--yes"]
         # Variable values may be deployment secrets (license servers, manager
         # overrides): log the names only.
