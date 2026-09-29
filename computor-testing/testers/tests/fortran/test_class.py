@@ -22,6 +22,8 @@ from ctcore.models import (
     ResultEnum,
     QualificationEnum,
 )
+from ctexec.safe_io import read_untrusted_text
+
 from .conftest import report_key, Solution
 from testers.executors.fortran import FortranExecutor, analyze_source, FORTRAN_DEFAULTS
 from ctcore.helpers import get_property_as_list
@@ -443,8 +445,8 @@ class TestComputorFortran:
 
             else:
                 # Check if it's in the source
-                with open(file_path, 'r') as f:
-                    content = f.read()
+                # Student-controlled: no symlinks/FIFOs, size-capped (#237).
+                content = read_untrusted_text(file_path)
 
                 if pattern:
                     try:

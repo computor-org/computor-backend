@@ -15,6 +15,7 @@ from .base import BaseExecutor, ExecutorResult, sandbox_command_prefix
 from .environment import get_safe_env
 from .exceptions import ExecutionError, ExecutionTimeoutError
 from .process import run_bounded, truncate_text
+from .safe_io import read_untrusted_bytes, result_limit
 from .resources import make_preexec_fn
 
 
@@ -232,14 +233,19 @@ class InterpretedExecutor(BaseExecutor):
             self._cleanup_temp_files()
 
     def _read_result_file(self, result_path: str) -> Dict[str, Any]:
-        """Read and parse the JSON result file."""
+        """Read and parse the JSON result file.
+
+        The file sits in a directory the job can write, so it is read with
+        read_untrusted_bytes: a symlink, FIFO or oversized file raises
+        UnsafeFileError and fails the job instead of leaking or hanging.
+        """
+        if not os.path.lexists(result_path):
+            return {}
+        data = read_untrusted_bytes(result_path, result_limit())
         try:
-            if os.path.exists(result_path):
-                with open(result_path, "r") as f:
-                    return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            pass
-        return {}
+            return json.loads(data)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return {}
 
     def _cleanup_temp_files(self) -> None:
         """Remove temporary files (and the private sandbox dir) after a run."""

@@ -375,3 +375,69 @@ def test_compiler_cannot_include_worker_files(tmp_path, sandboxed):
     assert not compiled.success
     assert "TOPSECRET" not in compiled.stderr + compiled.stdout
     assert "Permission denied" in compiled.stderr
+
+
+# --- 6. student-controlled result/report files ------------------------------
+
+# The job finds its result file next to the wrapper (sys.argv[0]), replaces
+# it, and exits before the wrapper writes the real result.
+REPLACE_RESULT = """
+    import glob, os, sys
+    result = glob.glob(os.path.join(os.path.dirname(sys.argv[0]), "*.json"))[0]
+    os.unlink(result)
+    {action}
+    os._exit(0)
+"""
+
+
+@pytest.fixture
+def no_hang():
+    import signal
+
+    def _fail(*_):
+        raise AssertionError("harness hung reading a student file")
+    old = signal.signal(signal.SIGALRM, _fail)
+    signal.alarm(30)
+    yield
+    signal.alarm(0)
+    signal.signal(signal.SIGALRM, old)
+
+
+def test_symlinked_result_does_not_leak_worker_file(tmp_path, no_hang):
+    secret = tmp_path / "worker_only.json"
+    secret.write_text('{"status": "COMPLETED", "variables": {"leak": "TOPSECRET"}}')
+    result = run_student(tmp_path, REPLACE_RESULT.format(
+        action=f"os.symlink({str(secret)!r}, result)"))
+    assert not result.success
+    assert "leak" not in result.namespace
+    assert result.error_type == "UnsafeFileError"
+    assert "symlink" in result.error_message
+
+
+def test_huge_result_file_is_refused(tmp_path, monkeypatch, no_hang):
+    monkeypatch.setenv("COMPUTOR_JOB_MAX_FILE_SIZE", "0")  # no RLIMIT_FSIZE
+    result = run_student(tmp_path, REPLACE_RESULT.format(
+        action="open(result, 'wb').truncate(1 << 30)"))  # 1 GiB, sparse
+    assert not result.success
+    assert result.error_type == "UnsafeFileError"
+    assert "too large" in result.error_message
+
+
+def test_fifo_result_file_does_not_hang(tmp_path, no_hang):
+    start = time.monotonic()
+    result = run_student(tmp_path, REPLACE_RESULT.format(
+        action="os.mkfifo(result)"))
+    assert time.monotonic() - start < 20
+    assert not result.success
+    assert result.error_type == "UnsafeFileError"
+    assert "not a regular file" in result.error_message
+
+
+def test_symlinked_student_source_is_not_read(tmp_path):
+    from ctexec.safe_io import UnsafeFileError, read_untrusted_text
+    secret = tmp_path / "reference.c"
+    secret.write_text("TOPSECRET")
+    link = tmp_path / "main.c"
+    link.symlink_to(secret)
+    with pytest.raises(UnsafeFileError, match="symlink"):
+        read_untrusted_text(str(link))

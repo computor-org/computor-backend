@@ -21,6 +21,8 @@ from ctcore.models import (
 from ctcore.helpers import get_property_as_list
 from testers.executors.c import CExecutor, analyze_source
 
+from ctexec.safe_io import read_untrusted_text
+
 from .conftest import report_key
 from ..test_base import (
     Solution,
@@ -231,8 +233,8 @@ class TestComputorC(CompiledTestClass):
 
         else:
             # Check if it's in the source
-            with open(file_path, 'r') as f:
-                content = f.read()
+            # Student-controlled: no symlinks/FIFOs, size-capped (#237).
+            content = read_untrusted_text(file_path)
 
             if pattern:
                 try:

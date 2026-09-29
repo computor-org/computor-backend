@@ -20,6 +20,9 @@ import numpy as np
 
 from ctexec import InterpretedExecutor, ExecutorResult, make_preexec_fn
 from ctexec.process import run_bounded
+from ctexec.safe_io import (
+    UnsafeFileError, read_untrusted_bytes, read_untrusted_text, result_limit,
+)
 from ctexec.exceptions import ExecutionError
 
 logger = logging.getLogger(__name__)
@@ -271,8 +274,12 @@ fclose(__fid__);
             success = self._run_octave(script_path)
             self.execution_time = time.time() - start_time
 
-            if success and os.path.exists(result_path):
-                self._load_results(result_path)
+            if success and os.path.lexists(result_path):
+                try:
+                    self._load_results(result_path)
+                except UnsafeFileError as e:
+                    self.error = f"Result file rejected: {e}"
+                    return False
 
             return success
 
@@ -353,12 +360,13 @@ fclose(__fid__);
             result_path: Path to the JSON results file
         """
         try:
-            with open(result_path, 'r') as f:
-                data = json.load(f)
+            data = json.loads(read_untrusted_bytes(result_path, result_limit()))
 
             for name, value in data.items():
                 self.namespace[name] = self._deserialize_value(value)
 
+        except UnsafeFileError:
+            raise
         except json.JSONDecodeError as e:
             logger.warning(f"Failed to parse Octave results: {e}")
         except Exception as e:
@@ -427,8 +435,8 @@ def run_structural_analysis(file_path: str, keywords: List[str]) -> Dict[str, in
         Dictionary mapping keywords to their occurrence counts
     """
     try:
-        with open(file_path, 'r') as f:
-            content = f.read()
+        # Student-controlled: no symlinks/FIFOs, size-capped (#237).
+        content = read_untrusted_text(file_path)
     except Exception as e:
         logger.error(f"Failed to read file {file_path}: {e}")
         return {kw: 0 for kw in keywords}

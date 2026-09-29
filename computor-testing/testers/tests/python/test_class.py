@@ -25,6 +25,8 @@ from ctcore.models import (
     StatusEnum,
     QualificationEnum,
 )
+from ctexec.safe_io import read_untrusted_bytes, read_untrusted_text
+
 from .conftest import report_key, Solution
 from ctcore.helpers import get_property_as_list, token_exchange
 from testers.executors.python import PyExecutor, PyExecutionError
@@ -82,8 +84,9 @@ def _tokenize_name(name: str):
 def _read_tokens(file_path: str):
     """Tokenize a student file, failing the test if it cannot be parsed."""
     try:
-        with open(file_path, 'rb') as f:
-            return list(tokenize.tokenize(f.readline))
+        # Student-controlled: no symlinks/FIFOs, size-capped (#237).
+        data = read_untrusted_bytes(file_path)
+        return list(tokenize.tokenize(io.BytesIO(data).readline))
     except (tokenize.TokenError, SyntaxError, IndentationError) as e:
         pytest.fail(f"Could not tokenize student file: {e}")
 
@@ -538,8 +541,8 @@ class TestComputorPython:
                 pytest.skip("allowedOccuranceRange not set")
 
             if sub.pattern:
-                with open(file_path, 'r') as f:
-                    source = f.read()
+                # Student-controlled: no symlinks/FIFOs, size-capped (#237).
+                source = read_untrusted_text(file_path)
                 try:
                     count = len(safe_regex_findall(sub.pattern, source))
                 except RegexTimeoutError:

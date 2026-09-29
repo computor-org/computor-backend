@@ -19,6 +19,8 @@ from ctcore.models import (
     StatusEnum,
     QualificationEnum,
 )
+from ctexec.safe_io import read_untrusted_text
+
 from .conftest import report_key, Solution
 from testers.executors.document import TextAnalyzer, TextMetrics
 from ctcore.helpers import get_property_as_list
@@ -267,8 +269,8 @@ class TestComputorDocument:
             if not os.path.exists(file_path):
                 pytest.fail(f"File `{file}` not found")
 
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            # Student-controlled: no symlinks/FIFOs, size-capped (#237).
+            content = read_untrusted_text(file_path)
 
             if pattern:
                 flags = re.IGNORECASE if ignore_case else 0

@@ -15,6 +15,7 @@ import numpy as np
 
 from ctexec import InterpretedExecutor, ExecutorResult
 from ctexec.exceptions import ExecutionError
+from ctexec.safe_io import read_untrusted_text
 
 # Import sandbox security analysis
 try:
@@ -290,8 +291,8 @@ class PyExecutor(InterpretedExecutor):
         if self.security_check and SANDBOX_AVAILABLE:
             full_path = script_path if os.path.isabs(script_path) else os.path.join(self.working_dir, script_path)
             try:
-                with open(full_path, 'r') as f:
-                    code = f.read()
+                # Student-controlled: no symlinks/FIFOs, size-capped (#237).
+                code = read_untrusted_text(full_path)
                 report = analyze_python_security(code)
                 if not report.safe:
                     return {
