@@ -202,3 +202,138 @@ def test_raw_output_flood_neither_hangs_nor_grows(tmp_path):
     for stream in (result.stdout, result.stderr):
         assert len(stream.encode()) < MIB + 200
         assert "output truncated" in stream
+
+
+# --- 4. network and signal isolation (sandbox.launch) -----------------------
+
+def _landlock_abi():
+    from sandbox import launch
+    return launch._landlock_abi()
+
+
+@pytest.fixture
+def sandboxed(monkeypatch):
+    if _landlock_abi() < 6:
+        pytest.skip("needs Landlock ABI >= 6 (TCP rules + scoping)")
+    monkeypatch.setenv("COMPUTOR_SANDBOX_ENABLE", "1")
+
+
+@pytest.fixture
+def local_servers():
+    """A TCP listener and a UDP receiver on loopback, owned by the 'worker'."""
+    import socket
+    tcp = socket.create_server(("127.0.0.1", 0))
+    udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    udp.bind(("127.0.0.1", 0))
+    udp.settimeout(0.5)
+    yield tcp.getsockname()[1], udp
+    tcp.close()
+    udp.close()
+
+
+NET_PROBE = """
+    import errno, socket
+    def attempt(fn):
+        try:
+            fn()
+            return "OK"
+        except OSError as e:
+            return errno.errorcode.get(e.errno, str(e.errno))
+    def udp(addr):
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.sendto(b"exfil", addr)
+    udp_dns = attempt(lambda: udp(("1.1.1.1", 53)))
+    udp_local = attempt(lambda: udp(("127.0.0.1", {udp_port})))
+    tcp_local = attempt(lambda: socket.create_connection(("127.0.0.1", {tcp_port}), 2))
+    tcp_remote = attempt(lambda: socket.create_connection(("1.1.1.1", 80), 2))
+    raw = attempt(lambda: socket.socket(socket.AF_INET, socket.SOCK_RAW, 1))
+    packet = attempt(lambda: socket.socket(17, socket.SOCK_RAW, 0))
+    fastopen = attempt(lambda: socket.socket().sendto(
+        b"x", 0x20000000, ("127.0.0.1", {tcp_port})))
+    unix_ok = attempt(lambda: socket.socketpair())
+"""
+NET_VARS = ["udp_dns", "udp_local", "tcp_local", "tcp_remote", "raw", "packet",
+            "fastopen", "unix_ok"]
+
+
+def test_network_egress_is_blocked(tmp_path, sandboxed, local_servers):
+    tcp_port, udp = local_servers
+    code = NET_PROBE.format(tcp_port=tcp_port, udp_port=udp.getsockname()[1])
+    result = run_student(tmp_path, code, NET_VARS)
+    assert result.success, result.error_message
+    ns = result.namespace
+    for name in ("udp_dns", "udp_local", "tcp_local", "tcp_remote", "raw",
+                 "packet", "fastopen"):
+        assert ns[name] == "EACCES", (name, ns)
+    assert ns["unix_ok"] == "OK"  # local IPC keeps working
+    with pytest.raises(OSError):  # and nothing arrived at the receiver
+        udp.recv(64)
+
+
+def test_network_probe_control_without_sandbox(tmp_path, local_servers):
+    """The oracle itself: unsandboxed, the same probe reaches the servers."""
+    tcp_port, udp = local_servers
+    code = NET_PROBE.format(tcp_port=tcp_port, udp_port=udp.getsockname()[1])
+    result = run_student(tmp_path, code, NET_VARS)
+    assert result.namespace["tcp_local"] == "OK"
+    assert result.namespace["udp_local"] == "OK"
+    assert udp.recv(64) == b"exfil"
+
+
+def test_job_cannot_signal_outside_its_domain(tmp_path, sandboxed):
+    import subprocess
+    bystander = subprocess.Popen(["sleep", "60"])  # a worker-side process
+    try:
+        result = run_student(tmp_path, f"""
+            import os, signal
+            def attempt(pid):
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                    return "KILLED"
+                except OSError as e:
+                    return e.errno
+            parent = attempt(os.getppid())
+            bystander = attempt({bystander.pid})
+            worker = attempt({os.getpid()})
+        """, ["parent", "bystander", "worker"])
+        assert result.success, result.error_message
+        assert result.namespace == {"parent": 1, "bystander": 1, "worker": 1}
+        assert bystander.poll() is None
+    finally:
+        bystander.kill()
+        bystander.wait()
+
+
+ESCAPE_SESSION = textwrap.dedent("""
+    import os, subprocess, time
+    escaped = subprocess.Popen(["setsid", "sleep", "1000"])
+    r, w = os.pipe()
+    if os.fork() == 0:
+        os.setsid()                       # leave the job's process group
+        if os.fork() == 0:
+            os.write(w, str(os.getpid()).encode())
+            time.sleep(1000)
+        os._exit(0)
+    grandchild = int(os.read(r, 32))
+    with open("pids.txt", "w") as f:
+        f.write(f"{escaped.pid} {grandchild}")
+""")
+
+
+@pytest.mark.parametrize("finish", ["timeout", "exit"])
+def test_setsid_escapees_are_killed(tmp_path, sandboxed, finish):
+    tail = "time.sleep(1000)\n" if finish == "timeout" else "done = True\n"
+    result = run_student(tmp_path, ESCAPE_SESSION + tail, timeout=4)
+    assert result.timed_out == (finish == "timeout")
+    assert_all_dead(tmp_path / "work" / "pids.txt")
+
+
+def test_numpy_and_matplotlib_work_in_sandbox(tmp_path, sandboxed):
+    test_numpy_and_matplotlib_work_under_default_limits(tmp_path)
+
+
+def test_old_landlock_fails_closed(monkeypatch):
+    from sandbox import launch
+    monkeypatch.setattr(launch, "_landlock_abi", lambda: 3)
+    with pytest.raises(OSError, match="cannot restrict TCP"):
+        launch.apply_landlock([], [], allow_net=False)
