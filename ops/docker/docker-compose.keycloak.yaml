@@ -105,14 +105,15 @@ services:
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes:/opt/keycloak/themes
       - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports:/opt/keycloak/data/import
+      - ../keycloak/healthcheck.sh:/opt/keycloak/healthcheck.sh:ro
     depends_on:
       keycloak-db:
         condition: service_healthy
     healthcheck:
-      # Keycloak 25+/26.x exposes health on the management interface (port 9000)
-      # under the same relative path as the main HTTP. Use bash /dev/tcp because
-      # the Keycloak image has no curl/wget.
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && printf 'GET %s/health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' \"$${KC_HTTP_RELATIVE_PATH%/}\" >&3 && grep -q 'UP' <&3"]
+      # Readiness on the management interface (port 9000) under the relative path.
+      # Healthy only on HTTP 200 — see ops/keycloak/healthcheck.sh for why a body
+      # grep for "UP" is wrong (mixed-status 503 during startup/migration).
+      test: ["CMD", "bash", "/opt/keycloak/healthcheck.sh"]
       interval: 10s
       timeout: 5s
       retries: 15

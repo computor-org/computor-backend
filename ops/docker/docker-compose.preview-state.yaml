@@ -57,7 +57,7 @@ services:
         - >-
           bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9000;
           printf "GET /auth/health/ready HTTP/1.0\r\nHost: localhost\r\n\r\n" >&3;
-          grep -q "200" <&3'
+          IFS= read -r s <&3; case "$${s%$$(printf "\r")}" in "HTTP/1."?" 200"|"HTTP/1."?" 200 "*) exit 0;; esac; exit 1'
       interval: 5s
       timeout: 5s
       start_period: 10s
