@@ -13,13 +13,13 @@ import re
 import json
 import time
 import tempfile
-import subprocess
 import logging
 from typing import Dict, Any, Optional, List, Tuple
 
 import numpy as np
 
-from ctexec import InterpretedExecutor, ExecutorResult, ResourceLimits, make_preexec_fn
+from ctexec import InterpretedExecutor, ExecutorResult, make_preexec_fn
+from ctexec.process import run_bounded
 from ctexec.exceptions import ExecutionError
 
 logger = logging.getLogger(__name__)
@@ -303,21 +303,24 @@ fclose(__fid__);
 
         env = self._get_env()
 
-        stdin_file = None
         try:
+            stdin_data = None
             if input_path:
-                stdin_file = open(input_path, 'r')
+                with open(input_path, 'r') as stdin_file:
+                    stdin_data = stdin_file.read()
 
-            result = subprocess.run(
+            # Own process group, whole tree killed at the end, output capped.
+            result = run_bounded(
                 cmd,
                 cwd=self.working_dir,
-                stdin=stdin_file,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
                 env=env,
+                input=stdin_data,
+                timeout=self.timeout,
                 preexec_fn=preexec,
             )
+            if result.timed_out:
+                self.error = f"Execution timed out after {self.timeout} seconds"
+                return False
 
             self.stdout = result.stdout
             self.stderr = result.stderr
@@ -333,10 +336,6 @@ fclose(__fid__);
 
             return True
 
-        except subprocess.TimeoutExpired:
-            self.error = f"Execution timed out after {self.timeout} seconds"
-            return False
-
         except FileNotFoundError:
             self.error = f"Octave executable not found: {OCTAVE_EXECUTABLE}"
             return False
@@ -345,9 +344,6 @@ fclose(__fid__);
             self.error = f"Execution failed: {str(e)}"
             return False
 
-        finally:
-            if stdin_file:
-                stdin_file.close()
 
     def _load_results(self, result_path: str) -> None:
         """

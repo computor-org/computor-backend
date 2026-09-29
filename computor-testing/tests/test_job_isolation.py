@@ -40,6 +40,14 @@ def uid_task_count():
     return count
 
 
+@pytest.fixture(autouse=True)
+def _nproc_headroom(monkeypatch):
+    """RLIMIT_NPROC is UID-wide; on a developer box the login session alone
+    can exceed the 512 default. Give each job the default-sized headroom above
+    what the UID already runs, as a dedicated worker UID would have."""
+    monkeypatch.setenv("COMPUTOR_JOB_MAX_PROCESSES", str(uid_task_count() + 256))
+
+
 # --- 1. per-job resource limits ---------------------------------------------
 
 def test_numpy_and_matplotlib_work_under_default_limits(tmp_path):
@@ -118,3 +126,79 @@ def test_fork_bomb_is_bounded(tmp_path, monkeypatch):
     assert result.success, result.error_message
     assert result.namespace["refused"] is True
     assert result.namespace["spawned"] < budget + 20
+
+
+# --- 2. process-tree teardown -----------------------------------------------
+
+SPAWN_DESCENDANTS = textwrap.dedent("""
+    import os, subprocess, time
+    detached = subprocess.Popen(["sleep", "1000"])  # never waited for
+    r, w = os.pipe()
+    if os.fork() == 0:                              # double fork: the
+        if os.fork() == 0:                          # grandchild is orphaned
+            os.write(w, str(os.getpid()).encode())
+            time.sleep(1000)
+        os._exit(0)
+    grandchild = int(os.read(r, 32))
+    with open("pids.txt", "w") as f:
+        f.write(f"{detached.pid} {grandchild}")
+""")
+
+
+def alive(pid):
+    """True if pid exists and is not a zombie awaiting its reaper."""
+    try:
+        with open(f"/proc/{pid}/stat") as f:
+            return f.read().rsplit(")", 1)[1].split()[0] != "Z"
+    except FileNotFoundError:
+        return False
+
+
+def assert_all_dead(pid_file):
+    pids = [int(p) for p in pid_file.read_text().split()]
+    assert len(pids) == 2
+    deadline = time.monotonic() + 5
+    while any(alive(p) for p in pids) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not [p for p in pids if alive(p)]
+
+
+def test_descendants_killed_on_timeout(tmp_path):
+    result = run_student(tmp_path, SPAWN_DESCENDANTS + "time.sleep(1000)\n",
+                         timeout=3)
+    assert result.timed_out
+    assert_all_dead(tmp_path / "work" / "pids.txt")
+
+
+def test_descendants_killed_when_job_finishes(tmp_path):
+    result = run_student(tmp_path, SPAWN_DESCENDANTS + "done = True\n", ["done"])
+    assert result.success, result.error_message
+    assert_all_dead(tmp_path / "work" / "pids.txt")
+
+
+# --- 3. bounded output capture ----------------------------------------------
+
+def test_print_flood_is_truncated(tmp_path):
+    result = run_student(tmp_path, """
+        line = "y" * 1023
+        for _ in range(20 * 1024):   # 20 MiB through print()
+            print(line)
+    """)
+    assert len(result.stdout.encode()) < MIB + 200
+    assert "output truncated" in result.stdout
+
+
+def test_raw_output_flood_neither_hangs_nor_grows(tmp_path):
+    start = time.monotonic()
+    result = run_student(tmp_path, """
+        import os
+        chunk = b"z" * 65536
+        while True:                  # endless, straight into the pipes
+            os.write(1, chunk)
+            os.write(2, chunk)
+    """, timeout=3)
+    assert result.timed_out
+    assert time.monotonic() - start < 15
+    for stream in (result.stdout, result.stderr):
+        assert len(stream.encode()) < MIB + 200
+        assert "output truncated" in stream
