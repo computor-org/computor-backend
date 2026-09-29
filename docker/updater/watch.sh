@@ -20,7 +20,7 @@ RUNNER_NAME="computor-update-runner"
 SCHEDULE_GRACE_SECONDS=3600
 
 rcli() {
-    redis-cli -h redis -a "$REDIS_PASSWORD" --no-auth-warning "$@"
+    REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli -h redis "$@"
 }
 
 log() { echo "[updater] $*"; }
