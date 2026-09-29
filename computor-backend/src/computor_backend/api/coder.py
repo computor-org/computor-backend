@@ -1240,6 +1240,29 @@ def _require_public_workspace_limits() -> None:
         )
 
 
+def _require_worker_db_role(db: Session) -> None:
+    """A forced rollout re-derives app credentials on the coder worker, which
+    reads the DB as the restricted role (scripts/ensure_coder_worker_db_role).
+    Refuse the rollout until that role exists, instead of letting the worker
+    fail authentication and silently carry stale credentials forward."""
+    import os
+
+    from sqlalchemy import text
+
+    role = os.environ.get("CODER_WORKER_DB_USER") or "computor_coder_worker"
+    ready = db.execute(
+        text("SELECT rolcanlogin FROM pg_roles WHERE rolname = :role"), {"role": role}
+    ).scalar()
+    if not ready:
+        raise ServiceUnavailableException(
+            detail=(
+                f"The coder worker database role '{role}' does not exist yet. Set "
+                "CODER_WORKER_DB_PASSWORD and restart the API (it creates the role "
+                "after migrations) before rolling out workspaces."
+            )
+        )
+
+
 def _build_template_parameters(settings: CoderSettings) -> dict:
     """Build common parameters for coder template workflows from settings and env."""
     import os
@@ -1368,6 +1391,7 @@ async def rollout_workspaces_endpoint(
     request: WorkspaceRolloutRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> CoderAdminTaskResponse:
     """
     Roll every existing workspace onto its template's active version — running
@@ -1377,6 +1401,7 @@ async def rollout_workspaces_endpoint(
     their owners to restart them. Requires workspace:manage permission.
     """
     _check_workspace_access(permissions, "manage")
+    _require_worker_db_role(db)
     await _reject_conflicting_coder_task()
 
     executor = get_task_executor()

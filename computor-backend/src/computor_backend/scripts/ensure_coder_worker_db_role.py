@@ -29,17 +29,48 @@ DEFAULT_ROLE = "computor_coder_worker"
 # coder/service.py that run on the coder worker.
 READABLE_COLUMNS = (("user", ("id", "workspace_app_key_version")),)
 
-_ROLE_ATTRS = "LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION"
+_ROLE_ATTRS = (
+    "LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION "
+    "NOBYPASSRLS CONNECTION LIMIT 20"
+)
+
+# pg_catalog functions that create large objects: a write that needs no table
+# privilege and survives any transaction setting the role can change itself.
+_LO_CREATE_FUNCTIONS = ("lo_create(oid)", "lo_creat(integer)", "lo_from_bytea(oid, bytea)")
 
 logger = logging.getLogger("ensure_coder_worker_db_role")
 
 
-def ensure_role(conn, role: str, password: str, database: str) -> None:
-    """Apply the role definition on an open psycopg2 connection (autocommit)."""
+def ensure_role(conn, role: str, password: str, database: str) -> list:
+    """Reconcile the role to exactly the definition below, in ONE transaction.
+
+    Runs on an open psycopg2 connection (autocommit off) as the app owner.
+    Returns warnings for the hardening steps the connecting user was not
+    allowed to perform (non-superuser owner on a managed Postgres).
+
+    - CREATE/ALTER with fixed attributes and the password.
+    - Every membership of the role is revoked (pg_read_all_data & co. could
+      otherwise be reached with SET ROLE, which NOINHERIT does not stop).
+    - Objects it owns are reassigned to the app owner, and DROP OWNED revokes
+      every privilege granted to it in this database (tables, sequences,
+      functions, schemas, large objects, default privileges, CONNECT/TEMP).
+    - PUBLIC loses CREATE on schema public and TEMPORARY on the database (the
+      app owner keeps both as owner; migrations run as the owner), and EXECUTE
+      on the large-object *creation* functions (re-granted to the app owner).
+    - Then exactly: CONNECT, USAGE on public, SELECT (id,
+      workspace_app_key_version) on "user"; default_transaction_read_only on.
+
+    A single transaction (plus an advisory lock against concurrent runs)
+    means a concurrent rollout never sees the revoked-but-not-yet-granted
+    state. default_transaction_read_only is only defence in depth: the role
+    can SET it off, so the grants above are what actually bound it.
+    """
     from psycopg2 import sql
 
     r = sql.Identifier(role)
+    warnings: list = []
     with conn.cursor() as cur:
+        cur.execute("SELECT pg_advisory_xact_lock(hashtext('computor_coder_worker_role'))")
         cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (role,))
         verb = "ALTER" if cur.fetchone() else "CREATE"
         cur.execute(
@@ -49,18 +80,38 @@ def ensure_role(conn, role: str, password: str, database: str) -> None:
         cur.execute(
             sql.SQL("ALTER ROLE {} SET default_transaction_read_only = on").format(r)
         )
-        # Drop anything granted earlier (by hand or by an older version of this
-        # script) so the grant set below is the whole truth. Revoking at table
-        # level also revokes the column-level privileges.
-        cur.execute(sql.SQL("REVOKE ALL ON ALL TABLES IN SCHEMA public FROM {}").format(r))
+        # Per grantor: on PG16 a membership granted by another role survives a
+        # plain REVOKE issued by us.
         cur.execute(
-            sql.SQL("REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM {}").format(r)
+            "SELECT g.rolname, gr.rolname FROM pg_auth_members m "
+            "JOIN pg_roles g ON g.oid = m.roleid "
+            "JOIN pg_roles u ON u.oid = m.member "
+            "JOIN pg_roles gr ON gr.oid = m.grantor WHERE u.rolname = %s",
+            (role,),
         )
-        cur.execute(
-            sql.SQL("GRANT CONNECT ON DATABASE {} TO {}").format(
-                sql.Identifier(database), r
+        for granted, grantor in cur.fetchall():
+            cur.execute(
+                sql.SQL("REVOKE {} FROM {} GRANTED BY {} CASCADE").format(
+                    sql.Identifier(granted), r, sql.Identifier(grantor)
+                )
             )
-        )
+        cur.execute(sql.SQL("REASSIGN OWNED BY {} TO CURRENT_USER").format(r))
+        cur.execute(sql.SQL("DROP OWNED BY {}").format(r))
+
+        db = sql.Identifier(database)
+        cur.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC")
+        cur.execute(sql.SQL("REVOKE TEMPORARY ON DATABASE {} FROM PUBLIC").format(db))
+        for fn in _LO_CREATE_FUNCTIONS:
+            cur.execute("SAVEPOINT lo_acl")
+            try:
+                cur.execute(f"REVOKE EXECUTE ON FUNCTION pg_catalog.{fn} FROM PUBLIC")
+                cur.execute(f"GRANT EXECUTE ON FUNCTION pg_catalog.{fn} TO CURRENT_USER")
+                cur.execute("RELEASE SAVEPOINT lo_acl")
+            except Exception as e:  # not the function owner (managed Postgres)
+                cur.execute("ROLLBACK TO SAVEPOINT lo_acl")
+                warnings.append(f"could not revoke EXECUTE on {fn} from PUBLIC: {e}")
+
+        cur.execute(sql.SQL("GRANT CONNECT ON DATABASE {} TO {}").format(db, r))
         cur.execute(sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(r))
         for table, columns in READABLE_COLUMNS:
             cur.execute(
@@ -70,6 +121,16 @@ def ensure_role(conn, role: str, password: str, database: str) -> None:
                     r,
                 )
             )
+    conn.commit()
+    return warnings
+
+
+def role_ready(conn, role: str) -> bool:
+    """True when the worker role exists and can log in."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT rolcanlogin FROM pg_roles WHERE rolname = %s", (role,))
+        row = cur.fetchone()
+    return bool(row and row[0])
 
 
 def main() -> int:
@@ -91,10 +152,14 @@ def main() -> int:
         dbname=database,
     )
     try:
-        conn.autocommit = True
-        ensure_role(conn, role, password, database)
+        warnings = ensure_role(conn, role, password, database)
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
+    for warning in warnings:
+        logger.warning(f"WARNING: {warning}")
     logger.info(f"Coder worker DB role '{role}' ensured (SELECT on user.id, "
                 "user.workspace_app_key_version only).")
     return 0
