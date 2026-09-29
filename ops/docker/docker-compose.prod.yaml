@@ -160,6 +160,8 @@ services:
       # Read by the API when pushing Coder templates (matlab_license_file
       # template variable) — must reach this container, not just the host env.
       MATLAB_MLM_LICENSE_FILE: ${MATLAB_MLM_LICENSE_FILE:-}
+      # Aggregate parent slice for workspace containers (Terraform cgroup_parent).
+      CODER_WORKSPACE_CGROUP_PARENT: ${CODER_WORKSPACE_CGROUP_PARENT:-}
       BACKEND_EXTERNAL_URL: ${BACKEND_EXTERNAL_URL:-}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?}
       # Extra origins SSO login/logout may redirect to (comma-separated);

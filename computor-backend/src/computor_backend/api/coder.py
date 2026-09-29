@@ -1182,11 +1182,15 @@ def _deployment_template_variables() -> dict:
 
     matlab_license_file: MATLAB site license (port@host or in-container
     path); empty falls back to in-browser MathWorks sign-in.
+
+    cgroup_parent: parent cgroup (e.g. computor-workspaces.slice) that puts
+    every workspace container under one aggregate systemd slice limit.
     """
     import os
 
     return {
         "matlab_license_file": os.environ.get("MATLAB_MLM_LICENSE_FILE", ""),
+        "cgroup_parent": os.environ.get("CODER_WORKSPACE_CGROUP_PARENT", ""),
     }
 
 
@@ -1516,8 +1520,8 @@ async def list_template_settings(
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     db: Annotated[Session, Depends(get_db)],
 ) -> TemplateSettingsListResponse:
-    """All stored settings rows; templates without a row use the defaults
-    (unlimited). Requires workspace:manage permission."""
+    """All stored settings rows; templates without a row use the template
+    file defaults (hard memory/CPU caps). Requires workspace:manage permission."""
     _check_workspace_access(permissions, "manage")
     rows = db.query(WorkspaceTemplateSettings).order_by(
         WorkspaceTemplateSettings.template_name
