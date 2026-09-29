@@ -279,7 +279,7 @@ def test_audit_counts_users_whose_sso_email_was_never_verified(db):
                 provider_account_id=f"kc-{uuid.uuid4().hex}",
                 user_id=user.id,
                 builtin=True,
-                properties={"attributes": attributes},
+                properties={"email": user.email, "attributes": attributes},
             )
         )
         db.flush()
@@ -287,9 +287,62 @@ def test_audit_counts_users_whose_sso_email_was_never_verified(db):
     _sso_user(True)
     _sso_user(False)
     _sso_user(None)
+    # Verified, but for a different address than User.email.
+    other = _existing_user(db, _email())
+    db.add(
+        Account(
+            provider="keycloak",
+            type="oidc",
+            provider_account_id=f"kc-{uuid.uuid4().hex}",
+            user_id=other.id,
+            builtin=True,
+            properties={"email": _email(), "attributes": {"email_verified": True}},
+        )
+    )
+    db.flush()
     after = audit(db)
 
-    assert after["sso_users_with_email"] - before["sso_users_with_email"] == 3
-    assert after["unverified_total"] - before["unverified_total"] == 2
+    assert after["unverified_verified_other_email"] - before["unverified_verified_other_email"] == 1
+    assert after["sso_users_with_email"] - before["sso_users_with_email"] == 4
+    assert after["unverified_total"] - before["unverified_total"] == 3
     assert after["unverified_email_verified_false"] - before["unverified_email_verified_false"] == 1
     assert after["unverified_claim_missing"] - before["unverified_claim_missing"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_pre_fix_reservation_stays_flagged_after_a_verified_login_elsewhere(
+    db, login_as, caplog
+):
+    """Legacy state: an identity reserved someone else's unverified address as
+    User.email (possible before the first-login check). Logging in later with
+    its *own* verified address must neither rewrite User.email silently nor
+    make the audit treat the reserved address as verified.
+    """
+    from computor_backend.scripts.audit_unverified_sso_users import audit
+
+    before = audit(db)
+    victim_email = _email()
+    sub = f"legacy-{uuid.uuid4().hex}"
+    squatter = _existing_user(db, victim_email)
+    db.add(
+        Account(
+            provider="keycloak",
+            type="oidc",
+            provider_account_id=sub,
+            user_id=squatter.id,
+            builtin=True,
+            properties={"email": victim_email, "attributes": {"email_verified": False}},
+        )
+    )
+    db.flush()
+
+    with caplog.at_level("WARNING"):
+        result = await login_as(db, email=_email(), email_verified=True, sub=sub)
+
+    assert result["user_id"] == str(squatter.id)
+    db.refresh(squatter)
+    assert squatter.email == victim_email
+    assert "differs from User.email" in caplog.text
+    after = audit(db)
+    assert after["unverified_total"] - before["unverified_total"] == 1
+    assert after["unverified_verified_other_email"] - before["unverified_verified_other_email"] == 1

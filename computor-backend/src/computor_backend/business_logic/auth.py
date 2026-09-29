@@ -461,6 +461,23 @@ async def handle_sso_callback(
                 ),
             }
 
+            # User.email is deliberately NOT rewritten from the token (another
+            # user may own the new address, and the email is the join key for
+            # git and imports). A mismatch is not silent though: before the
+            # first-login email check, an identity could reserve someone else's
+            # unverified address as User.email. The stored ``email`` above is
+            # what scripts/audit_unverified_sso_users.py compares against.
+            token_email = (user_info.email or "").strip().lower()
+            if token_email and token_email != (user.email or "").strip().lower():
+                logger.warning(
+                    "SSO login for user %s via %s carries an email that differs "
+                    "from User.email (token email_verified=%s); run "
+                    "scripts/audit_unverified_sso_users.py",
+                    user.id,
+                    provider,
+                    (user_info.attributes or {}).get("email_verified"),
+                )
+
         else:
             # New keycloak account — link to an existing user if we recognise the
             # email, otherwise create a fresh user.

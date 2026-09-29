@@ -10,8 +10,10 @@ staff import by that email would enrol them in the owner's place.
 Read-only. Prints counts only, never emails or ids, so the output can go into
 a ticket. A user is counted when it has an email and none of its SSO identity
 accounts (``Account.builtin``) recorded ``email_verified: true`` at its last
-login. ``handle_sso_callback`` stores the claim in
-``Account.properties["attributes"]`` on every login, so "missing" means the
+login *for that same address* (a verified login under another address does
+not count). ``handle_sso_callback`` stores the claim in
+``Account.properties["attributes"]`` and the address in
+``Account.properties["email"]`` on every login, so "missing" means the
 account predates that or the IdP sent no claim.
 
 Usage:
@@ -44,34 +46,59 @@ def _create_session(database_url: str | None = None) -> Session:
     return next(get_db())
 
 
+def _normalize(email) -> str | None:
+    if not isinstance(email, str):
+        return None
+    return email.strip().lower() or None
+
+
+def classify(user_email: str, accounts: list[dict | None]) -> str:
+    """How well a user's SSO accounts vouch for ``User.email``.
+
+    ``verified`` only when some account's last login carried
+    ``email_verified`` as boolean ``true`` *for that same address*. A verified
+    login under a different address says nothing about ``User.email``: a
+    pre-fix login could reserve someone else's unverified address and later
+    log in with its own verified one, while User.email kept the reservation.
+    Otherwise the strongest evidence wins: ``mismatch`` (verified, other
+    address), then ``false`` (claim false or non-boolean), then ``missing``.
+    """
+    target = _normalize(user_email)
+    seen = set()
+    for properties in accounts:
+        properties = properties or {}
+        flag = (properties.get("attributes") or {}).get("email_verified", None)
+        if flag is True:
+            if _normalize(properties.get("email")) == target:
+                return "verified"
+            seen.add("mismatch")
+        elif "email_verified" in (properties.get("attributes") or {}):
+            seen.add("false")
+        else:
+            seen.add("missing")
+    for label in ("mismatch", "false", "missing"):
+        if label in seen:
+            return label
+    return "missing"
+
+
 def audit(db: Session) -> dict[str, int]:
-    """Counts of email-bearing users with no verified SSO identity."""
+    """Counts of email-bearing SSO users whose User.email is not verified."""
     from computor_backend.model.auth import Account, User
     from computor_backend.model.course import CourseMember
 
-    verified_flag = Account.properties["attributes"]["email_verified"]
     rows = (
-        db.query(Account.user_id, verified_flag.astext)
-        .join(User, User.id == Account.user_id)
+        db.query(User.id, User.email, Account.properties)
+        .join(Account, Account.user_id == User.id)
         .filter(Account.builtin.is_(True), User.email.isnot(None))
         .all()
     )
+    by_user: dict[str, tuple[str, list]] = {}
+    for user_id, email, properties in rows:
+        by_user.setdefault(str(user_id), (email, []))[1].append(properties)
 
-    verified: set[str] = set()
-    explicit_false: set[str] = set()
-    missing: set[str] = set()
-    for user_id, flag in rows:
-        uid = str(user_id)
-        if flag == "true":
-            verified.add(uid)
-        elif flag is None:
-            missing.add(uid)
-        else:
-            explicit_false.add(uid)
-
-    unverified = (explicit_false | missing) - verified
-    explicit_false -= verified
-    missing -= verified | explicit_false
+    labels = {uid: classify(email, props) for uid, (email, props) in by_user.items()}
+    unverified = {uid for uid, label in labels.items() if label != "verified"}
 
     with_membership = 0
     if unverified:
@@ -81,11 +108,15 @@ def audit(db: Session) -> dict[str, int]:
             .scalar()
         )
 
+    def _count(label: str) -> int:
+        return sum(1 for value in labels.values() if value == label)
+
     return {
-        "sso_users_with_email": len(verified | unverified),
+        "sso_users_with_email": len(labels),
         "unverified_total": len(unverified),
-        "unverified_email_verified_false": len(explicit_false),
-        "unverified_claim_missing": len(missing),
+        "unverified_verified_other_email": _count("mismatch"),
+        "unverified_email_verified_false": _count("false"),
+        "unverified_claim_missing": _count("missing"),
         "unverified_with_course_membership": with_membership,
     }
 
