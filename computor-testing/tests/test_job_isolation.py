@@ -831,3 +831,30 @@ def test_launcher_started_after_harness_death_does_not_run(tmp_path):
     time.sleep(0.5)
     assert "is gone" in log.read_text()
     assert not marker.exists()
+
+
+# --- 18. bounded writer: byte budget, empty writes --------------------------
+
+def test_capture_budget_is_utf8_bytes(tmp_path):
+    result = run_student(tmp_path, """
+        import sys
+        for _ in range(3 * 1024):
+            sys.stdout.write("\\u20ac" * 1024)   # 3 bytes per character
+        kept_bytes = len(sys.stdout.getvalue().split("\\n[... output truncated")[0].encode())
+    """, ["kept_bytes"])
+    assert result.success, result.error_message
+    assert result.namespace["kept_bytes"] <= 1024 * 1024
+    assert "output truncated" in result.stdout
+
+
+def test_empty_writes_do_not_accumulate(tmp_path):
+    result = run_student(tmp_path, """
+        import sys
+        for _ in range(1_000_000):
+            sys.stdout.write("")
+        sys.stdout.write("x")
+        stored = len(sys.stdout._parts)
+    """, ["stored"])
+    assert result.success, result.error_message
+    assert result.namespace["stored"] == 1
+    assert result.stdout == "x"
