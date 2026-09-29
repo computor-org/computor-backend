@@ -158,3 +158,23 @@ async def test_unauthenticated_navigation_to_non_workspace_path_gets_401():
     # Only clean /coder/{owner}/{workspace} paths are worth a reauth round-trip.
     resp = await verify_coder_access(_FakeRequest("/coder/onlyowner", headers=_NAV_HEADERS), None)
     assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_credentials_never_reach_the_log(caplog):
+    # Every workspace request passes through here; credential headers must not
+    # be logged, not even as a prefix.
+    secrets = {
+        "X-API-Token": "ctp_supersecretapitoken0123456789",
+        "Cookie": "ct_access_token=eyJhbGciOiJSUzI1NiJ9.secretpayload",
+        "Authorization": "Bearer eyJhbGciOiJSUzI1NiJ9.othersecret",
+        "X-API-Key": "key_0123456789abcdefghijklmnop",
+    }
+    caplog.set_level("DEBUG")
+    resp = await verify_coder_access(
+        _FakeRequest("/coder/%s/workspace/" % USER_OWNER, headers=secrets), _user()
+    )
+    assert resp.status_code == 200
+    logged = caplog.text
+    for value in secrets.values():
+        assert value[:12] not in logged

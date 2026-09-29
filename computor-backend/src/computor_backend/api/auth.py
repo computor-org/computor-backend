@@ -667,18 +667,7 @@ async def verify_coder_access(
             return RedirectResponse(url=reauth, status_code=302)
         return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
 
-    # Debug: Log all headers to understand the authentication flow
-    logger.info("=== ForwardAuth Debug ===")
-    logger.info(f"ForwardAuth request for: {original_uri}")
-    logger.info(f"Authenticated user: {principal.user_id}")
-    logger.info("Headers received:")
-    for header_name, header_value in request.headers.items():
-        # Mask sensitive values
-        if header_name.lower() in ["authorization", "cookie", "x-api-key"]:
-            logger.info(f"  {header_name}: {header_value[:20]}..." if len(header_value) > 20 else f"  {header_name}: ***")
-        else:
-            logger.info(f"  {header_name}: {header_value}")
-    logger.info("=========================")
+    logger.debug("ForwardAuth request for %s by user %s", original_uri, principal.user_id)
 
     # Extract owner + workspace from the URL path: /coder/{owner}/{workspace}/...
     # Regular users get a Coder username of u{backend_uuid}; the shared admin/service
