@@ -464,3 +464,19 @@ def test_leader_unreaped_until_group_killed(monkeypatch, script, timeout):
     result = run_bounded(["sh", "-c", script], timeout=timeout)
     assert result.timed_out == (timeout == 1)
     assert seen and all(seen)
+
+
+# --- 8. required policy: ABI >= 6 -------------------------------------------
+
+@pytest.mark.parametrize("abi", [0, 3, 4, 5])
+def test_required_mode_refuses_partial_isolation(monkeypatch, capsys, abi):
+    from sandbox import launch
+    monkeypatch.setattr(launch, "_landlock_abi", lambda: abi)
+    executed = []
+    monkeypatch.setattr(launch.os, "execvp", lambda *a: executed.append(a))
+    monkeypatch.setattr(launch.os, "fork", lambda: pytest.fail("forked"))
+    monkeypatch.setattr(sys, "argv", ["launch.py", "--required", "--workdir",
+                                      "/nonexistent", "--", "true"])
+    assert launch.main() == 125
+    assert not executed
+    assert "required" in capsys.readouterr().err

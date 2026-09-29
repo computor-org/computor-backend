@@ -20,8 +20,9 @@ What it guarantees, verified against the running worker:
 - The reference/example cache is bound nowhere, so reading it (the master
   solution) returns ``EACCES`` (#240).
 - All outbound TCP is denied, so the databases, object store, API and any TCP
-  internet host are unreachable (#241). This needs Landlock ABI >= 4; with
-  ``--required`` an older kernel fails closed instead of running without it.
+  internet host are unreachable (#241). This needs Landlock ABI >= 4. The
+  worker's ``--required`` policy demands ABI >= 6 (TCP rules plus scoping and
+  the supervisor below) and fails closed with exit 125 on anything older.
 - Landlock does not cover UDP, raw or packet sockets, so a small seccomp filter
   (installed unprivileged, under no_new_privs) allows only AF_UNIX, AF_NETLINK
   and plain TCP stream sockets, and refuses TCP Fast Open sends (which connect
@@ -81,6 +82,9 @@ FS_REFER = 1 << 13      # ABI >= 2
 # Network access rights (ABI >= 4)
 NET_BIND_TCP = 1 << 0
 NET_CONNECT_TCP = 1 << 1
+
+# Minimum ABI for --required: TCP rules (4) and signal/socket scoping (6).
+REQUIRED_ABI = 6
 
 # Scopes (ABI >= 6)
 SCOPE_ABSTRACT_UNIX_SOCKET = 1 << 0
@@ -463,7 +467,7 @@ def main() -> int:
     parser.add_argument("--allow-net", action="store_true",
                         help="do not restrict the network")
     parser.add_argument("--required", action="store_true",
-                        help="fail (exit 125) if Landlock cannot be applied")
+                        help="fail (exit 125) unless the full sandbox (ABI >= 6) applies")
     parser.add_argument("--probe", action="store_true",
                         help="print a capability report and exit")
     parser.add_argument("cmd", nargs=argparse.REMAINDER,
@@ -487,10 +491,19 @@ def main() -> int:
     rw_paths = _existing(list(DEFAULT_RW) + args.rw
                          + ([args.workdir] if args.workdir else []))
 
+    # The worker's policy (--required) is all or nothing: without scoping
+    # (ABI < 6) a job could signal the harness and leave setsid()'d
+    # descendants behind, so refuse to run rather than isolate partially.
+    abi = _landlock_abi()
+    if args.required and abi < REQUIRED_ABI:
+        print(f"sandbox.launch: Landlock ABI {abi} is below the required "
+              f"{REQUIRED_ABI} (TCP rules + signal scoping)", file=sys.stderr)
+        return 125
+
     # With scoping (ABI >= 6) stay behind as the job's supervisor; the
     # sandboxed student command runs in a forked child.
     supervised = False
-    if _landlock_abi() >= 6:
+    if abi >= 6:
         try:
             enter_scope_domain()
             supervised = _scope_holds()
