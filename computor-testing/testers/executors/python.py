@@ -8,13 +8,16 @@ exec() to provide isolation between the testing framework and student code.
 """
 
 import os
+import re
 import sys
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from ctexec.process import max_output_bytes
 from ctexec import InterpretedExecutor, ExecutorResult
 from ctexec.exceptions import ExecutionError
+from ctexec.safe_io import read_untrusted_bytes, read_untrusted_text
 
 # Import sandbox security analysis
 try:
@@ -27,6 +30,12 @@ except ImportError:
 class PyExecutionError(ExecutionError):
     """Exception raised when Python execution fails."""
     pass
+
+
+FIGURE_SUBDIR = "figures"
+MAX_FIGURES = 20
+MAX_FIGURE_DIR_ENTRIES = 1000
+_FIGURE_NAME = re.compile(r"figure_(\d{1,4})\.png")
 
 
 class PyExecutor(InterpretedExecutor):
@@ -51,6 +60,9 @@ class PyExecutor(InterpretedExecutor):
         use_sandbox: bool = True,
         security_check: bool = False,
         check_runtime: bool = False,  # Python is always available
+        graphics: bool = False,
+        figure_dir: Optional[str] = None,
+        figure_prefix: str = "",
     ):
         """
         Initialize the Python executor.
@@ -65,6 +77,13 @@ class PyExecutor(InterpretedExecutor):
         super().__init__(working_dir, timeout, use_safe_env=True, check_runtime=check_runtime)
         self.use_sandbox = use_sandbox and SANDBOX_AVAILABLE
         self.security_check = security_check
+        # Graphics tests (#237): evaluated inside the job, never in the
+        # harness. `plt` is bound in the job's namespace so `plt.<expr>`
+        # names extract like variables; figures are saved into the private
+        # result dir and copied out (size-capped, no symlinks) to figure_dir.
+        self.graphics = graphics
+        self.figure_dir = figure_dir
+        self.figure_prefix = figure_prefix
 
     def _get_interpreter_command(self) -> List[str]:
         """
@@ -133,9 +152,41 @@ class PyExecutor(InterpretedExecutor):
             "    'exectime': 0,",
             "}",
             "",
-            "# Capture output",
-            "stdout_capture = io.StringIO()",
-            "stderr_capture = io.StringIO()",
+            "# Capture output, bounded while it is written (#237): an output",
+            "# flood must not grow the job's memory or the result file.",
+            "class _BoundedCapture(io.TextIOBase):",
+            "    # Keeps at most `limit` UTF-8 bytes; empty writes store nothing.",
+            "    def __init__(self, limit):",
+            "        self._parts, self._kept, self._limit, self.dropped = [], 0, limit, 0",
+            "    def writable(self):",
+            "        return True",
+            "    def write(self, s):",
+            "        if not isinstance(s, str):",
+            "            raise TypeError('write() argument must be str')",
+            "        if not s:",
+            "            return 0",
+            "        room = self._limit - self._kept",
+            "        kept_chars = 0",
+            "        if room > 0:",
+            "            # s[:room] holds at least `room` bytes (>= 1 byte per char);",
+            "            # cut the encoding to the byte budget, dropping a split char.",
+            "            data = s[:room].encode('utf-8', 'replace')[:room]",
+            "            data = data.decode('utf-8', 'ignore').encode('utf-8')",
+            "            if data:",
+            "                self._parts.append(data)",
+            "                self._kept += len(data)",
+            "                kept_chars = len(data.decode('utf-8'))",
+            "            if len(data) < room and kept_chars < len(s):",
+            "                self._kept = self._limit  # budget exhausted mid-char",
+            "        self.dropped += len(s) - kept_chars",
+            "        return len(s)",
+            "    def getvalue(self):",
+            "        text = b''.join(self._parts).decode('utf-8', 'replace')",
+            "        if self.dropped:",
+            "            text += '\\n[... output truncated: %d more characters discarded ...]\\n' % self.dropped",
+            "        return text",
+            f"stdout_capture = _BoundedCapture({max_output_bytes()})",
+            f"stderr_capture = _BoundedCapture({max_output_bytes()})",
             "",
         ]
 
@@ -209,6 +260,17 @@ class PyExecutor(InterpretedExecutor):
             "",
         ])
 
+        if self.graphics:
+            lines.extend([
+                "# Graphics test: expose pyplot for plt.<expr> extraction",
+                "try:",
+                "    import matplotlib.pyplot as _ct_plt",
+                "    namespace['plt'] = _ct_plt",
+                "except Exception as e:",
+                "    result['warnings'].append('matplotlib unavailable: %s' % e)",
+                "",
+            ])
+
         # Extract variables
         if variables_to_extract:
             lines.append("# Extract requested variables")
@@ -254,6 +316,21 @@ class PyExecutor(InterpretedExecutor):
                 ])
             lines.append("")
 
+        if self.graphics and self.figure_dir:
+            escaped_figs = self.escape_path(
+                os.path.join(os.path.dirname(result_path), FIGURE_SUBDIR))
+            lines.extend([
+                "# Save open figures for the harness to collect",
+                "try:",
+                "    import matplotlib.pyplot as _ct_plt",
+                f"    os.makedirs('{escaped_figs}', exist_ok=True)",
+                f"    for _ct_n in _ct_plt.get_fignums()[:{MAX_FIGURES}]:",
+                f"        _ct_plt.figure(_ct_n).savefig(os.path.join('{escaped_figs}', 'figure_%d.png' % _ct_n))",
+                "except Exception as e:",
+                "    result['warnings'].append('could not save figures: %s' % e)",
+                "",
+            ])
+
         lines.extend([
             "# Write result to file",
             f"with open('{escaped_result}', 'w') as f:",
@@ -261,6 +338,46 @@ class PyExecutor(InterpretedExecutor):
         ])
 
         return "\n".join(lines)
+
+    def _collect_artifacts(self, sandbox_dir: str) -> None:
+        """Copy saved figures out of the job's private dir (#237).
+
+        Only ``figure_<n>.png`` regular files directly in the figures dir are
+        taken, read without following symlinks and capped in size.
+        """
+        if not (self.graphics and self.figure_dir):
+            return
+        figures = os.path.join(sandbox_dir, FIGURE_SUBDIR)
+        # The job controls this directory: open it without following a
+        # symlink and examine a bounded number of entries, keeping only the
+        # MAX_FIGURES lowest-numbered candidates (no full listing or sort).
+        try:
+            dir_fd = os.open(figures, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        except OSError:
+            return
+        candidates = []  # (figure number, name), at most MAX_FIGURES
+        try:
+            with os.scandir(dir_fd) as entries:
+                for examined, entry in enumerate(entries):
+                    if examined >= MAX_FIGURE_DIR_ENTRIES:
+                        break
+                    match = _FIGURE_NAME.fullmatch(entry.name)
+                    if not match:
+                        continue
+                    candidates.append((int(match.group(1)), entry.name))
+                    if len(candidates) > MAX_FIGURES:
+                        candidates.remove(max(candidates))
+        finally:
+            os.close(dir_fd)
+        for _number, name in sorted(candidates):
+            try:
+                data = read_untrusted_bytes(os.path.join(figures, name),
+                                            root=sandbox_dir)
+            except OSError:
+                continue
+            target = os.path.join(self.figure_dir, f"{self.figure_prefix}_{name}")
+            with open(target, "wb") as f:
+                f.write(data)
 
     def execute_script(
         self,
@@ -290,8 +407,8 @@ class PyExecutor(InterpretedExecutor):
         if self.security_check and SANDBOX_AVAILABLE:
             full_path = script_path if os.path.isabs(script_path) else os.path.join(self.working_dir, script_path)
             try:
-                with open(full_path, 'r') as f:
-                    code = f.read()
+                # Student-controlled: no symlinks/FIFOs, size-capped (#237).
+                code = read_untrusted_text(full_path)
                 report = analyze_python_security(code)
                 if not report.safe:
                     return {

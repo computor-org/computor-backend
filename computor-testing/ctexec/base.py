@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .environment import get_safe_env
 from .exceptions import ExecutorError, RuntimeNotFoundError
-from .resources import ResourceLimits, make_preexec_fn
+from .resources import ResourceLimits, default_resource_limits, make_preexec_fn
 from .runtime import check_runtime_installed, get_runtime_info, RuntimeType, get_binary_path
 
 
@@ -46,7 +46,10 @@ def sandbox_command_prefix(
     # child's HOME (and thus Python's user-site) is redirected away from where
     # the sandbox package is installed.
     from sandbox import launch as _launch
-    argv = [sys.executable, os.path.abspath(_launch.__file__), "--required"]
+    # The launcher is exec'd directly by this (harness) process, so it can
+    # verify that the harness is still its parent once PDEATHSIG is armed.
+    argv = [sys.executable, os.path.abspath(_launch.__file__), "--required",
+            "--expected-parent-pid", str(os.getpid())]
     if workdir:
         argv += ["--workdir", workdir]
     for path in rw_paths or []:
@@ -132,7 +135,9 @@ class BaseExecutor(ABC):
             timeout: Timeout in seconds (uses default if None)
             use_safe_env: Use safe environment variables
             check_runtime: Check if runtime is available on init
-            resource_limits: Optional resource limits (CPU, memory, etc.)
+            resource_limits: Resource limits (CPU, memory, etc.); None means
+                the per-job defaults from default_resource_limits(), never
+                unbounded
 
         Raises:
             RuntimeNotFoundError: If check_runtime=True and runtime not found
@@ -140,7 +145,7 @@ class BaseExecutor(ABC):
         self.working_dir = working_dir or os.getcwd()
         self.timeout = timeout if timeout is not None else self.default_timeout
         self.use_safe_env = use_safe_env
-        self.resource_limits = resource_limits
+        self.resource_limits = resource_limits or default_resource_limits()
 
         # Check runtime availability
         if check_runtime and self.language:

@@ -19,6 +19,8 @@ from ctcore.models import (
     StatusEnum,
     QualificationEnum,
 )
+from ctexec.safe_io import read_untrusted_text
+
 from .conftest import report_key, Solution
 from testers.executors.document import TextAnalyzer, TextMetrics
 from ctcore.helpers import get_property_as_list
@@ -46,7 +48,11 @@ def get_analyzer(pytestconfig, file_path: str) -> TextAnalyzer:
     if not os.path.exists(file_path):
         return None
 
-    analyzer = TextAnalyzer.from_file(file_path)
+    # Only the student directory is trusted; no symlink below it (#237).
+    student_root = _report["specification"].studentDirectory
+    if not os.path.isabs(student_root):
+        student_root = os.path.join(_report["root"], student_root)
+    analyzer = TextAnalyzer.from_file(file_path, root=student_root)
     analyzer.analyze()  # Pre-compute metrics
     analyzed_files[file_path] = analyzer
     _report["analyzed_files"] = analyzed_files
@@ -267,8 +273,8 @@ class TestComputorDocument:
             if not os.path.exists(file_path):
                 pytest.fail(f"File `{file}` not found")
 
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            # Student-controlled: no symlinks/FIFOs, size-capped (#237).
+            content = read_untrusted_text(file_path, root=dir_student)
 
             if pattern:
                 flags = re.IGNORECASE if ignore_case else 0

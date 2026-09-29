@@ -28,6 +28,7 @@ from ctcore.models import (
     QualificationEnum,
 )
 from ctcore.helpers import get_property_as_list, token_exchange
+from ctexec.safe_io import read_untrusted_text
 
 
 # =============================================================================
@@ -704,8 +705,12 @@ def check_structural(
     if not file_path or not os.path.exists(file_path):
         pytest.fail(f"Source file not found for structural test")
 
-    with open(file_path, 'r') as f:
-        code = f.read()
+    # Student-controlled: no symlink in any component, regular file only
+    # (a FIFO must not block the harness), size-capped (#237).
+    try:
+        code = read_untrusted_text(file_path, root=dir_student)
+    except OSError as e:
+        pytest.fail(f"Source file rejected for structural test: {e}")
 
     if pattern:
         try:

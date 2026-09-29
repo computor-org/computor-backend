@@ -18,6 +18,7 @@ from ctcore.security import safe_regex_findall, RegexTimeoutError
 
 from ctexec import BaseExecutor, ExecutorResult
 from ctexec.runtime import RuntimeType
+from ctexec.safe_io import read_untrusted_text
 
 
 @dataclass
@@ -125,7 +126,7 @@ class DocumentAnalyzer(BaseExecutor):
         return True, "Built-in text analyzer"
 
     @classmethod
-    def from_file(cls, file_path: str) -> "DocumentAnalyzer":
+    def from_file(cls, file_path: str, root: Optional[str] = None) -> "DocumentAnalyzer":
         """
         Create a DocumentAnalyzer from a file path.
 
@@ -139,8 +140,8 @@ class DocumentAnalyzer(BaseExecutor):
         path = Path(file_path)
         analyzer._is_markdown = path.suffix.lower() in ('.md', '.markdown', '.mdown')
 
-        with open(file_path, 'r', encoding='utf-8') as f:
-            analyzer._content = f.read()
+        # Student-controlled: no symlinks/FIFOs, size-capped (#237).
+        analyzer._content = read_untrusted_text(file_path, root=root)
 
         return analyzer
 
@@ -181,8 +182,8 @@ class DocumentAnalyzer(BaseExecutor):
             path = Path(source_path)
             self._is_markdown = path.suffix.lower() in ('.md', '.markdown', '.mdown')
 
-            with open(source_path, 'r', encoding='utf-8') as f:
-                self._content = f.read()
+            # Student-controlled: no symlinks/FIFOs, size-capped (#237).
+            self._content = read_untrusted_text(source_path, root=self.working_dir)
 
             # Analyze
             metrics = self.analyze()

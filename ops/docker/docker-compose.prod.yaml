@@ -301,6 +301,13 @@ services:
     build:
       context: ../../
       dockerfile: ./docker/temporal-worker-testing/Dockerfile
+      args:
+        WORKER_UID: ${TESTING_WORKER_UID:-23100}
+        WORKER_GID: ${TESTING_WORKER_GID:-23100}
+    # Dedicated UID, not shared with Coder workspaces (uid 1000): RLIMIT_NPROC
+    # is per UID host-wide, so COMPUTOR_JOB_MAX_PROCESSES only means "per job
+    # budget" if nothing else runs under this UID (#237). Must match the args.
+    user: "${TESTING_WORKER_UID:-23100}:${TESTING_WORKER_GID:-23100}"
     networks:
       - computor-network
     restart: unless-stopped
@@ -320,11 +327,38 @@ services:
     command: ["--queues=testing"]
     deploy:
       replicas: ${TESTING_WORKER_REPLICAS:-2}
+    # Container-wide bounds for everything the worker and its student jobs do
+    # together (#237). Per job, ctexec applies rlimits (COMPUTOR_JOB_*); these
+    # cgroup limits cap the sum, so concurrent hostile jobs can exhaust at most
+    # this replica, never the host. pids_limit is the real fork-bomb ceiling:
+    # RLIMIT_NPROC is per UID, not per container (see docker-compose.matlab.yaml).
+    # Memory: 4 concurrent jobs x 2 GiB RLIMIT_AS = 8 GiB, plus 2 GiB headroom
+    # for the worker, the harness and the job supervisors. RLIMIT_AS is per
+    # process, so a multi-process job can still exceed 2 GiB; the cgroup limit
+    # is the backstop, and jobs run with oom_score_adj=1000 so the OOM killer
+    # takes student processes before the worker. Keep in sync with dev.
+    mem_limit: ${TESTING_WORKER_MEM_LIMIT:-10g}
+    cpus: ${TESTING_WORKER_CPUS:-4}
+    pids_limit: ${TESTING_WORKER_PIDS_LIMIT:-2048}
+    # tini as PID 1 reaps orphaned processes, so killed job trees do not pile
+    # up as zombies against pids_limit.
+    init: true
     environment:
       - TZ=UTC
       - RUNNING_IN_DOCKER=true
       # Isolate every student process spawned by the test harness (#240, #241).
       - COMPUTOR_SANDBOX_ENABLE=1
+      # Test activities this replica runs at once (SDK default: 100). Each may
+      # use up to COMPUTOR_JOB_MEMORY_BYTES; keep the product under mem_limit
+      # minus ~2 GiB headroom for the worker and harness.
+      - TEMPORAL_MAX_CONCURRENT_ACTIVITIES=${TESTING_WORKER_MAX_CONCURRENT_ACTIVITIES:-4}
+      # Per-job rlimits (computor-testing/ctexec/resources.py); empty = default.
+      - COMPUTOR_JOB_CPU_SECONDS=${COMPUTOR_JOB_CPU_SECONDS:-60}
+      - COMPUTOR_JOB_MEMORY_BYTES=${COMPUTOR_JOB_MEMORY_BYTES:-2147483648}
+      - COMPUTOR_JOB_MAX_PROCESSES=${COMPUTOR_JOB_MAX_PROCESSES:-512}
+      - COMPUTOR_JOB_MAX_FILE_SIZE=${COMPUTOR_JOB_MAX_FILE_SIZE:-67108864}
+      - COMPUTOR_JOB_MAX_OPEN_FILES=${COMPUTOR_JOB_MAX_OPEN_FILES:-256}
+      - COMPUTOR_JOB_MAX_OUTPUT_BYTES=${COMPUTOR_JOB_MAX_OUTPUT_BYTES:-1048576}
       - TEMPORAL_HOST=temporal
       - TEMPORAL_PORT=7233
       - TEMPORAL_NAMESPACE=default
