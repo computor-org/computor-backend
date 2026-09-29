@@ -1,0 +1,13 @@
+# Input for requirements-py312.lock: the third-party dependencies of the
+# standalone computor-testing images (Dockerfile.sandbox, docker/Dockerfile.*,
+# python:3.12). The two local packages are resolved from source for their
+# dependencies and then left out of the lock (--no-emit-package); the images
+# install them with --no-deps after the hashed lock.
+-r requirements.txt
+pandas
+./computor-types
+./computor-testing
+# Build backend for the --no-build-isolation install of the local packages, so
+# pip does not fetch an unpinned setuptools into an isolated build env.
+setuptools
+wheel

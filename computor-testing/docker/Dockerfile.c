@@ -3,7 +3,7 @@
 # Container for testing C/C++ code submissions.
 #
 # Usage:
-#   docker build -f docker/Dockerfile.c -t ct-c .
+#   docker build -f computor-testing/docker/Dockerfile.c -t ct-c .   (from the repo root)
 #
 #   docker run --rm \
 #     --user 1000:1000 \
@@ -22,7 +22,7 @@
 #     ct-c \
 #     ctester run -t /sandbox/submission -T /sandbox/tests/test.yaml
 
-FROM python:3.12-slim
+FROM python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
 
 LABEL maintainer="Computor Testing Framework"
 LABEL description="C/C++ sandbox for testing student code"
@@ -44,8 +44,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy and install the testing framework
 WORKDIR /opt/ct-testing
+# Third-party deps from the hashed lock (computor-testing/requirements-py312.lock,
+# which also covers computor-types' deps and the build backend), then the two
+# local packages with --no-deps / --no-build-isolation so nothing floats.
+COPY computor-testing/requirements-py312.lock /tmp/requirements-py312.lock
+RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements-py312.lock \
+    && rm /tmp/requirements-py312.lock
+COPY computor-types /opt/computor-types/
 COPY computor-testing /opt/ct-testing/
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir --no-deps --no-build-isolation /opt/computor-types -e .
 
 # Create sandbox structure
 RUN mkdir -p /sandbox/submission /sandbox/tests /sandbox/output \
