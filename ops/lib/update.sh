@@ -137,25 +137,130 @@ keycloak_predump() { # dest.sql.gz ; Keycloak itself must already be stopped
     mv -f "$tmp" "$dest"
 }
 
+# --- recovery marker ----------------------------------------------------------------
+# Written when the Keycloak guard keeps maintenance after a failed upgrade. While it
+# exists, updates and 'maintenance exit' refuse to run; only 'update recover' (which
+# health-checks the result) clears it. File = authoritative (host-persistent);
+# Redis update:recovery = mirror for the admin UI.
+UPDATE_KEY_RECOVERY="update:recovery"
+
+recovery_marker_file() { echo "$(updater_state_dir)/recovery-required"; }
+
+recovery_required() {
+    [ -f "$(recovery_marker_file)" ] && return 0
+    [ "$(redis_cli EXISTS "$UPDATE_KEY_RECOVERY" 2>/dev/null)" = "1" ]
+}
+
+recovery_marker_get() { # key -> value from the marker file
+    sed -n "s/^$1=//p" "$(recovery_marker_file)" 2>/dev/null | head -n 1
+}
+
+write_recovery_marker() { # reason from-commit to-commit kc-from kc-to dump
+    local f
+    f="$(recovery_marker_file)"
+    { printf 'reason=%s\nfrom_commit=%s\nto_commit=%s\nkeycloak_from=%s\nkeycloak_to=%s\ndump=%s\ncreated_at=%s\n' \
+        "$1" "$2" "$3" "$4" "$5" "$6" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$f.tmp" && mv -f "$f.tmp" "$f"; } \
+        || ulog "WARNING: could not write $f (Redis marker still set)"
+    redis_cli HSET "$UPDATE_KEY_RECOVERY" reason "$1" from_commit "$2" to_commit "$3" \
+        keycloak_from "$4" keycloak_to "$5" dump "$6" >/dev/null || true
+}
+
+clear_recovery_marker() {
+    rm -f "$(recovery_marker_file)"
+    redis_cli DEL "$UPDATE_KEY_RECOVERY" >/dev/null || true
+}
+
+wait_for_keycloak() {
+    local i
+    for ((i = 1; i <= UPDATE_HEALTH_TRIES; i++)); do
+        [ "$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$KEYCLOAK_CONTAINER" 2>/dev/null)" = "healthy" ] && return 0
+        sleep 5
+    done
+    return 1
+}
+
+keycloak_restore_dump() { # dump expected-version ; Keycloak must be stopped
+    local dump="$1" want="$2" got i
+    keycloak_dump_is_complete "$dump" || { ulog "dump $dump missing or incomplete"; return 1; }
+    compose up -d "$KEYCLOAK_DB_SERVICE" >/dev/null 2>&1 || return 1
+    for ((i = 1; i <= 30; i++)); do
+        compose exec -T "$KEYCLOAK_DB_SERVICE" pg_isready -U keycloak -p 5438 >/dev/null 2>&1 && break
+        sleep 2
+    done
+    compose exec -T "$KEYCLOAK_DB_SERVICE" psql -U keycloak -p 5438 -d postgres -q \
+        -c 'DROP DATABASE IF EXISTS keycloak WITH (FORCE)' >/dev/null || return 1
+    # pg_dumpall output re-creates roles/DBs that already exist: those errors are expected.
+    gzip -dc "$dump" | compose exec -T "$KEYCLOAK_DB_SERVICE" psql -U keycloak -p 5438 -d postgres -q >/dev/null 2>&1
+    got=$(compose exec -T "$KEYCLOAK_DB_SERVICE" psql -U keycloak -p 5438 -d keycloak -Atc \
+        'select version from migration_model order by update_time desc limit 1' 2>/dev/null | tr -d '[:space:]')
+    [ "$got" = "$want" ] || { ulog "restored Keycloak schema is '${got}', expected '${want}'"; return 1; }
+}
+
+# ./computor.sh update recover prod restore|keep-new
+#   restore  : stop Keycloak, check out the pre-upgrade commit, restore the pre-upgrade
+#              dump (verified schema version), rebuild, start, health-check
+#   keep-new : keep the new version (fixed forward), start, health-check
+# Maintenance and the marker are cleared only when every health check passes.
+cmd_update_recover() {
+    ENVIRONMENT="${1:-prod}"
+    local mode="${2:-}" branch dump from_commit kc_from
+    [ "$ENVIRONMENT" = "prod" ] || die "Recovery only applies to prod."
+    update_env_init "$ENVIRONMENT"
+    case "$mode" in restore|keep-new) ;; *) die "Usage: $0 update recover prod restore|keep-new" ;; esac
+    recovery_required || die "No update recovery is pending."
+    if [ "$(redis_cli SET "$UPDATE_KEY_LOCK" "recover-$$" NX EX $UPDATE_LOCK_TTL)" != "OK" ]; then
+        die "An update is in progress (update:lock is held)."
+    fi
+    branch="${SYSTEM_REPO_BRANCH:-main}"
+    dump=$(recovery_marker_get dump)
+    from_commit=$(recovery_marker_get from_commit)
+    kc_from=$(recovery_marker_get keycloak_from)
+
+    recover_fail() {
+        ulog "RECOVERY FAILED ($mode): $1 — maintenance stays up, recovery still required"
+        set_update_state status recovery_failed error "$1" finished_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        redis_cli DEL "$UPDATE_KEY_LOCK" >/dev/null || true
+        exit 1
+    }
+
+    set_update_state status running phase recovering message "Recovery (${mode})" error ""
+    if [ "$mode" = "restore" ]; then
+        [ -n "$dump" ] && [ -n "$from_commit" ] && [ -n "$kc_from" ] \
+            || recover_fail "recovery marker lacks dump/from_commit/keycloak_from (Redis-only marker?)"
+        keycloak_stop_verified || recover_fail "Keycloak did not stop cleanly"
+        git -C "$REPO_ROOT" checkout -q -B "$branch" "$from_commit" || recover_fail "checkout of ${from_commit} failed"
+        keycloak_restore_dump "$dump" "$kc_from" || recover_fail "restoring ${dump} failed"
+        ulog "Keycloak DB restored from ${dump} (schema ${kc_from})"
+        build_images || recover_fail "image build for ${from_commit} failed"
+    fi
+    compose up -d || recover_fail "'compose up' failed"
+    wait_for_keycloak || recover_fail "Keycloak did not become healthy"
+    wait_for_api || recover_fail "API health check timed out"
+    wait_for_frontend || recover_fail "frontend health check timed out"
+
+    clear_recovery_marker
+    deactivate_traefik_maintenance
+    set_redis_maintenance "0" ""
+    set_update_state status recovered message "Recovery (${mode}) succeeded" error "" \
+        finished_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    redis_cli DEL "$UPDATE_KEY_LOCK" >/dev/null || true
+    ulog "Recovery (${mode}) succeeded; maintenance lifted."
+}
+
 keycloak_restore_instructions() { # dump from-commit from-tag
     cat <<INSTR
 Keycloak was upgraded in place and its database may already be migrated.
 Keycloak does not support downgrades; the previous code was NOT restored.
-Maintenance mode stays active. To roll back manually:
-  1. docker stop computor-keycloak
-  2. git -C $REPO_ROOT checkout -B ${SYSTEM_REPO_BRANCH:-main} $2
-  3. docker start $KEYCLOAK_DB_CONTAINER
-     docker exec $KEYCLOAK_DB_CONTAINER psql -U keycloak -p 5438 -d postgres -c 'DROP DATABASE keycloak WITH (FORCE)'
-     gzip -dc $1 | docker exec -i $KEYCLOAK_DB_CONTAINER psql -U keycloak -p 5438 -d postgres
-     (errors about already-existing roles/databases other than keycloak are expected)
-  4. ./computor.sh up prod                   (starts Keycloak $3 on the restored DB)
-  5. ./computor.sh maintenance exit prod
-Alternatively fix forward on the new version and exit maintenance.
+Maintenance mode stays active and further updates are blocked until recovery:
+  ./computor.sh update recover prod restore    # restore $1, back to $2 (Keycloak $3)
+  ./computor.sh update recover prod keep-new   # after fixing forward on the new version
+Both health-check Keycloak, API and frontend before lifting maintenance.
 INSTR
 }
 
-keycloak_block_rollback() { # reason dump from-commit from-tag ; never returns
+keycloak_block_rollback() { # reason dump from-commit from-tag [to-commit to-tag] ; never returns
     local line
+    write_recovery_marker "$1" "$3" "${5:-}" "$4" "${6:-}" "$2"
     set_update_state keycloak_restore_dump "$2"
     while IFS= read -r line; do ulog "$line"; done < <(keycloak_restore_instructions "$2" "$3" "$4")
     fail_update "Update failed ($1) after the Keycloak ${4} -> new version switch; automatic rollback refused (Keycloak DB downgrade unsupported). Maintenance page stays up; pre-upgrade dump: $2. See the update log for the restore procedure."
@@ -353,7 +458,7 @@ cmd_update_exec() {
 
     do_rollback() { # reason
         if [ "$kc_switched" = "1" ]; then
-            keycloak_block_rollback "$1" "$kc_dump" "$from_commit" "$kc_from"
+            keycloak_block_rollback "$1" "$kc_dump" "$from_commit" "$kc_from" "$to_commit" "$kc_to"
         fi
         set_phase rolling_back "Update failed ($1) — restoring ${from_commit}"
         if ! git -C "$REPO_ROOT" checkout -q -B "$branch" "$from_commit"; then
@@ -380,6 +485,9 @@ cmd_update_exec() {
 
     # 1. preflight ------------------------------------------------------------
     set_phase preflight
+    if recovery_required; then
+        fail_update "Recovery required after a failed Keycloak upgrade ($(recovery_marker_get reason)); maintenance stays up. Run './computor.sh update recover prod restore|keep-new'."
+    fi
     [ -n "$url" ] || fail_update "SYSTEM_REPO_URL is not set in .env"
     git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1 \
         || fail_update "$REPO_ROOT is not a git repository"
@@ -483,13 +591,15 @@ dispatch_update() {
         status) cmd_update_status "$@" ;;
         run)    cmd_update_run "$@" ;;
         exec)   cmd_update_exec "$@" ;;
+        recover) cmd_update_recover "$@" ;;
         *)
-            echo "Usage: $0 update {check|status|run|exec} [prod]"
+            echo "Usage: $0 update {check|status|run|exec} [prod] | recover prod restore|keep-new"
             echo ""
             echo "  check   Compare local HEAD with the tracked remote branch"
             echo "  status  Show the state of the last/current update run"
             echo "  run     Execute a full update now (maintenance + rebuild + restart)"
             echo "  exec    Executor entry point (used by 'run' and the updater sidecar)"
+            echo "  recover Finish a Keycloak upgrade that kept maintenance (restore dump, or keep new)"
             exit 1
             ;;
     esac

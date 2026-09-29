@@ -231,7 +231,9 @@ cmd_up() {
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/traefik/dynamic"
 
     # Clear stale maintenance mode config (if services are starting, maintenance is over)
-    if [ -f "${SYSTEM_DEPLOYMENT_PATH}/traefik/dynamic/maintenance.yaml" ]; then
+    if [ -f "${SYSTEM_DEPLOYMENT_PATH}/updater/recovery-required" ]; then
+        warn "  Update recovery pending — keeping maintenance mode (use './computor.sh update recover prod ...')"
+    elif [ -f "${SYSTEM_DEPLOYMENT_PATH}/traefik/dynamic/maintenance.yaml" ]; then
         warn "  Clearing stale maintenance mode config"
         rm -f "${SYSTEM_DEPLOYMENT_PATH}/traefik/dynamic/maintenance.yaml"
     fi
@@ -642,6 +644,11 @@ cmd_maintenance() {
             ;;
 
         exit)
+            # A failed Keycloak upgrade left the system needing recovery: lifting
+            # maintenance without it would expose an unverified Keycloak/DB state.
+            if [ -f "${SYSTEM_DEPLOYMENT_PATH}/updater/recovery-required" ]; then
+                die "Update recovery pending (${SYSTEM_DEPLOYMENT_PATH}/updater/recovery-required). Run './computor.sh update recover prod restore|keep-new'; it lifts maintenance after health checks."
+            fi
             log "${GREEN}=== Exiting Maintenance Mode ===${NC}"
             log "Environment: ${BLUE}$ENVIRONMENT${NC}"
 
