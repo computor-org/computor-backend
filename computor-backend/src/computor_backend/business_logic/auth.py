@@ -16,6 +16,7 @@ from computor_backend.exceptions import (
     NotFoundException,
     ForbiddenException,
     ServiceUnavailableException,
+    ConflictException,
 )
 from computor_backend.business_logic.instance_limits import (
     enforce_login_cap,
@@ -873,26 +874,35 @@ async def provision_keycloak_login(
     password: str,
     given_name: str = "",
     family_name: str = "",
+    email_verified: bool = True,
 ) -> Tuple[str, bool]:
-    """Create (or password-reset) a Keycloak login for ``email``.
+    """Create a Keycloak login for ``email`` with ``password``.
 
-    Username == email is the single matching key across systems. If the Keycloak
-    user already exists its password is reset; otherwise it is created with the
-    password live (no temporary flag, no email round-trip).
+    Never touches an existing Keycloak user: if one already has this email
+    the call is refused (ConflictException). Resetting its password here
+    handed any invite holder the account behind a victim's email.
+
+    ``email_verified=False`` creates the login with the VERIFY_EMAIL required
+    action, so Keycloak will not issue tokens until the address is confirmed
+    — the proof of ownership an adopted pre-provisioned user needs before the
+    first SSO login links to it by email.
 
     This performs NO identity verification — the caller must first establish
-    authorization (a verified GitLab PAT, or a valid invite token).
+    authorization (a valid invite token).
 
-    Returns ``(keycloak_user_id, created)``.
+    Returns ``(keycloak_user_id, True)``.
     """
     kc = KeycloakAdminClient()
 
     # Match existing users by email — the Keycloak username is a generated handle,
     # not the email, so it can't be used as the lookup key.
-    existing_id = await kc._get_user_id_by_email(email)
-    if existing_id:
-        await kc.set_user_password(existing_id, password, temporary=False)
-        return existing_id, False
+    if await kc._get_user_id_by_email(email):
+        raise ConflictException(
+            detail=(
+                "A login for this email address already exists. Sign in, or use "
+                "'Forgot password' on the sign-in page."
+            )
+        )
 
     # Username is a generated, Forgejo-safe handle (never the email) so that
     # Forgejo's OIDC preferred_username maps to a valid Forgejo account name.
@@ -913,7 +923,8 @@ async def provision_keycloak_login(
                 firstName=given_name or email.split("@")[0],
                 lastName=family_name or "User",
                 enabled=True,
-                emailVerified=True,
+                emailVerified=email_verified,
+                requiredActions=None if email_verified else ["VERIFY_EMAIL"],
                 credentials=[{"type": "password", "value": password, "temporary": False}],
             ))
             return kc_user_id, True

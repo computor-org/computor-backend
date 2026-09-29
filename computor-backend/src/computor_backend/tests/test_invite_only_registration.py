@@ -167,7 +167,7 @@ def env(monkeypatch):
         s.close()
         return uid
 
-    def make_invite(*, created_by=None, max_uses=1, expired=False):
+    def make_invite(*, created_by=None, max_uses=1, expired=False, email=None):
         s = Session()
         delta = timedelta(days=-1 if expired else 7)
         inv = InviteLink(
@@ -175,6 +175,7 @@ def env(monkeypatch):
             created_by=created_by,
             max_uses=max_uses,
             use_count=0,
+            email=email,
             expires_at=datetime.now(timezone.utc) + delta,
             roles=[],
             note=f"test-{suffix}",
@@ -586,7 +587,7 @@ def test_password_invite_accept_respects_the_cap(env, monkeypatch):
 
     monkeypatch.setattr(auth_mod, "provision_keycloak_login", _provision)
     env.settings(registration_mode="invite_only", max_registered_users=env.registered())
-    token = env.make_invite()
+    token = env.make_invite(email=f"pwuser.{env.suffix}@test.local")
     payload = InviteAccept(given_name="Pw", family_name="User",
                            email=f"pwuser.{env.suffix}@test.local", password="x")
     s = env.Session()
@@ -668,3 +669,77 @@ def test_same_identity_racing_its_own_first_login_is_one_user_and_never_refused(
     assert sorted(r["is_new_user"] for r in results) == [False, True]
     assert results[0]["user_id"] == results[1]["user_id"]
     assert env.kc_deleted == []
+
+
+def test_generic_invite_in_gated_mode_must_use_join(env, monkeypatch):
+    """The password path trusts the typed email; while gated it needs a bound invite."""
+    from computor_backend.api.invites import accept_invite
+    from computor_backend.exceptions import BadRequestException
+    from computor_types.invites import InviteAccept
+
+    async def _provision(**kwargs):  # pragma: no cover - must not be reached
+        raise AssertionError("provisioned")
+
+    monkeypatch.setattr(auth_mod, "provision_keycloak_login", _provision)
+    env.settings(registration_mode="invite_only")
+    token = env.make_invite()
+    s = env.Session()
+    with pytest.raises(BadRequestException):
+        asyncio.run(accept_invite(token, InviteAccept(
+            given_name="G", family_name="U", email=f"generic.{env.suffix}@test.local",
+            password="x"), s))
+    s.close()
+    assert env.invite(token).use_count == 0
+
+
+def test_two_password_accepts_of_a_single_use_invite_admit_exactly_one(env, monkeypatch):
+    """Reviewer repro: both accepted and use_count stayed 1.
+
+    The first accept is held inside Keycloak provisioning — after the invite
+    is spent, before commit. The second must wait on the invite row and then
+    be refused; exactly one user may exist afterwards.
+    """
+    from computor_backend.api.invites import accept_invite
+    from computor_backend.exceptions import BadRequestException
+    from computor_types.invites import InviteAccept
+
+    held, release = threading.Event(), threading.Event()
+
+    async def _provision(**kwargs):
+        if kwargs["email"].startswith("pwrace1."):
+            held.set()
+            await asyncio.get_running_loop().run_in_executor(None, release.wait, 30)
+        return "kc", True
+
+    monkeypatch.setattr(auth_mod, "provision_keycloak_login", _provision)
+    env.settings(registration_mode="open")
+    token = env.make_invite()
+    results = {}
+
+    def _run(name):
+        s = env.Session()
+        try:
+            results[name] = asyncio.run(accept_invite(token, InviteAccept(
+                given_name=name, family_name="Race", email=f"{name}.{env.suffix}@test.local",
+                password="x"), s))
+        except Exception as exc:  # noqa: BLE001 - the outcome is the assertion
+            results[name] = exc
+        finally:
+            s.close()
+
+    a = threading.Thread(target=_run, args=("pwrace1",))
+    b = threading.Thread(target=_run, args=("pwrace2",))
+    try:
+        a.start()
+        assert held.wait(timeout=10), "first accept never reached provisioning"
+        b.start()
+        b.join(timeout=2)
+        assert b.is_alive(), "second accept must wait on the spent invite row"
+    finally:
+        release.set()
+        a.join(timeout=10)
+        b.join(timeout=10)
+    assert isinstance(results["pwrace1"], dict), results["pwrace1"]
+    assert isinstance(results["pwrace2"], BadRequestException), results["pwrace2"]
+    assert env.user("pwrace1") is not None and env.user("pwrace2") is None
+    assert env.invite(token).use_count == 1

@@ -24,6 +24,7 @@ class KeycloakUser(BaseModel):
     credentials: Optional[List[Dict[str, Any]]] = Field(None, description="User credentials")
     attributes: Optional[Dict[str, Any]] = Field(None, description="User attributes")
     groups: Optional[List[str]] = Field(None, description="User groups")
+    requiredActions: Optional[List[str]] = Field(None, description="Required actions, e.g. VERIFY_EMAIL")
 
 
 class KeycloakAdminClient:
