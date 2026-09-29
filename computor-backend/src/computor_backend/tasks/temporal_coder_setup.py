@@ -559,7 +559,10 @@ async def push_coder_template(
             if value and _template_declares_variable(template_dir, name):
                 cmd += ["--variable", f"{name}={value}"]
         cmd += ["--yes"]
-        logger.info(f"Running: {' '.join(cmd)}")
+        # Variable values may be deployment secrets (license servers, manager
+        # overrides): log the names only.
+        logged = [a.split("=", 1)[0] + "=***" if "=" in a else a for a in cmd]
+        logger.info(f"Running: {' '.join(logged)}")
 
         try:
             # Offload the blocking coder CLI subprocess to a thread so the
