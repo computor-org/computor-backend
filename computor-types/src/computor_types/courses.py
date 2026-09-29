@@ -209,6 +209,22 @@ class CoursePublicList(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CoursePublicCatalogEntry(BaseModel):
+    """One row of the anonymous course catalog (GET /public/courses, issue #415).
+
+    Narrower than ``CoursePublicList``: this is read by visitors who are not
+    signed in, so it carries no path, organization, or caller-relative data.
+    ``id`` stays because it is what the register call takes after sign-in.
+    """
+    id: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    language_code: Optional[str] = None
+    # TODO(#415): add seats_left / full once course capacity (PR #242) lands.
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class CoursePublicQuery(ListQuery):
     title: Optional[str] = None
     language_code: Optional[str] = None
