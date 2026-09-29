@@ -536,3 +536,20 @@ def test_real_build_input_outside_workdir_is_granted(tmp_path, sandboxed):
     compiled = executor.compile(["main.c", str(drivers / "driver.c")])
     assert compiled.success, compiled.stderr
     assert executor.run().return_code == 0
+
+
+# --- 11. capture bounded while writing --------------------------------------
+
+def test_print_flood_beyond_memory_limit_is_capped_in_the_job(tmp_path):
+    # 3 GiB through print(): more than RLIMIT_AS (2 GiB). An unbounded
+    # in-job capture dies with MemoryError; a bounded one keeps 1 MiB.
+    result = run_student(tmp_path, """
+        chunk = "q" * (1024 * 1024)
+        for _ in range(3 * 1024):
+            print(chunk)
+        finished = True
+    """, ["finished"], timeout=120)
+    assert result.success, result.error_message
+    assert result.namespace["finished"] is True
+    assert len(result.stdout.encode()) < MIB + 200
+    assert "output truncated" in result.stdout

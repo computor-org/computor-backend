@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from ctexec.process import max_output_bytes
 from ctexec import InterpretedExecutor, ExecutorResult
 from ctexec.exceptions import ExecutionError
 from ctexec.safe_io import read_untrusted_text
@@ -134,9 +135,30 @@ class PyExecutor(InterpretedExecutor):
             "    'exectime': 0,",
             "}",
             "",
-            "# Capture output",
-            "stdout_capture = io.StringIO()",
-            "stderr_capture = io.StringIO()",
+            "# Capture output, bounded while it is written (#237): an output",
+            "# flood must not grow the job's memory or the result file.",
+            "class _BoundedCapture(io.TextIOBase):",
+            "    def __init__(self, limit):",
+            "        self._parts, self._kept, self._limit, self.dropped = [], 0, limit, 0",
+            "    def writable(self):",
+            "        return True",
+            "    def write(self, s):",
+            "        if not isinstance(s, str):",
+            "            raise TypeError('write() argument must be str')",
+            "        room = self._limit - self._kept",
+            "        if room > 0:",
+            "            part = s[:room]",
+            "            self._parts.append(part)",
+            "            self._kept += len(part)",
+            "        self.dropped += len(s) - max(0, min(room, len(s)))",
+            "        return len(s)",
+            "    def getvalue(self):",
+            "        text = ''.join(self._parts)",
+            "        if self.dropped:",
+            "            text += '\\n[... output truncated: %d more characters discarded ...]\\n' % self.dropped",
+            "        return text",
+            f"stdout_capture = _BoundedCapture({max_output_bytes()})",
+            f"stderr_capture = _BoundedCapture({max_output_bytes()})",
             "",
         ]
 
