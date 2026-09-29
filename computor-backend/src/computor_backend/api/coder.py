@@ -1201,6 +1201,9 @@ def _per_template_variables(db: Session) -> dict:
     overrides: dict = {}
     for row in db.query(WorkspaceTemplateSettings).all():
         variables: dict = {}
+        # 0/NULL is not sent; the push activity then passes the template's
+        # positive default explicitly (never unlimited, see
+        # temporal_coder_setup._effective_resource_caps).
         if row.memory_mb:
             variables["memory_mb"] = str(row.memory_mb)
         if row.cpu_shares:
