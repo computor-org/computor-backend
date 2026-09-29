@@ -1,10 +1,10 @@
 [Unit]
-Description=Run the Computor workspace volume disk guard every 10 minutes
+Description=Run the Computor workspace volume disk guard every 60 seconds
 
 [Timer]
 OnBootSec=5min
-OnUnitActiveSec=10min
-RandomizedDelaySec=60
+OnUnitActiveSec=60s
+AccuracySec=5s
 
 [Install]
 WantedBy=timers.target

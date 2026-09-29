@@ -189,17 +189,26 @@ sudo systemctl daemon-reload && sudo systemctl start computor-workspaces.slice
 # then push all templates (the push always sends the memory/CPU caps).
 ```
 
-### Home and scratch volumes
+### Home/scratch volumes and writable layers
 
-Docker named volumes on ext4 have no quota, and a per-workspace loop-mounted
-XFS with project quotas is too heavy to operate here. Instead,
-`ops/coder/home-watchdog/` has a host-side systemd timer that runs every 10
-minutes. It measures every `coder-home-*` and `coder-scratch-*` volume with
-`du -sx` on its mountpoint. When a volume is over `COMPUTOR_HOME_LIMIT_GIB`
-(default 10), it stops the containers that mount it and alerts through syslog
-and the optional `COMPUTOR_HOME_ALERT_URL` webhook. It never deletes data. The
-worst case is a disk fill of up to one timer interval of writes, so keep the
-Docker data root on its own filesystem with headroom.
+Docker named volumes on ext4 have no quota, and overlay2 on ext4 cannot limit
+the writable layer either. Real byte and inode quotas (XFS project quotas on
+the Docker data root) are a tracked follow-up. Until then,
+`ops/coder/home-watchdog/` is supplementary monitoring with after-the-fact
+enforcement, not a quota:
+
+- A systemd timer runs it every 60 s.
+- It measures every `coder-home-*`/`coder-scratch-*` volume (`du -sx`) and
+  every running workspace container's writable layer (`docker inspect --size`,
+  which covers `/tmp`, `/var` and so on).
+- Over `COMPUTOR_HOME_LIMIT_GIB` (default 10) or `COMPUTOR_LAYER_LIMIT_GIB`
+  (default 5) it stops the containers concerned. It alerts through syslog and
+  the optional `COMPUTOR_HOME_ALERT_URL`, and never deletes data.
+- An error on one object is reported and the scan continues. Exit status 2 plus
+  an "enforcement INCOMPLETE" alert means something could not be measured or
+  stopped.
+- Between two runs a workspace can still write at full disk speed. Keep the
+  Docker data root on its own filesystem with headroom.
 
 ```bash
 sudo install -m 0755 ops/coder/home-watchdog/computor-home-watchdog.sh /usr/local/sbin/
