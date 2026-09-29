@@ -272,15 +272,15 @@ def env(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_invite_only_without_a_code_creates_no_user_and_discards_the_keycloak_account(env):
+def test_invite_only_without_a_code_creates_no_user_and_keeps_the_keycloak_account(env):
     env.settings(registration_mode="invite_only")
     result = env.login("nocode")
     assert isinstance(result, RegistrationRefused)
     assert result.reason == "invite_required"
     assert env.user("nocode") is None
-    # The Keycloak account made by the registration form / broker is removed.
-    assert env.kc_deleted == [f"kc-nocode-{env.suffix}"]
-    assert result.discard_identity is True and result.id_token.startswith("idtoken-")
+    # Refusal only logs out; no Keycloak account is ever deleted.
+    assert env.kc_deleted == []
+    assert result.id_token.startswith("idtoken-")
 
 
 def test_valid_code_creates_the_user_consumes_the_invite_and_records_the_referrer(env):
@@ -325,7 +325,7 @@ def test_cap_reached_refuses_even_a_valid_code_and_leaves_it_unspent(env):
     assert isinstance(result, RegistrationRefused) and result.reason == "full"
     assert env.user("capped") is None
     assert env.invite(token).use_count == 0
-    assert env.kc_deleted == [f"kc-capped-{env.suffix}"]
+    assert env.kc_deleted == []
 
 
 def test_cap_applies_in_open_mode_too(env):
@@ -403,7 +403,6 @@ def test_unverified_email_is_refused_but_keeps_the_keycloak_account_and_invite(e
     assert env.invite(token).use_count == 0
     # Not an orphan: the person only has to click the verification link.
     assert env.kc_deleted == []
-    assert result.discard_identity is False
 
 
 def test_verified_email_registration_with_a_valid_code_is_admitted(env):
@@ -414,7 +413,7 @@ def test_verified_email_registration_with_a_valid_code_is_admitted(env):
     assert env.user("emailreg") is not None
 
 
-def test_refused_registration_redirect_skips_keycloak_logout_when_account_was_deleted(monkeypatch):
+def test_refused_registration_redirect_logs_out_of_keycloak(monkeypatch):
     from computor_backend.api import auth as api_auth
 
     plugin = SimpleNamespace(_oidc_config={"end_session_endpoint": "https://kc/logout"})
@@ -424,16 +423,13 @@ def test_refused_registration_redirect_skips_keycloak_logout_when_account_was_de
     )
     monkeypatch.setenv("NEXT_PUBLIC_API_URL", "https://computor.example/api")
 
-    full = RegistrationRefused("full")
-    resp = api_auth._registration_refused_redirect("keycloak", full)
-    assert resp.headers["location"] == "https://computor.example/join/refused?reason=full"
-
-    unverified = RegistrationRefused("email_unverified")
-    unverified.id_token = "tok"
-    loc = api_auth._registration_refused_redirect("keycloak", unverified).headers["location"]
-    assert loc.startswith("https://kc/logout?")
-    assert "state=email_unverified" in loc and "id_token_hint=tok" in loc
-    assert "post_logout_redirect_uri=https%3A%2F%2Fcomputor.example%2Fjoin%2Frefused" in loc
+    for reason in ("full", "email_unverified"):
+        refusal = RegistrationRefused(reason)
+        refusal.id_token = "tok"
+        loc = api_auth._registration_refused_redirect("keycloak", refusal).headers["location"]
+        assert loc.startswith("https://kc/logout?")
+        assert f"state={reason}" in loc and "id_token_hint=tok" in loc
+        assert "post_logout_redirect_uri=https%3A%2F%2Fcomputor.example%2Fjoin%2Frefused" in loc
 
 
 # ---------------------------------------------------------------------------
@@ -631,3 +627,44 @@ def test_referral_invites_cannot_be_redeemed_through_the_password_path(env, monk
     s.close()
     assert env.user("pwfriend") is None
     assert env.invite(token).use_count == 0
+
+
+def test_same_identity_racing_its_own_first_login_is_one_user_and_never_refused(env, monkeypatch):
+    """Reviewer repro: two callbacks of ONE identity for the last seat.
+
+    Without per-identity serialisation both miss the account lookup; one takes
+    the seat and the other is refused as "full" for a login that succeeded.
+    With it, the second waits, then finds the account and simply signs in.
+    """
+    env.settings(registration_mode="invite_only", max_registered_users=env.registered() + 1)
+    token = env.make_invite()
+    held, release = threading.Event(), threading.Event()
+    real_record = auth_mod.record_invite
+
+    def _record(user, consumed):
+        real_record(user, consumed)
+        held.set()
+        release.wait(timeout=30)
+
+    monkeypatch.setattr(auth_mod, "record_invite", _record)
+    results = []
+
+    def _run():
+        results.append(env.login("samebody", invite=token))
+
+    a, b = threading.Thread(target=_run), threading.Thread(target=_run)
+    try:
+        a.start()
+        assert held.wait(timeout=10)
+        b.start()
+        b.join(timeout=2)
+        assert b.is_alive(), "the second callback must wait for the first"
+    finally:
+        release.set()
+        a.join(timeout=10)
+        b.join(timeout=10)
+    assert len(results) == 2
+    assert not any(isinstance(r, RegistrationRefused) for r in results), results
+    assert sorted(r["is_new_user"] for r in results) == [False, True]
+    assert results[0]["user_id"] == results[1]["user_id"]
+    assert env.kc_deleted == []

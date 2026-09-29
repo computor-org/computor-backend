@@ -35,6 +35,7 @@ from computor_backend.business_logic.registration_admission import (
     REASON_EMAIL_UNVERIFIED,
     RegistrationRefused,
     admit_new_user,
+    lock_first_login,
     enroll_in_pilot_courses,
     record_invite,
 )
@@ -448,6 +449,13 @@ async def handle_sso_callback(
         nonlocal user_info, provider, registry
         created_user = False
 
+        # Serialise concurrent first logins of this identity (and email) so
+        # the lookups below see the other attempt's committed rows.
+        lock_first_login(
+            db, provider, user_info.provider_id,
+            user_info.email.strip().lower() if user_info.email else None,
+        )
+
         account = (
             db.query(Account)
             .filter(
@@ -657,10 +665,6 @@ async def handle_sso_callback(
         )
     except RegistrationRefused as refusal:
         refusal.id_token = (auth_result.session_data or {}).get("id_token")
-        if refusal.discard_identity:
-            refusal.discard_identity = await _discard_keycloak_identity(
-                provider, user_info.provider_id
-            )
         logger.info(
             f"Registration refused ({refusal.reason}) for a new {provider} identity"
         )
@@ -733,27 +737,6 @@ async def handle_sso_callback(
         "refresh_token": auth_result.refresh_token if auth_result.refresh_token else "",
         "is_new_user": is_new_user,
     }
-
-
-async def _discard_keycloak_identity(provider: str, keycloak_user_id: Optional[str]) -> bool:
-    """Delete the Keycloak account behind a refused first login.
-
-    Keycloak creates the account (its own registration form, or the first
-    GitHub broker login) before Computor sees the identity, so a refusal would
-    otherwise leave an orphan that can never sign in to Computor. Deleting it
-    also ends its Keycloak sessions. Best effort: returns False if it could
-    not be deleted, in which case the caller still logs the browser out.
-    """
-    # Only the Keycloak plugin's subject is a Keycloak user id.
-    if provider != "keycloak" or not keycloak_user_id:
-        return False
-    try:
-        await KeycloakAdminClient().delete_user(keycloak_user_id)
-        logger.info(f"Deleted Keycloak user {keycloak_user_id} after a refused registration")
-        return True
-    except Exception as exc:  # noqa: BLE001 - refusal must not turn into a 500
-        logger.warning(f"Could not delete Keycloak user {keycloak_user_id}: {exc}")
-        return False
 
 
 async def refresh_sso_token(
