@@ -35,7 +35,7 @@ from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.roles import grants_system_admin
 from computor_backend.redis_cache import get_redis_client
-from computor_backend.utils.client_info import get_client_ip
+from computor_backend.utils.client_info import trusted_client_ip
 from computor_types.invites import (
     InviteAccept,
     InviteLinkCreate,
@@ -161,23 +161,36 @@ async def revoke_invite(
 # Public endpoints (no authentication required)
 # ---------------------------------------------------------------------------
 
-# Per client IP, fixed window. Bounds guessing at codes through the status
-# endpoint; codes are 256-bit random, so this is about load, not secrecy.
-INVITE_STATUS_LIMIT = 30
-INVITE_STATUS_WINDOW = 600
+# Per client IP, fixed windows, on every public invite endpoint. Codes are
+# 256-bit random, so this bounds load and abuse, not secrecy. The IP comes
+# from trusted_client_ip, which ignores client-supplied forwarding headers.
+INVITE_LOOKUP_LIMIT = 30
+INVITE_ACCEPT_LIMIT = 10
+INVITE_WINDOW = 600
 
 
-async def _invite_status_rate_limited(ip: str, cache) -> bool:
-    """True once this IP has spent its budget. Fails open, like the others."""
-    key = f"rate_limit:invite_status:{ip}"
+async def _throttle_public_invite(request: Optional[Request], cache, bucket: str, limit: int) -> None:
+    """Raise RateLimitException once this client spent ``limit`` in the window.
+
+    Fails open on Redis errors, like the other limiters. Skipped when called
+    outside a request (direct calls in tests).
+    """
+    if request is None:
+        return
+    key = f"rate_limit:{bucket}:{trusted_client_ip(request)}"
     try:
         count = await cache.incr(key)
         if count == 1:
-            await cache.expire(key, INVITE_STATUS_WINDOW)
-        return count > INVITE_STATUS_LIMIT
+            await cache.expire(key, INVITE_WINDOW)
     except Exception as e:
-        logger.error(f"Invite status rate limit check failed: {e}")
-        return False
+        logger.error(f"Invite rate limit check failed: {e}")
+        return
+    if count > limit:
+        raise RateLimitException(
+            error_code="RATE_001",
+            detail="Too many invite requests. Please wait before trying again.",
+            retry_after=INVITE_WINDOW,
+        )
 
 
 @invites_router.get("/invites/{token}/status", response_model=InviteStatusPublic)
@@ -192,13 +205,7 @@ async def get_invite_status(
     Reveals only valid/used/expired/invalid plus whether registration is open
     at all — never who issued the code, its email restriction or its roles.
     """
-    ip = get_client_ip(request)
-    if await _invite_status_rate_limited(ip, cache):
-        raise RateLimitException(
-            error_code="RATE_001",
-            detail="Too many invite checks. Please wait before trying again.",
-            retry_after=INVITE_STATUS_WINDOW,
-        )
+    await _throttle_public_invite(request, cache, "invite_lookup", INVITE_LOOKUP_LIMIT)
     invite = db.query(InviteLink).filter(InviteLink.token == token[:128]).first()
     row = db.query(InstanceSettings).first()
     full = False
@@ -214,9 +221,12 @@ async def get_invite_status(
 @invites_router.get("/invites/{token}", response_model=InviteLinkPublic)
 async def get_invite_public(
     token: str,
+    request: Request = None,
     db: Session = Depends(get_db),
+    cache=Depends(get_redis_client),
 ) -> InviteLinkPublic:
-    """Get invite metadata for the registration page (public, no auth)."""
+    """Get invite metadata for the registration page (public, no auth, rate-limited)."""
+    await _throttle_public_invite(request, cache, "invite_lookup", INVITE_LOOKUP_LIMIT)
     invite = _resolve_token(token, db)
     return InviteLinkPublic(
         id=str(invite.id),
@@ -232,6 +242,8 @@ async def accept_invite(
     token: str,
     payload: InviteAccept,
     db: Session = Depends(get_db),
+    request: Request = None,
+    cache=Depends(get_redis_client),
 ) -> dict:
     """
     Accept an invite, provision a Keycloak login, and pre-create the user.
@@ -261,6 +273,7 @@ async def accept_invite(
     )
     from computor_backend.business_logic.user_lifecycle import login_evidence
 
+    await _throttle_public_invite(request, cache, "invite_accept", INVITE_ACCEPT_LIMIT)
     email = payload.email.lower()
 
     def _admit():
