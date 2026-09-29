@@ -301,6 +301,13 @@ services:
     build:
       context: ../../
       dockerfile: ./docker/temporal-worker-testing/Dockerfile
+      args:
+        WORKER_UID: ${TESTING_WORKER_UID:-23100}
+        WORKER_GID: ${TESTING_WORKER_GID:-23100}
+    # Dedicated UID, not shared with Coder workspaces (uid 1000): RLIMIT_NPROC
+    # is per UID host-wide, so COMPUTOR_JOB_MAX_PROCESSES only means "per job
+    # budget" if nothing else runs under this UID (#237). Must match the args.
+    user: "${TESTING_WORKER_UID:-23100}:${TESTING_WORKER_GID:-23100}"
     networks:
       - computor-network
     restart: unless-stopped

@@ -10,6 +10,20 @@ FROM computor-base AS pybase
 
 FROM computor-testing-runtimes
 
+# Run as a dedicated UID/GID that nothing else on the host uses (#237).
+# RLIMIT_NPROC is counted per real UID host-wide (no userns-remap), so sharing
+# UID 1000 with Coder workspaces (`coder`, uid 1000) or a host login would let
+# their processes eat the grading jobs' fork budget and vice versa. The
+# runtimes image created `worker` as 1000; renumber it and re-own everything
+# it owned, inside the image. Keep in sync with `user:` in the compose files.
+ARG WORKER_UID=23100
+ARG WORKER_GID=23100
+USER root
+RUN groupmod -g "${WORKER_GID}" worker && \
+    usermod -u "${WORKER_UID}" -g "${WORKER_GID}" worker && \
+    find / -xdev \( -uid 1000 -o -gid 1000 \) -not -path '/proc/*' \
+        -exec chown -h "${WORKER_UID}:${WORKER_GID}" {} +
+
 # Bring in the computor python project env from the shared base. Same /home/worker
 # path + CPython 3.10, so the editable installs + their deps resolve.
 COPY --from=pybase --chown=worker:worker /home/worker/.local           /home/worker/.local
