@@ -94,6 +94,15 @@ where = ["src"]
 # the backend's in uv.lock instead of floating on its version ranges.
 testing-worker = ["computor-testing"]
 
+[tool.uv]
+# Supply-chain cooldown: resolve only releases uploaded before this instant.
+# Refresh = move it to "now minus 7 days" and relock, e.g.
+#   sed -i "s/^exclude-newer = .*/exclude-newer = \"$(date -u -d '7 days ago' +%FT%TZ)\"/" pyproject.toml
+#   uv lock --upgrade && uv lock --check
+# A security fix newer than the cutoff is taken per package with
+# exclude-newer-package, and named in the PR.
+exclude-newer = "2026-09-22T14:13:07Z"
+
 [tool.uv.sources]
 computor-client = { path = "../computor-client" }
 computor-types = { path = "../computor-types" }

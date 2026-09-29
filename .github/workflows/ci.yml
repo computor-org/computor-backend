@@ -16,7 +16,8 @@ jobs:
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           enable-cache: true
-      - run: uv sync --project computor-backend --python 3.12 --frozen --extra dev
+      - run: uv lock --project computor-backend --check
+      - run: uv sync --project computor-backend --python 3.12 --locked --extra dev
       - name: Behavioral unit tests
         env:
           # Coder settings validate these at import; dummy values suffice here.
