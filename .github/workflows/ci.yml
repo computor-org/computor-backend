@@ -32,6 +32,30 @@ jobs:
           computor-backend/src/computor_backend/tests/test_password_hashing.py
           computor-backend/src/computor_backend/tests/test_sso_redirect_allowlist.py
           computor-backend/src/computor_backend/tests/test_version_constraints.py
+          computor-backend/src/computor_backend/tests/test_harness_bounds.py
+          computor-backend/src/computor_backend/tests/test_compose_testing_bounds.py
+
+  grading-isolation:
+    # Hostile-snippet tests for grading jobs (#237). Sandbox-dependent cases
+    # skip themselves when the runner kernel lacks Landlock ABI >= 6; limits,
+    # tree kill, output caps and safe file reads run everywhere.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv venv --python 3.12 .venv-grading
+      - run: >-
+          VIRTUAL_ENV=.venv-grading uv pip install
+          ./computor-types ./computor-testing numpy matplotlib pytest
+      - name: Landlock capability
+        run: .venv-grading/bin/python computor-testing/sandbox/launch.py --probe
+      - name: Isolation tests
+        working-directory: computor-testing
+        run: >-
+          ../.venv-grading/bin/python -m pytest -q -rs
+          tests/test_job_isolation.py tests/test_sandbox_launch.py
 
   web:
     runs-on: ubuntu-latest

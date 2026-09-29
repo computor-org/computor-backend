@@ -70,15 +70,20 @@ def test_numpy_and_matplotlib_work_under_default_limits(tmp_path):
 
 
 def test_memory_hog_is_stopped(tmp_path):
+    # The job itself sees the allocation refused at RLIMIT_AS (2 GiB), well
+    # before the host or container would run out.
     result = run_student(tmp_path, """
         hog = []
-        while True:
-            hog.append(bytearray(64 * 1024 * 1024))
-    """)
-    # RLIMIT_AS (2 GiB) stops it at once, not the 30 s wall-clock timeout.
-    assert not result.success
+        try:
+            while True:
+                hog.append(bytearray(64 * 1024 * 1024))
+        except MemoryError:
+            refused_after_mib = 64 * len(hog)
+        hog = None
+    """, ["refused_after_mib"])
+    assert result.success, result.error_message
+    assert 1024 <= result.namespace["refused_after_mib"] < 2048
     assert not result.timed_out
-    assert result.duration < 20
 
 
 def test_cpu_limit_kills_busy_loop(tmp_path, monkeypatch):
@@ -86,7 +91,10 @@ def test_cpu_limit_kills_busy_loop(tmp_path, monkeypatch):
     start = time.monotonic()
     result = run_student(tmp_path, "while True:\n    pass\n", timeout=60)
     assert not result.success
-    # Killed by RLIMIT_CPU (SIGKILL at 2 s CPU), long before the 60 s timeout.
+    # Killed by RLIMIT_CPU (hard limit -> SIGKILL at 2 s CPU), long before
+    # the 60 s wall-clock timeout.
+    assert result.return_code == -9
+    assert 1.5 < result.duration < 20
     assert time.monotonic() - start < 20
     assert not result.timed_out
 
@@ -689,3 +697,34 @@ def test_jobs_are_preferred_oom_victims(tmp_path):
     """, ["adj"])
     assert result.success, result.error_message
     assert result.namespace["adj"] == 1000
+
+
+# --- 15. harness death tears the job down -----------------------------------
+
+def test_job_dies_with_its_harness(tmp_path, sandboxed):
+    """SIGKILL the process that launched a job (the harness): the launcher's
+    supervisor gets PDEATHSIG and kills the whole domain, setsid() escapees
+    included."""
+    import signal
+    import subprocess
+    from ctexec.base import sandbox_command_prefix
+    work = tmp_path / "work"
+    work.mkdir()
+    pid_file = work / "pid"
+    job = (f"import subprocess, time; p = subprocess.Popen(['setsid', 'sleep', '1000']); "
+           f"open({str(pid_file)!r}, 'w').write(str(p.pid)); time.sleep(1000)")
+    cmd = sandbox_command_prefix(str(work)) + [sys.executable, "-c", job]
+    harness = subprocess.Popen(
+        [sys.executable, "-c",
+         f"import subprocess; subprocess.Popen({cmd!r}).wait()"])
+    deadline = time.monotonic() + 20
+    while not (pid_file.exists() and pid_file.read_text()) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    escaped = int(pid_file.read_text())
+    assert alive(escaped)
+    harness.send_signal(signal.SIGKILL)
+    harness.wait()
+    deadline = time.monotonic() + 10
+    while alive(escaped) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not alive(escaped)
