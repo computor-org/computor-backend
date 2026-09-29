@@ -17,7 +17,7 @@
 
 services:
   keycloak-db:
-    image: postgres:16
+    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
     networks:
       - computor-network
     container_name: computor-keycloak-db
@@ -46,7 +46,7 @@ services:
       retries: 5
 
   keycloak:
-    image: quay.io/keycloak/keycloak:25.0.6
+    image: quay.io/keycloak/keycloak:25.0.6@sha256:82c5b7a110456dbd42b86ea572e728878549954cc8bd03cd65410d75328095d2
     networks:
       - computor-network
     container_name: computor-keycloak
@@ -123,7 +123,7 @@ services:
   # on host) and prod (backend containerized) without needing the backend image.
   # Secrets reach it via env_file (.env): each provider names its IDP_*_CLIENT_SECRET.
   keycloak-idp-setup:
-    image: python:3.13-slim
+    image: python:3.13-slim@sha256:7c61056e61ac89e852de05f3dc6fa51a6dd2181797bceed46aa725dd7cb2cd3b
     container_name: computor-keycloak-idp-setup
     networks:
       - computor-network
