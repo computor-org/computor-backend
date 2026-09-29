@@ -108,8 +108,21 @@ keycloak_stop_verified() { # stop Keycloak; 0 only if it is verifiably not runni
     esac
 }
 
+updater_state_dir() { # host-persistent updater state (dumps, recovery marker)
+    echo "${SYSTEM_DEPLOYMENT_PATH:?}/updater"
+}
+
+updater_state_is_persistent() {
+    # Created on the host by computor.sh up; visible in the runner only through the
+    # bind mount watch.sh adds. Never create it here: inside a runner without the
+    # mount that would silently write into the throwaway container.
+    [ -f "$(updater_state_dir)/.host-persistent" ] && [ -w "$(updater_state_dir)" ]
+}
+
 keycloak_predump() { # dest.sql.gz ; Keycloak itself must already be stopped
     local dest="$1" tmp i
+    updater_state_is_persistent || { ulog "updater state dir $(updater_state_dir) is missing, not writable or not host-persistent"; return 1; }
+    case "$dest" in "$(updater_state_dir)"/*) ;; *) return 1 ;; esac
     mkdir -p "$(dirname "$dest")" || return 1
     tmp="${dest}.partial"
     compose up -d "$KEYCLOAK_DB_SERVICE" >/dev/null 2>&1 || return 1
@@ -436,7 +449,7 @@ cmd_update_exec() {
 
     # 5b. Keycloak pre-upgrade dump (Keycloak is stopped: quiesced) ------------------
     if [ "$kc_decision" = "guard" ]; then
-        kc_dump="${SYSTEM_DEPLOYMENT_PATH}/backups/keycloak/keycloak-pre-${kc_from}-to-${kc_to}-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
+        kc_dump="$(updater_state_dir)/backups/keycloak/keycloak-pre-${kc_from}-to-${kc_to}-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
         set_phase keycloak_backup "Dumping the Keycloak DB before ${kc_from} -> ${kc_to}"
         # Nothing has run on the new Keycloak yet, so a plain rollback is still safe here.
         # A dump is only consistent if the old Keycloak can no longer write.

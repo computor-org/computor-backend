@@ -56,8 +56,13 @@ def _make_repos(tmp_path, from_tag, to_tag):
 
 
 def _run_update(tmp_path, origin, deploy, a, dump_body, keycloak_enabled="true",
-                kc_state="exited", stop_fails=False, docker_ps_fails=False):
+                kc_state="exited", stop_fails=False, docker_ps_fails=False,
+                persistent=True):
     calls = tmp_path / "calls.log"
+    state = tmp_path / "deploypath/updater"
+    state.mkdir(parents=True, exist_ok=True)
+    if persistent:
+        (state / ".host-persistent").touch()
     script = textwrap.dedent(f"""
         set -u
         REPO_ROOT={deploy}
@@ -112,7 +117,7 @@ def test_keycloak_change_failed_update_keeps_maintenance_and_code(tmp_path):
     assert "compose up -d\n" in calls
     # verified dump taken before the new Keycloak was started
     assert calls.index("pg_dumpall") < calls.index("compose up -d\n")
-    dumps = list((tmp_path / "deploypath/backups/keycloak").glob("keycloak-pre-25.0.6-to-26.7.4-*.sql.gz"))
+    dumps = list((tmp_path / "deploypath/updater/backups/keycloak").glob("keycloak-pre-25.0.6-to-26.7.4-*.sql.gz"))
     assert len(dumps) == 1 and not list(dumps[0].parent.glob("*.partial"))
     assert "rolling_back" not in calls
     for needle in ("DROP DATABASE keycloak", str(dumps[0]), a, "Keycloak 25.0.6"):
@@ -129,7 +134,7 @@ def test_keycloak_change_with_incomplete_dump_rolls_back_safely(tmp_path):
     assert calls.count("compose up -d\n") == 1
     assert "status rolled_back" in calls
     assert "traefik-maintenance off" in calls
-    assert not list((tmp_path / "deploypath/backups/keycloak").glob("*"))
+    assert not list((tmp_path / "deploypath/updater/backups/keycloak").glob("*"))
 
 
 @pytest.mark.parametrize("tags,enabled", [(("26.7.4", "26.7.4"), "true"),
@@ -187,3 +192,12 @@ def test_keycloak_downgrade_is_refused_without_touching_anything(tmp_path):
     assert "build " not in calls and "maintenance 1" not in calls
     assert "pg_dumpall" not in calls and "compose up" not in calls
     assert "Refusing automated Keycloak downgrade 26.7.4 -> 25.0.6" in calls
+
+
+def test_missing_host_persistent_state_dir_fails_safe(tmp_path):
+    origin, deploy, a, b = _make_repos(tmp_path, "25.0.6", "26.7.4")
+    p, calls = _run_update(tmp_path, origin, deploy, a, COMPLETE_DUMP, persistent=False)
+    assert p.returncode == 0, p.stdout + p.stderr          # ordinary rollback, 25 kept
+    assert _git(deploy, "rev-parse", "HEAD") == a
+    assert "pg_dumpall" not in calls and calls.count("compose up -d\n") == 1
+    assert not (tmp_path / "deploypath/updater/backups").exists()

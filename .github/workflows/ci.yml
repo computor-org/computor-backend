@@ -38,6 +38,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_route_shadowing.py
           computor-backend/src/computor_backend/tests/test_sso_redirect_allowlist.py
           computor-backend/src/computor_backend/tests/test_update_keycloak_guard.py
+          computor-backend/src/computor_backend/tests/test_updater_runner_persistence.py
           computor-backend/src/computor_backend/tests/test_upload_limiter.py
           computor-backend/src/computor_backend/tests/test_version_constraints.py
 

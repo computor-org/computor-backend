@@ -31,6 +31,8 @@ services:
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       COMPUTOR_REPO_DIR: ${COMPUTOR_REPO_DIR:-.}
+      # Host path; watch.sh bind-mounts ${SYSTEM_DEPLOYMENT_PATH}/updater into the runner.
+      SYSTEM_DEPLOYMENT_PATH: ${SYSTEM_DEPLOYMENT_PATH:-}
       DOCKER_GID: ${DOCKER_GID:-0}
       HOME: /tmp
     volumes:

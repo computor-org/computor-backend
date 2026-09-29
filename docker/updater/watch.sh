@@ -81,6 +81,39 @@ check_schedule() {
     write_schedule_result fired "$SCHED_AT" "The scheduled update was started."
 }
 
+# Launch the detached runner. Besides the repo, it bind-mounts the host's
+# updater state dir (${SYSTEM_DEPLOYMENT_PATH}/updater: pre-upgrade DB dumps and
+# the recovery marker) at the same path; without it anything the runner writes
+# there would vanish with the --rm container. update.sh refuses to dump unless
+# the dir carries computor.sh's .host-persistent sentinel, so a missing mount
+# fails safe. RUNNER_NETWORK / RUNNER_CMD are overridable for tests.
+launch_runner() {
+    local -a state_mount=()
+    if [ -n "${SYSTEM_DEPLOYMENT_PATH:-}" ]; then
+        state_mount=(-v "${SYSTEM_DEPLOYMENT_PATH}/updater:${SYSTEM_DEPLOYMENT_PATH}/updater")
+    else
+        log "WARNING: SYSTEM_DEPLOYMENT_PATH unset — runner gets no updater state mount (Keycloak upgrades will refuse to proceed)"
+    fi
+    docker run -d --rm --name "$RUNNER_NAME" \
+        --network "${RUNNER_NETWORK:-computor-network}" \
+        --user "$(id -u):$(id -g)" \
+        --group-add "${DOCKER_GID:-0}" \
+        -v /var/run/docker.sock:/var/run/docker.sock \
+        -v "${COMPUTOR_REPO_DIR}:${COMPUTOR_REPO_DIR}" \
+        "${state_mount[@]}" \
+        -w "${COMPUTOR_REPO_DIR}" \
+        -e REDIS_PASSWORD \
+        -e DOCKER_GID \
+        -e HOME=/tmp \
+        "$SELF_IMAGE" \
+        bash -c "${RUNNER_CMD:-source '${COMPUTOR_REPO_DIR}/ops/lib/common.sh' && source '${COMPUTOR_REPO_DIR}/ops/lib/update.sh' && cmd_update_exec prod}"
+}
+
+# Tests source this file for launch_runner only.
+if [ "${UPDATER_WATCH_SOURCE_ONLY:-}" = "1" ]; then
+    return 0 2>/dev/null || exit 0
+fi
+
 SELF_IMAGE=$(docker inspect --format '{{.Image}}' "$(hostname)" 2>/dev/null || echo "computor-updater:latest")
 log "watcher started (image ${SELF_IMAGE}, repo ${COMPUTOR_REPO_DIR})"
 
@@ -102,18 +135,7 @@ while true; do
         continue
     fi
 
-    docker run -d --rm --name "$RUNNER_NAME" \
-        --network computor-network \
-        --user "$(id -u):$(id -g)" \
-        --group-add "${DOCKER_GID:-0}" \
-        -v /var/run/docker.sock:/var/run/docker.sock \
-        -v "${COMPUTOR_REPO_DIR}:${COMPUTOR_REPO_DIR}" \
-        -w "${COMPUTOR_REPO_DIR}" \
-        -e REDIS_PASSWORD \
-        -e DOCKER_GID \
-        -e HOME=/tmp \
-        "$SELF_IMAGE" \
-        bash -c "source '${COMPUTOR_REPO_DIR}/ops/lib/common.sh' && source '${COMPUTOR_REPO_DIR}/ops/lib/update.sh' && cmd_update_exec prod" \
+    launch_runner \
         || { log "failed to launch runner"; continue; }
 
     log "runner launched — waiting for it to finish"

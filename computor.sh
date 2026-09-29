@@ -322,6 +322,15 @@ cmd_up() {
         create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/forgejo/data"
     fi
 
+    # Self-update state (pre-upgrade DB dumps, recovery marker). Host-owned; the
+    # updater runner gets it bind-mounted at the same path. The sentinel tells
+    # update.sh the dir is the real host dir, not a runner-local fallback.
+    if [ "$ENVIRONMENT" = "prod" ]; then
+        create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/updater/backups"
+        touch "${SYSTEM_DEPLOYMENT_PATH}/updater/.host-persistent" \
+            || die "  Cannot write ${SYSTEM_DEPLOYMENT_PATH}/updater"
+    fi
+
     # Optional: Keycloak directories + realm/theme/IdP staging
     if [ "${KEYCLOAK_ENABLED:-}" = "true" ]; then
         log "\n${GREEN}Setting up Keycloak directories...${NC}"
