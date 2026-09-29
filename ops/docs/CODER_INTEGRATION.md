@@ -151,6 +151,54 @@ The backend uses these environment variables:
 - `CODER_URL` - Internal API URL
 - `CODER_ADMIN_API_SECRET` - API authentication
 
+## Public Deployment: Workspace Resource Bounds
+
+Workspaces run untrusted code, often with root. Set
+`COMPUTOR_PUBLIC_DEPLOYMENT=true` on a public instance: `computor.sh` and the
+API then refuse to build, push or roll out templates unless every bound below
+that can be enforced is in place.
+
+| Resource | Bound | Where |
+|---|---|---|
+| RAM per workspace | `memory_mb` (default 3072, MATLAB 6144), swap off | template; always pushed explicitly |
+| CPU per workspace | `cpus` (default 2) | template; always pushed explicitly |
+| Sum of all workspaces, **process count** | `MemoryMax`, `CPUQuota`, `TasksMax` of `computor-workspaces.slice` | worker host; **required** when public |
+| Writable image layer | `storage_size` (overlay2 on xfs+pquota only) | template variable, opt-in |
+| Home/scratch volumes | host disk watchdog (below) | worker host |
+
+The kreuzwerker/docker provider has no per-container pids limit and dockerd has
+no default one, so the slice's `TasksMax` is the fork-bomb bound.
+
+Install on the worker host:
+
+```bash
+sudo install -m 0644 ops/coder/systemd/computor-workspaces.slice /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl start computor-workspaces.slice
+# .env on the control plane:
+#   COMPUTOR_PUBLIC_DEPLOYMENT=true
+#   CODER_WORKSPACE_CGROUP_PARENT=computor-workspaces.slice
+# then push all templates (the push always sends the memory/CPU caps).
+```
+
+### Home and scratch volumes
+
+Docker named volumes on ext4 have no quota, and a per-workspace loop-mounted
+XFS with project quotas is too heavy to operate here. Instead,
+`ops/coder/home-watchdog/` has a host-side systemd timer that runs every 10
+minutes. It measures every `coder-home-*` and `coder-scratch-*` volume with
+`du -sx` on its mountpoint. When a volume is over `COMPUTOR_HOME_LIMIT_GIB`
+(default 10), it stops the containers that mount it and alerts through syslog
+and the optional `COMPUTOR_HOME_ALERT_URL` webhook. It never deletes data. The
+worst case is a disk fill of up to one timer interval of writes, so keep the
+Docker data root on its own filesystem with headroom.
+
+```bash
+sudo install -m 0755 ops/coder/home-watchdog/computor-home-watchdog.sh /usr/local/sbin/
+sudo install -m 0644 ops/coder/home-watchdog/computor-home-watchdog.{service,timer} /etc/systemd/system/
+echo 'COMPUTOR_HOME_LIMIT_GIB=10' | sudo tee /etc/default/computor-home-watchdog
+sudo systemctl daemon-reload && sudo systemctl enable --now computor-home-watchdog.timer
+```
+
 ## Troubleshooting
 
 ### Port Conflicts

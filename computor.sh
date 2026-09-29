@@ -187,6 +187,14 @@ cmd_up() {
         log "  ${GREEN}✓${NC} Generated and persisted FORGEJO_KEYCLOAK_CLIENT_SECRET to .env"
     fi
 
+    # Public deployments must bound workspaces in aggregate (the docker provider
+    # has no per-container pids limit): require the systemd slice.
+    if [ "${COMPUTOR_PUBLIC_DEPLOYMENT:-false}" = "true" ] \
+        && { [ "${CODER_ENABLED:-}" = "true" ] || [ "${API_CODER_ENABLED:-}" = "true" ]; } \
+        && [ -z "${CODER_WORKSPACE_CGROUP_PARENT:-}" ]; then
+        die "COMPUTOR_PUBLIC_DEPLOYMENT=true requires CODER_WORKSPACE_CGROUP_PARENT (install ops/coder/systemd/computor-workspaces.slice on the worker)."
+    fi
+
     # Restricted DB role password of the coder temporal worker (see
     # scripts/ensure_coder_worker_db_role.py). Self-heals older .env files on
     # the control plane; a split worker host (WORKERHOST_CONTROL_ADDR set) must
