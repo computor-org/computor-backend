@@ -114,7 +114,7 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
 # up. See docs/figures.md.
 # Hash-locked (see requirements.in for how to regenerate the lock).
 COPY requirements.lock /tmp/requirements.lock
-RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock \
+RUN pip install --no-cache-dir --require-hashes --only-binary :all: -r /tmp/requirements.lock \
     && rm /tmp/requirements.lock
 
 COPY figures/computor_figures.py /tmp/computor_figures.py

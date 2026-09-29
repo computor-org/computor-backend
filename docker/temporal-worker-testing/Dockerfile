@@ -29,11 +29,12 @@ ENV PYTHONPATH=/home/worker/computor-backend/src
 COPY --from=pybase --chown=worker:worker /home/worker/.computor-locks /home/worker/.computor-locks
 ADD --chown=worker:worker computor-testing /home/worker/computor-testing
 RUN pip install --user --no-warn-script-location --no-cache-dir \
-        --require-hashes --no-deps --no-build-isolation \
+        --require-hashes --no-deps --only-binary :all: \
         -r /home/worker/.computor-locks/testing-worker.txt \
     && pip install --user --no-warn-script-location --no-cache-dir \
         --no-deps --no-build-isolation /home/worker/computor-testing \
-    && pip check
+    && pip check \
+    && python -c "import ctcore, ctexec, computor_backend.tasks.temporal_worker"
 
 # R user library
 ENV R_LIBS_USER=/home/worker/.local/lib/R/library
@@ -44,8 +45,10 @@ RUN mkdir -p /home/worker/.local/lib/R/library
 # Installed from the hashed lock (computor-testing/requirements.lock, compiled
 # from requirements.txt with a cooldown); the venv's bundled pip is used as is.
 RUN python3.13 -m venv /home/worker/test-venv && \
-    /home/worker/test-venv/bin/pip install --no-cache-dir --require-hashes \
-        -r /home/worker/computor-testing/requirements.lock
+    PYTHONPATH= /home/worker/test-venv/bin/pip install --no-cache-dir --require-hashes \
+        --only-binary :all: -r /home/worker/computor-testing/requirements.lock && \
+    PYTHONPATH= MPLBACKEND=Agg /home/worker/test-venv/bin/python \
+        /home/worker/computor-testing/scripts/import_smoke.py
 ENV PYTHON_TEST_EXECUTABLE=/home/worker/test-venv/bin/python
 
 # Testing worker startup script: sets up language envs, then starts the worker.
