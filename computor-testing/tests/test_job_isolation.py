@@ -251,9 +251,11 @@ NET_PROBE = """
     fastopen = attempt(lambda: socket.socket().sendto(
         b"x", 0x20000000, ("127.0.0.1", {tcp_port})))
     unix_ok = attempt(lambda: socket.socketpair())
+    tipc_pair = attempt(lambda: socket.socketpair(30, socket.SOCK_DGRAM))
+    inet_pair = attempt(lambda: socket.socketpair(socket.AF_INET))
 """
 NET_VARS = ["udp_dns", "udp_local", "tcp_local", "tcp_remote", "raw", "packet",
-            "fastopen", "unix_ok"]
+            "fastopen", "unix_ok", "tipc_pair", "inet_pair"]
 
 
 def test_network_egress_is_blocked(tmp_path, sandboxed, local_servers):
@@ -263,7 +265,7 @@ def test_network_egress_is_blocked(tmp_path, sandboxed, local_servers):
     assert result.success, result.error_message
     ns = result.namespace
     for name in ("udp_dns", "udp_local", "tcp_local", "tcp_remote", "raw",
-                 "packet", "fastopen"):
+                 "packet", "fastopen", "tipc_pair", "inet_pair"):
         assert ns[name] == "EACCES", (name, ns)
     assert ns["unix_ok"] == "OK"  # local IPC keeps working
     with pytest.raises(OSError):  # and nothing arrived at the receiver

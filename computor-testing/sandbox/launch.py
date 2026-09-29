@@ -223,15 +223,16 @@ def enter_scope_domain() -> None:
 # --- seccomp socket filter (#237) -------------------------------------------
 # Landlock restricts TCP only. This classic-BPF filter closes the rest of the
 # network: sockets other than AF_UNIX, AF_NETLINK and TCP stream sockets fail
+# (socketpair() only for AF_UNIX, e.g. no TIPC pairs)
 # with EACCES (no UDP/DNS, raw, packet, SCTP, MPTCP, vsock...), TCP Fast Open
 # sends (MSG_FASTOPEN connects without the connect hook) are refused, and
 # io_uring (whose socket ops bypass seccomp) reports ENOSYS. Non-native
 # syscall ABIs (i386 socketcall, x32) are refused or killed outright.
 
-# arch -> (AUDIT_ARCH, socket, sendto, sendmsg, sendmmsg)
+# arch -> (AUDIT_ARCH, socket, sendto, sendmsg, sendmmsg, socketpair)
 _SECCOMP_ARCH = {
-    "x86_64": (0xC000003E, 41, 44, 46, 307),
-    "aarch64": (0xC00000B7, 198, 206, 211, 269),
+    "x86_64": (0xC000003E, 41, 44, 46, 307, 53),
+    "aarch64": (0xC00000B7, 198, 206, 211, 269, 199),
 }
 _IO_URING_SYSCALLS = (425, 426, 427)  # setup/enter/register, both arches
 AF_UNIX, AF_INET, AF_INET6, AF_NETLINK = 1, 2, 10, 16
@@ -255,7 +256,8 @@ def _seccomp_program():
     machine = platform.machine()
     if machine not in _SECCOMP_ARCH:
         raise OSError(f"no seccomp socket filter for {machine}")
-    arch, nr_socket, nr_sendto, nr_sendmsg, nr_sendmmsg = _SECCOMP_ARCH[machine]
+    (arch, nr_socket, nr_sendto, nr_sendmsg, nr_sendmmsg,
+     nr_socketpair) = _SECCOMP_ARCH[machine]
     # (code, k, jump-if-true label, jump-if-false label); None = next insn
     code = [
         (_BPF_LD_ABS, 4, None, None),                  # arch
@@ -263,6 +265,7 @@ def _seccomp_program():
         (_BPF_LD_ABS, 0, None, None),                  # syscall nr
         (_BPF_JGE, X32_SYSCALL_BIT, "deny", None),
         (_BPF_JEQ, nr_socket, "socket", None),
+        (_BPF_JEQ, nr_socketpair, "socketpair", None),
         (_BPF_JEQ, nr_sendto, "flags3", None),
         (_BPF_JEQ, nr_sendmmsg, "flags3", None),
         (_BPF_JEQ, nr_sendmsg, "flags2", None),
@@ -274,6 +277,9 @@ def _seccomp_program():
         (_BPF_JEQ, AF_NETLINK, "allow", None),
         (_BPF_JEQ, AF_INET, "inet", None),
         (_BPF_JEQ, AF_INET6, "inet", "deny"),
+        "socketpair",                                  # AF_UNIX pairs only
+        (_BPF_LD_ABS, _arg(0), None, None),
+        (_BPF_JEQ, AF_UNIX, "allow", "deny"),
         "inet",
         (_BPF_LD_ABS, _arg(1), None, None),            # type | flags
         (_BPF_AND, SOCK_TYPE_MASK, None, None),
