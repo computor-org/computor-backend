@@ -106,7 +106,7 @@ async def check_user_rate_limit(user_id: str, cache) -> bool:
 async def create_test_run(
     test_create: TestCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache = Depends(get_redis_client),
     repo_cache: Cache = Depends(get_cache),
 ):
@@ -426,7 +426,7 @@ async def create_test_run(
 async def get_test_status(
     result_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """Get the current status of a test execution.
 

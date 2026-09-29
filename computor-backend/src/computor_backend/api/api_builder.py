@@ -91,7 +91,7 @@ class CrudRouter:
                 background_tasks: BackgroundTasks,
                 permissions: Annotated[Principal, Depends(get_current_principal)],
                 entity: self.dto.create,
-                db: Session = Depends(get_db)
+                db: Session = Depends(get_db, scope="function")
         ) -> self.dto.get:
             entity_created = await create_db(permissions, db, entity, self.dto.model, self.dto.get, self.dto.post_create)
 
@@ -108,7 +108,7 @@ class CrudRouter:
         async def route(
                 permissions: Annotated[Principal, Depends(get_current_principal)],
                 id: UUID | str,
-                db: Session = Depends(get_db)
+                db: Session = Depends(get_db, scope="function")
         ) -> self.dto.get:
             return await get_id_db(permissions, db, id, self.dto)
         return route
@@ -118,7 +118,7 @@ class CrudRouter:
                 permissions: Annotated[Principal, Depends(get_current_principal)],
                 response: Response,
                 params: Annotated[self.dto.query, Depends()],
-                db: Session = Depends(get_db)
+                db: Session = Depends(get_db, scope="function")
         ) -> list[self.dto.list]:
             list_result, total = await list_db(permissions, db, params, self.dto)
             return paginated_list(list_result, total, response=response)
@@ -130,7 +130,7 @@ class CrudRouter:
                 permissions: Annotated[Principal, Depends(get_current_principal)],
                 id: UUID | str,
                 entity: self.dto.update,
-                db: Session = Depends(get_db)
+                db: Session = Depends(get_db, scope="function")
         ) -> self.dto.get:
             entity_updated = await update_db(permissions, db, id, entity, self.dto.model, self.dto.get, self.dto.post_update, self.dto.custom_permissions)
 
@@ -147,7 +147,7 @@ class CrudRouter:
                 background_tasks: BackgroundTasks,
                 permissions: Annotated[Principal, Depends(get_current_principal)],
                 id: UUID | str,
-                db: Session = Depends(get_db)
+                db: Session = Depends(get_db, scope="function")
         ):
             # Fetch the row before deletion so post_delete callbacks and cache
             # invalidation can see its fields. Cheaper than racing the delete.
@@ -174,7 +174,7 @@ class CrudRouter:
                     background_tasks: BackgroundTasks,
                     permissions: Annotated[Principal, Depends(get_current_principal)],
                     id: UUID | str,
-                    db: Session = Depends(get_db)
+                    db: Session = Depends(get_db, scope="function")
             ):
                 entity_archived = await get_id_db(permissions, db, id, self.dto)
 
@@ -197,7 +197,7 @@ class CrudRouter:
                     background_tasks: BackgroundTasks,
                     permissions: Annotated[Principal, Depends(get_current_principal)],
                     id: UUID | str,
-                    db: Session = Depends(get_db)
+                    db: Session = Depends(get_db, scope="function")
             ):
                 entity = await get_id_db(permissions, db, id, self.dto)
 
@@ -216,7 +216,7 @@ class CrudRouter:
                 permissions: Annotated[Principal, Depends(get_current_principal)], 
                 filters: Optional[dict] = None, 
                 params: self.dto.query = Depends(), 
-                db: Session = Depends(get_db)
+                db: Session = Depends(get_db, scope="function")
         ) -> list[self.dto.list]:
             return await filter_db(permissions, db, self.dto.model, params, self.dto.search, filters)
         return route
@@ -339,13 +339,13 @@ class LookUpRouter:
         self.router = APIRouter()
         
     def get(self):
-        async def route(permissions: Annotated[Principal, Depends(get_current_principal)], id: str, db: Session = Depends(get_db)) -> self.dto.get:
+        async def route(permissions: Annotated[Principal, Depends(get_current_principal)], id: str, db: Session = Depends(get_db, scope="function")) -> self.dto.get:
             return await get_id_db(permissions, db, id, self.dto)
         return route
 
     
     def list(self):
-        async def route(permissions: Annotated[Principal, Depends(get_current_principal)], response: Response, params: self.dto.query = Depends(), db: Session = Depends(get_db)) -> list[self.dto.list]:
+        async def route(permissions: Annotated[Principal, Depends(get_current_principal)], response: Response, params: self.dto.query = Depends(), db: Session = Depends(get_db, scope="function")) -> list[self.dto.list]:
             list_result, total = await list_db(permissions, db, params, self.dto)
             return paginated_list(list_result, total, response=response)
         return route

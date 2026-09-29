@@ -409,7 +409,7 @@ async def list_templates(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
 ) -> TemplateListResponse:
     """List available workspace templates.
 
@@ -474,7 +474,7 @@ async def provision_workspace(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
     cache: Annotated[object, Depends(get_cache)],
 ) -> ProvisionResult:
     """
@@ -651,7 +651,7 @@ async def get_workspaces(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
     cache: Annotated[object, Depends(get_cache)],
     email: Optional[str] = None,
 ) -> WorkspaceListResponse:
@@ -696,7 +696,7 @@ async def list_all_workspaces_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
 ) -> WorkspaceListResponse:
     """List every workspace on the server, across all users. Requires
     workspace:manage — the fleet view behind the admin rollout.
@@ -722,7 +722,7 @@ async def workspace_exists(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
     cache: Annotated[object, Depends(get_cache)],
     email: Optional[str] = None,
 ) -> bool:
@@ -765,7 +765,7 @@ async def get_workspace_details(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
 ) -> WorkspaceDetails:
     """Get detailed information about a specific workspace."""
     _check_workspace_access_or_course_member(permissions, "access", db, username=username)
@@ -788,7 +788,7 @@ async def start_workspace(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
 ) -> WorkspaceActionResponse:
     """Start a stopped workspace."""
     _check_workspace_access_or_course_member(permissions, "start", db, username=username)
@@ -846,7 +846,7 @@ async def stop_workspace(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
 ) -> WorkspaceActionResponse:
     """Stop a running workspace."""
     _check_workspace_access_or_course_member(permissions, "stop", db, username=username)
@@ -898,7 +898,7 @@ async def get_coder_session(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
     cache: Annotated[object, Depends(get_cache)],
 ) -> CoderSessionResponse:
     """Login to Coder and get a session token."""
@@ -1384,7 +1384,7 @@ async def push_coder_templates(
     request: TemplatePushRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
 ) -> CoderAdminTaskResponse:
     """
     Push Coder templates (Terraform configs) via Temporal workflow.
@@ -1427,7 +1427,7 @@ async def rollout_workspaces_endpoint(
     request: WorkspaceRolloutRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
 ) -> CoderAdminTaskResponse:
     """
     Roll every existing workspace onto its template's active version — running
@@ -1486,7 +1486,7 @@ def _settings_row_to_schema(row: WorkspaceTemplateSettings) -> WorkspaceTemplate
 )
 async def list_admin_courses(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
 ) -> CourseWorkspaceAdminListResponse:
     """Every course with its allowed templates and lecturer-provisioning flag.
 
@@ -1505,7 +1505,7 @@ async def list_template_catalog(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
 ) -> TemplateCatalogResponse:
     """The union of the templates on disk and the templates live in Coder.
 
@@ -1604,7 +1604,7 @@ async def list_template_catalog(
 async def list_template_settings(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
 ) -> TemplateSettingsListResponse:
     """All stored settings rows; templates without a row use the template
     file defaults (hard memory/CPU caps). Requires workspace:manage permission."""
@@ -1627,7 +1627,7 @@ async def update_template_settings(
     request: WorkspaceTemplateSettingsUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
 ) -> WorkspaceTemplateSettingsSchema:
     """Upsert resource limits, the running-workspace quota, and Terraform
     variable overrides for one template. Limits and overrides apply at the
@@ -1858,7 +1858,7 @@ async def create_template(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
 ) -> TemplateMetadata:
     """Copy the source template's directory — Terraform, Dockerfile, payload —
     into a new template named after ``key`` with its own Coder name and image
@@ -2023,7 +2023,7 @@ async def delete_template(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
 ) -> TemplateDeleteResponse:
     """Removes the directory, the live Coder template (only when no workspace
     uses it) and the settings / course assignment rows for the name. Refused
@@ -2137,7 +2137,7 @@ async def list_workspace_volumes(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
     cache=Depends(get_cache),
 ) -> WorkspaceVolumeListResponse:
     """Home volumes (shared per user) and scratch volumes (per workspace).
@@ -2254,7 +2254,7 @@ async def rotate_user_app_credential(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
-    db: Annotated[Session, Depends(get_db)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
     cache=Depends(get_cache),
 ) -> WorkspaceCredentialRotationResponse:
     """Revoke the credential this user's workspace apps accept, and replace it.

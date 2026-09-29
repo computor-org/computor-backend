@@ -31,7 +31,7 @@ api_tokens_router = APIRouter()
 def create_token_endpoint(
     token_data: ApiTokenCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """
     Create a new API token.
@@ -45,7 +45,7 @@ def create_token_endpoint(
 def create_token_admin_endpoint(
     token_data: ApiTokenAdminCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """
     Create an API token with a predefined value.
@@ -67,7 +67,7 @@ def update_token_admin_endpoint(
     token_id: UUID,
     token_data: ApiTokenUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """
     Update an API token (name, description, scopes, expiry).
@@ -86,7 +86,7 @@ def list_tokens_endpoint(
     user_id: Optional[UUID] = Query(None, description="Filter by user ID"),
     include_revoked: bool = Query(False, description="Include revoked tokens"),
     permissions: Annotated[Principal, Depends(get_current_principal)] = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """
     List API tokens.
@@ -101,7 +101,7 @@ def list_tokens_endpoint(
 def get_token_endpoint(
     token_id: UUID,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Get API token details by ID (does not include the actual token)."""
     return get_api_token(token_id, permissions, db)
@@ -112,7 +112,7 @@ def revoke_token_endpoint(
     token_id: UUID,
     reason: Optional[str] = Query(None, description="Revocation reason"),
     permissions: Annotated[Principal, Depends(get_current_principal)] = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """
     Revoke an API token.

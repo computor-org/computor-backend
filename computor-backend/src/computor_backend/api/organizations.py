@@ -33,7 +33,7 @@ def patch_organizations_token(
     organization_id: UUID | str,
     payload: OrganizationUpdateTokenUpdate,
     params: OrganizationUpdateTokenQuery = Depends(),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """Update organization provider token."""
     update_organization_token(
@@ -66,7 +66,7 @@ async def delete_organization_endpoint(
     organization_id: UUID,
     request: Request,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     dry_run: bool = Query(
         default=False,
         description="If true, only returns preview without deleting"

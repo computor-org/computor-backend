@@ -16,7 +16,7 @@ role_claim_router = APIRouter()
 async def list_role_claim(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     role_claim_query: RoleClaimQuery = Depends(),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """List role claims."""
     return list_role_claims(permissions, role_claim_query, db)

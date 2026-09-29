@@ -95,7 +95,7 @@ def get_cache() -> Cache:
         >>> def get_org(
         ...     id: str,
         ...     cache: Cache = Depends(get_cache),
-        ...     db: Session = Depends(get_db)
+        ...     db: Session = Depends(get_db, scope="function")
         ... ):
         ...     key = cache.key("organization", id)
         ...     org = cache.get_by_key(key)

@@ -37,7 +37,7 @@ async def import_member(
     course_id: str,
     request: CourseMemberImportRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)] = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> CourseMemberImportResponse:
     """Import a course member.
 
@@ -126,7 +126,7 @@ async def parse_member_file(
     course_id: str,
     request: CourseMemberImportFileParseRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)] = None,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> CourseMemberImportParseResponse:
     """Parse an uploaded member file (CSV/JSON/XLSX/Excel-XML) into preview rows.
 
