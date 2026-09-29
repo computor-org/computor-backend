@@ -58,8 +58,8 @@ variable "dev_forward_ports" {
 }
 
 variable "memory_mb" {
-  default     = 0
-  description = "Workspace memory cap in MiB; 0 is unlimited"
+  default     = 6144
+  description = "Hard workspace memory cap in MiB (swap disabled: memory_swap = memory). 0 = unlimited."
   type        = number
 }
 
@@ -67,6 +67,24 @@ variable "cpu_shares" {
   default     = 0
   description = "Relative CPU weight; 0 uses the Docker default"
   type        = number
+}
+
+variable "cpus" {
+  default     = "2"
+  description = "Hard CPU cap (CFS quota) in CPUs, e.g. \"2\" or \"1.5\". Empty or \"0\" = unlimited."
+  type        = string
+}
+
+variable "cgroup_parent" {
+  default     = ""
+  description = "Parent cgroup for the workspace container, e.g. computor-workspaces.slice (systemd driver) to put all workspaces under one aggregate memory/CPU/TasksMax limit. Set from CODER_WORKSPACE_CGROUP_PARENT at push time. Empty = Docker default."
+  type        = string
+}
+
+variable "storage_size" {
+  default     = ""
+  description = "Writable-layer size cap (docker storage-opt size, e.g. \"10G\"). Only works for overlay2 on xfs with pquota; empty = unbounded."
+  type        = string
 }
 
 variable "shm_size" {

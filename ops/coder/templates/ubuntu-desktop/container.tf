@@ -26,12 +26,22 @@ resource "docker_container" "workspace" {
   name       = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
   hostname   = data.coder_workspace.me.name
 
-  # Resource limits so one workspace (whose user may have root) cannot
-  # exhaust the host. Opt-in caps (0 = unlimited/default) — set per host capacity. NOTE: the
-  # docker provider exposes no per-container pids_limit; use dockerd
-  # --default-pids-limit for a host-wide fork-bomb guard.
-  memory     = var.memory_mb
-  cpu_shares = var.cpu_shares
+  # Hard resource limits so one workspace (whose user may have root) cannot
+  # exhaust the host. Safe non-zero defaults in variables.tf; per-template
+  # overrides come from the workspace template settings (memory_mb,
+  # cpu_shares; cpus/storage_size via the extra-variable overrides).
+  # memory_swap = memory disables swap. The kreuzwerker/docker provider
+  # (4.6.0) has no per-container pids limit: fork bombs are bounded by the
+  # aggregate systemd slice (TasksMax=) that cgroup_parent places every
+  # workspace in (CODER_WORKSPACE_CGROUP_PARENT, e.g.
+  # computor-workspaces.slice). storage_opts size needs overlay2 on xfs with
+  # pquota; on ext4 leave storage_size empty (dockerd rejects it).
+  memory        = var.memory_mb
+  memory_swap   = var.memory_mb
+  cpu_shares    = var.cpu_shares
+  cpus          = var.cpus != "" && var.cpus != "0" ? var.cpus : null
+  cgroup_parent = var.cgroup_parent != "" ? var.cgroup_parent : null
+  storage_opts  = var.storage_size != "" ? { size = var.storage_size } : null
 
   # Root policy (see allow_root). no-new-privileges makes the kernel refuse the
   # setuid transition in sudo/su, so the same image serves both modes and there
