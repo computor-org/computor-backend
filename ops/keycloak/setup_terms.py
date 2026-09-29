@@ -8,19 +8,23 @@ and must not show computor.at's public texts. The script refuses to run unless
 COMPUTOR_LEGAL_PROFILE=computor-at is set, as a guard against running it on
 the wrong deployment by accident.
 
-What it reconciles on realm KEYCLOAK_REALM (default: computor):
-  1. Required action "Terms and Conditions" (alias TERMS_AND_CONDITIONS; older
-     Keycloak: terms_and_conditions) registered, enabled, and a *default*
-     action, so every newly created account (incl. GitHub first broker login)
-     must accept before a token is issued.
-  2. Internationalization enabled with "de" and "en" in supportedLocales
+What it reconciles on realm KEYCLOAK_REALM (default: computor), in this order:
+  1. Internationalization enabled with "de" and "en" in supportedLocales
      (existing locales and defaultLocale are kept).
-  3. Realm localization overrides termsTitle / termsText / doAccept / doDecline
+  2. Realm localization overrides termsTitle / termsText / doAccept / doDecline
      for de and en, read from computor-at-terms.json next to this script.
-  4. Optional (--require-for-existing-users): add the required action to
-     existing users who have neither accepted (no terms_and_conditions
-     attribute) nor already got it pending. Default actions only apply to new
-     accounts.
+  3. Verification: every one of those values is read back and must match.
+  4. Only then: required action "Terms and Conditions" (alias
+     TERMS_AND_CONDITIONS; older Keycloak: terms_and_conditions) registered,
+     enabled and a *default* action, so every newly created account (incl.
+     GitHub first broker login) must accept before a token is issued.
+Any failure in 1-3 aborts before step 4, so users can never be asked to
+accept Keycloak's placeholder terms text.
+
+Existing accounts are not gated by a default action. This script deliberately
+does not touch users: replacing a user's requiredActions from a snapshot can
+drop an action (e.g. UPDATE_PASSWORD) added concurrently. See ops/README.md for
+the one-off maintenance procedure.
 
 Each step reads first and writes only on a difference, so a second run changes
 nothing. --dry-run prints what would change without writing.
@@ -154,30 +158,23 @@ def ensure_localization(kc: Keycloak, texts: dict) -> None:
     _log("localization: de/en terms texts reconciled")
 
 
-def require_for_existing_users(kc: Keycloak, alias: str) -> None:
-    first, page = 0, 100
-    while True:
-        status, users = kc.get(f"/users?first={first}&max={page}&briefRepresentation=false")
-        if status != 200 or not isinstance(users, list):
-            raise SystemExit(f"listing users failed: {status}")
-        for user in users:
-            accepted = (user.get("attributes") or {}).get("terms_and_conditions")
-            pending = user.get("requiredActions") or []
-            if accepted or alias in pending or user.get("serviceAccountClientId"):
-                continue
-            body = {"requiredActions": pending + [alias]}
-            kc.write("PUT", f"/users/{user['id']}",
-                     f"user {user.get('username')}: add required action {alias}", json_body=body)
-        if len(users) < page:
-            return
-        first += page
+def verify_localization(kc: Keycloak, texts: dict) -> None:
+    """Read every terms text back; abort (before enabling the action) on any mismatch."""
+    for locale in LOCALES:
+        status, stored = kc.get(f"/localization/{locale}")
+        if status != 200 or not isinstance(stored, dict):
+            raise SystemExit(f"verifying localization {locale} failed: {status}; "
+                             "required action NOT enabled")
+        wrong = [key for key, value in texts[locale].items() if stored.get(key) != value]
+        if wrong:
+            raise SystemExit(f"localization {locale} does not match for {wrong}; "
+                             "required action NOT enabled")
+    _log("localization: de/en terms texts verified")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--dry-run", action="store_true", help="print changes, write nothing")
-    parser.add_argument("--require-for-existing-users", action="store_true",
-                        help="also add the required action to existing users who have not accepted")
     args = parser.parse_args()
 
     if os.environ.get("COMPUTOR_LEGAL_PROFILE") != "computor-at":
@@ -200,11 +197,14 @@ def main() -> None:
     kc = Keycloak(base, realm, get_admin_token(base, admin, admin_pass), args.dry_run)
     _log(f"realm '{realm}' at {base}{' (dry run)' if args.dry_run else ''}")
 
-    alias = ensure_terms_required_action(kc)
     ensure_internationalization(kc)
     ensure_localization(kc, texts)
-    if args.require_for_existing_users:
-        require_for_existing_users(kc, alias)
+    if kc.dry_run and kc.changes:
+        _log("dry run: texts not installed yet, so the required action would be enabled "
+             "only after they verify")
+    else:
+        verify_localization(kc, texts)
+    ensure_terms_required_action(kc)
     _log(f"done: {kc.changes} change(s){' planned' if args.dry_run else ''}")
 
 
