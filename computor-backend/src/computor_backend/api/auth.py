@@ -250,7 +250,7 @@ def _post_login_target(state_data: dict) -> tuple:
 async def handle_callback(
     provider: str,
     code: str = Query(..., description="Authorization code"),
-    state: Optional[str] = Query(None, description="State parameter"),
+    state: str = Query(..., description="State parameter (required, single-use)"),
     request: Request = None,
     db: Session = Depends(get_db)
 ) -> RedirectResponse:
@@ -264,34 +264,34 @@ async def handle_callback(
 
     redis_client = await get_redis_client()
 
-    # Validate state parameter
-    state_data = {}
-    if state:
-        state_key = f"sso_state:{state}"
-        state_data_raw = await redis_client.get(state_key)
+    # The state is mandatory: it binds this callback to a login this backend
+    # started (CSRF / login fixation) and carries the validated destination.
+    if not state:
+        raise BadRequestException(detail="Missing state parameter")
 
-        if not state_data_raw:
-            # State expired or already consumed — e.g. a slow first-login
-            # required-action flow that outran the TTL, or a duplicate callback
-            # (the first one succeeded and deleted the single-use state). The auth
-            # cookies were typically already set by that first callback, so send
-            # the user to the app home instead of a raw 4xx: they land logged in,
-            # or the app bounces them to a fresh login. Avoids the scary error page.
-            logger.warning("SSO callback with missing/expired state — redirecting to app home")
-            from urllib.parse import urlparse
-            _api_base = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
-            _parsed = urlparse(_api_base) if _api_base else None
-            home = f"{_parsed.scheme}://{_parsed.netloc}/" if _parsed and _parsed.scheme and _parsed.netloc else "/"
-            return RedirectResponse(url=home, status_code=302)
+    # Read and consume in one step (GETDEL): with a separate GET and DELETE two
+    # callbacks racing on the same state (a replayed redirect) could both pass.
+    state_key = f"sso_state:{state}"
+    state_data_raw = await redis_client.getdel(state_key)
 
-        state_data = json.loads(state_data_raw)
+    if not state_data_raw:
+        # State expired or already consumed — e.g. a slow first-login
+        # required-action flow that outran the TTL, or a duplicate callback
+        # (the first one succeeded and consumed the single-use state). The auth
+        # cookies were typically already set by that first callback, so send
+        # the user to the app home instead of a raw 4xx: they land logged in,
+        # or the app bounces them to a fresh login. Avoids the scary error page.
+        logger.warning("SSO callback with missing/expired state — redirecting to app home")
+        _api_base = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
+        _parsed = urlparse(_api_base) if _api_base else None
+        home = f"{_parsed.scheme}://{_parsed.netloc}/" if _parsed and _parsed.scheme and _parsed.netloc else "/"
+        return RedirectResponse(url=home, status_code=302)
 
-        # Delete state to prevent replay attacks
-        await redis_client.delete(state_key)
+    state_data = json.loads(state_data_raw)
 
-        # Validate provider matches
-        if state_data["provider"] != provider:
-            raise BadRequestException(detail="Provider mismatch in state parameter")
+    # Validate provider matches
+    if state_data.get("provider") != provider:
+        raise BadRequestException(detail="Provider mismatch in state parameter")
 
     try:
         _api_base = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")

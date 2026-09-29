@@ -272,6 +272,40 @@ async def test_logout_keeps_first_party_post_logout_redirect():
     assert params["post_logout_redirect_uri"] == ["https://computor.at/"]
 
 
+# --- state handling ----------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state", [None, ""])
+async def test_callback_requires_state(state):
+    # Without state nothing ties the callback to a login we started (login CSRF).
+    exchange = AsyncMock()
+    with pytest.raises(BadRequestException) as exc:
+        await _callback(_Redis(), state, exchange=exchange)
+    assert exc.value.status_code == 400
+    exchange.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_state_is_consumed_once_under_concurrent_replay():
+    # Two callbacks racing on one state (a replayed redirect) must not both
+    # exchange the code and both receive a session.
+    redis = _Redis()
+    state = _plant_state(redis, "/auth/success")
+    exchange = AsyncMock(return_value={
+        "user_id": USER_ID, "account_id": "acc-1", "is_new_user": False,
+        "token": ACCESS, "refresh_token": REFRESH,
+    })
+    responses = await asyncio.gather(
+        _callback(redis, state, exchange=exchange), _callback(redis, state, exchange=exchange)
+    )
+    assert exchange.await_count == 1
+    with_session = [r for r in responses if any(
+        ACCESS in c for c in r.headers.getlist("set-cookie"))]
+    assert len(with_session) == 1
+    assert not redis.data
+
+
 # --- shipped development defaults ----------------------------------------------------
 
 
