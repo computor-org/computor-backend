@@ -25,9 +25,9 @@
 # runtime image). The 7-day cooldown lives in computor-backend/pyproject.toml
 # ([tool.uv] exclude-newer), with the refresh procedure next to it.
 # ---------------------------------------------------------------------------
-FROM ghcr.io/astral-sh/uv:0.12.17@sha256:10787c682e4184e4f290de1171fd4703dc63de99221f10fe1c99002ce7fa9acc AS uv
+FROM ghcr.io/astral-sh/uv:0.12.21@sha256:a7aed3216253ee804de3e2d8afa5073baa1a177335345d43845cd4165e43b711 AS uv
 
-FROM python:3.10.21-slim@sha256:31dd4d9529d02d7436659061cb7564cd4733fc90e5e152709a942d53382ec8d0 AS lock-export
+FROM python:3.14.6-slim@sha256:7bec7ddcddeff7975d6ba9b4be7dd6f6b2f55e7491539145e2978f7f97ce9144 AS lock-export
 COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /src
 COPY computor-types/pyproject.toml    computor-types/
@@ -45,7 +45,7 @@ RUN mkdir /locks \
 # ---------------------------------------------------------------------------
 # Runtime image
 # ---------------------------------------------------------------------------
-FROM python:3.10.21-slim@sha256:31dd4d9529d02d7436659061cb7564cd4733fc90e5e152709a942d53382ec8d0
+FROM python:3.14.6-slim@sha256:7bec7ddcddeff7975d6ba9b4be7dd6f6b2f55e7491539145e2978f7f97ce9144
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         postgresql-client \
