@@ -97,7 +97,17 @@ services:
     restart: unless-stopped
     ports:
       - "${INFRA_BIND_ADDRESS:-127.0.0.1}:${REDIS_PORT:-6379}:6379"
-    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
+    # The password reaches redis through a private config file written from the
+    # environment, never through the command line (visible in ps / inspect Cmd).
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    # Atomically replace the file on restart: Redis owns the previous 0600 file,
+    # so Linux protected_regular prevents root from reopening it in /tmp.
+    # The image's own entrypoint still drops to the redis user.
+    entrypoint:
+      - sh
+      - -c
+      - umask 077 && auth_config=$$(mktemp /tmp/redis-auth.XXXXXX) && printf 'requirepass %s\n' "$$REDIS_PASSWORD" > "$$auth_config" && chown redis "$$auth_config" && mv -f "$$auth_config" /tmp/redis-auth.conf && unset REDIS_PASSWORD && exec docker-entrypoint.sh redis-server /tmp/redis-auth.conf --save 20 1 --loglevel warning
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/redis:/usr/local/etc/redis
       - ${SYSTEM_DEPLOYMENT_PATH}/redis-data:/data
