@@ -11,31 +11,9 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
 import { InstanceStatusClient } from '@/src/generated/clients/InstanceStatusClient';
+import { WEB_COMMIT, duration, shortCommit, stamp } from '@/src/utils/instanceStatus';
 
 const statusClient = new InstanceStatusClient();
-
-// Baked into the web image by computor.sh (docker/web/Dockerfile GIT_COMMIT
-// arg); unset under `next dev`. The same constant the sidebar footer shows.
-const WEB_COMMIT = process.env.NEXT_PUBLIC_GIT_COMMIT;
-
-function stamp(value?: string | null): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleString();
-}
-
-/** "1d 6h", "18m" — coarse on purpose, this is read at a glance. */
-function duration(seconds: number): string {
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
-
-const shortCommit = (commit?: string | null) =>
-  commit && commit !== 'unknown' ? commit.slice(0, 7) : null;
 
 /**
  * What is running here, and since when (#350).
@@ -44,6 +22,11 @@ const shortCommit = (commit?: string | null) =>
  * build I deployed?" — had no answer anywhere in the UI. Updates answers a
  * different one ("is there something newer"), which is why this is its own page
  * rather than another card over there.
+ *
+ * The endpoint itself is readable by any authenticated user and Settings shows
+ * the same restart time there. This page stays under /admin with its siblings
+ * because it is the operator's view of it: the running commit, which the API
+ * only fills in for an admin, and a poll that catches a restart live.
  *
  * The issue also asks for memory, of the host and of each workspace. That is
  * deliberately not here: the API holds no docker socket and nothing collects

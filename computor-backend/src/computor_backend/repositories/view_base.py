@@ -349,7 +349,10 @@ class ViewRepository(ABC):
         if cached is not None:
             return [dto_cls.model_validate(item, from_attributes=True) for item in cached]
 
-        query = check_course_permissions(permissions, Course, role, self.db)
+        # Archived courses are over for students and tutors: not listed.
+        query = check_course_permissions(permissions, Course, role, self.db).filter(
+            Course.archived_at.is_(None)
+        )
         courses = CourseStudentInterface.search(self.db, query, params).all()
         response_list = [row_builder(course) for course in courses]
 
@@ -396,7 +399,9 @@ class ViewRepository(ABC):
             return dto_cls.model_validate(cached, from_attributes=True)
 
         course = check_course_permissions(permissions, Course, role, self.db).filter(
-            Course.id == course_id
+            Course.id == course_id,
+            # Archived courses are over for students and tutors: not found.
+            Course.archived_at.is_(None),
         ).first()
         if course is None and raise_if_missing:
             from ..exceptions import NotFoundException

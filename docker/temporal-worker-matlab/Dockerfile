@@ -58,9 +58,16 @@ RUN export DEBIAN_FRONTEND=noninteractive \
 # for here. The < 70 pin is not cosmetic — the COPYed computor deps include
 # grapheme, which has no setuptools of its own and resolves pkg_resources from
 # this interpreter at runtime.
+# Both steps install from hash-locked, wheel-only files (compiled with the
+# 7-day cooldown: uv pip compile --generate-hashes --python-version 3.10
+# --exclude-newer <cutoff>), so the rebuild cannot pick up a newer release.
+COPY docker/temporal-worker-matlab/bootstrap-setuptools.lock docker/temporal-worker-matlab/bootstrap-tools.lock /tmp/
 RUN python3.10 -m ensurepip --upgrade \
-    && python3.10 -m pip install --upgrade "setuptools>=65.0,<70" \
-    && python3.10 -m pip install --upgrade --ignore-installed wheel packaging
+    && python3.10 -m pip install --upgrade --require-hashes --only-binary :all: \
+        -r /tmp/bootstrap-setuptools.lock \
+    && python3.10 -m pip install --upgrade --ignore-installed --require-hashes \
+        --only-binary :all: -r /tmp/bootstrap-tools.lock \
+    && rm /tmp/bootstrap-setuptools.lock /tmp/bootstrap-tools.lock
 
 # Derive MATLAB's root instead of naming a release. This image is built FROM
 # ${MATLAB_BASE_IMAGE}, whose tag lives in .env, so a hardcoded

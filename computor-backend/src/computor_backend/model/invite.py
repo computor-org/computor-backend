@@ -23,6 +23,9 @@ class InviteLink(Base):
     roles = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))  # list of role_ids
     note = Column(Text, nullable=True)
     revoked_at = Column(DateTime(timezone=True), nullable=True)
+    # 'admin' (minted by an invite manager) or 'referral' (one of a user's
+    # own share-with-a-friend codes, created lazily by /user/referral-invites).
+    kind = Column(String(16), nullable=False, server_default=text("'admin'"), default='admin')
 
     creator = relationship('User', foreign_keys=[created_by])
 

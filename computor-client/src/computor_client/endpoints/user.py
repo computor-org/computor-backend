@@ -12,6 +12,7 @@ from computor_types.course_git import (
     CourseGitDescriptor,
     CourseMemberRepositoryGet,
     CourseMemberRepositoryRegister,
+    PersonalCloneCredentialGet,
     StudentRepositoryProvisioned,
     TemplateAccessGet,
 )
@@ -45,6 +46,15 @@ class UserClient:
         """Get Current User Endpoint"""
         response = await self._http.get("/user", params=kwargs)
         return UserGet.model_validate(response.json())
+
+    async def courses_clone_credential(
+        self,
+        course_id: str,
+        **kwargs: Any,
+    ) -> PersonalCloneCredentialGet:
+        """Personal Clone Credential Endpoint"""
+        response = await self._http.post(f"/user/courses/{quote_path(course_id)}/clone-credential", params=kwargs)
+        return PersonalCloneCredentialGet.model_validate(response.json())
 
     async def courses_enroll(
         self,

@@ -10,6 +10,20 @@ FROM computor-base AS pybase
 
 FROM computor-testing-runtimes
 
+# Run as a dedicated UID/GID that nothing else on the host uses (#237).
+# RLIMIT_NPROC is counted per real UID host-wide (no userns-remap), so sharing
+# UID 1000 with Coder workspaces (`coder`, uid 1000) or a host login would let
+# their processes eat the grading jobs' fork budget and vice versa. The
+# runtimes image created `worker` as 1000; renumber it and re-own everything
+# it owned, inside the image. Keep in sync with `user:` in the compose files.
+ARG WORKER_UID=23100
+ARG WORKER_GID=23100
+USER root
+RUN groupmod -g "${WORKER_GID}" worker && \
+    usermod -u "${WORKER_UID}" -g "${WORKER_GID}" worker && \
+    find / -xdev \( -uid 1000 -o -gid 1000 \) -not -path '/proc/*' \
+        -exec chown -h "${WORKER_UID}:${WORKER_GID}" {} +
+
 # Bring in the computor python project env from the shared base. Same /home/worker
 # path + CPython 3.10, so the editable installs + their deps resolve.
 COPY --from=pybase --chown=worker:worker /home/worker/.local           /home/worker/.local
@@ -23,9 +37,18 @@ WORKDIR /home/worker
 ENV PATH=/home/worker/.local/bin:$PATH
 ENV PYTHONPATH=/home/worker/computor-backend/src
 
-# computor-testing framework (not part of the shared base)
+# computor-testing framework (not part of the shared base). Its dependencies
+# come hash-locked from uv.lock (the `testing-worker` group, exported in
+# computor-base); the package itself is installed without resolving anything.
+COPY --from=pybase --chown=worker:worker /home/worker/.computor-locks /home/worker/.computor-locks
 ADD --chown=worker:worker computor-testing /home/worker/computor-testing
-RUN pip install --user --no-warn-script-location /home/worker/computor-testing
+RUN pip install --user --no-warn-script-location --no-cache-dir \
+        --require-hashes --no-deps --only-binary :all: \
+        -r /home/worker/.computor-locks/testing-worker.txt \
+    && pip install --user --no-warn-script-location --no-cache-dir \
+        --no-deps --no-build-isolation /home/worker/computor-testing \
+    && pip check \
+    && python -c "import ctcore, ctexec, computor_backend.tasks.temporal_worker"
 
 # R user library
 ENV R_LIBS_USER=/home/worker/.local/lib/R/library
@@ -33,9 +56,13 @@ RUN mkdir -p /home/worker/.local/lib/R/library
 
 # Pre-build the Python 3.13 test venv with base testing deps at build time
 # (avoids slow installs at container startup).
+# Installed from the hashed lock (computor-testing/requirements.lock, compiled
+# from requirements.txt with a cooldown); the venv's bundled pip is used as is.
 RUN python3.13 -m venv /home/worker/test-venv && \
-    /home/worker/test-venv/bin/pip install --upgrade pip && \
-    /home/worker/test-venv/bin/pip install -r /home/worker/computor-testing/requirements.txt
+    PYTHONPATH= /home/worker/test-venv/bin/pip install --no-cache-dir --require-hashes \
+        --only-binary :all: -r /home/worker/computor-testing/requirements.lock && \
+    PYTHONPATH= MPLBACKEND=Agg /home/worker/test-venv/bin/python \
+        /home/worker/computor-testing/scripts/import_smoke.py
 ENV PYTHON_TEST_EXECUTABLE=/home/worker/test-venv/bin/python
 
 # Testing worker startup script: sets up language envs, then starts the worker.

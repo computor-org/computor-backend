@@ -29,7 +29,7 @@ router = APIRouter()
 async def list_comments(
     params: Annotated[CourseMemberCommentQuery, Depends()],
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """List comments accessible to the user (optionally filtered by course_member_id)."""
     if params.course_member_id:
@@ -41,7 +41,7 @@ async def list_comments(
 async def create_comment(
     payload: CommentCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Create a comment for a course member.
 
@@ -61,7 +61,7 @@ async def update_comment(
     course_member_comment_id: UUID | str,
     payload: CommentUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Update a course member comment. Returns the full refreshed comment list."""
     return update_course_member_comment(
@@ -75,7 +75,7 @@ async def update_comment(
 async def delete_comment(
     course_member_comment_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Delete a course member comment. Returns the full refreshed comment list."""
     return delete_course_member_comment(

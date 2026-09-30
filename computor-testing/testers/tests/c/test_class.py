@@ -21,6 +21,8 @@ from ctcore.models import (
 from ctcore.helpers import get_property_as_list
 from testers.executors.c import CExecutor, analyze_source
 
+from ctexec.safe_io import read_untrusted_text
+
 from .conftest import report_key
 from ..test_base import (
     Solution,
@@ -206,7 +208,7 @@ class TestComputorC(CompiledTestClass):
         if not file_path or not os.path.exists(file_path):
             pytest.fail("Source file not found for structural test")
 
-        analysis = analyze_source(file_path)
+        analysis = analyze_source(file_path, root=dir_student)
 
         if "error" in analysis:
             pytest.fail(f"Analysis failed: {analysis['error']}")
@@ -231,8 +233,8 @@ class TestComputorC(CompiledTestClass):
 
         else:
             # Check if it's in the source
-            with open(file_path, 'r') as f:
-                content = f.read()
+            # Student-controlled: no symlinks/FIFOs, size-capped (#237).
+            content = read_untrusted_text(file_path, root=dir_student)
 
             if pattern:
                 try:

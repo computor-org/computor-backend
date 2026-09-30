@@ -25,6 +25,8 @@ from ctcore.models import (
     StatusEnum,
     QualificationEnum,
 )
+from ctexec.safe_io import read_untrusted_bytes, read_untrusted_text
+
 from .conftest import report_key, Solution
 from ctcore.helpers import get_property_as_list, token_exchange
 from testers.executors.python import PyExecutor, PyExecutionError
@@ -79,19 +81,21 @@ def _tokenize_name(name: str):
     return pieces or None
 
 
-def _read_tokens(file_path: str):
+def _read_tokens(file_path: str, root=None):
     """Tokenize a student file, failing the test if it cannot be parsed."""
     try:
-        with open(file_path, 'rb') as f:
-            return list(tokenize.tokenize(f.readline))
+        # Student-controlled: no symlinks/FIFOs, size-capped (#237).
+        data = read_untrusted_bytes(file_path, root=root)
+        return list(tokenize.tokenize(io.BytesIO(data).readline))
     except (tokenize.TokenError, SyntaxError, IndentationError) as e:
         pytest.fail(f"Could not tokenize student file: {e}")
 
 
-def _count_single_token(file_path: str, name: str, occurance_type=None) -> int:
+def _count_single_token(file_path: str, name: str, occurance_type=None,
+                        root=None) -> int:
     """Count tokens whose text equals `name`, optionally filtered by token type."""
     count = 0
-    for _token in _read_tokens(file_path):
+    for _token in _read_tokens(file_path, root):
         if occurance_type:
             c_type = getattr(token, occurance_type, None)
             if c_type and _token.type == c_type and _token.string == name:
@@ -101,7 +105,7 @@ def _count_single_token(file_path: str, name: str, occurance_type=None) -> int:
     return count
 
 
-def _count_token_sequence(file_path: str, name: str) -> int:
+def _count_token_sequence(file_path: str, name: str, root=None) -> int:
     """
     Count non-overlapping occurrences of `name` as a token sequence.
 
@@ -111,12 +115,12 @@ def _count_token_sequence(file_path: str, name: str) -> int:
     """
     needle = _tokenize_name(name)
     if needle is None:
-        return _count_single_token(file_path, name)
+        return _count_single_token(file_path, name, root=root)
     if len(needle) == 1:
-        return _count_single_token(file_path, needle[0])
+        return _count_single_token(file_path, needle[0], root=root)
 
     hay = [
-        t.string for t in _read_tokens(file_path)
+        t.string for t in _read_tokens(file_path, root)
         if t.type not in _HAYSTACK_SKIP_TYPES
     ]
 
@@ -243,7 +247,9 @@ def get_solution(mm, pytestconfig, idx: int, where: Solution) -> dict:
     random.seed(1)
     np.random.seed(1)
 
-    # Graphics tests require in-process execution to access matplotlib figures
+    # Graphics tests run in the bounded, sandboxed job like every other test
+    # (#237): `plt.<name>` is evaluated inside the job and returned as data;
+    # figures are saved there and copied out only if they pass safe_io.
     if main.type == TypeEnum.graphics:
         store_graphics_artifacts = main.storeGraphicsArtifacts
         if specification.storeGraphicsArtifacts is not None:
@@ -253,9 +259,12 @@ def get_solution(mm, pytestconfig, idx: int, where: Solution) -> dict:
             if store_graphics_artifacts and specification.artifactDirectory
             else None
         )
-        _execute_graphics_inprocess(
-            _solution, where, script_path, _dir, setup_code, teardown_code,
-            main, plt,
+        graphics_names = [test.name for test in main.tests if test.name]
+        _execute_subprocess(
+            _solution, where, script_path, _dir, timeout,
+            [f"plt.{name}" for name in graphics_names],
+            setup_code, teardown_code, input_answers,
+            graphics_names=graphics_names,
             artifact_dir=artifact_dir,
             artifact_prefix=f"{where}_test_{idx}",
         )
@@ -269,101 +278,18 @@ def get_solution(mm, pytestconfig, idx: int, where: Solution) -> dict:
     return _solution[where]
 
 
-def _execute_graphics_inprocess(
-    _solution, where, script_path, _dir, setup_code, teardown_code, main, plt,
-    artifact_dir=None, artifact_prefix="",
-):
-    """Execute Python code in-process for graphics tests."""
-    try:
-        start_time = time.time()
-        stdout_capture = io.StringIO()
-        stderr_capture = io.StringIO()
-        namespace = {'__file__': script_path}
-        old_stdout, old_stderr, old_cwd = sys.stdout, sys.stderr, os.getcwd()
-
-        try:
-            os.chdir(_dir)
-            if _dir not in sys.path:
-                sys.path.insert(0, _dir)
-            sys.stdout = stdout_capture
-            sys.stderr = stderr_capture
-
-            with open(script_path, 'r') as f:
-                code = f.read()
-            exec(compile(code, script_path, 'exec'), namespace)
-
-            for code in setup_code:
-                exec(code, namespace)
-            for code in teardown_code:
-                exec(code, namespace)
-
-            # Extract graphics objects
-            try:
-                from matplotlib import pyplot as plt_mod
-                namespace['plt'] = plt_mod
-            except ImportError:
-                plt_mod = None
-
-            namespace["_graphics_object_"] = {}
-            for test in main.tests:
-                fun2eval = f"plt.{test.name}"
-                try:
-                    namespace["_graphics_object_"][test.name] = eval(fun2eval, namespace)
-                except (AttributeError, NameError, SyntaxError, KeyError):
-                    pass
-
-            # Persist the open figures as result artifacts while they are
-            # still alive — plt.close('all') in the finally wipes them.
-            if artifact_dir and plt_mod is not None:
-                for fig_num in plt_mod.get_fignums():
-                    try:
-                        plt_mod.figure(fig_num).savefig(os.path.join(
-                            artifact_dir,
-                            f"{artifact_prefix}_figure_{fig_num}.png",
-                        ))
-                    except Exception as e:
-                        print(f"Warning: could not save figure {fig_num}: {e}",
-                              file=sys.stderr)
-
-            _solution[where] = {
-                "status": StatusEnum.completed, "errormsg": "",
-                "namespace": namespace, "variables": namespace,
-                "errors": [], "warnings": [], "traceback": {},
-                "exectime": time.time() - start_time,
-                "setup_code": setup_code,
-                "std": {"stdout": stdout_capture.getvalue(), "stderr": stderr_capture.getvalue()},
-            }
-        except Exception as e:
-            import traceback as tb
-            _solution[where] = {
-                "status": StatusEnum.failed,
-                "errormsg": f"Execution failed: {e}",
-                "namespace": namespace, "variables": namespace,
-                "errors": [str(e)], "traceback": {"error": str(e)},
-                "exectime": time.time() - start_time,
-                "std": {"stdout": stdout_capture.getvalue(), "stderr": stderr_capture.getvalue()},
-            }
-        finally:
-            sys.stdout, sys.stderr = old_stdout, old_stderr
-            os.chdir(old_cwd)
-            if plt:
-                plt.close('all')
-    except Exception as e:
-        _solution[where] = {
-            "status": StatusEnum.crashed, "errormsg": f"Unexpected error: {e}",
-            "namespace": {}, "variables": {}, "errors": [str(e)],
-            "traceback": {}, "exectime": 0,
-            "std": {"stdout": None, "stderr": None},
-        }
-
-
 def _execute_subprocess(
     _solution, where, script_path, _dir, timeout,
-    variables_to_extract, setup_code, teardown_code, input_answers
+    variables_to_extract, setup_code, teardown_code, input_answers,
+    graphics_names=None, artifact_dir=None, artifact_prefix="",
 ):
-    """Execute Python code via subprocess."""
+    """Execute Python code via subprocess (bounded, sandboxed job)."""
     try:
-        executor = PyExecutor(working_dir=_dir, timeout=timeout)
+        executor = PyExecutor(
+            working_dir=_dir, timeout=timeout,
+            graphics=graphics_names is not None,
+            figure_dir=artifact_dir, figure_prefix=artifact_prefix,
+        )
         start_time = time.time()
 
         result = executor.execute_script(
@@ -375,6 +301,14 @@ def _execute_subprocess(
         )
 
         exec_time = time.time() - start_time
+
+        if graphics_names is not None:
+            variables = result.get("variables") or {}
+            variables["_graphics_object_"] = {
+                name: variables.pop(f"plt.{name}")
+                for name in graphics_names if f"plt.{name}" in variables
+            }
+            result["variables"] = variables
 
         if result["status"] == "COMPLETED":
             _solution[where] = {
@@ -538,18 +472,19 @@ class TestComputorPython:
                 pytest.skip("allowedOccuranceRange not set")
 
             if sub.pattern:
-                with open(file_path, 'r') as f:
-                    source = f.read()
+                # Student-controlled: no symlinks/FIFOs, size-capped (#237).
+                source = read_untrusted_text(file_path, root=dir_student)
                 try:
                     count = len(safe_regex_findall(sub.pattern, source))
                 except RegexTimeoutError:
                     pytest.fail(f"Pattern `{sub.pattern}` timed out (possible ReDoS)")
             elif sub.occuranceType:
                 count = _count_single_token(
-                    file_path, sub.name, occurance_type=sub.occuranceType
+                    file_path, sub.name, occurance_type=sub.occuranceType,
+                    root=dir_student,
                 )
             else:
-                count = _count_token_sequence(file_path, sub.name)
+                count = _count_token_sequence(file_path, sub.name, root=dir_student)
 
             if sub.allowedOccuranceRange is not None:
                 check_occurrence_range(

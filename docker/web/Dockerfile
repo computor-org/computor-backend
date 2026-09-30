@@ -2,7 +2,7 @@
 # Optimized for minimal image size and security
 
 # Stage 1: Dependencies
-FROM node:20-alpine AS deps
+FROM node:20.20.2-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS deps
 
 # Install dependencies only when needed
 WORKDIR /app
@@ -11,11 +11,11 @@ WORKDIR /app
 COPY computor-web/package.json computor-web/yarn.lock ./
 
 # Install all dependencies (including dev deps needed for build)
-RUN yarn install --frozen-lockfile && \
+RUN yarn install --frozen-lockfile --ignore-scripts && \
     yarn cache clean
 
 # Stage 2: Builder
-FROM node:20-alpine AS builder
+FROM node:20.20.2-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS builder
 
 WORKDIR /app
 
@@ -32,6 +32,9 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 # Build provenance (set by computor.sh) — shown in the sidebar footer.
 ARG GIT_COMMIT=
 ENV NEXT_PUBLIC_GIT_COMMIT=$GIT_COMMIT
+# Legal footer/pages profile: computor-at | tugraz-internal | none (default).
+ARG NEXT_PUBLIC_LEGAL_PROFILE=none
+ENV NEXT_PUBLIC_LEGAL_PROFILE=$NEXT_PUBLIC_LEGAL_PROFILE
 
 # Disable Next.js telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -40,7 +43,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN yarn build
 
 # Stage 3: Production Runner
-FROM node:20-alpine AS runner
+FROM node:20.20.2-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS runner
 
 WORKDIR /app
 

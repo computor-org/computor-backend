@@ -19,6 +19,7 @@ import logging
 import os
 import re
 import subprocess
+import uuid
 from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
@@ -40,7 +41,10 @@ IMAGE_VERSIONS_TO_KEEP = 2
 # Auto-generated tag shape ("v" + workflow.now timestamp). Only tags matching
 # this are ever cleanup candidates — :latest, admin-chosen custom tags and
 # foreign repos are never touched.
-_VERSION_TAG_RE = re.compile(r"^v\d{8}-\d{6}$")
+# The optional 6-hex suffix (workflow.uuid4) keeps two runs in the same second
+# from overwriting each other's tag; the timestamp prefix keeps lexical order
+# chronological.
+_VERSION_TAG_RE = re.compile(r"^v\d{8}-\d{6}(-[0-9a-f]{6})?$")
 
 _REGISTRY_REPO_ROOT = "/var/lib/registry/docker/registry/v2/repositories"
 
@@ -176,6 +180,23 @@ def _resolve_templates(
 # ---------------------------------------------------------------------------
 
 
+def _repo_digest_of(repo_digests: List[str], repo: str) -> Optional[str]:
+    """The ``sha256:`` digest ``repo`` holds for an image, from its RepoDigests."""
+    for ref in repo_digests:
+        name, _, digest = ref.partition("@")
+        if name == repo and digest.startswith("sha256:"):
+            return digest
+    return None
+
+
+def _generated_version_tag() -> str:
+    """A fresh ``v<UTC timestamp>-<6 hex>`` tag (cleanup recognises the shape)."""
+    from datetime import datetime, timezone
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    return f"v{stamp}-{uuid.uuid4().hex[:6]}"
+
+
 @activity.defn(name="build_workspace_image")
 def build_workspace_image(
     template_key: str,
@@ -192,10 +213,10 @@ def build_workspace_image(
     thread pool (Worker(activity_executor=...)) instead of on the event loop.
 
     Pushes two tags: the moving ``:latest`` and an immutable ``:<image_tag>``.
-    The versioned tag is what a Coder template version pins to, so rebuilt
-    workspaces actually pull the new image (a moved ``:latest`` would not be
-    re-pulled by the docker provider's ``keep_locally`` image resource) and a
-    rollback target exists.
+    The versioned tag is the rollback/cleanup handle; what a Coder template
+    version pins to is the manifest digest the registry reported for it
+    (returned as ``digest``), so rebuilt workspaces actually pull the new image
+    and a re-pushed tag cannot change an existing version.
 
     Templates that build from an external repo declare it under ``source_repos``
     and get its current commit injected as a build arg, so the layer that checks
@@ -230,6 +251,12 @@ def build_workspace_image(
     push_tags = ["latest"]
     if image_tag and image_tag != "latest":
         push_tags.append(image_tag)
+    else:
+        # Always publish one tag no concurrent build shares, so this build's
+        # own image reaches the registry even if another build moves :latest.
+        push_tags.append(_generated_version_tag())
+    # Local-only identity for this build; never shared, removed afterwards.
+    build_tag = f"build-{uuid.uuid4().hex[:12]}"
 
     # Collect build args from environment variables
     buildargs = {}
@@ -259,9 +286,10 @@ def build_workspace_image(
         # result and rebuilt the identical image. Heartbeating per output
         # chunk keeps the activity provably alive, and the log shows progress
         # while it happens instead of one dump at the end.
+        built_id: Optional[str] = None
         for chunk in client.api.build(
             path=build_dir,
-            tag=f"{repo}:{push_tags[0]}",
+            tag=f"{repo}:{build_tag}",
             rm=True,
             buildargs=buildargs or None,
             nocache=no_cache,
@@ -270,16 +298,18 @@ def build_workspace_image(
             activity.heartbeat()
             if chunk.get("error"):
                 raise docker_sdk.errors.BuildError(chunk["error"], build_log=None)
+            built_id = (chunk.get("aux") or {}).get("ID") or built_id
             if "stream" in chunk:
                 line = chunk["stream"].strip()
                 if line:
                     logger.info(f"[build:{template_key}] {line}")
 
-        # The build applied the first tag; resolve the image through it and
-        # apply the remaining tags to the same id so every tag is identical.
-        image = client.images.get(f"{repo}:{push_tags[0]}")
-        for extra in push_tags[1:]:
-            image.tag(repo, tag=extra)
+        # Identity of THIS build: the image ID the build reported (else the
+        # unique build tag). Every later step goes through the ID, never
+        # through a tag another concurrent build could move.
+        image_id = built_id or client.images.get(f"{repo}:{build_tag}").id
+        for t in push_tags:
+            client.api.tag(image_id, repo, tag=t)
 
         # Push every tag, streaming for the same heartbeat reason — a multi-GB
         # MATLAB layer push is minutes on its own.
@@ -292,11 +322,26 @@ def build_workspace_image(
                     )
             logger.info(f"Pushed {repo}:{t}")
 
+        # The digest the template version pins is the one the daemon recorded
+        # for pushing this image ID to this repo (RepoDigests) — not a lookup
+        # of a tag, which a concurrent build may have re-pushed meanwhile.
+        pinned_digest = _repo_digest_of(
+            client.images.get(image_id).attrs.get("RepoDigests") or [], repo
+        )
+        if not pinned_digest:
+            raise RuntimeError(f"registry reported no digest for {repo} image {image_id}")
+        try:
+            client.images.remove(f"{repo}:{build_tag}", noprune=True)
+        except Exception:  # noqa: BLE001 - only a local helper tag
+            logger.warning(f"Could not remove local tag {repo}:{build_tag}")
+
         return {
             "success": True,
             "template": template_key,
             "image": f"{repo}:{image_tag}",
             "tags": push_tags,
+            "digest": pinned_digest,
+            "image_ref": f"{repo}@{pinned_digest}",
             # Which commit of each tracked repo went in, so the operator can
             # confirm a change shipped without inspecting the image.
             "source_revisions": source_revisions,
@@ -430,6 +475,44 @@ def cleanup_stale_workspace_images(
     return result
 
 
+def _registry_digest(repo: str, tag: str) -> str:
+    """Return the immutable ``sha256:`` digest the registry serves for ``repo:tag``.
+
+    Asked through the worker's Docker daemon, which is the same path the build
+    activity pushes through, so it reaches the registry under the same host.
+    """
+    import docker as docker_sdk
+
+    client = docker_sdk.DockerClient(
+        base_url="unix://" + get_worker_settings().docker_socket_path
+    )
+    try:
+        return client.images.get_registry_data(f"{repo}:{tag}").id
+    finally:
+        client.close()
+
+
+def _workspace_image_ref(
+    registry_host: str,
+    image_name: str,
+    image_tag: str,
+    image_digest: Optional[str],
+    resolve_digest,
+) -> str:
+    """The ``workspace_image`` a template version is pinned to: always
+    ``<registry>/<image>@sha256:...``, never a tag (every tag can be re-pushed).
+
+    ``image_digest`` is the digest this run's build pushed; without a build,
+    whatever tag was selected (``latest`` or an explicit one) is resolved to the
+    digest the registry holds right now via ``resolve_digest(image_name, tag)``,
+    which may raise.
+    """
+    digest = image_digest or resolve_digest(image_name, image_tag)
+    if not isinstance(digest, str) or not digest.startswith("sha256:"):
+        raise ValueError(f"not an image digest: {digest!r}")
+    return f"{registry_host}/{image_name}@{digest}"
+
+
 def _template_declares_variable(template_dir: str, name: str) -> bool:
     """True if any .tf file in the template declares `variable "<name>"`.
 
@@ -454,6 +537,88 @@ def _template_declares_variable(template_dir: str, name: str) -> bool:
     return False
 
 
+# Hard workspace caps. Coder carries a template variable's PREVIOUS value
+# forward when a push omits it — including the old "0" (unlimited) default —
+# so every push passes these explicitly. 0/empty/invalid never means
+# unlimited here: it falls back to the template file's own positive default,
+# then to the deployment default.
+_RESOURCE_CAP_DEFAULTS = {
+    "memory_mb": ("CODER_WORKSPACE_DEFAULT_MEMORY_MB", "3072"),
+    "cpus": ("CODER_WORKSPACE_DEFAULT_CPUS", "2"),
+}
+
+
+def _positive_number(value: Any) -> Optional[str]:
+    """``value`` as a canonical positive number string, else None."""
+    try:
+        number = float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    if not number > 0 or number != number or number == float("inf"):
+        return None
+    return str(int(number)) if number.is_integer() else str(number)
+
+
+def _template_variable_default(template_dir: str, name: str) -> Optional[str]:
+    """The literal ``default`` of ``variable "<name>"`` in the template's .tf files."""
+    pattern = re.compile(
+        r'variable\s+"' + re.escape(name) + r'"\s*\{[^}]*?default\s*=\s*"?([^"\n]*)"?',
+        re.S,
+    )
+    try:
+        entries = sorted(os.listdir(template_dir))
+    except OSError:
+        return None
+    for fn in entries:
+        if not fn.endswith(".tf"):
+            continue
+        try:
+            with open(os.path.join(template_dir, fn), "r", encoding="utf-8") as f:
+                match = pattern.search(f.read())
+        except OSError:
+            continue
+        if match:
+            return match.group(1).strip()
+    return None
+
+
+def _effective_resource_caps(
+    template_dir: str, variables: Optional[Dict[str, str]]
+) -> Dict[str, str]:
+    """Explicit positive memory/CPU caps for every cap the template declares."""
+    variables = variables or {}
+    caps: Dict[str, str] = {}
+    for name, (env_name, fallback) in _RESOURCE_CAP_DEFAULTS.items():
+        if not _template_declares_variable(template_dir, name):
+            continue
+        caps[name] = (
+            _positive_number(variables.get(name))
+            or _positive_number(_template_variable_default(template_dir, name))
+            or _positive_number(os.environ.get(env_name))
+            or fallback
+        )
+    return caps
+
+
+def _optional_push_variable_args(
+    template_dir: str, template_variables: Optional[Dict[str, str]]
+) -> List[str]:
+    """``--variable`` args beyond the always-pushed wiring.
+
+    Optional deployment-wide and per-template variables (e.g. the MATLAB
+    license) are applied only to templates that declare them — `coder
+    templates push` rejects undeclared variables (see
+    _template_declares_variable). Resource caps are always included.
+    """
+    merged = dict(template_variables or {})
+    merged.update(_effective_resource_caps(template_dir, merged))
+    args: List[str] = []
+    for name, value in merged.items():
+        if value and _template_declares_variable(template_dir, name):
+            args += ["--variable", f"{name}={value}"]
+    return args
+
+
 @activity.defn(name="push_coder_template")
 async def push_coder_template(
     template_key: str,
@@ -469,13 +634,16 @@ async def push_coder_template(
     registry_host: str = "localhost:5000",
     image_tag: str = "latest",
     template_variables: Optional[Dict[str, str]] = None,
+    image_digest: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Push a Coder template (Terraform config) using the coder CLI,
     then set TTL via the Coder REST API.
 
     Pins the template's ``workspace_image`` variable to the immutable
-    ``<registry>/<image>:<image_tag>`` ref so this new template version is tied
+    ``<registry>/<image>@sha256:...`` ref (``image_digest`` from this run's
+    build, else the registry's digest for ``image_tag``) so this new template
+    version is tied
     to a specific image build (and so rolling workspaces onto it actually
     changes the running image). ``registry_host`` here is the provisioner's view
     of the registry (matches the template's default host), NOT the worker's push
@@ -490,6 +658,10 @@ async def push_coder_template(
     from computor_backend.coder.config import CoderSettings
 
     # Discover template from filesystem
+    slice_error = await asyncio.to_thread(public_slice_error)
+    if slice_error:
+        return {"success": False, "template": template_key, "error": slice_error}
+
     discovered = _discover_templates(templates_dir)
     info = discovered.get(template_key)
     if not info:
@@ -510,7 +682,28 @@ async def push_coder_template(
     if coder_url_override is not None:
         coder_url = coder_url_override
 
-    image_ref = f"{registry_host}/{info['image_name']}:{image_tag}"
+    # The workflow parameters are assembled by the API on the control plane,
+    # where http://uvicorn:8000 is valid. Template ingress runs on the worker,
+    # so prefer that worker's explicit backend route (the WireGuard address in
+    # split-host production) for ForwardAuth.
+    worker_backend_url = get_worker_settings().backend_external_url
+    if worker_backend_url:
+        backend_internal_url = worker_backend_url.rstrip("/")
+
+    # Resolve through the worker's push host (as the build activity does); the
+    # digest is host-independent, so the ref keeps the provisioner's host.
+    push_host = get_worker_settings().coder_registry_host or registry_host
+    try:
+        image_ref = _workspace_image_ref(
+            registry_host, info["image_name"], image_tag, image_digest,
+            lambda name, tag: _registry_digest(f"{push_host}/{name}", tag),
+        )
+    except Exception as e:
+        return {
+            "success": False, "template": template_key,
+            "error": f"Cannot pin {info['image_name']}:{image_tag} to a digest "
+                     f"(build the image first): {e}",
+        }
 
     # Route login and template GET/PATCH through CoderClient instead of raw
     # httpx. The client is configured with this activity's resolved url and
@@ -544,14 +737,12 @@ async def push_coder_template(
             "--variable", f"dev_forward_ports={dev_forward_ports}",
             "--variable", f"workspace_image={image_ref}",
         ]
-        # Optional deployment-wide variables (e.g. the MATLAB license) are
-        # applied only to templates that declare them — `coder templates push`
-        # rejects undeclared variables. See _template_declares_variable.
-        for name, value in (template_variables or {}).items():
-            if value and _template_declares_variable(template_dir, name):
-                cmd += ["--variable", f"{name}={value}"]
+        cmd += _optional_push_variable_args(template_dir, template_variables)
         cmd += ["--yes"]
-        logger.info(f"Running: {' '.join(cmd)}")
+        # Variable values may be deployment secrets (license servers, manager
+        # overrides): log the names only.
+        logged = [a.split("=", 1)[0] + "=***" if "=" in a else a for a in cmd]
+        logger.info(f"Running: {' '.join(logged)}")
 
         try:
             # Offload the blocking coder CLI subprocess to a thread so the
@@ -683,7 +874,10 @@ class BuildWorkspaceImagesWorkflow(BaseWorkflow):
         registry_host = parameters.get("registry_host", "localhost:5000")
         requested = parameters.get("templates")
         # One immutable image tag per run; workflow.now() is replay-deterministic.
-        image_tag = parameters.get("image_tag") or ("v" + workflow.now().strftime("%Y%m%d-%H%M%S"))
+        image_tag = parameters.get("image_tag") or (
+            "v" + workflow.now().strftime("%Y%m%d-%H%M%S")
+            + "-" + workflow.uuid4().hex[:6]
+        )
         no_cache = bool(parameters.get("no_cache", False))
         self._progress.update({"phase": "discovering", "image_tag": image_tag})
 
@@ -824,12 +1018,15 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
         # Without a build there is nothing to give a fresh tag to, and pinning
         # the template to one would produce a version whose every workspace
         # fails with "unable to pull image ...:vYYYYMMDD-HHMMSS". Fall back to
-        # the tag the last build published instead.
+        # the image the last build published: push_coder_template resolves
+        # "latest" to its current registry digest, so the version is still
+        # pinned immutably.
         no_cache = bool(parameters.get("no_cache", False))
         image_tag = parameters.get("image_tag")
         if not image_tag:
             image_tag = (
                 "v" + workflow.now().strftime("%Y%m%d-%H%M%S")
+                + "-" + workflow.uuid4().hex[:6]
                 if build_images
                 else "latest"
             )
@@ -955,6 +1152,9 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
                     registry_host,
                     image_tag,
                     {**template_variables, **overrides},
+                    # The digest this run's build pushed; None without a build
+                    # (the activity then resolves the selected tag).
+                    (build_result or {}).get("digest"),
                 ],
                 start_to_close_timeout=timedelta(minutes=10),
                 retry_policy=RetryPolicy(
@@ -1075,6 +1275,10 @@ async def rollout_template_workspaces(
     force-rebuilds running workspaces too.
     """
     from computor_backend.coder.client import CoderClient
+
+    slice_error = await asyncio.to_thread(public_slice_error)
+    if slice_error:
+        return {"success": False, "template": template_key, "error": slice_error}
 
     discovered = _discover_templates(templates_dir)
     info = discovered.get(template_key)
@@ -1395,6 +1599,102 @@ def delete_workspace_volume(name: str) -> Dict[str, Any]:
     return {"success": True, "message": f"Volume '{name}' deleted"}
 
 
+# Aggregate workspace limits (public deployments). The docker provider has no
+# per-container pids limit, so the systemd slice every workspace is placed in
+# (Terraform cgroup_parent) is the process-count and aggregate bound. Docker
+# silently creates a missing slice with NO limits, so a configured name proves
+# nothing: a throwaway container is started in the slice with the host cgroup
+# namespace and reads the slice's own memory.max / cpu.max / pids.max.
+_SLICE_CHECK_SCRIPT = (
+    'c=$(sed -n "s/^0:://p" /proc/self/cgroup); '
+    'd=/sys/fs/cgroup$(dirname "$c"); '
+    'echo "path=$(dirname "$c")"; '
+    'for f in memory.max cpu.max pids.max; do '
+    'echo "$f=$(cat "$d/$f" 2>/dev/null || echo missing)"; done'
+)
+
+
+def public_deployment() -> bool:
+    return os.environ.get("COMPUTOR_PUBLIC_DEPLOYMENT", "").strip().lower() == "true"
+
+
+def parse_slice_limits(output: str) -> Dict[str, Any]:
+    """Judge the check container's output. Fails closed on anything unexpected."""
+    values: Dict[str, str] = {}
+    for line in output.splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip()
+    problems = []
+    path = values.get("path", "")
+    if not path or path in ("/", "."):
+        problems.append("container is not below a cgroup parent (cgroup v2 + systemd driver required)")
+    memory = values.get("memory.max", "missing")
+    if not memory.isdigit() or int(memory) <= 0:
+        problems.append(f"memory.max is {memory!r}")
+    cpu = values.get("cpu.max", "missing").split()
+    if not cpu or not cpu[0].isdigit():
+        problems.append(f"cpu.max is {' '.join(cpu) or 'missing'!r}")
+    pids = values.get("pids.max", "missing")
+    if not pids.isdigit() or int(pids) <= 0:
+        problems.append(f"pids.max is {pids!r}")
+    return {
+        "success": not problems,
+        "limits": values,
+        "error": "; ".join(problems) if problems else None,
+    }
+
+
+def verify_workspace_slice_limits(cgroup_parent: Optional[str] = None) -> Dict[str, Any]:
+    """Verify the configured workspace slice has memory, CPU and pids limits."""
+    import docker as docker_sdk
+
+    cgroup_parent = (
+        cgroup_parent
+        if cgroup_parent is not None
+        else os.environ.get("CODER_WORKSPACE_CGROUP_PARENT", "")
+    ).strip()
+    if not cgroup_parent:
+        return {"success": False, "limits": {}, "error": "CODER_WORKSPACE_CGROUP_PARENT is not set"}
+    settings = get_worker_settings()
+    try:
+        client = docker_sdk.DockerClient(base_url="unix://" + settings.docker_socket_path)
+        output = client.containers.run(
+            REPAIR_IMAGE,
+            command=["sh", "-c", _SLICE_CHECK_SCRIPT],
+            cgroup_parent=cgroup_parent,
+            cgroupns="host",
+            remove=True,
+            network_disabled=True,
+            read_only=True,
+        )
+    except Exception as e:  # noqa: BLE001 - any failure means "not verified"
+        return {"success": False, "limits": {}, "error": f"slice check failed: {e}"}
+    if isinstance(output, bytes):
+        output = output.decode("utf-8", "replace")
+    result = parse_slice_limits(output)
+    result["cgroup_parent"] = cgroup_parent
+    if result["error"]:
+        result["error"] = f"workspace slice '{cgroup_parent}' is not limited: {result['error']}"
+    return result
+
+
+def public_slice_error() -> Optional[str]:
+    """None when not public or the slice is verified; else why it is refused."""
+    if not public_deployment():
+        return None
+    result = verify_workspace_slice_limits()
+    return None if result["success"] else (
+        "COMPUTOR_PUBLIC_DEPLOYMENT=true: " + (result.get("error") or "slice not verified")
+    )
+
+
+@activity.defn(name="verify_workspace_slice")
+def verify_workspace_slice() -> Dict[str, Any]:
+    """Temporal entry point for the API's provisioning gate."""
+    return verify_workspace_slice_limits()
+
+
 @activity.defn(name="repair_volume_ownership")
 def repair_volume_ownership(name: str) -> Dict[str, Any]:
     """Give a volume's contents back to uid 1000 from outside the workspace.
@@ -1457,6 +1757,11 @@ class WorkspaceVolumesWorkflow(BaseWorkflow):
                 list_workspace_volumes,
                 start_to_close_timeout=timedelta(minutes=5),
             )
+        elif action == "verify_slice":
+            result = await workflow.execute_activity(
+                verify_workspace_slice,
+                start_to_close_timeout=timedelta(minutes=2),
+            )
         elif action in ("delete", "repair"):
             if not volume:
                 return WorkflowResult(
@@ -1495,4 +1800,5 @@ ACTIVITIES = [
     push_coder_template,
     repair_volume_ownership,
     rollout_template_workspaces,
+    verify_workspace_slice,
 ]

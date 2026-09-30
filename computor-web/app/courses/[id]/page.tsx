@@ -1,26 +1,30 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
 import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
 import { UserClient } from '@/src/generated/clients/UserClient';
+import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useCascadeDelete } from '@/src/hooks/useCascadeDelete';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
+import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
+import CascadeDeletePreview from '@/src/components/CascadeDeletePreview';
 import DescriptionList from '@/src/components/DescriptionList';
 import SectionCard from '@/src/components/SectionCard';
 import Button, { ButtonLink } from '@/src/components/ui/Button';
 import Notice from '@/src/components/ui/Notice';
 import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import { displayName } from '@/src/utils/displayName';
-import type { StudentRepositoryProvisioned } from 'types/generated';
+import type { PersonalCloneCredentialGet } from 'types/generated';
 
 const coursesClient = new CoursesClient();
 const courseFamiliesClient = new CourseFamiliesClient();
@@ -65,7 +69,17 @@ function CopyValue({ value }: { value: string }) {
 
 export default function CoursePage() {
   const courseId = useParams().id as string;
-  const { canManageHierarchy: canManage, isAdmin, isOrganizationManager, courseHasAtLeast, courseRole } = usePermissions();
+  const router = useRouter();
+  const { refreshPermissions } = useAuth();
+  const {
+    canManageHierarchy: canManage,
+    isAdmin,
+    isOrganizationManager,
+    courseHasAtLeast,
+    courseRole,
+    canArchiveCourse,
+    canDeleteCourse,
+  } = usePermissions();
   const canManageMembers = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
 
   const { data, loading, error, reload } = useResource(
@@ -105,7 +119,37 @@ export default function CoursePage() {
 
   const notify = useNotify();
   const [ensuring, setEnsuring] = useState(false);
-  const [provisioned, setProvisioned] = useState<StudentRepositoryProvisioned | null>(null);
+  const [archiving, setArchiving] = useState(false);
+
+  // Owner-only lifecycle. Archiving hides the course from students and closes
+  // submissions; it is reversible. Deleting previews first (dry run) and then
+  // asks for the course path — and the preview carries the server's
+  // `blocked_reason` when the real call would be refused (a course with student
+  // submissions is admin-only, and even an admin must archive it first).
+  async function setArchived(archived: boolean) {
+    setArchiving(true);
+    try {
+      if (archived) await coursesClient.routeCoursesCoursesIdArchivePatch({ id: courseId });
+      else await coursesClient.unarchiveCoursesCoursesIdUnarchivePatch({ id: courseId });
+      notify(archived ? 'Course archived.' : 'Course unarchived.', 'success');
+      await reload();
+    } catch (e) {
+      notify(e instanceof Error ? e.message : 'Could not update the course', 'error');
+    } finally {
+      setArchiving(false);
+    }
+  }
+  const del = useCascadeDelete(
+    () => coursesClient.deleteCourseEndpointCoursesCourseIdDelete({ courseId, dryRun: true }),
+    () => coursesClient.deleteCourseEndpointCoursesCourseIdDelete({ courseId, dryRun: false }),
+    async () => {
+      // The caller just lost their _owner membership; refresh the cached scopes
+      // so the list does not keep offering a course that is gone.
+      await refreshPermissions();
+      router.push('/courses');
+    },
+  );
+  const [personalCred, setPersonalCred] = useState<PersonalCloneCredentialGet | null>(null);
   // Fully controlled rather than an `open` attribute derived from `provisioned`:
   // any unrelated re-render would otherwise snap the disclosure shut under the
   // reader while they are copying out of it.
@@ -113,15 +157,21 @@ export default function CoursePage() {
 
   async function ensureGitAccess() {
     setEnsuring(true);
-    setProvisioned(null);
+    setPersonalCred(null);
     try {
-      const r = await userClient.provisionStudentRepositoryEndpointUserCoursesCourseIdProvisionRepositoryPost(
+      await userClient.provisionStudentRepositoryEndpointUserCoursesCourseIdProvisionRepositoryPost(
         { courseId },
       );
-      setProvisioned(r);
+      // A credential of the reader's own, NOT the workspace-managed token: that
+      // one is re-minted by every workspace credential repair, which silently
+      // killed whatever a student had copied from this page (#342).
+      const cred = await userClient
+        .personalCloneCredentialEndpointUserCoursesCourseIdCloneCredentialPost({ courseId })
+        .catch(() => null);
+      setPersonalCred(cred);
       // The credential is only reachable from inside the disclosure, so open it
       // rather than leaving the freshly-fetched token hidden behind a summary.
-      if (r.clone_token) setCloneOpen(true);
+      if (cred?.clone_token) setCloneOpen(true);
       notify('Git access checked — your repository is reachable.', 'success');
       await reload(); // refresh the persisted repository details below
     } catch (e) {
@@ -165,22 +215,47 @@ export default function CoursePage() {
   const facts = (items: (Fact | false | null | undefined | '')[]): Fact[] =>
     items.filter(Boolean) as Fact[];
 
+  const isArchived = Boolean(course.archived_at);
+
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
           breadcrumbs={crumbs}
           title={displayName(course, 'Untitled Course')}
+          subtitle={isArchived && <Badge tone="muted">Archived</Badge>}
           actions={
-            canManage && (
-              <ButtonLink href={`/courses/${courseId}/edit`} variant="secondary">
-                Edit
-              </ButtonLink>
-            )
+            <>
+              {canManage && (
+                <ButtonLink href={`/courses/${courseId}/edit`} variant="secondary">
+                  Edit
+                </ButtonLink>
+              )}
+              {canArchiveCourse(courseId) && (
+                <Button
+                  variant="secondary"
+                  onClick={() => setArchived(!isArchived)}
+                  loading={archiving}
+                  loadingLabel={isArchived ? 'Unarchive' : 'Archive'}
+                >
+                  {isArchived ? 'Unarchive' : 'Archive'}
+                </Button>
+              )}
+              {canDeleteCourse(courseId) && (
+                <Button variant="dangerGhost" onClick={del.begin} loading={del.opening} loadingLabel="Delete">
+                  Delete
+                </Button>
+              )}
+            </>
           }
         />
 
         <ScrollArea>
+        {isArchived && (
+          <Notice tone="info">
+            Archived: students no longer see this course and cannot submit. An owner can unarchive it.
+          </Notice>
+        )}
         {/* About — description + the few facts worth showing (no identifiers).
             First card: the course introduces itself before it hands out tools,
             and the description is what a member opening an unfamiliar course
@@ -327,23 +402,27 @@ export default function CoursePage() {
                     ])}
                   />
                 )}
-                {provisioned?.clone_token && (
+                {personalCred?.clone_token && (
                   <Notice tone="warning">
                     <p className="font-medium">
-                      Your git credential for this server — treat it like a password.
+                      Your personal git credential — treat it like a password.
                     </p>
                     <p className="mt-1">
-                      It is the same credential your workspace already uses, so it is shown again
-                      whenever you check access; it is not a one-time secret.
+                      It is independent of the credential your workspace manages, so it keeps
+                      working no matter what the workspace does; checking access again shows the
+                      same one. Clone in one step:
                     </p>
+                    <div className="mt-2">
+                      {personalCred.clone_command && <CopyValue value={personalCred.clone_command} />}
+                    </div>
                     <dl className="mt-2 space-y-1">
                       <div className="flex gap-2">
                         <dt className="w-20 shrink-0">Username</dt>
-                        <dd><CopyValue value={provisioned.clone_username ?? ''} /></dd>
+                        <dd><CopyValue value={personalCred.clone_username ?? ''} /></dd>
                       </div>
                       <div className="flex gap-2">
                         <dt className="w-20 shrink-0">Token</dt>
-                        <dd><CopyValue value={provisioned.clone_token} /></dd>
+                        <dd><CopyValue value={personalCred.clone_token} /></dd>
                       </div>
                     </dl>
                   </Notice>
@@ -406,6 +485,18 @@ export default function CoursePage() {
 
         </ScrollArea>
       </ListPageLayout>
+
+      {del.preview && (
+        <ConfirmDeleteDialog
+          title={`Delete course “${displayName(course, 'Untitled Course')}”?`}
+          message="This permanently deletes the course, its members, assignments, submissions and results, and its template and reference repositories. It is irreversible."
+          confirmWord={course.path}
+          preview={<CascadeDeletePreview result={del.preview} />}
+          blockedReason={del.preview.blocked_reason}
+          onConfirm={del.confirm}
+          onClose={del.close}
+        />
+      )}
     </AuthenticatedLayout>
   );
 }

@@ -40,7 +40,7 @@ async def upload_file(
     object_key: Optional[str] = Form(None),
     bucket_name: Optional[str] = Form(None),
     metadata: Optional[str] = Form(None),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     permissions: Principal = Depends(get_current_principal),
     storage_service = Depends(get_storage_service)
 ):

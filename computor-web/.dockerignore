@@ -42,6 +42,7 @@ Thumbs.db
 # Documentation
 *.md
 !README.md
+!content/legal/*.md
 docs
 
 # Docker

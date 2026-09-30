@@ -18,7 +18,7 @@ import numpy as np
 
 from ctexec import InterpretedExecutor, ExecutorResult
 from ctexec.exceptions import ExecutionError
-from ctexec.environment import BLOCKED_ENV_VARS
+from ctexec.environment import apply_thread_limits, filter_env
 
 
 class JuliaExecutionError(ExecutionError):
@@ -97,12 +97,12 @@ class JuliaExecutor(InterpretedExecutor):
         Note: Julia needs a fuller environment than other languages
         due to juliaup launcher requirements.
         """
-        # Julia needs most of the environment, just filter sensitive vars
-        env = os.environ.copy()
-        for var in BLOCKED_ENV_VARS:
-            env.pop(var, None)
+        # Julia needs most of the environment; filter secrets (exact names
+        # and the COMPUTOR_* prefix) and apply the shared per-job thread
+        # limits, which the generic builder would have set (#237).
+        env = apply_thread_limits(filter_env(os.environ.copy()))
         if extra_vars:
-            env.update(extra_vars)
+            env.update(filter_env(extra_vars))
         return env
 
     def _build_wrapper_script(

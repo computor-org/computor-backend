@@ -304,6 +304,99 @@ class TestPluginRegistry:
             registry.get_login_url("nonexistent", "http://localhost/callback")
 
 
+class FlakyAuthPlugin(MockAuthPlugin):
+    """A plugin whose backing service can be down, the way Keycloak can be.
+
+    Mirrors KeycloakAuthPlugin: initialize() tolerates the service being down
+    (it does not raise, so the API can still start) and reports readiness
+    through is_available.
+    """
+
+    def __init__(self, config: PluginConfig, service_up: bool = True):
+        super().__init__(config)
+        self.service_up = service_up
+        self.init_calls = 0
+        self._available = False
+
+    @property
+    def is_available(self) -> bool:
+        return self._available
+
+    async def initialize(self) -> None:
+        await super().initialize()
+        self.init_calls += 1
+        self._available = self.service_up
+
+
+class TestPluginReadiness:
+    """Test on-demand recovery of a provider that was down at startup."""
+
+    @staticmethod
+    def _registry_with(plugin: AuthenticationPlugin, name: str = "flaky") -> PluginRegistry:
+        registry = PluginRegistry()
+        registry._enabled_plugins.add(name)
+        registry._plugins[name] = plugin
+        return registry
+
+    @pytest.mark.asyncio
+    async def test_ready_plugin_is_returned_untouched(self):
+        """A usable provider must not be re-initialized on every request."""
+        plugin = FlakyAuthPlugin(PluginConfig(), service_up=True)
+        await plugin.initialize()
+        registry = self._registry_with(plugin)
+
+        assert await registry.ensure_plugin_ready("flaky") is plugin
+        assert plugin.init_calls == 1  # only the startup one
+
+    @pytest.mark.asyncio
+    async def test_unavailable_plugin_recovers_on_demand(self):
+        """Loaded but never initialized: the next request heals it, no restart."""
+        plugin = FlakyAuthPlugin(PluginConfig(), service_up=False)
+        await plugin.initialize()  # service was down at startup
+        registry = self._registry_with(plugin)
+        assert not plugin.is_available
+
+        plugin.service_up = True  # the service came back
+
+        assert await registry.ensure_plugin_ready("flaky") is plugin
+        assert plugin.is_available
+
+    @pytest.mark.asyncio
+    async def test_still_down_provider_is_not_retried_within_cooldown(self):
+        """A hard-down provider must not be re-probed on every single request."""
+        plugin = FlakyAuthPlugin(PluginConfig(), service_up=False)
+        await plugin.initialize()
+        registry = self._registry_with(plugin)
+        init_calls_after_startup = plugin.init_calls
+
+        assert await registry.ensure_plugin_ready("flaky") is None
+        assert await registry.ensure_plugin_ready("flaky") is None
+        assert plugin.init_calls == init_calls_after_startup + 1
+
+    @pytest.mark.asyncio
+    async def test_retry_resumes_after_cooldown(self):
+        """Once the cooldown has passed, the provider is probed again."""
+        plugin = FlakyAuthPlugin(PluginConfig(), service_up=False)
+        await plugin.initialize()
+        registry = self._registry_with(plugin)
+        registry.READINESS_RETRY_COOLDOWN = 0.0
+
+        assert await registry.ensure_plugin_ready("flaky") is None
+
+        plugin.service_up = True
+        assert await registry.ensure_plugin_ready("flaky") is plugin
+
+    @pytest.mark.asyncio
+    async def test_disabled_provider_is_never_readied(self):
+        """Readiness follows configuration: a disabled provider stays off."""
+        plugin = FlakyAuthPlugin(PluginConfig(), service_up=True)
+        registry = self._registry_with(plugin)
+        registry._enabled_plugins.discard("flaky")
+
+        assert await registry.ensure_plugin_ready("flaky") is None
+        assert plugin.init_calls == 0
+
+
 class TestPluginConfig:
     """Test plugin configuration."""
     

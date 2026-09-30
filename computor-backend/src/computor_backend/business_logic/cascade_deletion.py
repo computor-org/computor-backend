@@ -193,6 +193,22 @@ def count_course_entities(db: Session, course_id: str) -> EntityDeleteCount:
             SubmissionArtifact.submission_group_id.in_(submission_group_ids)
         ).count()
 
+        # Of those, the ones that are a STUDENT's: artifacts in a submission
+        # group with at least one ``_student`` member. Staff self-tests do not
+        # count. This is the figure that decides whether the course may be
+        # deleted at all (see ``course_delete_block_reason``).
+        student_group_ids = (
+            db.query(SubmissionGroupMember.submission_group_id)
+            .join(CourseMember, CourseMember.id == SubmissionGroupMember.course_member_id)
+            .filter(
+                SubmissionGroupMember.submission_group_id.in_(submission_group_ids),
+                CourseMember.course_role_id == "_student",
+            )
+        )
+        counts.student_submissions = db.query(SubmissionArtifact).filter(
+            SubmissionArtifact.submission_group_id.in_(student_group_ids)
+        ).count()
+
         # Count submission grades and reviews
         artifact_ids = [
             str(a.id) for a in
@@ -229,11 +245,41 @@ def count_course_entities(db: Session, course_id: str) -> EntityDeleteCount:
     return counts
 
 
+def course_delete_block_reason(
+    counts: EntityDeleteCount, *, archived: bool, is_admin: bool
+) -> Optional[str]:
+    """Why deleting this course must be refused (409), or None when it may go.
+
+    The rule, decided for release 2026.10: a course that holds submissions
+    from students can never be deleted by its owner — only an administrator
+    may, and only after the course has been archived. A course with no student
+    submissions (fresh, misconfigured, or only staff self-tests) deletes
+    directly. The message is the one the real call returns; a dry run hands it
+    back as ``blocked_reason`` so a client can explain the block up front.
+    """
+    n = counts.student_submissions
+    if n == 0:
+        return None
+    noun = "submission" if n == 1 else "submissions"
+    if not is_admin:
+        return (
+            f"This course has {n} {noun} from students and can only be deleted "
+            "by an administrator."
+        )
+    if not archived:
+        return (
+            f"This course has {n} {noun} from students. Archive the course first, "
+            "then delete it."
+        )
+    return None
+
+
 async def delete_course_cascade(
     db: Session,
     course_id: str,
     storage: StorageService | None = None,
-    dry_run: bool = False
+    dry_run: bool = False,
+    counts: Optional[EntityDeleteCount] = None,
 ) -> CascadeDeleteResult:
     """
     Delete a course and all its descendant data.
@@ -260,6 +306,8 @@ async def delete_course_cascade(
         course_id: The course ID to delete
         storage: Optional storage service for MinIO cleanup
         dry_run: If True, only return counts without deleting
+        counts: Pre-computed ``count_course_entities`` result, when the caller
+            already needed it for its own guards
 
     Returns:
         CascadeDeleteResult with deletion counts
@@ -279,7 +327,8 @@ async def delete_course_cascade(
         )
 
     # Count entities
-    counts = count_course_entities(db, course_id)
+    if counts is None:
+        counts = count_course_entities(db, course_id)
 
     if dry_run:
         return CascadeDeleteResult(

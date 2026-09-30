@@ -7,15 +7,15 @@ extracting variables via JSON serialization, and handling I/O.
 
 import json
 import os
-import subprocess
 import tempfile
-import time
 from abc import abstractmethod
 from typing import Any, Dict, List, Optional
 
 from .base import BaseExecutor, ExecutorResult, sandbox_command_prefix
 from .environment import get_safe_env
 from .exceptions import ExecutionError, ExecutionTimeoutError
+from .process import run_bounded, truncate_text
+from .safe_io import read_untrusted_bytes, result_limit
 from .resources import make_preexec_fn
 
 
@@ -135,6 +135,7 @@ class InterpretedExecutor(BaseExecutor):
         # Create temp files
         wrapper_path = None
         result_path = None
+        sandbox_dir = None
 
         try:
             # Wrapper and result files live in a private dir, not the shared
@@ -181,30 +182,24 @@ class InterpretedExecutor(BaseExecutor):
                 env["TMPDIR"] = sandbox_dir
                 if env.get("HOME") in (None, "/tmp"):
                     env["HOME"] = sandbox_dir
-            preexec_fn = make_preexec_fn(self.resource_limits) if self.resource_limits else None
+            preexec_fn = make_preexec_fn(self.resource_limits)
 
-            start_time = time.perf_counter()
-            try:
-                proc = subprocess.run(
-                    cmd,
-                    cwd=self.working_dir,
-                    capture_output=True,
-                    text=True,
-                    timeout=self.timeout,
-                    env=env,
-                    input=input_data,
-                    preexec_fn=preexec_fn,
-                )
-                duration = time.perf_counter() - start_time
-                timed_out = False
-                return_code = proc.returncode
-
-            except subprocess.TimeoutExpired as e:
-                duration = time.perf_counter() - start_time
+            # Own process group, whole tree killed at the end, output capped.
+            proc = run_bounded(
+                cmd,
+                cwd=self.working_dir,
+                env=env,
+                input=input_data,
+                timeout=self.timeout,
+                preexec_fn=preexec_fn,
+            )
+            duration = proc.duration
+            return_code = proc.returncode
+            if proc.timed_out:
                 return ExecutorResult(
                     success=False,
-                    stdout=e.stdout or "" if hasattr(e, "stdout") else "",
-                    stderr=e.stderr or "" if hasattr(e, "stderr") else "",
+                    stdout=proc.stdout,
+                    stderr=proc.stderr,
                     duration=duration,
                     timed_out=True,
                     error_message=f"Execution timed out after {self.timeout}s",
@@ -217,8 +212,10 @@ class InterpretedExecutor(BaseExecutor):
             # Build ExecutorResult
             return ExecutorResult(
                 success=result_data.get("status") == "COMPLETED",
-                stdout=result_data.get("stdout", proc.stdout),
-                stderr=result_data.get("stderr", proc.stderr),
+                # The wrapper's own capture is bounded only by RLIMIT_FSIZE;
+                # cap it like the pipe output.
+                stdout=truncate_text(result_data.get("stdout", proc.stdout)),
+                stderr=truncate_text(result_data.get("stderr", proc.stderr)),
                 duration=result_data.get("exectime", duration),
                 return_code=return_code,
                 namespace=result_data.get("variables", {}),
@@ -234,17 +231,31 @@ class InterpretedExecutor(BaseExecutor):
             )
 
         finally:
+            if sandbox_dir:
+                try:
+                    self._collect_artifacts(sandbox_dir)
+                except Exception:
+                    pass  # artifacts are best effort, never fail the job
             self._cleanup_temp_files()
 
+    def _collect_artifacts(self, sandbox_dir: str) -> None:
+        """Hook: copy job-produced files out of the private dir before it is
+        removed. Anything read from there is student-controlled (#237)."""
+
     def _read_result_file(self, result_path: str) -> Dict[str, Any]:
-        """Read and parse the JSON result file."""
+        """Read and parse the JSON result file.
+
+        The file sits in a directory the job can write, so it is read with
+        read_untrusted_bytes: a symlink, FIFO or oversized file raises
+        UnsafeFileError and fails the job instead of leaking or hanging.
+        """
+        if not os.path.lexists(result_path):
+            return {}
+        data = read_untrusted_bytes(result_path, result_limit())
         try:
-            if os.path.exists(result_path):
-                with open(result_path, "r") as f:
-                    return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            pass
-        return {}
+            return json.loads(data)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return {}
 
     def _cleanup_temp_files(self) -> None:
         """Remove temporary files (and the private sandbox dir) after a run."""

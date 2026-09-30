@@ -10,6 +10,7 @@ import Forbidden from '@/src/components/Forbidden';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { ADMIN_ROLE_LOCKED_HINT, grantsAdmin } from '@/src/utils/systemRoles';
 import { RolesClient } from '@/src/generated/clients/RolesClient';
 import { RoleClaimClient } from '@/src/generated/clients/RoleClaimClient';
 import { UserRolesClient } from '@/src/generated/clients/UserRolesClient';
@@ -323,7 +324,7 @@ export default function RolesPage() {
                   <div className="mb-4 space-y-1">
                     {members.map(m => {
                       const u = userMap.get(m.user_id);
-                      const canRemove = isAdmin || roleDetail.id !== '_admin';
+                      const canRemove = isAdmin || !grantsAdmin(roleDetail.id);
                       return (
                         <div key={m.user_id} className="flex items-center justify-between px-3 py-2 bg-surface border border-rule rounded-lg">
                           <div>
@@ -344,8 +345,8 @@ export default function RolesPage() {
                   </div>
                 )}
 
-                {/* Add member — blocked for _admin role for non-admins */}
-                {(isAdmin || roleDetail.id !== '_admin') && (
+                {/* Add member — blocked for admin-conferring roles for non-admins */}
+                {(isAdmin || !grantsAdmin(roleDetail.id)) && (
                   <div className="relative">
                     <p className="text-xs font-medium text-muted mb-1.5">Add user to role</p>
                     <input
@@ -383,8 +384,8 @@ export default function RolesPage() {
                     )}
                   </div>
                 )}
-                {!isAdmin && roleDetail.id === '_admin' && (
-                  <p className="text-xs text-subtle italic">Only admins can modify _admin role membership.</p>
+                {!isAdmin && grantsAdmin(roleDetail.id) && (
+                  <p className="text-xs text-subtle italic">{ADMIN_ROLE_LOCKED_HINT}</p>
                 )}
               </section>
 

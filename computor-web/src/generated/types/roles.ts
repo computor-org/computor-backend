@@ -63,3 +63,17 @@ export interface RoleClaimQuery {
   claim_type?: string | null;
   claim_value?: string | null;
 }
+
+/**
+ * Answer to ``GET /documents/permissions``: may the caller write here?
+ * 
+ * Reading needs only authentication, so ``can_write`` is the one question a
+ * client UI has before showing upload/rename/delete for a scope — showing an
+ * action the server would refuse just trades a click for a 403 (#361).
+ */
+export interface DocumentPermissionsGet {
+  scope: "system" | "organization" | "course_family" | "course";
+  scope_id?: string | null;
+  /** True when the write endpoints would accept this caller for this scope (admin, or the scope-specific role). */
+  can_write: boolean;
+}

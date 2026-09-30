@@ -73,7 +73,7 @@ def _binding_deploy_urls(binding) -> tuple[Optional[str], Optional[str]]:
 async def create_course_async(
     request: CourseTaskRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """Create a course asynchronously using Temporal workflows."""
 
@@ -150,7 +150,7 @@ async def generate_student_template(
     course_id: str,
     request: GenerateTemplateRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """
     Generate student template from assigned examples (Git operations).
@@ -369,7 +369,7 @@ async def generate_assignments(
     course_id: str,
     request: GenerateAssignmentsRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     # Permissions
     if check_course_permissions(permissions, Course, "_lecturer", db).filter(Course.id == course_id).first() is None:
@@ -490,7 +490,7 @@ async def generate_assignments(
 async def get_course_gitlab_status(
     course_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """
     Check GitLab configuration status for a course.
@@ -595,7 +595,7 @@ async def get_course_gitlab_status(
 async def create_hierarchy(
     payload: dict,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """
     Create a complete organization -> course family -> course hierarchy from a configuration.

@@ -1,9 +1,10 @@
 """Runtime status of the running API (#350).
 
 Covers the three answers the endpoint gives — when the process started, what it
-is running, when that was built — and the one refusal, since it is admin-only.
-The interesting cases are the ones where the honest answer is "I don't know":
-a working tree with no baked build, and a BUILD_TIME nobody can parse.
+is running, when that was built — and the one field it withholds, since the
+commit is admin-only while the rest is readable by anyone. The interesting cases
+are the ones where the honest answer is "I don't know": a working tree with no
+baked build, and a BUILD_TIME nobody can parse.
 """
 
 import sys
@@ -13,7 +14,6 @@ from types import SimpleNamespace
 import pytest
 
 from computor_backend.business_logic import build_info
-from computor_backend.exceptions import ForbiddenException
 from computor_backend.permissions.principal import Principal
 
 
@@ -134,9 +134,18 @@ async def test_status_reports_the_running_process(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_status_is_admin_only(monkeypatch):
+async def test_a_non_admin_is_told_the_uptime_but_not_the_commit(monkeypatch):
+    # The restart is what a user needs when something broke under them; the SHA
+    # names the exact source of a public repository and stays with the operator.
     from computor_backend.api.instance import get_instance_status
 
-    _settings(monkeypatch, git_commit="abc123")
-    with pytest.raises(ForbiddenException):
-        await get_instance_status(Principal(user_id="u", roles=["_user"]))
+    _settings(monkeypatch, git_commit="abc123", git_branch="release/2026.10",
+              build_time="2026-08-26T21:40:00Z")
+    build_info.mark_started()
+
+    status = await get_instance_status(Principal(user_id="u", roles=["_user"]))
+
+    assert status.commit is None
+    assert status.branch == "release/2026.10"
+    assert status.started_at == build_info.started_at()
+    assert status.build_time == datetime(2026, 8, 26, 21, 40, tzinfo=timezone.utc)

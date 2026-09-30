@@ -298,7 +298,7 @@ def _invalidate_lecturer_caches_for_example(example: Example, db: Session) -> No
 @examples_router.get("", response_model=List[ExampleList])
 async def list_examples(
     response: Response,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     permissions: Principal = Depends(get_current_principal),
     params: ExampleQuery = Depends(),
     redis_client=Depends(get_redis_client),
@@ -310,7 +310,7 @@ async def list_examples(
 @examples_router.get("/{example_id}", response_model=ExampleGet)
 async def get_example(
     example_id: str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     permissions: Principal = Depends(get_current_principal),
     redis_client=Depends(get_redis_client),
 ):
@@ -325,7 +325,7 @@ async def get_example(
 async def create_version(
     example_id: str,
     version: ExampleVersionCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     permissions: Principal = Depends(get_current_principal),
 ):
     """Create a new version for an example."""
@@ -379,7 +379,7 @@ async def list_versions(
     example_id: str,
     response: Response,
     params: ExampleVersionQuery = Depends(),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     permissions: Principal = Depends(get_current_principal),
     redis_client=Depends(get_redis_client),
 ):
@@ -427,7 +427,7 @@ async def list_versions(
 @examples_router.get("/versions/{version_id}", response_model=ExampleVersionGet)
 async def get_version(
     version_id: str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     permissions: Principal = Depends(get_current_principal),
     redis_client=Depends(get_redis_client),
 ):
@@ -466,7 +466,7 @@ async def get_version(
 async def delete_example_version_endpoint(
     version_id: str,
     permissions: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     dry_run: bool = Query(default=False, description="If true, only returns preview without deleting"),
 ) -> ExampleVersionDeleteResult:
     # ``example:delete`` is a write/action capability; a reader can see the
@@ -580,7 +580,7 @@ async def delete_example_version_endpoint(
 async def add_dependency(
     example_id: str,
     dependency: ExampleDependencyCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     permissions: Principal = Depends(get_current_principal),
 ):
     """Add a dependency to an example."""
@@ -628,7 +628,7 @@ async def add_dependency(
 @examples_router.get("/{example_id}/dependencies", response_model=List[ExampleDependencyGet])
 async def list_dependencies(
     example_id: str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     permissions: Principal = Depends(get_current_principal),
 ):
     """List all dependencies of an example."""
@@ -657,7 +657,7 @@ async def list_dependencies(
 async def remove_dependency(
     example_id: str,
     dependency_id: str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     permissions: Principal = Depends(get_current_principal),
 ):
     """Remove a dependency from an example."""
@@ -688,7 +688,7 @@ async def remove_dependency(
 @examples_router.post("/upload", response_model=ExampleVersionGet)
 async def upload_example(
     request: ExampleUploadRequest,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     permissions: Principal = Depends(get_current_principal),
     storage_service=Depends(get_storage_service),
 ):
@@ -918,11 +918,15 @@ async def upload_example(
         # Update existing version — refresh every promoted column so
         # we don't end up with a stale title / exec-backend / file
         # list hanging off a re-uploaded version.
-        for field, value in promoted.items():
-            setattr(existing_version, field, value)
-        existing_version.testing_service_id = testing_service_id
-        existing_version.updated_at = func.now()
-        version = version_repo.update(existing_version)
+        # ExampleVersionRepository.update takes an entity id and an update
+        # mapping.  Passing the already-loaded entity here used to raise a
+        # TypeError on every ``update_existing`` upload, after MinIO had
+        # already been overwritten.  Keep the repository as the single write
+        # path so its cache/deployment invalidation hooks still run.
+        updates = dict(promoted)
+        updates["testing_service_id"] = testing_service_id
+        updates["updated_at"] = func.now()
+        version = version_repo.update(existing_version.id, updates)
         cache.invalidate_tags(f"example_version:{version.id}")
     else:
         # Create new version
@@ -966,7 +970,7 @@ async def upload_example(
 async def download_example_latest(
     example_id: str,
     with_dependencies: bool = Query(False, description="Include all dependencies recursively"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     permissions: Principal = Depends(get_current_principal),
     storage_service=Depends(get_storage_service),
 ):
@@ -1038,7 +1042,7 @@ async def download_example_latest(
 async def download_example_version(
     version_id: str,
     with_dependencies: bool = Query(False, description="Include all dependencies recursively"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     permissions: Principal = Depends(get_current_principal),
     storage_service=Depends(get_storage_service),
 ):
@@ -1215,7 +1219,7 @@ async def download_example_version(
 )
 async def delete_examples_by_pattern_endpoint(
     permissions: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     identifier_pattern: str = Query(
         ...,
         description="Ltree pattern with * wildcard, e.g., 'itpcp.progphys.py.*'"

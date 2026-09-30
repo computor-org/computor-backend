@@ -104,7 +104,7 @@ async def assign_example_to_course_content(
     course_content_id: UUID | str,
     request: AssignExampleRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
 ):
     """
@@ -181,7 +181,7 @@ async def assign_example_to_course_content(
 def get_course_content_deployment(
     course_content_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """
     Get the current deployment information for a course content.
@@ -258,7 +258,7 @@ def get_course_content_deployment(
 async def unassign_example_from_course_content(
     course_content_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
 ):
     """
@@ -312,7 +312,7 @@ async def unassign_example_from_course_content(
 def get_course_deployments_endpoint(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """
     Get all deployments for a course with has_newer_version computed server-side.
@@ -339,7 +339,7 @@ async def batch_upgrade_versions_endpoint(
     course_id: UUID | str,
     request: VersionUpgradeCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
 ):
     """
@@ -386,7 +386,7 @@ def validate_course_content_batch(
     course_id: UUID | str,
     request: ContentValidationCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """
     Batch validate multiple course contents with their assigned examples and versions.
@@ -486,7 +486,7 @@ async def sync_member_gitlab_permissions_endpoint(
     course_member_id: UUID,
     request: GitLabSyncRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """
     Sync GitLab permissions for a specific course member.

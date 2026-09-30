@@ -55,6 +55,99 @@ set_phase() { # phase [message]
     ulog "phase: $1${2:+ — $2}"
 }
 
+# --- Keycloak version-change guard ------------------------------------------------
+#
+# Keycloak migrates its database on start and does NOT support downgrades: an old
+# Keycloak happily reports ready on a newer schema (only a log warning), so the
+# code-only rollback below would silently run e.g. 25.x on a 26-migrated DB.
+# Patch releases migrate too (26.4.3, 26.6.1, ...), so ANY image-tag change counts.
+# When the tag changes, the updater takes a verified dump while Keycloak is
+# stopped, and on a later failure it keeps maintenance up and refuses the
+# automatic code rollback, printing the restore procedure instead.
+
+KEYCLOAK_COMPOSE_REL="ops/docker/docker-compose.keycloak.yaml"
+KEYCLOAK_DB_SERVICE="keycloak-db"
+KEYCLOAK_DB_CONTAINER="computor-keycloak-db"
+KEYCLOAK_CONTAINER="computor-keycloak"
+
+keycloak_image_tag_at() { # git-ref -> Keycloak image tag in that tree ("" if none)
+    git -C "$REPO_ROOT" show "$1:$KEYCLOAK_COMPOSE_REL" 2>/dev/null \
+        | sed -n 's#^[[:space:]]*image:[[:space:]]*quay\.io/keycloak/keycloak:\([^@[:space:]]*\).*#\1#p' \
+        | head -n 1
+}
+
+keycloak_update_decision() { # from-tag to-tag keycloak-enabled -> none|guard|downgrade
+    local from="$1" to="$2" enabled="$3"
+    if [ "$enabled" != "true" ] || [ -z "$from" ] || [ -z "$to" ] || [ "$from" = "$to" ]; then
+        echo none
+    elif [ "$(printf '%s\n%s\n' "$from" "$to" | sort -V | tail -n 1)" = "$from" ]; then
+        # Target is older: the DB is (or may be) migrated past it. A dump taken now
+        # would be of the newer schema, so only a restore of a pre-upgrade dump is safe.
+        echo downgrade
+    else
+        echo guard
+    fi
+}
+
+keycloak_dump_is_complete() { # dump.sql.gz -> 0 if a complete pg_dumpall with the keycloak DB
+    local f="$1"
+    [ -s "$f" ] || return 1
+    gzip -t "$f" 2>/dev/null || return 1
+    gzip -dc "$f" | grep -q '^CREATE DATABASE keycloak ' || return 1
+    gzip -dc "$f" | tail -n 5 | grep -q 'PostgreSQL database cluster dump complete' || return 1
+}
+
+keycloak_stop_verified() { # stop Keycloak; 0 only if it is verifiably not running
+    local state
+    compose stop keycloak >/dev/null 2>&1 || return 1
+    # docker ps fails (non-zero) if the daemon cannot answer: never read that as "absent".
+    state=$(docker ps -a --filter "name=^/${KEYCLOAK_CONTAINER}\$" --format '{{.State}}') || return 1
+    case "$state" in
+        exited|created|"") return 0 ;;   # "" = no container at all: nothing can write
+        *) return 1 ;;
+    esac
+}
+
+keycloak_predump() { # dest.sql.gz ; Keycloak itself must already be stopped
+    local dest="$1" tmp i
+    mkdir -p "$(dirname "$dest")" || return 1
+    tmp="${dest}.partial"
+    compose up -d "$KEYCLOAK_DB_SERVICE" >/dev/null 2>&1 || return 1
+    for ((i = 1; i <= 30; i++)); do
+        compose exec -T "$KEYCLOAK_DB_SERVICE" pg_isready -U keycloak -p 5438 >/dev/null 2>&1 && break
+        sleep 2
+    done
+    ( umask 077; set -o pipefail
+      compose exec -T "$KEYCLOAK_DB_SERVICE" pg_dumpall -U keycloak -p 5438 | gzip > "$tmp" ) \
+        || { rm -f "$tmp"; return 1; }
+    keycloak_dump_is_complete "$tmp" || { rm -f "$tmp"; return 1; }
+    mv -f "$tmp" "$dest"
+}
+
+keycloak_restore_instructions() { # dump from-commit from-tag
+    cat <<INSTR
+Keycloak was upgraded in place and its database may already be migrated.
+Keycloak does not support downgrades; the previous code was NOT restored.
+Maintenance mode stays active. To roll back manually:
+  1. docker stop computor-keycloak
+  2. git -C $REPO_ROOT checkout -B ${SYSTEM_REPO_BRANCH:-main} $2
+  3. docker start $KEYCLOAK_DB_CONTAINER
+     docker exec $KEYCLOAK_DB_CONTAINER psql -U keycloak -p 5438 -d postgres -c 'DROP DATABASE keycloak WITH (FORCE)'
+     gzip -dc $1 | docker exec -i $KEYCLOAK_DB_CONTAINER psql -U keycloak -p 5438 -d postgres
+     (errors about already-existing roles/databases other than keycloak are expected)
+  4. ./computor.sh up prod                   (starts Keycloak $3 on the restored DB)
+  5. ./computor.sh maintenance exit prod
+Alternatively fix forward on the new version and exit maintenance.
+INSTR
+}
+
+keycloak_block_rollback() { # reason dump from-commit from-tag ; never returns
+    local line
+    set_update_state keycloak_restore_dump "$2"
+    while IFS= read -r line; do ulog "$line"; done < <(keycloak_restore_instructions "$2" "$3" "$4")
+    fail_update "Update failed ($1) after the Keycloak ${4} -> new version switch; automatic rollback refused (Keycloak DB downgrade unsupported). Maintenance page stays up; pre-upgrade dump: $2. See the update log for the restore procedure."
+}
+
 # Tip commit of the tracked branch. The token (if any) goes through an inline
 # credential helper that reads it from the environment — never argv or the URL.
 git_remote_tip() {
@@ -215,6 +308,7 @@ cmd_update_exec() {
 
     local url="${SYSTEM_REPO_URL:-}" branch="${SYSTEM_REPO_BRANCH:-main}"
     local from_commit to_commit maintenance_entered=0
+    local kc_from="" kc_to="" kc_decision=none kc_dump="" kc_switched=0
 
     # Keep the sidecar (and socket-proxy, which traefik's docker provider needs)
     # alive through the maintenance stop — everything else goes down.
@@ -245,6 +339,9 @@ cmd_update_exec() {
     }
 
     do_rollback() { # reason
+        if [ "$kc_switched" = "1" ]; then
+            keycloak_block_rollback "$1" "$kc_dump" "$from_commit" "$kc_from"
+        fi
         set_phase rolling_back "Update failed ($1) — restoring ${from_commit}"
         if ! git -C "$REPO_ROOT" checkout -q -B "$branch" "$from_commit"; then
             fail_update "Rollback checkout to ${from_commit} failed after: $1. Manual intervention required (maintenance page stays up): fix the checkout, then './computor.sh maintenance exit prod'."
@@ -298,6 +395,17 @@ cmd_update_exec() {
         finish_update success "Already up to date (${from_commit})."
     fi
 
+    kc_from=$(keycloak_image_tag_at "$from_commit")
+    kc_to=$(keycloak_image_tag_at "$to_commit")
+    kc_decision=$(keycloak_update_decision "$kc_from" "$kc_to" "${KEYCLOAK_ENABLED:-}")
+    if [ "$kc_decision" = "downgrade" ]; then
+        fail_update "Refusing automated Keycloak downgrade ${kc_from} -> ${kc_to} (target ${to_commit}): Keycloak cannot run on a database migrated by a newer version. Nothing was changed. Restore a pre-upgrade dump of the Keycloak DB taken on ${kc_to} (restore procedure: see the Keycloak rollback section of PR #255 / the update log), then deploy ${to_commit} manually."
+    fi
+    if [ "$kc_decision" = "guard" ]; then
+        ulog "Keycloak image changes ${kc_from} -> ${kc_to}: a verified DB dump is taken before start; no automatic rollback after it"
+        set_update_state keycloak_from "$kc_from" keycloak_to "$kc_to"
+    fi
+
     # 3. checkout ---------------------------------------------------------------
     set_phase checking_out "Checking out ${to_commit}"
     git -C "$REPO_ROOT" checkout -q -B "$branch" FETCH_HEAD \
@@ -325,6 +433,19 @@ cmd_update_exec() {
     for service in $(get_stoppable_services); do
         compose stop "$service" >/dev/null 2>&1 && ulog "stopped: $service" || true
     done
+
+    # 5b. Keycloak pre-upgrade dump (Keycloak is stopped: quiesced) ------------------
+    if [ "$kc_decision" = "guard" ]; then
+        kc_dump="${SYSTEM_DEPLOYMENT_PATH}/backups/keycloak/keycloak-pre-${kc_from}-to-${kc_to}-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
+        set_phase keycloak_backup "Dumping the Keycloak DB before ${kc_from} -> ${kc_to}"
+        # Nothing has run on the new Keycloak yet, so a plain rollback is still safe here.
+        # A dump is only consistent if the old Keycloak can no longer write.
+        keycloak_stop_verified || do_rollback "Keycloak did not stop cleanly; refusing to dump a live database"
+        keycloak_predump "$kc_dump" || do_rollback "Keycloak pre-upgrade DB dump failed or incomplete"
+        ulog "Keycloak DB dump verified: ${kc_dump}"
+        set_update_state keycloak_dump "$kc_dump"
+        kc_switched=1
+    fi
 
     # 6. start ---------------------------------------------------------------------
     set_phase starting "Starting services on ${to_commit}"

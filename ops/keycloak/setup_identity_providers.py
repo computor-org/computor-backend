@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """
-Idempotently register external OIDC identity providers in Keycloak (brokering).
+Idempotently register external identity providers in Keycloak (brokering).
+
+Generic OIDC IdPs ("providerId": "oidc", the default) get discovery import,
+client auth settings, a default scope and claim mappers. Keycloak's built-in
+social providers (e.g. "providerId": "github") are not OIDC: they fetch the
+profile from the provider's own API and map it themselves, so only the client
+credentials, "syncMode" and an optional "defaultScopes" override are sent
+(GitHub needs "user:email" to see a private primary address). Register the
+broker callback https://<host>/auth/realms/<realm>/broker/<alias>/endpoint
+in the provider's OAuth app.
 
 Each provider is *brokered* by Keycloak: users log in through Keycloak, which
 delegates to the external IdP, then issues its own tokens to computor-backend. So
@@ -34,6 +43,7 @@ Env:
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -90,21 +100,46 @@ def _parse(raw):
         return raw.decode("utf-8", "replace")
 
 
-def get_admin_token(base, realm_user, realm_pass):
+def get_admin_token(base, realm_user, realm_pass, timeout_s=None, sleep=time.sleep,
+                    clock=time.monotonic):
+    """Obtain a master-realm admin token, retrying with exponential backoff.
+
+    Keycloak can still be starting (connection refused, 5xx, or 404 while realms
+    load) when this one-shot runs, so any failure is retried until ``timeout_s``
+    (env IDP_SETUP_AUTH_TIMEOUT, default 300 s) elapses; only then does it exit.
+    """
+    if timeout_s is None:
+        timeout_s = float(os.environ.get("IDP_SETUP_AUTH_TIMEOUT", "300"))
     url = f"{base}/realms/master/protocol/openid-connect/token"
-    status, body = _request(
-        "POST",
-        url,
-        form_body={
-            "grant_type": "password",
-            "username": realm_user,
-            "password": realm_pass,
-            "client_id": "admin-cli",
-        },
-    )
-    if status != 200 or not isinstance(body, dict):
-        raise SystemExit(f"Keycloak admin auth failed: {status} {body}")
-    return body["access_token"]
+    deadline = clock() + timeout_s
+    delay = 2.0
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            status, body = _request(
+                "POST",
+                url,
+                form_body={
+                    "grant_type": "password",
+                    "username": realm_user,
+                    "password": realm_pass,
+                    "client_id": "admin-cli",
+                },
+            )
+        except (urllib.error.URLError, OSError) as e:
+            status, body = None, f"transport error: {e}"
+        if status == 200 and isinstance(body, dict) and body.get("access_token"):
+            return body["access_token"]
+        remaining = deadline - clock()
+        if remaining <= 0:
+            raise SystemExit(
+                f"Keycloak admin auth failed after {attempt} attempt(s): {status} {body}"
+            )
+        wait = min(delay, 30.0, remaining)
+        _log(f"admin auth not possible yet ({status}); retrying in {wait:.0f}s")
+        sleep(wait)
+        delay *= 2
 
 
 def import_oidc_config(base, realm, token, discovery_url):
@@ -119,6 +154,48 @@ def import_oidc_config(base, realm, token, discovery_url):
     return body
 
 
+# Keycloak provider ids that speak generic OIDC. Everything else (github,
+# google, gitlab, microsoft, ...) is a built-in social provider.
+OIDC_PROVIDER_IDS = {"oidc", "keycloak-oidc"}
+
+
+def _provider_id(entry):
+    return entry.get("providerId", "oidc")
+
+
+def _is_oidc(entry):
+    return _provider_id(entry) in OIDC_PROVIDER_IDS
+
+
+def build_provider_config(base, realm, token, entry, secret):
+    """The IdP ``config`` block for one providers-file entry.
+
+    OIDC: a discovery URL expands to endpoints; an explicit "config" block (no
+    discovery) is used verbatim. Then client creds, auth method and default
+    scope are layered on. Social providers: the explicit "config" block plus
+    client creds and syncMode; "defaultScope" only when the entry sets
+    "defaultScopes", because the provider's own default is otherwise right and
+    an OIDC "openid email profile" would be rejected by e.g. GitHub.
+    """
+    if _is_oidc(entry) and entry.get("discoveryUrl"):
+        config = import_oidc_config(base, realm, token, entry["discoveryUrl"])
+    else:
+        config = dict(entry.get("config", {}))
+    config.update(
+        {
+            "clientId": entry["clientId"],
+            "clientSecret": secret,
+            "syncMode": entry.get("syncMode", "FORCE"),
+        }
+    )
+    if _is_oidc(entry):
+        config["clientAuthMethod"] = entry.get("clientAuthMethod", "client_secret_post")
+        config["defaultScope"] = entry.get("defaultScopes", "openid email profile")
+    elif entry.get("defaultScopes"):
+        config["defaultScope"] = entry["defaultScopes"]
+    return config
+
+
 def upsert_provider(base, realm, token, entry):
     alias = entry["alias"]
     secret_env = entry["clientSecretEnv"]
@@ -129,26 +206,12 @@ def upsert_provider(base, realm, token, entry):
             f"(add it to .env)"
         )
 
-    # Build the OIDC config: discovery URL expands to endpoints; an explicit
-    # "config" block (no discovery) is used verbatim. Then layer client creds on.
-    if entry.get("discoveryUrl"):
-        config = import_oidc_config(base, realm, token, entry["discoveryUrl"])
-    else:
-        config = dict(entry.get("config", {}))
-    config.update(
-        {
-            "clientId": entry["clientId"],
-            "clientSecret": secret,
-            "clientAuthMethod": entry.get("clientAuthMethod", "client_secret_post"),
-            "defaultScope": entry.get("defaultScopes", "openid email profile"),
-            "syncMode": entry.get("syncMode", "FORCE"),
-        }
-    )
+    config = build_provider_config(base, realm, token, entry, secret)
 
     representation = {
         "alias": alias,
         "displayName": entry.get("displayName", alias),
-        "providerId": entry.get("providerId", "oidc"),
+        "providerId": _provider_id(entry),
         "enabled": entry.get("enabled", True),
         "trustEmail": entry.get("trustEmail", True),
         "storeToken": entry.get("storeToken", False),
@@ -176,7 +239,10 @@ def upsert_provider(base, realm, token, entry):
     else:
         raise RuntimeError(f"probing IdP '{alias}' failed: {status}")
 
-    _reconcile_mappers(base, realm, token, entry)
+    # The oidc-* mapper types only exist for OIDC brokers; a social provider
+    # maps its own profile and Keycloak rejects them there.
+    if _is_oidc(entry):
+        _reconcile_mappers(base, realm, token, entry)
 
 
 def _reconcile_mappers(base, realm, token, entry):

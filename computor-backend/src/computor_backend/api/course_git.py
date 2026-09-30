@@ -27,7 +27,7 @@ def upsert_course_git_binding_endpoint(
     course_id: UUID | str,
     data: CourseGitBindingUpsert,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Create or replace the course's git binding (lecturer cohort only)."""
     return upsert_course_git_binding(course_id, data, permissions, db)
@@ -37,7 +37,7 @@ def upsert_course_git_binding_endpoint(
 def get_course_git_binding_endpoint(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Full git binding for a course (lecturer cohort only)."""
     return get_course_git_binding(course_id, permissions, db)

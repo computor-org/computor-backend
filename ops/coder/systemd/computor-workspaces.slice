@@ -1,0 +1,26 @@
+# Aggregate cgroup for ALL Coder workspace containers on a worker host.
+#
+# Install on the worker (dockerd must use the systemd cgroup driver, the
+# default on cgroup v2 hosts):
+#   sudo install -m 0644 computor-workspaces.slice /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl start computor-workspaces.slice
+# then set CODER_WORKSPACE_CGROUP_PARENT=computor-workspaces.slice in .env and
+# re-push the templates. Per-container caps (memory, memory_swap, cpus) come
+# from the templates; this slice bounds their sum and the total task count,
+# which the docker Terraform provider cannot limit per container.
+#
+# Size the values to the host, leaving headroom for dockerd, Coder, the
+# temporal workers and the OS.
+[Unit]
+Description=Computor Coder workspaces (aggregate limits)
+Before=slices.target
+
+[Slice]
+MemoryAccounting=yes
+MemoryMax=80%
+MemorySwapMax=0
+CPUAccounting=yes
+# 100% = one CPU; e.g. 1200% for 12 of 16 cores.
+CPUQuota=1200%
+TasksAccounting=yes
+TasksMax=20000

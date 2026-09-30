@@ -14,11 +14,15 @@ import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import ThemePicker from '@/src/components/ThemePicker';
 import { inputCls } from '@/src/components/ui/tokens';
 import type { ApiTokenGet, ApiTokenCreateResponse, AccountList } from 'types/generated';
-import type { ConsentStatusGet } from '@/src/generated/types/common';
+import type { ConsentStatusGet, InstanceStatusGet } from '@/src/generated/types/common';
 import { ConsentClient } from '@/src/generated/clients/ConsentClient';
+import { InstanceStatusClient } from '@/src/generated/clients/InstanceStatusClient';
+import DescriptionList from '@/src/components/DescriptionList';
+import { WEB_COMMIT, duration, shortCommit, stamp } from '@/src/utils/instanceStatus';
 
 const tokensClient = new TokensClient();
 const accountsClient = new AccountsClient();
+const instanceStatusClient = new InstanceStatusClient();
 
 const KC_URL = process.env.NEXT_PUBLIC_KEYCLOAK_URL;
 const KC_REALM = process.env.NEXT_PUBLIC_KEYCLOAK_REALM || 'computor';
@@ -63,6 +67,10 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // About this instance. Fetched once per visit and never polled: nobody sits on
+  // Settings watching for a restart — System → Status is the page that does.
+  const [instanceStatus, setInstanceStatus] = useState<InstanceStatusGet | null>(null);
+
   // Consent / privacy
   const [consentStatus, setConsentStatus] = useState<ConsentStatusGet | null>(null);
   const [consentLoading, setConsentLoading] = useState(true);
@@ -83,12 +91,17 @@ export default function SettingsPage() {
   async function load() {
     if (!authUser) return;
     try {
-      const [tk, ac] = await Promise.all([
+      const [tk, ac, status] = await Promise.all([
         tokensClient.listTokensEndpointApiTokensGet({}),
         accountsClient.listAccountsAccountsGet({ userId: authUser.id }).catch(() => [] as AccountRow[]),
+        // Swallowed on purpose: the About section is the least of what this page
+        // is for, and an old deployment that predates the endpoint should not
+        // cost the user their tokens list.
+        instanceStatusClient.getInstanceStatusInstanceStatusGet().catch(() => null),
       ]);
       setTokens(tk);
       setAccounts(ac);
+      setInstanceStatus(status);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load settings');
     } finally {
@@ -153,6 +166,10 @@ export default function SettingsPage() {
       setConfirmWithdraw(false);
     }
   };
+
+  const onlineSince = stamp(instanceStatus?.started_at);
+  const lastUpdated = stamp(instanceStatus?.build_time);
+  const serverCommit = shortCommit(instanceStatus?.commit);
 
   return (
     <AuthenticatedLayout>
@@ -396,6 +413,46 @@ export default function SettingsPage() {
                 </div>
               )}
             </Section>
+
+            {/*
+              About this instance. Nothing here is privileged — a restart time,
+              an uptime and a version label — and "did the server restart?" is
+              the first thing anyone asks when something breaks under them. The
+              API withholds the running commit from a non-admin, so that row
+              simply isn't there for them.
+            */}
+            {instanceStatus && (
+              <Section
+                title="About this instance"
+                description="Which version of Computor you are using, and when the server last restarted."
+              >
+                <DescriptionList
+                  items={[
+                    {
+                      term: 'Server online since',
+                      value: onlineSince
+                        ? `${onlineSince} · up ${duration(instanceStatus.uptime_seconds)}`
+                        : '—',
+                    },
+                    { term: 'Version', value: instanceStatus.branch },
+                    {
+                      term: 'Last updated',
+                      // No build time means no build: the API is running from a
+                      // working tree. Saying so beats a blank where a date belongs.
+                      value: lastUpdated ?? 'development build',
+                    },
+                    ...(serverCommit
+                      ? [{ term: 'Server commit', value: serverCommit, mono: true }]
+                      : []),
+                    {
+                      term: 'Web app',
+                      value: WEB_COMMIT ? WEB_COMMIT.slice(0, 7) : 'development server',
+                      mono: !!WEB_COMMIT,
+                    },
+                  ]}
+                />
+              </Section>
+            )}
           </div>
         </ScrollArea>
       </ListPageLayout>

@@ -149,7 +149,7 @@ async def upload_submission(
     request: Request,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     file: UploadFile = File(..., description="Submission ZIP archive"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     storage_service = Depends(get_storage_service),
     cache: Cache = Depends(get_cache),
 ):
@@ -201,7 +201,7 @@ async def list_submission_artifacts(
     params: SubmissionArtifactQuery = Depends(),
     course_content_id: Optional[str] = None,
     with_latest_result: bool = False,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """List submission artifacts with optional filtering.
 
@@ -347,7 +347,7 @@ async def download_latest_submission(
     course_member_id: Optional[str] = None,
     version_identifier: Optional[str] = None,  # Optional
     submit_only: bool = True,  # Only download official submissions by default
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     storage_service = Depends(get_storage_service),
 ):
     """
@@ -444,7 +444,7 @@ async def download_latest_submission(
 async def get_submission_artifact(
     artifact_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Get details of a specific submission artifact."""
 
@@ -456,7 +456,7 @@ async def update_submission_artifact(
     artifact_id: str,
     update_data: SubmissionArtifactUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
 ):
     """Update a submission artifact (e.g., change submit status)."""
@@ -470,6 +470,15 @@ async def update_submission_artifact(
         cache=cache,
     )
 
+    if update_data.submit and artifact.submit:
+        # Marking an untested artifact as submitted must still test it
+        # (#311, #271); a no-op when a result already exists.
+        from computor_backend.business_logic.testing_orchestration import (
+            dispatch_submission_test,
+        )
+
+        await dispatch_submission_test(artifact, db)
+
     return get_artifact_with_details(artifact)
 
 @submissions_router.get(
@@ -479,7 +488,7 @@ async def update_submission_artifact(
 async def download_submission_artifact(
     artifact_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     storage_service = Depends(get_storage_service),
 ):
     """Download a specific submission artifact as a ZIP file by artifact ID."""
@@ -509,7 +518,7 @@ async def create_artifact_grade_endpoint(
     artifact_id: str,
     grade_data: SubmissionGradeCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
 ):
     """Create a grade for an artifact. Requires instructor/tutor permissions."""
@@ -532,7 +541,7 @@ async def list_artifact_grades(
     response: Response,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: SubmissionGradeQuery = Depends(),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """List all grades for an artifact. Students can view their own grades, tutors/instructors can view all.
 
@@ -599,7 +608,7 @@ async def list_grades(
     response: Response,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: SubmissionGradeQuery = Depends(),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """List submission grades with filtering.
 
@@ -728,7 +737,7 @@ async def update_artifact_grade(
     grade_id: str,
     update_data: SubmissionGradeUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
 ):
     """Update an existing grade. Only the grader can update their own grade."""
@@ -752,7 +761,7 @@ async def update_artifact_grade(
 async def delete_artifact_grade(
     grade_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
 ):
     """Delete a grade. Only the grader or an admin can delete."""
@@ -776,7 +785,7 @@ async def create_artifact_review_endpoint(
     artifact_id: str,
     review_data: SubmissionReviewCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Create a review for an artifact."""
 
@@ -798,7 +807,7 @@ async def list_artifact_reviews(
     artifact_id: str,
     response: Response,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """List all reviews for an artifact. Any course member can view reviews."""
 
@@ -836,7 +845,7 @@ async def update_artifact_review(
     review_id: str,
     update_data: SubmissionReviewUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Update an existing review. Only the reviewer can update their own review."""
 
@@ -857,7 +866,7 @@ async def update_artifact_review(
 async def delete_artifact_review(
     review_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Delete a review. Only the reviewer or an admin can delete."""
 
@@ -879,7 +888,7 @@ async def create_test_result_endpoint(
     artifact_id: str,
     test_data: ResultCreate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Create a test result for an artifact. Checks for test limitations."""
 
@@ -908,7 +917,7 @@ async def list_artifact_test_results(
     artifact_id: str,
     response: Response,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     include_failed: Annotated[bool, Query(description="Include failed/cancelled/crashed results")] = False,
 ):
     """List test results for an artifact. By default only successful results (status=0) are returned.
@@ -995,7 +1004,7 @@ async def update_test_result_endpoint(
     test_id: str,
     update_data: ResultUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
 ):
     """Update a test result (e.g., when test completes). Only the test runner or admin can update."""

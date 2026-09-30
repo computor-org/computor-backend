@@ -1119,12 +1119,33 @@ export interface CourseGitBindingGet {
   has_token?: boolean;
   template_repo?: string | null;
   template_url?: string | null;
+  /** Browser-audience URL of the template repository (no .git suffix), always on the public git host. template_url stays the clone URL for the requesting audience (a workspace gets its internal host there), so anything that opens a browser tab must use web_url instead. */
+  web_url?: string | null;
   default_branch?: string | null;
   student_repo_modes?: string[];
   /** True once the binding has materialized a template or student repos; its identity is then immutable (changing it would orphan student repositories). */
   locked?: boolean;
   /** Human-readable reason the binding is locked, when locked. */
   lock_reason?: string | null;
+}
+
+/**
+ * A clone credential for working OUTSIDE the managed workspace.
+ * 
+ * Deliberately a different Forgejo token than the one the workspace manages
+ * (rotation is keyed by token name): a workspace credential repair re-mints
+ * its own token and would silently invalidate anything a student copied off
+ * the course page (#342). This one is minted once and only re-minted when
+ * the caller explicitly asks to rotate it.
+ */
+export interface PersonalCloneCredentialGet {
+  clone_username?: string | null;
+  /** Repo-scoped personal token — treat it like a password. Null when the student has no Forgejo identity yet. */
+  clone_token?: string | null;
+  /** Public HTTPS clone URL of the student's repository. */
+  http_url?: string | null;
+  /** Complete `git clone` command with the credential embedded, ready to paste into a terminal. */
+  clone_command?: string | null;
 }
 
 /**
@@ -1295,6 +1316,7 @@ export interface CourseCreate {
   max_submissions?: number | null;
   visible?: boolean | null;
   public?: boolean | null;
+  max_self_registrations?: number | null;
 }
 
 export interface CourseGet {
@@ -1309,6 +1331,7 @@ export interface CourseGet {
   max_submissions?: number | null;
   visible?: boolean | null;
   public?: boolean | null;
+  max_self_registrations?: number | null;
   /** Creation timestamp */
   created_at?: string | null;
   /** Update timestamp */
@@ -1316,6 +1339,7 @@ export interface CourseGet {
   created_by?: string | null;
   updated_by?: string | null;
   organization_id: string;
+  archived_at?: string | null;
   course_family?: CourseFamilyGet | null;
 }
 
@@ -1332,6 +1356,7 @@ export interface CourseList {
   max_submissions?: number | null;
   visible?: boolean | null;
   public?: boolean | null;
+  archived_at?: string | null;
 }
 
 export interface CourseUpdate {
@@ -1342,6 +1367,7 @@ export interface CourseUpdate {
   max_submissions?: number | null;
   visible?: boolean | null;
   public?: boolean | null;
+  max_self_registrations?: number | null;
 }
 
 export interface CourseQuery {
@@ -1360,6 +1386,7 @@ export interface CourseQuery {
   max_submissions?: number | null;
   visible?: boolean | null;
   public?: boolean | null;
+  archived?: boolean | null;
 }
 
 /**
@@ -1381,6 +1408,22 @@ export interface CoursePublicList {
   language_code?: string | null;
   organization_title?: string | null;
   enrolled?: boolean;
+  seats_left?: number | null;
+  full?: boolean;
+}
+
+/**
+ * One row of the anonymous course catalog (GET /public/courses, issue #415).
+ * 
+ * Narrower than ``CoursePublicList``: this is read by visitors who are not
+ * signed in, so it carries no path, organization, or caller-relative data.
+ * ``id`` stays because it is what the register call takes after sign-in.
+ */
+export interface CoursePublicCatalogEntry {
+  id: string;
+  title?: string | null;
+  description?: string | null;
+  language_code?: string | null;
 }
 
 export interface CoursePublicQuery {

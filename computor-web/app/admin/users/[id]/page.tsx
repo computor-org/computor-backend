@@ -1,8 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
@@ -10,6 +9,8 @@ import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPa
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
+import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
+import Button, { ButtonLink } from '@/src/components/ui/Button';
 import Forbidden from '@/src/components/Forbidden';
 import SystemRoleCheckboxes from '@/src/components/SystemRoleCheckboxes';
 import ConnectUsersSection from '@/src/components/users/ConnectUsersSection';
@@ -25,7 +26,8 @@ const accountsClient = new AccountsClient();
 
 export default function UserDetailPage() {
   const userId = useParams().id as string;
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading, user: authUser } = useAuth();
   const { isAdmin, isUserManager } = usePermissions();
   const canManage = isAdmin || isUserManager;
 
@@ -44,6 +46,7 @@ export default function UserDetailPage() {
   const [showUnbanConfirm, setShowUnbanConfirm] = useState(false);
   const [banReason, setBanReason] = useState('');
   const [removeAccountId, setRemoveAccountId] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Add-account form
   const [addProvider, setAddProvider] = useState<string | null>(null);
@@ -159,6 +162,14 @@ export default function UserDetailPage() {
     }
   }
 
+  // Thrown errors surface inside ConfirmDeleteDialog (e.g. the backend's
+  // "archive first" refusal), so the dialog explains a blocked delete in place.
+  async function deleteUser() {
+    await usersClient.deleteUsersUsersIdDelete({ id: userId });
+    notify('User deleted.', 'success');
+    router.push('/admin/users');
+  }
+
   async function removeAccount(id: string) {
     setRemoveAccountId(null);
     try {
@@ -184,10 +195,10 @@ export default function UserDetailPage() {
           actions={
             user ? (
               <>
-                <Link href={`/admin/users/${userId}/edit`} className="px-3 py-2 text-sm font-medium text-body border border-rule-strong rounded-lg hover:bg-canvas">Edit</Link>
-                <button onClick={() => setShowArchiveConfirm(true)} className="px-3 py-2 text-sm font-medium text-body border border-rule-strong rounded-lg hover:bg-canvas">
+                <ButtonLink href={`/admin/users/${userId}/edit`} variant="secondary">Edit</ButtonLink>
+                <Button variant="secondary" onClick={() => setShowArchiveConfirm(true)}>
                   {user.archived_at ? 'Unarchive' : 'Archive'}
-                </button>
+                </Button>
               </>
             ) : undefined
           }
@@ -218,9 +229,7 @@ export default function UserDetailPage() {
                     Banned on {new Date(user.banned_at).toLocaleString()}. This user cannot authenticate.
                   </p>
                   {user.ban_reason ? <p className="text-muted">Reason: {user.ban_reason}</p> : null}
-                  <button onClick={() => setShowUnbanConfirm(true)} className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover">
-                    Unban user
-                  </button>
+                  <Button onClick={() => setShowUnbanConfirm(true)}>Unban user</Button>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -232,9 +241,7 @@ export default function UserDetailPage() {
                     maxLength={1024}
                     className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line"
                   />
-                  <button onClick={() => setShowBanConfirm(true)} className="px-4 py-2 text-sm font-medium text-on-accent bg-danger rounded-lg hover:bg-danger-hover">
-                    Ban user
-                  </button>
+                  <Button variant="danger" onClick={() => setShowBanConfirm(true)}>Ban user</Button>
                 </div>
               )}
             </section>
@@ -243,9 +250,7 @@ export default function UserDetailPage() {
             <section className="bg-surface border border-rule rounded-lg p-6 space-y-3">
               <h2 className="text-lg font-semibold text-fg">System roles</h2>
               <SystemRoleCheckboxes selected={roles} onToggle={toggleRole} disabled={savingRoles} />
-              <button onClick={saveRoles} disabled={savingRoles} className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50">
-                {savingRoles ? 'Saving…' : 'Save roles'}
-              </button>
+              <Button onClick={saveRoles} loading={savingRoles} loadingLabel="Saving…">Save roles</Button>
             </section>
 
             {/* Accounts */}
@@ -264,7 +269,7 @@ export default function UserDetailPage() {
                           <span className="mx-2 text-faint">·</span>
                           <span className="text-muted">{acc.provider_account_id}</span>
                         </div>
-                        <button onClick={() => setRemoveAccountId(acc.id)} className="text-xs text-danger-text hover:text-danger-text">Remove</button>
+                        <Button variant="dangerGhost" size="xs" onClick={() => setRemoveAccountId(acc.id)}>Remove</Button>
                       </div>
                     );
                   })}
@@ -274,9 +279,9 @@ export default function UserDetailPage() {
                 {addProvider === null ? (
                   <div className="flex flex-wrap gap-2">
                     {providers.map((p) => (
-                      <button key={p.id} onClick={() => { setAddProvider(p.id); setProviderUrl(p.provider); setAccountId(''); }} className="px-3 py-1.5 text-xs border border-rule-strong rounded-lg hover:bg-canvas">
+                      <Button key={p.id} variant="secondary" size="xs" onClick={() => { setAddProvider(p.id); setProviderUrl(p.provider); setAccountId(''); }}>
                         + {p.display_name}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 ) : (
@@ -293,10 +298,10 @@ export default function UserDetailPage() {
                           <input value={accountId} onChange={(e) => setAccountId(e.target.value)} placeholder={prov.placeholder} className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line" />
                         </div>
                         <div className="flex justify-end gap-2">
-                          <button onClick={() => setAddProvider(null)} className="px-3 py-2 text-sm text-muted hover:bg-sunken rounded-lg">Cancel</button>
-                          <button onClick={addAccount} disabled={savingAccount || !providerUrl.trim() || !accountId.trim()} className="px-3 py-2 text-sm bg-accent text-on-accent rounded-lg hover:bg-accent-hover disabled:opacity-50">
-                            {savingAccount ? 'Linking…' : 'Link account'}
-                          </button>
+                          <Button variant="ghost" size="sm" onClick={() => setAddProvider(null)}>Cancel</Button>
+                          <Button size="sm" onClick={addAccount} disabled={!providerUrl.trim() || !accountId.trim()} loading={savingAccount} loadingLabel="Linking…">
+                            Link account
+                          </Button>
                         </div>
                       </div>
                     );
@@ -313,6 +318,21 @@ export default function UserDetailPage() {
                 hasBuiltinAccount={accounts.some((a) => a.builtin === true)}
                 onConnected={load}
               />
+            )}
+
+            {/* Danger zone: two-step delete policy (issue #382). The backend
+                guard is the authority; the hints here mirror what it will
+                refuse so the reader learns it before the attempt. */}
+            {!user.is_service && authUser?.id !== user.id && (
+              <section className="bg-surface border border-danger-line rounded-lg p-6 space-y-3">
+                <h2 className="text-lg font-semibold text-danger-text">Delete user</h2>
+                <p className="text-sm text-muted">
+                  {accounts.some((a) => a.builtin === true)
+                    ? 'This user has signed in before. Deletion is a deliberate two-step action: archive the user first, then an administrator can permanently delete them.'
+                    : 'This user has never signed in (pre-provisioned by import, manual creation, or an unredeemed invite). Deleting removes the record together with its course memberships.'}
+                </p>
+                <Button variant="danger" onClick={() => setShowDeleteDialog(true)}>Delete user…</Button>
+              </section>
             )}
           </ScrollArea>
         ) : null}
@@ -347,6 +367,24 @@ export default function UserDetailPage() {
           onConfirm={unbanUser}
           onCancel={() => setShowUnbanConfirm(false)}
         />
+        {showDeleteDialog && user && (
+          <ConfirmDeleteDialog
+            title="Delete user"
+            message={`Permanently delete ${user.email}? This cannot be undone.`}
+            confirmWord={user.email ?? 'DELETE'}
+            blockedReason={
+              roles.some((r) => r === '_admin' || r.endsWith('_admin'))
+                ? 'Users holding an admin role cannot be deleted. Revoke the admin role first.'
+                : accounts.some((a) => a.builtin === true) && !user.archived_at
+                  ? 'This user has signed in before. Archive them first; an administrator can then delete the account.'
+                  : accounts.some((a) => a.builtin === true) && !isAdmin
+                    ? 'Only administrators can delete a user who has signed in.'
+                    : null
+            }
+            onConfirm={deleteUser}
+            onClose={() => setShowDeleteDialog(false)}
+          />
+        )}
         <ConfirmDialog
           open={removeAccountId !== null}
           title="Remove linked account"

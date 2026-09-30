@@ -151,6 +151,72 @@ The backend uses these environment variables:
 - `CODER_URL` - Internal API URL
 - `CODER_ADMIN_API_SECRET` - API authentication
 
+## Public Deployment: Workspace Resource Bounds
+
+Workspaces run untrusted code, often with root. Set
+`COMPUTOR_PUBLIC_DEPLOYMENT=true` on a public instance: `computor.sh` and the
+API then refuse to build, push or roll out templates unless every bound below
+that can be enforced is in place.
+
+| Resource | Bound | Where |
+|---|---|---|
+| RAM per workspace | `memory_mb` (default 3072, MATLAB 6144), swap off | template; always pushed explicitly |
+| CPU per workspace | `cpus` (default 2) | template; always pushed explicitly |
+| Sum of all workspaces, **process count** | `MemoryMax`, `CPUQuota`, `TasksMax` of `computor-workspaces.slice` | worker host; **required** when public |
+| Writable image layer | `storage_size` (overlay2 on xfs+pquota only) | template variable, opt-in |
+| Home/scratch volumes | host disk watchdog (below) | worker host |
+
+The kreuzwerker/docker provider has no per-container pids limit and dockerd has
+no default one, so the slice's `TasksMax` is the fork-bomb bound.
+
+A slice name alone proves nothing: Docker creates an unknown slice on the fly
+with no limits. With `COMPUTOR_PUBLIC_DEPLOYMENT=true`, the coder worker starts
+a throwaway container in the slice and reads the slice's `memory.max`,
+`cpu.max` and `pids.max`. Template push and rollout, as well as workspace
+provisioning and start in the API (the verification is cached for 5 minutes),
+are refused unless all three are limited. Any error also refuses. Coder's own
+autostart schedule bypasses the API gate, so do not enable autostart on public
+templates.
+
+Install on the worker host:
+
+```bash
+sudo install -m 0644 ops/coder/systemd/computor-workspaces.slice /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl start computor-workspaces.slice
+# .env on the control plane:
+#   COMPUTOR_PUBLIC_DEPLOYMENT=true
+#   CODER_WORKSPACE_CGROUP_PARENT=computor-workspaces.slice
+# then push all templates (the push always sends the memory/CPU caps).
+```
+
+### Home/scratch volumes and writable layers
+
+Docker named volumes on ext4 have no quota, and overlay2 on ext4 cannot limit
+the writable layer either. Real byte and inode quotas (XFS project quotas on
+the Docker data root) are a tracked follow-up. Until then,
+`ops/coder/home-watchdog/` is supplementary monitoring with after-the-fact
+enforcement, not a quota:
+
+- A systemd timer runs it every 60 s.
+- It measures every `coder-home-*`/`coder-scratch-*` volume (`du -sx`) and
+  every running workspace container's writable layer (`docker inspect --size`,
+  which covers `/tmp`, `/var` and so on).
+- Over `COMPUTOR_HOME_LIMIT_GIB` (default 10) or `COMPUTOR_LAYER_LIMIT_GIB`
+  (default 5) it stops the containers concerned. It alerts through syslog and
+  the optional `COMPUTOR_HOME_ALERT_URL`, and never deletes data.
+- An error on one object is reported and the scan continues. Exit status 2 plus
+  an "enforcement INCOMPLETE" alert means something could not be measured or
+  stopped.
+- Between two runs a workspace can still write at full disk speed. Keep the
+  Docker data root on its own filesystem with headroom.
+
+```bash
+sudo install -m 0755 ops/coder/home-watchdog/computor-home-watchdog.sh /usr/local/sbin/
+sudo install -m 0644 ops/coder/home-watchdog/computor-home-watchdog.{service,timer} /etc/systemd/system/
+echo 'COMPUTOR_HOME_LIMIT_GIB=10' | sudo tee /etc/default/computor-home-watchdog
+sudo systemctl daemon-reload && sudo systemctl enable --now computor-home-watchdog.timer
+```
+
 ## Troubleshooting
 
 ### Port Conflicts

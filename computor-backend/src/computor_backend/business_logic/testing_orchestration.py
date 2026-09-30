@@ -13,9 +13,10 @@ import json
 import logging
 import re
 from typing import Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import and_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from computor_backend.business_logic.content_visibility import enforce_content_visible
@@ -409,3 +410,188 @@ def build_testing_submission(
         parameters=parameters,
         queue=queue,
     )
+
+
+async def dispatch_submission_test(
+    artifact: SubmissionArtifact, db: Session
+) -> Optional[Result]:
+    """Fire the test run an official submission is entitled to.
+
+    A submitted artifact with no Result is a dead end: the editor shows a
+    submission with no outcome and nothing ever grades it (#311, #271). The
+    normal editor flow tests first and then flips ``submit``; this guard covers
+    every other way an artifact ends up submitted untested — the editor not
+    knowing the content's testing service at that moment being the observed
+    one (``testing_service_id`` is a lazily-backfilled cache and can be NULL).
+
+    Best-effort by design: a submission must never fail because its test could
+    not be dispatched, so every impossibility (no service, no deployment, the
+    version already tested, a lost race) logs and returns None. The submission
+    was already paid for by the caller's quota check; this run is that
+    submission's test, so no further budget is charged here.
+    """
+    try:
+        return await _dispatch_submission_test(artifact, db)
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Could not dispatch the submission test for artifact %s", artifact.id
+        )
+        return None
+
+
+async def _dispatch_submission_test(
+    artifact: SubmissionArtifact, db: Session
+) -> Optional[Result]:
+    from computor_backend.model.course import CourseMember
+    from computor_backend.model.deployment import CourseContentDeployment
+    from computor_backend.model.service import ServiceType
+
+    # Already tested (the normal editor flow, or an earlier dispatch).
+    if db.query(Result.id).filter(
+        Result.submission_artifact_id == artifact.id
+    ).first() is not None:
+        return None
+
+    submission_group = artifact.submission_group
+    course_content = submission_group.course_content if submission_group else None
+    if course_content is None:
+        logger.warning(
+            "Artifact %s has no course content; submission stays untested",
+            artifact.id,
+        )
+        return None
+
+    version_identifier = artifact.version_identifier or (
+        (artifact.properties or {}).get("commit")
+    )
+    if not version_identifier:
+        logger.warning(
+            "Artifact %s has no version identifier; submission stays untested",
+            artifact.id,
+        )
+        return None
+
+    course_member = db.query(CourseMember).filter(
+        CourseMember.id == artifact.uploaded_by_course_member_id
+    ).first()
+    if course_member is None:
+        logger.warning(
+            "Artifact %s has no uploading course member; submission stays untested",
+            artifact.id,
+        )
+        return None
+
+    # Same-version guard as ``create_test_run``: a byte-identical re-upload is a
+    # different artifact with the same version identifier, and its result counts.
+    already_tested = db.query(Result.id).filter(
+        Result.course_member_id == course_member.id,
+        Result.version_identifier == version_identifier,
+        Result.course_content_id == course_content.id,
+        Result.status.notin_(RETRYABLE_STATUSES),
+    ).first()
+    if already_tested is not None:
+        return None
+
+    from computor_backend.business_logic.testing_service import resolve_testing_service
+
+    service = resolve_testing_service(course_content, db)
+    if service is None:
+        logger.warning(
+            "No enabled testing service resolves for content %s; submission %s stays untested",
+            course_content.id, artifact.id,
+        )
+        return None
+
+    service_type = db.query(ServiceType).filter(
+        ServiceType.id == service.service_type_id
+    ).first()
+    if service_type is None:
+        logger.warning(
+            "Service %s has no service type; submission %s stays untested",
+            service.id, artifact.id,
+        )
+        return None
+
+    deployment = db.query(CourseContentDeployment).filter(
+        CourseContentDeployment.course_content_id == course_content.id
+    ).first()
+    if deployment is None or deployment.example_version_id is None:
+        logger.warning(
+            "Content %s has no deployed example version; submission %s stays untested",
+            course_content.id, artifact.id,
+        )
+        return None
+
+    task_queue = resolve_task_queue(service, service_type)
+
+    from computor_backend.tasks.queue_health import assert_queue_has_worker
+
+    await assert_queue_has_worker(task_queue, service.name)
+
+    workflow_id = f"student-testing-{uuid4()}"
+    job = {
+        "user_id": str(course_member.user_id),
+        "course_member_id": str(course_member.id),
+        "course_content_id": str(course_content.id),
+        "testing_service_id": str(service.id),
+        "testing_service_slug": service.slug,
+        "testing_service_type_path": str(service_type.path),
+        "example_version_id": str(deployment.example_version_id),
+        "artifact_id": str(artifact.id),
+        "version_identifier": version_identifier,
+    }
+
+    result = Result(
+        submission_artifact_id=artifact.id,
+        submission_group_id=submission_group.id,
+        course_member_id=course_member.id,
+        course_content_id=course_content.id,
+        course_content_type_id=course_content.course_content_type_id,
+        testing_service_id=service.id,
+        test_system_id=workflow_id,
+        status=map_task_status_to_int(TaskStatus.QUEUED),
+        grade=0.0,
+        result=0,
+        properties=None,
+        version_identifier=version_identifier,
+        reference_version_identifier=deployment.version_identifier,
+    )
+    db.add(result)
+    try:
+        db.commit()
+    except IntegrityError:
+        # A racing request created the result; that one's workflow runs.
+        db.rollback()
+        return None
+    db.refresh(result)
+
+    from computor_backend.tasks.temporal_executor import get_task_executor
+
+    try:
+        task_executor = get_task_executor()
+        submission = build_testing_submission(
+            task_name="student_testing",
+            workflow_id=workflow_id,
+            parameters={
+                "test_job": job,
+                "service_config": service_config_payload(service),
+                "service_type_config": service_type_config_payload(service_type),
+                "result_id": str(result.id),
+            },
+            queue=task_queue,
+        )
+        await task_executor.submit_task(submission)
+    except Exception:
+        logger.exception(
+            "Task submission failed for submission-test Result %s", result.id
+        )
+        result.status = map_task_status_to_int(TaskStatus.FAILED)
+        db.commit()
+        return result
+
+    logger.info(
+        "Dispatched the submission test for artifact %s (result %s, queue %s)",
+        artifact.id, result.id, task_queue,
+    )
+    return result

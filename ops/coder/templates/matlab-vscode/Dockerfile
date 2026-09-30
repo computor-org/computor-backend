@@ -1,5 +1,5 @@
 # MATLAB R2025b with browser-based VS Code, Computor and MathWorks extensions.
-FROM node:20-bookworm AS vsix-builder
+FROM node:20-bookworm@sha256:8f693eaa7e0a8e71560c9a82b55fd54c2ae920a2ba5d2cde28bac7d1c01c9ba5 AS vsix-builder
 
 ARG EXTENSION_REPO_URL=https://github.com/computor-org/computor-vscode.git
 ARG EXTENSION_REPO_REF="release/2026.10"
@@ -31,11 +31,12 @@ RUN git init extension \
 
 WORKDIR /build/extension
 
+# vsce comes from the extension's own package-lock.json (a devDependency
+# installed by `npm ci`), not a floating global `npm install -g`.
 RUN npm ci \
     && npm run compile --if-present \
     && npm run build --if-present \
-    && npm install --global @vscode/vsce \
-    && vsce package --out /tmp/computor-extension.vsix
+    && ./node_modules/.bin/vsce package --out /tmp/computor-extension.vsix
 
 # computor-code-server = upstream code-server + the webview service-worker
 # patch (issue #274); built by computor.sh from docker/code-server-base/.
@@ -96,10 +97,13 @@ RUN set -eux; \
 # version students get is therefore whatever is pinned here — bump it (and
 # rebuild) rather than letting them chase the update prompt forever
 # (computor-org/issues#330). Override per environment with MATLAB_EXTENSION_VERSION.
+# Bump MATLAB_EXTENSION_VERSION and MATLAB_EXTENSION_SHA256 together.
 ARG MATLAB_EXTENSION_VERSION=1.3.13
+ARG MATLAB_EXTENSION_SHA256=7812fafd99284f5ccd36956651224da6423d591cff27acb825ae8195a8c95f1e
 RUN curl -fsSL \
       "https://github.com/mathworks/MATLAB-extension-for-vscode/releases/download/v${MATLAB_EXTENSION_VERSION}/language-matlab-${MATLAB_EXTENSION_VERSION}.vsix" \
       -o /tmp/language-matlab.vsix \
+    && echo "${MATLAB_EXTENSION_SHA256}  /tmp/language-matlab.vsix" | sha256sum -c - \
     && chown coder:coder /tmp/language-matlab.vsix
 
 # Record which extension commit this image carries, so "did my change actually

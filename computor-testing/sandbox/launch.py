@@ -20,25 +20,45 @@ What it guarantees, verified against the running worker:
 - The reference/example cache is bound nowhere, so reading it (the master
   solution) returns ``EACCES`` (#240).
 - All outbound TCP is denied, so the databases, object store, API and any TCP
-  internet host are unreachable (#241). Raw UDP/ICMP egress is NOT covered by
-  Landlock; that residual (e.g. a DNS packet) is left to compose-level network
-  isolation — see the #237 note in ISSUES-2026.10-BACKLOG.md. Deliberately no
-  seccomp profile / network namespace here: that route needs unprivileged user
-  namespaces, which this host blocks, and buying it back with a vendored copy
-  of Docker's default seccomp profile was not worth the maintenance.
+  internet host are unreachable (#241). This needs Landlock ABI >= 4. The
+  worker's ``--required`` policy demands ABI >= 6 (TCP rules plus scoping and
+  the supervisor below) and fails closed with exit 125 on anything older.
+- Landlock does not cover UDP, raw or packet sockets, so a small seccomp filter
+  (installed unprivileged, under no_new_privs) allows only AF_UNIX, AF_NETLINK
+  and plain TCP stream sockets, and refuses TCP Fast Open sends (which connect
+  without the connect hook) and io_uring (#237). A DNS packet to 1.1.1.1:53
+  therefore fails with EACCES before it is sent.
+- From ABI 6 the job is also scoped (LANDLOCK_SCOPE_SIGNAL and
+  LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET): it cannot signal, or reach an abstract
+  UNIX socket of, anything outside its own domain — the worker, the harness,
+  other jobs (#237).
 
-``--required`` makes a Landlock failure fatal (exit 125) instead of running
-unsandboxed; the testing worker passes it, local lecturer runs on macOS or old
-kernels do not. ``COMPUTOR_SANDBOX_DISABLE=1`` skips everything (debugging).
-``--probe`` prints a one-line JSON capability report and exits.
+Process-tree teardown (#237). With scoping available the launcher does not
+exec directly: it enters a signal-scoped outer domain, forks, and stays as a
+tiny supervisor while the child enters the full (nested) sandbox and execs the
+student command. The student cannot signal the supervisor (outer domain), but
+the supervisor may signal the whole nested domain; ``kill(-1, SIGKILL)`` from
+there reaches exactly this job's processes — including ones that setsid()'d
+out of the process group — and nothing else. The supervisor is a child
+subreaper, tears the domain down when the student's main process exits, on
+SIGTERM/SIGINT/SIGHUP, and when its parent dies (PR_SET_PDEATHSIG), then exits
+with the student's status.
+
+Deliberately no network namespace: that needs unprivileged user namespaces,
+which the production host blocks, and a vendored copy of Docker's default
+seccomp profile was not worth the maintenance; the filter here only adds
+denials on top of Docker's profile.
 """
 
 import argparse
 import ctypes
 import json
 import os
+import platform
+import signal
 import struct
 import sys
+import time
 
 # Landlock syscall numbers (arch-independent for post-5.x syscalls)
 SYS_LANDLOCK_CREATE_RULESET = 444
@@ -63,12 +83,24 @@ FS_REFER = 1 << 13      # ABI >= 2
 NET_BIND_TCP = 1 << 0
 NET_CONNECT_TCP = 1 << 1
 
+# Minimum ABI for --required: TCP rules (4) and signal/socket scoping (6).
+REQUIRED_ABI = 6
+
+# Scopes (ABI >= 6)
+SCOPE_ABSTRACT_UNIX_SOCKET = 1 << 0
+SCOPE_SIGNAL = 1 << 1
+JOB_SCOPES = SCOPE_ABSTRACT_UNIX_SOCKET | SCOPE_SIGNAL
+
 # Rights that may appear on a rule for a regular file (dir-only rights EINVAL)
 FILE_COMPATIBLE = FS_EXECUTE | FS_WRITE_FILE | FS_READ_FILE | FS_TRUNCATE | FS_IOCTL_DEV
 
 RO_RIGHTS = FS_EXECUTE | FS_READ_FILE | FS_READ_DIR
 
+PR_SET_PDEATHSIG = 1
+PR_SET_SECCOMP = 22
+PR_SET_CHILD_SUBREAPER = 36
 PR_SET_NO_NEW_PRIVS = 38
+SECCOMP_MODE_FILTER = 2
 
 # Runtime paths every sandboxed process may read/execute (existence-checked).
 # ~ is the worker home: language runtimes live there (test venv, R libraries).
@@ -100,10 +132,11 @@ def _fs_mask(abi: int) -> int:
     return mask
 
 
-def _create_ruleset(abi: int, allow_net: bool) -> int:
-    handled_fs = _fs_mask(abi)
-    if abi >= 4:
-        handled_net = 0 if allow_net else (NET_BIND_TCP | NET_CONNECT_TCP)
+def _create_ruleset(abi: int, handled_fs: int, handled_net: int,
+                    scoped: int) -> int:
+    if abi >= 6:
+        attr = struct.pack("QQQ", handled_fs, handled_net, scoped)
+    elif abi >= 4:
         attr = struct.pack("QQ", handled_fs, handled_net)
     else:
         attr = struct.pack("Q", handled_fs)
@@ -112,6 +145,14 @@ def _create_ruleset(abi: int, allow_net: bool) -> int:
     if fd < 0:
         raise OSError(ctypes.get_errno(), "landlock_create_ruleset failed")
     return fd
+
+
+def _restrict_self(ruleset_fd: int) -> None:
+    try:
+        if _libc.syscall(SYS_LANDLOCK_RESTRICT_SELF, ruleset_fd, 0) != 0:
+            raise OSError(ctypes.get_errno(), "landlock_restrict_self failed")
+    finally:
+        os.close(ruleset_fd)
 
 
 def _add_path_rule(ruleset_fd: int, path: str, rights: int) -> None:
@@ -138,12 +179,21 @@ def _set_no_new_privs() -> None:
 
 
 def apply_landlock(ro_paths, rw_paths, allow_net: bool) -> None:
-    """Restrict this process to the given paths; deny TCP unless allowed."""
+    """Restrict this process to the given paths; deny TCP unless allowed.
+
+    Fails (OSError) rather than silently dropping the network rules when the
+    kernel's Landlock cannot express them (ABI < 4). From ABI 6 the domain is
+    also scoped: no signals to, or abstract UNIX sockets of, the outside.
+    """
     abi = _landlock_abi()
     if abi <= 0:
         raise OSError("Landlock is not available on this kernel")
+    if not allow_net and abi < 4:
+        raise OSError(f"Landlock ABI {abi} cannot restrict TCP (needs >= 4)")
     fs_mask = _fs_mask(abi)
-    ruleset_fd = _create_ruleset(abi, allow_net)
+    handled_net = 0 if allow_net else (NET_BIND_TCP | NET_CONNECT_TCP)
+    scoped = JOB_SCOPES if abi >= 6 else 0
+    ruleset_fd = _create_ruleset(abi, fs_mask, handled_net, scoped)
     try:
         for path in ro_paths:
             _add_path_rule(ruleset_fd, path, RO_RIGHTS)
@@ -151,10 +201,139 @@ def apply_landlock(ro_paths, rw_paths, allow_net: bool) -> None:
             _add_path_rule(ruleset_fd, path, fs_mask)
         # No net rules added: with handled_access_net set, all TCP is denied.
         _set_no_new_privs()
-        if _libc.syscall(SYS_LANDLOCK_RESTRICT_SELF, ruleset_fd, 0) != 0:
-            raise OSError(ctypes.get_errno(), "landlock_restrict_self failed")
-    finally:
+    except BaseException:
         os.close(ruleset_fd)
+        raise
+    _restrict_self(ruleset_fd)
+
+
+def enter_scope_domain() -> None:
+    """Enter a domain that only scopes signals/abstract sockets (ABI >= 6).
+
+    This is the supervisor's outer domain: it can signal the job's nested
+    domain but nothing outside, so kill(-1) from it hits only the job.
+    """
+    abi = _landlock_abi()
+    if abi < 6:
+        raise OSError(f"Landlock ABI {abi} has no scoping (needs >= 6)")
+    _set_no_new_privs()
+    _restrict_self(_create_ruleset(abi, 0, 0, JOB_SCOPES))
+
+
+# --- seccomp socket filter (#237) -------------------------------------------
+# Landlock restricts TCP only. This classic-BPF filter closes the rest of the
+# network: sockets other than AF_UNIX, AF_NETLINK and TCP stream sockets fail
+# (socketpair() only for AF_UNIX, e.g. no TIPC pairs)
+# with EACCES (no UDP/DNS, raw, packet, SCTP, MPTCP, vsock...), TCP Fast Open
+# sends (MSG_FASTOPEN connects without the connect hook) are refused, and
+# io_uring (whose socket ops bypass seccomp) reports ENOSYS. Non-native
+# syscall ABIs (i386 socketcall, x32) are refused or killed outright.
+
+# arch -> (AUDIT_ARCH, socket, sendto, sendmsg, sendmmsg, socketpair)
+_SECCOMP_ARCH = {
+    "x86_64": (0xC000003E, 41, 44, 46, 307, 53),
+    "aarch64": (0xC00000B7, 198, 206, 211, 269, 199),
+}
+_IO_URING_SYSCALLS = (425, 426, 427)  # setup/enter/register, both arches
+AF_UNIX, AF_INET, AF_INET6, AF_NETLINK = 1, 2, 10, 16
+SOCK_STREAM, SOCK_TYPE_MASK = 1, 0xF
+IPPROTO_TCP = 6
+MSG_FASTOPEN = 0x20000000
+X32_SYSCALL_BIT = 0x40000000
+EACCES, ENOSYS = 13, 38
+
+_BPF_LD_ABS, _BPF_JEQ, _BPF_JGE, _BPF_JSET = 0x20, 0x15, 0x35, 0x45
+_BPF_AND, _BPF_RET = 0x54, 0x06
+_RET_ALLOW, _RET_ERRNO, _RET_KILL = 0x7FFF0000, 0x00050000, 0x80000000
+
+
+def _arg(i: int) -> int:
+    """Offset of the low 32 bits of seccomp_data.args[i] (little-endian)."""
+    return 16 + 8 * i
+
+
+def _seccomp_program():
+    machine = platform.machine()
+    if machine not in _SECCOMP_ARCH:
+        raise OSError(f"no seccomp socket filter for {machine}")
+    (arch, nr_socket, nr_sendto, nr_sendmsg, nr_sendmmsg,
+     nr_socketpair) = _SECCOMP_ARCH[machine]
+    # (code, k, jump-if-true label, jump-if-false label); None = next insn
+    code = [
+        (_BPF_LD_ABS, 4, None, None),                  # arch
+        (_BPF_JEQ, arch, None, "kill"),
+        (_BPF_LD_ABS, 0, None, None),                  # syscall nr
+        (_BPF_JGE, X32_SYSCALL_BIT, "deny", None),
+        (_BPF_JEQ, nr_socket, "socket", None),
+        (_BPF_JEQ, nr_socketpair, "socketpair", None),
+        (_BPF_JEQ, nr_sendto, "flags3", None),
+        (_BPF_JEQ, nr_sendmmsg, "flags3", None),
+        (_BPF_JEQ, nr_sendmsg, "flags2", None),
+    ] + [(_BPF_JEQ, nr, "nosys", None) for nr in _IO_URING_SYSCALLS] + [
+        (_BPF_RET, _RET_ALLOW, None, None),
+        "socket",
+        (_BPF_LD_ABS, _arg(0), None, None),            # domain
+        (_BPF_JEQ, AF_UNIX, "allow", None),
+        (_BPF_JEQ, AF_NETLINK, "allow", None),
+        (_BPF_JEQ, AF_INET, "inet", None),
+        (_BPF_JEQ, AF_INET6, "inet", "deny"),
+        "socketpair",                                  # AF_UNIX pairs only
+        (_BPF_LD_ABS, _arg(0), None, None),
+        (_BPF_JEQ, AF_UNIX, "allow", "deny"),
+        "inet",
+        (_BPF_LD_ABS, _arg(1), None, None),            # type | flags
+        (_BPF_AND, SOCK_TYPE_MASK, None, None),
+        (_BPF_JEQ, SOCK_STREAM, None, "deny"),
+        (_BPF_LD_ABS, _arg(2), None, None),            # protocol
+        (_BPF_JEQ, 0, "allow", None),
+        (_BPF_JEQ, IPPROTO_TCP, "allow", "deny"),
+        "flags3",
+        (_BPF_LD_ABS, _arg(3), None, None),
+        (_BPF_JSET, MSG_FASTOPEN, "deny", "allow"),
+        "flags2",
+        (_BPF_LD_ABS, _arg(2), None, None),
+        (_BPF_JSET, MSG_FASTOPEN, "deny", "allow"),
+        "allow",
+        (_BPF_RET, _RET_ALLOW, None, None),
+        "deny",
+        (_BPF_RET, _RET_ERRNO | EACCES, None, None),
+        "nosys",
+        (_BPF_RET, _RET_ERRNO | ENOSYS, None, None),
+        "kill",
+        (_BPF_RET, _RET_KILL, None, None),
+    ]
+    labels, insns = {}, []
+    for item in code:
+        if isinstance(item, str):
+            labels[item] = len(insns)
+        else:
+            insns.append(item)
+    program = []
+    for index, (op, k, jt, jf) in enumerate(insns):
+        rel = [0 if lab is None else labels[lab] - index - 1 for lab in (jt, jf)]
+        program.append((op, rel[0], rel[1], k))
+    return program
+
+
+class _SockFilter(ctypes.Structure):
+    _fields_ = [("code", ctypes.c_ushort), ("jt", ctypes.c_ubyte),
+                ("jf", ctypes.c_ubyte), ("k", ctypes.c_uint)]
+
+
+class _SockFprog(ctypes.Structure):
+    _fields_ = [("len", ctypes.c_ushort),
+                ("filter", ctypes.POINTER(_SockFilter))]
+
+
+def apply_socket_filter() -> None:
+    """Install the socket seccomp filter on this process (needs no_new_privs)."""
+    program = _seccomp_program()
+    filters = (_SockFilter * len(program))(*[_SockFilter(*i) for i in program])
+    fprog = _SockFprog(len(program), filters)
+    _set_no_new_privs()
+    if _libc.prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, ctypes.byref(fprog),
+                   0, 0) != 0:
+        raise OSError(ctypes.get_errno(), "prctl(PR_SET_SECCOMP) failed")
 
 
 def _real_home() -> str:
@@ -192,9 +371,95 @@ def _existing(paths):
     return seen
 
 
+def _scope_holds() -> bool:
+    """True if this (scoped) process can no longer signal its parent.
+
+    kill(-1) reports success even when every target was refused, so it cannot
+    be used as a probe; the parent (the harness, outside the domain) can.
+    """
+    try:
+        os.kill(os.getppid(), 0)
+    except PermissionError:
+        return True
+    except ProcessLookupError:
+        return False
+    return False
+
+
+def _kill_domain(deadline_seconds: float = 5.0) -> None:
+    """SIGKILL every process of the job's nested domain and reap them all.
+
+    Only called from the scoped supervisor, where kill(-1) reaches the nested
+    domain and nothing else. As a child subreaper we inherit every orphaned
+    job process, so waitpid() drains the whole tree.
+    """
+    deadline = time.monotonic() + deadline_seconds
+    while True:
+        try:
+            os.kill(-1, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+        try:
+            while os.waitpid(-1, os.WNOHANG)[0]:
+                pass
+        except ChildProcessError:
+            return
+        if time.monotonic() > deadline:
+            return
+        time.sleep(0.01)
+
+
+_HANDLED_SIGNALS = (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)
+
+
+def _supervise(child: int, parent: int) -> int:
+    """Wait for the student's main process, then tear down the whole job."""
+    _libc.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0)
+
+    def _on_signal(signum, _frame):
+        _kill_domain()
+        os._exit(128 + signum)
+
+    for sig in _HANDLED_SIGNALS:
+        signal.signal(sig, _on_signal)
+    # The harness dying (killed on a worker timeout) must not orphan the job.
+    _libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM, 0, 0, 0)
+    signal.pthread_sigmask(signal.SIG_UNBLOCK, _HANDLED_SIGNALS)
+    if os.getppid() != parent:  # the harness died while we were setting up
+        _on_signal(signal.SIGTERM, None)
+
+    status = None
+    while status is None:
+        try:
+            pid, st = os.waitpid(-1, 0)
+        except ChildProcessError:
+            break
+        if pid == child:
+            status = st
+    _kill_domain()
+    code = os.waitstatus_to_exitcode(status) if status is not None else 1
+    if code < 0:
+        # Died by a signal: die the same way so the caller sees -signum.
+        for sig in _HANDLED_SIGNALS:
+            signal.signal(sig, signal.SIG_DFL)
+        signal.signal(-code, signal.SIG_DFL)
+        os.kill(os.getpid(), -code)
+        return 128 - code
+    return code
+
+
+def _sandbox_self(ro_paths, rw_paths, allow_net: bool) -> None:
+    """Full job sandbox: Landlock paths/TCP/scopes, then the socket filter."""
+    apply_landlock(ro_paths, rw_paths, allow_net)
+    if not allow_net:
+        apply_socket_filter()
+
+
 def probe() -> dict:
-    """Capability report: the Landlock ABI level, 0 if unavailable."""
-    return {"landlock_abi": _landlock_abi()}
+    """Capability report: Landlock ABI (0 if unavailable) and what it enables."""
+    abi = _landlock_abi()
+    return {"landlock_abi": abi, "tcp_rules": abi >= 4, "scoping": abi >= 6,
+            "socket_filter": platform.machine() in _SECCOMP_ARCH}
 
 
 def main() -> int:
@@ -208,7 +473,10 @@ def main() -> int:
     parser.add_argument("--allow-net", action="store_true",
                         help="do not restrict the network")
     parser.add_argument("--required", action="store_true",
-                        help="fail (exit 125) if Landlock cannot be applied")
+                        help="fail (exit 125) unless the full sandbox (ABI >= 6) applies")
+    parser.add_argument("--expected-parent-pid", type=int, default=None,
+                        help="pid of the harness that launched us; exit 125 "
+                             "if it is no longer our parent")
     parser.add_argument("--probe", action="store_true",
                         help="print a capability report and exit")
     parser.add_argument("cmd", nargs=argparse.REMAINDER,
@@ -228,14 +496,61 @@ def main() -> int:
     if os.environ.get("COMPUTOR_SANDBOX_DISABLE") == "1":
         os.execvp(cmd[0], cmd)
 
+    # Harness supervision is armed before anything else (#237). PDEATHSIG is
+    # not retroactive: if the harness already died, we have been reparented
+    # and would never be signalled. So arm it first, then check that our
+    # parent is still the harness the caller named; otherwise refuse to run.
+    _libc.prctl(PR_SET_PDEATHSIG, signal.SIGTERM, 0, 0, 0)
+    parent = (args.expected_parent_pid if args.expected_parent_pid is not None
+              else os.getppid())
+    if os.getppid() != parent:
+        print(f"sandbox.launch: harness {parent} is gone (parent is now "
+              f"{os.getppid()}); not starting the job", file=sys.stderr)
+        return 125
+
     ro_paths = _existing(_runtime_ro_paths() + args.ro)
     rw_paths = _existing(list(DEFAULT_RW) + args.rw
                          + ([args.workdir] if args.workdir else []))
+
+    # The worker's policy (--required) is all or nothing: without scoping
+    # (ABI < 6) a job could signal the harness and leave setsid()'d
+    # descendants behind, so refuse to run rather than isolate partially.
+    abi = _landlock_abi()
+    if args.required and abi < REQUIRED_ABI:
+        print(f"sandbox.launch: Landlock ABI {abi} is below the required "
+              f"{REQUIRED_ABI} (TCP rules + signal scoping)", file=sys.stderr)
+        return 125
+
+    # With scoping (ABI >= 6) stay behind as the job's supervisor; the
+    # sandboxed student command runs in a forked child.
+    supervised = False
+    if abi >= 6:
+        try:
+            enter_scope_domain()
+            supervised = _scope_holds()
+            if not supervised:
+                raise OSError("signal scoping has no effect")
+        except OSError as exc:
+            if args.required:
+                print(f"sandbox.launch: cannot scope the job: {exc}",
+                      file=sys.stderr)
+                return 125
+    if os.getppid() != parent:  # harness died during sandbox setup
+        print("sandbox.launch: harness is gone; not starting the job",
+              file=sys.stderr)
+        return 125
+    if supervised:
+        signal.pthread_sigmask(signal.SIG_BLOCK, _HANDLED_SIGNALS)
+        child = os.fork()
+        if child:
+            return _supervise(child, parent)
+        signal.pthread_sigmask(signal.SIG_UNBLOCK, _HANDLED_SIGNALS)
+
     try:
-        apply_landlock(ro_paths, rw_paths, args.allow_net)
+        _sandbox_self(ro_paths, rw_paths, args.allow_net)
     except OSError as exc:
         if args.required:
-            print(f"sandbox.launch: cannot apply Landlock sandbox: {exc}",
+            print(f"sandbox.launch: cannot apply sandbox: {exc}",
                   file=sys.stderr)
             return 125
         # Best-effort mode (local lecturer runs): continue unsandboxed.

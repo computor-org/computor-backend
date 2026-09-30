@@ -185,7 +185,7 @@ async def publish_extension_version(
     display_name: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
     permissions: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     storage_service=Depends(get_storage_service),
 ):
 
@@ -335,7 +335,7 @@ async def download_extension(
     extension_identity: str,
     version: Optional[str] = Query(None, description="Version specifier or 'latest'"),
     permissions: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     storage_service=Depends(get_storage_service),
 ):
     # if not permissions.permitted("extension", "get"):
@@ -389,7 +389,7 @@ async def list_extension_versions(
     limit: int = Query(50, ge=1, le=100),
     cursor: Optional[str] = Query(None),
     permissions: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     # if not permissions.permitted("extension", "list"):
     #     raise ForbiddenException("You don't have permission to list extension versions")
@@ -424,7 +424,7 @@ async def list_extensions(
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
     permissions: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     # if not permissions.permitted("extension", "list"):
     #     raise ForbiddenException("You don't have permission to list extensions")
@@ -446,7 +446,7 @@ async def list_extensions(
 async def get_extension_metadata(
     extension_identity: str,
     permissions: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     # if not permissions.permitted("extension", "get"):
     #     raise ForbiddenException("You don't have permission to view extensions")
@@ -500,7 +500,7 @@ async def update_extension_version(
     version: str,
     payload: ExtensionVersionYankRequest,
     permissions: Principal = Depends(get_current_principal),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
 
     if not permissions.permitted("extension", "update"):

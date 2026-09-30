@@ -23,6 +23,7 @@ class InviteLinkGet(BaseModel):
     expires_at: datetime
     roles: List[str] = []
     note: Optional[str] = None
+    kind: str = "admin"
     revoked_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -39,6 +40,7 @@ class InviteLinkList(BaseModel):
     expires_at: datetime
     roles: List[str] = []
     note: Optional[str] = None
+    kind: str = "admin"
     revoked_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
 
@@ -66,6 +68,26 @@ class InviteAccept(BaseModel):
         if '@' not in v or ' ' in v:
             raise ValueError("Invalid email address")
         return v.lower().strip()
+
+
+class InviteStatusPublic(BaseModel):
+    """What the public /join page may learn about a code — never who issued it."""
+    status: str = Field(..., description="valid | used | expired | invalid")
+    registration_mode: str = Field(..., description="open | invite_only | closed")
+    full: bool = Field(False, description="True when the user cap is reached")
+
+
+class ReferralInvite(BaseModel):
+    token: str
+    url: str = Field(..., description="Share link: <web>/join/<token>")
+    used: bool
+    status: str = Field(..., description="valid | used | expired | invalid")
+    expires_at: datetime
+
+
+class ReferralInviteList(BaseModel):
+    registration_mode: str
+    invites: List[ReferralInvite] = []
 
 
 class InviteLinkInterface(EntityInterface):

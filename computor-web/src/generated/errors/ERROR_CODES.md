@@ -1,7 +1,7 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Total errors:** 81
+**Total errors:** 84
 
 To regenerate: `bash generate_error_codes.sh`
 
@@ -495,6 +495,31 @@ Optimistic locking failure - resource modified since read
 1. Refresh resource data
 2. Retry operation
 3. Merge changes if appropriate
+
+---
+
+### CONFLICT_003 - Course Full
+
+**HTTP Status:** `409`  
+**Severity:** `info`  
+**Category:** `conflict`  
+**Documentation:** [/docs/api/conflicts](/docs/api/conflicts)  
+
+**Description:**  
+Self-registration refused: the course's max_self_registrations cap is reached
+
+**User Message:**  
+> This course is full.
+
+**Affected Functions:**
+- `register_in_public_course`
+
+**Common Causes:**
+- Every self-registration seat in the public course is taken
+- Another student took the last seat first
+
+**Resolution Steps:**
+1. Ask the course staff to raise the cap or enrol you directly
 
 ---
 
@@ -2171,6 +2196,60 @@ Effective visibility resolved to false for the course content (own flag or an an
 **Resolution Steps:**
 1. Refresh the assignment tree; hidden content is removed from it
 2. Ask the lecturer when the assignment will be released
+
+---
+
+### SUBMIT_013 - Course Archived
+
+**HTTP Status:** `400`  
+**Severity:** `warning`  
+**Category:** `validation`  
+**Documentation:** [/docs/courses#archive](/docs/courses#archive)  
+
+**Description:**  
+The course's archived_at is set. The whole content tree is hidden from students through the visibility veto and every student write is refused. Staff are exempt.
+
+**User Message:**  
+> This course has been archived. Submissions and test runs are closed.
+
+**Affected Functions:**
+- `create_test_run`
+- `upload_submission_artifact`
+- `update_artifact`
+- `create_test_result`
+- `enforce_content_visible`
+
+**Common Causes:**
+- An owner archived the course after the student's tree was cached
+- The client acted on a stale tree that still listed the course
+
+**Resolution Steps:**
+1. Nothing to do: the course is over. Ask the lecturer if you believe it was archived by mistake
+
+---
+
+### SUBMIT_014 - Nothing to Submit
+
+**HTTP Status:** `400`  
+**Severity:** `warning`  
+**Category:** `validation`  
+**Documentation:** [/docs/submissions#empty](/docs/submissions#empty)  
+
+**Description:**  
+The uploaded submission archive is effectively empty: it contains no files, only zero-byte files, or only files removed by the skip filter (system/VCS/IDE files, README, etc.). Raised by the upload flow before anything is stored.
+
+**User Message:**  
+> This assignment has no work to submit yet. Write your solution first, then submit again.
+
+**Affected Functions:**
+- `upload_submission_artifact`
+
+**Common Causes:**
+- The student submitted an assignment they have not worked on yet, so only the empty stub files were packaged
+- The assignment directory contains only filtered files such as README.md or dotfiles
+
+**Resolution Steps:**
+1. Open the assignment, write your solution into the provided files, save, then submit again
 
 ---
 

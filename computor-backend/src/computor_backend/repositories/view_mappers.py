@@ -437,6 +437,22 @@ async def course_member_course_content_result_mapper(
         detailed=detailed,
     )
 
+    # ``testing_service_id`` is a lazily-backfilled cache and is often NULL on
+    # deployed content (service registered after the example was assigned). The
+    # editor decides "must this submit test first?" from this field, so a NULL
+    # here made the very first submit skip testing (#311, #271). Resolve it the
+    # way the upload and test paths do; a successful resolution backfills the
+    # FK, so this costs nothing once healed.
+    testing_service_id = course_content.testing_service_id
+    if testing_service_id is None and course_content.is_submittable:
+        from computor_backend.business_logic.testing_service import (
+            resolve_testing_service,
+        )
+
+        service = resolve_testing_service(course_content, db)
+        if service is not None:
+            testing_service_id = service.id
+
     list_obj = CourseContentStudentList(
         id=course_content.id,
         title=course_content.title,
@@ -453,7 +469,7 @@ async def course_member_course_content_result_mapper(
         submission_count=qr.submission_count or 0,
         max_test_runs=effective_max_test_runs,
         max_submissions=effective_max_submissions,
-        testing_service_id=str(course_content.testing_service_id) if course_content.testing_service_id else None,
+        testing_service_id=str(testing_service_id) if testing_service_id else None,
         directory=directory,
         color=course_content.course_content_type.color,
         result=result_payload,

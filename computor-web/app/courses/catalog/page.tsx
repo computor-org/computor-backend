@@ -108,9 +108,22 @@ export default function CourseCatalogPage() {
                       Open course
                     </ButtonLink>
                   ) : (
-                    <Button size="sm" onClick={() => setPending(course)}>
-                      Join course
-                    </Button>
+                    <div className="flex items-center gap-3">
+                      {course.full ? (
+                        <span className="text-xs text-muted">Full</span>
+                      ) : course.seats_left != null ? (
+                        <span className="text-xs text-muted">
+                          {course.seats_left === 1 ? '1 seat left' : `${course.seats_left} seats left`}
+                        </span>
+                      ) : null}
+                      <Button
+                        size="sm"
+                        disabled={course.full === true}
+                        onClick={() => setPending(course)}
+                      >
+                        Join course
+                      </Button>
+                    </div>
                   )
                 }
               />

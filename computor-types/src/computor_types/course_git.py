@@ -93,6 +93,13 @@ class CourseGitBindingGet(BaseModel):
     )
     template_repo: Optional[str] = None
     template_url: Optional[str] = None
+    web_url: Optional[str] = Field(
+        None,
+        description="Browser-audience URL of the template repository (no .git suffix), "
+        "always on the public git host. template_url stays the clone URL for the "
+        "requesting audience (a workspace gets its internal host there), so anything "
+        "that opens a browser tab must use web_url instead.",
+    )
     default_branch: Optional[str] = None
     student_repo_modes: List[str] = Field(default_factory=list)
     locked: bool = Field(
@@ -102,6 +109,32 @@ class CourseGitBindingGet(BaseModel):
     )
     lock_reason: Optional[str] = Field(
         None, description="Human-readable reason the binding is locked, when locked."
+    )
+
+
+class PersonalCloneCredentialGet(BaseModel):
+    """A clone credential for working OUTSIDE the managed workspace.
+
+    Deliberately a different Forgejo token than the one the workspace manages
+    (rotation is keyed by token name): a workspace credential repair re-mints
+    its own token and would silently invalidate anything a student copied off
+    the course page (#342). This one is minted once and only re-minted when
+    the caller explicitly asks to rotate it.
+    """
+
+    clone_username: Optional[str] = None
+    clone_token: Optional[str] = Field(
+        None,
+        description="Repo-scoped personal token — treat it like a password. "
+        "Null when the student has no Forgejo identity yet.",
+    )
+    http_url: Optional[str] = Field(
+        None, description="Public HTTPS clone URL of the student's repository."
+    )
+    clone_command: Optional[str] = Field(
+        None,
+        description="Complete `git clone` command with the credential embedded, "
+        "ready to paste into a terminal.",
     )
 
 

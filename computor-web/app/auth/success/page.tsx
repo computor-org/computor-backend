@@ -1,13 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ssoAuthService } from '@/src/services/authInstances';
+import { safeInternalPath } from '@/src/utils/safeRedirect';
 
 export default function AuthSuccessPage() {
   const [error, setError] = useState<string | null>(null);
   const [refused, setRefused] = useState(false);
+  // One-shot: auth_redirect is consumed on read, so a second run of this effect
+  // (React StrictMode in dev) would find it gone and override the first run's
+  // redirect with /dashboard.
+  const handled = useRef(false);
 
   useEffect(() => {
+    if (handled.current) return;
+    handled.current = true;
     (async () => {
       // The backend bounces a refused sign-in back here rather than to /login,
       // which would redirect straight to Keycloak again and loop forever. It
@@ -29,20 +36,17 @@ export default function AuthSuccessPage() {
         if (!result.success) {
           throw new Error(result.error || 'Sign-in failed');
         }
-        let redirect = sessionStorage.getItem('auth_redirect') || '/dashboard';
+        const stored = sessionStorage.getItem('auth_redirect');
         sessionStorage.removeItem('auth_redirect');
-        // Only accept same-origin absolute paths: anything not starting with a
-        // single "/" (e.g. a protocol-relative "//host" planted in storage)
-        // would send the user off-site.
-        if (!redirect.startsWith('/') || redirect.startsWith('//')) {
-          redirect = '/dashboard';
-        }
+        // Only a canonical same-origin path: prefix checks alone let
+        // "/\t/host" (tab stripped by the browser) through as "//host".
+        let redirect = safeInternalPath(stored, window.location.origin) ?? '/dashboard';
         // Don't bounce back to single-use or pre-auth pages: an invite link is
         // consumed during this very sign-in (re-loading it 400s with "already
         // used"), and login/register/auth pages are meaningless once logged in.
         // Land on the dashboard instead. Genuine deep links (e.g. /courses/123)
         // are preserved.
-        if (/^\/(invite|login|register|auth)(\/|$)/.test(redirect)) {
+        if (/^\/(invite|join|login|register|auth)(\/|$)/.test(redirect)) {
           redirect = '/dashboard';
         }
         window.location.replace(redirect);

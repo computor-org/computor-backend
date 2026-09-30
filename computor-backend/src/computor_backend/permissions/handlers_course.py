@@ -43,7 +43,13 @@ class CoursePermissionHandler(PermissionHandler):
         "list": CourseRole.STUDENT,
         "update": CourseRole.LECTURER,
         "create": None,  # Only through general permission
-        "delete": None   # Only through general permission
+        # Archiving and deleting a course are owner decisions. ``delete`` is
+        # answered through ``can_perform_action`` by the hand-written cascade
+        # endpoint (the generic DELETE route is skipped for Course); ``archive``
+        # drives the auto-registered archive/unarchive routes, whose CRUD path
+        # filters by role — a non-owner gets a 404 there, not a 403.
+        "archive": CourseRole.OWNER,
+        "delete": CourseRole.OWNER,
     }
 
     def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
@@ -71,9 +77,20 @@ class CoursePermissionHandler(PermissionHandler):
 
         min_role = self.ACTION_ROLE_MAP.get(action)
         if min_role:
-            return CoursePermissionQueryBuilder.build_course_filtered_query(
+            query = CoursePermissionQueryBuilder.build_course_filtered_query(
                 self.entity, principal.user_id, min_role, db
             )
+            if action in ("get", "list"):
+                # An archived course is over for its students and tutors: it
+                # drops out of their reads entirely. Staff (_lecturer and up)
+                # keep seeing it so they can badge, unarchive or delete it.
+                staff_courses = CoursePermissionQueryBuilder.user_courses_subquery(
+                    principal.user_id, CourseRole.LECTURER, db
+                )
+                query = query.filter(
+                    or_(Course.archived_at.is_(None), Course.id.in_(staff_courses))
+                )
+            return query
 
         raise ForbiddenException(detail={"entity": self.resource_name})
 

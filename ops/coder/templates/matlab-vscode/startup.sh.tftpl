@@ -180,6 +180,15 @@ defaults = {
         "*.webp": "computor.imagePreview",
         "*.svg": "computor.imagePreview",
     },
+    # Dark by default (computor-org/issues#405). Add-if-missing, so a student
+    # who has already picked a theme keeps it.
+    "workbench.colorTheme": "Default Dark Modern",
+    # No AI entry points in a course workspace (computor-org/issues#406). We
+    # install no such extension; what a student sees comes from whatever the
+    # code-server base image bundles, so this suppresses the UI rather than
+    # removing a package.
+    "chat.commandCenter.enabled": False,
+    "chat.disableAIFeatures": True,
 }
 
 # Infrastructure, not preference. The home volume outlives the image, so a

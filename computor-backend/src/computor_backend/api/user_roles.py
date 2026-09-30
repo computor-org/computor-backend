@@ -28,7 +28,7 @@ user_roles_router = APIRouter()
 async def list_user_roles(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     response: Response,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     params: UserRoleQuery = Depends()
 ):
     """List user roles."""
@@ -41,7 +41,7 @@ async def get_user_role_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     user_id: UUID | str,
     role_id: UUID | str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """Get a specific user role by user_id and role_id."""
     entity = get_user_role(user_id, role_id, permissions, db)
@@ -51,7 +51,7 @@ async def get_user_role_endpoint(
 async def create_user_role(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     entity: UserRoleCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """Create a new user role."""
     return await create_db(permissions, db, entity, UserRole, UserRoleGet)
@@ -61,7 +61,7 @@ async def delete_user_role_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     user_id: UUID | str,
     role_id: UUID | str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db, scope="function")
 ):
     """Delete a user role."""
     return delete_user_role(user_id, role_id, permissions, db)

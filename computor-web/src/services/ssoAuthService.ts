@@ -61,15 +61,18 @@ export class SSOAuthService implements ISSOAuthProvider {
    * Initiate SSO login by redirecting to the provider
    * Backend will set HttpOnly cookies after successful authentication
    */
-  initiateSSO(provider: string = 'keycloak'): void {
-    // Save current location to return after auth
-    sessionStorage.setItem('auth_redirect', window.location.pathname);
+  initiateSSO(provider: string = 'keycloak', returnTo?: string, extraParams: Record<string, string> = {}): void {
+    // Save where to return after auth: an explicit target (validated again on
+    // /auth/success), else the current location.
+    sessionStorage.setItem('auth_redirect', returnTo || window.location.pathname);
 
     // Build the frontend callback URL
     const frontendCallbackUrl = `${window.location.origin}/auth/success`;
 
     // Redirect to SSO login with redirect_uri parameter
+    // extraParams: e.g. an invite code, idp_hint or action=register from /join.
     const params = new URLSearchParams({
+      ...extraParams,
       redirect_uri: frontendCallbackUrl
     });
 

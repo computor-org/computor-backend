@@ -16,6 +16,7 @@ from computor_types.documents import (
     DocumentDirectoryRename,
     DocumentGet,
     DocumentList,
+    DocumentPermissionsGet,
     DocumentRename,
 )
 
@@ -107,4 +108,12 @@ class DocumentsClient:
         if isinstance(data, list):
             return [DocumentList.model_validate(item) for item in data]
         return []
+
+    async def get_permissions(
+        self,
+        **kwargs: Any,
+    ) -> DocumentPermissionsGet:
+        """Get Documents Permissions"""
+        response = await self._http.get("/documents/permissions", params=kwargs)
+        return DocumentPermissionsGet.model_validate(response.json())
 

@@ -22,14 +22,22 @@ import logging
 from typing import Optional, Tuple
 from uuid import UUID
 
-from sqlalchemy import exc
+from sqlalchemy import exc, func
 from sqlalchemy.orm import Session
 
-from computor_backend.exceptions import ForbiddenException, PermissionDeniedAsNotFound
+from computor_backend.exceptions import (
+    ConflictException,
+    ForbiddenException,
+    PermissionDeniedAsNotFound,
+)
 from computor_backend.model.course import Course, CourseGroup, CourseMember
 from computor_backend.model.organization import Organization
 from computor_backend.permissions.principal import Principal
-from computor_types.courses import CoursePublicList, CoursePublicQuery
+from computor_types.courses import (
+    CoursePublicCatalogEntry,
+    CoursePublicList,
+    CoursePublicQuery,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,14 +50,18 @@ SELF_REGISTRATION_GROUP_TITLE = "default"
 def _catalog_query(db: Session):
     """Courses that are open for self-registration, joined to their org.
 
-    ``Course`` has no ``archived_at``, but ``Organization`` does — a course
-    under an archived organization must not stay joinable, so the predicate
-    lives here and both the catalog and the registration lookup use it.
+    Neither an archived course nor a course under an archived organization
+    may stay joinable, so the predicate lives here and both the catalog and
+    the registration lookup use it.
     """
     return (
         db.query(Course, Organization.title)
         .join(Organization, Organization.id == Course.organization_id)
-        .filter(Course.public.is_(True), Organization.archived_at.is_(None))
+        .filter(
+            Course.public.is_(True),
+            Course.archived_at.is_(None),
+            Organization.archived_at.is_(None),
+        )
     )
 
 
@@ -92,21 +104,81 @@ def list_public_courses(
             )
         }
 
+    # Seats for the capped courses on this page, again in one query.
+    capped_ids = [
+        str(course.id) for course, _ in rows if course.max_self_registrations is not None
+    ]
+    students: dict[str, int] = {}
+    if capped_ids:
+        students = {
+            str(course_id): count
+            for course_id, count in db.query(CourseMember.course_id, func.count())
+            .filter(
+                CourseMember.course_id.in_(capped_ids),
+                CourseMember.course_role_id == "_student",
+            )
+            .group_by(CourseMember.course_id)
+        }
+
+    def _seats_left(course: Course) -> Optional[int]:
+        if course.max_self_registrations is None:
+            return None
+        used = students.get(str(course.id), 0)
+        return max(course.max_self_registrations - used, 0)
+
     # Built field by field on purpose: an explicit constructor is what
     # guarantees a future column on Course cannot leak into the catalog.
-    items = [
-        CoursePublicList(
-            id=str(course.id),
-            title=course.title,
-            description=course.description,
-            path=str(course.path),
-            language_code=course.language_code,
-            organization_title=organization_title,
-            enrolled=str(course.id) in enrolled,
+    items = []
+    for course, organization_title in rows:
+        seats_left = _seats_left(course)
+        items.append(
+            CoursePublicList(
+                id=str(course.id),
+                title=course.title,
+                description=course.description,
+                path=str(course.path),
+                language_code=course.language_code,
+                organization_title=organization_title,
+                enrolled=str(course.id) in enrolled,
+                seats_left=seats_left,
+                full=seats_left == 0,
+            )
         )
-        for course, organization_title in rows
-    ]
     return items, total
+
+
+# Upper bound for the anonymous catalog: it is a landing-page teaser, not a
+# search API, and an unauthenticated endpoint must stay cheap per request.
+ANONYMOUS_CATALOG_LIMIT = 200
+
+
+def list_anonymous_catalog(db: Session) -> list[CoursePublicCatalogEntry]:
+    """The catalog as shown to visitors who are not signed in (issue #415).
+
+    Same predicate as the signed-in catalog (public, course and organization
+    not archived) and additionally hides courses whose ``visible`` is False:
+    a lecturer who hid a course from students has not advertised it. No
+    membership lookup, so there is nothing caller-relative to leak.
+    """
+    rows = (
+        _catalog_query(db)
+        .filter(Course.visible.isnot(False))
+        .with_entities(Course.id, Course.title, Course.description, Course.language_code)
+        .order_by(Course.title.asc(), Course.id.asc())
+        .limit(ANONYMOUS_CATALOG_LIMIT)
+        .all()
+    )
+    # Explicit constructor, as in list_public_courses: a new Course column
+    # cannot reach anonymous visitors by accident.
+    return [
+        CoursePublicCatalogEntry(
+            id=str(course_id),
+            title=title,
+            description=description,
+            language_code=language_code,
+        )
+        for course_id, title, description, language_code in rows
+    ]
 
 
 def get_public_course_or_404(course_id: UUID | str, db: Session) -> Course:
@@ -185,6 +257,54 @@ def resolve_registration_group(
         return group
 
 
+def _ensure_seat_available(
+    course: Course, user_id: str, db: Session
+) -> Optional[CourseMember]:
+    """Raise 409 when the course's self-registration cap is reached.
+
+    Locks the course row (``FOR UPDATE`` on ``course`` only) before counting,
+    so two students racing for the last seat serialize here: the second one
+    counts after the first has committed and sees the course full. The lock is
+    held until the caller's commit. Uncapped courses skip the lock entirely.
+
+    Returns the caller's membership if one appeared while waiting for the
+    lock: a retried request from the same user must get that back, not a 409
+    for a seat they already hold. The caller's pre-lock check is stale then.
+    """
+    if course.max_self_registrations is None:
+        return None
+    cap = (
+        db.query(Course.max_self_registrations)
+        .filter(Course.id == course.id)
+        .with_for_update(of=Course)
+        .scalar()
+    )
+    if cap is None:
+        return None
+    existing = (
+        db.query(CourseMember)
+        .filter(CourseMember.course_id == course.id, CourseMember.user_id == user_id)
+        .first()
+    )
+    if existing is not None:
+        return existing
+    students = (
+        db.query(func.count(CourseMember.id))
+        .filter(
+            CourseMember.course_id == course.id,
+            CourseMember.course_role_id == "_student",
+        )
+        .scalar()
+    )
+    if students >= cap:
+        raise ConflictException(
+            error_code="CONFLICT_003",
+            detail="This course is full.",
+            context={"course_id": str(course.id), "max_self_registrations": cap},
+        )
+    return None
+
+
 async def register_in_public_course(
     course_id: UUID | str,
     permissions: Principal,
@@ -212,6 +332,10 @@ async def register_in_public_course(
         )
         .first()
     )
+    if existing is not None:
+        return existing, False
+
+    existing = _ensure_seat_available(course, user_id, db)
     if existing is not None:
         return existing, False
 

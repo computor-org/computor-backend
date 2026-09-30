@@ -1,0 +1,12 @@
+[Unit]
+Description=Computor workspace volume disk guard
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/computor-home-watchdog
+ExecStart=/usr/local/sbin/computor-home-watchdog.sh
+Nice=10
+TimeoutStartSec=5min
+IOSchedulingClass=idle

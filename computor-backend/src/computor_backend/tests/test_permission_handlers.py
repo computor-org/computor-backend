@@ -71,15 +71,61 @@ class TestCoursePermissionHandler:
         db = make_db()
         handler = CoursePermissionHandler(Course)
 
-        # Force filtered query builder to return a sentinel value
-        sentinel = object()
+        # Force the filtered query builder to return a recording query; reads
+        # then narrow it further to hide archived courses from non-staff.
+        from unittest.mock import MagicMock
+        sentinel = MagicMock(name='filtered_query')
+        sentinel.filter.return_value = sentinel
+        import computor_backend.permissions.query_builders as qb
+        monkeypatch.setattr(qb.CoursePermissionQueryBuilder, 'build_course_filtered_query',
+                            lambda entity, user_id, min_role, db_: sentinel)
+        monkeypatch.setattr(qb.CoursePermissionQueryBuilder, 'user_courses_subquery',
+                            lambda user_id, min_role, db_: MagicMock(name='staff_subquery'))
+
+        principal = Principal(user_id='u2', roles=['user'])
+        q = handler.build_query(principal, 'list', db)
+        assert q is sentinel
+        # The archived-course clause was applied on top of the membership filter.
+        sentinel.filter.assert_called_once()
+
+    def test_archived_clause_only_on_reads(self, monkeypatch):
+        db = make_db()
+        handler = CoursePermissionHandler(Course)
+        from unittest.mock import MagicMock
+        sentinel = MagicMock(name='filtered_query')
         import computor_backend.permissions.query_builders as qb
         monkeypatch.setattr(qb.CoursePermissionQueryBuilder, 'build_course_filtered_query',
                             lambda entity, user_id, min_role, db_: sentinel)
 
         principal = Principal(user_id='u2', roles=['user'])
-        q = handler.build_query(principal, 'list', db)
+        # Writes (archive/update) filter by role only — an owner must still
+        # reach an archived course to unarchive it.
+        q = handler.build_query(principal, 'archive', db)
         assert q is sentinel
+        sentinel.filter.assert_not_called()
+
+    def test_owner_may_archive_and_delete(self):
+        handler = CoursePermissionHandler(Course)
+        course_id = 'c1'
+        owner = Principal(
+            user_id='u5', roles=['user'],
+            claims=build_claims([('permissions', f'course:_owner:{course_id}')]),
+        )
+        maintainer = Principal(
+            user_id='u6', roles=['user'],
+            claims=build_claims([('permissions', f'course:_maintainer:{course_id}')]),
+        )
+        for action in ('archive', 'delete'):
+            assert handler.can_perform_action(owner, action, course_id) is True
+            assert handler.can_perform_action(maintainer, action, course_id) is False
+            # Roles never leak across courses.
+            assert handler.can_perform_action(owner, action, 'other-course') is False
+
+    def test_organization_manager_is_not_a_course_owner(self):
+        handler = CoursePermissionHandler(Course)
+        manager = Principal(user_id='u7', roles=['_organization_manager'])
+        assert handler.can_perform_action(manager, 'delete', 'c1') is False
+        assert handler.can_perform_action(manager, 'archive', 'c1') is False
 
 
 class TestCourseContentTypePermissionHandler:

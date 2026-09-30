@@ -107,6 +107,8 @@ export UVICORN_LOG_LEVEL
 if [ "$RUN_MIGRATIONS" = true ]; then
     echo "Applying Alembic migrations..."
     cd computor-backend/src/computor_backend && alembic upgrade head && cd -  > /dev/null
+    (cd computor-backend/src && python -m computor_backend.scripts.ensure_coder_worker_db_role) \
+        || echo "WARNING: could not ensure the coder worker DB role"
     echo ""
 fi
 

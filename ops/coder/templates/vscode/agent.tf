@@ -61,13 +61,7 @@ resource "coder_agent" "main" {
 # above) to support --abs-proxy-base-path for Traefik routing at
 # /coder/{user}/{workspace}. Do NOT add the code-server module here — it will
 # conflict (EADDRINUSE).
-
-# JetBrains Gateway
-module "jetbrains" {
-  count      = data.coder_workspace.me.start_count
-  source     = "registry.coder.com/coder/jetbrains/coder"
-  version    = "~> 1.1"
-  agent_id   = coder_agent.main.id
-  agent_name = "main"
-  folder     = "/home/coder"
-}
+#
+# Do NOT add registry.coder.com (or any other remote) modules: the provisioner
+# would fetch them on every build. Providers are pinned in versions.tf and
+# locked by .terraform.lock.hcl (GHSA-vx42-ghc9-gw65).

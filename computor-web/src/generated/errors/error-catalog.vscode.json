@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "error_count": 81,
+  "error_count": 84,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -298,6 +298,19 @@
         "plain": "The resource was modified by another user. Please refresh and try again.",
         "markdown": "**Concurrent Modification**\n\nThe resource was modified by another user. Please refresh and try again.",
         "html": "<strong>Concurrent Modification</strong><p>The resource was modified by another user. Please refresh and try again.</p>"
+      },
+      "retry_after": null
+    },
+    "CONFLICT_003": {
+      "code": "CONFLICT_003",
+      "http_status": 409,
+      "category": "conflict",
+      "severity": "info",
+      "title": "Course Full",
+      "message": {
+        "plain": "This course is full.",
+        "markdown": "**Course Full**\n\nThis course is full. No self-registration seats are left.",
+        "html": "<strong>Course Full</strong><p>This course is full. No self-registration seats are left.</p>"
       },
       "retry_after": null
     },
@@ -701,6 +714,32 @@
         "plain": "This assignment is not currently available. Your lecturer has hidden it.",
         "markdown": "**Assignment Not Available**\n\nThis assignment is not currently available because your lecturer has hidden it. Your existing work and submissions are untouched and will reappear if it is made visible again.",
         "html": "<strong>Assignment Not Available</strong><p>This assignment is not currently available because your lecturer has hidden it. Your existing work and submissions are untouched and will reappear if it is made visible again.</p>"
+      },
+      "retry_after": null
+    },
+    "SUBMIT_013": {
+      "code": "SUBMIT_013",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Course Archived",
+      "message": {
+        "plain": "This course has been archived. Submissions and test runs are closed.",
+        "markdown": "**Course Archived**\n\nThis course has been archived. Submissions and test runs are closed. Your existing work and submissions are untouched.",
+        "html": "<strong>Course Archived</strong><p>This course has been archived. Submissions and test runs are closed. Your existing work and submissions are untouched.</p>"
+      },
+      "retry_after": null
+    },
+    "SUBMIT_014": {
+      "code": "SUBMIT_014",
+      "http_status": 400,
+      "category": "validation",
+      "severity": "warning",
+      "title": "Nothing to Submit",
+      "message": {
+        "plain": "This assignment has no work to submit yet. Write your solution first, then submit again.",
+        "markdown": "**Nothing to Submit**\n\nThis assignment has no work to submit yet. All files are empty or nothing submittable was found. Write your solution first, then submit again.",
+        "html": "<strong>Nothing to Submit</strong><p>This assignment has no work to submit yet. All files are empty or nothing submittable was found. Write your solution first, then submit again.</p>"
       },
       "retry_after": null
     },

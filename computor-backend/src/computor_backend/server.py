@@ -16,6 +16,7 @@ from computor_backend.api.api_builder import CrudRouter, LookUpRouter
 from computor_backend.api.tests import tests_router
 from computor_backend.permissions.auth import get_current_principal, get_current_principal_optional
 from computor_backend.api.auth import auth_router
+from computor_backend.api.public_catalog import public_catalog_router
 from computor_backend.api.sessions import session_router
 from computor_backend.plugins.registry import initialize_plugin_registry
 from sqlalchemy.orm import Session
@@ -218,6 +219,7 @@ async def startup_logic():
                         redirect_uris=[
                             f"{api_public_url}/auth/keycloak/callback",  # SSO login callback
                             f"{origin}/",                                # post-logout redirect target
+                            f"{origin}/join/refused",                    # refused-registration logout target
                         ],
                         web_origins=[origin],
                     )
@@ -455,8 +457,10 @@ def _guard_no_archive_admin(entity, permissions, db):
     if is_admin_target:
         raise ForbiddenException(detail="Admin users cannot be archived")
 
+from computor_backend.business_logic.user_lifecycle import guard_user_delete
 _user_router = CrudRouter(UserInterface)
 _user_router.pre_archive.append(_guard_no_archive_admin)
+_user_router.pre_delete.append(guard_user_delete)
 _user_router.register_routes(app)
 # Ban / unban lifecycle endpoints (PATCH /users/{id}/ban|unban). Distinct paths
 # from the CrudRouter, gated on admin / _user_manager inside the handlers.
@@ -467,6 +471,8 @@ app.include_router(user_connect_router, tags=["users", "admin"])
 # accounts_router must be registered before CrudRouter(AccountInterface) so that
 # GET /accounts/providers is matched before the authenticated GET /accounts/{id} route.
 app.include_router(accounts_router, tags=["accounts"])
+# Anonymous landing-page catalog (issue #415); no auth dependency.
+app.include_router(public_catalog_router)
 CrudRouter(AccountInterface).register_routes(app)
 CrudRouter(GroupInterface).register_routes(app)
 # ProfileInterface and StudentProfileInterface use custom routers for fine-grained permissions

@@ -158,7 +158,8 @@ Same concepts, same variant names, on both surfaces.
 
 **Button variants** — `primary` (default, filled), `secondary` (outlined),
 `danger` (filled red / theme error), `dangerGhost` (red text, no fill — for a
-destructive action repeated in every table row), `ghost` (muted text, no fill).
+destructive action repeated in every table row), `accentGhost` (accent text, no
+fill — a row's main action, e.g. Copy Link), `ghost` (muted text, no fill).
 
 > The extension has no `dangerGhost`. Add `.btn.danger-ghost` to `base.css` when a
 > webview first needs it; do not hand-roll it in a view stylesheet.

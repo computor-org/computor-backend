@@ -246,7 +246,7 @@ detect_environment() {
 # redis-cli inside the stack's redis container (works from host and from the
 # updater container — both talk to the same docker daemon).
 redis_cli() {
-    compose exec -T redis redis-cli -a "$REDIS_PASSWORD" "$@" 2>/dev/null
+    REDISCLI_AUTH="$REDIS_PASSWORD" compose exec -T -e REDISCLI_AUTH redis redis-cli "$@" 2>/dev/null
 }
 
 # Export GIT_COMMIT / GIT_BRANCH / BUILD_TIME of the checked-out tree for image

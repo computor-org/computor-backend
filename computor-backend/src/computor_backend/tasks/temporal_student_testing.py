@@ -65,6 +65,64 @@ TEST_ACTIVITY_HEARTBEAT_TIMEOUT = timedelta(minutes=2)
 TEST_WORKFLOW_EXECUTION_TIMEOUT = timedelta(hours=4)
 
 
+# testSummary.json is written by the harness into a directory student code
+# may also reach, so it is read defensively (#237): no symlink, regular file
+# only (a FIFO must not block the worker), bounded size.
+_REPORT_MAX_BYTES_DEFAULT = 16 * 1024 * 1024
+
+
+class UnsafeReportError(OSError):
+    """The test report was refused (symlink, not a regular file, too large)."""
+
+
+def _report_max_bytes() -> int:
+    raw = os.environ.get("TESTING_REPORT_MAX_BYTES", "").strip()
+    try:
+        value = int(raw) if raw else _REPORT_MAX_BYTES_DEFAULT
+    except ValueError:
+        value = _REPORT_MAX_BYTES_DEFAULT
+    return value if value > 0 else _REPORT_MAX_BYTES_DEFAULT
+
+
+def _read_test_report(output_dir: str, name: str, max_bytes: Optional[int] = None):
+    """Parse ``output_dir/name`` as JSON, refusing anything but a bounded
+    regular file directly inside the (trusted) output directory."""
+    import stat as _stat
+    max_bytes = max_bytes or _report_max_bytes()
+    if os.sep in name or name in ("", ".", ".."):
+        raise UnsafeReportError(f"invalid report name: {name!r}")
+    dirfd = os.open(output_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        try:
+            fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+                         | os.O_NOCTTY | os.O_CLOEXEC, dir_fd=dirfd)
+        except OSError as exc:
+            if _stat.S_ISLNK(os.stat(name, dir_fd=dirfd,
+                                     follow_symlinks=False).st_mode):
+                raise UnsafeReportError(f"report is a symlink: {name}") from exc
+            raise
+    finally:
+        os.close(dirfd)
+    try:
+        st = os.fstat(fd)
+        if not _stat.S_ISREG(st.st_mode):
+            raise UnsafeReportError(f"report is not a regular file: {name}")
+        if st.st_size > max_bytes:
+            raise UnsafeReportError(
+                f"report too large ({st.st_size} > {max_bytes} bytes)")
+        data = b""
+        while len(data) <= max_bytes:
+            chunk = os.read(fd, 1024 * 1024)
+            if not chunk:
+                break
+            data += chunk
+        if len(data) > max_bytes:
+            raise UnsafeReportError(f"report grew beyond {max_bytes} bytes")
+    finally:
+        os.close(fd)
+    return json.loads(data)
+
+
 def _resolve_within(base_dir: str, filename: str) -> str:
     """Resolve ``filename`` under ``base_dir``, refusing to escape it.
 
@@ -516,11 +574,19 @@ def execute_tests_activity(
         else:
             # Read results from output file (normal case - results written to file)
             report_file_path = os.path.join(output_path, REPORT_FILE_NAME)
-            if os.path.exists(report_file_path):
+            if os.path.lexists(report_file_path):
                 logger.info(f"Reading results from file: {report_file_path}")
-                with open(report_file_path, "r") as report_file:
-                    test_results = json.load(report_file)
-                logger.info(f"Test results: {json.dumps(test_results, indent=2)}")
+                try:
+                    test_results = _read_test_report(output_path, REPORT_FILE_NAME)
+                    logger.info(f"Test results: {json.dumps(test_results, indent=2)}")
+                except (UnsafeReportError, ValueError) as e:
+                    logger.warning(f"Rejected test report {report_file_path}: {e}")
+                    test_results = {
+                        "passed": 0,
+                        "failed": 1,
+                        "total": 1,
+                        "error": f"Test report rejected: {e}",
+                    }
             else:
                 test_results = {
                     "passed": 0,

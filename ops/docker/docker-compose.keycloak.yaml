@@ -17,7 +17,7 @@
 
 services:
   keycloak-db:
-    image: postgres:16
+    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
     networks:
       - computor-network
     container_name: computor-keycloak-db
@@ -46,7 +46,7 @@ services:
       retries: 5
 
   keycloak:
-    image: quay.io/keycloak/keycloak:25.0.6
+    image: quay.io/keycloak/keycloak:26.7.4@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
     networks:
       - computor-network
     container_name: computor-keycloak
@@ -59,8 +59,12 @@ services:
         max-size: "10m"
         max-file: "5"
     environment:
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
+      # Keycloak 26 renamed the bootstrap-admin variables (KEYCLOAK_ADMIN* is deprecated).
+      # .env keeps KEYCLOAK_ADMIN / KEYCLOAK_ADMIN_PASSWORD because the backend and
+      # keycloak-idp-setup log in with them. Only used when the master realm has no
+      # users yet (fresh install); an existing admin is never touched.
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:?}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5438/keycloak
       KC_DB_USERNAME: keycloak
@@ -74,7 +78,6 @@ services:
       # name — their token endpoint URLs are derived from the request Host header, not KC_HOSTNAME.
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
       KC_HOSTNAME_STRICT: "false"
-      KC_HOSTNAME_STRICT_HTTPS: "false"
       KC_HTTP_ENABLED: "true"
       KC_HTTP_PORT: 8080
       KC_HEALTH_ENABLED: "true"
@@ -102,14 +105,15 @@ services:
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes:/opt/keycloak/themes
       - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports:/opt/keycloak/data/import
+      - ../keycloak/healthcheck.sh:/opt/keycloak/healthcheck.sh:ro
     depends_on:
       keycloak-db:
         condition: service_healthy
     healthcheck:
-      # Keycloak 25.x exposes health on the management interface (port 9000)
-      # under the same relative path as the main HTTP. Use bash /dev/tcp because
-      # the Keycloak image has no curl/wget.
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && printf 'GET %s/health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' \"$${KC_HTTP_RELATIVE_PATH%/}\" >&3 && grep -q 'UP' <&3"]
+      # Readiness on the management interface (port 9000) under the relative path.
+      # Healthy only on HTTP 200 — see ops/keycloak/healthcheck.sh for why a body
+      # grep for "UP" is wrong (mixed-status 503 during startup/migration).
+      test: ["CMD", "bash", "/opt/keycloak/healthcheck.sh"]
       interval: 10s
       timeout: 5s
       retries: 15
@@ -123,7 +127,7 @@ services:
   # on host) and prod (backend containerized) without needing the backend image.
   # Secrets reach it via env_file (.env): each provider names its IDP_*_CLIENT_SECRET.
   keycloak-idp-setup:
-    image: python:3.13-slim
+    image: python:3.13-slim@sha256:7c61056e61ac89e852de05f3dc6fa51a6dd2181797bceed46aa725dd7cb2cd3b
     container_name: computor-keycloak-idp-setup
     networks:
       - computor-network

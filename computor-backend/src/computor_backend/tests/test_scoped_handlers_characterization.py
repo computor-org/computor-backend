@@ -327,3 +327,29 @@ class TestBuildQuery:
         # create is neither read nor in the write role map → Forbidden.
         with pytest.raises(ForbiddenException):
             handler.build_query(_no_access(), "create", db)
+
+
+class TestOrganizationManagerIsNotAnOwner:
+    """``_organization_manager`` is a global *manager* role: it may create and
+    edit across organizations, but deleting or archiving an organization /
+    course family is reserved to the scope's ``_owner`` (and admins). Pinned
+    because the hand-written delete endpoints used to grant it separately."""
+
+    @pytest.mark.parametrize("cfg", SCOPES, ids=_pid)
+    def test_manager_cannot_delete_or_archive(self, cfg):
+        _, HandlerCls, entity, scope_key, *_ = cfg
+        handler = HandlerCls(entity)
+        p = Principal(user_id="mgr", roles=["_organization_manager"])
+        assert handler.can_perform_action(p, "delete", resource_id="S1") is False
+        assert handler.can_perform_action(p, "archive", resource_id="S1") is False
+
+    @pytest.mark.parametrize("cfg", SCOPES, ids=_pid)
+    def test_can_perform_action_entry_point_agrees(self, cfg):
+        from computor_backend.permissions.core import can_perform_action
+
+        _, HandlerCls, entity, scope_key, *_ = cfg
+        manager = Principal(user_id="mgr", roles=["_organization_manager"])
+        owner = _scoped(scope_key, "_owner", scope_id="S1")
+        assert can_perform_action(manager, entity, "delete", resource_id="S1") is False
+        assert can_perform_action(owner, entity, "delete", resource_id="S1") is True
+        assert can_perform_action(_admin(), entity, "delete", resource_id="S1") is True

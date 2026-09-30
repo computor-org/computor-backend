@@ -331,6 +331,15 @@ async def test_rollout_replaces_the_credential_when_the_caller_supplies_one():
 
 
 @pytest.mark.asyncio
+async def test_rollout_replaces_auth_token_when_the_caller_supplies_one():
+    client = _rollout_client()
+    await client.update_workspace_to_version(
+        "ws-1", "tv-2", computor_auth_token="ctp_fresh_token"
+    )
+    assert _sent(client)["computor_auth_token"] == "ctp_fresh_token"
+
+
+@pytest.mark.asyncio
 async def test_rollout_carries_the_previous_credential_without_one():
     # Coder's own admin account or a deleted user: nothing to resolve, so the
     # workspace keeps the credential it has rather than getting one derived

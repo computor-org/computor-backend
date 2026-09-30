@@ -83,6 +83,7 @@ export const ErrorCodes = {
   NF_010: "NF_010", // Service Record Not Found
   CONFLICT_001: "CONFLICT_001", // Resource Already Exists
   CONFLICT_002: "CONFLICT_002", // Concurrent Modification
+  CONFLICT_003: "CONFLICT_003", // Course Full
   RATE_001: "RATE_001", // Rate Limit Exceeded
   RATE_002: "RATE_002", // Login Rate Limit Exceeded
   RATE_003: "RATE_003", // Test Request Rate Limit Exceeded
@@ -114,6 +115,8 @@ export const ErrorCodes = {
   SUBMIT_010: "SUBMIT_010", // Test and Submission Limits Exhausted
   SUBMIT_011: "SUBMIT_011", // Submission Cannot Be Withdrawn
   SUBMIT_012: "SUBMIT_012", // Assignment Not Available
+  SUBMIT_013: "SUBMIT_013", // Course Archived
+  SUBMIT_014: "SUBMIT_014", // Nothing to Submit
   TASK_001: "TASK_001", // Task Not Found
   TASK_002: "TASK_002", // Task Submission Failed
   TASK_003: "TASK_003", // Unsupported Execution Backend
@@ -486,6 +489,20 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
     },
     retryAfter: undefined,
     documentationUrl: "/docs/api/concurrency",
+  },
+  CONFLICT_003: {
+    code: "CONFLICT_003",
+    httpStatus: 409,
+    category: ErrorCategory.CONFLICT,
+    severity: ErrorSeverity.INFO,
+    title: "Course Full",
+    message: {
+      plain: "This course is full.",
+      markdown: "**Course Full**\n\nThis course is full. No self-registration seats are left.",
+      html: "<strong>Course Full</strong><p>This course is full. No self-registration seats are left.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/api/conflicts",
   },
   RATE_001: {
     code: "RATE_001",
@@ -920,6 +937,34 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
     },
     retryAfter: undefined,
     documentationUrl: "/docs/testing#visibility",
+  },
+  SUBMIT_013: {
+    code: "SUBMIT_013",
+    httpStatus: 400,
+    category: ErrorCategory.VALIDATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Course Archived",
+    message: {
+      plain: "This course has been archived. Submissions and test runs are closed.",
+      markdown: "**Course Archived**\n\nThis course has been archived. Submissions and test runs are closed. Your existing work and submissions are untouched.",
+      html: "<strong>Course Archived</strong><p>This course has been archived. Submissions and test runs are closed. Your existing work and submissions are untouched.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/courses#archive",
+  },
+  SUBMIT_014: {
+    code: "SUBMIT_014",
+    httpStatus: 400,
+    category: ErrorCategory.VALIDATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Nothing to Submit",
+    message: {
+      plain: "This assignment has no work to submit yet. Write your solution first, then submit again.",
+      markdown: "**Nothing to Submit**\n\nThis assignment has no work to submit yet. All files are empty or nothing submittable was found. Write your solution first, then submit again.",
+      html: "<strong>Nothing to Submit</strong><p>This assignment has no work to submit yet. All files are empty or nothing submittable was found. Write your solution first, then submit again.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/submissions#empty",
   },
   TASK_001: {
     code: "TASK_001",

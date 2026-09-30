@@ -29,7 +29,7 @@ workspace_roles_router = APIRouter()
 )
 async def list_users(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """List all users. Each user includes their workspace roles (empty list if none)."""
     return list_all_users(permissions, db)
@@ -43,7 +43,7 @@ async def list_users(
 async def assign_role(
     body: WorkspaceRoleAssign,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Assign _workspace_user or _workspace_maintainer to a user by email."""
     return assign_workspace_role(permissions, body.email, body.role_id, db)
@@ -57,7 +57,7 @@ async def remove_role(
     user_id: str,
     role_id: str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Remove _workspace_user or _workspace_maintainer from a user."""
     return remove_workspace_role(permissions, user_id, role_id, db)

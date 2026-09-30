@@ -229,6 +229,7 @@ export interface InviteLinkGet {
   expires_at: string;
   roles?: string[];
   note?: string | null;
+  kind?: string;
   revoked_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -243,6 +244,7 @@ export interface InviteLinkList {
   expires_at: string;
   roles?: string[];
   note?: string | null;
+  kind?: string;
   revoked_at?: string | null;
   created_at?: string | null;
 }
@@ -256,6 +258,33 @@ export interface InviteLinkPublic {
   roles?: string[];
   expires_at: string;
   note?: string | null;
+}
+
+/**
+ * What the public /join page may learn about a code — never who issued it.
+ */
+export interface InviteStatusPublic {
+  /** valid | used | expired | invalid */
+  status: string;
+  /** open | invite_only | closed */
+  registration_mode: string;
+  /** True when the user cap is reached */
+  full?: boolean;
+}
+
+export interface ReferralInvite {
+  token: string;
+  /** Share link: <web>/join/<token> */
+  url: string;
+  used: boolean;
+  /** valid | used | expired | invalid */
+  status: string;
+  expires_at: string;
+}
+
+export interface ReferralInviteList {
+  registration_mode: string;
+  invites?: ReferralInvite[];
 }
 
 export interface InviteAccept {
@@ -1748,6 +1777,7 @@ export interface EntityDeleteCount {
   example_versions?: number;
   example_dependencies?: number;
   student_profiles?: number;
+  student_submissions?: number;
 }
 
 /**
@@ -1782,6 +1812,12 @@ export interface CascadeDeleteResult {
   minio_objects_deleted?: number;
   /** Errors encountered during deletion */
   errors?: string[];
+  /** Template/reference git repositories deleted (or to be deleted on dry run) */
+  git_repositories?: string[];
+  /** Student repositories left untouched on the git server */
+  student_repositories_kept?: number;
+  /** Why the real delete would be refused, if it would */
+  blocked_reason?: string | null;
 }
 
 /**
@@ -1819,10 +1855,16 @@ export interface InstanceInfoGet {
 }
 
 /**
- * Runtime state of the running API (#350) — admin-only.
+ * Runtime state of the running API (#350).
  * 
  * Answers "when did this last restart, and what is it running", which nothing
  * in the UI could say before.
+ * 
+ * Readable by any authenticated user, with one field redacted rather than a
+ * second response shape: ``commit`` is admin-only. A restart time, an uptime
+ * and a branch name are a version label — the sidebar already shows the web
+ * image's own commit to everyone — but the full SHA pins the exact source of a
+ * public repository, which is the operator's business and nobody else's.
  * 
  * The issue also asks for system and workspace memory. That is deliberately
  * absent rather than null: the API holds no docker socket and there is no
@@ -1836,8 +1878,8 @@ export interface InstanceStatusGet {
   started_at: string;
   /** Seconds since started_at, so a client need not trust its own clock. */
   uptime_seconds: number;
-  /** Commit hash of the running code; 'unknown' if it cannot be determined. */
-  commit: string;
+  /** Commit hash of the running code; 'unknown' if it cannot be determined, and null for a non-admin reader, who is not shown it. */
+  commit?: string | null;
   /** Branch the running code was built from; 'unknown' if undeterminable. */
   branch: string;
   /** When the running image was built (UTC). Null in development, where the API runs from a working tree and there is no build. */
@@ -2577,6 +2619,8 @@ export interface InstanceLimitsUsage {
   workspace_users: number;
   /** Distinct users holding a login seat — one per user however many tabs or devices they are signed in from. */
   login_seats: number;
+  /** Non-staff, non-service, non-archived users — what max_registered_users counts. */
+  registered_users?: number | null;
   /** False when the workspace-user count could not be read (Coder unreachable or disabled); the number above is then meaningless. */
   workspace_users_available?: boolean | null;
 }
@@ -2593,6 +2637,14 @@ export interface InstanceLimitsGet {
   login_idle_minutes: number;
   /** Download URL for the local VS Code extension, quoted in both refusals; null when EXTENSION_PUBLIC_DOWNLOAD_URL is unset. */
   local_install_url?: string | null;
+  /** Who may create an account on first sign-in: open, invite_only (valid invite code required) or closed. */
+  registration_mode?: "open" | "invite_only" | "closed";
+  /** Hard cap on non-staff users; null = unlimited. */
+  max_registered_users?: number | null;
+  /** Single-use referral invites each non-staff user gets (invite_only mode). */
+  referral_invites_per_user?: number;
+  /** Public courses a new user is enrolled in on registration. */
+  pilot_course_ids?: string[];
   /** Current usage of both limits. */
   usage?: InstanceLimitsUsage | null;
 }
@@ -2607,6 +2659,14 @@ export interface InstanceLimitsUpdate {
   max_concurrent_logins?: number | null;
   /** Idle window for a login seat, in minutes. Keep it above 15: an active client re-authenticates (and so refreshes its seat) at most every 15 minutes, so a shorter window evicts users mid-session. */
   login_idle_minutes?: number;
+  /** Who may create an account on first sign-in: open, invite_only (valid invite code required) or closed. */
+  registration_mode?: "open" | "invite_only" | "closed";
+  /** Hard cap on non-staff users; null = unlimited. */
+  max_registered_users?: number | null;
+  /** Single-use referral invites each non-staff user gets (invite_only mode). */
+  referral_invites_per_user?: number;
+  /** Public courses a new user is enrolled in on registration. */
+  pilot_course_ids?: string[];
 }
 
 /**
@@ -4488,4 +4548,4 @@ export type ErrorCategory = "authentication" | "authorization" | "validation" | 
 
 export type GradingStatus = 0 | 1 | 2 | 3;
 
-export type ErrorCode = "AUTH_001" | "AUTH_002" | "AUTH_003" | "AUTH_004" | "AUTH_005" | "AUTHZ_001" | "AUTHZ_002" | "AUTHZ_003" | "AUTHZ_004" | "AUTHZ_005" | "AUTHZ_006" | "AUTHZ_010" | "VAL_001" | "VAL_002" | "VAL_003" | "VAL_004" | "NF_001" | "NF_002" | "NF_003" | "NF_004" | "NF_010" | "CONFLICT_001" | "CONFLICT_002" | "RATE_001" | "RATE_002" | "RATE_003" | "CONTENT_001" | "CONTENT_002" | "CONTENT_003" | "CONTENT_004" | "CONTENT_005" | "CONTENT_006" | "CONTENT_007" | "CONTENT_008" | "CONTENT_009" | "CONTENT_010" | "VERSION_001" | "DEPLOY_001" | "DEPLOY_002" | "DEPLOY_003" | "DEPLOY_004" | "DEPLOY_005" | "SUBMIT_001" | "SUBMIT_002" | "SUBMIT_003" | "SUBMIT_004" | "SUBMIT_005" | "SUBMIT_006" | "SUBMIT_007" | "SUBMIT_008" | "SUBMIT_009" | "SUBMIT_010" | "SUBMIT_011" | "SUBMIT_012" | "TASK_001" | "TASK_002" | "TASK_003" | "TASK_004" | "GITLAB_001" | "GITLAB_002" | "GITLAB_003" | "GITLAB_004" | "GITLAB_005" | "GITLAB_006" | "GITLAB_007" | "GITLAB_008" | "GIT_001" | "GIT_002" | "EXT_001" | "EXT_002" | "EXT_003" | "EXT_004" | "EXT_005" | "EXT_006" | "EXT_007" | "DB_001" | "DB_002" | "DB_003" | "INT_001" | "INT_002" | "NIMPL_001";
+export type ErrorCode = "AUTH_001" | "AUTH_002" | "AUTH_003" | "AUTH_004" | "AUTH_005" | "AUTHZ_001" | "AUTHZ_002" | "AUTHZ_003" | "AUTHZ_004" | "AUTHZ_005" | "AUTHZ_006" | "AUTHZ_010" | "VAL_001" | "VAL_002" | "VAL_003" | "VAL_004" | "NF_001" | "NF_002" | "NF_003" | "NF_004" | "NF_010" | "CONFLICT_001" | "CONFLICT_002" | "RATE_001" | "RATE_002" | "RATE_003" | "CONTENT_001" | "CONTENT_002" | "CONTENT_003" | "CONTENT_004" | "CONTENT_005" | "CONTENT_006" | "CONTENT_007" | "CONTENT_008" | "CONTENT_009" | "CONTENT_010" | "VERSION_001" | "DEPLOY_001" | "DEPLOY_002" | "DEPLOY_003" | "DEPLOY_004" | "DEPLOY_005" | "SUBMIT_001" | "SUBMIT_002" | "SUBMIT_003" | "SUBMIT_004" | "SUBMIT_005" | "SUBMIT_006" | "SUBMIT_007" | "SUBMIT_008" | "SUBMIT_009" | "SUBMIT_010" | "SUBMIT_011" | "SUBMIT_012" | "SUBMIT_013" | "TASK_001" | "TASK_002" | "TASK_003" | "TASK_004" | "GITLAB_001" | "GITLAB_002" | "GITLAB_003" | "GITLAB_004" | "GITLAB_005" | "GITLAB_006" | "GITLAB_007" | "GITLAB_008" | "GIT_001" | "GIT_002" | "EXT_001" | "EXT_002" | "EXT_003" | "EXT_004" | "EXT_005" | "EXT_006" | "EXT_007" | "DB_001" | "DB_002" | "DB_003" | "INT_001" | "INT_002" | "NIMPL_001";

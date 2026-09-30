@@ -132,6 +132,20 @@ export function usePermissions() {
     );
   };
 
+  // Scope-owner checks for the organization / course-family surfaces (admins
+  // bypass). Distinct from canManageHierarchy on purpose: that is the
+  // create/edit cohort, which includes _organization_manager, while deleting
+  // (and archiving) a scope is reserved to its `_owner` — a manager is not an
+  // owner. Mirrors the backend handlers (delete → ScopeRole.OWNER).
+  const orgHasAtLeast = (orgId: string, minRole: string): boolean =>
+    isAdmin || scopeHasAtLeast(orgRoles, orgId, minRole);
+  const familyHasAtLeast = (familyId: string, minRole: string): boolean =>
+    isAdmin || scopeHasAtLeast(familyRoles, familyId, minRole);
+
+  const canDeleteOrganization = (orgId: string): boolean => orgHasAtLeast(orgId, '_owner');
+  const canDeleteCourseFamily = (familyId: string): boolean =>
+    familyHasAtLeast(familyId, '_owner');
+
   // The user's highest role on a course → friendly label for a badge, or null.
   const courseRole = (courseId: string): string | null => {
     const roles = courseRoles[courseId] ?? [];
@@ -141,6 +155,13 @@ export function usePermissions() {
     );
     return COURSE_ROLE_LABEL[top] ?? top.replace(/^_/, '');
   };
+
+  // Deleting and archiving a course are owner decisions (admins bypass); the
+  // backend refuses everyone else, _organization_manager included. Whether an
+  // owner's delete then goes through is the server's call (a course with
+  // student submissions is admin-only) — the dry-run preview reports that.
+  const canDeleteCourse = (courseId: string): boolean => courseHasAtLeast(courseId, '_owner');
+  const canArchiveCourse = canDeleteCourse;
 
   return {
     isAdmin,
@@ -166,5 +187,11 @@ export function usePermissions() {
     canCreateCourse,
     courseRole,
     courseHasAtLeast,
+    orgHasAtLeast,
+    familyHasAtLeast,
+    canDeleteOrganization,
+    canDeleteCourseFamily,
+    canDeleteCourse,
+    canArchiveCourse,
   };
 }

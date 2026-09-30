@@ -48,6 +48,11 @@ class BackendSettings:
         # localhost:3000). When unset, /instance-info uses PUBLIC_DOMAIN.
         self.WEB_APP_URL = os.environ.get("WEB_APP_URL", None)
 
+        # Extra origins (comma-separated scheme://host[:port]) that SSO login and
+        # logout may redirect back to, on top of PUBLIC_DOMAIN, WEB_APP_URL and
+        # NEXT_PUBLIC_API_URL. Anything else is rejected (open-redirect guard).
+        self.SSO_REDIRECT_ALLOWED_ORIGINS = os.environ.get("SSO_REDIRECT_ALLOWED_ORIGINS", "")
+
         # WebSocket settings
         self.WS_MAX_CONNECTIONS_PER_USER = int(os.environ.get("WS_MAX_CONNECTIONS_PER_USER", "10"))
         self.WS_MAX_TOTAL_CONNECTIONS = int(os.environ.get("WS_MAX_TOTAL_CONNECTIONS", "10000"))

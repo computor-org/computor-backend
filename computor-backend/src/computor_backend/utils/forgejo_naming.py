@@ -165,6 +165,39 @@ def allocate_course_org_name(
     )
 
 
+def allocate_free_name(
+    base: str,
+    seed: str,
+    is_free: Callable[[str], bool],
+    max_suffix: int = 9,
+    max_len: int = REPO_NAME_MAX,
+) -> str:
+    """First free name: ``base`` as given, then ``base-2`` … ``base-9``, then
+    ``base-<6-char hash of seed>``; every candidate ``<= max_len``.
+
+    The collision guard for everything provisioned *inside* a namespace we do
+    not own outright — a student repo in a (legacy, shared) Forgejo org, a
+    course group under a GitLab parent group, a student fork in a ``students``
+    subgroup. Provisioning must never adopt a repository or group our database
+    does not track: a same-named one on the server is either someone else's or
+    a leftover of a deleted course, whose student repositories are deliberately
+    kept. ``is_free(name)`` asks the server. ``base`` is tried verbatim so
+    existing naming conventions are preserved when nothing is in the way.
+    """
+    base = str(base)[:max_len] or "student"
+    if is_free(base):
+        return base
+    for n in range(2, max_suffix + 1):
+        suffix = f"-{n}"
+        candidate = base[: max_len - len(suffix)] + suffix
+        if is_free(candidate):
+            return candidate
+    hashed = _fit(base, seed, suffix=f"-{_hash(seed)}", max_len=max_len)
+    if is_free(hashed):
+        return hashed
+    raise ValueError(f"Could not allocate a unique name from '{base}'")
+
+
 def student_repo_name_in_org(handle: str) -> str:
     """The student fork's repo name inside a per-course org: just the handle.
 

@@ -89,12 +89,17 @@ DEFAULT_SAFE_ENV: Dict[str, str] = {
 }
 
 
+# Thread-pool sizes of the common math runtimes, pinned per job.
+_THREAD_VARS = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")
+
+
 # Language-specific environment additions
 _LANGUAGE_ENV: Dict[str, Dict[str, str]] = {
     "python": {
         "PYTHONHASHSEED": "0",  # Reproducible hashing
         "PYTHONDONTWRITEBYTECODE": "1",  # Don't create .pyc files
         "PYTHONUNBUFFERED": "1",  # Unbuffered output
+        "MPLBACKEND": "Agg",  # headless plotting; plt.show() is a no-op
     },
     "octave": {
         "OCTAVE_HISTFILE": "/dev/null",  # No history file
@@ -123,6 +128,19 @@ _PASSTHROUGH_VARS: Dict[str, Set[str]] = {
 }
 
 
+def apply_thread_limits(env: Dict[str, str]) -> Dict[str, str]:
+    """Pin math-library thread pools to COMPUTOR_JOB_THREADS (default 1).
+
+    Shared by every executor's environment, including ones that build their
+    own (Julia): RLIMIT_NPROC counts threads, and OpenBLAS sized to the host
+    core count also reserves more address space than RLIMIT_AS allows.
+    """
+    threads = os.environ.get("COMPUTOR_JOB_THREADS", "1").strip() or "1"
+    for var in _THREAD_VARS:
+        env[var] = threads
+    return env
+
+
 def get_safe_env(
     language: str,
     working_dir: Optional[str] = None,
@@ -140,6 +158,12 @@ def get_safe_env(
         Dictionary of safe environment variables
     """
     env = DEFAULT_SAFE_ENV.copy()
+
+    # One math-library thread per job by default. The worker runs several jobs
+    # at once on a CPU-limited container, and every thread counts against the
+    # UID-wide RLIMIT_NPROC (see resources.py), so BLAS/OpenMP pools sized to
+    # the host core count would only oversubscribe and eat the process budget.
+    apply_thread_limits(env)
 
     # Add language-specific variables
     lang_lower = language.lower()

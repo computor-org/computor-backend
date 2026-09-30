@@ -16,7 +16,7 @@
 # Only the `services:` section is applied at boot (no organizations/users/contents).
 
 services:
-  - slug: testing.default               # MUST match properties.executionBackend.slug
+  - slug: itpcp.exec.py                 # MUST match properties.executionBackend.slug
                                          # in your examples' meta.yaml — that string is
                                          # what binds an assignment to this service.
                                          # Any name works; it is an identifier, not a

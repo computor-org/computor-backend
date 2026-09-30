@@ -36,6 +36,11 @@
 services:
   temporal-worker-testing:
     depends_on: !reset []
+    # Resource bounds (mem_limit/cpus/pids_limit, init, concurrency and the
+    # COMPUTOR_JOB_* rlimits) are inherited from docker-compose.prod.yaml;
+    # size them for this host via TESTING_WORKER_MEM_LIMIT, TESTING_WORKER_CPUS,
+    # TESTING_WORKER_PIDS_LIMIT and TESTING_WORKER_MAX_CONCURRENT_ACTIVITIES in
+    # the worker host's .env (#237).
     environment:
       - TEMPORAL_HOST=${WORKERHOST_CONTROL_ADDR:?set WORKERHOST_CONTROL_ADDR in .env (wg address of the control-plane host)}
       - TEMPORAL_PORT=${WORKERHOST_TEMPORAL_PORT:-7233}
@@ -55,4 +60,6 @@ services:
       # in docker-compose.coder.yaml) — reached over the wg link.
       POSTGRES_HOST: ${WORKERHOST_CONTROL_ADDR}
       POSTGRES_PORT: ${WORKERHOST_POSTGRES_PORT:-5432}
+      # Must equal the control plane's value: the role is created there.
+      POSTGRES_PASSWORD: ${CODER_WORKER_DB_PASSWORD:?copy CODER_WORKER_DB_PASSWORD from the control-plane .env}
       BACKEND_EXTERNAL_URL: ${BACKEND_EXTERNAL_URL:?set BACKEND_EXTERNAL_URL in .env (e.g. http://<control wg addr>:8000)}

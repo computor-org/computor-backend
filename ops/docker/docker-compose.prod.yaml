@@ -5,7 +5,7 @@ services:
   # Restricted Docker API proxy. Traefik talks to this instead of the raw
   # socket, so a compromised Traefik can't drive arbitrary Docker actions.
   socket-proxy:
-    image: tecnativa/docker-socket-proxy:0.3.0
+    image: tecnativa/docker-socket-proxy:0.3.0@sha256:9e4b9e7517a6b660f2cc903a19b257b1852d5b3344794e3ea334ff00ae677ac2
     networks:
       - computor-network
     restart: unless-stopped
@@ -87,6 +87,9 @@ services:
       DEPLOYMENTS_DIR: /deployments
       API_ADMIN_EMAIL: ${API_ADMIN_EMAIL}
       API_ADMIN_PASSWORD: ${API_ADMIN_PASSWORD}
+      # Bootstrap uses the same pinned secret as the testing worker to create
+      # or repair its service token. It is never written to deployment YAML.
+      TESTING_WORKER_TOKEN: ${TESTING_WORKER_TOKEN:-}
       # Read-only: the backend only compares it against API_ADMIN_EMAIL and warns
       # when they collide (a shared address means the platform admin can never
       # get a git-server account). The Forgejo admin itself is created by the
@@ -116,7 +119,15 @@ services:
       KEYCLOAK_ENABLED: ${KEYCLOAK_ENABLED:-true}
       ENABLE_KEYCLOAK: ${ENABLE_KEYCLOAK:-true}
       AUTH_PLUGINS_CONFIG: ${AUTH_PLUGINS_CONFIG:-}
-      KEYCLOAK_SERVER_URL: ${KEYCLOAK_SERVER_URL:-http://keycloak:8080/auth}
+      # Backend-reachable Keycloak, over the docker network. Deliberately NOT
+      # ${KEYCLOAK_SERVER_URL}: that variable is dev-scoped --
+      # .env.common.template ships it as http://localhost:8180 for the host-run
+      # backend -- so taking it here means uvicorn silently points at its own
+      # localhost and every login answers EXT_006 "provider unreachable". The
+      # keycloak-prod overlay sets the same value; this makes the base prod
+      # stack correct on its own rather than dependent on that overlay being
+      # included, and :? fails loudly instead of falling back to a wrong host.
+      KEYCLOAK_SERVER_URL: ${KEYCLOAK_SERVER_URL_INTERNAL:?}
       KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:-}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-computor}
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-computor-backend}
@@ -140,6 +151,9 @@ services:
       CODER_ENABLED: ${API_CODER_ENABLED:-${CODER_ENABLED:-false}}
       CODER_URL: ${CODER_URL}
       CODER_WORKSPACE_BASE_URL: ${CODER_WORKSPACE_BASE_URL:-}
+      # Coder service-account username: the only non-owner workspace admins
+      # may open (api/auth.py verify_coder_access); also used at startup.
+      CODER_ADMIN_USERNAME: ${CODER_ADMIN_USERNAME:-admin}
       CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
       CODER_ADMIN_API_SECRET: ${CODER_ADMIN_API_SECRET}
@@ -149,18 +163,39 @@ services:
       # Read by the API when pushing Coder templates (matlab_license_file
       # template variable) — must reach this container, not just the host env.
       MATLAB_MLM_LICENSE_FILE: ${MATLAB_MLM_LICENSE_FILE:-}
+      # Aggregate parent slice for workspace containers (Terraform cgroup_parent).
+      CODER_WORKSPACE_CGROUP_PARENT: ${CODER_WORKSPACE_CGROUP_PARENT:-}
+      # true = public deployment: template workflows refuse to run without
+      # CODER_WORKSPACE_CGROUP_PARENT (aggregate slice incl. TasksMax).
+      COMPUTOR_PUBLIC_DEPLOYMENT: ${COMPUTOR_PUBLIC_DEPLOYMENT:-false}
+      # Creates/refreshes the coder worker's restricted DB role at startup
+      # (scripts/ensure_coder_worker_db_role.py; no-op when empty).
+      CODER_WORKER_DB_USER: ${CODER_WORKER_DB_USER:-computor_coder_worker}
+      CODER_WORKER_DB_PASSWORD: ${CODER_WORKER_DB_PASSWORD:-}
       BACKEND_EXTERNAL_URL: ${BACKEND_EXTERNAL_URL:-}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?}
+      # Extra origins SSO login/logout may redirect to (comma-separated);
+      # the NEXT_PUBLIC_API_URL origin is always allowed.
+      SSO_REDIRECT_ALLOWED_ORIGINS: ${SSO_REDIRECT_ALLOWED_ORIGINS:-}
+      # Web app origin when it is not the NEXT_PUBLIC_API_URL origin (split
+      # deployment); also an allowed SSO redirect origin.
+      WEB_APP_URL: ${WEB_APP_URL:-}
       # Git server integration (if enabled) — uses the internal container URL
       # since uvicorn reaches Forgejo over computor-network, not localhost.
       GIT_SERVER: ${GIT_SERVER}
       GIT_SERVER_URL: ${GIT_SERVER_URL_INTERNAL}
       # User-reachable git URL, used to rewrite template/clone links in API
-      # responses (the internal host is not reachable from a browser). Optional:
-      # setup-env.sh never writes GIT_SERVER_URL for prod, and the backend falls
-      # back to FORGEJO_ROOT_URL below, so leaving it unset is the normal case —
-      # hence :- rather than a bare ${} that warns on every compose command.
-      GIT_SERVER_URL_PUBLIC: ${GIT_SERVER_URL:-}
+      # responses (the internal host is not reachable from a browser). Normally
+      # unset: the backend falls back to FORGEJO_ROOT_URL below.
+      #
+      # Deliberately NOT mapped from GIT_SERVER_URL. That variable is
+      # dev-scoped -- .env.common.template ships it as http://localhost:3030 for
+      # the host-run backend -- and a prod .env derived from that template
+      # therefore carried the dev value into this field, where it shadowed the
+      # FORGEJO_ROOT_URL fallback and stamped "http://localhost:3030/..." into
+      # every clone URL the API handed a student. Set GIT_SERVER_URL_PUBLIC
+      # explicitly if a deployment really needs to override FORGEJO_ROOT_URL.
+      GIT_SERVER_URL_PUBLIC: ${GIT_SERVER_URL_PUBLIC:-}
       GIT_SERVER_ADMIN_USERNAME: ${GIT_SERVER_ADMIN_USERNAME}
       GIT_SERVER_ADMIN_PASSWORD: ${GIT_SERVER_ADMIN_PASSWORD}
       # Public Forgejo URL — the backend reconciles the 'forgejo' Keycloak client's
@@ -266,6 +301,13 @@ services:
     build:
       context: ../../
       dockerfile: ./docker/temporal-worker-testing/Dockerfile
+      args:
+        WORKER_UID: ${TESTING_WORKER_UID:-23100}
+        WORKER_GID: ${TESTING_WORKER_GID:-23100}
+    # Dedicated UID, not shared with Coder workspaces (uid 1000): RLIMIT_NPROC
+    # is per UID host-wide, so COMPUTOR_JOB_MAX_PROCESSES only means "per job
+    # budget" if nothing else runs under this UID (#237). Must match the args.
+    user: "${TESTING_WORKER_UID:-23100}:${TESTING_WORKER_GID:-23100}"
     networks:
       - computor-network
     restart: unless-stopped
@@ -285,11 +327,38 @@ services:
     command: ["--queues=testing"]
     deploy:
       replicas: ${TESTING_WORKER_REPLICAS:-2}
+    # Container-wide bounds for everything the worker and its student jobs do
+    # together (#237). Per job, ctexec applies rlimits (COMPUTOR_JOB_*); these
+    # cgroup limits cap the sum, so concurrent hostile jobs can exhaust at most
+    # this replica, never the host. pids_limit is the real fork-bomb ceiling:
+    # RLIMIT_NPROC is per UID, not per container (see docker-compose.matlab.yaml).
+    # Memory: 4 concurrent jobs x 2 GiB RLIMIT_AS = 8 GiB, plus 2 GiB headroom
+    # for the worker, the harness and the job supervisors. RLIMIT_AS is per
+    # process, so a multi-process job can still exceed 2 GiB; the cgroup limit
+    # is the backstop, and jobs run with oom_score_adj=1000 so the OOM killer
+    # takes student processes before the worker. Keep in sync with dev.
+    mem_limit: ${TESTING_WORKER_MEM_LIMIT:-10g}
+    cpus: ${TESTING_WORKER_CPUS:-4}
+    pids_limit: ${TESTING_WORKER_PIDS_LIMIT:-2048}
+    # tini as PID 1 reaps orphaned processes, so killed job trees do not pile
+    # up as zombies against pids_limit.
+    init: true
     environment:
       - TZ=UTC
       - RUNNING_IN_DOCKER=true
       # Isolate every student process spawned by the test harness (#240, #241).
       - COMPUTOR_SANDBOX_ENABLE=1
+      # Test activities this replica runs at once (SDK default: 100). Each may
+      # use up to COMPUTOR_JOB_MEMORY_BYTES; keep the product under mem_limit
+      # minus ~2 GiB headroom for the worker and harness.
+      - TEMPORAL_MAX_CONCURRENT_ACTIVITIES=${TESTING_WORKER_MAX_CONCURRENT_ACTIVITIES:-4}
+      # Per-job rlimits (computor-testing/ctexec/resources.py); empty = default.
+      - COMPUTOR_JOB_CPU_SECONDS=${COMPUTOR_JOB_CPU_SECONDS:-60}
+      - COMPUTOR_JOB_MEMORY_BYTES=${COMPUTOR_JOB_MEMORY_BYTES:-2147483648}
+      - COMPUTOR_JOB_MAX_PROCESSES=${COMPUTOR_JOB_MAX_PROCESSES:-512}
+      - COMPUTOR_JOB_MAX_FILE_SIZE=${COMPUTOR_JOB_MAX_FILE_SIZE:-67108864}
+      - COMPUTOR_JOB_MAX_OPEN_FILES=${COMPUTOR_JOB_MAX_OPEN_FILES:-256}
+      - COMPUTOR_JOB_MAX_OUTPUT_BYTES=${COMPUTOR_JOB_MAX_OUTPUT_BYTES:-1048576}
       - TEMPORAL_HOST=temporal
       - TEMPORAL_PORT=7233
       - TEMPORAL_NAMESPACE=default

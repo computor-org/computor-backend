@@ -9,7 +9,7 @@ Requires authentication but is WHITELISTED in the consent gate
 fetch this to learn where to go and accept the current privacy policy.
 
 ``GET /instance-status`` sits alongside it and is a different thing: runtime
-state of this deployment, admin-only, and NOT consent-exempt. It is kept out of
+state of this deployment, and NOT consent-exempt. It is kept out of
 /instance-info precisely because that one is public to every client (#350).
 """
 from typing import Annotated
@@ -17,7 +17,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from computor_backend.business_logic import build_info
-from computor_backend.exceptions import ForbiddenException
 from computor_backend.git_server.config import get_git_server_settings
 from computor_backend.issue_reports.config import get_issue_report_settings
 from computor_backend.issue_reports.health import current_health
@@ -98,20 +97,19 @@ async def get_instance_status(
 ) -> InstanceStatusGet:
     """When this API last restarted and what it is running (#350).
 
-    Admin-only. Nothing here is a secret in itself — a commit hash and two
-    timestamps — but it describes the deployment rather than serving the user,
-    and the operator asking for it is the only one it helps.
-    """
-    if not check_admin(principal):
-        raise ForbiddenException(
-            detail="Only administrators may read the instance status.",
-        )
+    Readable by any authenticated user: "the server restarted an hour ago" is
+    the answer to a question every user asks when something breaks under them,
+    and refusing it only makes them ask an admin.
 
+    The commit is the exception, and is redacted rather than split into a second
+    endpoint — a full SHA names the exact source of a public repository, which
+    describes the deployment rather than serving the user.
+    """
     commit, branch = build_info.running_version()
     return InstanceStatusGet(
         started_at=build_info.started_at(),
         uptime_seconds=build_info.uptime_seconds(),
-        commit=commit,
+        commit=commit if check_admin(principal) else None,
         branch=branch,
         build_time=build_info.build_time(),
     )

@@ -44,7 +44,8 @@ assignment is not hidden, it is unfinished, and the staff views show its
 deployment status separately.
 """
 import logging
-from typing import Dict, Iterable, List, Optional
+from types import SimpleNamespace
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from sqlalchemy import and_, exists, or_
 from sqlalchemy.orm import Session, aliased
@@ -58,6 +59,9 @@ logger = logging.getLogger(__name__)
 
 # Raised when a student acts on content they cannot see.
 HIDDEN_CONTENT_ERROR_CODE = "SUBMIT_012"
+# Raised instead of the above when the whole course is archived: the student
+# should not go looking for a lecturer to un-hide anything.
+ARCHIVED_COURSE_ERROR_CODE = "SUBMIT_013"
 
 
 # ---------------------------------------------------------------------------
@@ -118,13 +122,35 @@ def load_visibility_overrides(
     return {str(path): visible for path, visible in rows}
 
 
-def load_course_visible(db: Session, course_id) -> Optional[bool]:
-    """The course row's own ``visible`` flag."""
-    return (
-        db.query(Course.visible)
+def _course_veto(visible: Optional[bool], archived_at) -> Optional[bool]:
+    """Collapse a course row's ``visible`` + ``archived_at`` into one veto value.
+
+    An archived course is hidden from students exactly like ``visible=False``:
+    the whole content tree drops out and every student write is refused. It is
+    folded in here, at the root of the chain, so every visibility path — the
+    list annotator, the single-row check, the SQL predicate and the write
+    guard — agrees without each growing its own archived branch.
+    """
+    if archived_at is not None:
+        return False
+    return visible
+
+
+def load_course_state(db: Session, course_id) -> Tuple[Optional[bool], Optional[object]]:
+    """The course row's ``(visible, archived_at)`` in one read."""
+    row = (
+        db.query(Course.visible, Course.archived_at)
         .filter(Course.id == course_id)
-        .scalar()
+        .first()
     )
+    if row is None:
+        return None, None
+    return row[0], row[1]
+
+
+def load_course_visible(db: Session, course_id) -> Optional[bool]:
+    """The course row's own veto: ``visible``, or False once archived."""
+    return _course_veto(*load_course_state(db, course_id))
 
 
 # ---------------------------------------------------------------------------
@@ -205,8 +231,11 @@ def is_content_visible(db: Session, course_content, course=None) -> bool:
     if course_content is None:
         return False
 
-    course_visible = getattr(course, "visible", None) if course is not None else None
-    if course is None:
+    if course is not None:
+        course_visible = _course_veto(
+            getattr(course, "visible", None), getattr(course, "archived_at", None)
+        )
+    else:
         course_visible = load_course_visible(db, course_content.course_id)
     if course_visible is False:
         return False
@@ -259,7 +288,7 @@ def effective_visible_predicate():
         .where(
             and_(
                 Course.id == CourseContent.course_id,
-                Course.visible.is_(False),
+                or_(Course.visible.is_(False), Course.archived_at.isnot(None)),
             )
         )
         .correlate(CourseContent)
@@ -384,6 +413,20 @@ def enforce_content_visible(
     """
     if exempt:
         return
+
+    # One read of the course row serves both checks below (is_content_visible
+    # would otherwise repeat it).
+    if course is None and course_content is not None:
+        visible, archived_at = load_course_state(db, course_content.course_id)
+        course = SimpleNamespace(visible=visible, archived_at=archived_at)
+
+    # Archived beats hidden: say so specifically, since "your lecturer has
+    # hidden it" would send the student looking for a reveal that never comes.
+    if getattr(course, "archived_at", None) is not None:
+        raise BadRequestException(
+            detail="This course has been archived. Submissions and test runs are closed.",
+            error_code=ARCHIVED_COURSE_ERROR_CODE,
+        )
 
     if not is_content_visible(db, course_content, course):
         raise BadRequestException(

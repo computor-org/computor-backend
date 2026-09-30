@@ -113,3 +113,21 @@ class CoursesClient:
         response = await self._http.patch(f"/courses/{quote_path(id)}", json_data=data, params=kwargs)
         return CourseGet.model_validate(response.json())
 
+    async def update_archive(
+        self,
+        id: str,
+        **kwargs: Any,
+    ) -> None:
+        """Route Courses"""
+        await self._http.patch(f"/courses/{quote_path(id)}/archive", params=kwargs)
+        return
+
+    async def update_unarchive(
+        self,
+        id: str,
+        **kwargs: Any,
+    ) -> None:
+        """Unarchive Courses"""
+        await self._http.patch(f"/courses/{quote_path(id)}/unarchive", params=kwargs)
+        return
+

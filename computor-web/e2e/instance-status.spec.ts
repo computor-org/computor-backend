@@ -1,11 +1,13 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
 
 /**
- * System → Status: when the API last restarted and what it is running (#350).
+ * When the API last restarted and what it is running (#350), on both surfaces
+ * that show it: System → Status for the operator, and Settings → About this
+ * instance for everyone else.
  *
- * The two cases worth pinning are the honest ones: a built image reports when it
- * was built, and a working tree says it is not a built image rather than showing
- * a blank where a date belongs.
+ * The cases worth pinning are the honest ones: a built image reports when it was
+ * built, a working tree says it is not a built image rather than showing a blank
+ * where a date belongs, and a non-admin is told the uptime without the commit.
  */
 
 const API_ORIGIN = 'http://localhost:8000';
@@ -51,10 +53,14 @@ async function setup(page: Page, { isAdmin = true, status = STATUS as unknown } 
     if (path.endsWith('/user/scopes')) return json(route, { is_admin: isAdmin });
     if (path.endsWith('/user')) return json(route, { ...USER, user_roles: isAdmin ? USER.user_roles : [] });
     if (path.startsWith('/messages')) return json(route, []);
+    // Settings' own calls, so the About section can be exercised on that page.
+    if (path.startsWith('/api-tokens')) return json(route, []);
+    if (path.startsWith('/accounts')) return json(route, []);
+    if (path === '/consent/status') return json(route, { required_version: null });
     if (path === '/instance-status') {
-      return isAdmin
-        ? json(route, status)
-        : json(route, { message: 'Only administrators may read the instance status.' }, 403);
+      // The endpoint answers everyone; it withholds the commit from a non-admin.
+      // Mirrored here so the mock cannot drift into justifying the page's gate.
+      return json(route, isAdmin ? status : { ...(status as object), commit: null });
     }
     return json(route, {});
   });
@@ -79,10 +85,24 @@ test('a working tree says so instead of leaving the build date blank', async ({ 
   await expect(page.getByText('unknown').first()).toBeVisible();
 });
 
+// The operator page stays under /admin with its siblings even though the data
+// behind it is no longer admin-only — a non-admin reads the same restart time
+// from Settings → About this instance, without the commit.
 test('non-admins are turned away', async ({ page }) => {
   await setup(page, { isAdmin: false });
   await page.goto('/admin/status');
 
   await expect(page.getByText('Access Denied')).toBeVisible();
   await expect(page.getByText('up 1d 6h')).toBeHidden();
+});
+
+test('Settings tells a non-admin the uptime without the commit', async ({ page }) => {
+  await setup(page, { isAdmin: false });
+  await page.goto('/settings');
+
+  await expect(page.getByText('About this instance')).toBeVisible();
+  await expect(page.getByText('up 1d 6h')).toBeVisible();
+  await expect(page.getByText('release/2026.10')).toBeVisible();
+  // Redacted by the API, so the row it would fill is not rendered at all.
+  await expect(page.getByText('Server commit')).toBeHidden();
 });

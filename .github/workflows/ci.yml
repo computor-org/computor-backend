@@ -12,19 +12,58 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          enable-cache: true
+      - run: uv lock --project computor-backend --check
+      - run: uv sync --project computor-backend --python 3.12 --locked --extra dev
+      - name: Behavioral unit tests
+        env:
+          # Coder settings validate these at import; dummy values suffice here.
+          CODER_ADMIN_EMAIL: ci@example.org
+          CODER_ADMIN_PASSWORD: ci-dummy-password
+        run: >-
+          uv run --project computor-backend --python 3.12 pytest -q
+          computor-backend/src/computor_backend/tests/test_canonical_zip_hash.py
+          computor-backend/src/computor_backend/tests/test_coder_forwardauth.py
+          computor-backend/src/computor_backend/tests/test_coder_image_cleanup.py
+          computor-backend/src/computor_backend/tests/test_coder_source_repo_pinning.py
+          computor-backend/src/computor_backend/tests/test_coder_workspace_image_pinning.py
+          computor-backend/src/computor_backend/tests/test_db_dependency_lifecycle.py
+          computor-backend/src/computor_backend/tests/test_keycloak_healthcheck.py
+          computor-backend/src/computor_backend/tests/test_keycloak_idp_setup_retry.py
+          computor-backend/src/computor_backend/tests/test_log_redaction.py
+          computor-backend/src/computor_backend/tests/test_password_hashing.py
+          computor-backend/src/computor_backend/tests/test_route_shadowing.py
+          computor-backend/src/computor_backend/tests/test_sso_redirect_allowlist.py
+          computor-backend/src/computor_backend/tests/test_update_keycloak_guard.py
+          computor-backend/src/computor_backend/tests/test_upload_limiter.py
+          computor-backend/src/computor_backend/tests/test_version_constraints.py
+          computor-backend/src/computor_backend/tests/test_harness_bounds.py
+          computor-backend/src/computor_backend/tests/test_compose_testing_bounds.py
+
+  grading-isolation:
+    # Hostile-snippet tests for grading jobs (#237). Sandbox-dependent cases
+    # skip themselves when the runner kernel lacks Landlock ABI >= 6; limits,
+    # tree kill, output caps and safe file reads run everywhere.
+    runs-on: ubuntu-latest
+    steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-      - run: uv sync --project computor-backend --python 3.12 --frozen --extra dev
-      - name: Behavioral unit tests
+      - run: uv venv --python 3.12 .venv-grading
+      - run: >-
+          VIRTUAL_ENV=.venv-grading uv pip install
+          ./computor-types ./computor-testing numpy matplotlib pytest
+      - name: Landlock capability
+        run: .venv-grading/bin/python computor-testing/sandbox/launch.py --probe
+      - name: Isolation tests
+        working-directory: computor-testing
         run: >-
-          uv run --project computor-backend --python 3.12 pytest -q
-          computor-backend/src/computor_backend/tests/test_canonical_zip_hash.py
-          computor-backend/src/computor_backend/tests/test_coder_image_cleanup.py
-          computor-backend/src/computor_backend/tests/test_coder_source_repo_pinning.py
-          computor-backend/src/computor_backend/tests/test_password_hashing.py
-          computor-backend/src/computor_backend/tests/test_version_constraints.py
+          ../.venv-grading/bin/python -m pytest -q -rs
+          tests/test_job_isolation.py tests/test_sandbox_launch.py
 
   web:
     runs-on: ubuntu-latest
@@ -32,13 +71,13 @@ jobs:
       run:
         working-directory: computor-web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 20
           cache: yarn
           cache-dependency-path: computor-web/yarn.lock
       - run: corepack enable
-      - run: yarn install --frozen-lockfile
+      - run: yarn install --frozen-lockfile --ignore-scripts
       - run: yarn lint
       - run: yarn build

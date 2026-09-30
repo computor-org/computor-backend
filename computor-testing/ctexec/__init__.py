@@ -54,6 +54,7 @@ from .compiled import (
 
 from .resources import (
     ResourceLimits,
+    default_resource_limits,
     set_resource_limits,
     make_preexec_fn,
 )
@@ -90,6 +91,7 @@ __all__ = [
     "CompiledExecutor",
     # Resources
     "ResourceLimits",
+    "default_resource_limits",
     "set_resource_limits",
     "make_preexec_fn",
 ]

@@ -1,5 +1,6 @@
-from pydantic import BaseModel, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional
+from datetime import datetime
 
 
     
@@ -46,6 +47,9 @@ class CourseCreate(BaseModel):
     # DEFAULT false; Optional here so an omitted key takes the server default
     # and a partially-loaded row still validates.
     public: Optional[bool] = None
+    # Cap on _student members for self-registration (GET /courses/public).
+    # None means unlimited.
+    max_self_registrations: Optional[int] = Field(default=None, ge=0)
 
 class CourseGet(BaseEntityGet,CourseCreate):
     id: str
@@ -71,6 +75,13 @@ class CourseGet(BaseEntityGet,CourseCreate):
     # DEFAULT false; Optional here so an omitted key takes the server default
     # and a partially-loaded row still validates.
     public: Optional[bool] = None
+    # Cap on _student members for self-registration (GET /courses/public).
+    # None means unlimited.
+    max_self_registrations: Optional[int] = Field(default=None, ge=0)
+    # Set once an owner archives the course: hidden from students and tutors,
+    # submissions and test runs closed, reversible. Read-only here; use
+    # ``PATCH /courses/{id}/archive`` / ``/unarchive``.
+    archived_at: Optional[datetime] = None
 
     course_family: Optional[CourseFamilyGet] = None
 
@@ -105,6 +116,10 @@ class CourseList(BaseModel):
     # DEFAULT false; Optional here so an omitted key takes the server default
     # and a partially-loaded row still validates.
     public: Optional[bool] = None
+    # See ``CourseGet.archived_at``. Lists include archived courses for staff so
+    # they can be badged, unarchived or deleted; students and tutors never get
+    # them (filtered server-side).
+    archived_at: Optional[datetime] = None
 
     @field_validator('path', mode='before')
     @classmethod
@@ -130,6 +145,8 @@ class CourseUpdate(BaseModel):
     # column is NOT NULL, so an explicit ``null`` is rejected rather than
     # meaning "unset".
     public: Optional[bool] = None
+    # Explicit ``null`` removes the cap (unlimited); omit to leave it alone.
+    max_self_registrations: Optional[int] = Field(default=None, ge=0)
 
 
 class CourseQuery(ListQuery):
@@ -146,6 +163,13 @@ class CourseQuery(ListQuery):
     max_submissions: Optional[int] = None
     visible: Optional[bool] = None
     public: Optional[bool] = None
+    # Tri-state lifecycle filter: None (default) returns live AND archived
+    # courses, True only archived, False only live. The default deliberately
+    # INCLUDES archived courses — unlike ``CourseContentQuery.archived`` — because
+    # the staff surfaces that list courses (web list, extension tree) must keep
+    # showing an archived course so it can be badged, unarchived or deleted.
+    # Students and tutors never see archived courses regardless of this flag.
+    archived: Optional[bool] = None
 
 
 class CoursePublicList(BaseModel):
@@ -171,11 +195,32 @@ class CoursePublicList(BaseModel):
     # Lets the catalog render "Open" instead of "Register" without a second
     # round trip, and without consulting the 15-minute-stale principal claims.
     enrolled: bool = False
+    # Free self-registration seats; None when the course has no cap. ``full``
+    # is true when a cap is set and no seat is left, so the catalog can
+    # disable Register without doing arithmetic on a nullable.
+    seats_left: Optional[int] = None
+    full: bool = False
 
     @field_validator('path', mode='before')
     @classmethod
     def cast_str_to_ltree(cls, value):
         return str(value)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CoursePublicCatalogEntry(BaseModel):
+    """One row of the anonymous course catalog (GET /public/courses, issue #415).
+
+    Narrower than ``CoursePublicList``: this is read by visitors who are not
+    signed in, so it carries no path, organization, or caller-relative data.
+    ``id`` stays because it is what the register call takes after sign-in.
+    """
+    id: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    language_code: Optional[str] = None
+    # TODO(#415): add seats_left / full once course capacity (PR #242) lands.
 
     model_config = ConfigDict(from_attributes=True)
 

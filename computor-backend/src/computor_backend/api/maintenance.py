@@ -63,7 +63,7 @@ async def get_maintenance_status(
 async def activate_maintenance(
     request: MaintenanceActivate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """
     Activate maintenance mode immediately.
@@ -139,7 +139,7 @@ async def deactivate_maintenance(
 async def schedule_maintenance(
     request: MaintenanceSchedule,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """
     Schedule future maintenance.

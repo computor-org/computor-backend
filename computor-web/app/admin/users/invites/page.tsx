@@ -18,6 +18,7 @@ import { usePermissions } from '@/src/hooks/usePermissions';
 import { InviteLinkClient } from '@/src/generated/clients/InviteLinkClient';
 import type { InviteLinkList, InviteLinkCreate } from 'types/generated';
 import { Table, Thead, Tbody, Th } from '@/src/components/ui/Table';
+import Button from '@/src/components/ui/Button';
 
 const invitesClient = new InviteLinkClient();
 
@@ -29,10 +30,10 @@ function StatusBadge({ invite }: { invite: InviteLinkList }) {
   const revoked = !!invite.revoked_at;
   const exhausted = invite.use_count >= invite.max_uses;
 
-  if (revoked) return <Badge color="red">Revoked</Badge>;
-  if (expired) return <Badge color="gray">Expired</Badge>;
-  if (exhausted) return <Badge color="gray">Used</Badge>;
-  return <Badge color="green">Active</Badge>;
+  if (revoked) return <Badge tone="error">Revoked</Badge>;
+  if (expired) return <Badge tone="muted">Expired</Badge>;
+  if (exhausted) return <Badge tone="muted">Used</Badge>;
+  return <Badge tone="success">Active</Badge>;
 }
 
 interface CreateModal {
@@ -121,14 +122,11 @@ export default function InvitesPage() {
         <PageHeader
           breadcrumbs={[{ label: 'Users', href: '/admin/users' }, { label: 'Invite links' }]}
           title="Invite links"
-          subtitle="Create one-time links to onboard new users without GitLab PAT"
+          subtitle="Create links that let people set a password and sign in. Nothing is emailed — copy each link and share it yourself."
           actions={
-            <button
-              onClick={() => setCreateModal(m => ({ ...m, open: true }))}
-              className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover transition-colors"
-            >
+            <Button onClick={() => setCreateModal(m => ({ ...m, open: true }))}>
               + New Invite
-            </button>
+            </Button>
           }
         />
 
@@ -162,7 +160,7 @@ export default function InvitesPage() {
                       <div className="flex flex-wrap gap-1">
                         {inv.roles && inv.roles.length > 0
                           ? inv.roles.map(r => (
-                              <Badge key={r} color="blue">{roleLabel(r)}</Badge>
+                              <Badge key={r} tone="info">{roleLabel(r)}</Badge>
                             ))
                           : <span className="text-xs text-subtle">None</span>
                         }
@@ -171,19 +169,13 @@ export default function InvitesPage() {
                     <td className="px-4 py-3"><StatusBadge invite={inv} /></td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-1">
-                        <button
-                          onClick={() => handleCopy(inv.id, inv.token)}
-                          className="px-2 py-1 text-xs text-accent-text hover:bg-accent-wash rounded transition-colors"
-                        >
+                        <Button variant="accentGhost" size="xs" onClick={() => handleCopy(inv.id, inv.token)}>
                           {copiedId === inv.id ? 'Copied!' : 'Copy Link'}
-                        </button>
+                        </Button>
                         {!inv.revoked_at && (
-                          <button
-                            onClick={() => setRevokeConfirm(inv.id)}
-                            className="px-2 py-1 text-xs text-danger-text hover:bg-danger-wash rounded transition-colors"
-                          >
+                          <Button variant="dangerGhost" size="xs" onClick={() => setRevokeConfirm(inv.id)}>
                             Revoke
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </td>
@@ -267,19 +259,12 @@ export default function InvitesPage() {
               </div>
             </div>
             <div className="px-6 py-4 bg-canvas rounded-b-lg flex justify-end gap-2">
-              <button
-                onClick={() => setCreateModal(m => ({ ...m, open: false, error: null }))}
-                className="px-4 py-2 text-sm text-muted hover:bg-sunken rounded-lg"
-              >
+              <Button variant="ghost" onClick={() => setCreateModal(m => ({ ...m, open: false, error: null }))}>
                 Cancel
-              </button>
-              <button
-                onClick={handleCreate}
-                disabled={createModal.saving}
-                className="px-4 py-2 text-sm bg-accent text-on-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
-              >
-                {createModal.saving ? 'Creating…' : 'Create Invite'}
-              </button>
+              </Button>
+              <Button onClick={handleCreate} loading={createModal.saving} loadingLabel="Creating…">
+                Create Invite
+              </Button>
             </div>
         </Modal>
       )}

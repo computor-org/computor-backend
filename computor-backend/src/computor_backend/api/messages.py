@@ -78,7 +78,7 @@ messages_router = APIRouter()
 async def create_message(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     payload: MessageCreate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
 ):
     """Create a new message with enforced author and defaults."""
@@ -127,7 +127,7 @@ async def create_message(
 async def list_mentionable_users_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: MentionableQuery = Depends(),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """List the users who may be @mentioned in a message of the given scope.
 
@@ -183,7 +183,7 @@ async def list_mentionable_users_endpoint(
 @messages_router.get("/counts", response_model=MessageCountsGet)
 async def get_message_counts(
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Aggregated message/unread counts per (scope, resolved course).
 
@@ -200,7 +200,7 @@ async def get_message_counts(
 async def get_message(
     id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Get a message with read status."""
     message = await get_id_db(permissions, db, id, MessageInterface)
@@ -211,7 +211,7 @@ async def list_messages(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     response: Response,
     params: MessageQuery = Depends(),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     # Explicit Query parameter for tags list - FastAPI doesn't parse List[str] from Pydantic Field
     tags: Optional[List[str]] = Query(
         None,
@@ -253,7 +253,7 @@ async def update_message(
     id: UUID | str,
     payload: MessageUpdate,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Update a message with audit logging."""
     # First verify user has access via permissions
@@ -305,7 +305,7 @@ async def update_message(
 async def delete_message(
     id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
 ):
     """Soft delete a message (preserves thread structure)."""
@@ -336,7 +336,7 @@ async def delete_message(
 async def mark_message_read(
     id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
 ):
     """Mark a message as read."""
@@ -362,7 +362,7 @@ async def mark_message_read(
 async def mark_messages_read_bulk(
     payload: MessageReadBulk,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
 ):
     """Mark many messages as read for the current user in one request.
@@ -394,7 +394,7 @@ async def mark_messages_read_bulk(
 async def mark_message_unread(
     id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
 ):
     """Mark a message as unread."""
@@ -413,7 +413,7 @@ async def mark_message_unread(
 async def get_message_thread_endpoint(
     id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Get the full conversation thread for a message.
 
@@ -431,7 +431,7 @@ async def get_message_thread_endpoint(
 async def get_message_audit(
     id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Get audit history for a message (author or admin only)."""
     # Verify user has access

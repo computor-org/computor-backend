@@ -342,11 +342,17 @@ async def upload_submission_artifact(
         with zipfile.ZipFile(file_data, 'r') as source_archive:
             members = [info for info in source_archive.infolist() if not info.is_dir()]
             if not members:
-                raise BadRequestException(detail="Archive does not contain any files")
+                raise BadRequestException(
+                    error_code="SUBMIT_014",
+                    detail="Your submission contains no files. Write your solution first, then submit again.",
+                )
 
             total_unpacked_size = sum(info.file_size for info in members)
             if total_unpacked_size == 0:
-                raise BadRequestException(detail="Archive contains only empty files")
+                raise BadRequestException(
+                    error_code="SUBMIT_014",
+                    detail="All files in your submission are empty. Write your solution first, then submit again.",
+                )
             if total_unpacked_size > MAX_UPLOAD_SIZE:
                 raise BadRequestException(
                     detail=f"Extracted content exceeds maximum allowed size of {format_bytes(MAX_UPLOAD_SIZE)}"
@@ -452,7 +458,10 @@ async def upload_submission_artifact(
                 logger.debug(f"Uploaded file to MinIO: {object_key} ({format_bytes(file_size)})")
 
             if not files_included:
-                raise BadRequestException(detail="No valid files found in archive after filtering")
+                raise BadRequestException(
+                    error_code="SUBMIT_014",
+                    detail="Your submission contains no submittable files. Write your solution in the provided files, then submit again.",
+                )
 
     except zipfile.BadZipFile as exc:
         raise BadRequestException(detail="Uploaded file is not a valid ZIP archive") from exc
@@ -491,6 +500,16 @@ async def upload_submission_artifact(
         len(files_included),
         format_bytes(total_filtered_size),
     )
+
+    if submit:
+        # A direct submit skipped the editor's test-first flow; the test must
+        # still run or the submission has no result to grade (#311, #271).
+        # Best-effort: the submission itself stands either way.
+        from computor_backend.business_logic.testing_orchestration import (
+            dispatch_submission_test,
+        )
+
+        await dispatch_submission_test(created_artifact, db)
 
     return SubmissionUploadResponseModel(
         artifacts=[created_artifact.id],

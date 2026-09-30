@@ -883,7 +883,7 @@ class CoderClient:
                 "name": "computor_auth_token",
                 "value": workspace_data.computor_auth_token,
             })
-            logger.info(f"Adding computor_auth_token to workspace (prefix: {workspace_data.computor_auth_token[:15]}...)")
+            logger.info(f"Adding computor_auth_token to workspace (prefix: {workspace_data.computor_auth_token[:12]}...)")
         else:
             logger.warning("No computor_auth_token provided for workspace creation!")
         if workspace_data.home_mode:
@@ -1466,9 +1466,11 @@ class CoderClient:
         workspace_id: str,
         template_version_id: str,
         credentials: Optional[tuple[str, str]] = None,
+        computor_auth_token: Optional[str] = None,
     ) -> bool:
         """Rebuild a workspace onto a specific template version (fleet update),
-        preserving its computor_auth_token so the extension stays authenticated.
+        preserving its computor_auth_token so the extension stays authenticated,
+        or replacing it when ``computor_auth_token`` is explicitly supplied.
 
         ``credentials`` is the owner's ``(app_secret, app_hash)`` at their
         current key version, resolved by the caller — this class has no database
@@ -1514,6 +1516,8 @@ class CoderClient:
         # credential to one that missed the push.
         if credentials:
             by_name["workspace_app_secret"], by_name["workspace_app_hash"] = credentials
+        if computor_auth_token:
+            by_name["computor_auth_token"] = computor_auth_token
 
         rich_params: list[dict] = [
             {"name": name, "value": value} for name, value in by_name.items()
@@ -1632,7 +1636,7 @@ class CoderClient:
                     ),
                 )
             if computor_auth_token:
-                logger.info(f"Workspace exists, updating with new token (prefix: {computor_auth_token[:15]}...)")
+                logger.info(f"Workspace exists, updating with new token (prefix: {computor_auth_token[:12]}...)")
                 # Replace the app credential rather than carrying the previous
                 # build's: after a rotation the carried value is the revoked
                 # one, and re-provisioning would quietly reinstate it.

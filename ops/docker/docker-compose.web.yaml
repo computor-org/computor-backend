@@ -11,6 +11,7 @@ services:
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
         - GIT_COMMIT=${GIT_COMMIT:-}
+        - NEXT_PUBLIC_LEGAL_PROFILE=${NEXT_PUBLIC_LEGAL_PROFILE:-none}
     networks:
       - computor-network
     restart: unless-stopped

@@ -274,7 +274,7 @@ class TestComputorOctave:
             if not os.path.exists(file_path):
                 pytest.fail(f"File `{main.file}` not found in student directory")
 
-            counts = run_structural_analysis(file_path, [sub.name])
+            counts = run_structural_analysis(file_path, [sub.name], root=dir_student)
             c = counts.get(sub.name, 0)
 
             check_occurrence_range(c, sub.allowedOccuranceRange, f"`{sub.name}`")

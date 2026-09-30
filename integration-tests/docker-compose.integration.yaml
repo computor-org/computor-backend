@@ -36,7 +36,7 @@ services:
   # ---- Infrastructure -----------------------------------------------------
 
   postgres:
-    image: postgres:16
+    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
     networks: [computor-it]
     ports:
       - "${IT_POSTGRES_PORT:-15432}:5432"
@@ -54,7 +54,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:alpine
+    image: redis:8.10.2-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
     networks: [computor-it]
     ports:
       - "${IT_REDIS_PORT:-16379}:6379"
@@ -68,7 +68,7 @@ services:
       retries: 10
 
   temporal-postgres:
-    image: postgres:16
+    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
     networks: [computor-it]
     environment:
       TZ: UTC
@@ -84,7 +84,7 @@ services:
       retries: 10
 
   temporal:
-    image: temporalio/auto-setup:1.27.0
+    image: temporalio/auto-setup:1.27.0@sha256:501a883b1c4a4168eb5000c368495e7eb7106dbadefc75b7fd886be0108456b9
     networks: [computor-it]
     ports:
       - "${IT_TEMPORAL_PORT:-17233}:7233"
@@ -108,7 +108,7 @@ services:
       start_period: 30s
 
   temporal-ui:
-    image: temporalio/ui:latest
+    image: temporalio/ui:2.54.1@sha256:ff0943fe532b8e33c46cd28b29e81e0ce0b6f55b9ee50a38ef1b437cc4de3fa5
     networks: [computor-it]
     ports:
       - "${IT_TEMPORAL_UI_PORT:-18088}:8080"
@@ -117,8 +117,38 @@ services:
     depends_on:
       - temporal
 
+  # One-shot, idempotent: the Chainguard MinIO image runs as uid 65532, while
+  # data written by the old minio/minio image (root) is root-owned. Chowns
+  # /data once (top level last, so an interrupted run is simply repeated) and
+  # is a no-op afterwards. Same pinned image, run as root, only for chown.
+  minio-init:
+    image: cgr.dev/chainguard/minio:latest@sha256:71674988a1c7ddd5724928633199152b11e4ddefd6c6ce2d60772ff4a8f22ca9
+    network_mode: none
+    user: "0:0"
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -eu
+        if [ "$$(stat -c %u:%g /data)" = 65532:65532 ]; then
+          echo "minio-init: /data ownership ok"
+          exit 0
+        fi
+        for p in /data/* /data/.[!.]* /data/..?*; do
+          [ -e "$$p" ] || [ -L "$$p" ] || continue
+          if ! chown -R 65532:65532 "$$p"; then
+            echo "minio-init: chown failed for $$p; /data left unmarked" >&2
+            exit 1
+          fi
+        done
+        # The parent is the "done" marker: only after every child succeeded.
+        chown 65532:65532 /data
+        echo "minio-init: /data chowned to 65532:65532"
+    volumes:
+      - minio-data:/data
+    restart: "no"
+
   minio:
-    image: minio/minio:latest
+    image: cgr.dev/chainguard/minio:latest@sha256:71674988a1c7ddd5724928633199152b11e4ddefd6c6ce2d60772ff4a8f22ca9
     networks: [computor-it]
     ports:
       - "${IT_MINIO_API_PORT:-19000}:9000"
@@ -130,6 +160,9 @@ services:
     volumes:
       - minio-data:/data
     command: server /data --console-address ":9001"
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 5s

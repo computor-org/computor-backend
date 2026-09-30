@@ -63,6 +63,14 @@ class AuthenticationClient:
         response = await self._http.post(f"/auth/admin/plugins/{quote_path(plugin_name)}/enable", params=kwargs)
         return response.json()
 
+    async def get_auth_coder_reauth(
+        self,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Coder Reauth"""
+        response = await self._http.get("/auth/coder-reauth", params=kwargs)
+        return response.json()
+
     async def auth_logout(
         self,
         **kwargs: Any,
@@ -122,6 +130,16 @@ class AuthenticationClient:
     ) -> Dict[str, Any]:
         """Verify Documents Access"""
         response = await self._http.get("/auth/verify-documents-access", params=kwargs)
+        return response.json()
+
+    async def get_auth_workspace_unavailable(
+        self,
+        owner: str,
+        workspace_name: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Workspace Unavailable"""
+        response = await self._http.get(f"/auth/workspace-unavailable/{quote_path(owner)}/{quote_path(workspace_name)}", params=kwargs)
         return response.json()
 
     async def get_auth_callback(

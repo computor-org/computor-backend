@@ -284,16 +284,18 @@ class _FakeQuery:
 class _FakeDb:
     """Answers exactly the two reads is_content_visible performs."""
 
-    def __init__(self, course_visible=None, hidden_ancestor=False):
+    def __init__(self, course_visible=None, hidden_ancestor=False, archived_at=None):
         self.course_visible = course_visible
         self.hidden_ancestor = hidden_ancestor
+        self.archived_at = archived_at
         self.queries = 0
 
     def query(self, *entities):
         self.queries += 1
-        # First read is Course.visible; second looks for a hiding ancestor.
+        # First read is the course row (visible, archived_at); second looks for
+        # a hiding ancestor.
         if self.queries == 1:
-            return _FakeQuery(scalar=self.course_visible)
+            return _FakeQuery(first=(self.course_visible, self.archived_at))
         return _FakeQuery(first="a-hidden-ancestor" if self.hidden_ancestor else None)
 
 
@@ -331,6 +333,72 @@ def test_enforce_raises_when_the_whole_course_is_hidden():
 
     with pytest.raises(BadRequestException):
         enforce_content_visible(_FakeDb(course_visible=False), _Content())
+
+
+def test_enforce_raises_submit_013_for_an_archived_course():
+    """Archived beats hidden: the student gets the archived message, not
+    "your lecturer has hidden it"."""
+    from datetime import datetime, timezone
+
+    from computor_backend.business_logic.content_visibility import (
+        enforce_content_visible,
+    )
+    from computor_backend.exceptions import BadRequestException
+
+    db = _FakeDb(archived_at=datetime.now(timezone.utc))
+    with pytest.raises(BadRequestException) as exc:
+        enforce_content_visible(db, _Content())
+    assert exc.value.error_code == "SUBMIT_013"
+    # The course row is read once; the ancestor lookup never runs.
+    assert db.queries == 1
+
+
+def test_enforce_uses_a_passed_course_row_for_the_archived_check():
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    from computor_backend.business_logic.content_visibility import (
+        enforce_content_visible,
+    )
+    from computor_backend.exceptions import BadRequestException
+
+    db = _FakeDb()
+    course = SimpleNamespace(visible=None, archived_at=datetime.now(timezone.utc))
+    with pytest.raises(BadRequestException) as exc:
+        enforce_content_visible(db, _Content(), course=course)
+    assert exc.value.error_code == "SUBMIT_013"
+    assert db.queries == 0
+
+
+def test_archived_course_is_invisible_like_visible_false():
+    """The archived veto sits at the root of the chain, so every read path —
+    not only the write guard — treats an archived course as hidden."""
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+
+    from computor_backend.business_logic.content_visibility import (
+        is_content_visible,
+        load_course_visible,
+    )
+
+    when = datetime.now(timezone.utc)
+    assert load_course_visible(_FakeDb(course_visible=True, archived_at=when), "course-1") is False
+    assert load_course_visible(_FakeDb(course_visible=None), "course-1") is None
+    assert is_content_visible(_FakeDb(archived_at=when), _Content()) is False
+    assert is_content_visible(
+        _FakeDb(), _Content(), SimpleNamespace(visible=True, archived_at=when)
+    ) is False
+
+
+def test_the_sql_predicate_vetoes_archived_courses():
+    """Paginated student lists go through the SQL predicate; archived must be
+    part of the course-level veto there too."""
+    from computor_backend.business_logic.content_visibility import (
+        effective_visible_predicate,
+    )
+
+    sql = str(effective_visible_predicate())
+    assert "archived_at IS NOT NULL" in sql
 
 
 def test_staff_are_exempt_and_the_check_is_not_even_run():

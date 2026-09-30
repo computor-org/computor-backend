@@ -7,9 +7,7 @@ running executables, and capturing stdout/stderr.
 
 import os
 import shutil
-import subprocess
 import tempfile
-import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -17,7 +15,15 @@ from typing import Any, Dict, List, Optional
 from .base import BaseExecutor, ExecutorResult, sandbox_command_prefix
 from .environment import get_safe_env, filter_env
 from .exceptions import CompilationError, ExecutionError, ExecutionTimeoutError
+from .process import run_bounded
+from .safe_io import has_symlink_component
 from .resources import make_preexec_fn
+
+
+def _is_beneath(path: str, root: str) -> bool:
+    """Lexically beneath ``root`` (no resolution: Landlock resolves later)."""
+    rel = os.path.relpath(os.path.abspath(path), os.path.abspath(root))
+    return rel != os.pardir and not rel.startswith(os.pardir + os.sep)
 
 
 @dataclass
@@ -185,17 +191,60 @@ class CompiledExecutor(BaseExecutor):
         if linker_flags:
             cmd.extend(linker_flags)
 
+        # The compiler digests student-controlled input (#include of any
+        # path, macro/template bombs), so it runs under the same sandbox as
+        # the program: working dir and build dir writable, nothing else (no
+        # reference cache, no network). Sources and -I dirs inside the working
+        # dir need no grant; one outside it (a harness-provided test driver) is
+        # granted individually, and only if no component of it is a symlink —
+        # Landlock follows symlinks when a rule is created, so a symlinked
+        # path would grant an otherwise excluded target.
+        include_dirs = [f[2:] for f in actual_flags
+                        if f.startswith("-I") and len(f) > 2]
+        extra_ro = []
+        for path in resolved + include_dirs:
+            if _is_beneath(path, self.working_dir):
+                continue
+            if has_symlink_component(path):
+                self.last_compilation = CompilationResult(
+                    success=False,
+                    stderr=f"Refusing symlinked build input outside the "
+                           f"working directory: {path}",
+                    return_code=-1,
+                )
+                return self.last_compilation
+            extra_ro.append(path)
+        prefix = sandbox_command_prefix(
+            self.working_dir,
+            rw_paths=[self.temp_dir],
+            ro_paths=extra_ro,
+        )
+        env = None
+        if prefix:
+            env = self._get_env()
+            env["TMPDIR"] = self.temp_dir  # compiler scratch files
+        cmd = prefix + cmd
+
         # Run compilation
-        start_time = time.perf_counter()
         try:
-            result = subprocess.run(
+            # The compiler digests untrusted source (template/macro bombs), so
+            # it runs as a bounded job like the program itself.
+            result = run_bounded(
                 cmd,
                 cwd=self.working_dir,
-                capture_output=True,
-                text=True,
+                env=env,
                 timeout=self.compile_timeout,
+                preexec_fn=make_preexec_fn(self.resource_limits),
             )
-            duration = time.perf_counter() - start_time
+            duration = result.duration
+            if result.timed_out:
+                self.last_compilation = CompilationResult(
+                    success=False,
+                    stderr=f"Compilation timed out after {self.compile_timeout}s",
+                    return_code=-1,
+                    duration=duration,
+                )
+                return self.last_compilation
 
             warnings, errors = self._parse_compiler_output(result.stderr)
 
@@ -208,15 +257,6 @@ class CompiledExecutor(BaseExecutor):
                 duration=duration,
                 warnings=warnings,
                 errors=errors,
-            )
-
-        except subprocess.TimeoutExpired:
-            duration = time.perf_counter() - start_time
-            self.last_compilation = CompilationResult(
-                success=False,
-                stderr=f"Compilation timed out after {self.compile_timeout}s",
-                return_code=-1,
-                duration=duration,
             )
 
         except FileNotFoundError:
@@ -259,47 +299,45 @@ class CompiledExecutor(BaseExecutor):
 
         # Sandbox the student binary when the worker enables it: its own
         # working dir stays read/write, the reference cache is bound nowhere.
-        cmd = sandbox_command_prefix(self.working_dir) + [self.executable_path]
+        # The binary lives in the private build dir: readable/executable, not
+        # writable, and the only extra path bound besides the working dir.
+        cmd = sandbox_command_prefix(
+            self.working_dir, ro_paths=[self.temp_dir]
+        ) + [self.executable_path]
         if args:
             cmd.extend(args)
 
         env = self._get_env()
         actual_timeout = timeout or self.timeout
-        preexec_fn = make_preexec_fn(self.resource_limits) if self.resource_limits else None
+        preexec_fn = make_preexec_fn(self.resource_limits)
 
-        start_time = time.perf_counter()
         try:
-            result = subprocess.run(
+            # Own process group, whole tree killed at the end, output capped.
+            result = run_bounded(
                 cmd,
                 cwd=self.working_dir,
-                input=stdin,
-                capture_output=True,
-                text=True,
-                timeout=actual_timeout,
                 env=env,
+                input=stdin,
+                timeout=actual_timeout,
                 preexec_fn=preexec_fn,
             )
-            duration = time.perf_counter() - start_time
-
+            if result.timed_out:
+                return ExecutorResult(
+                    success=False,
+                    stdout=result.stdout,
+                    stderr=result.stderr,
+                    duration=result.duration,
+                    return_code=-1,
+                    timed_out=True,
+                    error_message=f"Execution timed out after {actual_timeout}s",
+                    error_type="TimeoutError",
+                )
             return ExecutorResult(
                 success=True,  # Process completed (may have non-zero exit)
                 stdout=result.stdout,
                 stderr=result.stderr,
-                duration=duration,
+                duration=result.duration,
                 return_code=result.returncode,
-            )
-
-        except subprocess.TimeoutExpired as e:
-            duration = time.perf_counter() - start_time
-            return ExecutorResult(
-                success=False,
-                stdout=e.stdout.decode() if e.stdout else "",
-                stderr=e.stderr.decode() if e.stderr else "",
-                duration=duration,
-                return_code=-1,
-                timed_out=True,
-                error_message=f"Execution timed out after {actual_timeout}s",
-                error_type="TimeoutError",
             )
 
         except Exception as e:

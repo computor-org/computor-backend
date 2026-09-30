@@ -94,8 +94,12 @@ def enroll_course_creator_as_owner(
     return member
 
 
-def invalidate_creator_caches(user_id: str) -> None:
-    """Drop the user-keyed caches that would hide the fresh membership.
+def invalidate_user_membership_caches(user_id: str) -> None:
+    """Drop the user-keyed caches that answer "what courses is this user in".
+
+    Used after any change to a user's course memberships that happens outside
+    the CourseMember CRUD path: the creator's self-enrolment as ``_owner``, and
+    every member of a course that was just deleted.
 
     Two caches answer "what courses is this user in": the course-membership
     permission cache and the role-aware view cache. Both are keyed by user, so
@@ -119,7 +123,11 @@ def invalidate_creator_caches(user_id: str) -> None:
         get_cache().invalidate_user_views(user_id=user_id)
     except Exception:
         logger.warning(
-            "Cache invalidation after owner enrolment failed for user %s",
+            "Membership cache invalidation failed for user %s",
             user_id,
             exc_info=True,
         )
+
+
+# Original name, kept for the creator-enrolment callers.
+invalidate_creator_caches = invalidate_user_membership_caches

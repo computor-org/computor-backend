@@ -44,7 +44,7 @@ async def connect_user(
     user_id: str,
     payload: UserConnectRequest,
     principal: Annotated[Principal, Depends(get_current_principal)],
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ) -> UserConnectResponse:
     """Absorb a pre-provisioned user into this user (admin or _user_manager).
 

@@ -13,6 +13,7 @@ import datetime
 import json
 import hashlib
 import binascii
+import time
 from typing import Annotated, Optional, List
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -53,6 +54,23 @@ SSO_SESSION_TTL = 3600  # 1 hour for SSO sessions
 # the flag the principal cache is gone too, so the next request is a cache miss
 # and the DB gate takes over.
 BANNED_FLAG_PREFIX = "user:banned:"
+
+# Per-user staleness stamp (#384). The principal cache is keyed by the *raw
+# token*, so when someone ELSE changes a user's permissions (course-member role
+# update, user-role grant, org/family membership) there is no way to delete the
+# affected entries. Instead the mutation stamps ``principal:stale:<user_id>``
+# with the current epoch time; the cache-HIT path compares it against
+# ``Principal.built_at`` and rebuilds from the DB when the stamp is newer.
+# Written by permissions/principal_invalidation.py on post-commit.
+PRINCIPAL_STALE_PREFIX = "principal:stale:"
+# Any principal built before the stamp either fails the comparison while the
+# stamp lives or has itself expired (AUTH_CACHE_TTL) before the stamp does.
+PRINCIPAL_STALE_TTL = AUTH_CACHE_TTL + 60
+
+
+def principal_stale_key(user_id: str) -> str:
+    """Redis key for a user's permissions-changed stamp."""
+    return f"{PRINCIPAL_STALE_PREFIX}{user_id}"
 
 
 async def mark_user_banned(user_id: str) -> None:
@@ -103,16 +121,20 @@ async def _get_cached_principal(
     Returns the Principal on a cache hit for a live credential, or ``None`` on a
     cache miss or a deserialization/Redis error (fail-open to the DB path).
 
-    Two gates run here because neither the DB nor the token cache is consulted on
-    a cache hit:
+    Three gates run here because neither the DB nor the token cache is consulted
+    on a cache hit:
     - ``ForbiddenException`` when the cached user has been banned (the DB ban
       gate in ``PrincipalBuilder.build`` never runs on a hit);
+    - a treated-as-miss ``None`` when the user's permissions changed after this
+      Principal was built (per-user stale stamp, #384) — the caller rebuilds
+      from the DB;
     - ``UnauthorizedException`` when ``token_hash_hex`` names a revoked API token
       (the ``revoked_at IS NULL`` filter in ``authenticate_api_token`` likewise
       never runs).
 
-    Without them a ban or a revocation would only take effect after
-    ``AUTH_CACHE_TTL``.
+    Without them a ban, a role change, or a revocation would only take effect
+    after ``AUTH_CACHE_TTL``. The ban flag and the stale stamp share one MGET so
+    the hit path still costs a single extra Redis round trip.
     """
     from computor_backend.permissions.api_token_cache import is_token_revoked
 
@@ -122,11 +144,22 @@ async def _get_cached_principal(
         if cached_data:
             logger.debug(f"Principal cache hit for {cache_key[:16]}...")
             principal = Principal.model_validate(json.loads(cached_data), from_attributes=True)
-            if await is_user_banned_cached(principal.user_id):
+            banned_flag, stale_stamp = await cache.mget(
+                f"{BANNED_FLAG_PREFIX}{principal.user_id}",
+                principal_stale_key(principal.user_id),
+            )
+            if banned_flag:
                 raise ForbiddenException(
                     error_code="AUTHZ_002",
                     detail="User account is banned",
                 )
+            if stale_stamp is not None:
+                if principal.built_at is None or principal.built_at <= float(stale_stamp):
+                    logger.debug(
+                        f"Cached Principal for user {principal.user_id} predates a "
+                        "permissions change; rebuilding"
+                    )
+                    return None
             if token_hash_hex and await is_token_revoked(token_hash_hex):
                 logger.info("Rejected cached Principal for a revoked API token")
                 raise UnauthorizedException(
@@ -335,6 +368,11 @@ class PrincipalBuilder:
     def build(auth_result: AuthenticationResult, db: Session) -> Principal:
         """Build a Principal from authentication result"""
 
+        # Captured BEFORE the claim queries: a permissions change committed
+        # while we read must stamp a time >= built_at so the stale check
+        # (_get_cached_principal) discards this snapshot rather than miss it.
+        built_at = time.time()
+
         # Get user claims from database
         claim_values = db_get_claims(auth_result.user_id, db)
 
@@ -384,6 +422,7 @@ class PrincipalBuilder:
             roles=auth_result.role_ids,
             claims=claims,
             is_service=is_service,
+            built_at=built_at,
         )
     
     @staticmethod

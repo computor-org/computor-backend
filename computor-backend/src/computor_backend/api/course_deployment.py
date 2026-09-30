@@ -38,7 +38,7 @@ async def deploy_course(
     request: CourseDeployRequest,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     http_request: Request,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     """Validate (and optionally apply) a single-course deployment under a family.
 

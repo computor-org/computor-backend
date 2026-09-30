@@ -10,7 +10,7 @@ services:
   # `socket-proxy`, so dev and prod are wired identically and the ingress never
   # needs the raw socket.
   coder-socket-proxy:
-    image: tecnativa/docker-socket-proxy:0.3.0
+    image: tecnativa/docker-socket-proxy:0.3.0@sha256:9e4b9e7517a6b660f2cc903a19b257b1852d5b3344794e3ea334ff00ae677ac2
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-socket-proxy
     networks:
       - computor-network
@@ -45,7 +45,7 @@ services:
   # to the public domain, and the public domain never has to resolve inside
   # a workspace.
   workspace-ingress:
-    image: traefik:v3.6.6
+    image: traefik:v3.7.13@sha256:24841fe2de7304c149343d877d2923b4c8800a38ba015dea9174c23b20e344a0
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}workspace-ingress
     restart: unless-stopped
     security_opt:
@@ -95,7 +95,7 @@ services:
 
   # Dedicated PostgreSQL database for Coder (separate from main DB)
   coder-postgres:
-    image: postgres:16
+    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
     networks:
       - computor-network
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-postgres
@@ -127,7 +127,10 @@ services:
 
   # Coder server (internal only - not exposed via Traefik)
   coder:
-    image: ghcr.io/coder/coder:latest
+    # Pinned by version + digest: >= 2.36.4 is required (GHSA-vx42-ghc9-gw65).
+    # Keep in lockstep with CODER_VERSION in docker/coder-runtime/Dockerfile.
+    # Never downgrade: Coder DB migrations are forward-only.
+    image: ghcr.io/coder/coder:v2.37.3@sha256:a48f82c2c437e032ce3f6970b4e937a7900cad3c76956956955099465b45e542
     # Also on BOTH isolated workspace networks so workspace agents can reach
     # coder:7080 (CODER_ACCESS_URL) without workspaces touching
     # computor-network. The offline one is not optional: an agent that cannot
@@ -187,7 +190,7 @@ services:
   # for both pushes (from temporal-worker-coder) and pulls (from terraform
   # at workspace creation), since both go through the docker socket.
   coder-registry:
-    image: registry:2
+    image: registry:2.8.3@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-registry
     restart: unless-stopped
     security_opt:
@@ -255,15 +258,29 @@ services:
       # container — and a rollout fails on connection refused. It fails only
       # once a workspace exists, because the lookup is skipped when the
       # template has no workspaces to roll.
+      #
+      # NOT the app owner: a restricted login role (SELECT on user.id and
+      # user.workspace_app_key_version only, read-only transactions), created
+      # by computor_backend/scripts/ensure_coder_worker_db_role.py at API
+      # startup. computor.sh generates CODER_WORKER_DB_PASSWORD when missing.
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5437
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${CODER_WORKER_DB_USER:-computor_coder_worker}
+      POSTGRES_PASSWORD: ${CODER_WORKER_DB_PASSWORD:?must be set in .env (computor.sh generates it)}
       POSTGRES_DB: ${POSTGRES_DB}
-      # The app secret is derived from this plus the user id. Missing, the
-      # derivation raises, the rollout carries the previous credential forward
-      # and the rotation silently does not happen.
+      # Still required: the workspace app secret is HMAC(TOKEN_SECRET, user id
+      # [:key version]) (coder/service.py). The rollout re-derives the owner's
+      # CURRENT credential so a workspace that missed a rotation push, or was
+      # built before app auth existed, is healed; missing, the derivation
+      # raises and the rollout silently carries the previous credential
+      # forward. TOKEN_SECRET also encrypts stored git tokens at rest; the role
+      # above cannot read those ciphertexts, so here it only yields workspace
+      # app secrets, which this worker's Coder admin login can read anyway.
       TOKEN_SECRET: ${TOKEN_SECRET:?must be set in .env}
+      # Public deployments: push/rollout verify the workspace slice's real
+      # memory/cpu/pids limits through this worker's docker socket first.
+      COMPUTOR_PUBLIC_DEPLOYMENT: ${COMPUTOR_PUBLIC_DEPLOYMENT:-false}
+      CODER_WORKSPACE_CGROUP_PARENT: ${CODER_WORKSPACE_CGROUP_PARENT:-}
       DEBUG_MODE: ${DEBUG_MODE:-development}
       BACKEND_EXTERNAL_URL: ${BACKEND_EXTERNAL_URL:-http://host.docker.internal:8000}
       DEV_FORWARD_PORTS: ${DEV_FORWARD_PORTS:-}
