@@ -52,7 +52,7 @@ services:
 
   # PostgreSQL with multiple databases support
   postgres:
-    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
+    image: postgres:18.4@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
@@ -119,7 +119,7 @@ services:
 
   # Temporal PostgreSQL database
   temporal-postgres:
-    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
+    image: postgres:18.4@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
     security_opt:
       - "no-new-privileges:true"
     logging:
@@ -149,7 +149,7 @@ services:
 
   # Temporal server
   temporal:
-    image: temporalio/auto-setup:1.27.0@sha256:501a883b1c4a4168eb5000c368495e7eb7106dbadefc75b7fd886be0108456b9
+    image: temporalio/auto-setup:1.29.3@sha256:9be7b8d98f60d00f4f2ff74731c071a17848d8182bbc8429e314a24c94ea105b
     security_opt:
       - "no-new-privileges:true"
     logging:

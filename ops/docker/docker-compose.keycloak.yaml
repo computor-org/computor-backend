@@ -17,7 +17,7 @@
 
 services:
   keycloak-db:
-    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
+    image: postgres:18.4@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
     networks:
       - computor-network
     container_name: computor-keycloak-db
