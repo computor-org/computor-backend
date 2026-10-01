@@ -38,6 +38,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_public_luna_log_privacy.py
           computor-backend/src/computor_backend/tests/test_public_luna_queue.py
           computor-backend/src/computor_backend/tests/test_password_hashing.py
+          computor-backend/src/computor_backend/tests/test_public_luna_http_status.py
           computor-backend/src/computor_backend/tests/test_route_shadowing.py
           computor-backend/src/computor_backend/tests/test_sso_redirect_allowlist.py
           computor-backend/src/computor_backend/tests/test_update_keycloak_guard.py
