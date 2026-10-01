@@ -29,6 +29,7 @@ from computor_backend.model.course import (
     CourseFamily,
     CourseGroup,
     CourseMember,
+    CourseRole,
 )
 from computor_backend.model.organization import Organization
 from computor_backend.permissions.auth import get_current_principal
@@ -60,6 +61,9 @@ def world():
     db = sessionmaker(bind=connection)()
     suffix = uuid.uuid4().hex[:10]
     try:
+        if db.get(CourseRole, "_student") is None:
+            db.add(CourseRole(id="_student", title="Student", builtin=True))
+            db.flush()
         org = Organization(
             title="Luna Test",
             organization_type="organization",
