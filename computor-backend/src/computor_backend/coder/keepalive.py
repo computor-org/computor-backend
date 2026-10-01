@@ -66,6 +66,11 @@ async def _extend(owner: str, workspace_name: str, extend_ms: int) -> None:
     key = (owner, workspace_name)
     try:
         client = get_coder_client()
+        # ForwardAuth traffic bypasses Coder's own login/last-seen tracking.
+        # Its dormancy sweep may disconnect a running workspace's agent;
+        # restore only dormant owners during this already-throttled activity
+        # signal. Suspended accounts remain suspended.
+        await client.ensure_user_active(owner)
         workspace_id = _workspace_ids.get(key)
         if workspace_id is None:
             details = await client.get_workspace(owner, workspace_name)

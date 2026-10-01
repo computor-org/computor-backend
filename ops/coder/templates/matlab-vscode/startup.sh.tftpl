@@ -274,6 +274,7 @@ CODE_SERVER_AUTH=none
 
 code-server \
   --auth "$CODE_SERVER_AUTH" \
+  --disable-workspace-trust \
   --bind-addr 0.0.0.0:${code_server_port} \
   --abs-proxy-base-path "${coder_base_path}/${owner_name}/${workspace_name}" \
   --extensions-dir /opt/code-server/extensions \

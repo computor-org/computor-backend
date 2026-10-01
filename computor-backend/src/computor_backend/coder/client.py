@@ -489,10 +489,79 @@ class CoderClient:
         """
         try:
             user = await self._find_user_by_email(user_data.email)
+            if user.status == "dormant":
+                user = await self.activate_dormant_user(user)
             return user, False
         except CoderUserNotFoundError:
             user = await self.create_user(user_data)
             return user, True
+
+    async def activate_dormant_user(self, user: CoderUser) -> CoderUser:
+        """Restore a ForwardAuth user's Coder access without lifting suspensions.
+
+        Coder marks accounts dormant when they never log in to Coder itself.
+        Computor authenticates users at its own ForwardAuth endpoint instead.
+        """
+        if user.status != "dormant":
+            return user
+        resp = await self._request(
+            "PUT",
+            f"/api/v2/users/{user.id}/status/activate",
+            admin_headers=True,
+            ok=(200,),
+        )
+        # Coder's sweeper uses last_seen_at, which activation alone leaves at
+        # year 1 for ForwardAuth-only users. Use a one-minute key once as this
+        # user: Coder's own auth middleware records last_seen_at on first use.
+        # Revoke it even when the touch fails; the token is never persisted.
+        await self._mark_user_seen(user.id)
+        return CoderUser.from_api(resp.json())
+
+    async def _mark_user_seen(self, user_id: str) -> None:
+        issued = await self._request(
+            "POST",
+            f"/api/v2/users/{user_id}/keys/tokens",
+            json={
+                # Coder's Go time.Duration JSON field is nanoseconds.
+                "lifetime": 60_000_000_000,
+                "scope": "all",
+                "token_name": f"computor-last-seen-{secrets.token_hex(6)}",
+            },
+            admin_headers=True,
+            ok=(201,),
+        )
+        token = issued.json()["key"]
+        key_id, separator, _ = token.partition("-")
+        if not separator or not key_id:
+            raise CoderAPIError("Coder returned an invalid one-time key")
+        try:
+            # Isolate this user's one-use credential from the shared admin
+            # client's cookie jar and any environment proxy settings.
+            async with self._one_time_user_client() as user_client:
+                seen = await user_client.get(
+                    "/api/v2/users/me",
+                    headers={"Coder-Session-Token": token},
+                )
+            if seen.status_code != 200 or seen.json().get("id") != user_id:
+                raise CoderAPIError("Coder did not confirm the workspace owner's activity")
+        finally:
+            await self._request(
+                "DELETE",
+                f"/api/v2/users/{user_id}/keys/{key_id}",
+                admin_headers=True,
+                ok=(204,),
+            )
+
+    def _one_time_user_client(self) -> httpx.AsyncClient:
+        return httpx.AsyncClient(
+            base_url=self.settings.url,
+            timeout=httpx.Timeout(self.settings.timeout),
+            trust_env=False,
+        )
+
+    async def ensure_user_active(self, username: str) -> CoderUser:
+        """Reactivate a dormant workspace owner, preserving suspended status."""
+        return await self.activate_dormant_user(await self.get_user(username))
 
     async def delete_user(self, username: str) -> bool:
         """
