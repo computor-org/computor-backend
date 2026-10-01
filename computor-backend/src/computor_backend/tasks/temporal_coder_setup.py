@@ -852,7 +852,10 @@ class BuildWorkspaceImagesWorkflow(BaseWorkflow):
 
     @classmethod
     def get_execution_timeout(cls) -> timedelta:
-        return timedelta(minutes=30)
+        # Six shipped images build serially; two 60-minute attempts each can
+        # already take 12 hours. Leave room for queueing and discovery while
+        # retaining the per-attempt timeout and heartbeat for stalled builds.
+        return timedelta(hours=16)
 
     def __init__(self) -> None:
         self._progress: Dict[str, Any] = {
@@ -978,7 +981,11 @@ class PushCoderTemplatesWorkflow(BaseWorkflow):
 
     @classmethod
     def get_execution_timeout(cls) -> timedelta:
-        return timedelta(minutes=30)
+        # Six shipped templates run serially. A cold build can use two 60-minute
+        # attempts, followed by two 10-minute push and rollout attempts; that
+        # is already over 16 hours before cleanup or queue delays. Activity
+        # heartbeats and per-attempt deadlines still detect stuck work.
+        return timedelta(hours=24)
 
     def __init__(self) -> None:
         self._progress: Dict[str, Any] = {

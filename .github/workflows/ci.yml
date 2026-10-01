@@ -30,6 +30,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_coder_image_cleanup.py
           computor-backend/src/computor_backend/tests/test_coder_source_repo_pinning.py
           computor-backend/src/computor_backend/tests/test_coder_workspace_image_pinning.py
+          computor-backend/src/computor_backend/tests/test_coder_template_push_deadline.py
           computor-backend/src/computor_backend/tests/test_db_dependency_lifecycle.py
           computor-backend/src/computor_backend/tests/test_keycloak_healthcheck.py
           computor-backend/src/computor_backend/tests/test_keycloak_idp_setup_retry.py
