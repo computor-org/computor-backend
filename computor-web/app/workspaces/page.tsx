@@ -21,6 +21,7 @@ import EmptyState from '@/src/components/EmptyState';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Button from '@/src/components/ui/Button';
+import LearningOptions from '@/src/components/courses/LearningOptions';
 import {
   openLaunchTab,
   workspaceCreatingUrl,
@@ -33,6 +34,7 @@ const coderClient = new CoderClient();
 export default function WorkspacesPage() {
   const router = useRouter();
   const notify = useNotify();
+  const [creationFailed, setCreationFailed] = useState(false);
   const { isWorkspaceMaintainer } = usePermissions();
 
   // Workspace list with silent background polling (pauses on hidden tabs).
@@ -115,6 +117,7 @@ export default function WorkspacesPage() {
    * card claims to be about.
    */
   const handleCreate = async (templateName: string) => {
+    setCreationFailed(false);
     // Still inside the click — see workspaceCreatingUrl.
     const tab = window.open(workspaceCreatingUrl, '_blank');
     setCreating(templateName);
@@ -132,6 +135,7 @@ export default function WorkspacesPage() {
       }
       refresh();
     } catch (err) {
+      setCreationFailed(true);
       tab?.close();
       notify(err instanceof Error ? err.message : 'Failed to create workspace', 'error');
     } finally {
@@ -172,6 +176,7 @@ export default function WorkspacesPage() {
         />
 
         <ErrorBanner>{error}</ErrorBanner>
+        {creationFailed && <LearningOptions capacity />}
 
         {/* Compact status strip */}
         <div className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">

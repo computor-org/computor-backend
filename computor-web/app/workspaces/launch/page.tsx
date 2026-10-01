@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Button from '@/src/components/ui/Button';
 import Spinner from '@/src/components/ui/Spinner';
+import LearningOptions from '@/src/components/courses/LearningOptions';
 import { categorizeStatus } from '@/src/components/workspaces/WorkspaceStatusBadge';
 import { workspaceStage } from '@/src/components/workspaces/workspaceStage';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -182,6 +183,7 @@ function LaunchWorkspace() {
     <div className="max-w-md w-full text-center space-y-4">
       <h1 className="text-xl font-semibold text-fg">Could not open the workspace</h1>
       <p className="text-muted">{errorMessage}</p>
+      <LearningOptions capacity />
       <div className="flex items-center justify-center gap-3 pt-2">
         {hasTarget && <Button onClick={() => window.location.reload()}>Retry</Button>}
         <Link href="/workspaces" className="text-sm text-accent-text hover:underline">

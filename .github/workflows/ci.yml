@@ -43,6 +43,38 @@ jobs:
           computor-backend/src/computor_backend/tests/test_harness_bounds.py
           computor-backend/src/computor_backend/tests/test_compose_testing_bounds.py
 
+  public-course-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: computor_plan
+          POSTGRES_PASSWORD: synthetic-test-password
+          POSTGRES_DB: computor_plan_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U computor_plan -d computor_plan_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: computor_plan
+      POSTGRES_PASSWORD: synthetic-test-password
+      POSTGRES_DB: computor_plan_test
+      CODER_ADMIN_EMAIL: ci@example.invalid
+      CODER_ADMIN_PASSWORD: synthetic-test-password
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+      - run: uv sync --project computor-backend --python 3.12 --locked --extra dev
+      - run: uv run --project computor-backend python -m computor_backend.tests.bootstrap_public_catalog_db
+      - run: >-
+          uv run --project computor-backend pytest -q
+          computor-backend/src/computor_backend/tests/test_public_learning.py
+          computor-backend/src/computor_backend/tests/test_public_catalog_anonymous.py
+          computor-backend/src/computor_backend/tests/test_course_public_flag_authz.py
+
   grading-isolation:
     # Hostile-snippet tests for grading jobs (#237). Sandbox-dependent cases
     # skip themselves when the runner kernel lacks Landlock ABI >= 6; limits,

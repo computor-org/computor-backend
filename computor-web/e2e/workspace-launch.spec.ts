@@ -196,6 +196,9 @@ test('reports failure once our own start build is the one that failed', async ({
   body = details({ status: 'failed' });
 
   await expect(page.getByText('The workspace failed to start.')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('link', { name: 'Desktop VS Code', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'GitHub Codespaces', exact: true }))
+    .toHaveAttribute('href', /^https:\/\/codespaces.new\/computor-org\/data-science-python/);
   expect(page.url()).toContain('/workspaces/launch');
 });
 

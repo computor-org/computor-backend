@@ -4,6 +4,11 @@ A university programming course management platform with automated GitLab integr
 
 ## Packages
 
+Read the public Python examples without an account, then practice in desktop VS
+Code or your own GitHub Codespace. Hosted workspaces remain optional and server
+execution remains authenticated. See [Public learning](docs/public-learning.md)
+for the course, workspace, and Luna paths.
+
 | Package | Description |
 |---------|-------------|
 | `computor-types` | Pydantic DTOs - shared data structures for API contracts |
