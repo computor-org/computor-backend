@@ -3,7 +3,6 @@ import json
 import logging
 
 import pytest
-
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -82,5 +81,3 @@ def test_luna_access_logs_keep_status_without_text(target):
     assert "private-learner-text" not in record.getMessage()
     assert 'GET /public-luna/[REDACTED] HTTP/1.1' in record.getMessage()
     assert record.args[-1] == 302
-
-
