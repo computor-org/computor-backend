@@ -159,6 +159,29 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
         ServiceUnavailableException,
     )
 
+    # Public Luna uses these two ordinary HTTP statuses for admission control
+    # and oversized requests. The generic fallback below translates unknown
+    # statuses into 500, so preserve them here without logging learner text.
+    if is_public_luna_scope(request.scope) and exc.status_code in (413, 429):
+        messages = {
+            413: {"Luna request is too large"},
+            429: {
+                "A Luna request is already pending",
+                "Luna is busy; try again later",
+                "Luna request limit reached",
+            },
+        }
+        message = (
+            exc.detail if isinstance(exc.detail, str) and exc.detail in messages[exc.status_code]
+            else "Luna request rejected"
+        )
+        logger.warning("Public Luna request rejected", extra={"status_code": exc.status_code})
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"message": message},
+            headers=exc.headers,
+        )
+
     # Map status codes to exception types
     exception_map = {
         status.HTTP_400_BAD_REQUEST: BadRequestException,
