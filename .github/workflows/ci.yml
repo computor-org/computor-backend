@@ -27,6 +27,7 @@ jobs:
           uv run --project computor-backend --python 3.12 pytest -q
           computor-backend/src/computor_backend/tests/test_canonical_zip_hash.py
           computor-backend/src/computor_backend/tests/test_coder_forwardauth.py
+          computor-backend/src/computor_backend/tests/test_coder_provision_errors.py
           computor-backend/src/computor_backend/tests/test_coder_image_cleanup.py
           computor-backend/src/computor_backend/tests/test_coder_source_repo_pinning.py
           computor-backend/src/computor_backend/tests/test_coder_workspace_image_pinning.py
