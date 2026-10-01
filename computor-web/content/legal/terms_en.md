@@ -1,6 +1,6 @@
 # Terms of Use computor.at
 
-Version 1.0, gültig ab 30.09.2026 (effective 30 September 2026)
+Version 1.1, effective on publication of public Luna
 
 This is a translation. The German version (Nutzungsbedingungen) is
 authoritative.
@@ -56,7 +56,8 @@ using your account, please report it immediately to security@computor.at.
 
 3.1 We provide free of charge: courses and exercises, a programming
 environment in the browser (“workspace”), automatic testing of your
-submissions, Git repositories for your submissions, and a chat.
+submissions, Git repositories for your submissions, a chat, and Luna tutoring
+subject to capacity limits.
 
 3.2 We operate the platform with the care customary for a university learning
 service. Where possible, we announce maintenance on the platform in advance.
@@ -77,6 +78,11 @@ or downloading it.
 certificate or a confirmation of competence. If a university course uses
 results for an assessment, the responsible teacher decides under the
 applicable regulations.
+
+3.6 When you ask Luna, your question and relevant submitted work are processed
+on TU Graz-operated inference servers to generate a learning aid. Luna can be
+wrong; its answer is not an official assessment. Processing and storage are
+explained in the [Privacy notice](/privacy).
 
 ## 4. Changes to and discontinuation of services
 

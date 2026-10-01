@@ -1,6 +1,6 @@
 # Nutzungsbedingungen computor.at
 
-Version 1.0, gültig ab 30.09.2026
+Version 1.1, gültig ab Veröffentlichung von Luna für die Öffentlichkeit
 
 ## Das Wichtigste in Kürze
 
@@ -53,7 +53,8 @@ anderer Ihr Konto nutzt, melden Sie das bitte umgehend an security@computor.at.
 
 3.1 Wir stellen unentgeltlich bereit: Kurse und Übungsaufgaben, eine
 Programmierumgebung im Browser („Workspace“), die automatische Prüfung Ihrer
-Abgaben, Git-Repositories für Ihre Abgaben und einen Chat.
+Abgaben, Git-Repositories für Ihre Abgaben, einen Chat und die Lernhilfe Luna
+im Rahmen der verfügbaren Kapazität.
 
 3.2 Wir betreiben die Plattform mit der Sorgfalt, die für ein universitäres
 Lernangebot üblich ist. Wartungsarbeiten kündigen wir, soweit möglich, vorher
@@ -76,6 +77,11 @@ Arbeit selbst, indem Sie sie über Git abgeben oder herunterladen.
 kein Zeugnis und keine Bestätigung von Kenntnissen. Zieht eine
 Lehrveranstaltung Ergebnisse für eine Beurteilung heran, entscheidet die
 jeweilige Lehrperson nach den dafür geltenden Vorschriften.
+
+3.6 Wenn Sie Luna fragen, werden Ihre Frage und die betreffende abgegebene
+Arbeit auf Inferenzservern der TU Graz verarbeitet, um eine Lernhilfe zu
+erzeugen. Luna kann sich irren; ihre Antwort ist keine offizielle Beurteilung.
+Die Verarbeitung und Speicherung erläutert die [Datenschutzerklärung](/privacy).
 
 ## 4. Änderung und Einstellung von Leistungen
 

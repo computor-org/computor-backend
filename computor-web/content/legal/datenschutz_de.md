@@ -1,6 +1,6 @@
 # Datenschutzerklärung computor.at
 
-Version 1.0, gültig ab 30.09.2026
+Version 1.1, gültig ab Veröffentlichung von Luna für die Öffentlichkeit
 
 In dieser Datenschutzerklärung informieren wir Sie über die Verarbeitung
 personenbezogener Daten auf der Lernplattform computor.at und im Chat
@@ -15,11 +15,11 @@ Bestimmungen zum Datenschutz und zur Datensicherheit, insbesondere nach dem
 
 - Wir verarbeiten nur, was wir brauchen, um Ihnen Konto, Kurse,
   Arbeitsumgebung, automatische Tests und Chat bereitzustellen.
-- Keine Werbung, kein Tracking, keine Analyse-Werkzeuge, keine Einbindung von
-  Diensten Dritter in die Webseiten, kein Verkauf von Daten, keine Auswertung
-  Ihrer Daten durch KI-Dienste.
+- Keine Werbung, kein Tracking, keine Analyse-Werkzeuge und keine KI-Dienste
+  Dritter. Luna verarbeitet nur die Fragen und Arbeiten, die Sie an Luna senden,
+  auf Servern der TU Graz.
 - Nur technisch notwendige Cookies, daher kein Cookie-Banner.
-- Die Server stehen in Deutschland (Hetzner, Nürnberg und Falkenstein).
+- Die Plattformserver stehen in Deutschland, die Luna-Inferenzserver in Österreich.
 - Die Anmeldung erfolgt über GitHub. Wir erhalten dabei nur Ihre
   GitHub-Kennung, Ihren Benutzernamen, Ihren Namen und Ihre bestätigte
   E-Mail-Adresse.
@@ -182,6 +182,24 @@ anwendbar.
 Speicherdauer: bis zur Erledigung, danach höchstens drei Jahre zur
 Nachvollziehbarkeit und zur Abwehr von Ansprüchen.
 
+### 4.8 Lernhilfe Luna
+
+Wenn Sie Luna um Hilfe bitten, übermitteln wir Ihre Frage, die betreffende
+Übung sowie den dafür abgegebenen Code oder die abgegebenen Abbildungen an
+einen von der TU Graz betriebenen Modellserver in Österreich. Lunas Antwort
+erscheint in Ihrer Kursunterhaltung. Zweck ist die Lernhilfe und das Feedback
+auf Grundlage von Art. 6 Abs. 1 lit. e DSGVO iVm §§ 2 und 3 UG. Lunas
+Antworten können falsch sein und sind keine Beurteilung.
+
+Der Inferenzserver protokolliert weder Fragen, Code, Abbildungen noch
+Antworten und verwendet diese nicht zum Training eines Modells. Ein
+separater, größenbegrenzter Zwischenspeicher im Arbeitsspeicher und auf lokaler
+Festplatte beschleunigt Anfragen. Einträge werden bei Erreichen der
+Speichergrenze oder bei Wartung entfernt; für einen einzelnen Eintrag gibt es
+keine feste Löschfrist. Betriebsdaten enthalten Umfang, Dauer und Status
+einer Anfrage, aber keine Inhalte. Abgaben und Kursnachrichten bleiben auf
+der Plattform für die in Abschnitt 8 genannten Fristen gespeichert.
+
 ## 5. Wer Ihre Daten sieht
 
 - **Lehrende und Tutor*innen Ihres Kurses** sehen Ihren Namen, Ihren
@@ -196,11 +214,10 @@ Nachvollziehbarkeit und zur Abwehr von Ansprüchen.
 
 ## 6. Empfänger und Auftragsverarbeiter
 
-Alle Dienste der Plattform (Anmeldung mit Keycloak, Git-Server Forgejo,
-Datenbank, Dateispeicher, Testsystem, Workspaces mit Coder, Chat mit Zulip)
-betreiben wir selbst. Schriftarten werden von unseren eigenen Servern
-geladen. Wir binden keine Content-Delivery-Netzwerke, Analyse-, Werbe- oder
-KI-Dienste ein.
+Alle Dienste der Plattform (Anmeldung, Git-Server, Datenbank, Dateispeicher,
+Testsystem, Workspaces, Chat und Luna-Inferenz) betreiben wir selbst.
+Schriftarten werden von unseren eigenen Servern geladen. Wir binden keine
+Content-Delivery-Netzwerke, Analyse-, Werbe- oder KI-Dienste Dritter ein.
 
 | Empfänger | Rolle | Ort | Grundlage |
 |---|---|---|---|
@@ -255,6 +272,7 @@ jedoch nicht möglich.
 | Workspace-Dateien (Home-Verzeichnis) | bis zur Löschung Ihres Kontos |
 | Chat-Konto und Nachrichten | bis Sie Nachrichten oder Ihr Chat-Konto löschen bzw. dessen Löschung verlangen |
 | Zugriffsprotokolle des Webservers (Logdaten) | 14 Tage |
+| Luna-Inferenzcache | Löschung bei Erreichen der festen Speichergrenze oder bei Wartung; keine feste Frist pro Anfrage |
 | Sicherheitsmeldungen mit Kontozuordnung | 90 Tage |
 | Anfragen und Meldungen | bis zur Erledigung, danach höchstens drei Jahre |
 | Sicherungskopien (Server-Snapshots) | tägliche Sicherungen werden 7 Tage aufbewahrt; vor Wartungsarbeiten angelegte Sicherungen höchstens 30 Tage |

@@ -1,6 +1,6 @@
 # Privacy Notice computor.at
 
-Version 1.0, gültig ab 30.09.2026 (effective 30 September 2026)
+Version 1.1, effective on publication of public Luna
 
 In this privacy notice, we inform you about how personal data are processed on
 the learning platform computor.at and in the chat chat.computor.at. This
@@ -15,10 +15,10 @@ Telecommunications Act (“TKG 2021”). The German version is authoritative.
 
 - We process only what we need to provide your account, courses, workspace,
   automatic tests and chat.
-- No advertising, no tracking, no analytics, no third-party services embedded
-  in our web pages, no sale of data, no analysis of your data by AI services.
+- No advertising, tracking, analytics or third-party AI. Luna processes the
+  questions and work you send it on TU Graz-operated inference servers.
 - Only technically necessary cookies, so there is no cookie banner.
-- Servers are located in Germany (Hetzner, Nuremberg and Falkenstein).
+- Platform servers are in Germany; Luna inference servers are in Austria.
 - You sign in with GitHub. We receive only your GitHub user ID, username, name
   and verified email address.
 - You can ask us to delete your account at any time: privacy@computor.at.
@@ -170,6 +170,22 @@ Regulation (EU) 2022/2065 (Digital Services Act, “DSA”), where applicable.
 Storage period: until the matter is closed, then at most three years for
 traceability and the defence of legal claims.
 
+### 4.8 Luna tutoring
+
+When you ask Luna for help, we send your question, the relevant exercise and
+the code or plots you submitted for that exercise to a TU Graz-operated model
+server in Austria. Luna's answer is returned to your course conversation.
+This supports learning and feedback under Art. 6(1)(e) GDPR in conjunction
+with §§ 2 and 3 UG. Luna's answers may be wrong and do not assess you.
+
+The inference server does not log the contents of questions, code, plots or
+answers and does not use them to train a model. It keeps a separate, bounded
+performance cache in memory and on local disk. Cached prompt state is evicted
+as the cache fills or during maintenance; there is no fixed deletion time for
+an individual cache entry. Operational records contain request size, timing
+and status, without those contents. Your submitted work and course messages
+remain on the platform for the periods in section 8.
+
 ## 5. Who sees your data
 
 - **Teaching staff and tutors of your course** see your name, username,
@@ -184,10 +200,10 @@ traceability and the defence of legal claims.
 
 ## 6. Recipients and processors
 
-We run all services of the platform ourselves (sign-in with Keycloak, Forgejo
-Git server, database, file storage, test system, workspaces with Coder, chat
-with Zulip). Fonts are served from our own servers. We do not embed content
-delivery networks, analytics, advertising or AI services.
+We run the platform services ourselves (sign-in, Git server, database, file
+storage, tests, workspaces, chat and Luna inference). Fonts are served from
+our own servers. We do not embed content delivery networks, analytics,
+advertising or third-party AI services.
 
 | Recipient | Role | Location | Basis |
 |---|---|---|---|
@@ -240,6 +256,7 @@ Without these cookies, however, signing in is not possible.
 | Workspace files (home directory) | until your account is deleted |
 | Chat account and messages | until you delete messages or your chat account, or ask us to delete it |
 | Web server access logs (log data) | 14 days |
+| Luna inference cache | evicted as its fixed capacity is reached or during maintenance; no fixed per-request expiry |
 | Security alerts attributed to an account | 90 days |
 | Enquiries and reports | until closed, then at most three years |
 | Backups (server snapshots) | daily backups are kept for 7 days; backups made before maintenance for at most 30 days |
