@@ -489,10 +489,32 @@ class CoderClient:
         """
         try:
             user = await self._find_user_by_email(user_data.email)
+            if user.status == "dormant":
+                user = await self.activate_dormant_user(user)
             return user, False
         except CoderUserNotFoundError:
             user = await self.create_user(user_data)
             return user, True
+
+    async def activate_dormant_user(self, user: CoderUser) -> CoderUser:
+        """Restore a ForwardAuth user's Coder access without lifting suspensions.
+
+        Coder marks accounts dormant when they never log in to Coder itself.
+        Computor authenticates users at its own ForwardAuth endpoint instead.
+        """
+        if user.status != "dormant":
+            return user
+        resp = await self._request(
+            "PUT",
+            f"/api/v2/users/{user.id}/status/activate",
+            admin_headers=True,
+            ok=(200,),
+        )
+        return CoderUser.from_api(resp.json())
+
+    async def ensure_user_active(self, username: str) -> CoderUser:
+        """Reactivate a dormant workspace owner, preserving suspended status."""
+        return await self.activate_dormant_user(await self.get_user(username))
 
     async def delete_user(self, username: str) -> bool:
         """

@@ -7,6 +7,7 @@ form) but never another user's workspace.
 """
 
 import json
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -86,6 +87,37 @@ async def test_user_can_access_own_workspace():
     resp = await verify_coder_access(_FakeRequest("/coder/%s/workspace/" % USER_OWNER), _user())
     assert resp.status_code == 200
     assert _body(resp)["workspace"] == "workspace"
+
+
+@pytest.mark.asyncio
+async def test_direct_editor_navigation_recovers_dormant_owner(monkeypatch):
+    state = {"active": False}
+
+    async def activate(_owner):
+        state["active"] = True
+
+    client = MagicMock(ensure_user_active=AsyncMock(side_effect=activate))
+    monkeypatch.setattr("computor_backend.api.auth.get_coder_client", lambda: client)
+    monkeypatch.setattr("computor_backend.api.auth.bump_workspace_activity", lambda *_a: None)
+    request = _FakeRequest(
+        f"/coder/{USER_OWNER}/workspace/", headers={"Accept": "text/html"}
+    )
+    response = await verify_coder_access(request, _user())
+    assert response.status_code == 200
+    assert state["active"]
+    client.ensure_user_active.assert_awaited_once_with(USER_OWNER)
+
+
+@pytest.mark.asyncio
+async def test_denied_editor_navigation_cannot_activate_other_owner(monkeypatch):
+    client = MagicMock(ensure_user_active=AsyncMock())
+    monkeypatch.setattr("computor_backend.api.auth.get_coder_client", lambda: client)
+    request = _FakeRequest(
+        "/coder/udifferent/workspace/", headers={"Accept": "text/html"}
+    )
+    response = await verify_coder_access(request, _user())
+    assert response.status_code == 403
+    client.ensure_user_active.assert_not_awaited()
 
 
 @pytest.mark.asyncio
