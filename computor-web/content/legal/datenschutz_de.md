@@ -1,6 +1,6 @@
 # Datenschutzerklärung computor.at
 
-Version 1.0, gültig ab 30.09.2026
+Version 1.1, gültig ab 01.10.2026
 
 In dieser Datenschutzerklärung informieren wir Sie über die Verarbeitung
 personenbezogener Daten auf der Lernplattform computor.at und im Chat
@@ -14,15 +14,13 @@ Bestimmungen zum Datenschutz und zur Datensicherheit, insbesondere nach dem
 ## Das Wichtigste in Kürze
 
 - Wir verarbeiten nur, was wir brauchen, um Ihnen Konto, Kurse,
-  Arbeitsumgebung, automatische Tests und Chat bereitzustellen.
+  Arbeitsumgebung, automatische Tests, Chat und angefragte Luna-Lernhilfe bereitzustellen.
 - Keine Werbung, kein Tracking, keine Analyse-Werkzeuge, keine Einbindung von
   Diensten Dritter in die Webseiten, kein Verkauf von Daten, keine Auswertung
-  Ihrer Daten durch KI-Dienste.
+  Ihrer Daten zum Training von KI-Modellen.
 - Nur technisch notwendige Cookies, daher kein Cookie-Banner.
-- Die Server stehen in Deutschland (Hetzner, Nürnberg und Falkenstein).
-- Die Anmeldung erfolgt über GitHub. Wir erhalten dabei nur Ihre
-  GitHub-Kennung, Ihren Benutzernamen, Ihren Namen und Ihre bestätigte
-  E-Mail-Adresse.
+- Die Plattformserver stehen in Deutschland (Hetzner); Luna läuft an der TU Graz in Österreich.
+- Sie registrieren sich mit bestätigter E-Mail-Adresse und Passwort. Öffentliche Beispiele benötigen kein Konto.
 - Sie können die Löschung Ihres Kontos jederzeit verlangen: privacy@computor.at.
 
 ## 1. Anwendungsbereich
@@ -59,23 +57,20 @@ Plattform; sie ist keine datenschutzrechtliche Einwilligung.
 
 ### 4.1 Anmeldung und Konto
 
-Die Anmeldung erfolgt ausschließlich über GitHub. Unser Anmeldedienst
-(Keycloak) leitet Sie dazu an GitHub weiter. Ein eigenes Passwort für
-computor.at gibt es nicht.
+Sie erstellen ein Konto mit E-Mail-Adresse und Passwort. Der Anmeldedienst
+Keycloak bestätigt die E-Mail-Adresse und speichert das Passwort ausschließlich
+als kryptografischen Hash.
 
-Datenkategorien: GitHub-Benutzerkennung (numerische ID), GitHub-Benutzername,
-Name (wie in Ihrem GitHub-Profil angegeben), bestätigte primäre E-Mail-Adresse
-Ihres GitHub-Kontos, interne Benutzerkennung, Zeitpunkt der Annahme der
-Nutzungsbedingungen, Zeitpunkt der letzten Anmeldung.
+Datenkategorien: bestätigte E-Mail-Adresse, Benutzername, angegebener Name,
+Passwort-Hash, interne Benutzerkennung, Zeitpunkt der Annahme der
+Nutzungsbedingungen und der letzten Anmeldung.
 
-Zweck: Anlegen und Verwalten Ihres Kontos, Anmeldung, Kontaktaufnahme in
-Angelegenheiten Ihres Kontos (z. B. Ankündigung von Änderungen oder einer
-Löschung wegen Inaktivität).
+Zweck: Kontoerstellung, Anmeldung und Kontakt zu Ihrem Konto.
 
 Rechtsgrundlage: Art. 6 Abs. 1 lit. e DSGVO iVm §§ 2 und 3 UG.
 
-Ohne diese Angaben können wir kein Konto anlegen. Ihr Name wird so übernommen,
-wie er in Ihrem GitHub-Profil steht; Sie können ihn dort ändern oder leer lassen.
+Die E-Mail-Adresse ist zur Kontoerstellung erforderlich. Öffentliche Beispiele
+können Sie ohne Konto lesen.
 
 ### 4.2 Kurse, Abgaben und Tests
 
@@ -182,6 +177,25 @@ anwendbar.
 Speicherdauer: bis zur Erledigung, danach höchstens drei Jahre zur
 Nachvollziehbarkeit und zur Abwehr von Ansprüchen.
 
+### 4.8 Luna-Lernhilfe
+
+Wenn Sie Luna fragen, verarbeiten wir Ihre Frage, den von Ihnen ausgewählten
+Text, die für Sie sichtbare Aufgabenbeschreibung und die erzeugte Antwort.
+Luna gibt Lernhilfe, führt keinen Code aus und entscheidet keine Noten.
+Die Inferenz erfolgt auf Rechnern der TU Graz in Österreich, ohne externen
+KI-Anbieter und ohne Training von Modellen mit Ihren Daten.
+
+Rechtsgrundlage: Art. 6 Abs. 1 lit. e DSGVO iVm §§ 2 und 3 UG.
+
+Die Anfrage liegt auf computor.at höchstens 15 Minuten vor und wird nach
+Fertigstellung entfernt; die Antwort ist danach 24 Stunden nur für Sie abrufbar.
+Der Inferenz-Worker erstellt keine Dateien oder Inhaltsprotokolle von Fragen
+und Antworten. Das Modell verwendet begrenzte Speicher- und lokale
+Festplatten-Caches zur Wiederverwendung von Berechnungen. Einträge werden bei
+Kapazitätsbedarf oder beim Leeren ersetzt; eine feste zeitliche Ablaufgrenze
+besteht nicht. Diese Caches sind nicht für Lernende zugänglich. Größen-, Status-
+und Zeitmesswerte enthalten keine Fragen, eingereichten Texte oder Antworten.
+
 ## 5. Wer Ihre Daten sieht
 
 - **Lehrende und Tutor*innen Ihres Kurses** sehen Ihren Namen, Ihren
@@ -200,22 +214,17 @@ Alle Dienste der Plattform (Anmeldung mit Keycloak, Git-Server Forgejo,
 Datenbank, Dateispeicher, Testsystem, Workspaces mit Coder, Chat mit Zulip)
 betreiben wir selbst. Schriftarten werden von unseren eigenen Servern
 geladen. Wir binden keine Content-Delivery-Netzwerke, Analyse-, Werbe- oder
-KI-Dienste ein.
+externe KI-Dienste ein. Luna betreibt die TU Graz selbst.
 
 | Empfänger | Rolle | Ort | Grundlage |
 |---|---|---|---|
 | Hetzner Online GmbH, Industriestraße 25, 91710 Gunzenhausen, Deutschland | Auftragsverarbeiterin: Server, Speicher, Sicherungskopien | Rechenzentren Nürnberg und Falkenstein, Deutschland | Auftragsverarbeitungsvertrag nach Art. 28 DSGVO |
-| GitHub, Inc., 88 Colin P. Kelly Jr. Street, San Francisco, CA 94107, USA | eigenständige Verantwortliche für Ihr GitHub-Konto; Anmeldedienst | USA | siehe unten |
 | Behörden und Gerichte | nur bei gesetzlicher Verpflichtung oder zur Anzeige schwerer Straftaten (Art. 18 DSA) | Österreich bzw. EU | Art. 6 Abs. 1 lit. c DSGVO |
 
-**GitHub:** Wenn Sie „Mit GitHub anmelden“ wählen, meldet sich Ihr Browser
-direkt bei GitHub an. GitHub erfährt dabei, dass Sie sich bei computor.at
-anmelden, und übermittelt uns die in Abschnitt 4.1 genannten Daten. Für die
-Verarbeitung in Ihrem GitHub-Konto ist GitHub selbst verantwortlich; es gilt
-die Datenschutzerklärung von GitHub. GitHub, Inc. ist nach dem EU-US Data
-Privacy Framework zertifiziert; für Übermittlungen in die USA an zertifizierte
-Unternehmen besteht ein Angemessenheitsbeschluss der Europäischen Kommission
-(Art. 45 DSGVO). Wir selbst übermitteln keine Daten an GitHub.
+**Optional GitHub Codespaces:** Wenn Sie diesen Arbeitsweg wählen, stellt
+GitHub die Entwicklungsumgebung nach eigenen Bedingungen und Datenschutzhinweisen
+bereit. Sie entscheiden, welche Dateien Sie dort ablegen. Desktop-VS-Code und
+die öffentlichen Beispiele ohne Anmeldung stehen als Alternativen bereit.
 
 E-Mails der Plattform (z. B. Chat-Benachrichtigungen) werden über den
 Mailserver der TU Graz versendet. Eine Übermittlung Ihrer Daten in Drittländer
@@ -253,6 +262,9 @@ jedoch nicht möglich.
 |---|---|
 | Konto, Kurseinschreibungen, Abgaben, Git-Repositories, Testergebnisse | bis zur Löschung Ihres Kontos |
 | Workspace-Dateien (Home-Verzeichnis) | bis zur Löschung Ihres Kontos |
+| Luna-Anfragen | höchstens 15 Minuten; Entfernung bei Fertigstellung |
+| Luna-Antworten | 24 Stunden, nur für die anfragende Person |
+| Luna-Inferenz-Caches | begrenzte Kapazität; Ersatz bei Kapazitätsbedarf oder Leeren |
 | Chat-Konto und Nachrichten | bis Sie Nachrichten oder Ihr Chat-Konto löschen bzw. dessen Löschung verlangen |
 | Zugriffsprotokolle des Webservers (Logdaten) | 14 Tage |
 | Sicherheitsmeldungen mit Kontozuordnung | 90 Tage |
@@ -295,8 +307,7 @@ computor.at und chat.computor.at dürfen Sie ab 14 Jahren nutzen. Die
 Verarbeitung Ihrer Daten beruht nicht auf einer Einwilligung (siehe
 Abschnitt 3); deshalb brauchen Sie dafür auch keine Zustimmung Ihrer Eltern.
 Personen unter 14 Jahren dürfen kein Konto anlegen. Wenn wir erfahren, dass
-ein Konto einer Person unter 14 Jahren gehört, löschen wir es. GitHub selbst
-verlangt ein Mindestalter von 13 Jahren.
+ein Konto einer Person unter 14 Jahren gehört, löschen wir es.
 
 ## 11. Sicherheit
 

@@ -78,7 +78,7 @@ export default function PublicLunaPanel({ assignmentId }: { assignmentId: string
   if (!course?.public || !available) return null;
 
   return (
-    <SectionCard title="Ask Luna">
+    <SectionCard title="Ask Luna (AI tutor)">
       <form onSubmit={submit} className="space-y-3">
         <label className="block text-sm font-medium text-body" htmlFor="luna-question">Question</label>
         <textarea

@@ -1,6 +1,6 @@
 # Privacy Notice computor.at
 
-Version 1.0, gültig ab 30.09.2026 (effective 30 September 2026)
+Version 1.1, effective 1 October 2026
 
 In this privacy notice, we inform you about how personal data are processed on
 the learning platform computor.at and in the chat chat.computor.at. This
@@ -14,13 +14,12 @@ Telecommunications Act (“TKG 2021”). The German version is authoritative.
 ## Summary
 
 - We process only what we need to provide your account, courses, workspace,
-  automatic tests and chat.
+  automatic tests, chat and the Luna help you request.
 - No advertising, no tracking, no analytics, no third-party services embedded
-  in our web pages, no sale of data, no analysis of your data by AI services.
+  in our web pages, no sale of data, no use of your data to train AI models.
 - Only technically necessary cookies, so there is no cookie banner.
-- Servers are located in Germany (Hetzner, Nuremberg and Falkenstein).
-- You sign in with GitHub. We receive only your GitHub user ID, username, name
-  and verified email address.
+- Platform servers are in Germany (Hetzner); Luna inference runs at TU Graz in Austria.
+- You sign up with a verified email address and a password. Public examples need no account.
 - You can ask us to delete your account at any time: privacy@computor.at.
 
 ## 1. Scope
@@ -55,21 +54,19 @@ your use of the platform; it is not consent under data protection law.
 
 ### 4.1 Sign-in and account
 
-Sign-in is only possible via GitHub. Our sign-in service (Keycloak) redirects
-you to GitHub. There is no separate computor.at password.
+You create an account with your email address and password. Our sign-in
+service (Keycloak) verifies your email and stores the password as a cryptographic
+hash, never as readable text.
 
-Categories of data: GitHub user ID (numeric), GitHub username, name (as given
-in your GitHub profile), verified primary email address of your GitHub
-account, internal user ID, time you accepted the Terms of Use, time of last
-sign-in.
+Categories of data: verified email address, username, name you provide, password
+hash, internal user ID, time you accepted the Terms of Use, time of last sign-in.
 
-Purpose: creating and managing your account, sign-in, contacting you about
-your account (e.g. announcing changes or a deletion due to inactivity).
+Purpose: account creation, sign-in and account-related contact.
 
 Legal basis: Art. 6(1)(e) GDPR in conjunction with §§ 2 and 3 UG.
 
-We cannot create an account without these data. Your name is taken as it
-appears in your GitHub profile; you can change it there or leave it empty.
+Your email address is required to create an account. Reading public examples
+does not require an account.
 
 ### 4.2 Courses, submissions and tests
 
@@ -170,6 +167,24 @@ Regulation (EU) 2022/2065 (Digital Services Act, “DSA”), where applicable.
 Storage period: until the matter is closed, then at most three years for
 traceability and the defence of legal claims.
 
+### 4.8 Luna learning assistance
+
+When you ask Luna, we process your question, the text you choose to submit,
+the assignment description visible to you and the generated answer. Luna gives
+learning help; it does not run your code or decide grades. Inference takes place
+on TU Graz machines in Austria, without an external AI provider or model training.
+
+Legal basis: Art. 6(1)(e) GDPR in conjunction with §§ 2 and 3 UG.
+
+The request is held temporarily on computor.at for at most 15 minutes; after
+completion it is removed, and only you can retrieve the answer for 24 hours.
+The inference worker keeps no prompt or answer files or content logs. The model
+uses bounded memory and local disk caches to reuse computations. Cache entries
+are replaced when capacity is needed or the cache is cleared; they have no fixed
+time-based expiry. These caches are private to the inference service and are
+not made available to learners. We retain numeric size, status and timing
+telemetry without question, submitted-text or answer contents.
+
 ## 5. Who sees your data
 
 - **Teaching staff and tutors of your course** see your name, username,
@@ -186,23 +201,17 @@ traceability and the defence of legal claims.
 
 We run all services of the platform ourselves (sign-in with Keycloak, Forgejo
 Git server, database, file storage, test system, workspaces with Coder, chat
-with Zulip). Fonts are served from our own servers. We do not embed content
-delivery networks, analytics, advertising or AI services.
+with Zulip). Fonts are served from our own servers. We do not embed content delivery networks, analytics, advertising or external AI services. Luna is operated by TU Graz.
 
 | Recipient | Role | Location | Basis |
 |---|---|---|---|
 | Hetzner Online GmbH, Industriestraße 25, 91710 Gunzenhausen, Germany | processor: servers, storage, backups | data centres in Nuremberg and Falkenstein, Germany | data processing agreement under Art. 28 GDPR |
-| GitHub, Inc., 88 Colin P. Kelly Jr. Street, San Francisco, CA 94107, USA | independent controller for your GitHub account; sign-in provider | USA | see below |
 | Authorities and courts | only where required by law or to report serious criminal offences (Art. 18 DSA) | Austria or EU | Art. 6(1)(c) GDPR |
 
-**GitHub:** When you choose “Sign in with GitHub”, your browser signs in
-directly at GitHub. GitHub thereby learns that you are signing in to
-computor.at and sends us the data listed in section 4.1. GitHub is responsible
-for the processing in your GitHub account; GitHub's privacy statement applies.
-GitHub, Inc. is certified under the EU-US Data Privacy Framework; transfers to
-certified companies in the USA are covered by an adequacy decision of the
-European Commission (Art. 45 GDPR). We do not transmit data to GitHub
-ourselves.
+**Optional GitHub Codespaces:** If you choose this way of working, GitHub
+provides the development environment under its own terms and privacy notice.
+It is separate from computor.at; you decide which files to put there. Desktop
+VS Code and the anonymous read-only examples remain available as alternatives.
 
 Emails from the platform (e.g. chat notifications) are sent via the TU Graz
 mail server. Beyond this, your data are not transferred to third countries. We
@@ -238,6 +247,9 @@ Without these cookies, however, signing in is not possible.
 |---|---|
 | Account, course enrolments, submissions, Git repositories, test results | until your account is deleted |
 | Workspace files (home directory) | until your account is deleted |
+| Luna requests | at most 15 minutes; removed on completion |
+| Luna answers | 24 hours, visible only to the author |
+| Luna inference caches | bounded capacity; replacement on capacity pressure or clearing |
 | Chat account and messages | until you delete messages or your chat account, or ask us to delete it |
 | Web server access logs (log data) | 14 days |
 | Security alerts attributed to an account | 90 days |
@@ -275,8 +287,7 @@ Austria, dsb@dsb.gv.at, https://www.dsb.gv.at.
 You may use computor.at and chat.computor.at from the age of 14. Processing of
 your data is not based on consent (see section 3), so you do not need your
 parents' consent for it. Persons under 14 may not create an account. If we
-learn that an account belongs to a person under 14, we delete it. GitHub
-itself requires a minimum age of 13.
+learn that an account belongs to a person under 14, we delete it.
 
 ## 11. Security
 

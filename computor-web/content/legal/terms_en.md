@@ -1,6 +1,6 @@
 # Terms of Use computor.at
 
-Version 1.0, gültig ab 30.09.2026 (effective 30 September 2026)
+Version 1.1, effective 1 October 2026
 
 This is a translation. The German version (Nutzungsbedingungen) is
 authoritative.
@@ -37,7 +37,7 @@ conflict, they take precedence.
 
 ## 2. Account and conclusion of contract
 
-2.1 You sign in with your GitHub account. At your first sign-in you confirm
+2.1 You create an account with a verified email address and password. At your first sign-in you confirm
 that you accept these Terms of Use. This concludes a free-of-charge usage
 contract for an indefinite period. You can also use the chat
 chat.computor.at with a separate chat account; these Terms of Use apply to it
@@ -49,14 +49,14 @@ to it themselves (§ 170(3) Austrian Civil Code, ABGB). We delete accounts of
 persons under 14 as soon as we become aware of them.
 
 2.3 Each person may have only one account. Accounts are not transferable.
-Protect access to your GitHub account. If you suspect that someone else is
+Protect your password and email account. If you suspect that someone else is
 using your account, please report it immediately to security@computor.at.
 
 ## 3. Services
 
 3.1 We provide free of charge: courses and exercises, a programming
 environment in the browser (“workspace”), automatic testing of your
-submissions, Git repositories for your submissions, and a chat.
+submissions, Git repositories for your submissions, a chat and optional Luna learning assistance.
 
 3.2 We operate the platform with the care customary for a university learning
 service. Where possible, we announce maintenance on the platform in advance.
@@ -77,6 +77,14 @@ or downloading it.
 certificate or a confirmation of competence. If a university course uses
 results for an assessment, the responsible teacher decides under the
 applicable regulations.
+
+3.6 Luna provides AI-generated learning help from the question and text you
+send and your visible assignment. It cannot execute code or grade your work.
+Check its answers; they can be incorrect. Requests and answers are handled
+temporarily as described in the Privacy notice, including bounded inference
+caches. Their contents are not logged or used to train models. Availability and
+request limits depend on capacity. Public examples also work with desktop
+VS Code or optional GitHub Codespaces under GitHub's own terms.
 
 ## 4. Changes to and discontinuation of services
 
@@ -100,7 +108,7 @@ soon as possible of the reason and expected duration.
 following is not permitted:
 
 a) cryptocurrency mining and other compute-intensive use unrelated to a course;
-b) attacks on systems, whether against the platform or third parties: port and
+b) attacks on systems, including port and
    vulnerability scans, denial of service, brute-force attacks, attempts to
    escape the workspace, access to other people's accounts or data;
 c) circumventing resource limits, access restrictions or participation limits,

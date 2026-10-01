@@ -71,6 +71,11 @@ def _redact_query(query: str) -> str:
 
 
 def _redact_token(token: str) -> str:
+    # Malformed Luna paths/queries may themselves contain learner text. Keep
+    # only a fixed route label in HTTP/WS access logs, including encoded paths.
+    decoded = unquote_plus(token)
+    if re.search(r"(?:^|/)public-luna(?:/|[?#]|$)", decoded):
+        return "/public-luna/[REDACTED]"
     if "?" in token:
         base, _, query = token.partition("?")
         return f"{base}?{_redact_query(query)}"
@@ -84,7 +89,7 @@ def redact_url(value: str) -> str:
 
     Works on a bare URL/target as well as on a log message that embeds one.
     """
-    if "=" not in value and "%" not in value:
+    if "=" not in value and "%" not in value and "public-luna" not in value:
         return value
     return "".join(
         part if _TOKEN_SPLIT.fullmatch(part) else _redact_token(part)

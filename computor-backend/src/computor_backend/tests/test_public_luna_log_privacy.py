@@ -1,5 +1,8 @@
 """Real request failures must not expose private content to framework logs."""
 import json
+import logging
+
+import pytest
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -8,6 +11,7 @@ from computor_backend.api.public_luna import LunaRequest
 from computor_backend.exceptions import register_exception_handlers
 from computor_backend.exceptions.exceptions import InternalServerException
 from computor_backend.public_luna_privacy import PublicLunaPrivacyMiddleware
+from computor_backend.utils.log_redaction import RedactQueryCredentialsFilter
 
 SENTINEL = "private-learner-text-do-not-log"
 
@@ -61,3 +65,22 @@ def test_structured_error_context_and_traceback_are_not_logged(caplog):
     response = client().get("/public-luna/structured")
     assert response.status_code == 500
     assert_private(caplog)
+
+
+@pytest.mark.parametrize("target", [
+    "/api/public-luna/requests?question=private-learner-text",
+    "/api/public-luna/requests/private-learner-text",
+    "/api/%70ublic-luna/requests/private-learner-text",
+    "/public-luna?answer=private-learner-text",
+])
+def test_luna_access_logs_keep_status_without_text(target):
+    record = logging.LogRecord(
+        "uvicorn.access", logging.INFO, __file__, 1,
+        '%s - "%s %s HTTP/%s" %d', ("127.0.0.1", "GET", target, "1.1", 302), None,
+    )
+    assert RedactQueryCredentialsFilter().filter(record)
+    assert "private-learner-text" not in record.getMessage()
+    assert 'GET /public-luna/[REDACTED] HTTP/1.1' in record.getMessage()
+    assert record.args[-1] == 302
+
+
