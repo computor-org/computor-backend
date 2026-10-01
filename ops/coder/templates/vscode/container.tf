@@ -25,6 +25,7 @@ resource "docker_container" "workspace" {
   image      = docker_image.workspace_image.name
   name       = "coder-${data.coder_workspace_owner.me.name}-${lower(data.coder_workspace.me.name)}"
   hostname   = data.coder_workspace.me.name
+  restart    = "unless-stopped"
 
   # Hard resource limits so one workspace (whose user may have root) cannot
   # exhaust the host. Safe non-zero defaults in variables.tf; per-template
