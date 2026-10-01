@@ -8,6 +8,7 @@ from computor_backend.exceptions import ServiceUnavailableException
 
 def test_public_deployment_requires_cgroup_parent(monkeypatch):
     monkeypatch.setenv("COMPUTOR_PUBLIC_DEPLOYMENT", "true")
+    monkeypatch.setenv("CODER_MAX_RUNNING_WORKSPACES", "30")
     monkeypatch.delenv("CODER_WORKSPACE_CGROUP_PARENT", raising=False)
     with pytest.raises(ServiceUnavailableException):
         coder_api._require_public_workspace_limits()

@@ -57,9 +57,11 @@ def _required_variables():
 
 def test_api_receives_custom_coder_admin_username(tmp_path):
     env = _render(tmp_path, {"CODER_ADMIN_USERNAME": "svc", "COMPUTOR_PUBLIC_DEPLOYMENT": "true",
-                             "CODER_WORKSPACE_CGROUP_PARENT": "computor-workspaces.slice"})
+                             "CODER_WORKSPACE_CGROUP_PARENT": "computor-workspaces.slice",
+                             "CODER_MAX_RUNNING_WORKSPACES": "17"})
     assert env["CODER_ADMIN_USERNAME"] == "svc"
     assert env["COMPUTOR_PUBLIC_DEPLOYMENT"] == "true"
+    assert env["CODER_MAX_RUNNING_WORKSPACES"] == "17"
     assert env["CODER_WORKSPACE_CGROUP_PARENT"] == "computor-workspaces.slice"
     assert env["CODER_WORKER_DB_PASSWORD"] == "workerpw"
 

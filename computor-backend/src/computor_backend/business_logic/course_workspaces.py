@@ -28,6 +28,7 @@ from computor_backend.coder.exceptions import CoderWorkspaceNotFoundError
 from computor_backend.coder.naming import (
     decode_coder_username,
     derive_workspace_name,
+    encode_coder_username,
     sanitize_workspace_name,
 )
 from computor_backend.coder.service import (
@@ -41,6 +42,7 @@ from computor_backend.business_logic.instance_limits import (
     instance_settings_row,
     user_is_staff,
 )
+from computor_backend.business_logic.public_workspace_capacity import reserve_public_container
 from computor_backend.exceptions import (
     BadRequestException,
     ComputorException,
@@ -738,6 +740,9 @@ async def provision_student_workspaces(
                     is_staff=user_is_staff(db, str(member.user_id)),
                     exclude_workspace_id=exclude_id,
                 )
+            await reserve_public_container(
+                client, encode_coder_username(str(member.user_id)), workspace_name
+            )
             token = mint_workspace_token(
                 db, cache, str(member.user_id), str(permissions.user_id),
                 workspace_name=workspace_name,

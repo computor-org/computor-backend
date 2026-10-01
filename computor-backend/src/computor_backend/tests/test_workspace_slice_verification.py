@@ -78,6 +78,7 @@ def test_worker_push_and_rollout_refuse_unverified_slice(monkeypatch):
 @pytest.fixture
 def public(monkeypatch):
     monkeypatch.setenv("COMPUTOR_PUBLIC_DEPLOYMENT", "true")
+    monkeypatch.setenv("CODER_MAX_RUNNING_WORKSPACES", "30")
     monkeypatch.setenv("CODER_WORKSPACE_CGROUP_PARENT", "computor-workspaces.slice")
     monkeypatch.setattr(coder_api, "_SLICE_VERIFIED_AT", None)
 
