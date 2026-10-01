@@ -102,6 +102,10 @@ from computor_backend.business_logic.instance_limits import (
     principal_is_staff as _principal_is_staff,
     user_is_staff as _user_is_staff,
 )
+from computor_backend.business_logic.public_workspace_capacity import (
+    required_public_container_limit,
+    reserve_public_container,
+)
 from computor_backend.business_logic.course_workspaces import (
     ACTIVE_BUILD_STATUSES,
     enforce_workspace_admission as _enforce_workspace_admission,
@@ -589,6 +593,9 @@ async def provision_workspace(
             ),
             exclude_workspace_id=exclude_workspace_id,
         )
+        await reserve_public_container(
+            client, encode_coder_username(str(target_user.id)), workspace_name
+        )
 
         # Mint workspace token (bounded lifetime; rotated on each provision of
         # this workspace — tokens of the user's other workspaces stay valid)
@@ -823,6 +830,7 @@ async def start_workspace(
         # rendered from, and Coder carries them forward untouched.
         overrides = _current_app_credential_params(db, username)
         await client.ensure_user_active(username)
+        await reserve_public_container(client, username, workspace_name)
         success = await client.start_workspace(
             username, workspace_name, policy=policy, param_overrides=overrides
         )
@@ -1266,6 +1274,7 @@ def _require_public_workspace_limits() -> None:
     import os
 
     public = os.environ.get("COMPUTOR_PUBLIC_DEPLOYMENT", "").strip().lower() == "true"
+    required_public_container_limit()
     if public and not os.environ.get("CODER_WORKSPACE_CGROUP_PARENT", "").strip():
         raise ServiceUnavailableException(
             detail=(

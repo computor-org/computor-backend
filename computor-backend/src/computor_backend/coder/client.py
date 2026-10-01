@@ -815,6 +815,32 @@ class CoderClient:
 
         return [self._parse_workspace_summary(ws) for ws in resp.json().get("workspaces", [])]
 
+    async def list_all_workspaces_complete(self, max_items: int = 10000) -> list[CoderWorkspace]:
+        """Fetch the entire fleet or fail; a truncated list cannot enforce a cap."""
+        page_size = 1000
+        workspaces: list[CoderWorkspace] = []
+        total: int | None = None
+        while total is None or len(workspaces) < total:
+            resp = await self._request(
+                "GET", "/api/v2/workspaces",
+                params={"limit": page_size, "offset": len(workspaces)}, ok=(200,),
+            )
+            body = resp.json()
+            count = body.get("count")
+            page = body.get("workspaces")
+            if (not isinstance(count, int) or isinstance(count, bool)
+                    or count < 0 or count > max_items or not isinstance(page, list)
+                    or (total is not None and count != total)
+                    or (count > len(workspaces) and not page)):
+                raise CoderAPIError("Coder workspace inventory is incomplete")
+            total = count
+            workspaces.extend(self._parse_workspace_summary(ws) for ws in page)
+            if len(workspaces) > total or len(workspaces) > max_items:
+                raise CoderAPIError("Coder workspace inventory is inconsistent")
+        if len({ws.id for ws in workspaces}) != len(workspaces):
+            raise CoderAPIError("Coder workspace inventory contains duplicates")
+        return workspaces
+
     async def list_all_users(self, limit: int = 1000) -> list[CoderUser]:
         """Every Coder user (admin view).
 

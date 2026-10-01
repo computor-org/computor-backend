@@ -6,6 +6,22 @@ execution. Learners can work in a hosted Coder workspace after signing in, on
 their own computer with VS Code, or in a GitHub Codespace using their GitHub
 quota. A full hosted pool leaves the other two paths available.
 
+For a public deployment with Coder enabled, set
+`CODER_MAX_RUNNING_WORKSPACES=30`. The API refuses hosted creation/start when
+this positive limit or the verified workspace cgroup is missing. It counts all
+running and starting containers, including staff workspaces, separately from
+the existing distinct-user limit. Concurrent launches use a Postgres
+transaction lock to compare a complete Coder fleet inventory with durable
+reservations before calling Coder. Reservations have no guessed timeout,
+because a queued build can outlive one. A new active or terminal Coder build
+reconciles its reservation. If a launch failed before Coder created a build,
+an operator must compare `public_workspace_reservation` with the Coder fleet,
+verify no matching build remains queued, and remove only that stale row. For
+example, after confirming that `alice/vscode` has no pending build, delete
+only that row with `DELETE FROM public_workspace_reservation WHERE
+owner_name='alice' AND workspace_name='vscode';`. Database and Coder failures
+refuse new launches, leaving local VS Code and Codespaces available.
+
 Verified, signed-in learners can join public courses and submit work. Once
 `PUBLIC_LUNA_ENABLED=true` and the restricted worker are deployed, an assignment
 page also shows a short Ask Luna form. A learner sends a question and selected
