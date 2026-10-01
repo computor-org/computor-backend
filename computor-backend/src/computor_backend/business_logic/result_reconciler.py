@@ -21,6 +21,8 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from sqlalchemy import or_
+
 from computor_backend.business_logic.testing_orchestration import (
     IN_PROGRESS_STATUSES,
     sync_result_status_from_temporal,
@@ -32,12 +34,13 @@ from computor_backend.database import get_db_session
 from computor_backend.model.public_grading_reservation import PublicGradingReservation
 from computor_backend.model.result import Result
 from computor_backend.redis_cache import get_redis_client
-from computor_types.tasks import TaskStatus
+from computor_types.tasks import ResultStatus, TaskStatus
 
 logger = logging.getLogger(__name__)
 
 # How often to sweep.
 POLL_INTERVAL_SECONDS = 300
+PUBLIC_POLL_INTERVAL_SECONDS = 30
 
 # Only reconcile rows that have been in progress at least this long. The
 # student-testing workflow has a 30 minute execution timeout, so anything
@@ -51,14 +54,14 @@ RECONCILE_BATCH_SIZE = 100
 
 # Only one API replica should sweep at a time.
 LOCK_KEY = "testing:result_reconciler:lock"
-LOCK_TTL_SECONDS = POLL_INTERVAL_SECONDS - 30
 
 
 async def _acquire_lock() -> bool:
     """Best-effort cross-replica mutex. Fails open to *not* running."""
     try:
         redis = await get_redis_client()
-        return bool(await redis.set(LOCK_KEY, "1", ex=LOCK_TTL_SECONDS, nx=True))
+        interval = PUBLIC_POLL_INTERVAL_SECONDS if public_test_limit() is not None else POLL_INTERVAL_SECONDS
+        return bool(await redis.set(LOCK_KEY, "1", ex=interval - 5, nx=True))
     except Exception as e:  # pragma: no cover - redis hiccup
         logger.warning(f"Result reconciler could not acquire lock: {e}")
         return False
@@ -84,9 +87,15 @@ async def _release_terminal_reservations(db, cutoff: datetime) -> int:
     from computor_backend.tasks import get_task_executor
     from computor_backend.tasks.temporal_executor import TaskNotFoundError
 
+    terminal = tuple(int(status) for status in (
+        ResultStatus.FINISHED, ResultStatus.FAILED,
+        ResultStatus.CANCELLED, ResultStatus.CRASHED,
+    ))
     reservations = (db.query(PublicGradingReservation)
+                    .outerjoin(Result, Result.id == PublicGradingReservation.result_id)
                     .filter(PublicGradingReservation.released_at.is_(None),
-                            PublicGradingReservation.created_at < cutoff)
+                            or_(Result.status.in_(terminal), Result.id.is_(None),
+                                PublicGradingReservation.created_at < cutoff))
                     .order_by(PublicGradingReservation.created_at.asc())
                     .limit(RECONCILE_BATCH_SIZE).all())
     if not reservations:
@@ -177,7 +186,8 @@ class ResultReconciler:
             while self._running:
                 # Sleep first: at boot the workers may not have reconnected yet,
                 # and nothing here is urgent.
-                await asyncio.sleep(POLL_INTERVAL_SECONDS)
+                interval = PUBLIC_POLL_INTERVAL_SECONDS if public_test_limit() is not None else POLL_INTERVAL_SECONDS
+                await asyncio.sleep(interval)
                 if not self._running:
                     break
                 try:

@@ -132,28 +132,34 @@ def test_only_proven_terminal_or_local_pre_rpc_failure_releases(sessions):
 
 
 @pytest.mark.asyncio
-async def test_worker_result_patch_immediately_reopens_a_slot(sessions, monkeypatch):
+async def test_worker_result_patch_waits_for_temporal_terminal(sessions, monkeypatch):
     from computor_backend.api import results as result_api
+    from computor_backend.business_logic import result_reconciler
     from computor_backend.permissions import core
     from computor_backend.services import result_storage
+    import computor_backend.tasks as tasks
 
     result_id = _admit(sessions, "student-testing-callback")
     _admit(sessions, "student-testing-other-1")
     _admit(sessions, "student-testing-other-2")
 
     class Query:
+        def __init__(self, db):
+            self.db = db
+
         def filter(self, *_conditions):
             return self
 
         def first(self):
-            return SimpleNamespace(id=result_id)
+            return self.db.query(ProbeResult).filter(ProbeResult.id == result_id).one()
 
     class Repo:
         def __init__(self, db, cache):
-            pass
+            self.db = db
 
         def update_entity(self, result, updates):
             result.status = updates["status"]
+            self.db.flush()
             return result
 
     class DTO:
@@ -164,10 +170,11 @@ async def test_worker_result_patch_immediately_reopens_a_slot(sessions, monkeypa
         def model_dump(self):
             return {"id": str(result_id)}
 
-    monkeypatch.setattr(core, "check_permissions", lambda *_args: Query())
+    monkeypatch.setattr(core, "check_permissions", lambda *_args: Query(_args[-1]))
     monkeypatch.setattr(result_api, "ResultRepository", Repo)
     monkeypatch.setattr(result_api, "ResultGet", DTO)
     monkeypatch.setattr(result_storage, "retrieve_result_json", AsyncMock(return_value=None))
+    monkeypatch.setattr(result_reconciler, "Result", ProbeResult)
 
     worker = SimpleNamespace(is_service=True, is_admin=False)
     student = SimpleNamespace(is_service=False, is_admin=False)
@@ -179,13 +186,29 @@ async def test_worker_result_patch_immediately_reopens_a_slot(sessions, monkeypa
         await result_api.update_result(result_id, ResultUpdate(status=TaskStatus.FINISHED),
                                        worker, db, None)
         db.commit()
+    # Worker PATCH is inside an activity. Temporal may retry that activity
+    # after a crash, so its Result.status cannot release the global slot.
+    assert _occupied(sessions) == 3
+    with pytest.raises(RateLimitException):
+        _admit(sessions, "student-testing-before-workflow-terminal")
+
+    class Executor:
+        async def get_task_status(self, workflow_id):
+            status = TaskStatus.FINISHED if workflow_id == "student-testing-callback" else TaskStatus.STARTED
+            return SimpleNamespace(status=status)
+
+    monkeypatch.setattr(tasks, "get_task_executor", lambda: Executor())
+    with sessions() as db:
+        cutoff = datetime.now(timezone.utc)
+        assert await _release_terminal_reservations(db, cutoff) == 1
     assert _occupied(sessions) == 2
-    assert _admit(sessions, "student-testing-after-worker-patch")
+    assert _admit(sessions, "student-testing-after-workflow-terminal")
 
 
 @pytest.mark.asyncio
 async def test_reconciler_uses_temporal_terminal_not_age_or_missing(sessions, monkeypatch):
     import computor_backend.tasks as tasks
+    from computor_backend.business_logic import result_reconciler
 
     for i in range(3):
         _admit(sessions, f"student-testing-{i}")
@@ -199,6 +222,7 @@ async def test_reconciler_uses_temporal_terminal_not_age_or_missing(sessions, mo
             raise TaskNotFoundError(workflow_id)
 
     monkeypatch.setattr(tasks, "get_task_executor", lambda: Executor())
+    monkeypatch.setattr(result_reconciler, "Result", ProbeResult)
     with sessions() as db:
         assert await _release_terminal_reservations(db, datetime.max.replace(tzinfo=timezone.utc)) == 1
     assert _occupied(sessions) == 2

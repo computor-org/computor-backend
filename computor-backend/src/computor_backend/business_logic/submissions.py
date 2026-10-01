@@ -41,7 +41,7 @@ from computor_backend.permissions.course_access import (
 from computor_backend.business_logic.content_visibility import enforce_content_visible
 from computor_backend.business_logic.submission_limits import enforce_max_submissions
 from computor_backend.business_logic.public_testing_admission import (
-    release_for_result, require_public_result_writer,
+    require_public_result_writer,
 )
 from computor_backend.cache import Cache
 from computor_backend.repositories.submission_artifact import SubmissionArtifactRepository
@@ -1087,12 +1087,6 @@ async def update_test_result(
     if updates:
         from computor_backend.repositories.result import ResultRepository
         result = ResultRepository(db, cache).update(str(test_id), updates)
-        from computor_types.tasks import ResultStatus
-        if updates.get("status") in (
-            int(ResultStatus.FINISHED), int(ResultStatus.FAILED),
-            int(ResultStatus.CANCELLED), int(ResultStatus.CRASHED),
-        ):
-            release_for_result(db, result.id)
 
     logger.info("Updated test result %s (cache invalidated)", test_id)
 
