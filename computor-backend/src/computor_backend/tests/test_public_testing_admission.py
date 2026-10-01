@@ -8,6 +8,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -26,6 +27,7 @@ from computor_backend.exceptions import ForbiddenException, RateLimitException
 from computor_backend.model.public_grading_reservation import PublicGradingReservation
 from computor_backend.tasks.temporal_executor import TaskNotFoundError, TaskRegistrationError
 from computor_types.tasks import TaskStatus
+from computor_types.results import ResultUpdate
 
 ProbeBase = declarative_base()
 
@@ -127,6 +129,58 @@ def test_only_proven_terminal_or_local_pre_rpc_failure_releases(sessions):
         assert release_for_result(db, ids[1]) == 1
         db.commit()
     assert _admit(sessions, "student-testing-after-trusted-callback")
+
+
+@pytest.mark.asyncio
+async def test_worker_result_patch_immediately_reopens_a_slot(sessions, monkeypatch):
+    from computor_backend.api import results as result_api
+    from computor_backend.permissions import core
+    from computor_backend.services import result_storage
+
+    result_id = _admit(sessions, "student-testing-callback")
+    _admit(sessions, "student-testing-other-1")
+    _admit(sessions, "student-testing-other-2")
+
+    class Query:
+        def filter(self, *_conditions):
+            return self
+
+        def first(self):
+            return SimpleNamespace(id=result_id)
+
+    class Repo:
+        def __init__(self, db, cache):
+            pass
+
+        def update_entity(self, result, updates):
+            result.status = updates["status"]
+            return result
+
+    class DTO:
+        @classmethod
+        def model_validate(cls, result, **_kwargs):
+            return cls()
+
+        def model_dump(self):
+            return {"id": str(result_id)}
+
+    monkeypatch.setattr(core, "check_permissions", lambda *_args: Query())
+    monkeypatch.setattr(result_api, "ResultRepository", Repo)
+    monkeypatch.setattr(result_api, "ResultGet", DTO)
+    monkeypatch.setattr(result_storage, "retrieve_result_json", AsyncMock(return_value=None))
+
+    worker = SimpleNamespace(is_service=True, is_admin=False)
+    student = SimpleNamespace(is_service=False, is_admin=False)
+    with sessions() as db:
+        with pytest.raises(ForbiddenException):
+            await result_api.update_result(result_id, ResultUpdate(status=TaskStatus.FINISHED),
+                                           student, db, None)
+        assert _occupied(sessions) == 3
+        await result_api.update_result(result_id, ResultUpdate(status=TaskStatus.FINISHED),
+                                       worker, db, None)
+        db.commit()
+    assert _occupied(sessions) == 2
+    assert _admit(sessions, "student-testing-after-worker-patch")
 
 
 @pytest.mark.asyncio
