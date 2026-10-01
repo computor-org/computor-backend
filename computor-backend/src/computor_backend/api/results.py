@@ -6,6 +6,9 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from computor_backend.api._pagination import paginated_list
+from computor_backend.business_logic.public_testing_admission import (
+    release_for_result, require_public_result_writer,
+)
 from computor_backend.business_logic.crud import (
     create_entity as create_db,
     delete_entity as delete_db,
@@ -24,7 +27,7 @@ from computor_types.results import (
     ResultQuery,
 )
 from computor_backend.interfaces.result import ResultInterface
-from computor_types.tasks import TaskStatus
+from computor_types.tasks import ResultStatus, TaskStatus
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.repositories.result import ResultRepository
@@ -87,6 +90,7 @@ async def create_result(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db, scope="function"),
 ) -> ResultGet:
+    require_public_result_writer(permissions)
     return await create_db(
         permissions,
         db,
@@ -112,6 +116,7 @@ async def update_result(
     - Tutor views (GET /tutors/course-members/{id}/course-contents)
     - Lecturer views
     """
+    require_public_result_writer(permissions)
     # Initialize repository with cache for automatic invalidation
     result_repo = ResultRepository(db, cache)
 
@@ -144,6 +149,11 @@ async def update_result(
     # Use repository for cache-aware update (triggers invalidation)
     # Pass the entity directly to avoid re-querying
     result = result_repo.update_entity(db_result, updates)
+    if updates.get("status") in (
+        int(ResultStatus.FINISHED), int(ResultStatus.FAILED),
+        int(ResultStatus.CANCELLED), int(ResultStatus.CRASHED),
+    ):
+        release_for_result(db, result.id)
 
     # Fetch result_json from MinIO for response
     from computor_backend.services.result_storage import retrieve_result_json
@@ -161,6 +171,7 @@ async def delete_result(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db, scope="function"),
 ):
+    require_public_result_writer(permissions)
     await delete_db(permissions, db, result_id, ResultInterface.model)
 
 @result_router.get("/{result_id}/status", response_model=TaskStatus)

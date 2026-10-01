@@ -21,7 +21,10 @@ from sqlalchemy.orm import Session
 
 from computor_backend.business_logic.content_visibility import enforce_content_visible
 from computor_backend.business_logic.submission_limits import enforce_max_test_runs
-from computor_backend.exceptions import BadRequestException, NotFoundException
+from computor_backend.business_logic.public_testing_admission import (
+    commit_admitted_result, release_for_result, release_definitive_start_failure,
+)
+from computor_backend.exceptions import BadRequestException, NotFoundException, RateLimitException
 from computor_backend.model.artifact import SubmissionArtifact
 from computor_backend.model.result import Result
 from computor_types.tasks import (
@@ -207,12 +210,17 @@ async def sync_result_status_from_temporal(
         }
         new_status = terminal_map.get(task_info.status, int(ResultStatus.CRASHED))
 
+    released = 0
+    if task_info.status in (TaskStatus.FINISHED, TaskStatus.FAILED, TaskStatus.CANCELLED):
+        released = release_for_result(db, result.id)
     if new_status != result.status:
         logger.info(
             f"Status synced from Temporal for Result {result.id}: "
             f"{task_info.status} -> status {new_status}"
         )
         result.status = new_status
+        db.commit()
+    elif released:
         db.commit()
     return False
 
@@ -432,6 +440,9 @@ async def dispatch_submission_test(
     """
     try:
         return await _dispatch_submission_test(artifact, db)
+    except RateLimitException:
+        db.rollback()
+        raise
     except Exception:
         db.rollback()
         logger.exception(
@@ -557,9 +568,8 @@ async def _dispatch_submission_test(
         version_identifier=version_identifier,
         reference_version_identifier=deployment.version_identifier,
     )
-    db.add(result)
     try:
-        db.commit()
+        commit_admitted_result(db, result, workflow_id)
     except IntegrityError:
         # A racing request created the result; that one's workflow runs.
         db.rollback()
@@ -582,11 +592,12 @@ async def _dispatch_submission_test(
             queue=task_queue,
         )
         await task_executor.submit_task(submission)
-    except Exception:
+    except Exception as exc:
         logger.exception(
             "Task submission failed for submission-test Result %s", result.id
         )
         result.status = map_task_status_to_int(TaskStatus.FAILED)
+        release_definitive_start_failure(db, workflow_id, exc)
         db.commit()
         return result
 

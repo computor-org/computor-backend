@@ -90,10 +90,10 @@ def test_endpoint_refuses_before_insert_and_catches_the_race():
         "the version-keyed already-tested refusal is missing — a FINISHED row "
         "would fall through to the INSERT and 500 (issue #307)"
     )
-    assert source.index(version_refusal) < source.index("db.add(result)"), (
+    assert source.index(version_refusal) < source.index("commit_admitted_result(db, result, workflow_id)"), (
         "the refusal must precede the INSERT it is protecting"
     )
 
     # The concurrent-double-submit net around the commit.
     assert "except IntegrityError" in source
-    assert source.index("except IntegrityError") > source.index("db.add(result)")
+    assert source.index("except IntegrityError") > source.index("commit_admitted_result(db, result, workflow_id)")

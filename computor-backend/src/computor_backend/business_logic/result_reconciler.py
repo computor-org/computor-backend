@@ -25,9 +25,14 @@ from computor_backend.business_logic.testing_orchestration import (
     IN_PROGRESS_STATUSES,
     sync_result_status_from_temporal,
 )
+from computor_backend.business_logic.public_testing_admission import (
+    public_test_limit, release_for_workflow,
+)
 from computor_backend.database import get_db_session
+from computor_backend.model.public_grading_reservation import PublicGradingReservation
 from computor_backend.model.result import Result
 from computor_backend.redis_cache import get_redis_client
+from computor_types.tasks import TaskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -72,15 +77,50 @@ def _find_stale_results(db, cutoff: datetime) -> list[Result]:
     )
 
 
+async def _release_terminal_reservations(db, cutoff: datetime) -> int:
+    """Recover missed worker callbacks from authoritative Temporal executions."""
+    if public_test_limit() is None:
+        return 0
+    from computor_backend.tasks import get_task_executor
+    from computor_backend.tasks.temporal_executor import TaskNotFoundError
+
+    reservations = (db.query(PublicGradingReservation)
+                    .filter(PublicGradingReservation.released_at.is_(None),
+                            PublicGradingReservation.created_at < cutoff)
+                    .order_by(PublicGradingReservation.created_at.asc())
+                    .limit(RECONCILE_BATCH_SIZE).all())
+    if not reservations:
+        return 0
+    executor = get_task_executor()
+    released = 0
+    for reservation in reservations:
+        try:
+            task = await executor.get_task_status(reservation.workflow_id)
+        except TaskNotFoundError:
+            # No TTL: a not-found result is not proof that a late submit
+            # cannot still happen. Leave it reserved for operator review.
+            continue
+        except Exception:
+            logger.warning("Could not verify grading reservation %s", reservation.workflow_id,
+                           exc_info=True)
+            continue
+        if task.status in (TaskStatus.FINISHED, TaskStatus.FAILED, TaskStatus.CANCELLED):
+            released += release_for_workflow(db, reservation.workflow_id)
+    if released:
+        db.commit()
+    return released
+
+
 async def reconcile_stale_results() -> int:
     """Reconcile one batch of stale in-progress results. Returns rows changed."""
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=RECONCILE_MIN_AGE_MINUTES)
     changed = 0
 
     with get_db_session() as db:
+        changed += await _release_terminal_reservations(db, cutoff)
         stale = _find_stale_results(db, cutoff)
         if not stale:
-            return 0
+            return changed
 
         logger.info("Result reconciler: checking %d stale in-progress result(s)", len(stale))
         for result in stale:

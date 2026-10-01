@@ -18,6 +18,7 @@ from .course import (
     CourseMemberComment
 )
 from .result import Result
+from .public_grading_reservation import PublicGradingReservation
 from .role import Role, RoleClaim, UserRole
 from .group import Group, GroupClaim, UserGroup
 from .message import Message, MessageRead
@@ -43,6 +44,7 @@ from . import (
     group,
     course,
     result,
+    public_grading_reservation,
     message,
     message_audit,
     example,

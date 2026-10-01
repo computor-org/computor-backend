@@ -34,6 +34,9 @@ from computor_backend.business_logic.testing_orchestration import (
     service_type_config_payload,
     sync_result_status_from_temporal,
 )
+from computor_backend.business_logic.public_testing_admission import (
+    commit_admitted_result, public_test_limit, release_definitive_start_failure,
+)
 from computor_types.tasks import ResultStatus
 from computor_backend.database import get_db, set_db_user
 from computor_backend.redis_cache import get_redis_client, get_cache
@@ -99,7 +102,12 @@ async def check_user_rate_limit(user_id: str, cache) -> bool:
                 return False
     except Exception as e:
         logger.error(f"Error checking user rate limit: {e}")
-        # On error, allow the request (fail open)
+        if public_test_limit() is not None:
+            raise RateLimitException(
+                error_code="RATE_003", detail="Testing is busy. Please try again shortly.",
+                retry_after=5,
+            ) from e
+        # Legacy/private deployments keep their existing fail-open behaviour.
         return False
 
 @tests_router.post("", response_model=ResultList)
@@ -378,9 +386,8 @@ async def create_test_run(
     # other (double-click, retrying client) can both pass them and only the
     # index can arbitrate. Translate that into the same 400 rather than a 500 —
     # the rate limiter makes this rare, not impossible.
-    db.add(result)
     try:
-        db.commit()
+        commit_admitted_result(db, result, workflow_id)
     except IntegrityError:
         db.rollback()
         raise BadRequestException(
@@ -416,6 +423,7 @@ async def create_test_run(
         # If task submission fails, update result status to FAILED
         logger.error(f"Task submission failed for Result {result.id}: {str(e)}")
         result.status = map_task_status_to_int(TaskStatus.FAILED)
+        release_definitive_start_failure(db, workflow_id, e)
         db.commit()
         db.refresh(result)
         raise

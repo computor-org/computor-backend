@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, joinedload, contains_eager, aliased
 from sqlalchemy import and_, or_, exists, func as sql_func
 
 from computor_backend.api._pagination import paginated_list
+from computor_backend.business_logic.public_testing_admission import require_public_result_writer
 from computor_backend.exceptions import (
     BadRequestException,
     ForbiddenException,
@@ -891,6 +892,7 @@ async def create_test_result_endpoint(
     db: Session = Depends(get_db, scope="function"),
 ):
     """Create a test result for an artifact. Checks for test limitations."""
+    require_public_result_writer(permissions)
 
     # Set user context for audit tracking
     set_db_user(db, permissions.user_id)
@@ -1008,6 +1010,7 @@ async def update_test_result_endpoint(
     cache: Cache = Depends(get_cache),
 ):
     """Update a test result (e.g., when test completes). Only the test runner or admin can update."""
+    require_public_result_writer(permissions)
 
     result = await update_test_result(
         test_id=test_id,

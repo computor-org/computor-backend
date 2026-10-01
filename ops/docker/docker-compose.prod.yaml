@@ -171,6 +171,7 @@ services:
       # true = public deployment: template workflows refuse to run without
       # CODER_WORKSPACE_CGROUP_PARENT (aggregate slice incl. TasksMax).
       COMPUTOR_PUBLIC_DEPLOYMENT: ${COMPUTOR_PUBLIC_DEPLOYMENT:-false}
+      PUBLIC_TEST_MAX_INFLIGHT: ${PUBLIC_TEST_MAX_INFLIGHT:-100}
       # Creates/refreshes the coder worker's restricted DB role at startup
       # (scripts/ensure_coder_worker_db_role.py; no-op when empty).
       CODER_WORKER_DB_USER: ${CODER_WORKER_DB_USER:-computor_coder_worker}
