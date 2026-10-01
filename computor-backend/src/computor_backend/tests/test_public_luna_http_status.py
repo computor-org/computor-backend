@@ -109,6 +109,10 @@ def test_other_authenticated_user_cannot_read_queued_job(luna_client, caplog):
     submitted = client.post("/public-luna/requests", json=payload())
     assert submitted.status_code == 202
     job_id = submitted.json()["id"]
+    duplicate = client.post("/public-luna/requests", json=payload())
+    assert duplicate.status_code == 429
+    assert duplicate.json() == {"message": "A Luna request is already pending"}
+    assert_private(caplog, duplicate)
     actor["user_id"] = "another-owned-learner"
     denied = client.get(f"/public-luna/requests/{job_id}")
     assert denied.status_code == 404
