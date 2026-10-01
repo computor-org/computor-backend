@@ -34,6 +34,8 @@ jobs:
           computor-backend/src/computor_backend/tests/test_keycloak_healthcheck.py
           computor-backend/src/computor_backend/tests/test_keycloak_idp_setup_retry.py
           computor-backend/src/computor_backend/tests/test_log_redaction.py
+          computor-backend/src/computor_backend/tests/test_public_luna_log_privacy.py
+          computor-backend/src/computor_backend/tests/test_public_luna_queue.py
           computor-backend/src/computor_backend/tests/test_password_hashing.py
           computor-backend/src/computor_backend/tests/test_route_shadowing.py
           computor-backend/src/computor_backend/tests/test_sso_redirect_allowlist.py
@@ -74,6 +76,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_public_learning.py
           computor-backend/src/computor_backend/tests/test_public_catalog_anonymous.py
           computor-backend/src/computor_backend/tests/test_course_public_flag_authz.py
+          computor-backend/src/computor_backend/tests/test_public_luna_access.py
 
   grading-isolation:
     # Hostile-snippet tests for grading jobs (#237). Sandbox-dependent cases
