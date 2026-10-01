@@ -1,7 +1,7 @@
 """Real PostgreSQL oracles for public grading queue admission and recovery.
 
-Set PUBLIC_TESTING_TEST_DATABASE_URL to an isolated disposable PostgreSQL DB.
-The fixture owns only its two probe tables and leaves production data untouched.
+Set PUBLIC_TESTING_TEST_DATABASE_URL to a disposable PostgreSQL test database.
+Each fixture creates a random schema, separate from the public-course fixtures.
 """
 
 import os
@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import Column, Integer, create_engine, func
+from sqlalchemy import Column, Integer, create_engine, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -43,13 +43,21 @@ def sessions(monkeypatch):
         pytest.skip("requires isolated PUBLIC_TESTING_TEST_DATABASE_URL")
     monkeypatch.setenv("COMPUTOR_PUBLIC_DEPLOYMENT", "true")
     monkeypatch.setenv("PUBLIC_TEST_MAX_INFLIGHT", "3")
-    engine = create_engine(url, pool_size=8, max_overflow=0)
-    PublicGradingReservation.__table__.create(engine)
-    ProbeBase.metadata.create_all(engine)
-    yield sessionmaker(bind=engine)
-    ProbeBase.metadata.drop_all(engine)
-    PublicGradingReservation.__table__.drop(engine)
-    engine.dispose()
+    schema = f"grading_{uuid4().hex}"
+    admin_engine = create_engine(url)
+    with admin_engine.begin() as db:
+        db.execute(text(f'CREATE SCHEMA "{schema}"'))
+    engine = create_engine(url, pool_size=8, max_overflow=0,
+                           connect_args={"options": f"-csearch_path={schema}"})
+    try:
+        PublicGradingReservation.__table__.create(engine)
+        ProbeBase.metadata.create_all(engine)
+        yield sessionmaker(bind=engine)
+    finally:
+        engine.dispose()
+        with admin_engine.begin() as db:
+            db.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+        admin_engine.dispose()
 
 
 def _admit(factory, workflow_id):
