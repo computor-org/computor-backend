@@ -822,6 +822,7 @@ async def start_workspace(
         # one — the build parameters are what the container and the ingress are
         # rendered from, and Coder carries them forward untouched.
         overrides = _current_app_credential_params(db, username)
+        await client.ensure_user_active(username)
         success = await client.start_workspace(
             username, workspace_name, policy=policy, param_overrides=overrides
         )

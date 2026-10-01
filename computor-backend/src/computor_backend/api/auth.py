@@ -19,6 +19,8 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from computor_backend.coder.client import get_coder_client
+from computor_backend.coder.exceptions import CoderError
 from computor_backend.coder.keepalive import bump_workspace_activity
 from computor_backend.coder.naming import coder_username_matches_user
 from computor_backend.database import get_db
@@ -920,6 +922,19 @@ async def verify_coder_access(
 
     # User is authorized
     logger.info(f"User {principal.user_id} authorized for workspace {workspace_name}")
+
+    # A direct tab load may be the first request since Coder's dormancy sweep.
+    # Our ForwardAuth login does not update Coder's last_seen_at; bring only a
+    # dormant owner back before serving editor HTML. Assets/XHR stay on the
+    # existing fast path, with the throttled keepalive covering ongoing use.
+    if _is_browser_navigation(request):
+        try:
+            await get_coder_client().ensure_user_active(url_owner)
+        except CoderError:
+            return JSONResponse(
+                status_code=503,
+                content={"detail": "Workspace authorization is temporarily unavailable"},
+            )
 
     # This ForwardAuth hit is the only activity signal Coder gets (browser
     # traffic bypasses Coder's proxy), so push the workspace's auto-stop
