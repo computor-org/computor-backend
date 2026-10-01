@@ -245,13 +245,10 @@ cmd_up() {
         create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder/registry"
         create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/coder/templates"
 
-        # Seed/sync default templates from repo. Deployed template dirs carrying a
-        # .computor-managed marker are re-synced from the repo on every startup so
-        # template changes actually propagate; dirs WITHOUT the marker (operator-
-        # customized, or seeded before markers existed) are never touched — delete
-        # such a dir once to adopt syncing. The loop enumerates the REPO, not the
-        # deployed root: a dir that exists only there (a template created in the
-        # web UI, `cloned_from` in its template.json) is never visited at all.
+        # Seed/sync default templates from repo. The helper runs in a bounded
+        # container so old UID-1000-owned directories do not block deployment.
+        # It stages complete, non-root-readable copies before replacing managed
+        # directories, and never changes operator-customized directories.
         #
         # EVERY template is seeded, whether or not this deployment intends to
         # offer it. Seeding is a few kilobytes per directory; what costs anything
@@ -260,23 +257,17 @@ cmd_up() {
         # already on disk.
         if [ -d "${OPS_DIR}/coder/templates" ]; then
             log "  ${GREEN}Seeding Coder templates...${NC}"
-            for tpl_dir in "${OPS_DIR}/coder/templates"/*/; do
-                tpl_name=$(basename "$tpl_dir")
-                deployed_dir="${SYSTEM_DEPLOYMENT_PATH}/coder/templates/${tpl_name}"
-                if [ ! -d "$deployed_dir" ]; then
-                    echo "    Copying template: ${tpl_name}"
-                    cp -r "$tpl_dir" "$deployed_dir"
-                    touch "$deployed_dir/.computor-managed"
-                elif [ -f "$deployed_dir/.computor-managed" ]; then
-                    echo "    Syncing managed template: ${tpl_name}"
-                    rm -rf "$deployed_dir"
-                    cp -r "$tpl_dir" "$deployed_dir"
-                    touch "$deployed_dir/.computor-managed"
-                else
-                    warn "    Template ${tpl_name} is unmanaged (no .computor-managed marker) — left as-is."
-                    echo "      Delete ${deployed_dir} once to adopt automatic syncing."
-                fi
-            done
+            [ ! -L "${SYSTEM_DEPLOYMENT_PATH}/coder/templates" ] \
+                || die "Coder templates path must not be a symlink"
+            docker run --rm --network none --read-only --security-opt no-new-privileges \
+                --user 0:0 --cap-drop ALL --cap-add CHOWN --cap-add DAC_OVERRIDE \
+                --cap-add FOWNER --pids-limit 64 --memory 128m \
+                --entrypoint sh \
+                -v "${OPS_DIR}/coder/templates:/source:ro" \
+                -v "${SYSTEM_DEPLOYMENT_PATH}/coder/templates:/target" \
+                -v "${OPS_DIR}/lib/seed_coder_templates.sh:/seed.sh:ro" \
+                alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 \
+                -e /seed.sh /source /target "$(id -u)" "$(id -g)"
         fi
 
         # Render the workspace-ingress allowlist. This is the file that decides
