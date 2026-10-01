@@ -522,7 +522,8 @@ class CoderClient:
             "POST",
             f"/api/v2/users/{user_id}/keys/tokens",
             json={
-                "lifetime": 60,
+                # Coder's Go time.Duration JSON field is nanoseconds.
+                "lifetime": 60_000_000_000,
                 "scope": "all",
                 "token_name": f"computor-last-seen-{secrets.token_hex(6)}",
             },

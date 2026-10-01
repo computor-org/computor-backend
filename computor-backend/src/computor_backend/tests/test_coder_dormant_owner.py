@@ -52,7 +52,7 @@ async def test_existing_owner_is_usable_without_reactivating_suspensions(initial
             return httpx.Response(200, json=_coder_user("active"))
         if request.method == "POST" and request.url.path == "/api/v2/users/coder-user-id/keys/tokens":
             issued = json.loads(request.content)
-            assert 0 < issued["lifetime"] <= 60
+            assert issued["lifetime"] == 60_000_000_000  # Coder expects nanoseconds
             assert issued["token_name"].startswith("computor-last-seen-")
             state["issued"] += 1
             return httpx.Response(201, json={"key": "ephemeral1-secret"})
