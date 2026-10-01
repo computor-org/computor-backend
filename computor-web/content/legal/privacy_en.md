@@ -179,8 +179,9 @@ This supports learning and feedback under Art. 6(1)(e) GDPR in conjunction
 with §§ 2 and 3 UG. Luna's answers may be wrong and do not assess you.
 
 The inference server does not log the contents of questions, code, plots or
-answers and does not use them to train a model. It keeps a separate, bounded
-performance cache in memory and on local disk. Cached prompt state is evicted
+answers and does not use them to train a model. It uses a bounded model cache
+in memory and on local disk, shared with other local inference requests.
+Cached prompt state is evicted
 as the cache fills or during maintenance; there is no fixed deletion time for
 an individual cache entry. Operational records contain request size, timing
 and status, without those contents. Your submitted work and course messages

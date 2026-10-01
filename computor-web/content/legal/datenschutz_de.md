@@ -193,8 +193,9 @@ Antworten können falsch sein und sind keine Beurteilung.
 
 Der Inferenzserver protokolliert weder Fragen, Code, Abbildungen noch
 Antworten und verwendet diese nicht zum Training eines Modells. Ein
-separater, größenbegrenzter Zwischenspeicher im Arbeitsspeicher und auf lokaler
-Festplatte beschleunigt Anfragen. Einträge werden bei Erreichen der
+größenbegrenzter Modell-Zwischenspeicher im Arbeitsspeicher und auf lokaler
+Festplatte beschleunigt Anfragen; er wird mit anderen lokalen Inferenzanfragen
+geteilt. Einträge werden bei Erreichen der
 Speichergrenze oder bei Wartung entfernt; für einen einzelnen Eintrag gibt es
 keine feste Löschfrist. Betriebsdaten enthalten Umfang, Dauer und Status
 einer Anfrage, aber keine Inhalte. Abgaben und Kursnachrichten bleiben auf
