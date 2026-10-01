@@ -172,9 +172,9 @@ traceability and the defence of legal claims.
 
 ### 4.8 Luna tutoring
 
-When you ask Luna for help, we send your question, the relevant exercise and
-the code or plots you submitted for that exercise to a TU Graz-operated model
-server in Austria. Luna's answer is returned to your course conversation.
+In the public Ask Luna form, we send your question, the code or result text you
+choose to paste, and the visible exercise description to a TU Graz-operated
+model server in Austria. The answer is shown only to your account in that form.
 This supports learning and feedback under Art. 6(1)(e) GDPR in conjunction
 with §§ 2 and 3 UG. Luna's answers may be wrong and do not assess you.
 
@@ -184,8 +184,9 @@ in memory and on local disk, shared with other local inference requests.
 Cached prompt state is evicted
 as the cache fills or during maintenance; there is no fixed deletion time for
 an individual cache entry. Operational records contain request size, timing
-and status, without those contents. Your submitted work and course messages
-remain on the platform for the periods in section 8.
+and status, without those contents. On the platform, the public request waits
+for at most 15 minutes and its answer is available to you for 24 hours.
+Separate course submissions and messages remain for the periods in section 8.
 
 ## 5. Who sees your data
 
@@ -257,6 +258,8 @@ Without these cookies, however, signing in is not possible.
 | Workspace files (home directory) | until your account is deleted |
 | Chat account and messages | until you delete messages or your chat account, or ask us to delete it |
 | Web server access logs (log data) | 14 days |
+| Public Ask Luna request on the platform | at most 15 minutes while queued or running |
+| Public Ask Luna answer on the platform | 24 hours after completion |
 | Luna inference cache | evicted as its fixed capacity is reached or during maintenance; no fixed per-request expiry |
 | Security alerts attributed to an account | 90 days |
 | Enquiries and reports | until closed, then at most three years |

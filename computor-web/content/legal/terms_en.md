@@ -79,7 +79,7 @@ certificate or a confirmation of competence. If a university course uses
 results for an assessment, the responsible teacher decides under the
 applicable regulations.
 
-3.6 When you ask Luna, your question and relevant submitted work are processed
+3.6 When you ask Luna, your question and the work you choose to paste are processed
 on TU Graz-operated inference servers to generate a learning aid. Luna can be
 wrong; its answer is not an official assessment. Processing and storage are
 explained in the [Privacy notice](/privacy).

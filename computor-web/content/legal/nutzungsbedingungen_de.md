@@ -78,8 +78,8 @@ kein Zeugnis und keine Bestätigung von Kenntnissen. Zieht eine
 Lehrveranstaltung Ergebnisse für eine Beurteilung heran, entscheidet die
 jeweilige Lehrperson nach den dafür geltenden Vorschriften.
 
-3.6 Wenn Sie Luna fragen, werden Ihre Frage und die betreffende abgegebene
-Arbeit auf Inferenzservern der TU Graz verarbeitet, um eine Lernhilfe zu
+3.6 Wenn Sie Luna fragen, werden Ihre Frage und die Arbeit, die Sie selbst
+einfügen, auf Inferenzservern der TU Graz verarbeitet, um eine Lernhilfe zu
 erzeugen. Luna kann sich irren; ihre Antwort ist keine offizielle Beurteilung.
 Die Verarbeitung und Speicherung erläutert die [Datenschutzerklärung](/privacy).
 

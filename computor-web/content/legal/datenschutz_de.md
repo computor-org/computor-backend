@@ -184,10 +184,11 @@ Nachvollziehbarkeit und zur Abwehr von Ansprüchen.
 
 ### 4.8 Lernhilfe Luna
 
-Wenn Sie Luna um Hilfe bitten, übermitteln wir Ihre Frage, die betreffende
-Übung sowie den dafür abgegebenen Code oder die abgegebenen Abbildungen an
-einen von der TU Graz betriebenen Modellserver in Österreich. Lunas Antwort
-erscheint in Ihrer Kursunterhaltung. Zweck ist die Lernhilfe und das Feedback
+Im öffentlichen Formular „Luna fragen“ übermitteln wir Ihre Frage, den Code
+oder Ergebnistext, den Sie selbst einfügen, sowie die sichtbare
+Übungsbeschreibung an einen von der TU Graz betriebenen Modellserver in
+Österreich. Die Antwort wird nur Ihrem Konto in diesem Formular angezeigt.
+Zweck ist die Lernhilfe und das Feedback
 auf Grundlage von Art. 6 Abs. 1 lit. e DSGVO iVm §§ 2 und 3 UG. Lunas
 Antworten können falsch sein und sind keine Beurteilung.
 
@@ -198,8 +199,10 @@ Festplatte beschleunigt Anfragen; er wird mit anderen lokalen Inferenzanfragen
 geteilt. Einträge werden bei Erreichen der
 Speichergrenze oder bei Wartung entfernt; für einen einzelnen Eintrag gibt es
 keine feste Löschfrist. Betriebsdaten enthalten Umfang, Dauer und Status
-einer Anfrage, aber keine Inhalte. Abgaben und Kursnachrichten bleiben auf
-der Plattform für die in Abschnitt 8 genannten Fristen gespeichert.
+einer Anfrage, aber keine Inhalte. Auf der Plattform bleibt eine öffentliche
+Luna-Anfrage höchstens 15 Minuten in Bearbeitung; die Antwort ist für Sie
+24 Stunden verfügbar. Andere Abgaben und Kursnachrichten bleiben für die in
+Abschnitt 8 genannten Fristen gespeichert.
 
 ## 5. Wer Ihre Daten sieht
 
@@ -273,6 +276,8 @@ jedoch nicht möglich.
 | Workspace-Dateien (Home-Verzeichnis) | bis zur Löschung Ihres Kontos |
 | Chat-Konto und Nachrichten | bis Sie Nachrichten oder Ihr Chat-Konto löschen bzw. dessen Löschung verlangen |
 | Zugriffsprotokolle des Webservers (Logdaten) | 14 Tage |
+| Öffentliche Luna-Anfrage auf der Plattform | höchstens 15 Minuten während Warteschlange oder Bearbeitung |
+| Öffentliche Luna-Antwort auf der Plattform | 24 Stunden nach Fertigstellung |
 | Luna-Inferenzcache | Löschung bei Erreichen der festen Speichergrenze oder bei Wartung; keine feste Frist pro Anfrage |
 | Sicherheitsmeldungen mit Kontozuordnung | 90 Tage |
 | Anfragen und Meldungen | bis zur Erledigung, danach höchstens drei Jahre |
