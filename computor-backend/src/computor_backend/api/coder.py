@@ -30,6 +30,7 @@ from computor_backend.coder.naming import (
     coder_username_matches_user,
     decode_coder_username,
     derive_workspace_name,
+    encode_coder_username,
     sanitize_workspace_name,
 )
 from computor_backend.exceptions import (
