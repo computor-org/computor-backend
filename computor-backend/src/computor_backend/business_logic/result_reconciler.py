@@ -21,18 +21,26 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from sqlalchemy import or_
+
 from computor_backend.business_logic.testing_orchestration import (
     IN_PROGRESS_STATUSES,
     sync_result_status_from_temporal,
 )
+from computor_backend.business_logic.public_testing_admission import (
+    public_test_limit, release_for_workflow,
+)
 from computor_backend.database import get_db_session
+from computor_backend.model.public_grading_reservation import PublicGradingReservation
 from computor_backend.model.result import Result
 from computor_backend.redis_cache import get_redis_client
+from computor_types.tasks import ResultStatus, TaskStatus
 
 logger = logging.getLogger(__name__)
 
 # How often to sweep.
 POLL_INTERVAL_SECONDS = 300
+PUBLIC_POLL_INTERVAL_SECONDS = 30
 
 # Only reconcile rows that have been in progress at least this long. The
 # student-testing workflow has a 30 minute execution timeout, so anything
@@ -46,14 +54,14 @@ RECONCILE_BATCH_SIZE = 100
 
 # Only one API replica should sweep at a time.
 LOCK_KEY = "testing:result_reconciler:lock"
-LOCK_TTL_SECONDS = POLL_INTERVAL_SECONDS - 30
 
 
 async def _acquire_lock() -> bool:
     """Best-effort cross-replica mutex. Fails open to *not* running."""
     try:
         redis = await get_redis_client()
-        return bool(await redis.set(LOCK_KEY, "1", ex=LOCK_TTL_SECONDS, nx=True))
+        interval = PUBLIC_POLL_INTERVAL_SECONDS if public_test_limit() is not None else POLL_INTERVAL_SECONDS
+        return bool(await redis.set(LOCK_KEY, "1", ex=interval - 5, nx=True))
     except Exception as e:  # pragma: no cover - redis hiccup
         logger.warning(f"Result reconciler could not acquire lock: {e}")
         return False
@@ -72,15 +80,56 @@ def _find_stale_results(db, cutoff: datetime) -> list[Result]:
     )
 
 
+async def _release_terminal_reservations(db, cutoff: datetime) -> int:
+    """Recover missed worker callbacks from authoritative Temporal executions."""
+    if public_test_limit() is None:
+        return 0
+    from computor_backend.tasks import get_task_executor
+    from computor_backend.tasks.temporal_executor import TaskNotFoundError
+
+    terminal = tuple(int(status) for status in (
+        ResultStatus.FINISHED, ResultStatus.FAILED,
+        ResultStatus.CANCELLED, ResultStatus.CRASHED,
+    ))
+    reservations = (db.query(PublicGradingReservation)
+                    .outerjoin(Result, Result.id == PublicGradingReservation.result_id)
+                    .filter(PublicGradingReservation.released_at.is_(None),
+                            or_(Result.status.in_(terminal), Result.id.is_(None),
+                                PublicGradingReservation.created_at < cutoff))
+                    .order_by(PublicGradingReservation.created_at.asc())
+                    .limit(RECONCILE_BATCH_SIZE).all())
+    if not reservations:
+        return 0
+    executor = get_task_executor()
+    released = 0
+    for reservation in reservations:
+        try:
+            task = await executor.get_task_status(reservation.workflow_id)
+        except TaskNotFoundError:
+            # No TTL: a not-found result is not proof that a late submit
+            # cannot still happen. Leave it reserved for operator review.
+            continue
+        except Exception:
+            logger.warning("Could not verify grading reservation %s", reservation.workflow_id,
+                           exc_info=True)
+            continue
+        if task.status in (TaskStatus.FINISHED, TaskStatus.FAILED, TaskStatus.CANCELLED):
+            released += release_for_workflow(db, reservation.workflow_id)
+    if released:
+        db.commit()
+    return released
+
+
 async def reconcile_stale_results() -> int:
     """Reconcile one batch of stale in-progress results. Returns rows changed."""
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=RECONCILE_MIN_AGE_MINUTES)
     changed = 0
 
     with get_db_session() as db:
+        changed += await _release_terminal_reservations(db, cutoff)
         stale = _find_stale_results(db, cutoff)
         if not stale:
-            return 0
+            return changed
 
         logger.info("Result reconciler: checking %d stale in-progress result(s)", len(stale))
         for result in stale:
@@ -137,7 +186,8 @@ class ResultReconciler:
             while self._running:
                 # Sleep first: at boot the workers may not have reconnected yet,
                 # and nothing here is urgent.
-                await asyncio.sleep(POLL_INTERVAL_SECONDS)
+                interval = PUBLIC_POLL_INTERVAL_SECONDS if public_test_limit() is not None else POLL_INTERVAL_SECONDS
+                await asyncio.sleep(interval)
                 if not self._running:
                     break
                 try:

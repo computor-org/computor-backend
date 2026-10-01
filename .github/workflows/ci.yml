@@ -68,6 +68,7 @@ jobs:
       POSTGRES_DB: computor_plan_test
       CODER_ADMIN_EMAIL: ci@example.invalid
       CODER_ADMIN_PASSWORD: synthetic-test-password
+      PUBLIC_TESTING_TEST_DATABASE_URL: postgresql://computor_plan:synthetic-test-password@localhost:5432/computor_plan_test
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
@@ -79,6 +80,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_public_catalog_anonymous.py
           computor-backend/src/computor_backend/tests/test_course_public_flag_authz.py
           computor-backend/src/computor_backend/tests/test_public_luna_access.py
+          computor-backend/src/computor_backend/tests/test_public_testing_admission.py
 
   grading-isolation:
     # Hostile-snippet tests for grading jobs (#237). Sandbox-dependent cases

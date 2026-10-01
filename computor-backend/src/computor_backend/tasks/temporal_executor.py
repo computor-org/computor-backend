@@ -26,6 +26,10 @@ class TaskNotFoundError(Exception):
     """
 
 
+class TaskRegistrationError(ValueError):
+    """Task type was rejected locally, before contacting Temporal."""
+
+
 def _unwrap_workflow_result(result: Any) -> tuple[TaskStatus, Any, Optional[str]]:
     """Normalise a workflow's return payload to (status, inner result, error).
 
@@ -116,7 +120,7 @@ class TemporalTaskExecutor:
         try:
             workflow_class = task_registry.get_task(submission.task_name)
         except KeyError:
-            raise ValueError(f"Workflow '{submission.task_name}' not found in task registry")
+            raise TaskRegistrationError(f"Workflow '{submission.task_name}' not found in task registry")
         
         # Get Temporal client
         client = await get_temporal_client()

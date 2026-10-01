@@ -6,6 +6,9 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from computor_backend.api._pagination import paginated_list
+from computor_backend.business_logic.public_testing_admission import (
+    require_public_result_writer,
+)
 from computor_backend.business_logic.crud import (
     create_entity as create_db,
     delete_entity as delete_db,
@@ -87,6 +90,7 @@ async def create_result(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db, scope="function"),
 ) -> ResultGet:
+    require_public_result_writer(permissions)
     return await create_db(
         permissions,
         db,
@@ -112,6 +116,7 @@ async def update_result(
     - Tutor views (GET /tutors/course-members/{id}/course-contents)
     - Lecturer views
     """
+    require_public_result_writer(permissions)
     # Initialize repository with cache for automatic invalidation
     result_repo = ResultRepository(db, cache)
 
@@ -161,6 +166,7 @@ async def delete_result(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db, scope="function"),
 ):
+    require_public_result_writer(permissions)
     await delete_db(permissions, db, result_id, ResultInterface.model)
 
 @result_router.get("/{result_id}/status", response_model=TaskStatus)
