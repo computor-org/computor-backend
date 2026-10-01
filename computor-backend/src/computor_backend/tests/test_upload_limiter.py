@@ -22,6 +22,11 @@ def _app():
         seen["bytes"] = len(await request.body())
         return {"ok": True}
 
+    @app.post("/public-luna/requests")
+    async def luna_raw(request: Request):
+        seen["bytes"] = len(await request.body())
+        return {"ok": True}
+
     # max_size=0 -> limit is the 1 MiB metadata allowance
     app.add_middleware(UploadSizeLimiterMiddleware, max_size=0)
     return app, seen
@@ -63,6 +68,19 @@ def test_declared_oversize_content_length_is_refused_up_front():
     r = TestClient(app).post("/raw", content=b"x" * (2 * MIB))
     assert r.status_code == 413
     assert seen["bytes"] is None
+
+
+def test_public_luna_body_limit_is_smaller_for_declared_and_chunked_bodies():
+    app, seen = _app()
+    client = TestClient(app)
+    declared = client.post("/public-luna/requests", content=b"x" * (129 * 1024))
+    assert declared.status_code == 413
+    chunked = client.post("/public-luna/requests", content=_chunks(129 * 1024))
+    assert chunked.status_code == 413
+    assert seen["bytes"] is None
+    accepted = client.post("/public-luna/requests", content=_chunks(64 * 1024))
+    assert accepted.status_code == 200
+    assert seen["bytes"] == 64 * 1024
 
 
 def test_real_app_multipart_upload_chunked_over_limit_is_413():

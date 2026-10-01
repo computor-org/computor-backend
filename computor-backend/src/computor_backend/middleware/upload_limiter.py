@@ -4,11 +4,14 @@ Middleware to limit request body size and add timeouts for upload endpoints.
 Uses pure ASGI instead of BaseHTTPMiddleware to properly support WebSocket connections.
 """
 import logging
-from starlette.types import ASGIApp, Receive, Scope, Send
+
 from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
+
 from computor_backend.storage_config import MAX_UPLOAD_SIZE, format_bytes
 
 logger = logging.getLogger(__name__)
+PUBLIC_LUNA_BODY_LIMIT = 128 * 1024
 
 
 class UploadSizeLimiterMiddleware:
@@ -28,22 +31,22 @@ class UploadSizeLimiterMiddleware:
         # Add buffer for form metadata (1MB)
         self.max_total_size = max_size + (1 * 1024 * 1024)
 
-    def _too_large(self, received: int) -> JSONResponse:
+    def _too_large(self, received: int, limit: int) -> JSONResponse:
         return JSONResponse(
             status_code=413,  # Payload Too Large
             content={
                 "detail": {
-                    "error": f"Request body too large. Maximum allowed size is {format_bytes(self.max_size)} "
+                    "error": f"Request body too large. Maximum allowed size is {format_bytes(limit)} "
                             f"(received {format_bytes(received)})"
                 }
             }
         )
 
-    def _log(self, scope: Scope, size: int) -> None:
+    def _log(self, scope: Scope, size: int, limit: int) -> None:
         client = scope.get("client") or ("unknown", 0)
         logger.warning(
             f"Request rejected: size {format_bytes(size)} "
-            f"exceeds limit {format_bytes(self.max_total_size)} "
+            f"exceeds limit {format_bytes(limit)} "
             f"from {client[0]}"
         )
 
@@ -53,14 +56,20 @@ class UploadSizeLimiterMiddleware:
             await self.app(scope, receive, send)
             return
 
+        limit = (
+            min(self.max_total_size, PUBLIC_LUNA_BODY_LIMIT)
+            if scope.get("method") == "POST"
+            and scope.get("path", "").startswith("/public-luna/")
+            else self.max_total_size
+        )
+
         # Fast path: a declared Content-Length over the limit is refused
         # before any body byte is read.
         content_length = dict(scope.get("headers", [])).get(b"content-length")
-        if content_length and content_length.isdigit():
-            if int(content_length) > self.max_total_size:
-                self._log(scope, int(content_length))
-                await self._too_large(int(content_length))(scope, receive, send)
-                return
+        if content_length and content_length.isdigit() and int(content_length) > limit:
+            self._log(scope, int(content_length), limit)
+            await self._too_large(int(content_length), limit)(scope, receive, send)
+            return
 
         # The header can be absent (chunked transfer) or wrong, so also count
         # the body bytes actually delivered. Past the limit the 413 is sent
@@ -78,11 +87,11 @@ class UploadSizeLimiterMiddleware:
             message = await receive()
             if message["type"] == "http.request":
                 received += len(message.get("body", b""))
-                if received > self.max_total_size:
-                    self._log(scope, received)
+                if received > limit:
+                    self._log(scope, received, limit)
                     rejected = True
                     if not response_started:
-                        await self._too_large(received)(scope, receive, send)
+                        await self._too_large(received, limit)(scope, receive, send)
                     return {"type": "http.disconnect"}
             return message
 

@@ -1,6 +1,6 @@
 # Nutzungsbedingungen computor.at
 
-Version 1.0, gültig ab 30.09.2026
+Version 1.1, gültig ab 01.10.2026
 
 ## Das Wichtigste in Kürze
 
@@ -34,7 +34,7 @@ Vorgaben der Lehrveranstaltung. Bei einem Widerspruch gehen diese vor.
 
 ## 2. Konto und Vertragsabschluss
 
-2.1 Sie melden sich über Ihr GitHub-Konto an. Beim ersten Login bestätigen
+2.1 Sie erstellen ein Konto mit bestätigter E-Mail-Adresse und Passwort. Beim ersten Login bestätigen
 Sie, diese Nutzungsbedingungen zu akzeptieren. Damit kommt ein unentgeltlicher
 Nutzungsvertrag auf unbestimmte Zeit zustande. Den Chat chat.computor.at können
 Sie auch mit einem eigenen Chat-Konto nutzen; auch dafür gelten diese
@@ -46,14 +46,14 @@ daher selbst vereinbaren (§ 170 Abs. 3 ABGB). Konten von Personen unter 14
 Jahren löschen wir, sobald wir davon erfahren.
 
 2.3 Jede Person darf nur ein Konto haben. Konten sind nicht übertragbar.
-Schützen Sie den Zugang zu Ihrem GitHub-Konto. Wenn Sie vermuten, dass jemand
+Schützen Sie Ihr Passwort und Ihr E-Mail-Konto. Wenn Sie vermuten, dass jemand
 anderer Ihr Konto nutzt, melden Sie das bitte umgehend an security@computor.at.
 
 ## 3. Leistungen
 
 3.1 Wir stellen unentgeltlich bereit: Kurse und Übungsaufgaben, eine
 Programmierumgebung im Browser („Workspace“), die automatische Prüfung Ihrer
-Abgaben, Git-Repositories für Ihre Abgaben und einen Chat.
+Abgaben, Git-Repositories für Ihre Abgaben, einen Chat und optionale Luna-Lernhilfe.
 
 3.2 Wir betreiben die Plattform mit der Sorgfalt, die für ein universitäres
 Lernangebot üblich ist. Wartungsarbeiten kündigen wir, soweit möglich, vorher
@@ -76,6 +76,15 @@ Arbeit selbst, indem Sie sie über Git abgeben oder herunterladen.
 kein Zeugnis und keine Bestätigung von Kenntnissen. Zieht eine
 Lehrveranstaltung Ergebnisse für eine Beurteilung heran, entscheidet die
 jeweilige Lehrperson nach den dafür geltenden Vorschriften.
+
+3.6 Luna erzeugt KI-Lernhilfe aus Ihrer Frage, Ihrem ausgewählten Text und
+der sichtbaren Aufgabe. Luna führt keinen Code aus und bewertet keine Abgaben.
+Prüfen Sie Antworten; sie können falsch sein. Anfragen und Antworten werden wie
+in der Datenschutzerklärung beschrieben vorübergehend verarbeitet, einschließlich
+begrenzter Inferenz-Caches. Ihre Inhalte werden weder protokolliert noch zum
+Modelltraining verwendet. Verfügbarkeit und Anfragegrenzen hängen von der
+Kapazität ab. Öffentliche Beispiele können Sie auch mit Desktop-VS-Code oder
+optional GitHub Codespaces nach den dortigen Bedingungen bearbeiten.
 
 ## 4. Änderung und Einstellung von Leistungen
 

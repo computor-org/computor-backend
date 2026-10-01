@@ -21,6 +21,7 @@ import type { TestRunResult } from '@/src/components/student/TestResultTree';
 import GradingPanel from '@/src/components/student/GradingPanel';
 import GradingStatusBadge from '@/src/components/student/gradingStatus';
 import TestRunHistory from '@/src/components/student/TestRunHistory';
+import PublicLunaPanel from '@/src/components/student/PublicLunaPanel';
 import { displayName } from '@/src/utils/displayName';
 import { StudentsClient } from '@/src/generated/clients/StudentsClient';
 import { ResultsClient } from '@/src/generated/clients/ResultsClient';
@@ -147,6 +148,8 @@ export default function AssignmentDetailPage() {
                 <EmptyState compact title="No description." />
               )}
             </SectionCard>
+
+            <PublicLunaPanel key={assignmentId} assignmentId={assignmentId} />
 
             <SectionCard
               title="Latest test result"

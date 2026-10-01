@@ -122,8 +122,8 @@ class APIClient {
     if (contentType.includes('application/json')) {
       try {
         return JSON.parse(text) as T;
-      } catch (error) {
-        console.warn('Failed to parse JSON response', error);
+      } catch {
+        console.warn('Failed to parse JSON response');
       }
     }
 

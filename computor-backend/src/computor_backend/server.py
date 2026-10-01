@@ -17,6 +17,7 @@ from computor_backend.api.tests import tests_router
 from computor_backend.permissions.auth import get_current_principal, get_current_principal_optional
 from computor_backend.api.auth import auth_router
 from computor_backend.api.public_catalog import public_catalog_router
+from computor_backend.api.public_luna import router as public_luna_router
 from computor_backend.api.sessions import session_router
 from computor_backend.plugins.registry import initialize_plugin_registry
 from sqlalchemy.orm import Session
@@ -396,13 +397,14 @@ origins = [
 
 # Middleware order (last added = outermost = runs first):
 # 1. CORS (outermost) - ensures CORS headers on all responses including 503/403
-# 2. Maintenance - blocks non-GET for non-admins during maintenance
-# 3. Consent gate - 403 consent_required for authenticated users without
+# 2. Public Luna privacy - contains text-bearing errors before server logging
+# 3. Maintenance - blocks non-GET for non-admins during maintenance
+# 4. Consent gate - 403 consent_required for authenticated users without
 #    current GDPR consent. Auth in this app is a per-route dependency, so the
 #    gate resolves the user itself from the Redis principal/session caches
 #    (see middleware/consent.py); it must only run inside CORS so blocked
 #    responses carry CORS headers.
-# 4. Upload size limiter (innermost) - enforces body size limits
+# 5. Upload size limiter (innermost) - enforces body size limits
 from computor_backend.middleware import UploadSizeLimiterMiddleware, MaintenanceMiddleware, ConsentGateMiddleware
 
 
@@ -434,6 +436,8 @@ async def _tag_git_url_audience(request, call_next):
 app.add_middleware(UploadSizeLimiterMiddleware)
 app.add_middleware(ConsentGateMiddleware)
 app.add_middleware(MaintenanceMiddleware)
+from computor_backend.public_luna_privacy import PublicLunaPrivacyMiddleware
+app.add_middleware(PublicLunaPrivacyMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -745,6 +749,12 @@ app.include_router(
     prefix="/messages",
     tags=["messages"],
     dependencies=[Depends(get_current_principal)]
+)
+
+app.include_router(
+    public_luna_router,
+    prefix="/public-luna",
+    tags=["public luna"],
 )
 
 # Session management router is registered earlier, above CrudRouter(SessionInterface).

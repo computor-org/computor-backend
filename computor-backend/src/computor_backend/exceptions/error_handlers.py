@@ -14,6 +14,7 @@ import logging
 
 from computor_backend.exceptions.exceptions import ComputorException, BadRequestException, InternalServerException
 from computor_backend.settings import settings
+from computor_backend.public_luna_privacy import is_public_luna_scope
 
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
     SECURITY NOTE: Debug information is only included in development mode.
     """
+    if is_public_luna_scope(request.scope):
+        # Unknown JSON field names and validator messages may contain learner
+        # text. Retain only numeric diagnostics for this private text channel.
+        logger.warning("Invalid public Luna request", extra={
+            "status_code": 400, "validation_error_count": len(exc.errors()),
+        })
+        return JSONResponse({"message": "Invalid Luna request"}, status_code=400)
+
     # Extract validation errors
     errors = []
     for error in exc.errors():
@@ -239,6 +248,11 @@ def log_error(request: Request, exception: ComputorException, error_response_dic
         exception: The exception that was raised
         error_response_dict: Serialized error response
     """
+    if is_public_luna_scope(request.scope):
+        logger.log(logging.ERROR if exception.status_code >= 500 else logging.WARNING,
+                   "Public Luna request rejected", extra={"status_code": exception.status_code})
+        return
+
     log_data = {
         "error_code": exception.error_code,
         "status_code": exception.status_code,
