@@ -115,6 +115,9 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # Off by default; the outbound worker uses a separate key with no API role.
+      PUBLIC_LUNA_ENABLED: ${PUBLIC_LUNA_ENABLED:-false}
+      PUBLIC_LUNA_WORKER_KEY: ${PUBLIC_LUNA_WORKER_KEY:-}
       DEBUG_MODE: ${DEBUG_MODE}
       KEYCLOAK_ENABLED: ${KEYCLOAK_ENABLED:-true}
       ENABLE_KEYCLOAK: ${ENABLE_KEYCLOAK:-true}

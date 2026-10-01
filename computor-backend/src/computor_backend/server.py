@@ -17,6 +17,7 @@ from computor_backend.api.tests import tests_router
 from computor_backend.permissions.auth import get_current_principal, get_current_principal_optional
 from computor_backend.api.auth import auth_router
 from computor_backend.api.public_catalog import public_catalog_router
+from computor_backend.api.public_luna import router as public_luna_router
 from computor_backend.api.sessions import session_router
 from computor_backend.plugins.registry import initialize_plugin_registry
 from sqlalchemy.orm import Session
@@ -745,6 +746,12 @@ app.include_router(
     prefix="/messages",
     tags=["messages"],
     dependencies=[Depends(get_current_principal)]
+)
+
+app.include_router(
+    public_luna_router,
+    prefix="/public-luna",
+    tags=["public luna"],
 )
 
 # Session management router is registered earlier, above CrudRouter(SessionInterface).
