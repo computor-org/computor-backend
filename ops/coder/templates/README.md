@@ -48,7 +48,8 @@ A template directory must contain:
 1. `computor.sh up` seeds/syncs `ops/coder/templates/*` into `${SYSTEM_DEPLOYMENT_PATH}/coder/templates/`.
    Deployed dirs containing a `.computor-managed` marker are re-synced from the repo on every
    startup; dirs without the marker are left alone (operator-customized) — delete such a dir once
-   to adopt syncing.
+   to adopt syncing. The seed helper prepares readable copies before replacing managed dirs,
+   retains the previous dir until publication succeeds, and restores it after an interrupted swap.
 2. That directory is bind-mounted into the `coder` server (`/templates`) and the
    `temporal-worker-coder` (`/templates:ro`).
 3. `POST /coder/admin/templates/push` (with `build_images: true`) — or backend startup, when Coder
