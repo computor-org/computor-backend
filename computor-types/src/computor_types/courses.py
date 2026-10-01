@@ -9,8 +9,11 @@ from computor_types.gitlab import GitLabConfig, GitLabConfigGet
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 
 from computor_types.custom_types import Ltree
+from computor_types.assistant_policy import AssistantPolicy
 
 class CourseProperties(BaseModel):
+    assistant_guidance: Optional[str] = Field(default=None, max_length=8000)
+    assistant_policy: Optional[AssistantPolicy] = None
     gitlab: Optional[GitLabConfig] = None
     
     model_config = ConfigDict(
@@ -18,6 +21,8 @@ class CourseProperties(BaseModel):
     )
 
 class CoursePropertiesGet(BaseModel):
+    assistant_guidance: Optional[str] = Field(default=None, max_length=8000)
+    assistant_policy: Optional[AssistantPolicy] = None
     gitlab: Optional[GitLabConfigGet] = None
     
     model_config = ConfigDict(
@@ -129,6 +134,7 @@ class CourseList(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class CourseUpdate(BaseModel):
+    properties: Optional[CourseProperties] = None
     title: Optional[str] = None
     description: Optional[str] = None
     language_code: Optional[str] = None

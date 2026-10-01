@@ -140,6 +140,13 @@ def custom_permissions_course(permissions: Principal, db: Session, id, entity):
     )
     if "public" in fields:
         _guard_public_flag(permissions, db, id)
+    properties = getattr(entity, "properties", None) if isinstance(entity, BaseModel) else (entity or {}).get("properties")
+    if isinstance(properties, BaseModel):
+        properties = properties.model_dump(exclude_unset=True)
+    # Repository credentials and remote URLs have the same institutional trust
+    # boundary as publication. A teaching-policy edit must not expose them.
+    if properties and "gitlab" in properties:
+        _guard_public_flag(permissions, db, id)
 
     return check_permissions(permissions, Course, "update", db)
 

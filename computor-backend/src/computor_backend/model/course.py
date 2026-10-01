@@ -317,6 +317,16 @@ class CourseContent(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     # for every materialised CourseContent — visible as ``SubPlan 2`` /
     # ``SubPlan 3`` in EXPLAIN, with loops equal to the row count.
 
+    @property
+    def assistant_policy(self):
+        from computor_types.assistant_policy import resolve_assistant_policy
+        return resolve_assistant_policy(self.course.properties, self.properties)
+
+    @property
+    def assistant_guidance(self):
+        content = (self.properties or {}).get("assistant_guidance")
+        return content if content is not None else (self.course.properties or {}).get("assistant_guidance")
+
     # Column property for has_deployment - check if deployment exists
     @property 
     def has_deployment(self):

@@ -11,6 +11,7 @@ from computor_types.deployment import CourseContentDeploymentList
 from computor_types.results import ResultArtifactInfo
 
 from computor_types.custom_types import Ltree
+from computor_types.assistant_policy import AssistantPolicy
 
 class SubmissionGroupRepository(BaseModel):
     """Repository information for a submission group"""
@@ -90,6 +91,8 @@ class CourseContentStudentProperties(BaseModel):
     )
 
 class CourseContentStudentGet(BaseEntityGet):
+    assistant_guidance: Optional[str] = None
+    assistant_policy: Optional["AssistantPolicy"] = None
     id: str
     archived_at: Optional[datetime] = None
     title: Optional[str] = None
@@ -147,6 +150,8 @@ class CourseContentStudentGet(BaseEntityGet):
     model_config = ConfigDict(from_attributes=True)
 
 class CourseContentStudentList(BaseModel):
+    assistant_guidance: Optional[str] = None
+    assistant_policy: Optional["AssistantPolicy"] = None
     id: str
     title: Optional[str] = None
     description: Optional[str] = None

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { API_BASE_URL, apiFetch } from '@/src/utils/apiClient';
 import PublicCourseCatalog from '@/src/components/courses/PublicCourseCatalog';
+import LearningOptions from '@/src/components/courses/LearningOptions';
 import LegalLinks from '@/src/components/LegalLinks';
 import NetideeNotice from '@/src/components/NetideeNotice';
 
@@ -212,6 +213,7 @@ export default function Home() {
             </div>
           </div>
 
+          <div className="mt-12"><LearningOptions /></div>
           <PublicCourseCatalog signedIn={!!user} />
         </div>
       </main>

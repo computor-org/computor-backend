@@ -109,3 +109,17 @@ def test_an_update_that_omits_public_is_not_guarded():
     assert "public" not in update.model_fields_set
 
     custom_permissions_course(_principal("_lecturer"), _Session(), COURSE_ID, update)
+
+
+@pytest.mark.parametrize("role", ["_student", "_tutor", "_lecturer"])
+def test_repository_configuration_requires_maintainer(role):
+    with pytest.raises(ForbiddenException):
+        custom_permissions_course(_principal(role), _Session(), COURSE_ID,
+                                  CourseUpdate(properties={"gitlab": {"url": "https://example.invalid"}}))
+
+
+def test_lecturer_can_change_teaching_policy_without_repository_access():
+    custom_permissions_course(_principal("_lecturer"), _Session(), COURSE_ID,
+                              CourseUpdate(properties={"assistant_policy": {"independent_check": True}}))
+    custom_permissions_course(_principal("_maintainer"), _Session(), COURSE_ID,
+                              CourseUpdate(properties={"gitlab": None}))

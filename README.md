@@ -4,6 +4,11 @@ A university programming course management platform with automated GitLab integr
 
 ## Packages
 
+Read the public Python examples without an account, then practice in desktop VS
+Code or your own GitHub Codespace. Hosted workspaces remain optional and server
+execution remains authenticated. See [Course assistant and public learning](docs/course-assistant.md)
+for Hackl tutoring, BYOK, teaching policies and 26.10/27.3 compatibility.
+
 | Package | Description |
 |---------|-------------|
 | `computor-types` | Pydantic DTOs - shared data structures for API contracts |

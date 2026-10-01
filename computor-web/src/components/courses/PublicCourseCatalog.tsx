@@ -56,6 +56,10 @@ export default function PublicCourseCatalog({ signedIn }: { signedIn: boolean })
               ? 'Pilotbetrieb – Teilnahme mit Einladungslink / Pilot – join with an invite link'
               : 'Offen zur Anmeldung / Open for registration'}
           </p>
+          <p className="text-muted mt-1">
+            <Link href="/learn" className="text-accent-text hover:underline">Read public courses without an account</Link>
+            {' — practice in desktop VS Code or your own GitHub Codespace.'}
+          </p>
         </div>
         <div className="flex flex-col items-start sm:items-end gap-1">
           <Link

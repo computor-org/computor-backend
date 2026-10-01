@@ -7,12 +7,15 @@ from computor_types.gitlab import GitLabConfig, GitLabConfigGet
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 
 from computor_types.custom_types import Ltree
+from computor_types.assistant_policy import AssistantPolicy, AssistantPolicyOverride
 
 if TYPE_CHECKING:
     from .deployment import CourseContentDeploymentGet
 
 # Course Content Properties - deployment history moved to separate deployment table
 class CourseContentProperties(BaseModel):
+    assistant_guidance: Optional[str] = Field(default=None, max_length=8000)
+    assistant_policy: Optional[AssistantPolicyOverride] = None
     """Properties for course content (stored in JSONB)."""
     gitlab: Optional[GitLabConfig] = None
     # Additional custom properties can be stored here
@@ -22,6 +25,8 @@ class CourseContentProperties(BaseModel):
     )
 
 class CourseContentPropertiesGet(BaseModel):
+    assistant_guidance: Optional[str] = Field(default=None, max_length=8000)
+    assistant_policy: Optional[AssistantPolicyOverride] = None
     """Properties for course content GET responses."""
     gitlab: Optional[GitLabConfigGet] = None
     # Additional custom properties can be included here
@@ -58,6 +63,8 @@ class CourseContentCreate(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
 class CourseContentGet(BaseEntityGet):
+    assistant_guidance: Optional[str] = None
+    assistant_policy: Optional[AssistantPolicy] = None
     """DTO for course content GET responses."""
     id: str
     archived_at: Optional[datetime] = None

@@ -29,6 +29,7 @@ from fastapi import APIRouter, Response
 from computor_backend.business_logic.course_registration import list_anonymous_catalog
 from computor_backend.database import get_db_session
 from computor_types.courses import CoursePublicCatalogEntry
+from computor_types.public_learning import PublicLearningResources
 
 PUBLIC_CATALOG_TTL = 60.0
 
@@ -68,3 +69,22 @@ def list_public_catalog(response: Response) -> list[CoursePublicCatalogEntry]:
     remaining = max(0, math.floor(PUBLIC_CATALOG_TTL - (now - fetched_at)))
     response.headers["Cache-Control"] = f"public, max-age={remaining}"
     return items
+
+
+@public_catalog_router.get("/learning", response_model=PublicLearningResources,
+    summary="Published learning material and independent practice options")
+def public_learning_resources(response: Response) -> PublicLearningResources:
+    """Curated public links only: no storage access, repository credentials or jobs."""
+    repo = "https://github.com/computor-org/data-science-python"
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return PublicLearningResources(
+        courses=[dict(slug=slug, title=title, exercises=count, languages=["de", "en"],
+            manifest_url=f"{repo}/blob/main/courses/python-{slug}.yaml",
+            examples_url=f"{repo}/tree/main/examples/python", license="MIT OR CC-BY-4.0")
+            for slug, title, count in [("beginner", "Data Science mit Python – Grundlagen", 21),
+                ("intermediate", "Data Science mit Python – Aufbau", 31),
+                ("advanced", "Data Science mit Python – Vertiefung", 18)]],
+        desktop_extension_url="https://marketplace.visualstudio.com/items?itemName=computor-org.computor",
+        codespaces_url="https://codespaces.new/computor-org/data-science-python?quickstart=1",
+        guide_url=f"{repo}/blob/main/docs/GETTING_STARTED.md",
+    )

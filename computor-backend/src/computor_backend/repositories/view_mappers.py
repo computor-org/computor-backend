@@ -454,6 +454,8 @@ async def course_member_course_content_result_mapper(
             testing_service_id = service.id
 
     list_obj = CourseContentStudentList(
+        assistant_policy=getattr(course_content, "assistant_policy", None),
+        assistant_guidance=getattr(course_content, "assistant_guidance", None),
         id=course_content.id,
         title=course_content.title,
         description=course_content.description,

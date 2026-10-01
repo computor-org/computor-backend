@@ -49,6 +49,12 @@ def db():
 
 @pytest.fixture
 def world(db):
+    from computor_backend.model import Language, CourseRole
+    if db.query(Language).filter(Language.code == "de").first() is None:
+        db.add(Language(code="de", name="German"))
+    if db.query(CourseRole).filter(CourseRole.id == "_student").first() is None:
+        db.add(CourseRole(id="_student", title="Student", builtin=True))
+    db.flush()
     suffix = uuid.uuid4().hex[:10]
     org = Organization(
         title="Anon Catalog Org",

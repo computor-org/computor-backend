@@ -383,6 +383,10 @@ async def update_entity(
 
         old_db_item = response_type(**db_item.__dict__)
 
+        if db_type.__tablename__ in {"course", "course_content"} and isinstance(entity_dict.get("properties"), dict):
+            from computor_types.assistant_policy import merge_assistant_properties
+            entity_dict["properties"] = merge_assistant_properties(db_item.properties, entity_dict["properties"])
+
         # Handle Ltree columns specially
         mapper = inspect(db_type)
         for column in mapper.columns.keys():
