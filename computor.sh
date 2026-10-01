@@ -266,7 +266,8 @@ cmd_up() {
                 -v "${OPS_DIR}/coder/templates:/source:ro" \
                 -v "${SYSTEM_DEPLOYMENT_PATH}/coder/templates:/target" \
                 -v "${OPS_DIR}/lib/seed_coder_templates.sh:/seed.sh:ro" \
-                alpine -e /seed.sh /source /target "$(id -u)" "$(id -g)"
+                alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 \
+                -e /seed.sh /source /target "$(id -u)" "$(id -g)"
         fi
 
         # Render the workspace-ingress allowlist. This is the file that decides

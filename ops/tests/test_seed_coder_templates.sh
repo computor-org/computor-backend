@@ -26,7 +26,8 @@ run_seed() {
         --cap-add FOWNER --pids-limit 64 --memory 128m --entrypoint sh \
         -v "$scratch/source:/source:ro" -v "$scratch/target:/target" \
         -v "$repo_root/ops/lib/seed_coder_templates.sh:/seed.sh:ro" \
-        alpine -e /seed.sh /source /target "$1" "$2"
+        alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 \
+        -e /seed.sh /source /target "$1" "$2"
 }
 
 # Reproduce an old deployment whose entire mount is private to a foreign UID.
