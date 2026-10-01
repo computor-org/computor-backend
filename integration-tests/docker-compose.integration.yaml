@@ -36,7 +36,7 @@ services:
   # ---- Infrastructure -----------------------------------------------------
 
   postgres:
-    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
+    image: postgres:18.4@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
     networks: [computor-it]
     ports:
       - "${IT_POSTGRES_PORT:-15432}:5432"
@@ -68,7 +68,7 @@ services:
       retries: 10
 
   temporal-postgres:
-    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
+    image: postgres:18.4@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
     networks: [computor-it]
     environment:
       TZ: UTC
@@ -84,7 +84,7 @@ services:
       retries: 10
 
   temporal:
-    image: temporalio/auto-setup:1.27.0@sha256:501a883b1c4a4168eb5000c368495e7eb7106dbadefc75b7fd886be0108456b9
+    image: temporalio/auto-setup:1.29.3@sha256:9be7b8d98f60d00f4f2ff74731c071a17848d8182bbc8429e314a24c94ea105b
     networks: [computor-it]
     ports:
       - "${IT_TEMPORAL_PORT:-17233}:7233"
@@ -122,7 +122,7 @@ services:
   # /data once (top level last, so an interrupted run is simply repeated) and
   # is a no-op afterwards. Same pinned image, run as root, only for chown.
   minio-init:
-    image: cgr.dev/chainguard/minio:latest@sha256:71674988a1c7ddd5724928633199152b11e4ddefd6c6ce2d60772ff4a8f22ca9
+    image: cgr.dev/chainguard/minio:latest@sha256:4692462f35d97d7e82c30371d82f057703c5d9489bcae726010594c812f2d285
     network_mode: none
     user: "0:0"
     entrypoint: ["sh", "-c"]
@@ -148,7 +148,7 @@ services:
     restart: "no"
 
   minio:
-    image: cgr.dev/chainguard/minio:latest@sha256:71674988a1c7ddd5724928633199152b11e4ddefd6c6ce2d60772ff4a8f22ca9
+    image: cgr.dev/chainguard/minio:latest@sha256:4692462f35d97d7e82c30371d82f057703c5d9489bcae726010594c812f2d285
     networks: [computor-it]
     ports:
       - "${IT_MINIO_API_PORT:-19000}:9000"
