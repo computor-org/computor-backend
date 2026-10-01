@@ -7,6 +7,7 @@ import { useCoderTemplates } from '@/src/hooks/useCoderTemplates';
 import { useWorkspaceActions } from '@/src/hooks/useWorkspaceActions';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import Button from '@/src/components/ui/Button';
+import LearningOptions from '@/src/components/courses/LearningOptions';
 import WorkspaceStatusBadge, {
   categorizeStatus,
 } from '@/src/components/workspaces/WorkspaceStatusBadge';
@@ -111,6 +112,7 @@ export default function CourseWorkspaceLaunchButtons({
   });
 
   const workspaces = workspacesData ?? [];
+  const [launchError, setLaunchError] = useState(false);
 
   // Same stop as the /workspaces table (notification + delayed refresh) — the
   // backend allows course-derived callers to stop their own workspaces, and
@@ -130,6 +132,7 @@ export default function CourseWorkspaceLaunchButtons({
   // window.open must happen synchronously inside the click — after an await it
   // is no longer tied to the user gesture and popup blockers eat it.
   async function provisionAndLaunch(templateName: string) {
+    setLaunchError(false);
     setLaunching(templateName);
     const tab = window.open(workspaceCreatingUrl, '_blank');
     try {
@@ -145,6 +148,7 @@ export default function CourseWorkspaceLaunchButtons({
         router.push(launchUrl);
       }
     } catch (err) {
+      setLaunchError(true);
       tab?.close();
       notify(err instanceof Error ? err.message : 'Failed to launch workspace', 'error');
     } finally {
@@ -172,6 +176,7 @@ export default function CourseWorkspaceLaunchButtons({
   if (compact) {
     return (
       <div className={`mt-2 flex flex-wrap items-center gap-1.5 ${className ?? ''}`}>
+        {launchError && <LearningOptions capacity />}
         {courseOptions.map((option) => (
           <TemplateIconButton
             key={option.name}
@@ -187,6 +192,7 @@ export default function CourseWorkspaceLaunchButtons({
 
   return (
     <div className={`space-y-4 ${className ?? ''}`}>
+      {launchError && <LearningOptions capacity />}
       {title && <h2 className="text-lg font-semibold text-fg">{title}</h2>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {courseOptions.map((option) => (
