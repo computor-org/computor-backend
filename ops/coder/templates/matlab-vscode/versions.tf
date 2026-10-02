@@ -13,7 +13,7 @@ terraform {
     # (it used hashicorp/http). Nothing in this template uses it.
     http = {
       source  = "hashicorp/http"
-      version = "3.6.1"
+      version = "3.6.2"
     }
   }
 }
