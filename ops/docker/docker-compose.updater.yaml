@@ -28,10 +28,12 @@ services:
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     group_add:
       - "${DOCKER_GID:-0}"
+      - "${COMPUTOR_DEPLOY_GID:-${HOST_GID:-1000}}"
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       COMPUTOR_REPO_DIR: ${COMPUTOR_REPO_DIR:-.}
       DOCKER_GID: ${DOCKER_GID:-0}
+      COMPUTOR_DEPLOY_GID: ${COMPUTOR_DEPLOY_GID:-${HOST_GID:-1000}}
       HOME: /tmp
     volumes:
       - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock

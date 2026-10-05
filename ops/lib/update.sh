@@ -20,6 +20,9 @@
 
 [ -n "${_COMPUTOR_UPDATE_SOURCED:-}" ] && return 0
 _COMPUTOR_UPDATE_SOURCED=1
+# Also available when the executor is sourced directly by a watcher or test.
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/git.sh"
 
 UPDATE_KEY_STATE="update:state"
 UPDATE_KEY_LOCK="update:lock"
@@ -71,7 +74,7 @@ KEYCLOAK_DB_CONTAINER="computor-keycloak-db"
 KEYCLOAK_CONTAINER="computor-keycloak"
 
 keycloak_image_tag_at() { # git-ref -> Keycloak image tag in that tree ("" if none)
-    git -C "$REPO_ROOT" show "$1:$KEYCLOAK_COMPOSE_REL" 2>/dev/null \
+    deployment_git show "$1:$KEYCLOAK_COMPOSE_REL" 2>/dev/null \
         | sed -n 's#^[[:space:]]*image:[[:space:]]*quay\.io/keycloak/keycloak:\([^@[:space:]]*\).*#\1#p' \
         | head -n 1
 }
@@ -168,7 +171,7 @@ git_fetch_tracked() {
         # shellcheck disable=SC2016
         cfg=(-c 'credential.helper=!f() { echo "username=oauth2"; echo "password=$SYSTEM_REPO_TOKEN"; }; f')
     fi
-    GIT_TERMINAL_PROMPT=0 git -C "$REPO_ROOT" "${cfg[@]}" fetch "$url" "$branch"
+    GIT_TERMINAL_PROMPT=0 deployment_git "${cfg[@]}" fetch "$url" "$branch"
 }
 
 # API liveness via docker exec — identical from the host and from the runner
@@ -244,6 +247,17 @@ build_images() {
 
 # --- commands ----------------------------------------------------------------
 
+update_access_preflight() {
+    local git_dir path
+    git_dir=$(deployment_git rev-parse --absolute-git-dir) \
+        || die "Cannot read the deployment Git repository as $(id -un)."
+    for path in "$REPO_ROOT" "$git_dir" "$git_dir/HEAD" "$git_dir/index"; do
+        [ ! -e "$path" ] || [ -w "$path" ] || die "Cannot update $path as $(id -un).
+Ask the deployment owner to prepare shared deployment access; no sudo to another user is required.
+See ops/docs/DOCKER_SETUP.md (shared deployments)."
+    done
+}
+
 cmd_update_check() {
     ENVIRONMENT="${1:-prod}"
     load_env
@@ -251,7 +265,8 @@ cmd_update_check() {
     [ -n "$url" ] || die "SYSTEM_REPO_URL is not set in .env"
 
     local local_head remote_tip
-    local_head=$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)
+    local_head=$(deployment_git rev-parse HEAD) \
+        || die "Cannot read the deployment Git repository as $(id -un)."
     remote_tip=$(git_remote_tip "$url" "$branch")
     [ -n "$remote_tip" ] || die "Could not read refs/heads/$branch from $url"
 
@@ -291,6 +306,7 @@ cmd_update_run() {
     ENVIRONMENT="${1:-prod}"
     [ "$ENVIRONMENT" = "prod" ] || die "Self-update only supports prod (dev runs the API on the host)."
     update_env_init "$ENVIRONMENT"
+    update_access_preflight
 
     if [ "$(redis_cli SET "$UPDATE_KEY_LOCK" "cli-$$" NX EX $UPDATE_LOCK_TTL)" != "OK" ]; then
         die "An update is already in progress (update:lock is held). See: ./computor.sh update status"
@@ -305,6 +321,7 @@ cmd_update_exec() {
     ENVIRONMENT="${1:-prod}"
     [ "$ENVIRONMENT" = "prod" ] || die "Self-update only supports prod (dev runs the API on the host)."
     update_env_init "$ENVIRONMENT"
+    update_access_preflight
 
     local url="${SYSTEM_REPO_URL:-}" branch="${SYSTEM_REPO_BRANCH:-main}"
     local from_commit to_commit maintenance_entered=0
@@ -343,7 +360,7 @@ cmd_update_exec() {
             keycloak_block_rollback "$1" "$kc_dump" "$from_commit" "$kc_from"
         fi
         set_phase rolling_back "Update failed ($1) — restoring ${from_commit}"
-        if ! git -C "$REPO_ROOT" checkout -q -B "$branch" "$from_commit"; then
+        if ! deployment_git checkout -q -B "$branch" "$from_commit"; then
             fail_update "Rollback checkout to ${from_commit} failed after: $1. Manual intervention required (maintenance page stays up): fix the checkout, then './computor.sh maintenance exit prod'."
         fi
         if ! build_images; then
@@ -368,27 +385,27 @@ cmd_update_exec() {
     # 1. preflight ------------------------------------------------------------
     set_phase preflight
     [ -n "$url" ] || fail_update "SYSTEM_REPO_URL is not set in .env"
-    git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1 \
+    deployment_git rev-parse --git-dir >/dev/null 2>&1 \
         || fail_update "$REPO_ROOT is not a git repository"
 
     local dirty
-    dirty=$(git -C "$REPO_ROOT" status --porcelain --untracked-files=no)
+    dirty=$(deployment_git status --porcelain --untracked-files=no)
     if [ -n "$dirty" ]; then
         if [ "${UPDATE_GIT_FORCE:-}" = "true" ]; then
             ulog "working tree dirty — discarding local changes (UPDATE_GIT_FORCE=true)"
-            git -C "$REPO_ROOT" reset --hard >/dev/null
+            deployment_git reset --hard >/dev/null
         else
             fail_update "Working tree has local changes; refusing to update. Commit/stash them or set UPDATE_GIT_FORCE=true in .env. Dirty files: $(echo "$dirty" | awk '{print $2}' | tr '\n' ' ')"
         fi
     fi
 
-    from_commit=$(git -C "$REPO_ROOT" rev-parse HEAD)
+    from_commit=$(deployment_git rev-parse HEAD)
     set_update_state from_commit "$from_commit"
 
     # 2. fetch ------------------------------------------------------------------
     set_phase checking "Fetching ${branch} from remote"
     git_fetch_tracked "$url" "$branch" || fail_update "git fetch from configured SYSTEM_REPO_URL failed"
-    to_commit=$(git -C "$REPO_ROOT" rev-parse FETCH_HEAD)
+    to_commit=$(deployment_git rev-parse FETCH_HEAD)
     set_update_state to_commit "$to_commit"
 
     if [ "$to_commit" = "$from_commit" ]; then
@@ -408,13 +425,13 @@ cmd_update_exec() {
 
     # 3. checkout ---------------------------------------------------------------
     set_phase checking_out "Checking out ${to_commit}"
-    git -C "$REPO_ROOT" checkout -q -B "$branch" FETCH_HEAD \
+    deployment_git checkout -q -B "$branch" FETCH_HEAD \
         || fail_update "git checkout of ${to_commit} failed"
 
     # New-tree preflight: catches broken compose interpolation (e.g. a new :?
     # variable missing from .env) BEFORE any downtime.
     if ! compose config -q; then
-        git -C "$REPO_ROOT" checkout -q -B "$branch" "$from_commit"
+        deployment_git checkout -q -B "$branch" "$from_commit"
         fail_update "The new version's docker compose configuration is invalid with the current .env (checked out ${to_commit}, reverted). Compare .env against ops/environments/.env.common.template."
     fi
 
