@@ -1,17 +1,24 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 
 const COURSE = 'python-beginner';
 const MATH = 'week_1.math_constants';
 const URL = `/learn/${COURSE}/content/${MATH}`;
 
+async function blockApi(page: Page, calls: string[]) {
+  // Cover both the local test API origin and production's same-origin /api.
+  for (const pattern of ['http://localhost:8000/**', '**/api/**']) {
+    await page.route(pattern, route => {
+      calls.push(route.request().url());
+      return route.fulfill({ status: 503, body: '{}' });
+    });
+  }
+}
+
 test('anonymous reading uses only static files even when the API is unavailable', async ({ page }) => {
   const apiRequests: string[] = [];
   const mutations: string[] = [];
-  await page.route('http://localhost:8000/**', route => {
-    apiRequests.push(route.request().url());
-    return route.fulfill({ status: 503, body: '{}' });
-  });
+  await blockApi(page, apiRequests);
   page.on('request', request => {
     if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method())) mutations.push(request.url());
   });
@@ -51,10 +58,7 @@ test('all three courses have native reading content', async ({ page }) => {
 
 test('landing shows open registration and static courses with no pilot or invite claim', async ({ page }) => {
   const calls: string[] = [];
-  await page.route('http://localhost:8000/**', route => {
-    calls.push(route.request().url());
-    return route.fulfill({ status: 503, body: '{}' });
-  });
+  await blockApi(page, calls);
   await page.goto('/');
   await expect(page.getByText('Offen zur Anmeldung / Open for registration')).toBeVisible();
   await expect(page.getByText(/Pilotbetrieb|join with an invite link|Teilnahme mit Einladungslink/)).toHaveCount(0);

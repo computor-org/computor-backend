@@ -28,6 +28,12 @@ shown rather than fetching an unpublished file.
 The reader can deploy by replacing only the frontend image. No database
 migration, API/worker restart or workspace-template rebuild is required.
 
+Run the publication checks with `yarn test:public-learning` and the browser
+checks with `yarn test:e2e e2e/public-learning.spec.ts --workers=2`. After
+deployment, repeat the same browser checks with `E2E_BASE_URL=https://computor.at`
+to verify the actual public site without starting a local server. These checks
+read public pages and check rejected write methods only on the static catalog.
+
 A course opens on an explicit welcome/start content item when one exists.
 Until such an item exists, the reader shows the course description and a clear
 link to the first released exercise. Learners can then sign in to join the
