@@ -35,12 +35,14 @@ function OutlineLinks({
       <Link
         href={`/learn/${outline.id}`}
         className={`block rounded-md px-3 py-2 text-sm font-medium ${
-          !activeContentId ? 'bg-accent-wash text-accent-text' : 'text-body hover:bg-sunken'
+          !activeContentId || activeContentId === outline.welcome_content_id
+            ? 'bg-accent-wash text-accent-text'
+            : 'text-body hover:bg-sunken'
         }`}
       >
         Welcome / Start here
       </Link>
-      {outline.contents.map((item) => (
+      {outline.contents.filter(item => item.id !== outline.welcome_content_id).map((item) => (
         <Link
           key={item.id}
           href={`/learn/${outline.id}/content/${item.id}`}
@@ -100,6 +102,7 @@ export default function PublicCourseReader({
   useEffect(() => {
     let cancelled = false;
     setOutlineLoading(true);
+    setOutline(null);
     setError(null);
     apiFetch(`${API_BASE_URL}/public/courses/${encodeURIComponent(courseId)}/outline`)
       .then(async response => {
@@ -128,6 +131,7 @@ export default function PublicCourseReader({
     }
     let cancelled = false;
     setContentLoading(true);
+    setContent(null);
     setError(null);
     const query = requestedLanguage ? `?language=${encodeURIComponent(requestedLanguage)}` : '';
     apiFetch(
@@ -138,6 +142,9 @@ export default function PublicCourseReader({
         return response.json() as Promise<PublicLearningContent>;
       })
       .then(data => {
+        if (data.course_id !== courseId) {
+          throw new Error('Course content not found.');
+        }
         if (!cancelled) setContent(data);
       })
       .catch(err => {
