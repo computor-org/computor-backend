@@ -111,7 +111,14 @@ test('static publication is read-only and restricts content sniffing', async ({ 
   const response = await request.get(file);
   expect(response.headers()['x-content-type-options']).toBe('nosniff');
   expect(response.headers()['content-security-policy']).toContain("default-src 'none'");
+  const original = await response.body();
   for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
-    expect((await request.fetch(file, { method })).status()).toBe(405);
+    const rejected = await request.fetch(file, { method });
+    // Next 16.3.6 production can fail rendering its 405 page with
+    // NoFallbackError (500). Both responses deny the method; assert the
+    // explicit read-only Allow header and unchanged bytes independently.
+    expect([405, 500]).toContain(rejected.status());
+    expect(rejected.headers()['allow']?.split(/,\s*/).sort()).toEqual(['GET', 'HEAD']);
+    expect(await (await request.get(file)).body()).toEqual(original);
   }
 });

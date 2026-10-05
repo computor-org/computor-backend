@@ -34,6 +34,16 @@ deployment, repeat the same browser checks with `E2E_BASE_URL=https://computor.a
 to verify the actual public site without starting a local server. These checks
 read public pages and check rejected write methods only on the static catalog.
 
+The Next 16.3.6 standalone server denies unsupported static-file methods with
+`Allow: GET, HEAD`, but its default 405-page rendering currently throws
+`NoFallbackError` and returns 500. Development returns 405. The production
+checks accept this known rejection only with the read-only Allow header and
+unchanged file bytes; successful writes always fail verification. Reproducer:
+POST/PUT/PATCH/DELETE `/learning/catalog.json` in the network-isolated image.
+The framework response-rendering repair belongs upstream; no dependency patch
+or application workaround is included here. Recheck this focused case on the
+next supported Next upgrade and restore the exact 405 expectation when fixed.
+
 A course opens on an explicit welcome/start content item when one exists.
 Until such an item exists, the reader shows the course description and a clear
 link to the first released exercise. Learners can then sign in to join the
