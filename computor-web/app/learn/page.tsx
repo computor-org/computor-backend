@@ -1,39 +1,106 @@
-import type { Metadata } from 'next';
-import LearningOptions, { PUBLIC_COURSES_URL } from '@/src/components/courses/LearningOptions';
+'use client';
 
-export const metadata: Metadata = { title: 'Public Python courses | Computor',
-  description: 'Three free bilingual Data Science with Python courses. Read without an account; practice in VS Code or Codespaces.' };
-
-const courses = [
-  { slug: 'beginner', name: 'Grundlagen / Foundations', weeks: 3, examples: 21 },
-  { slug: 'intermediate', name: 'Aufbau / Intermediate', weeks: 5, examples: 31 },
-  { slug: 'advanced', name: 'Vertiefung / Advanced', weeks: 4, examples: 18 },
-];
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import EmptyState from '@/src/components/EmptyState';
+import PublicLearnShell from '@/src/components/learn/PublicLearnShell';
+import { API_BASE_URL, apiFetch } from '@/src/utils/apiClient';
+import type { PublicCourseCatalogEntry } from '@/src/types/publicLearning';
 
 export default function LearnPage() {
+  const [courses, setCourses] = useState<PublicCourseCatalogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch(`${API_BASE_URL}/public/courses`)
+      .then(async response => {
+        if (!response.ok) throw new Error('catalog unavailable');
+        return response.json() as Promise<PublicCourseCatalogEntry[]>;
+      })
+      .then(rows => {
+        if (!cancelled) setCourses(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   return (
-    <main className="container mx-auto max-w-5xl px-4 py-12">
-      <h1 className="text-3xl font-bold text-fg">Data Science mit Python / Data Science with Python</h1>
-      <p className="my-5 text-muted">Drei freie Kurse mit deutschen und englischen Aufgaben, Vorlagen und Eingabedaten.
-        Keine Anmeldung zum Lesen nötig. / Three free courses with German and English exercises, templates and input data.
-        No account is required to read them.</p>
-      <div className="mb-8 grid gap-4 md:grid-cols-3">
-        {courses.map(course => (
-          <section key={course.slug} className="rounded-lg border border-rule bg-surface p-5">
-            <h2 className="text-xl font-semibold text-fg">{course.name}</h2>
-            <p className="my-3 text-muted">{course.weeks} Wochen / weeks · {course.examples} Aufgaben / exercises</p>
-            <a className="text-accent-text underline" href={`${PUBLIC_COURSES_URL}/blob/main/courses/python-${course.slug}.yaml`}>
-              Kursaufbau / Course structure
-            </a>
-          </section>
-        ))}
+    <PublicLearnShell>
+      <div className="container mx-auto max-w-6xl px-4 py-12">
+        <header className="max-w-3xl">
+          <p className="text-sm font-semibold uppercase tracking-wide text-accent-text">
+            Free public learning material
+          </p>
+          <h1 className="mt-2 text-4xl font-bold text-fg">Data Science mit Python</h1>
+          <p className="mt-4 text-lg leading-8 text-muted">
+            Browse courses and exercises directly on Computor. No account is
+            required to read the public material.
+          </p>
+        </header>
+
+        <section className="mt-10" aria-labelledby="course-shelf-heading">
+          <h2 id="course-shelf-heading" className="text-2xl font-semibold text-fg">Courses</h2>
+          {loading ? (
+            <p className="mt-5 rounded-lg border border-rule bg-surface p-10 text-center text-muted">
+              Loading courses…
+            </p>
+          ) : failed ? (
+            <div className="mt-5">
+              <EmptyState
+                title="Courses are temporarily unavailable"
+                description="The public course catalog could not be loaded."
+              />
+            </div>
+          ) : courses.length === 0 ? (
+            <div className="mt-5">
+              <EmptyState title="No public courses are available right now." />
+            </div>
+          ) : (
+            <div className="mt-5 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {courses.map(course => (
+                <article key={course.id} className="flex min-h-64 flex-col rounded-xl border border-rule bg-surface p-6">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                      {course.language_code ? course.language_code.toUpperCase() : 'Course'}
+                    </p>
+                    <h3 className="mt-2 text-xl font-semibold text-fg">
+                      {course.title || 'Untitled course'}
+                    </h3>
+                    {course.description && (
+                      <p className="mt-3 whitespace-pre-line text-sm leading-6 text-muted">
+                        {course.description}
+                      </p>
+                    )}
+                  </div>
+                  <Link
+                    href={`/learn/${course.id}`}
+                    className="mt-5 inline-flex self-start rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent-hover"
+                  >
+                    Browse course
+                  </Link>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="mt-12 rounded-xl border border-rule bg-surface p-6">
+          <h2 className="text-lg font-semibold text-fg">Ready to practise?</h2>
+          <p className="mt-2 text-sm text-muted">
+            Sign in to join a course, keep progress, run official tests, or use a hosted workspace.
+          </p>
+          <Link href="/courses/catalog" className="mt-3 inline-block text-sm text-accent-text hover:underline">
+            Open course catalog
+          </Link>
+        </section>
       </div>
-      <p className="mb-6 text-muted">
-        <a className="text-accent-text underline" href={`${PUBLIC_COURSES_URL}/tree/main/examples/python`}>Alle Beispiele lesen / Read all examples</a>
-        {' · '}<a className="text-accent-text underline" href={`${PUBLIC_COURSES_URL}/blob/main/docs/GETTING_STARTED.md`}>Anleitung / Getting started</a>
-        {' · '}<a className="text-accent-text underline" href={`${PUBLIC_COURSES_URL}/blob/main/RIGHTS.md`}>Lizenzen / Licenses</a>
-      </p>
-      <LearningOptions />
-    </main>
+    </PublicLearnShell>
   );
 }
