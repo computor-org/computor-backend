@@ -63,6 +63,7 @@ EXEMPT_PATHS_EXACT = (
     "/extensions-public",
     "/extensions-getting-started",
     "/public/courses",     # anonymous catalog; same answer for everyone
+    "/public/learning",    # anonymous runtime/provenance metadata
 )
 
 EXEMPT_PATH_PREFIXES = (
@@ -71,6 +72,8 @@ EXEMPT_PATH_PREFIXES = (
     "/password/",          # password reset flow
     "/invites/",           # public invite acceptance (pre-account)
     "/docs/",              # Swagger UI sub-paths (oauth2-redirect)
+    "/public/courses/",     # anonymous public-course reader outline
+    "/public/course-contents/",  # anonymous descriptions + public media
 )
 
 # GET-only exemptions: the web UI must be able to load the signed-in user's
