@@ -10,11 +10,7 @@ FROM alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6
 
 RUN apk add --no-cache bash git curl redis docker-cli docker-cli-compose docker-cli-buildx
 
-# The repo is bind-mounted and owned by the host user; the container runs as
-# that uid (compose `user:`), but belt-and-braces for uid mismatches.
-ENV GIT_CONFIG_COUNT=1 \
-    GIT_CONFIG_KEY_0=safe.directory \
-    GIT_CONFIG_VALUE_0=*
+# Repository trust is scoped by ops/lib/git.sh to the selected deployment.
 
 COPY docker/updater/watch.sh /usr/local/bin/watch.sh
 
