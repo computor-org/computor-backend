@@ -174,6 +174,17 @@ class TestConsentGateMiddleware:
         for path in ("/consent/status", "/auth/providers", "/user"):
             assert client.get(path, headers=bearer()).status_code == 200, path
 
+    def test_public_reader_paths_are_exempt_without_consent(self, client, fake_redis):
+        seed_principal(fake_redis, TOKEN, USER)
+        for path in (
+            "/public/courses",
+            "/public/learning",
+            "/public/courses/course-id/outline",
+            "/public/course-contents/content-id",
+            "/public/course-contents/content-id/assets/mediaFiles/plot.png",
+        ):
+            assert client.get(path, headers=bearer()).status_code != 403, path
+
     def test_get_only_exemption_does_not_cover_mutations_elsewhere(self, client, fake_redis):
         seed_principal(fake_redis, TOKEN, USER)
         # /user is exempt for GET, but /user-roles must stay gated.
