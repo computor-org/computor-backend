@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/src/contexts/AuthContext';
-import { API_BASE_URL, apiFetch } from '@/src/utils/apiClient';
 import {
   CODESPACES_URL,
   COMPUTOR_EXTENSION_URL,
@@ -92,78 +91,45 @@ export default function PublicCourseReader({
   contentId?: string;
 }) {
   const { user } = useAuth();
-  const [outline, setOutline] = useState<PublicLearningCourseOutline | null>(null);
-  const [content, setContent] = useState<PublicLearningContent | null>(null);
-  const [requestedLanguage, setRequestedLanguage] = useState<string | null>(null);
-  const [outlineLoading, setOutlineLoading] = useState(true);
-  const [contentLoading, setContentLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState<{
+    courseId: string; outline: PublicLearningCourseOutline | null; error: string | null;
+  } | null>(null);
+  const [requestedLanguage, setRequestedLanguage] = useState<string | null>(() => {
+    const lang = typeof navigator === 'undefined' ? '' : navigator.language.split('-')[0].toLowerCase();
+    return ['de', 'en'].includes(lang) ? lang : null;
+  });
+  const outline = loaded?.courseId === courseId ? loaded.outline : null;
+  const outlineLoading = loaded?.courseId !== courseId;
+  const error = loaded?.courseId === courseId ? loaded.error : null;
+  const contentLoading = false;
 
   useEffect(() => {
     let cancelled = false;
-    setOutlineLoading(true);
-    setOutline(null);
-    setError(null);
-    apiFetch(`${API_BASE_URL}/public/courses/${encodeURIComponent(courseId)}/outline`)
+    fetch(`/learning/courses/${encodeURIComponent(courseId)}.json`, { credentials: 'omit' })
       .then(async response => {
         if (!response.ok) throw new Error(response.status === 404 ? 'Course not found.' : 'Could not load this course.');
         return response.json() as Promise<PublicLearningCourseOutline>;
       })
       .then(data => {
-        if (!cancelled) setOutline(data);
+        if (!cancelled) setLoaded({ courseId, outline: data, error: null });
       })
       .catch(err => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load this course.');
-      })
-      .finally(() => {
-        if (!cancelled) setOutlineLoading(false);
+        if (!cancelled) setLoaded({ courseId, outline: null, error: err instanceof Error ? err.message : 'Could not load this course.' });
       });
     return () => { cancelled = true; };
   }, [courseId]);
 
   const activeContentId = contentId ?? outline?.welcome_content_id ?? undefined;
 
-  useEffect(() => {
-    if (!activeContentId) {
-      setContent(null);
-      setContentLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setContentLoading(true);
-    setContent(null);
-    setError(null);
-    const query = requestedLanguage ? `?language=${encodeURIComponent(requestedLanguage)}` : '';
-    apiFetch(
-      `${API_BASE_URL}/public/course-contents/${encodeURIComponent(activeContentId)}${query}`,
-    )
-      .then(async response => {
-        if (!response.ok) throw new Error(response.status === 404 ? 'Course content not found.' : 'Could not load this content.');
-        return response.json() as Promise<PublicLearningContent>;
-      })
-      .then(data => {
-        if (data.course_id !== courseId) {
-          throw new Error('Course content not found.');
-        }
-        if (!cancelled) setContent(data);
-      })
-      .catch(err => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Could not load this content.');
-      })
-      .finally(() => {
-        if (!cancelled) setContentLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [activeContentId, requestedLanguage]);
-
-  useEffect(() => {
-    const browserLanguage = typeof navigator === 'undefined'
-      ? null
-      : navigator.language.split('-')[0]?.toLowerCase() ?? null;
-    setRequestedLanguage(
-      browserLanguage === 'de' || browserLanguage === 'en' ? browserLanguage : null,
-    );
-  }, [contentId, courseId]);
+  const material = activeContentId && outline && Object.hasOwn(outline.materials, activeContentId)
+    ? outline.materials[activeContentId] : undefined;
+  const languages = Object.keys(material?.markdown_variants ?? {});
+  const language = [requestedLanguage, outline?.language_code, 'en', 'de']
+    .find(value => value && languages.includes(value)) ?? languages[0];
+  const content: PublicLearningContent | null = material ? {
+    ...material, markdown: material.markdown_variants[language ?? ''] ?? '',
+    selected_language: language, available_languages: languages,
+  } : null;
 
   const exercises = useMemo(
     () => outline?.contents.filter(item => item.is_submittable) ?? [],
@@ -277,7 +243,7 @@ export default function PublicCourseReader({
                       )}
                     </div>
                     {content.markdown ? (
-                      <PublicMarkdown contentId={content.id} markdown={content.markdown} />
+                      <PublicMarkdown assetBaseUrl={content.asset_base_url} mediaFiles={content.media_files} markdown={content.markdown} />
                     ) : content.description ? (
                       <p className="whitespace-pre-wrap leading-7 text-body">{content.description}</p>
                     ) : (

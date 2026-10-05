@@ -5,42 +5,23 @@ import { useEffect, useState } from 'react';
 import EmptyState from '@/src/components/EmptyState';
 import PublicLearnShell from '@/src/components/learn/PublicLearnShell';
 import { CODESPACES_URL, COMPUTOR_EXTENSION_URL } from '@/src/components/courses/LearningOptions';
-import { API_BASE_URL, apiFetch } from '@/src/utils/apiClient';
-import type { PublicCourseCatalogEntry, PublicLearningCourseOutline } from '@/src/types/publicLearning';
+import type { PublicCourseCatalogEntry } from '@/src/types/publicLearning';
 
 export default function LearnPage() {
   const [courses, setCourses] = useState<PublicCourseCatalogEntry[]>([]);
-  const [outlines, setOutlines] = useState<Record<string, PublicLearningCourseOutline>>({});
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    apiFetch(`${API_BASE_URL}/public/courses`)
+    fetch('/learning/catalog.json', { credentials: 'omit' })
       .then(async response => {
         if (!response.ok) throw new Error('catalog unavailable');
         return response.json() as Promise<PublicCourseCatalogEntry[]>;
       })
-      .then(async rows => {
+      .then(rows => {
         if (cancelled) return;
         setCourses(rows);
-        const pairs = await Promise.all(rows.map(async course => {
-          try {
-            const response = await apiFetch(
-              `${API_BASE_URL}/public/courses/${encodeURIComponent(course.id)}/outline`,
-            );
-            if (!response.ok) return [course.id, null] as const;
-            return [course.id, await response.json() as PublicLearningCourseOutline] as const;
-          } catch {
-            return [course.id, null] as const;
-          }
-        }));
-        if (!cancelled) {
-          setOutlines(
-            Object.fromEntries(pairs.filter(([, outline]) => outline !== null))
-              as Record<string, PublicLearningCourseOutline>,
-          );
-        }
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -85,7 +66,7 @@ export default function LearnPage() {
           ) : (
             <div className="mt-5 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
               {courses.map(course => {
-                const outline = outlines[course.id];
+                const outline = course;
                 return (
                 <article key={course.id} className="flex min-h-64 flex-col rounded-xl border border-rule bg-surface p-6">
                   <div className="flex-1">

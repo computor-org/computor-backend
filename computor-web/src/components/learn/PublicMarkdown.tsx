@@ -4,7 +4,6 @@ import type { ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import katex from 'katex';
-import { API_BASE_URL } from '@/src/utils/apiClient';
 
 const MATH_RE = /\$\$([\s\S]+?)\$\$|\$([^$\n]+?)\$/g;
 
@@ -44,6 +43,9 @@ function mathifyString(text: string, keyPrefix: string): ReactNode {
       throwOnError: false,
       strict: 'ignore',
       output: 'htmlAndMathml',
+      trust: false,
+      maxExpand: 1000,
+      maxSize: 10,
     });
     nodes.push(
       <span
@@ -58,19 +60,25 @@ function mathifyString(text: string, keyPrefix: string): ReactNode {
   return nodes.length > 0 ? nodes : text;
 }
 
-function publicAssetUrl(contentId: string, value: string): string {
-  if (/^(?:https?:|data:|blob:|\/)/i.test(value)) return value;
+function publicAssetUrl(base: string, media: string[], value: string): string | undefined {
   const normalized = value.replace(/^\.\//, '');
-  if (!normalized.startsWith('mediaFiles/')) return value;
-  const encoded = normalized.split('/').map(encodeURIComponent).join('/');
-  return `${API_BASE_URL}/public/course-contents/${encodeURIComponent(contentId)}/assets/${encoded}`;
+  if (!normalized.startsWith('mediaFiles/')) return undefined;
+  let parts: string[];
+  try { parts = normalized.slice('mediaFiles/'.length).split('/').map(decodeURIComponent); }
+  catch { return undefined; }
+  if (parts.some(part => !/^[a-zA-Z0-9_. -]+$/.test(part) || ['.', '..'].includes(part))) return undefined;
+  if (!/\.(?:png|jpe?g|gif|webp)$/i.test(parts.at(-1) ?? '')) return undefined;
+  if (!media.includes(parts.join('/'))) return undefined;
+  return base + parts.map(encodeURIComponent).join('/');
 }
 
 export default function PublicMarkdown({
-  contentId,
+  assetBaseUrl,
+  mediaFiles,
   markdown,
 }: {
-  contentId: string;
+  assetBaseUrl: string;
+  mediaFiles: string[];
   markdown: string;
 }) {
   const source = normalizeLegacyHtml(markdown);
@@ -79,6 +87,7 @@ export default function PublicMarkdown({
     <div className="prose markdown max-w-none">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        skipHtml
         components={{
           p: ({ children }) => <p>{mathify(children)}</p>,
           li: ({ children }) => <li>{mathify(children)}</li>,
@@ -93,7 +102,7 @@ export default function PublicMarkdown({
           a: ({ href, children, ...props }) => (
             <a
               {...props}
-              href={href ? publicAssetUrl(contentId, href) : href}
+              href={href && (/^(?:https?:|mailto:|#)/i.test(href) ? href : publicAssetUrl(assetBaseUrl, mediaFiles, href))}
               target={href && /^https?:/i.test(href) ? '_blank' : undefined}
               rel={href && /^https?:/i.test(href) ? 'noreferrer' : undefined}
             >
@@ -101,7 +110,8 @@ export default function PublicMarkdown({
             </a>
           ),
           img: ({ src, alt, ...props }) => {
-            const resolved = typeof src === 'string' ? publicAssetUrl(contentId, src) : src;
+            const resolved = typeof src === 'string' ? publicAssetUrl(assetBaseUrl, mediaFiles, src) : undefined;
+            if (!resolved) return <span>{alt ?? ''}</span>;
             // Dynamic assignment media has no reliable dimensions in metadata.
             // eslint-disable-next-line @next/next/no-img-element
             return <img {...props} src={resolved} alt={alt ?? ''} className="max-w-full h-auto rounded-md" />;

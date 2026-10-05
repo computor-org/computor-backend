@@ -5,6 +5,14 @@ const nextConfig: NextConfig = {
   // This creates a minimal production build in .next/standalone
   output: 'standalone',
 
+  async headers() {
+    return [{ source: '/learning/:path*', headers: [
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'Content-Security-Policy', value: "default-src 'none'; sandbox" },
+      { key: 'Referrer-Policy', value: 'no-referrer' },
+    ] }];
+  },
+
   // Optionally disable source maps in production for smaller bundle
   // productionBrowserSourceMaps: false,
 

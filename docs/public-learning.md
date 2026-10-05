@@ -1,20 +1,32 @@
 # Public learning on computor.at
 
-`/learn` is the anonymous, first-party course reader. Course discovery comes
-from `GET /public/courses`; a reader then loads
-`GET /public/courses/{course_id}/outline` and
-`GET /public/course-contents/{content_id}`. The web app renders the pedagogical
-unit/exercise hierarchy, descriptions, media and language variants without
-sending learners to a repository browser. GitHub is provenance and reuse
-information only.
+`/learn` is an anonymous, first-party static course reader. It reads generated
+JSON and raster images under `/learning/`; it makes no API or GitHub requests.
+This feature adds no anonymous API endpoints or runtime database/storage access.
+The web app renders the course hierarchy, descriptions, math and DE/EN variants.
+GitHub is optional provenance and reuse information.
 
-The public reader applies the same visibility/release rules as the student
-view, plus `Course.public` and archive checks. Assignment Markdown is read only
-from the deployed example's top-level `content/index*.md` or `README*.md`
-files. Public media is restricted to `content/mediaFiles/**`. The projection
-never returns repository credentials, reference solutions, local tests,
-submission data or instructor-only files. Reading requires no account and
-triggers no server execution.
+Every frontend `yarn build` regenerates the bundle from the public mirror pinned
+in `computor-web/learning-source.json`. The build downloads that exact commit
+and checks the archive SHA-256 before extraction. Updating course content means
+reviewing the new public revision, updating both pins and rebuilding. A failed
+download or checksum mismatch stops the build; deployed content stays available.
+
+The generator selects only the three reviewed Python manifests, public
+`content/index*.md`/`README*.md` descriptions and referenced PNG/JPEG/GIF/WebP
+images whose signatures match. It rejects symlinks, traversal and oversized
+files, and omits hidden/archived/unreleased branches. It never copies solutions,
+tests, submissions, credentials, metadata authors or arbitrary example files.
+Only publish source content approved for anonymous reading; the bundle is a
+snapshot and does not follow later database visibility changes until rebuilt.
+
+Raw HTML, external/inline images and SVG are not rendered. KaTeX disables trusted
+commands and bounds expansion. Static assets carry nosniff and a sandboxed CSP.
+The public mirror currently refers to an absent pendulum image; its alt text is
+shown rather than fetching an unpublished file.
+
+The reader can deploy by replacing only the frontend image. No database
+migration, API/worker restart or workspace-template rebuild is required.
 
 A course opens on an explicit welcome/start content item when one exists.
 Until such an item exists, the reader shows the course description and a clear

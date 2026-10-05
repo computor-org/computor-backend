@@ -1,256 +1,113 @@
-import { test, expect, type Page, type Route } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
 
-const API_ORIGIN = 'http://localhost:8000';
-const COURSE = '00000000-0000-0000-0000-000000000101';
-const MATH = '00000000-0000-0000-0000-000000000201';
-const BASIS = '00000000-0000-0000-0000-000000000202';
+const COURSE = 'python-beginner';
+const MATH = 'week_1.math_constants';
+const URL = `/learn/${COURSE}/content/${MATH}`;
 
-function json(route: Route, body: unknown) {
-  return route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify(body),
-  });
-}
-
-async function mockPublicReader(page: Page) {
-  await page.route(`${API_ORIGIN}/**`, async (route: Route) => {
-    const url = new URL(route.request().url());
-    const path = url.pathname;
-
-    if (path === '/public/courses') {
-      return json(route, [
-        { id: COURSE, title: 'Data Science mit Python – Grundlagen', description: 'Python von Anfang an.', language_code: 'de' },
-        { id: '00000000-0000-0000-0000-000000000102', title: 'Data Science mit Python – Aufbau', description: 'Weiterführende Übungen.', language_code: 'de' },
-        { id: '00000000-0000-0000-0000-000000000103', title: 'Data Science mit Python – Vertiefung', description: 'Vertiefende Übungen.', language_code: 'de' },
-      ]);
-    }
-
-    if (path === `/public/courses/${COURSE}/outline`) {
-      return json(route, {
-        id: COURSE,
-        title: 'Data Science mit Python – Grundlagen',
-        description: 'Python von Anfang an.',
-        language_code: 'de',
-        contents: [
-          { id: 'unit-1', title: 'Week 1', path: 'week_1', parent_path: null, depth: 0, position: 1, kind: 'unit', type_title: 'Week', color: 'green', is_submittable: false },
-          { id: MATH, title: 'Mathematical Constants', path: 'week_1.math_constants', parent_path: 'week_1', depth: 1, position: 1, kind: 'assignment', type_title: 'Exercise', color: 'yellow', is_submittable: true },
-          { id: BASIS, title: 'Basis 1', path: 'week_1.basis1', parent_path: 'week_1', depth: 1, position: 2, kind: 'assignment', type_title: 'Exercise', color: 'yellow', is_submittable: true },
-        ],
-        welcome_content_id: null,
-        first_exercise_id: MATH,
-        exercise_count: 2,
-        unit_count: 1,
-      });
-    }
-
-    if (path === `/public/course-contents/${MATH}`) {
-      const english = url.searchParams.get('language') === 'en';
-      return json(route, {
-        id: MATH,
-        course_id: COURSE,
-        title: 'Mathematical Constants',
-        path: 'week_1.math_constants',
-        kind: 'assignment',
-        is_submittable: true,
-        markdown: english
-          ? '# Mathematical Constants\n\nEnglish instructions. Euler: $e^{i\\pi}+1=0$.\n\n![Console](mediaFiles/demo.svg)'
-          : '# Mathematische Konstanten\n\nDeutsche Anleitung. Euler: $e^{i\\pi}+1=0$.\n\n![Konsole](mediaFiles/demo.svg)',
-        selected_language: english ? 'en' : 'de',
-        available_languages: ['de', 'en'],
-      });
-    }
-
-    if (path === `/public/course-contents/${BASIS}`) {
-      return json(route, {
-        id: BASIS,
-        course_id: COURSE,
-        title: 'Basis 1',
-        path: 'week_1.basis1',
-        kind: 'assignment',
-        is_submittable: true,
-        markdown: '# Basis 1\n\nNext exercise.',
-        selected_language: 'de',
-        available_languages: ['de', 'en'],
-      });
-    }
-
-    if (path.includes('/assets/mediaFiles/demo.svg')) {
-      return route.fulfill({
-        status: 200,
-        contentType: 'image/svg+xml',
-        body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>',
-      });
-    }
-
-    return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
-  });
-}
-
-test('anonymous learner browses a native course and bilingual exercises', async ({ page }) => {
+test('anonymous reading uses only static files even when the API is unavailable', async ({ page }) => {
+  const apiRequests: string[] = [];
   const mutations: string[] = [];
+  await page.route('http://localhost:8000/**', route => {
+    apiRequests.push(route.request().url());
+    return route.fulfill({ status: 503, body: '{}' });
+  });
   page.on('request', request => {
     if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method())) mutations.push(request.url());
   });
-  await mockPublicReader(page);
-
   await page.goto('/learn');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Data Science mit Python');
   await expect(page.getByRole('link', { name: 'Browse course' })).toHaveCount(3);
   await expect(page.getByText('python-beginner.yaml')).toHaveCount(0);
-
   await page.getByRole('link', { name: 'Browse course' }).first().click();
   await expect(page).toHaveURL(new RegExp(`/learn/${COURSE}$`));
-  await expect(page.getByText('Week 1', { exact: true })).toBeVisible();
-  await expect(page.getByText('Mathematical Constants', { exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Start with Mathematical Constants/ })).toBeVisible();
-
+  await expect(page.getByRole('heading', { name: 'Welcome', exact: true })).toBeVisible();
   await page.getByRole('link', { name: /Start with Mathematical Constants/ }).click();
-  await expect(page).toHaveURL(new RegExp(`/learn/${COURSE}/content/${MATH}$`));
-  await expect(page.getByText('English instructions.')).toBeVisible();
-  await expect(page.locator('.katex')).toBeVisible();
-  await expect(page.getByRole('img', { name: 'Console' })).toHaveAttribute(
-    'src',
-    new RegExp(`/public/course-contents/${MATH}/assets/mediaFiles/demo.svgimport { test, expect, type Page, type Route } from '@playwright/test';
-
-const API_ORIGIN = 'http://localhost:8000';
-const COURSE = '00000000-0000-0000-0000-000000000101';
-const MATH = '00000000-0000-0000-0000-000000000201';
-const BASIS = '00000000-0000-0000-0000-000000000202';
-
-function json(route: Route, body: unknown) {
-  return route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify(body),
-  });
-}
-
-async function mockPublicReader(page: Page) {
-  await page.route(`${API_ORIGIN}/**`, async (route: Route) => {
-    const url = new URL(route.request().url());
-    const path = url.pathname;
-
-    if (path === '/public/courses') {
-      return json(route, [
-        { id: COURSE, title: 'Data Science mit Python – Grundlagen', description: 'Python von Anfang an.', language_code: 'de' },
-        { id: '00000000-0000-0000-0000-000000000102', title: 'Data Science mit Python – Aufbau', description: 'Weiterführende Übungen.', language_code: 'de' },
-        { id: '00000000-0000-0000-0000-000000000103', title: 'Data Science mit Python – Vertiefung', description: 'Vertiefende Übungen.', language_code: 'de' },
-      ]);
-    }
-
-    if (path === `/public/courses/${COURSE}/outline`) {
-      return json(route, {
-        id: COURSE,
-        title: 'Data Science mit Python – Grundlagen',
-        description: 'Python von Anfang an.',
-        language_code: 'de',
-        contents: [
-          { id: 'unit-1', title: 'Week 1', path: 'week_1', parent_path: null, depth: 0, position: 1, kind: 'unit', type_title: 'Week', color: 'green', is_submittable: false },
-          { id: MATH, title: 'Mathematical Constants', path: 'week_1.math_constants', parent_path: 'week_1', depth: 1, position: 1, kind: 'assignment', type_title: 'Exercise', color: 'yellow', is_submittable: true },
-          { id: BASIS, title: 'Basis 1', path: 'week_1.basis1', parent_path: 'week_1', depth: 1, position: 2, kind: 'assignment', type_title: 'Exercise', color: 'yellow', is_submittable: true },
-        ],
-        welcome_content_id: null,
-        first_exercise_id: MATH,
-        exercise_count: 2,
-        unit_count: 1,
-      });
-    }
-
-    if (path === `/public/course-contents/${MATH}`) {
-      const english = url.searchParams.get('language') === 'en';
-      return json(route, {
-        id: MATH,
-        course_id: COURSE,
-        title: 'Mathematical Constants',
-        path: 'week_1.math_constants',
-        kind: 'assignment',
-        is_submittable: true,
-        markdown: english
-          ? '# Mathematical Constants\n\nEnglish instructions. Euler: $e^{i\\pi}+1=0$.\n\n![Console](mediaFiles/demo.svg)'
-          : '# Mathematische Konstanten\n\nDeutsche Anleitung. Euler: $e^{i\\pi}+1=0$.\n\n![Konsole](mediaFiles/demo.svg)',
-        selected_language: english ? 'en' : 'de',
-        available_languages: ['de', 'en'],
-      });
-    }
-
-    if (path === `/public/course-contents/${BASIS}`) {
-      return json(route, {
-        id: BASIS,
-        course_id: COURSE,
-        title: 'Basis 1',
-        path: 'week_1.basis1',
-        kind: 'assignment',
-        is_submittable: true,
-        markdown: '# Basis 1\n\nNext exercise.',
-        selected_language: 'de',
-        available_languages: ['de', 'en'],
-      });
-    }
-
-    if (path.includes('/assets/mediaFiles/demo.svg')) {
-      return route.fulfill({
-        status: 200,
-        contentType: 'image/svg+xml',
-        body: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>',
-      });
-    }
-
-    return route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
-  });
-}
-
-test('anonymous learner browses a native course and bilingual exercises', async ({ page }) => {
-  const mutations: string[] = [];
-  page.on('request', request => {
-    if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method())) mutations.push(request.url());
-  });
-  await mockPublicReader(page);
-
-  await page.goto('/learn');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Data Science mit Python');
-  await expect(page.getByRole('link', { name: 'Browse course' })).toHaveCount(3);
-  await expect(page.getByText('python-beginner.yaml')).toHaveCount(0);
-
-  await page.getByRole('link', { name: 'Browse course' }).first().click();
-  await expect(page).toHaveURL(new RegExp(`/learn/${COURSE}$`));
-  await expect(page.getByText('Week 1', { exact: true })).toBeVisible();
-  await expect(page.getByText('Mathematical Constants', { exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Start with Mathematical Constants/ })).toBeVisible();
-
-  await page.getByRole('link', { name: /Start with Mathematical Constants/ }).click();
-  await expect(page).toHaveURL(new RegExp(`/learn/${COURSE}/content/${MATH}$`));
-),
-  );
-
-  await page.getByRole('button', { name: 'Deutsch' }).click();
-  await expect(page.getByText('Deutsche Anleitung.')).toBeVisible();
-  await page.getByRole('button', { name: 'English' }).click();
-  await expect(page.getByText('English instructions.')).toBeVisible();
-
-  await page.getByRole('link', { name: /Basis 1/ }).last().click();
-  await expect(page).toHaveURL(new RegExp(`/learn/${COURSE}/content/${BASIS}$`));
-  await expect(page.getByText('Next exercise.')).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(URL.replaceAll('.', '\\.') + '$'));
+  await expect(page.getByText(/This is the first task/)).toBeVisible();
+  await expect(page.locator('.katex').first()).toBeVisible();
+  const image = page.getByRole('img', { name: 'Run File in Interactive Window' });
+  await expect(image).toHaveAttribute('src', `/learning/media/${COURSE}/${MATH}/run_interactively.png`);
+  await expect(image).toBeVisible();
+  expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Deutsch', exact: true }).click();
+  await expect(page.getByText(/Dies ist die erste Aufgabe/)).toBeVisible();
+  await page.getByRole('button', { name: 'English', exact: true }).click();
+  await expect(page.getByText(/This is the first task/)).toBeVisible();
+  await page.getByRole('navigation', { name: 'Exercise navigation' }).getByRole('link').last().click();
+  await expect(page).toHaveURL(/week_1\.basis1$/);
+  await expect(page.locator('article .prose')).not.toBeEmpty();
+  expect(apiRequests).toEqual([]);
   expect(mutations).toEqual([]);
 });
 
-test('public course outline remains usable on a narrow screen', async ({ page }) => {
-  await mockPublicReader(page);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`/learn/${COURSE}`);
-
-  const outline = page.getByText('Course outline', { exact: true });
-  await expect(outline).toBeVisible();
-  await outline.click();
-  await expect(page.getByText('Week 1', { exact: true })).toBeVisible();
+test('all three courses have native reading content', async ({ page }) => {
+  for (const slug of ['python-beginner', 'python-intermediate', 'python-advanced']) {
+    await page.goto(`/learn/${slug}`);
+    await expect(page.getByRole('heading', { name: 'Welcome', exact: true })).toBeVisible();
+    await page.getByRole('link', { name: /Start with / }).click();
+    await expect(page.locator('article .prose')).not.toBeEmpty();
+  }
 });
 
-test('landing still links to the public reader when the catalog is unavailable', async ({ page }) => {
-  await page.route(`${API_ORIGIN}/**`, route => route.fulfill({ status: 503, body: '{}' }));
+test('landing shows open registration and static courses with no pilot or invite claim', async ({ page }) => {
+  const calls: string[] = [];
+  await page.route('http://localhost:8000/**', route => {
+    calls.push(route.request().url());
+    return route.fulfill({ status: 503, body: '{}' });
+  });
   await page.goto('/');
-  await expect(page.getByRole('link', { name: 'Read courses' })).toBeVisible();
-  await page.getByRole('link', { name: 'Read courses' }).click();
-  await expect(page).toHaveURL(/\/learn$/);
+  await expect(page.getByText('Offen zur Anmeldung / Open for registration')).toBeVisible();
+  await expect(page.getByText(/Pilotbetrieb|join with an invite link|Teilnahme mit Einladungslink/)).toHaveCount(0);
+  await page.getByRole('link', { name: /Data Science mit Python – Grundlagen/ }).click();
+  await expect(page).toHaveURL(/\/learn\/python-beginner$/);
+  await expect(page.getByRole('heading', { name: 'Welcome', exact: true })).toBeVisible();
+  expect(calls).toEqual([]);
+});
+
+test('course outline remains usable on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/learn/${COURSE}`);
+  await page.getByText('Course outline', { exact: true }).click();
+  await expect(page.locator('details[open] nav').getByText('Week 1', { exact: true })).toBeVisible();
+  await page.locator('details[open] nav').getByText('Mathematical Constants', { exact: true }).click();
+  await expect(page.getByText(/This is the first task/)).toBeVisible();
+});
+
+test('Markdown cannot execute HTML, trusted math commands or load foreign images', async ({ page }) => {
+  const outline = JSON.parse(fs.readFileSync('public/learning/courses/python-beginner.json', 'utf8'));
+  const hostile = `# Safety example
+<script>window.__readerAttack = true</script>
+<img src="https://evil.invalid/pixel.png" onerror="window.__readerAttack = true" />
+![Foreign](https://evil.invalid/pixel.png)
+![Inline](data:image/svg+xml;base64,PHN2Zz4=)
+![Traversal](mediaFiles/../../secret.png)
+[Attack](javascript:alert(1))
+$\\href{javascript:alert(1)}{click}$`;
+  outline.materials[MATH].markdown_variants = { de: hostile, en: hostile };
+  await page.route('**/learning/courses/python-beginner.json', route => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify(outline),
+  }));
+  const foreign: string[] = [];
+  page.on('request', request => { if (request.url().includes('evil.invalid')) foreign.push(request.url()); });
+  await page.goto(URL);
+  await expect(page.getByRole('heading', { name: 'Safety example' })).toBeVisible();
+  expect(await page.evaluate(() => Reflect.get(window, '__readerAttack'))).toBeUndefined();
+  await expect(page.locator('article a[href^="javascript:"]')).toHaveCount(0);
+  await expect(page.locator('article img')).toHaveCount(0);
+  expect(foreign).toEqual([]);
+});
+
+test('unknown courses and exercise IDs do not leak other content', async ({ page }) => {
+  expect((await page.goto('/learn/private-course'))?.status()).toBe(404);
+  expect((await page.goto(`/learn/${COURSE}/content/private-exercise`))?.status()).toBe(404);
+});
+
+test('static publication is read-only and restricts content sniffing', async ({ request }) => {
+  const file = '/learning/catalog.json';
+  const response = await request.get(file);
+  expect(response.headers()['x-content-type-options']).toBe('nosniff');
+  expect(response.headers()['content-security-policy']).toContain("default-src 'none'");
+  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+    expect((await request.fetch(file, { method })).status()).toBe(405);
+  }
 });

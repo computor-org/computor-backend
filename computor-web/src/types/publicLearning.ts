@@ -3,6 +3,8 @@ export interface PublicCourseCatalogEntry {
   title?: string | null;
   description?: string | null;
   language_code?: string | null;
+  exercise_count: number;
+  unit_count: number;
 }
 
 export interface PublicLearningContentSummary {
@@ -29,6 +31,21 @@ export interface PublicLearningCourseOutline {
   first_exercise_id?: string | null;
   exercise_count: number;
   unit_count: number;
+  materials: Record<string, PublicLearningMaterial>;
+  source_commit: string;
+}
+
+export interface PublicLearningMaterial {
+  id: string;
+  course_id: string;
+  title: string;
+  description?: string | null;
+  path: string;
+  kind: string;
+  is_submittable: boolean;
+  markdown_variants: Record<string, string>;
+  asset_base_url: string;
+  media_files: string[];
 }
 
 export interface PublicLearningContent {
@@ -42,4 +59,6 @@ export interface PublicLearningContent {
   markdown: string;
   selected_language?: string | null;
   available_languages: string[];
+  asset_base_url: string;
+  media_files: string[];
 }
