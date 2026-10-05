@@ -360,14 +360,22 @@ async def logout_session(
                     try:
                         token_data = json.loads(token_data_raw)
                         access_token_provider = token_data.get("access_token")
+                        refresh_token_provider = token_data.get("refresh_token")
 
                         if access_token_provider:
                             # Perform provider logout
                             plugin = registry.get_plugin(provider)
                             if plugin and hasattr(plugin, "logout"):
                                 try:
-                                    await plugin.logout(access_token_provider)
-                                    logger.info(f"Performed provider logout for {provider}")
+                                    if await plugin.logout(
+                                        access_token_provider,
+                                        refresh_token=refresh_token_provider,
+                                    ):
+                                        logger.info(f"Performed provider logout for {provider}")
+                                    else:
+                                        logger.warning(
+                                            f"Provider logout for {provider} did not end the provider session"
+                                        )
                                 except Exception as e:
                                     logger.error(f"Failed to logout from {provider}: {e}")
 
