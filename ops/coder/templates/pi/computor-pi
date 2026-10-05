@@ -1,0 +1,21 @@
+#!/bin/bash
+# Browser-terminal entrypoint of the pi workspace (ttyd runs this instead of a
+# login shell). pi is restarted whenever it exits, so quitting the agent never
+# drops the user to a shell — the workspace *is* the agent harness. pi's own
+# "!command" still runs shell commands, inside the harness.
+
+# A handler rather than `trap '' INT`: an ignored signal would be inherited by
+# pi and everything it spawns, while a handler is reset to default on exec.
+trap 'true' INT
+
+mkdir -p "$HOME/workspace"
+cd "$HOME/workspace" || cd "$HOME" || exit 1
+
+while true; do
+  pi "$@"
+  status=$?
+  printf '\n\033[2mpi exited (status %s) — restarting…\033[0m\n\n' "$status"
+  # Throttles a crash loop (e.g. a broken ~/.pi/agent/settings.json) to one
+  # restart every couple of seconds instead of a spinning terminal.
+  sleep 2
+done

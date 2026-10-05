@@ -25,7 +25,7 @@ def _vars(template, variables=None):
 
 
 @pytest.mark.parametrize(
-    "template", ["vscode", "bash", "jupyter", "ubuntu-desktop", "matlab-ui", "matlab-vscode"]
+    "template", ["vscode", "bash", "pi", "jupyter", "ubuntu-desktop", "matlab-ui", "matlab-vscode"]
 )
 @pytest.mark.parametrize("given", [None, {}, {"memory_mb": "0", "cpus": "0"}, {"cpus": ""}])
 def test_push_always_carries_positive_caps(template, given):

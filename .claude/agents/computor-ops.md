@@ -51,7 +51,7 @@ the root path.
 
 ## Coder workspaces
 
-Templates in `ops/coder/templates/{vscode,bash,ubuntu-desktop,jupyter,matlab-ui,matlab-vscode}/`,
+Templates in `ops/coder/templates/{vscode,bash,pi,ubuntu-desktop,jupyter,matlab-ui,matlab-vscode}/`,
 each split into `versions.tf`, `variables.tf`, `main.tf`, `agent.tf`,
 `container.tf` + `startup.sh.tftpl`. The contract is in each template's
 `README.md` — follow it; the split exists so templates stay diffable.
