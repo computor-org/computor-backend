@@ -157,7 +157,12 @@ export default function PublicCourseReader({
   }, [activeContentId, requestedLanguage]);
 
   useEffect(() => {
-    setRequestedLanguage(null);
+    const browserLanguage = typeof navigator === 'undefined'
+      ? null
+      : navigator.language.split('-')[0]?.toLowerCase() ?? null;
+    setRequestedLanguage(
+      browserLanguage === 'de' || browserLanguage === 'en' ? browserLanguage : null,
+    );
   }, [contentId, courseId]);
 
   const exercises = useMemo(
