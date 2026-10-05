@@ -43,7 +43,7 @@ function OutlineLinks({
       {outline.contents.map((item) => (
         <Link
           key={item.id}
-          href={`/learn/${outline.id}/${item.id}`}
+          href={`/learn/${outline.id}/content/${item.id}`}
           className={`block rounded-md py-2 pr-3 text-sm ${
             activeContentId === item.id
               ? 'bg-accent-wash text-accent-text font-medium'
@@ -223,17 +223,19 @@ export default function PublicCourseReader({
                     )}
                     {firstExercise && (
                       <Link
-                        href={`/learn/${outline.id}/${firstExercise.id}`}
+                        href={`/learn/${outline.id}/content/${firstExercise.id}`}
                         className="mt-6 inline-block rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent-hover"
                       >
                         Start with {firstExercise.title}
                       </Link>
                     )}
                   </section>
-                ) : contentLoading || !content ? (
+                ) : contentLoading ? (
                   <div className="rounded-lg border border-rule bg-surface p-10 text-center text-muted">
                     Loading content…
                   </div>
+                ) : !content ? (
+                  <EmptyState compact title="Course content unavailable" description={error ?? 'This item could not be loaded.'} />
                 ) : (
                   <section className="rounded-lg border border-rule bg-surface p-6 md:p-8">
                     <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
@@ -276,14 +278,14 @@ export default function PublicCourseReader({
                   <nav aria-label="Exercise navigation" className="flex items-center justify-between gap-4">
                     <div>
                       {previous && (
-                        <Link href={`/learn/${outline.id}/${previous.id}`} className="text-sm text-accent-text hover:underline">
+                        <Link href={`/learn/${outline.id}/content/${previous.id}`} className="text-sm text-accent-text hover:underline">
                           ← {previous.title}
                         </Link>
                       )}
                     </div>
                     <div className="text-right">
                       {next && (
-                        <Link href={`/learn/${outline.id}/${next.id}`} className="text-sm text-accent-text hover:underline">
+                        <Link href={`/learn/${outline.id}/content/${next.id}`} className="text-sm text-accent-text hover:underline">
                           {next.title} →
                         </Link>
                       )}
