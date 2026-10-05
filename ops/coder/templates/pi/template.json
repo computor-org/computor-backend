@@ -1,0 +1,8 @@
+{
+    "coder_template_name": "pi-workspace",
+    "image_name": "computor-workspace-pi",
+    "build_args_env": [],
+    "display_name": "Pi Agent",
+    "description": "Debian with the pi coding agent (pi.dev) as the browser terminal (ttyd). No shell or editor outside the agent.",
+    "icon": "/icon/terminal.svg"
+}

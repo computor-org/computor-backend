@@ -3,7 +3,7 @@
 set -euo pipefail
 
 templates_root=$(cd "$(dirname "$0")/../coder/templates" && pwd)
-for template in bash jupyter matlab-ui matlab-vscode ubuntu-desktop vscode; do
+for template in bash jupyter matlab-ui matlab-vscode pi ubuntu-desktop vscode; do
     config="$templates_root/$template/container.tf"
     grep -Eq '^[[:space:]]*restart[[:space:]]*=[[:space:]]*"unless-stopped"' "$config"
     grep -Eq '^[[:space:]]*count[[:space:]]*=[[:space:]]*data.coder_workspace.me.start_count' "$config"

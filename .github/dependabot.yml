@@ -115,6 +115,7 @@ updates:
       - /ops/coder/templates/ubuntu-desktop
       - /ops/coder/templates/matlab-ui
       - /ops/coder/templates/matlab-vscode
+      - /ops/coder/templates/pi
       - /computor-testing
       - /computor-testing/docker
     target-branch: release/2026.10
@@ -152,6 +153,7 @@ updates:
       - /ops/coder/templates/jupyter
       - /ops/coder/templates/matlab-ui
       - /ops/coder/templates/matlab-vscode
+      - /ops/coder/templates/pi
       - /ops/coder/templates/ubuntu-desktop
       - /ops/coder/templates/vscode
     target-branch: release/2026.10

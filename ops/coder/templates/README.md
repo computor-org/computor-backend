@@ -95,8 +95,8 @@ docker run --rm \
 ## Root and internet policy
 
 Both are **configuration, not image properties** — every template's image ships whatever it
-ships (five of the six carry passwordless sudo: `bash`, `ubuntu-desktop`, `vscode` and both
-MATLAB images; `jupyter` is the only one without, and has no `sudo` binary at all), and the
+ships (six of the seven carry passwordless sudo: `bash`, `pi`, `ubuntu-desktop`, `vscode` and
+both MATLAB images; `jupyter` is the only one without, and has no `sudo` binary at all), and the
 container decides whether that sudo can actually be used.
 
 | Knob | Off means | Mechanism |
@@ -169,6 +169,24 @@ startup leaves it alone.
    middleware so the prefix reaches the container intact (see `jupyter`).
 5. Run `computor.sh up` (or copy the dir into the deployed templates dir) and push via
    `POST /coder/admin/templates/push {"templates": ["<dir-name>"], "build_images": true}`.
+
+## Pi agent workspace
+
+`pi` is an agent-harness workspace (issue computor-org/issues#431): the `bash` template with
+Node.js and the [pi coding agent](https://github.com/badlogic/pi-mono) baked in, and ttyd
+running `computor-pi` instead of a login shell. `computor-pi` starts pi in `~/workspace` and
+restarts it whenever it exits, so the user cannot leave the harness for a plain shell; shell
+commands still run *through* pi (its `!command` and bash tool), under the same root/internet
+policy as every other template.
+
+- **Version** — pinned by `PI_VERSION` in the Dockerfile and installed globally as root, so a
+  workspace without root cannot `pi update --self`. Bump it there and rebuild. The startup
+  version check and install telemetry are switched off (`PI_SKIP_VERSION_CHECK`, `PI_TELEMETRY`).
+- **Credentials** — none are provisioned. Users run `/login` in pi and either sign in with a
+  subscription (OAuth) or paste an API key; pi stores both in `~/.pi/agent/auth.json` in the
+  **shared** home, so they follow the user into every workspace, including other templates.
+- **Internet** — pi is only useful with egress to its model provider; with `allow_internet`
+  off it starts but cannot reach any model.
 
 ## MATLAB workspaces
 
