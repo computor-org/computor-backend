@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import EmptyState from '@/src/components/EmptyState';
 import PublicLearnShell from '@/src/components/learn/PublicLearnShell';
+import { CODESPACES_URL, COMPUTOR_EXTENSION_URL } from '@/src/components/courses/LearningOptions';
 import { API_BASE_URL, apiFetch } from '@/src/utils/apiClient';
-import type { PublicCourseCatalogEntry } from '@/src/types/publicLearning';
+import type { PublicCourseCatalogEntry, PublicLearningCourseOutline } from '@/src/types/publicLearning';
 
 export default function LearnPage() {
   const [courses, setCourses] = useState<PublicCourseCatalogEntry[]>([]);
+  const [outlines, setOutlines] = useState<Record<string, PublicLearningCourseOutline>>({});
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
@@ -19,8 +21,26 @@ export default function LearnPage() {
         if (!response.ok) throw new Error('catalog unavailable');
         return response.json() as Promise<PublicCourseCatalogEntry[]>;
       })
-      .then(rows => {
-        if (!cancelled) setCourses(rows);
+      .then(async rows => {
+        if (cancelled) return;
+        setCourses(rows);
+        const pairs = await Promise.all(rows.map(async course => {
+          try {
+            const response = await apiFetch(
+              `${API_BASE_URL}/public/courses/${encodeURIComponent(course.id)}/outline`,
+            );
+            if (!response.ok) return [course.id, null] as const;
+            return [course.id, await response.json() as PublicLearningCourseOutline] as const;
+          } catch {
+            return [course.id, null] as const;
+          }
+        }));
+        if (!cancelled) {
+          setOutlines(
+            Object.fromEntries(pairs.filter(([, outline]) => outline !== null))
+              as Record<string, PublicLearningCourseOutline>,
+          );
+        }
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -64,7 +84,9 @@ export default function LearnPage() {
             </div>
           ) : (
             <div className="mt-5 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {courses.map(course => (
+              {courses.map(course => {
+                const outline = outlines[course.id];
+                return (
                 <article key={course.id} className="flex min-h-64 flex-col rounded-xl border border-rule bg-surface p-6">
                   <div className="flex-1">
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted">
@@ -79,6 +101,11 @@ export default function LearnPage() {
                       </p>
                     )}
                   </div>
+                  {outline && (
+                    <p className="mt-4 text-xs text-subtle">
+                      {outline.unit_count} units · {outline.exercise_count} exercises
+                    </p>
+                  )}
                   <Link
                     href={`/learn/${course.id}`}
                     className="mt-5 inline-flex self-start rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent-hover"
@@ -86,7 +113,8 @@ export default function LearnPage() {
                     Browse course
                   </Link>
                 </article>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
@@ -96,9 +124,17 @@ export default function LearnPage() {
           <p className="mt-2 text-sm text-muted">
             Sign in to join a course, keep progress, run official tests, or use a hosted workspace.
           </p>
-          <Link href="/courses/catalog" className="mt-3 inline-block text-sm text-accent-text hover:underline">
-            Open course catalog
-          </Link>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+            <Link href="/courses/catalog" className="text-accent-text hover:underline">
+              Open course catalog
+            </Link>
+            <a href={COMPUTOR_EXTENSION_URL} target="_blank" rel="noreferrer" className="text-accent-text hover:underline">
+              Desktop VS Code
+            </a>
+            <a href={CODESPACES_URL} target="_blank" rel="noreferrer" className="text-accent-text hover:underline">
+              GitHub Codespaces
+            </a>
+          </div>
         </section>
       </div>
     </PublicLearnShell>
