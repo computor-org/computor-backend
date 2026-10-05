@@ -10,7 +10,7 @@ services:
   # `socket-proxy`, so dev and prod are wired identically and the ingress never
   # needs the raw socket.
   coder-socket-proxy:
-    image: tecnativa/docker-socket-proxy:0.3.0@sha256:9e4b9e7517a6b660f2cc903a19b257b1852d5b3344794e3ea334ff00ae677ac2
+    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-socket-proxy
     networks:
       - computor-network
@@ -95,7 +95,7 @@ services:
 
   # Dedicated PostgreSQL database for Coder (separate from main DB)
   coder-postgres:
-    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
+    image: postgres:18.6@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722
     networks:
       - computor-network
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-postgres
@@ -190,7 +190,7 @@ services:
   # for both pushes (from temporal-worker-coder) and pulls (from terraform
   # at workspace creation), since both go through the docker socket.
   coder-registry:
-    image: registry:2.8.3@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+    image: registry:3.1.1@sha256:325b4b29b041e82803abeb703e201655e4e23ab83264ec1a7c9ddb0a5b14a6e0
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-registry
     restart: unless-stopped
     security_opt:

@@ -17,7 +17,7 @@ networks:
 
 services:
   forgejo-db:
-    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
+    image: postgres:18.6@sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722
     container_name: computor-forgejo-db
     networks:
       - forgejo-internal
@@ -46,7 +46,7 @@ services:
       retries: 5
 
   forgejo:
-    image: codeberg.org/forgejo/forgejo:9.0.3@sha256:3c34f11fe8b9983096eef3f8f25c2d2c21c4ae7504960cb203f0b075d1d8ed73
+    image: codeberg.org/forgejo/forgejo:16.0.5@sha256:cf5f5ae6acf2ababca0ee3d255705b83a47f35b25e07fc931d694d60664053fe
     container_name: computor-forgejo
     networks:
       - forgejo-internal
@@ -151,7 +151,7 @@ services:
   # Runs once per `docker compose up` to create the admin user and configure OIDC.
   # Idempotent: forgejo returns non-zero if the user/auth-source exists, which is ignored.
   forgejo-bootstrap:
-    image: codeberg.org/forgejo/forgejo:9.0.3@sha256:3c34f11fe8b9983096eef3f8f25c2d2c21c4ae7504960cb203f0b075d1d8ed73
+    image: codeberg.org/forgejo/forgejo:16.0.5@sha256:cf5f5ae6acf2ababca0ee3d255705b83a47f35b25e07fc931d694d60664053fe
     container_name: computor-forgejo-bootstrap
     # Run as the image's git user. The forgejo CLI refuses to run as root, and
     # overriding the entrypoint skips the image's own privilege drop. Using the
