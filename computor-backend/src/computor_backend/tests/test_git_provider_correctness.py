@@ -35,6 +35,14 @@ class TestAccountSecretsAreNotSerialized:
         assert account.properties == {"email": "student@example.org"}
         assert "gAAAAA-ciphertext" not in account.model_dump_json()
 
+    def test_personal_clone_tokens_are_dropped(self):
+        account = self.account({
+            "email": "student@example.org",
+            "forgejo_personal_clone_tokens": {"srv-1": "gAAAAA-cli-ciphertext"},
+        })
+        assert account.properties == {"email": "student@example.org"}
+        assert "gAAAAA-cli-ciphertext" not in account.model_dump_json()
+
     def test_everything_else_survives(self):
         properties = {"email": "s@example.org", "username": "s", "groups": ["a"]}
         assert self.account(properties).properties == properties
