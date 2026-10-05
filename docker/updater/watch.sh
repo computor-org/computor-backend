@@ -106,11 +106,13 @@ while true; do
         --network computor-network \
         --user "$(id -u):$(id -g)" \
         --group-add "${DOCKER_GID:-0}" \
+        --group-add "${COMPUTOR_DEPLOY_GID:-$(id -g)}" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v "${COMPUTOR_REPO_DIR}:${COMPUTOR_REPO_DIR}" \
         -w "${COMPUTOR_REPO_DIR}" \
         -e REDIS_PASSWORD \
         -e DOCKER_GID \
+        -e COMPUTOR_DEPLOY_GID \
         -e HOME=/tmp \
         "$SELF_IMAGE" \
         bash -c "source '${COMPUTOR_REPO_DIR}/ops/lib/common.sh' && source '${COMPUTOR_REPO_DIR}/ops/lib/update.sh' && cmd_update_exec prod" \

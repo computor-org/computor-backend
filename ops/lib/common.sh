@@ -22,6 +22,8 @@ NC='\033[0m'
 # container, where the repo is bind-mounted at its host path).
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OPS_DIR="${REPO_ROOT}/ops"
+# shellcheck disable=SC1091
+source "${OPS_DIR}/lib/git.sh"
 
 log()  { echo -e "$@"; }
 warn() { echo -e "${YELLOW}$*${NC}"; }
@@ -31,6 +33,9 @@ die()  { echo -e "${RED}$*${NC}" >&2; exit 1; }
 load_env() {
     [ -f "${REPO_ROOT}/.env" ] || die "No .env file found in ${REPO_ROOT}!
 Please create a .env file with your configuration (see ./setup-env.sh)."
+    [ -r "${REPO_ROOT}/.env" ] || die "Cannot read ${REPO_ROOT}/.env as $(id -un).
+The deployment owner must grant your deployment group access to this checkout.
+Run updates from your own account; see ops/docs/DOCKER_SETUP.md (shared deployments)."
     set -a
     # shellcheck disable=SC1091
     source "${REPO_ROOT}/.env"
@@ -254,8 +259,8 @@ redis_cli() {
 # of the same commit is a different running image, and "when did this start
 # running what it is running" is the question #350 asks.
 git_build_meta() {
-    GIT_COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
-    GIT_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+    GIT_COMMIT="$(deployment_git rev-parse HEAD 2>/dev/null || echo unknown)"
+    GIT_BRANCH="$(deployment_git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
     BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     export GIT_COMMIT GIT_BRANCH BUILD_TIME
 }
