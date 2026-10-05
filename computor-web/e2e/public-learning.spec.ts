@@ -1,4 +1,4 @@
-import { test, expect, type Route } from '@playwright/test';
+import { test, expect, type Page, type Route } from '@playwright/test';
 
 const API_ORIGIN = 'http://localhost:8000';
 const COURSE = '00000000-0000-0000-0000-000000000101';
@@ -13,7 +13,7 @@ function json(route: Route, body: unknown) {
   });
 }
 
-async function mockPublicReader(page: Parameters<typeof test>[0] extends never ? never : any) {
+async function mockPublicReader(page: Page) {
   await page.route(`${API_ORIGIN}/**`, async (route: Route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
