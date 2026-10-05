@@ -287,3 +287,48 @@ For issues or questions:
 2. Review configuration: `docker-compose config`
 3. Consult the main documentation
 4. Open an issue on GitHub
+
+## Shared deployments
+
+Operators run `./computor.sh update check`, `update status`, and `update run prod`
+from their own accounts. They need access to the deployment checkout, its `.git`
+and `.env`, the operator-managed configuration directories, and the Docker daemon.
+Running the command as the original checkout owner is unnecessary.
+
+For code.tugraz.at, the operator group is `ag-ai`; both `ert` and `thalerj` already
+belong to it. The infrastructure repository prepares existing files and default
+ACLs without changing their owners or the service/database UIDs:
+
+```bash
+# Once, as the current deployment owner with a valid Kerberos ticket:
+cd ~/infra/computor-infra/prod
+./share-deployment-access.sh code-tugraz
+
+# Each operator, on faepkub3, with their own login:
+cd /srv/docker/computor-backend
+./computor.sh update check
+./computor.sh update status
+./computor.sh update run prod
+```
+
+`check` is read-only and returns 10 when an update is available. `run` performs
+builds, maintenance and a restart; use the deployment's backup and release gates
+before running it. The CLI checks writable Git state before acquiring an update
+lock and reports unreadable configuration with deployment-access instructions.
+Git ownership exceptions are scoped to the selected checkout for each script
+invocation. For manual Git commands in a shared checkout, use
+`git -c safe.directory=/srv/docker/computor-backend -C /srv/docker/computor-backend ...`.
+
+The shared group can read deployment secrets and modify deployed code; include
+only authorized operators. Default ACLs and `core.sharedRepository=group` keep
+new Git/source files usable by both operators, including under `umask 077`.
+The infrastructure release exporter reapplies the policy after its tree swap
+and preserves group access on atomic env/recovery writes. No blanket sudo rule
+is needed for routine application administration. Host packages, nginx/TLS,
+SSH, systemd and group enrollment remain the host administrator's responsibility.
+
+For the optional updater sidecar, `COMPUTOR_DEPLOY_GID` is the numeric operator
+GID (507 on faepkub3). The bootstrap appends it to the deployment env. Both the
+watcher and detached runner receive this supplementary group as well as the
+Docker socket group. Existing automatic-updater enablement stays unchanged;
+rebuild/recreate its image when choosing to enable it with the corrected watcher.
