@@ -539,23 +539,60 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
                 error_message=f"Token refresh failed: {str(e)}"
             )
     
-    async def logout(self, access_token: str) -> bool:
-        """Logout user from Keycloak."""
-        if not self._oidc_config:
+    async def logout(self, access_token: str, refresh_token: Optional[str] = None) -> bool:
+        """End the user's Keycloak session server-side.
+
+        Keycloak ignores a bare ``Authorization: Bearer`` POST to the end-session
+        endpoint, so the session can only be ended with the refresh token and the
+        client credentials (backchannel logout). If the provider does not confirm
+        that with a 2xx, the token is revoked at the revocation endpoint instead.
+
+        Returns True only when Keycloak confirmed one of those calls. Without a
+        refresh token nothing can be ended, so it returns False.
+        """
+        if not refresh_token:
+            logger.warning("Keycloak logout skipped: no refresh token, the provider session stays active")
             return False
-        
+
+        if not self._oidc_config:
+            logger.warning("Keycloak logout skipped: plugin not initialized")
+            return False
+
+        client_credentials = {
+            "client_id": self.keycloak_config.client_id,
+            "client_secret": self.keycloak_config.client_secret,
+        }
+        attempts = []
         end_session_endpoint = self._oidc_config.get("end_session_endpoint")
-        if not end_session_endpoint:
-            # If no end session endpoint, just return success
-            return True
-        
+        if end_session_endpoint:
+            attempts.append(("end session", end_session_endpoint, {**client_credentials, "refresh_token": refresh_token}))
+        revocation_endpoint = self._oidc_config.get("revocation_endpoint")
+        if revocation_endpoint:
+            attempts.append((
+                "revocation",
+                revocation_endpoint,
+                {**client_credentials, "token": refresh_token, "token_type_hint": "refresh_token"},
+            ))
+
+        if not attempts:
+            logger.warning("Keycloak logout failed: no end_session or revocation endpoint in OIDC configuration")
+            return False
+
         try:
             async with httpx.AsyncClient(verify=self.keycloak_config.verify_ssl) as client:
-                response = await client.post(
-                    end_session_endpoint,
-                    headers={"Authorization": f"Bearer {access_token}"}
-                )
-                return response.status_code < 400
+                for name, endpoint, data in attempts:
+                    try:
+                        response = await client.post(
+                            endpoint,
+                            data=data,
+                            headers={"Content-Type": "application/x-www-form-urlencoded"}
+                        )
+                    except httpx.HTTPError as e:
+                        logger.warning(f"Keycloak {name} request failed: {type(e).__name__}")
+                        continue
+                    if 200 <= response.status_code < 300:
+                        return True
+                    logger.warning(f"Keycloak {name} request rejected with status {response.status_code}")
         except Exception as e:
-            logger.error(f"Logout failed: {e}")
-            return False
+            logger.error(f"Logout failed: {type(e).__name__}")
+        return False

@@ -184,12 +184,13 @@ class AuthenticationPlugin(ABC):
         """
         raise NotImplementedError(f"Token refresh not supported by {self.metadata.provider_name}")
     
-    async def logout(self, access_token: str) -> bool:
+    async def logout(self, access_token: str, refresh_token: Optional[str] = None) -> bool:
         """
         Logout user from provider.
         
         Args:
             access_token: Access token to revoke
+            refresh_token: Refresh token, needed by providers that end the session server-side
             
         Returns:
             True if logout successful, False otherwise
