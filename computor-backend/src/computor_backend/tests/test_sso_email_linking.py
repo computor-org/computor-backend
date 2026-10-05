@@ -196,6 +196,39 @@ async def test_a_returning_identity_is_not_rechecked(db, login_as):
 
 
 @pytest.mark.asyncio
+async def test_a_returning_login_keeps_the_stored_clone_tokens(db, login_as):
+    """A login refreshes the identity claims, not the whole properties blob.
+
+    The OIDC account also holds the encrypted Forgejo clone tokens. Replacing
+    the blob on every login dropped them, so the next provisioning re-minted the
+    workspace token and revoked the one in every existing clone's remote
+    (computor-org/issues#332, #433).
+    """
+    sub = f"kc-{uuid.uuid4().hex}"
+    await login_as(db, email=_email(), email_verified=True, sub=sub)
+    account = db.query(Account).filter(Account.provider_account_id == sub).one()
+    stored = {
+        "forgejo_clone_tokens": {"srv-1": "gAAAAA-workspace"},
+        "forgejo_personal_clone_tokens": {"srv-1": "gAAAAA-cli"},
+    }
+    account.properties = {**account.properties, **stored}
+    db.flush()
+
+    new_email = _email()
+    await login_as(db, email=new_email, email_verified=True, sub=sub)
+
+    db.refresh(account)
+    assert account.properties["forgejo_clone_tokens"] == stored["forgejo_clone_tokens"]
+    assert (
+        account.properties["forgejo_personal_clone_tokens"]
+        == stored["forgejo_personal_clone_tokens"]
+    )
+    # The identity claims themselves are still refreshed from the token.
+    assert account.properties["email"] == new_email
+    assert account.properties["username"] == new_email.split("@")[0]
+
+
+@pytest.mark.asyncio
 async def test_unverified_claim_cannot_capture_a_later_staff_import(db, login_as, monkeypatch):
     """Signup with someone else's unverified email, then staff import that email.
 
