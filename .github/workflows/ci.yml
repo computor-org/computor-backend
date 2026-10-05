@@ -123,4 +123,7 @@ jobs:
       - run: corepack enable
       - run: yarn install --frozen-lockfile --ignore-scripts
       - run: yarn lint
+      - run: yarn test:public-learning
       - run: yarn build
+      - run: npx playwright install --with-deps chromium
+      - run: yarn test:e2e e2e/public-learning.spec.ts --workers=2

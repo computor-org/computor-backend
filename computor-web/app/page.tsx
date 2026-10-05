@@ -1,60 +1,23 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
-import { API_BASE_URL, apiFetch } from '@/src/utils/apiClient';
 import PublicCourseCatalog from '@/src/components/courses/PublicCourseCatalog';
-import LearningOptions from '@/src/components/courses/LearningOptions';
+import LearningOptions, { COMPUTOR_EXTENSION_URL } from '@/src/components/courses/LearningOptions';
 import LegalLinks from '@/src/components/LegalLinks';
 import NetideeNotice from '@/src/components/NetideeNotice';
 
 export default function Home() {
   const router = useRouter();
   const { user, logout } = useAuth();
-  const [extensionUrl, setExtensionUrl] = useState<string | null>(null);
-  const [gettingStartedUrl, setGettingStartedUrl] = useState<string | null>(null);
+  const extensionUrl = COMPUTOR_EXTENSION_URL;
+  const gettingStartedUrl = '/learn';
 
   // `/` is the public landing page and stays viewable when signed in (the header
   // shows Dashboard + Sign Out for authenticated users) — no auto-redirect, so a
   // signed-in user can switch back to this view.
-
-  useEffect(() => {
-    async function fetchExtensionUrl() {
-      try {
-        const response = await apiFetch(`${API_BASE_URL}/extensions-public`);
-        if (response.ok) {
-          const url = await response.text();
-          setExtensionUrl(url.replace(/^"|"$/g, '')); // Remove quotes if present
-        } else {
-          setExtensionUrl(null);
-        }
-      } catch (error) {
-        console.error('Failed to fetch extension URL:', error);
-        setExtensionUrl(null);
-      }
-    }
-
-    async function fetchGettingStartedUrl() {
-      try {
-        const response = await apiFetch(`${API_BASE_URL}/extensions-getting-started`);
-        if (response.ok) {
-          const url = await response.text();
-          setGettingStartedUrl(url.replace(/^"|"$/g, '')); // Remove quotes if present
-        } else {
-          setGettingStartedUrl(null);
-        }
-      } catch (error) {
-        console.error('Failed to fetch getting started URL:', error);
-        setGettingStartedUrl(null);
-      }
-    }
-
-    fetchExtensionUrl();
-    fetchGettingStartedUrl();
-  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -63,13 +26,13 @@ export default function Home() {
 
   const handleDownload = () => {
     if (extensionUrl) {
-      window.open(extensionUrl, '_blank');
+      window.open(extensionUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
   const handleGettingStarted = () => {
     if (gettingStartedUrl) {
-      window.open(gettingStartedUrl, '_blank');
+      router.push(gettingStartedUrl);
     }
   };
 

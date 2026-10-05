@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import "katex/dist/katex.min.css";
 import "./globals.css";
 import { AuthProvider } from "@/src/contexts/AuthContext";
 import { NotificationProvider } from "@/src/contexts/NotificationContext";

@@ -8,6 +8,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 const PORT = Number(process.env.E2E_PORT ?? 3100);
 const API = process.env.E2E_API_URL ?? 'http://localhost:8000';
+const EXTERNAL = process.env.E2E_BASE_URL;
 
 export default defineConfig({
   testDir: './e2e',
@@ -17,12 +18,12 @@ export default defineConfig({
   reporter: process.env.CI ? 'line' : [['list']],
   timeout: 30_000,
   use: {
-    baseURL: `http://localhost:${PORT}`,
+    baseURL: EXTERNAL ?? `http://localhost:${PORT}`,
     trace: 'on-first-retry',
     headless: true,
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: {
+  webServer: EXTERNAL ? undefined : {
     command: `npx next dev -p ${PORT}`,
     url: `http://localhost:${PORT}`,
     timeout: 120_000,
