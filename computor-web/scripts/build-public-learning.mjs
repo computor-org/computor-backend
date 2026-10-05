@@ -35,6 +35,8 @@ export function buildPublicLearning(source, destination, revision) {
   if (!/^[0-9a-f]{40}$/.test(revision)) throw Error('An exact source commit is required');
   source = fs.realpathSync(source);
   fs.mkdirSync(destination, { recursive: true });
+  // Retain the source copyright and permission notice with the copied material.
+  fs.writeFileSync(path.join(destination, 'LICENSE.txt'), readInside(source, 'LICENSE', MAX_TEXT));
   const catalog = [];
   for (const slug of COURSES) {
     const manifest = readYaml(source, `courses/${slug}.yaml`);

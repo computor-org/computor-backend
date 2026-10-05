@@ -14,6 +14,7 @@ function fixture(t) {
   const example = path.join(source, 'examples/python/example.first');
   fs.mkdirSync(path.join(source, 'courses'), { recursive: true });
   fs.mkdirSync(path.join(example, 'content/mediaFiles'), { recursive: true });
+  fs.writeFileSync(path.join(source, 'LICENSE'), 'MIT License\nCopyright Example Contributors\nPermission notice');
   const manifest = { name: 'Public course', description: 'Course description',
     content_types: [{ slug: 'week', kind: 'unit', title: 'Week' }, { slug: 'task', kind: 'assignment', title: 'Exercise' }],
     contents: [{ path: 'week_1', position: 1, content_type: 'week', contents: [
@@ -46,6 +47,8 @@ test('publication selects real course structure, bilingual text and referenced r
   assert.deepEqual(course.contents.map(row => row.id), ['week_1', 'week_1.first']);
   assert.equal(course.materials['week_1.first'].markdown_variants.en, '# First exercise');
   assert.equal(course.source_commit, revision);
+  assert.equal(fs.readFileSync(path.join(f.output, 'LICENSE.txt'), 'utf8'),
+    'MIT License\nCopyright Example Contributors\nPermission notice');
   const files = fs.readdirSync(f.output, { recursive: true }).filter(name => fs.statSync(path.join(f.output, name)).isFile());
   assert(files.some(name => name.endsWith('figure.png')));
   assert(!files.some(name => /\.env|solution|secret\.html|meta\.yaml/.test(name)));

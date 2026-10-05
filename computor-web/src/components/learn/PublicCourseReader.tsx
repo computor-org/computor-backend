@@ -280,7 +280,11 @@ export default function PublicCourseReader({
                     <a href={PUBLIC_COURSES_URL} target="_blank" rel="noreferrer" className="text-accent-text hover:underline">
                       GitHub
                     </a>
-                    . Repository structure is provenance, not required course navigation.
+                    . Published material retains its{' '}
+                    <a href="/learning/LICENSE.txt" target="_blank" rel="noreferrer" className="text-accent-text hover:underline">
+                      MIT copyright and permission notice
+                    </a>
+                    .
                   </p>
                 </details>
               </article>
