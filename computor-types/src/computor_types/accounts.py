@@ -44,14 +44,15 @@ class AccountGet(BaseEntityGet):
         """Keep credential material out of a general-purpose entity response.
 
         An OIDC account carries the user's per-git-server clone tokens under
-        ``forgejo_clone_tokens``. They are encrypted and only the owner can read
+        ``forgejo_clone_tokens`` (workspace) and ``forgejo_personal_clone_tokens``
+        (``computor-cli``, #342). They are encrypted and only the owner can read
         their own accounts, so the exposure is small — but secrets should not
         ride along in a response whose job is describing an identity, and if
         TOKEN_SECRET ever leaked these would be decryptable offline.
         """
         if not value:
             return value
-        secret_keys = {"forgejo_clone_tokens"}
+        secret_keys = {"forgejo_clone_tokens", "forgejo_personal_clone_tokens"}
         if not secret_keys & value.keys():
             return value
         return {k: v for k, v in value.items() if k not in secret_keys}

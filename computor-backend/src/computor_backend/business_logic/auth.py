@@ -397,6 +397,30 @@ async def logout_session(
     return LogoutResponse(message="Logout successful", provider=provider_name)
 
 
+def _sso_identity_properties(user_info, auth_result) -> Dict[str, Any]:
+    """The identity claims an SSO login (re)writes on the OIDC account.
+
+    Only these keys belong to the login. The same ``properties`` column also
+    holds state the backend keeps on the SSO identity itself — the encrypted
+    per-git-server clone tokens (``forgejo_clone_tokens``,
+    ``forgejo_personal_clone_tokens``) — so a returning login merges these over
+    what is stored instead of replacing it. Replacing it dropped the remembered
+    tokens on every login, and the next repository provisioning then re-minted
+    the token, revoking the copy every existing clone carries in its remote
+    (computor-org/issues#332, #433).
+    """
+    return {
+        "email": user_info.email,
+        "username": user_info.username,
+        "picture": user_info.picture,
+        "groups": user_info.groups,
+        "attributes": user_info.attributes,
+        "last_login": (
+            str(auth_result.expires_at) if auth_result.expires_at else None
+        ),
+    }
+
+
 async def handle_sso_callback(
     provider: str,
     code: str,
@@ -481,16 +505,11 @@ async def handle_sso_callback(
             # Existing account - get user
             user = account.user
 
-            # Update account properties with latest info
+            # Refresh the identity claims, keeping everything else stored here
+            # (see _sso_identity_properties).
             account.properties = {
-                "email": user_info.email,
-                "username": user_info.username,
-                "picture": user_info.picture,
-                "groups": user_info.groups,
-                "attributes": user_info.attributes,
-                "last_login": (
-                    str(auth_result.expires_at) if auth_result.expires_at else None
-                ),
+                **(account.properties or {}),
+                **_sso_identity_properties(user_info, auth_result),
             }
 
             # User.email is deliberately NOT rewritten from the token (another
@@ -604,16 +623,7 @@ async def handle_sso_callback(
                 type=registry.get_plugin_metadata(provider).provider_type.value,
                 provider_account_id=user_info.provider_id,
                 user_id=user.id,
-                properties={
-                    "email": user_info.email,
-                    "username": user_info.username,
-                    "picture": user_info.picture,
-                    "groups": user_info.groups,
-                    "attributes": user_info.attributes,
-                    "last_login": (
-                        str(auth_result.expires_at) if auth_result.expires_at else None
-                    ),
-                },
+                properties=_sso_identity_properties(user_info, auth_result),
                 builtin=True,  # the SSO identity account — not user-unlinkable
             )
             db.add(account)
