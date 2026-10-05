@@ -1,10 +1,25 @@
 # Public learning on computor.at
 
-The `/learn` page and `GET /public/learning` expose a curated set of public
-Python courses and links. Reading requires no account and triggers no server
-execution. Learners can work in a hosted Coder workspace after signing in, on
-their own computer with VS Code, or in a GitHub Codespace using their GitHub
-quota. A full hosted pool leaves the other two paths available.
+`/learn` is the anonymous, first-party course reader. Course discovery comes
+from `GET /public/courses`; a reader then loads
+`GET /public/courses/{course_id}/outline` and
+`GET /public/course-contents/{content_id}`. The web app renders the pedagogical
+unit/exercise hierarchy, descriptions, media and language variants without
+sending learners to a repository browser. GitHub is provenance and reuse
+information only.
+
+The public reader applies the same visibility/release rules as the student
+view, plus `Course.public` and archive checks. Assignment Markdown is read only
+from the deployed example's top-level `content/index*.md` or `README*.md`
+files. Public media is restricted to `content/mediaFiles/**`. The projection
+never returns repository credentials, reference solutions, local tests,
+submission data or instructor-only files. Reading requires no account and
+triggers no server execution.
+
+A course opens on an explicit welcome/start content item when one exists.
+Until such an item exists, the reader shows the course description and a clear
+link to the first released exercise. Learners can then sign in to join the
+course or work in a hosted Coder workspace, local VS Code, or GitHub Codespaces.
 
 For a public deployment with Coder enabled, set
 `CODER_MAX_RUNNING_WORKSPACES=30`. The API refuses hosted creation/start when
