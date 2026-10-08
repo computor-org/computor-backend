@@ -10,20 +10,20 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@tailwindcss/typography": "^0.5.19",
-    "js-yaml": "^4.3.2",
-    "jszip": "^3.10.1",
+    "@tailwindcss/typography": "^0.5.20",
+    "js-yaml": "^5.4.1",
+    "jszip": "^3.10.2",
     "next": "16.3.6",
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "react-markdown": "^10.1.0",
-    "recharts": "^3.7.0",
+    "recharts": "^3.10.1",
     "remark-gfm": "^4.0.1"
   },
   "resolutions": {
     "minimatch": ">=9.0.7",
     "postcss": "^8.5.23",
-    "js-yaml": "^4.3.2",
+    "js-yaml": "^5.4.1",
     "sharp": "^0.35.4",
     "browserslist": "^4.28.7",
     "brace-expansion": "^5.0.7",
