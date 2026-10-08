@@ -477,13 +477,16 @@ async def sso_logout(
     # Read the stored id_token (for id_token_hint) before deleting the session,
     # then best-effort cleanup of Redis sessions — don't fail logout if Redis is unhappy.
     id_token_hint = None
+    session_user_id = None
     try:
         if current_token:
             session_key = f"sso_session:{hash_token(current_token)}"
             raw = await cache.get(session_key)
             if raw:
                 try:
-                    id_token_hint = json.loads(raw).get("id_token")
+                    session = json.loads(raw)
+                    id_token_hint = session.get("id_token")
+                    session_user_id = session.get("user_id")
                 except Exception:
                     pass
             await cache.delete(session_key)
@@ -497,6 +500,24 @@ async def sso_logout(
     end_session_endpoint = None
     if plugin is not None and getattr(plugin, "_oidc_config", None):
         end_session_endpoint = plugin._oidc_config.get("end_session_endpoint")
+
+    # End the Keycloak session server-side too. The browser redirect below only
+    # ends it when Keycloak gets an id_token_hint; without one Keycloak asks
+    # "Do you want to log out?", and a user who leaves that page stays signed
+    # in, so the next sign-in silently returns the same account.
+    if session_user_id and plugin is not None and hasattr(plugin, "logout"):
+        token_key = f"sso_token:{provider}:{session_user_id}"
+        try:
+            raw = await cache.get(token_key)
+            if raw:
+                stored = json.loads(raw)
+                if not await plugin.logout(
+                    stored.get("access_token"), refresh_token=stored.get("refresh_token")
+                ):
+                    logger.warning(f"SSO logout: {provider} did not confirm the session end")
+                await cache.delete(token_key)
+        except Exception as e:
+            logger.warning(f"SSO logout: provider session end failed: {e}")
 
     # Same allowlist as login (minus the loopback receiver, which never logs out
     # through here); anything else is dropped rather than failing the logout.
