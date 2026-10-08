@@ -43,6 +43,16 @@ export default function Modal({
   const panelRef = useRef<HTMLDivElement>(null);
   const mounted = useSyncExternalStore(subscribeToNothing, onClient, onServer);
 
+  // Callers usually pass an inline arrow, i.e. a new onClose every render. If
+  // the effect below depended on it, every keystroke in a field would tear it
+  // down (focus back to the opener) and set it up again (focus to the FIRST
+  // field) — the cursor jumped out of any later field (issues#437). Read the
+  // latest handler through a ref so the effect runs once per open.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   useEffect(() => {
     const panel = panelRef.current;
     if (!panel) return;
@@ -63,7 +73,7 @@ export default function Modal({
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -91,7 +101,7 @@ export default function Modal({
     };
     // `mounted` gates the portal, so the panel this effect needs only exists
     // once it flips true.
-  }, [onClose, mounted]);
+  }, [mounted]);
 
   if (!mounted) return null;
 
