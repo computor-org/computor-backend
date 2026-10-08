@@ -10,7 +10,7 @@ services:
   # `socket-proxy`, so dev and prod are wired identically and the ingress never
   # needs the raw socket.
   coder-socket-proxy:
-    image: tecnativa/docker-socket-proxy:0.3.0@sha256:9e4b9e7517a6b660f2cc903a19b257b1852d5b3344794e3ea334ff00ae677ac2
+    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-socket-proxy
     networks:
       - computor-network
@@ -95,7 +95,7 @@ services:
 
   # Dedicated PostgreSQL database for Coder (separate from main DB)
   coder-postgres:
-    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
+    image: postgres:18.4@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
     networks:
       - computor-network
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-postgres
@@ -130,7 +130,7 @@ services:
     # Pinned by version + digest: >= 2.36.4 is required (GHSA-vx42-ghc9-gw65).
     # Keep in lockstep with CODER_VERSION in docker/coder-runtime/Dockerfile.
     # Never downgrade: Coder DB migrations are forward-only.
-    image: ghcr.io/coder/coder:v2.37.3@sha256:a48f82c2c437e032ce3f6970b4e937a7900cad3c76956956955099465b45e542
+    image: ghcr.io/coder/coder:v2.38.0@sha256:38a4cfc548b096484d6d1743e5f1a5af18301ed9a7ffde5150663822f9887026
     # Also on BOTH isolated workspace networks so workspace agents can reach
     # coder:7080 (CODER_ACCESS_URL) without workspaces touching
     # computor-network. The offline one is not optional: an agent that cannot
@@ -190,7 +190,7 @@ services:
   # for both pushes (from temporal-worker-coder) and pulls (from terraform
   # at workspace creation), since both go through the docker socket.
   coder-registry:
-    image: registry:2.8.3@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+    image: registry:3.1.2@sha256:ddf754342cfc8acc51a56d5d0ab6af06826461864460636d8bd5c546dab2a7b8
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-registry
     restart: unless-stopped
     security_opt:
