@@ -301,20 +301,20 @@ maintenance_paths() {
 
 ensure_maintenance_page() {
     maintenance_paths
-    mkdir -p "$MAINTENANCE_PAGE_DIR"
+    mkdir -p "$MAINTENANCE_PAGE_DIR" || return 1
     # Compare, not just test for existence: a page staged by an older checkout
     # would otherwise be served forever after the source changed.
     if ! cmp -s "${OPS_DIR}/maintenance/maintenance.html" "$MAINTENANCE_PAGE_DIR/index.html"; then
         cp "${OPS_DIR}/maintenance/maintenance.html" "$MAINTENANCE_PAGE_DIR/index.html" \
             && log "  ${GREEN}Staged maintenance page${NC}" \
-            || warn "  Could not stage maintenance page (missing ${OPS_DIR}/maintenance/maintenance.html)"
+            || { warn "  Could not stage maintenance page (missing ${OPS_DIR}/maintenance/maintenance.html)"; return 1; }
     fi
 }
 
 activate_traefik_maintenance() {
     maintenance_paths
-    mkdir -p "$TRAEFIK_DYNAMIC_DIR"
-    cat > "$MAINTENANCE_CONFIG" << 'YAMLEOF'
+    mkdir -p "$TRAEFIK_DYNAMIC_DIR" || return 1
+    cat > "$MAINTENANCE_CONFIG" << 'YAMLEOF' || return 1
 http:
   routers:
     maintenance-catchall:
