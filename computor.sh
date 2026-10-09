@@ -230,8 +230,11 @@ cmd_up() {
     done
     create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/traefik/dynamic"
 
-    # Clear stale maintenance mode config (if services are starting, maintenance is over)
-    if [ -f "${SYSTEM_DEPLOYMENT_PATH}/traefik/dynamic/maintenance.yaml" ]; then
+    # Starting services does not prove recovery from a Keycloak migration.
+    source "${OPS_DIR}/lib/update.sh"
+    if recovery_required; then
+        warn "  Update recovery pending — keeping maintenance mode (use './computor.sh update recover prod ...')"
+    elif [ -f "${SYSTEM_DEPLOYMENT_PATH}/traefik/dynamic/maintenance.yaml" ]; then
         warn "  Clearing stale maintenance mode config"
         rm -f "${SYSTEM_DEPLOYMENT_PATH}/traefik/dynamic/maintenance.yaml"
     fi
@@ -311,6 +314,16 @@ cmd_up() {
     if [ "${GIT_SERVER:-}" = "forgejo" ]; then
         create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/forgejo/postgres"
         create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/forgejo/data"
+    fi
+
+    # Self-update state (pre-upgrade DB dumps, recovery marker). Host-owned; the
+    # updater runner gets it bind-mounted at the same path. The sentinel tells
+    # update.sh the dir is the real host dir, not a runner-local fallback.
+    if [ "$ENVIRONMENT" = "prod" ]; then
+        create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/updater/backups"
+        create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/shared/documents/_maintenance"
+        touch "${SYSTEM_DEPLOYMENT_PATH}/updater/.host-persistent" \
+            || die "  Cannot write ${SYSTEM_DEPLOYMENT_PATH}/updater"
     fi
 
     # Optional: Keycloak directories + realm/theme/IdP staging
@@ -624,6 +637,12 @@ cmd_maintenance() {
             ;;
 
         exit)
+            # A failed Keycloak upgrade left the system needing recovery: lifting
+            # maintenance without it would expose an unverified Keycloak/DB state.
+            source "${OPS_DIR}/lib/update.sh"
+            if recovery_required; then
+                die "Update recovery pending (${SYSTEM_DEPLOYMENT_PATH}/updater/recovery-required). Run './computor.sh update recover prod restore|keep-new'; it lifts maintenance after health checks."
+            fi
             log "${GREEN}=== Exiting Maintenance Mode ===${NC}"
             log "Environment: ${BLUE}$ENVIRONMENT${NC}"
 
