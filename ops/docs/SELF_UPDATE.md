@@ -4,8 +4,9 @@ One-click system updates from the admin UI (**System → Updates**), or from the
 CLI (`./computor.sh update`). The system compares its running git commit with
 the tip of a configured repository branch; an admin can then trigger an update
 that serves a maintenance page, checks out and builds the new version, restarts
-the stack, and automatically rolls back if the new version fails its health
-check.
+the stack, and automatically rolls back code if the new version fails its health
+check. A Keycloak version change needs explicit recovery instead: Keycloak
+database migrations cannot be undone by reverting its image.
 
 ## Configuration (.env)
 
@@ -30,7 +31,8 @@ the repo bind-mounted) picks it up and launches a detached **runner** container
 *outside* the compose project — so stopping/recreating stack services can never
 kill the process driving the update. The runner executes `ops/lib/update.sh`:
 
-1. **preflight** — refuse on a dirty working tree (unless `UPDATE_GIT_FORCE`).
+1. **preflight** — refuse if recovery is pending, or on a dirty working tree
+   (unless `UPDATE_GIT_FORCE`).
 2. **fetch + checkout** — `git fetch $SYSTEM_REPO_URL $SYSTEM_REPO_BRANCH`,
    checkout `FETCH_HEAD`. Then `docker compose config -q` against the *new*
    tree: a broken compose config (e.g. a new required variable missing from
@@ -39,14 +41,20 @@ kill the process driving the update. The runner executes `ops/lib/update.sh`:
 4. **maintenance** — Redis maintenance flag + Traefik catch-all to the static
    maintenance page; every service stops except `traefik`, `static-server`,
    `redis`, `socket-proxy`, and the `updater` itself.
-5. **start + health check** — `compose up -d` (migrations run on API boot),
-   then the API and frontend are polled for up to 5 minutes each.
-6. **success** — maintenance ends, state `success`.
+5. **Keycloak guard** — refuse a downgrade. For an upgrade, verify Keycloak has
+   stopped, take a host-persistent database dump, and persist a recovery marker
+   before the new version can migrate the database.
+6. **start + health check** — `compose up -d` (migrations run on API boot),
+   then the API and frontend are polled for up to 5 minutes each. A Keycloak
+   upgrade also checks Keycloak readiness and the resulting schema version.
+7. **success** — recovery state is cleared, maintenance ends, state `success`.
    **Failure** → **automatic rollback**: checkout of the previous commit,
    rebuild (cache-fast), restart, health check → state `rolled_back`. If even
    the rollback fails, the maintenance page **stays up**, state is `failed`,
    and the error in the UI / `./computor.sh update status` tells you how to
    recover (typically `./computor.sh maintenance exit prod` after fixing).
+   After a Keycloak upgrade, code rollback is refused and **explicit recovery**
+   is required instead.
 
 Progress is written to Redis (`update:state`, `update:log`), so the admin page
 can narrate the run even while the API itself is down (the page keeps polling
@@ -113,11 +121,65 @@ Semantics:
 ./computor.sh update check    # compare local HEAD vs. remote tip (read-only)
 ./computor.sh update status   # Redis state, lock, sidecar heartbeat, recent log
 ./computor.sh update run prod # full update from the host (no sidecar needed)
+./computor.sh update recover prod restore  # restore pre-upgrade Keycloak DB/code
+./computor.sh update recover prod keep-new # validate and keep a fixed new version
 ```
 
 `POST /system/update/reset` (or clearing `update:lock` in Redis) recovers from
 a run that died without cleaning up; the lock also expires on its own after
 2 hours.
+
+## Keycloak backups and recovery
+
+`computor.sh up prod` prepares `${SYSTEM_DEPLOYMENT_PATH}/updater/` and its
+`.host-persistent` sentinel. The detached runner bind-mounts that directory,
+the Traefik dynamic configuration directory, and the maintenance page directory
+at their host paths. A missing mount or unwritable state directory prevents the
+Keycloak upgrade; backups and maintenance routes survive removal of the runner.
+
+Pre-upgrade backups are gzip-compressed, database-only `pg_dump --create` SQL
+under `updater/backups/keycloak/`, created with `umask 077`; inherited deployment
+ACLs can also grant authorized operators access. They include Keycloak credentials
+and personal data: retain them according to the deployment's
+backup policy. They are not an off-host backup and do not cover the application
+database, workspace data, or PostgreSQL cluster roles. The existing `keycloak`
+database role is retained during recovery. Dumps are not automatically deleted.
+
+The authoritative gate is `updater/recovery-required`; `update:recovery` in
+Redis mirrors it. It is written **before** starting the new Keycloak, so killing
+the runner during migration also leaves recovery required. While it exists,
+another update (even at the same commit) and `maintenance exit` refuse, and
+`up` preserves the maintenance route. Clearing the Redis update lock or losing
+Redis state does not remove this gate.
+
+After inspecting the update log, choose one recovery command:
+
+- **`restore`** verifies the dump and stopped Keycloak, checks out the recorded
+  pre-upgrade commit, drops and restores only the Keycloak database, and verifies
+  the old schema version. Every SQL error aborts recovery. It then rebuilds and
+  starts the old services. This discards Keycloak changes made after the dump.
+- **`keep-new`** keeps the current checkout, which must use the recorded new
+  Keycloak version. Commit any fix-forward changes first; recovery requires a
+  clean tracked working tree. It rebuilds and starts that checkout.
+
+Both require Keycloak readiness, the expected schema version, and healthy API
+and frontend before clearing the gate and lifting maintenance. Any failure keeps
+maintenance. Once a restore has started, `keep-new` refuses: retry `restore`
+after fixing its cause, because a partial SQL restore must never be accepted
+merely because HTTP health checks succeed. Do not remove the marker manually.
+This restores Keycloak only; application migrations must still follow the
+backward-compatibility rule above.
+
+### Rollout prerequisite
+
+Keep the production self-updater disabled until issue
+[computor-org/issues#424](https://github.com/computor-org/issues/issues/424)
+is resolved and this executor, watcher image, mounts, and host directories have
+been deployed **while still using the current Keycloak version**. The running
+executor is sourced before checkout, so an upgrade cannot install its own
+backup/recovery protection. Do not simply enable an old sidecar and ask it to
+update to this change. Until that prerequisite is met, use the manual Keycloak
+runbook: maintenance, verified stop and dump, checkout, then `computor.sh up prod`.
 
 ## Security notes
 
