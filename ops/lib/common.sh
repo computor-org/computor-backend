@@ -308,7 +308,7 @@ http:
   middlewares:
     maintenance-rewrite:
       replacePath:
-        path: "/_maintenance/index.html"
+        path: "/_maintenance/"
 
   services:
     maintenance-page:

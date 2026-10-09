@@ -213,7 +213,7 @@ keycloak_restore_dump() { # dump expected-version ; Keycloak must be stopped
 # Maintenance and the marker are cleared only when every health check passes.
 cmd_update_recover() {
     ENVIRONMENT="${1:-prod}"
-    local mode="${2:-}" branch dump from_commit kc_from kc_to expected
+    local mode="${2:-}" branch dump from_commit kc_from kc_to expected outcome=success
     [ "$ENVIRONMENT" = "prod" ] || die "Recovery only applies to prod."
     update_env_init "$ENVIRONMENT"
     case "$mode" in restore|keep-new) ;; *) die "Usage: $0 update recover prod restore|keep-new" ;; esac
@@ -258,6 +258,7 @@ cmd_update_recover() {
         keycloak_restore_dump "$dump" "$kc_from" || recover_fail "restoring ${dump} failed"
         ulog "Keycloak DB restored from ${dump} (schema ${kc_from})"
         expected="$kc_from"
+        outcome=rolled_back
     else
         [ "$(recovery_marker_get restore_started)" != "1" ] \
             || recover_fail "a restore was started; retry restore instead of accepting a possibly partial database"
@@ -275,7 +276,7 @@ cmd_update_recover() {
     clear_recovery_marker || recover_fail "cannot clear recovery state"
     deactivate_traefik_maintenance
     set_redis_maintenance "0" ""
-    set_update_state status success message "Recovery (${mode}) succeeded" error "" \
+    set_update_state status "$outcome" message "Recovery (${mode}) succeeded" error "" \
         finished_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     redis_cli DEL "$UPDATE_KEY_LOCK" >/dev/null || true
     ulog "Recovery (${mode}) succeeded; maintenance lifted."

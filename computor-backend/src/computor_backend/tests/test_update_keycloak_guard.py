@@ -314,7 +314,8 @@ def test_recovery_reopens_only_after_every_health_check(tmp_path, failed_upgrade
     result, calls = _run_recovery(tmp_path, deploy, mode)
     assert result.returncode == 0, result.stdout + result.stderr
     assert not marker.exists()
-    assert "redis HSET update:state status success" in calls
+    outcome = "rolled_back" if mode == "restore" else "success"
+    assert f"redis HSET update:state status {outcome}" in calls
     assert dump.is_file()  # recovery does not discard the only pre-upgrade backup
     assert _git(deploy, "rev-parse", "HEAD") == (a if mode == "restore" else b)
     assert calls.index("health-keycloak") < calls.index("health-api") < calls.index("health-frontend")
