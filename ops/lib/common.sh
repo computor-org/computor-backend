@@ -291,9 +291,13 @@ ensure_maintenance_page() {
 }
 
 activate_traefik_maintenance() {
+    local pending
     maintenance_paths
     mkdir -p "$TRAEFIK_DYNAMIC_DIR" || return 1
-    cat > "$MAINTENANCE_CONFIG" << 'YAMLEOF' || return 1
+    # Traefik watches this directory: never truncate its live route during a
+    # recovery retry. It ignores the temporary file's non-YAML extension.
+    pending=$(mktemp "${TRAEFIK_DYNAMIC_DIR}/.maintenance.XXXXXX.tmp") || return 1
+    cat > "$pending" << 'YAMLEOF' || { rm -f "$pending"; return 1; }
 http:
   routers:
     maintenance-catchall:
@@ -316,6 +320,7 @@ http:
         servers:
           - url: "http://static-server:8080"
 YAMLEOF
+    mv -f "$pending" "$MAINTENANCE_CONFIG" || { rm -f "$pending"; return 1; }
     log "  ${GREEN}Traefik maintenance route activated${NC}"
 }
 
