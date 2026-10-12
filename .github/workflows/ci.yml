@@ -82,3 +82,5 @@ jobs:
       - run: yarn install --frozen-lockfile --ignore-scripts
       - run: yarn lint
       - run: yarn build
+      - run: yarn playwright install --with-deps chromium
+      - run: yarn test:e2e e2e/course-card-layout.spec.ts

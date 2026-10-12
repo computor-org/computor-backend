@@ -99,7 +99,7 @@ export default function CourseCatalogPage() {
                   course.enrolled ? (
                     <Badge color="green" className="shrink-0">Enrolled</Badge>
                   ) : course.organization_title ? (
-                    <Badge color="gray" className="shrink-0">{course.organization_title}</Badge>
+                    <Badge color="gray" className="max-w-full whitespace-normal wrap-anywhere">{course.organization_title}</Badge>
                   ) : undefined
                 }
                 footer={

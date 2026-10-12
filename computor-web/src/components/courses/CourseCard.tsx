@@ -33,7 +33,7 @@ export default function CourseCard({
 }) {
   const body = (
     <>
-      <div className="flex items-start justify-between mb-4 gap-2">
+      <div className="flex flex-col items-start mb-4 gap-2 min-w-0">
         <h3 className="text-lg font-semibold text-fg line-clamp-2">
           {displayName(course, 'Untitled Course')}
         </h3>
