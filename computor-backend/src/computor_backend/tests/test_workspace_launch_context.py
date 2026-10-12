@@ -11,6 +11,8 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
+from sqlalchemy.dialects.postgresql.psycopg2 import dialect as postgres_dialect
+from sqlalchemy.orm import Session
 from sqlalchemy.sql import operators
 from sqlalchemy.sql.elements import BooleanClauseList, False_, True_
 
@@ -18,11 +20,12 @@ import computor_backend.business_logic.workspace_launch_context as launch
 from computor_backend.coder.exceptions import CoderWorkspaceNotFoundError
 from computor_backend.coder.naming import encode_coder_username
 from computor_backend.exceptions import ForbiddenException, NotFoundException
-from computor_backend.model.course import Course
+from computor_backend.model.course import Course, CourseMember
 from computor_backend.model.workspace import (
     CourseWorkspaceTemplate,
     WorkspaceTemplateSettings,
 )
+from computor_backend.permissions.course_access import get_course_member_or_403
 from computor_backend.permissions.principal import Principal
 
 USER_ID = "0232de59-e05d-4bc2-898f-b879c06abcde"
@@ -126,6 +129,63 @@ async def test_reusing_a_workspace_replaces_the_course_and_request(context):
     assert len(context.redis.values) == 1
     assert list(context.redis.expirations.values()) == [900]
     assert datetime.now(timezone.utc) < second.expires_at <= datetime.now(timezone.utc) + timedelta(seconds=900)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["launch", "poll"])
+async def test_uuid_context_works_with_native_membership_parameter_binding(context, monkeypatch, operation):
+    """Use the real permission query and PostgreSQL model binding, without a DB.
+
+    The model stores UUIDs as strings (as_uuid=False). An incoming Pydantic
+    UUID must cross that boundary correctly on both POST and the later GET.
+    """
+    original_query = context.db.query.side_effect
+    session = Session()
+
+    class BindingQuery:
+        def __init__(self, query):
+            self.query = query
+
+        def filter(self, *criteria):
+            return BindingQuery(self.query.filter(*criteria))
+
+        def first(self):
+            dialect = postgres_dialect()
+            compiled = self.query.statement.compile(dialect=dialect)
+            for name, value in compiled.params.items():
+                binding = compiled.binds[name]
+                processor = binding.type.dialect_impl(dialect).bind_processor(dialect)
+                if processor is not None:
+                    # This is the same native processor called before the
+                    # driver executes a real PostgreSQL membership query.
+                    processor(value)
+            return SimpleNamespace(user_id=USER_ID, course_id=COURSE_A)
+
+    def query(model):
+        if model is CourseMember:
+            return BindingQuery(session.query(model))
+        return original_query(model)
+
+    context.db.query.side_effect = query
+    monkeypatch.setattr(launch, "get_course_member_or_403", get_course_member_or_403)
+    try:
+        if operation == "launch":
+            result = await _set(context)
+        else:
+            await context.redis.set(
+                launch._key(USER_ID, context.workspace.id),
+                json.dumps({
+                    "course_id": str(COURSE_A),
+                    "request_id": "96292e04-5989-4f29-a50f-5b0043b6ea81",
+                    "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+                }),
+                ex=900,
+            )
+            result = await _get(context)
+        assert result is not None
+        assert result.course_id == COURSE_A
+    finally:
+        session.close()
 
 
 @pytest.mark.asyncio
