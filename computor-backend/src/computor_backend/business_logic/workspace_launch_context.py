@@ -60,13 +60,16 @@ def _require_course(
 ) -> None:
     # This helper checks an actual membership row, even for administrators,
     # rather than accepting a possibly stale token's cached course claims.
-    get_course_member_or_403(permissions, course_id, db)
-    course = db.query(Course).filter(Course.id == str(course_id)).first()
+    # PostgreSQL UUID columns use as_uuid=False: keep API DTOs typed as UUID,
+    # but pass their string form to all database filters, including membership.
+    course_key = str(course_id)
+    get_course_member_or_403(permissions, course_key, db)
+    course = db.query(Course).filter(Course.id == course_key).first()
     if course is None or course.archived_at is not None or course.visible is False:
         raise NotFoundException(detail="Course is not available.")
     template_name = workspace.template_name
     allowed = db.query(CourseWorkspaceTemplate).filter(
-        CourseWorkspaceTemplate.course_id == str(course_id),
+        CourseWorkspaceTemplate.course_id == course_key,
         CourseWorkspaceTemplate.template_name == template_name,
     ).first()
     if not template_name or allowed is None or not is_template_enabled(db, template_name):
