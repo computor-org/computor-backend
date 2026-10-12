@@ -138,7 +138,9 @@ async function setup(
       if (/^\/courses\/[^/]+\/workspace-settings$/.test(path)) {
         return json(route, {
           course_id: path.split('/')[2],
-          templates: [{ template_name: 'vscode-workspace', enabled: true, exists_in_coder: true }],
+          templates: [{
+            template_name: 'vscode-workspace', display_name: 'VS Code', enabled: true, exists_in_coder: true,
+          }],
           lecturer_provision_enabled: false, can_manage: false,
         });
       }
