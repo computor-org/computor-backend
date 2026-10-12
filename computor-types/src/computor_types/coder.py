@@ -8,6 +8,7 @@ computor-types; that module remains as a re-export shim.
 from datetime import datetime
 from enum import Enum
 from typing import Any, Optional, Union
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -45,6 +46,20 @@ class WorkspaceBuildStatus(str, Enum):
 
 
 # Request schemas
+
+class WorkspaceLaunchContextRequest(BaseModel):
+    """Course navigation requested when opening an existing workspace."""
+
+    course_id: UUID
+
+
+class WorkspaceLaunchContext(BaseModel):
+    """Short-lived navigation context; does not change workspace provisioning."""
+
+    course_id: UUID
+    request_id: UUID
+    expires_at: datetime
+
 
 class CoderUserCreate(BaseModel):
     """Schema for creating a Coder user."""

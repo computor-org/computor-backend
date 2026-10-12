@@ -48,6 +48,8 @@ jobs:
           computor-backend/src/computor_backend/tests/test_version_constraints.py
           computor-backend/src/computor_backend/tests/test_harness_bounds.py
           computor-backend/src/computor_backend/tests/test_compose_testing_bounds.py
+          computor-backend/src/computor_backend/tests/test_workspace_launch_context.py
+          computor-backend/src/computor_backend/tests/test_student_description_download.py
 
   public-course-contract:
     runs-on: ubuntu-latest
@@ -126,4 +128,4 @@ jobs:
       - run: yarn test:public-learning
       - run: yarn build
       - run: npx playwright install --with-deps chromium
-      - run: yarn test:e2e e2e/public-learning.spec.ts e2e/course-card-layout.spec.ts --workers=2
+      - run: yarn test:e2e e2e/public-learning.spec.ts e2e/course-card-layout.spec.ts e2e/workspace-launch.spec.ts --workers=2

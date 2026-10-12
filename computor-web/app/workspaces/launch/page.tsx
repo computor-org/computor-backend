@@ -12,7 +12,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
 import { CoderClient } from '@/src/clients/CoderClient';
-import { AGENT_LIFECYCLE_GAVE_UP, type WorkspaceDetails } from '@/src/types/workspaces';
+import { AGENT_LIFECYCLE_GAVE_UP, type WorkspaceDetails, type WorkspaceLaunchContext } from '@/src/types/workspaces';
 
 const coderClient = new CoderClient();
 
@@ -42,6 +42,7 @@ function workspaceUrl(details: WorkspaceDetails): string | null {
 function LaunchWorkspace() {
   const owner = useSearchParam('owner');
   const name = useSearchParam('name');
+  const courseId = useSearchParam('courseId');
   // Creation parks the tab here before the workspace's name is known — the
   // opener replaces the URL (or closes the tab) once provisioning returns.
   const creating = Boolean(useSearchParam('creating'));
@@ -56,7 +57,11 @@ function LaunchWorkspace() {
   // One-shot guards. Refs, not state: StrictMode double-invokes effects in dev,
   // and re-renders must not fire a second build or a second redirect.
   const startRequested = useRef(false);
+  const opening = useRef(false);
   const redirected = useRef(false);
+  const launchFailed = useRef(false);
+  const mounted = useRef(false);
+  const contextRequest = useRef<Promise<WorkspaceLaunchContext> | null>(null);
   const graceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /**
    * Whether the workspace has reported anything other than `failed` since we
@@ -64,6 +69,31 @@ function LaunchWorkspace() {
    * build that was already there when we arrived — not ours.
    */
   const leftFailedBehind = useRef(false);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+
+  const failLaunch = useCallback((message: string) => {
+    launchFailed.current = true;
+    if (graceTimer.current) clearTimeout(graceTimer.current);
+    if (mounted.current) setTerminalError(message);
+  }, []);
+
+  // Start and redirect share one request. In particular, a ready poll or the
+  // grace timer must not race past a context handoff still in flight. Keeping
+  // the promise also prevents StrictMode/repeated polls creating new requests.
+  const handOffCourse = useCallback(async () => {
+    if (!courseId) return;
+    contextRequest.current ??= coderClient.setWorkspaceLaunchContext({
+      username: owner, workspaceName: name, courseId,
+    });
+    const context = await contextRequest.current;
+    if (context.course_id !== courseId) {
+      throw new Error('The course could not be selected in your workspace. Please retry.');
+    }
+  }, [owner, name, courseId]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -79,24 +109,30 @@ function LaunchWorkspace() {
       // our start request can be told apart from a build that actually failed.
       if (categorizeStatus(polled.status) === 'failed') {
         if (startRequested.current && leftFailedBehind.current) {
-          setTerminalError('The workspace failed to start.');
+          failLaunch('The workspace failed to start.');
         }
       } else {
         leftFailedBehind.current = true;
       }
       return polled;
     },
-    [owner, name],
+    [owner, name, failLaunch],
     { enabled: hasTarget, refetchInterval: POLL_MS },
   );
 
-  /** Pure side effect — no state, so it is safe to call straight from an effect. */
-  const openWorkspace = useCallback((url: string) => {
-    if (redirected.current) return;
-    redirected.current = true;
-    // replace(), not href: Back should return to the app, not to this waiter.
-    window.location.replace(url);
-  }, []);
+  const openWorkspace = useCallback(async (url: string) => {
+    if (opening.current || redirected.current || launchFailed.current) return;
+    opening.current = true;
+    try {
+      await handOffCourse();
+      if (!mounted.current || launchFailed.current) return;
+      redirected.current = true;
+      // replace(), not href: Back should return to the app, not to this waiter.
+      window.location.replace(url);
+    } catch (err) {
+      failLaunch(err instanceof Error ? err.message : 'The course could not be selected in your workspace.');
+    }
+  }, [handOffCourse, failLaunch]);
 
   // Ceiling on the whole wait. A timer rather than a wall-clock check on each
   // poll, because polling pauses while the tab is hidden — and a workspace that
@@ -105,24 +141,25 @@ function LaunchWorkspace() {
     if (!hasTarget) return;
     const id = setTimeout(() => {
       if (!redirected.current) {
-        setTerminalError('This workspace is taking longer than expected to start.');
+        failLaunch('This workspace is taking longer than expected to start.');
       }
     }, OVERALL_TIMEOUT_MS);
     return () => clearTimeout(id);
-  }, [hasTarget]);
+  }, [hasTarget, failLaunch]);
 
   useEffect(() => {
     if (hasTarget || !creating) return;
-    const id = setTimeout(() => setTerminalError('The workspace was not created.'), CREATING_TIMEOUT_MS);
+    const id = setTimeout(() => failLaunch('The workspace was not created.'), CREATING_TIMEOUT_MS);
     return () => clearTimeout(id);
-  }, [hasTarget, creating]);
+  }, [hasTarget, creating, failLaunch]);
 
   useEffect(() => () => {
     if (graceTimer.current) clearTimeout(graceTimer.current);
+    graceTimer.current = null;
   }, []);
 
   useEffect(() => {
-    if (!hasTarget || redirected.current || error || !details) return;
+    if (!hasTarget || redirected.current || launchFailed.current || error || !details) return;
 
     const category = categorizeStatus(details.status);
     const url = workspaceUrl(details);
@@ -133,7 +170,7 @@ function LaunchWorkspace() {
 
       // `ready` is the real signal; `gaveUp` means it is never coming.
       if (details.ready || gaveUp) {
-        openWorkspace(url);
+        void openWorkspace(url);
         return;
       }
 
@@ -141,22 +178,30 @@ function LaunchWorkspace() {
       // then open anyway and let the workspace URL be the retry surface. This
       // is what carries workspaces still on a pre-port-gate template version.
       if (graceTimer.current === null) {
-        graceTimer.current = setTimeout(() => openWorkspace(url), READY_GRACE_MS);
+        graceTimer.current = setTimeout(() => { void openWorkspace(url); }, READY_GRACE_MS);
       }
       return;
+    }
+
+    if (graceTimer.current) {
+      clearTimeout(graceTimer.current);
+      graceTimer.current = null;
     }
 
     // A stopped workspace is why we are here; a failed one is what the Start
     // button offers to retry. Either way: start it, exactly once.
     if ((category === 'stopped' || category === 'failed') && !startRequested.current) {
       startRequested.current = true;
-      coderClient
-        .startWorkspace({ username: owner, workspaceName: name })
+      handOffCourse()
+        .then(() => {
+          if (!mounted.current || launchFailed.current) return;
+          return coderClient.startWorkspace({ username: owner, workspaceName: name });
+        })
         .catch((err) =>
-          setTerminalError(err instanceof Error ? err.message : 'Failed to start the workspace.'),
+          failLaunch(err instanceof Error ? err.message : 'Failed to start the workspace.'),
         );
     }
-  }, [details, error, hasTarget, owner, name, openWorkspace]);
+  }, [details, error, hasTarget, owner, name, openWorkspace, handOffCourse, failLaunch]);
 
   const errorMessage = hasTarget
     ? (terminalError ?? error)

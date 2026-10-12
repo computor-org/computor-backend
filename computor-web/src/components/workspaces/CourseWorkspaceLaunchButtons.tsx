@@ -141,7 +141,7 @@ export default function CourseWorkspaceLaunchButtons({
       });
       const workspaceName = result.workspace?.name;
       if (!workspaceName) throw new Error('The workspace was not created.');
-      const launchUrl = workspaceLaunchUrl(result.user.username, workspaceName);
+      const launchUrl = workspaceLaunchUrl(result.user.username, workspaceName, courseId);
       if (tab) {
         tab.location.replace(launchUrl);
       } else {
@@ -158,8 +158,8 @@ export default function CourseWorkspaceLaunchButtons({
 
   function openExisting(workspace: CoderWorkspace) {
     if (!workspace.owner_name) return;
-    if (!openLaunchTab(workspace.owner_name, workspace.name)) {
-      router.push(workspaceLaunchUrl(workspace.owner_name, workspace.name));
+    if (!openLaunchTab(workspace.owner_name, workspace.name, courseId)) {
+      router.push(workspaceLaunchUrl(workspace.owner_name, workspace.name, courseId));
     }
   }
 
