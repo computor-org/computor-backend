@@ -2,8 +2,14 @@ import { test, expect, type Page, type Route } from '@playwright/test';
 
 const API_ORIGIN = 'http://localhost:8000';
 const WORKSPACE_URL = 'http://localhost:8080/coder/u-me/code/';
+const COURSE_WORKSPACE_URL = 'http://localhost:8080/coder/u-me/vscode/';
 const COURSE_A = '11111111-1111-4111-8111-111111111111';
 const COURSE_B = '22222222-2222-4222-8222-222222222222';
+const COURSE_WORKSPACE = {
+  id: 'w1', name: 'vscode', owner_id: 'u-me', owner_name: 'u-me',
+  template_id: 't-vscode', template_name: 'vscode-workspace',
+  latest_build_status: 'succeeded', latest_build_id: 'build-existing',
+};
 
 const USER = {
   id: 'u-me',
@@ -24,21 +30,25 @@ function details({
   lifecycle,
   ready,
   withUrl = true,
+  name = 'code',
 }: {
   status: string;
   lifecycle?: string | null;
   ready?: boolean;
   withUrl?: boolean;
+  name?: string;
 }) {
+  const url = name === 'vscode' ? COURSE_WORKSPACE_URL : WORKSPACE_URL;
   return {
     workspace: {
-      id: 'w1', name: 'code', owner_id: 'u-me', owner_name: 'u-me',
+      id: 'w1', name, owner_id: 'u-me', owner_name: 'u-me',
       template_id: 't-vscode', template_name: 'vscode-workspace',
       latest_build_status: status === 'running' ? 'succeeded' : status,
+      latest_build_id: 'build-existing',
     },
     status,
-    access_url: withUrl && status === 'running' ? WORKSPACE_URL : null,
-    code_server_url: withUrl && status === 'running' ? WORKSPACE_URL : null,
+    access_url: withUrl && status === 'running' ? url : null,
+    code_server_url: withUrl && status === 'running' ? url : null,
     agent_lifecycle: lifecycle ?? null,
     ready: ready ?? false,
     health: true,
@@ -55,8 +65,14 @@ function details({
  */
 async function setup(
   page: Page,
-  source: unknown[] | (() => unknown),
-  options: { handoff?: (route: Route) => Promise<unknown>; courseWorkspaces?: boolean } = {},
+  source: ReturnType<typeof details>[] | (() => ReturnType<typeof details>),
+  options: {
+    handoff?: (route: Route) => Promise<unknown>;
+    courseWorkspaces?: boolean;
+    workspaces?: Partial<typeof COURSE_WORKSPACE>[];
+    workspaceListStatus?: number | (() => number);
+    allowProvision?: boolean;
+  } = {},
 ) {
   const next = typeof source === 'function' ? source : undefined;
   const sequence = typeof source === 'function' ? [] : source;
@@ -72,11 +88,16 @@ async function setup(
   const starts: string[] = [];
   const contexts: { course_id: string }[] = [];
   const actions: string[] = [];
+  const provisions: { template: string }[] = [];
+  const observedWorkspaces: { id: string; name: string; build: string }[] = [];
+  const workspaceName = options.courseWorkspaces ? 'vscode' : 'code';
+  const workspaceUrl = options.courseWorkspaces ? COURSE_WORKSPACE_URL : WORKSPACE_URL;
+  const workspacePath = `/coder/workspaces/u-me/${workspaceName}`;
   let poll = 0;
 
   // The workspace itself is not part of this app; stub it so the redirect lands
   // somewhere assertable instead of a connection error.
-  await page.context().route(`${WORKSPACE_URL}**`, (route) =>
+  await page.context().route(`${workspaceUrl}**`, (route) =>
     route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>editor</h1>' }),
   );
 
@@ -99,12 +120,20 @@ async function setup(
         });
       }
       if (path === '/coder/workspaces') {
+        const status = typeof options.workspaceListStatus === 'function'
+          ? options.workspaceListStatus()
+          : options.workspaceListStatus ?? 200;
+        if (status !== 200) return json(route, { detail: 'Workspace lookup unavailable.' }, status);
+        const workspaces = options.workspaces ?? [COURSE_WORKSPACE];
         return json(route, {
-          workspaces: [{
-            id: 'w1', name: 'code', owner_id: 'u-me', owner_name: 'u-me',
-            template_id: 't-vscode', template_name: 'vscode-workspace', latest_build_status: 'succeeded',
-          }], count: 1,
+          workspaces, count: workspaces.length,
         });
+      }
+      if (path === '/courses') {
+        return json(route, [
+          { id: COURSE_A, title: 'Course A' },
+          { id: COURSE_B, title: 'Course B' },
+        ]);
       }
       if (/^\/courses\/[^/]+\/workspace-settings$/.test(path)) {
         return json(route, {
@@ -116,16 +145,21 @@ async function setup(
       if (/^\/courses\/[^/]+$/.test(path)) {
         return json(route, { id: path.split('/')[2], title: 'Course with a workspace' });
       }
-      if (path === '/coder/workspaces/provision') {
+      if (path === '/coder/workspaces/provision' && request.method() === 'POST') {
+        provisions.push(request.postDataJSON() as { template: string });
+        actions.push('provision');
+        if (!options.allowProvision) {
+          return json(route, { detail: 'Existing workspaces must not be provisioned again.' }, 500);
+        }
         return json(route, {
           user: { id: 'u-me', username: 'u-me', email: USER.email },
-          workspace: { id: 'w1', name: 'code', owner_id: 'u-me', template_id: 't-vscode' },
-          created_user: false, created_workspace: false,
+          workspace: COURSE_WORKSPACE,
+          created_user: false, created_workspace: true,
         });
       }
     }
 
-    if (path === '/coder/workspaces/u-me/code/launch-context' && request.method() === 'POST') {
+    if (path === `${workspacePath}/launch-context` && request.method() === 'POST') {
       const body = request.postDataJSON() as { course_id: string };
       contexts.push(body);
       if (options.handoff) return options.handoff(route);
@@ -133,21 +167,23 @@ async function setup(
       return json(route, { ...body, request_id: `request-${contexts.length}`, expires_at: '2099-01-01T00:00:00Z' });
     }
 
-    if (path === '/coder/workspaces/u-me/code/start' && request.method() === 'POST') {
+    if (path === `${workspacePath}/start` && request.method() === 'POST') {
       starts.push(path);
       actions.push('start');
       return json(route, { success: true, message: 'starting' });
     }
-    if (path === '/coder/workspaces/u-me/code') {
-      if (next) return json(route, next());
-      const body = sequence[Math.min(poll, sequence.length - 1)];
+    if (path === workspacePath) {
+      const body = next ? next() : sequence[Math.min(poll, sequence.length - 1)];
       poll += 1;
+      observedWorkspaces.push({
+        id: body.workspace.id, name: body.workspace.name, build: body.workspace.latest_build_id,
+      });
       return json(route, body);
     }
     return json(route, {});
   });
 
-  return { starts, contexts, actions };
+  return { starts, contexts, actions, provisions, observedWorkspaces };
 }
 
 test('waits while the agent is still starting, then opens when it reports ready', async ({ page }) => {
@@ -381,38 +417,197 @@ test('a rejected course handoff offers retry without opening the wrong course', 
   expect(starts).toHaveLength(0);
 });
 
-test('launching two courses on the same running workspace sends each selected course', async ({ page }) => {
-  const { contexts, starts } = await setup(page, [details({ status: 'running', ready: true })], {
+test('primary launches reuse the running workspace across courses without rebuilding it', async ({ page }) => {
+  const { contexts, starts, provisions, observedWorkspaces } = await setup(page, [
+    details({ status: 'running', ready: true, name: 'vscode' }),
+  ], {
     courseWorkspaces: true,
   });
 
-  // Provision is idempotent: this first button reuses the same editor.
   await page.goto(`/courses/${COURSE_A}`);
   const firstPopup = page.waitForEvent('popup');
   await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
   const first = await firstPopup;
-  await first.waitForURL(WORKSPACE_URL);
+  await first.waitForURL(COURSE_WORKSPACE_URL);
 
-  // The existing-workspace Open button must replace the course too.
+  // Reusing the primary button for another course must only replace the
+  // course context, preserving the editor's workspace and current build.
   await page.goto(`/courses/${COURSE_B}`);
   const secondPopup = page.waitForEvent('popup');
-  await page.getByRole('button', { name: 'Open', exact: true }).click();
+  await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
   const second = await secondPopup;
-  await second.waitForURL(WORKSPACE_URL);
+  await second.waitForURL(COURSE_WORKSPACE_URL);
 
   expect(contexts).toEqual([{ course_id: COURSE_A }, { course_id: COURSE_B }]);
   expect(starts).toHaveLength(0);
+  expect(provisions).toHaveLength(0);
+  expect(observedWorkspaces.length).toBeGreaterThanOrEqual(2);
+  expect(observedWorkspaces).toEqual(observedWorkspaces.map(() => ({
+    id: 'w1', name: 'vscode', build: 'build-existing',
+  })));
   await first.close();
   await second.close();
 });
 
-test('a popup-blocked course launch retains the course in its same-tab fallback', async ({ page }) => {
-  const { contexts } = await setup(page, [details({ status: 'running', ready: true })], {
+test('a primary course launch starts its stopped workspace once after the course handoff', async ({ page }) => {
+  let body = details({ status: 'stopped', name: 'vscode' });
+  const { contexts, starts, actions, provisions } = await setup(page, () => body, {
+    courseWorkspaces: true,
+    workspaces: [{ ...COURSE_WORKSPACE, latest_build_status: 'stopped' }],
+  });
+  await page.goto(`/courses/${COURSE_A}`);
+  const popup = page.waitForEvent('popup');
+  await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
+  const launchTab = await popup;
+  await expect.poll(() => starts.length).toBe(1);
+  expect(actions).toEqual(['context', 'start']);
+
+  body = details({ status: 'running', ready: true, name: 'vscode' });
+  await launchTab.waitForURL(COURSE_WORKSPACE_URL);
+  expect(contexts).toEqual([{ course_id: COURSE_A }]);
+  expect(starts).toHaveLength(1);
+  expect(provisions).toHaveLength(0);
+  await launchTab.close();
+});
+
+test('a primary course launch provisions an absent workspace once and retains the selected course', async ({ page }) => {
+  const { contexts, starts, provisions, actions } = await setup(page, [
+    details({ status: 'running', ready: true, name: 'vscode' }),
+  ], { courseWorkspaces: true, workspaces: [], allowProvision: true });
+  await page.goto(`/courses/${COURSE_B}`);
+  const popup = page.waitForEvent('popup');
+  await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
+  const launchTab = await popup;
+  await launchTab.waitForURL(COURSE_WORKSPACE_URL);
+
+  expect(provisions).toEqual([{ template: 'vscode-workspace' }]);
+  expect(contexts).toEqual([{ course_id: COURSE_B }]);
+  expect(actions).toEqual(['provision', 'context']);
+  expect(starts).toHaveLength(0);
+  await launchTab.close();
+});
+
+test('a primary course launch does not substitute a scratch workspace or another template', async ({ page }) => {
+  const { contexts, provisions, observedWorkspaces } = await setup(page, [
+    details({ status: 'running', ready: true, name: 'vscode' }),
+  ], {
+    courseWorkspaces: true,
+    workspaces: [
+      { ...COURSE_WORKSPACE, id: 'w-scratch', name: 'lecturer-scratch' },
+      { ...COURSE_WORKSPACE, id: 'w-other-template', template_name: 'python-workspace' },
+    ],
+    allowProvision: true,
+  });
+  await page.goto(`/courses/${COURSE_A}`);
+  const popup = page.waitForEvent('popup');
+  await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
+  const launchTab = await popup;
+  await launchTab.waitForURL(COURSE_WORKSPACE_URL);
+
+  expect(provisions).toEqual([{ template: 'vscode-workspace' }]);
+  expect(contexts).toEqual([{ course_id: COURSE_A }]);
+  expect(observedWorkspaces.every((workspace) => workspace.id === 'w1')).toBe(true);
+  await launchTab.close();
+});
+
+test('a failed workspace lookup shows an error without provisioning and allows a safe retry', async ({ page }) => {
+  let status = 200;
+  const { contexts, starts, provisions } = await setup(page, [
+    details({ status: 'running', ready: true, name: 'vscode' }),
+  ], { courseWorkspaces: true, workspaceListStatus: () => status });
+  await page.goto(`/courses/${COURSE_A}`);
+  // The background poll saw the existing workspace; a failing fresh lookup
+  // must not silently use that stale snapshot or fall back to provisioning.
+  await expect(page.getByRole('button', { name: 'Open', exact: true })).toBeVisible();
+  status = 503;
+  const firstPopup = page.waitForEvent('popup');
+  await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
+  const failedTab = await firstPopup;
+  await expect(page.getByText('Workspace lookup unavailable.', { exact: true })).toBeVisible();
+  await expect.poll(() => failedTab.isClosed()).toBe(true);
+  expect(provisions).toHaveLength(0);
+  expect(starts).toHaveLength(0);
+  expect(contexts).toHaveLength(0);
+
+  status = 200;
+  const retryPopup = page.waitForEvent('popup');
+  await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
+  const launchTab = await retryPopup;
+  await launchTab.waitForURL(COURSE_WORKSPACE_URL);
+  expect(contexts).toEqual([{ course_id: COURSE_A }]);
+  expect(provisions).toHaveLength(0);
+  expect(starts).toHaveLength(0);
+  await launchTab.close();
+});
+
+test('an existing workspace with no owner fails safely and can be retried without provisioning', async ({ page }) => {
+  const workspaces: Partial<typeof COURSE_WORKSPACE>[] = [
+    { ...COURSE_WORKSPACE, owner_name: undefined },
+  ];
+  const { contexts, starts, provisions } = await setup(page, [
+    details({ status: 'running', ready: true, name: 'vscode' }),
+  ], { courseWorkspaces: true, workspaces });
+  await page.goto(`/courses/${COURSE_A}`);
+  const firstPopup = page.waitForEvent('popup');
+  await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
+  const failedTab = await firstPopup;
+  await expect(page.getByText('The existing workspace owner is unavailable. Please retry.', {
+    exact: true,
+  })).toBeVisible();
+  await expect.poll(() => failedTab.isClosed()).toBe(true);
+  expect(provisions).toHaveLength(0);
+  expect(starts).toHaveLength(0);
+  expect(contexts).toHaveLength(0);
+
+  workspaces[0] = COURSE_WORKSPACE;
+  const retryPopup = page.waitForEvent('popup');
+  await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
+  const launchTab = await retryPopup;
+  await launchTab.waitForURL(COURSE_WORKSPACE_URL);
+  expect(contexts).toEqual([{ course_id: COURSE_A }]);
+  expect(provisions).toHaveLength(0);
+  expect(starts).toHaveLength(0);
+  await launchTab.close();
+});
+
+test('the compact course-card launcher reuses the running workspace without provisioning', async ({ page }) => {
+  const { contexts, starts, provisions } = await setup(page, [
+    details({ status: 'running', ready: true, name: 'vscode' }),
+  ], { courseWorkspaces: true });
+  await page.goto('/courses');
+  const popup = page.waitForEvent('popup');
+  await page.getByRole('button', { name: 'Launch VS Code workspace' }).first().click();
+  const launchTab = await popup;
+  await launchTab.waitForURL(COURSE_WORKSPACE_URL);
+  expect(page.url()).toMatch(/\/courses$/);
+  expect(contexts).toEqual([{ course_id: COURSE_A }]);
+  expect(provisions).toHaveLength(0);
+  expect(starts).toHaveLength(0);
+  await launchTab.close();
+});
+
+test('a popup-blocked primary course launch retains the course in its same-tab fallback', async ({ page }) => {
+  const { contexts, provisions, starts } = await setup(page, [
+    details({ status: 'running', ready: true, name: 'vscode' }),
+  ], {
     courseWorkspaces: true,
   });
   await page.addInitScript(() => { window.open = () => null; });
   await page.goto(`/courses/${COURSE_B}`);
+  await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
+  await page.waitForURL(COURSE_WORKSPACE_URL);
+  expect(contexts).toEqual([{ course_id: COURSE_B }]);
+  expect(provisions).toHaveLength(0);
+  expect(starts).toHaveLength(0);
+});
+
+test('a popup-blocked existing-workspace Open retains the selected course', async ({ page }) => {
+  const { contexts } = await setup(page, [
+    details({ status: 'running', ready: true, name: 'vscode' }),
+  ], { courseWorkspaces: true });
+  await page.addInitScript(() => { window.open = () => null; });
+  await page.goto(`/courses/${COURSE_B}`);
   await page.getByRole('button', { name: 'Open', exact: true }).click();
-  await page.waitForURL(WORKSPACE_URL);
+  await page.waitForURL(COURSE_WORKSPACE_URL);
   expect(contexts).toEqual([{ course_id: COURSE_B }]);
 });
