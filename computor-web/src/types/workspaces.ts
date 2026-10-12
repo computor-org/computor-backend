@@ -95,6 +95,13 @@ export type TemplateMetadataUpdateResponse = GenTemplateMetadataUpdateResponse &
   coder_updated: boolean;
 };
 
+/** One-use course selection delivered to the workspace's Computor extension. */
+export interface WorkspaceLaunchContext {
+  course_id: string;
+  request_id: string;
+  expires_at: string;
+}
+
 // --- UI-only: agent lifecycle ---
 
 /** Coder agent lifecycle_state — how far the agent's startup script got. */

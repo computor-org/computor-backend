@@ -43,6 +43,8 @@ jobs:
           computor-backend/src/computor_backend/tests/test_version_constraints.py
           computor-backend/src/computor_backend/tests/test_harness_bounds.py
           computor-backend/src/computor_backend/tests/test_compose_testing_bounds.py
+          computor-backend/src/computor_backend/tests/test_workspace_launch_context.py
+          computor-backend/src/computor_backend/tests/test_student_description_download.py
 
   grading-isolation:
     # Hostile-snippet tests for grading jobs (#237). Sandbox-dependent cases
@@ -83,4 +85,4 @@ jobs:
       - run: yarn lint
       - run: yarn build
       - run: yarn playwright install --with-deps chromium
-      - run: yarn test:e2e e2e/course-card-layout.spec.ts
+      - run: yarn test:e2e e2e/course-card-layout.spec.ts e2e/workspace-launch.spec.ts

@@ -57,6 +57,14 @@ A template directory must contain:
    `coder templates push` → PATCH TTL + display metadata.
 4. `POST /coder/admin/templates/rollout` moves existing workspaces onto the new active version.
 
+VS Code templates expose `COMPUTOR_WORKSPACE_OWNER` and `COMPUTOR_WORKSPACE_NAME`
+to the extension. A course launch records a short-lived authenticated navigation
+context for that workspace; the extension reads it to select the course and open
+its instructions, including when reusing an already-running workspace. This does
+not change the template's immutable provisioning `course_id` or grant course access.
+Keep the identity in the agent environment, since per-user home files are shared
+between workspaces. Existing workspaces need a template rollout to receive it.
+
 ## Shared per-user home
 
 All templates mount the **same per-user volume** `coder-home-{owner-uuid}` at `/home/coder`
