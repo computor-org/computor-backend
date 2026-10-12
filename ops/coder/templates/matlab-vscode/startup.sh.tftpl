@@ -183,6 +183,9 @@ defaults = {
     # Dark by default (computor-org/issues#405). Add-if-missing, so a student
     # who has already picked a theme keeps it.
     "workbench.colorTheme": "Default Dark Modern",
+    # Avoid reserving an empty right sidebar (computor-org/issues#455). This is
+    # a default only: saved layouts and deliberately opened views stay intact.
+    "workbench.secondarySideBar.defaultVisibility": "hidden",
     # No AI entry points in a course workspace (computor-org/issues#406). We
     # install no such extension; what a student sees comes from whatever the
     # code-server base image bundles, so this suppresses the UI rather than
