@@ -4,8 +4,9 @@
  * a window.open() after an await is no longer tied to the user gesture and
  * popup blockers eat it.
  */
-export function workspaceLaunchUrl(owner: string, name: string): string {
-  return `/workspaces/launch?owner=${encodeURIComponent(owner)}&name=${encodeURIComponent(name)}`;
+export function workspaceLaunchUrl(owner: string, name: string, courseId?: string): string {
+  const url = `/workspaces/launch?owner=${encodeURIComponent(owner)}&name=${encodeURIComponent(name)}`;
+  return courseId ? `${url}&courseId=${encodeURIComponent(courseId)}` : url;
 }
 
 /**
@@ -22,8 +23,8 @@ export const workspaceCreatingUrl = '/workspaces/launch?creating=1';
  * popup was blocked, so the caller can fall back to launching in this tab.
  * Call this synchronously from the click handler.
  */
-export function openLaunchTab(owner: string, name: string): boolean {
-  return window.open(workspaceLaunchUrl(owner, name), '_blank') !== null;
+export function openLaunchTab(owner: string, name: string, courseId?: string): boolean {
+  return window.open(workspaceLaunchUrl(owner, name, courseId), '_blank') !== null;
 }
 
 /**
