@@ -2,6 +2,11 @@ import logging
 from uuid import UUID
 from typing import Annotated
 from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from computor_backend.database import get_db
+from computor_backend.services.storage_service import get_storage_service
+from computor_backend.business_logic.student_description import get_student_description
 
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.auth import get_current_principal
@@ -26,6 +31,18 @@ student_router = APIRouter()
 logger = logging.getLogger(__name__)
 
 ## MR-based course-content messages removed (deprecated)
+
+@student_router.get(
+    "/course-contents/{course_content_id}/description",
+    responses={200: {"content": {"application/zip": {}}}},
+)
+async def student_get_course_content_description_endpoint(
+    course_content_id: UUID,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db, scope="function"),
+    storage_service=Depends(get_storage_service),
+):
+    return await get_student_description(course_content_id, permissions, db, storage_service)
 
 @student_router.get("/course-contents/{course_content_id}", response_model=CourseContentStudentGet)
 async def student_get_course_content_endpoint(

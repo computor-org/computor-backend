@@ -33,6 +33,7 @@ import type {
   TemplateVariablesResponse,
   WorkspaceTemplateSettings,
   WorkspaceTemplateSettingsUpdate,
+  WorkspaceLaunchContext,
 } from '@/src/types/workspaces';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from '@/src/generated/clients/baseClient';
@@ -77,6 +78,18 @@ export class CoderClient extends BaseEndpointClient {
    */
   async getWorkspaceDetails({ username, workspaceName }: { username: string; workspaceName: string }): Promise<WorkspaceDetails> {
     return this.client.get<WorkspaceDetails>(this.buildPath('workspaces', username, workspaceName));
+  }
+
+  /** Preserve the course for a new or already-running editor session. */
+  async setWorkspaceLaunchContext({ username, workspaceName, courseId }: {
+    username: string;
+    workspaceName: string;
+    courseId: string;
+  }): Promise<WorkspaceLaunchContext> {
+    return this.client.post<WorkspaceLaunchContext>(
+      this.buildPath('workspaces', username, workspaceName, 'launch-context'),
+      { course_id: courseId },
+    );
   }
 
   /**

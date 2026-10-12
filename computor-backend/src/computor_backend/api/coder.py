@@ -78,6 +78,8 @@ from computor_types.coder import (
     WorkspaceVolumeListResponse,
     WorkspaceTemplateSettingsSchema,
     WorkspaceTemplateSettingsUpdate,
+    WorkspaceLaunchContext,
+    WorkspaceLaunchContextRequest,
 )
 from computor_backend.coder import templates_fs
 from computor_backend.model.workspace import (
@@ -120,6 +122,10 @@ from computor_backend.database import get_db
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.redis_cache import get_cache, get_redis_client
+from computor_backend.business_logic.workspace_launch_context import (
+    get_workspace_launch_context as read_workspace_launch_context,
+    set_workspace_launch_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -753,6 +759,55 @@ async def workspace_exists(
 # -----------------------------------------------------------------------------
 # Workspace details and lifecycle endpoints
 # -----------------------------------------------------------------------------
+
+@router.post(
+    "/workspaces/{username}/{workspace_name}/launch-context",
+    response_model=WorkspaceLaunchContext,
+    summary="Select the course to open in your workspace",
+)
+async def post_workspace_launch_context(
+    username: str,
+    workspace_name: str,
+    request: WorkspaceLaunchContextRequest,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    client: Annotated[CoderClient, Depends(get_coder_client)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
+    redis=Depends(get_redis_client),
+) -> WorkspaceLaunchContext:
+    try:
+        return await set_workspace_launch_context(
+            username, workspace_name, request.course_id, permissions, db, client, redis
+        )
+    except ComputorException:
+        raise
+    except Exception as e:
+        raise _handle_coder_error(e) from e
+
+
+@router.get(
+    "/workspaces/{username}/{workspace_name}/launch-context",
+    response_model=Optional[WorkspaceLaunchContext],
+    summary="Read your latest workspace course navigation request",
+)
+async def get_workspace_launch_context_endpoint(
+    username: str,
+    workspace_name: str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
+    client: Annotated[CoderClient, Depends(get_coder_client)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
+    redis=Depends(get_redis_client),
+) -> Optional[WorkspaceLaunchContext]:
+    try:
+        return await read_workspace_launch_context(
+            username, workspace_name, permissions, db, client, redis
+        )
+    except ComputorException:
+        raise
+    except Exception as e:
+        raise _handle_coder_error(e) from e
+
 
 @router.get(
     "/workspaces/{username}/{workspace_name}",
