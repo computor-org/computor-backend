@@ -16,6 +16,7 @@ import { courseTemplateOption } from '@/src/components/workspaces/templateOption
 import { CoderClient } from '@/src/clients/CoderClient';
 import { CourseWorkspacesClient } from '@/src/clients/CourseWorkspacesClient';
 import {
+  derivedWorkspaceName,
   openLaunchTab,
   workspaceCreatingUrl,
   workspaceLaunchUrl,
@@ -28,10 +29,10 @@ const courseWorkspacesClient = new CourseWorkspacesClient();
 /**
  * Launch buttons for a course's allowed workspace templates.
  *
- * Renders one card per (enabled) template — clicking ensures the caller's
- * per-template workspace exists (provisioning is idempotent; a re-click just
- * refreshes its token) and opens the launch tab. The non-compact variant also
- * lists the caller's existing workspaces on course templates, which covers
+ * Renders one card per (enabled) template — clicking reuses the caller's
+ * per-template workspace, or provisions it when missing, and opens the launch
+ * tab. Reusing keeps the running editor and its credentials intact. The
+ * non-compact variant also lists the caller's existing workspaces on course templates, which covers
  * lecturer-provisioned throwaway workspaces (students can open and start
  * those, but not provision them).
  *
@@ -136,12 +137,31 @@ export default function CourseWorkspaceLaunchButtons({
     setLaunching(templateName);
     const tab = window.open(workspaceCreatingUrl, '_blank');
     try {
-      const result = await coderClient.provisionWorkspace({
-        body: { template: templateName },
-      });
-      const workspaceName = result.workspace?.name;
-      if (!workspaceName) throw new Error('The workspace was not created.');
-      const launchUrl = workspaceLaunchUrl(result.user.username, workspaceName, courseId);
+      // This listing is scoped to the current user. Read it on every click,
+      // including compact cards, rather than trusting a possibly stale poll.
+      // A failed lookup must surface as an error: provisioning an existing
+      // workspace rotates its token and rebuilds the editor.
+      const { workspaces: ownWorkspaces } = await coderClient.listWorkspaces();
+      const existing = ownWorkspaces.find((workspace) =>
+        workspace.template_name === templateName
+        && workspace.name === derivedWorkspaceName(templateName),
+      );
+      let launchUrl: string;
+      if (existing) {
+        if (!existing.owner_name) {
+          throw new Error('The existing workspace owner is unavailable. Please retry.');
+        }
+        // The launch page handles stopped/failed workspaces and sends the new
+        // course context. Do not provision just to select a different course.
+        launchUrl = workspaceLaunchUrl(existing.owner_name, existing.name, courseId);
+      } else {
+        const result = await coderClient.provisionWorkspace({
+          body: { template: templateName },
+        });
+        const workspaceName = result.workspace?.name;
+        if (!workspaceName) throw new Error('The workspace was not created.');
+        launchUrl = workspaceLaunchUrl(result.user.username, workspaceName, courseId);
+      }
       if (tab) {
         tab.location.replace(launchUrl);
       } else {
