@@ -23,3 +23,7 @@ tmp
 .env
 .env.*
 !.env.*.template
+# Operator runtime data next to the bootstrap examples (backups, generated
+# deployment files). No image copies it, and an entry the build user cannot
+# read fails the whole build — including an update's rollback.
+data/deployments
