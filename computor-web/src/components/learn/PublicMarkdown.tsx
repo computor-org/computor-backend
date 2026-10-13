@@ -20,7 +20,7 @@ function normalizeLegacyHtml(markdown: string): string {
     .replace(/<br\s*\/?>/gi, '\n');
 }
 
-function mathify(children: ReactNode): ReactNode {
+export function mathify(children: ReactNode): ReactNode {
   if (!Array.isArray(children)) {
     return typeof children === 'string' ? mathifyString(children, 'm') : children;
   }

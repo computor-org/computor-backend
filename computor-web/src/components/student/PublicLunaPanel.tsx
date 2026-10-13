@@ -5,6 +5,7 @@ import { PublicLunaClient, type LunaStatus } from '@/src/clients/PublicLunaClien
 import { useCourse } from '@/src/contexts/CourseContext';
 import SectionCard from '@/src/components/SectionCard';
 import Button from '@/src/components/ui/Button';
+import LunaAnswer from '@/src/components/student/LunaAnswer';
 
 const client = new PublicLunaClient();
 const jobKey = (assignmentId: string) => `computor:luna:${assignmentId}`;
@@ -108,7 +109,9 @@ export default function PublicLunaPanel({ assignmentId }: { assignmentId: string
       {result?.state === 'running' && <p className="mt-3 text-sm text-muted">Luna is answering…</p>}
       {result?.state === 'failed' && <p className="mt-3 text-sm text-muted">Luna could not answer. Try again.</p>}
       {result?.state === 'done' && (
-        <p className="mt-3 whitespace-pre-wrap text-sm text-body">{result.answer}</p>
+        <div className="mt-3">
+          <LunaAnswer answer={result.answer} />
+        </div>
       )}
     </SectionCard>
   );
