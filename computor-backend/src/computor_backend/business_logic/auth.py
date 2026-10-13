@@ -847,6 +847,9 @@ async def refresh_sso_token(
             "email": user.email,
             "created_at": str(datetime.now(timezone.utc)),
             "refreshed_at": str(datetime.now(timezone.utc)),
+            # As at login: without it, logout after any refresh reached
+            # Keycloak with no id_token_hint and stopped at its confirmation page.
+            "id_token": (auth_result.session_data or {}).get("id_token"),
         }
 
         # Store new session in Redis — keyed by token HASH to match authenticate_sso() lookup.
