@@ -15,6 +15,8 @@ const ANSWER = [
   '```',
   '',
   '![tracker](https://tracker.invalid/pixel.png) [docs](https://docs.python.org/3/) [bad](javascript:alert(2))',
+  '',
+  '$$\n\\begin{aligned}\nx_1 &= 2 \\\\\nx_2 &= 3\n\\end{aligned}\n$$',
 ].join('\n');
 
 function json(route: Route, body: unknown, status = 200) {
@@ -74,6 +76,8 @@ test('public Luna form appears only when enabled and renders the answer as Markd
   expect(text).not.toContain('**');
   expect(text).not.toContain('```');
   expect(text).not.toContain('`range');
+  await expect(answer.locator('.katex-display .mtable')).toBeVisible();
+  await expect(answer.locator('.katex-error')).toHaveCount(0);
 
   // Model output: no markup, no fetched image, no script link.
   expect(text).not.toContain('<script>');
