@@ -285,6 +285,17 @@ body {
   --tw-prose-td-borders: var(--c-rule);
 }
 
+/* Code delimiters are Markdown syntax, not part of the rendered identifier. */
+.markdown code::before,
+.markdown code::after {
+  content: none;
+}
+
+.markdown .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 /*
  * Scrollbar styling for the app's internal scroll areas.
  *

@@ -56,6 +56,40 @@ test('all three courses have native reading content', async ({ page }) => {
   }
 });
 
+for (const exercise of [MATH, 'week_1.basis1']) {
+  test(`equations and inline code render from the real ${exercise} descriptions`, async ({ page }, testInfo) => {
+    await page.goto(`/learn/${COURSE}/content/${exercise}`);
+    for (const language of ['English', 'Deutsch']) {
+      await page.getByRole('button', { name: language, exact: true }).click();
+      const article = page.locator('article');
+      await expect(article.locator('.katex-display .mtable').first()).toBeVisible();
+      await expect(article.locator('.katex-error')).toHaveCount(0);
+      const equations = article.locator('.katex-display annotation').first();
+      await expect(equations).toContainText('\\begin{aligned}');
+      await expect(equations).toContainText(exercise === MATH ? 'p\\_half' : 'sum\\_ab');
+      const code = article.locator('code').first();
+      await expect(code).toBeVisible();
+      for (const pseudo of ['::before', '::after']) {
+        expect(await code.evaluate((element, pseudo) => getComputedStyle(element, pseudo).content, pseudo)).not.toContain('`');
+      }
+      await page.screenshot({ path: testInfo.outputPath(`${language}.png`), fullPage: true });
+    }
+  });
+}
+
+test('math parsing leaves literal dollars and LaTeX inside code unchanged', async ({ page }) => {
+  const outline = JSON.parse(fs.readFileSync('public/learning/courses/python-beginner.json', 'utf8'));
+  const markdown = '# Literal code\n\n`$x_1$`\n\n```python\nprice = "$5"\n# \\begin{aligned} $x_1$\n```\n\n$y_1 = 2$';
+  outline.materials[MATH].markdown_variants = { de: markdown, en: markdown };
+  await page.route('**/learning/courses/python-beginner.json', route => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify(outline),
+  }));
+  await page.goto(URL);
+  await expect(page.locator('article p code')).toHaveText('$x_1$');
+  await expect(page.locator('article pre code')).toHaveText('price = "$5"\n# \\begin{aligned} $x_1$');
+  await expect(page.locator('article .katex')).toHaveCount(1);
+});
+
 test('landing shows open registration and static courses with no pilot or invite claim', async ({ page }) => {
   const calls: string[] = [];
   await blockApi(page, calls);
