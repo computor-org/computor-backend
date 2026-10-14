@@ -154,7 +154,7 @@ async def request_status(
 async def claim_request(
     response: Response,
     redis: Annotated[Redis, Depends(get_redis_client)],
-    worker_key: Annotated[str | None, Header(alias="X-Public-Lena-Worker-Key")] = None,
+    worker_key: Annotated[str | None, Header(alias="X-Public-Luna-Worker-Key")] = None,
 ):
     _worker_key(worker_key)
     response.headers["Cache-Control"] = "no-store"
@@ -177,7 +177,7 @@ async def complete_request(
     body: LunaCompletion,
     response: Response,
     redis: Annotated[Redis, Depends(get_redis_client)],
-    worker_key: Annotated[str | None, Header(alias="X-Public-Lena-Worker-Key")] = None,
+    worker_key: Annotated[str | None, Header(alias="X-Public-Luna-Worker-Key")] = None,
 ):
     _worker_key(worker_key)
     if body.state == "failed" and body.answer:

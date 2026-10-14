@@ -131,7 +131,7 @@ def test_worker_http_route_requires_dedicated_secret(monkeypatch):
         == 401
     )
     response = client.post(
-        "/worker/claim", headers={"X-Public-Lena-Worker-Key": "k" * 32}
+        "/worker/claim", headers={"X-Public-Luna-Worker-Key": "k" * 32}
     )
     assert response.status_code == 200
     assert response.json() == {"state": "idle"}
