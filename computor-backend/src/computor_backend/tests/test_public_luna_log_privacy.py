@@ -47,7 +47,7 @@ def test_unknown_json_field_name_is_not_logged(caplog):
         "question": "A synthetic question", SENTINEL: SENTINEL,
     })
     assert response.status_code == 400
-    assert response.json() == {"message": "Invalid Luna request"}
+    assert response.json() == {"message": "Invalid Lena request"}
     assert_private(caplog)
 
 
@@ -56,7 +56,7 @@ def test_unexpected_error_is_contained_before_asgi_server_logging(caplog):
     # escape to the server's error logger, rather than only hiding its response.
     response = client().get("/public-luna/unexpected")
     assert response.status_code == 500
-    assert response.json() == {"message": "Luna is temporarily unavailable"}
+    assert response.json() == {"message": "Lena is temporarily unavailable"}
     assert_private(caplog)
 
 

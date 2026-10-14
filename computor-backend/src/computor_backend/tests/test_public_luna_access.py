@@ -1,4 +1,4 @@
-"""Public Luna visibility and ownership against the real PostgreSQL schema."""
+"""Public Lena visibility and ownership against the real PostgreSQL schema."""
 
 import os
 import uuid
@@ -65,14 +65,14 @@ def world():
             db.add(CourseRole(id="_student", title="Student", builtin=True))
             db.flush()
         org = Organization(
-            title="Luna Test",
+            title="Lena Test",
             organization_type="organization",
             path=Ltree(f"luna_{suffix}"),
         )
         db.add(org)
         db.flush()
         family = CourseFamily(
-            title="Luna Test",
+            title="Lena Test",
             organization_id=org.id,
             path=Ltree(f"luna_{suffix}.family"),
         )
@@ -227,7 +227,7 @@ def test_http_request_claim_complete_and_owner_only_status(world, monkeypatch):
     assert accepted.status_code == 202
     assert accepted.headers["cache-control"] == "no-store"
     job_id = accepted.json()["id"]
-    worker_header = {"X-Public-Luna-Worker-Key": "k" * 32}
+    worker_header = {"X-Public-Lena-Worker-Key": "k" * 32}
     claim = client.post("/worker/claim", headers=worker_header)
     assert claim.status_code == 200
     assert claim.headers["cache-control"] == "no-store"

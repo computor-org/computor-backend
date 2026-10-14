@@ -37,11 +37,11 @@ class PublicLunaPrivacyMiddleware:
         except Exception as exc:  # noqa: BLE001 - this is the final privacy boundary
             # ServerErrorMiddleware re-raises uncaught exceptions for the ASGI
             # server to log. Contain them here, without their text or traceback.
-            logger.error("Public Luna request failed", extra={
+            logger.error("Public Lena request failed", extra={
                 "status_code": 500, "exception_type": type(exc).__name__,
             })
             if not started:
-                await JSONResponse({"message": "Luna is temporarily unavailable"},
+                await JSONResponse({"message": "Lena is temporarily unavailable"},
                                    status_code=500)(scope, receive, send)
             elif not finished:
                 await send({"type": "http.response.body", "body": b"", "more_body": False})

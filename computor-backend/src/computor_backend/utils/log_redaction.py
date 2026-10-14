@@ -71,7 +71,7 @@ def _redact_query(query: str) -> str:
 
 
 def _redact_token(token: str) -> str:
-    # Malformed Luna paths/queries may themselves contain learner text. Keep
+    # Malformed Lena paths/queries may themselves contain learner text. Keep
     # only a fixed route label in HTTP/WS access logs, including encoded paths.
     decoded = unquote_plus(token)
     if re.search(r"(?:^|/)public-luna(?:/|[?#]|$)", decoded):

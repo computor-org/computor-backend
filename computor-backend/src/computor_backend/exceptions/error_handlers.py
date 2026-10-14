@@ -84,10 +84,10 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     if is_public_luna_scope(request.scope):
         # Unknown JSON field names and validator messages may contain learner
         # text. Retain only numeric diagnostics for this private text channel.
-        logger.warning("Invalid public Luna request", extra={
+        logger.warning("Invalid public Lena request", extra={
             "status_code": 400, "validation_error_count": len(exc.errors()),
         })
-        return JSONResponse({"message": "Invalid Luna request"}, status_code=400)
+        return JSONResponse({"message": "Invalid Lena request"}, status_code=400)
 
     # Extract validation errors
     errors = []
@@ -159,23 +159,23 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
         ServiceUnavailableException,
     )
 
-    # Public Luna uses these two ordinary HTTP statuses for admission control
+    # Public Lena uses these two ordinary HTTP statuses for admission control
     # and oversized requests. The generic fallback below translates unknown
     # statuses into 500, so preserve them here without logging learner text.
     if is_public_luna_scope(request.scope) and exc.status_code in (413, 429):
         messages = {
-            413: {"Luna request is too large"},
+            413: {"Lena request is too large"},
             429: {
-                "A Luna request is already pending",
-                "Luna is busy; try again later",
-                "Luna request limit reached",
+                "A Lena request is already pending",
+                "Lena is busy; try again later",
+                "Lena request limit reached",
             },
         }
         message = (
             exc.detail if isinstance(exc.detail, str) and exc.detail in messages[exc.status_code]
-            else "Luna request rejected"
+            else "Lena request rejected"
         )
-        logger.warning("Public Luna request rejected", extra={"status_code": exc.status_code})
+        logger.warning("Public Lena request rejected", extra={"status_code": exc.status_code})
         return JSONResponse(
             status_code=exc.status_code,
             content={"message": message},
@@ -273,7 +273,7 @@ def log_error(request: Request, exception: ComputorException, error_response_dic
     """
     if is_public_luna_scope(request.scope):
         logger.log(logging.ERROR if exception.status_code >= 500 else logging.WARNING,
-                   "Public Luna request rejected", extra={"status_code": exception.status_code})
+                   "Public Lena request rejected", extra={"status_code": exception.status_code})
         return
 
     log_data = {

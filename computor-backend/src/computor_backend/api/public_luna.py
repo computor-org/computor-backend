@@ -1,8 +1,8 @@
-"""Narrow public Luna ingress and outbound worker API.
+"""Narrow public Lena ingress and outbound worker API.
 
 The worker credential has no Principal and cannot reach tutor, grading,
 reference, submission or general message APIs. The browser submits only the
-selected text it wants Luna to see; the backend adds visible assignment text.
+selected text it wants Lena to see; the backend adds visible assignment text.
 """
 
 import hmac
@@ -97,11 +97,11 @@ async def submit_request(
     if principal.is_service or not principal.user_id:
         raise HTTPException(status_code=403, detail="Learner account required")
     if not _enabled():
-        raise HTTPException(status_code=503, detail="Luna is unavailable")
+        raise HTTPException(status_code=503, detail="Lena is unavailable")
     content = _visible_assignment(db, principal.user_id, body.course_content_id)
     assignment = _assignment_text(content)
     if len(body.question) + len(body.submitted_text) + len(assignment) > 24000:
-        raise HTTPException(status_code=413, detail="Luna request is too large")
+        raise HTTPException(status_code=413, detail="Lena request is too large")
     try:
         outcome, job_id = await queue.admit(
             redis,
@@ -115,17 +115,17 @@ async def submit_request(
         )
     except RedisError:
         raise HTTPException(
-            status_code=503, detail="Luna admission unavailable"
+            status_code=503, detail="Lena admission unavailable"
         ) from None
     if outcome != "accepted":
         code = 429 if outcome in {"pending", "full", "quota"} else 503
         raise HTTPException(
             status_code=code,
             detail={
-                "pending": "A Luna request is already pending",
-                "full": "Luna is busy; try again later",
-                "quota": "Luna request limit reached",
-            }.get(outcome, "Luna admission unavailable"),
+                "pending": "A Lena request is already pending",
+                "full": "Lena is busy; try again later",
+                "quota": "Lena request limit reached",
+            }.get(outcome, "Lena admission unavailable"),
         )
     response.headers["Cache-Control"] = "no-store"
     return {"id": job_id, "state": "queued"}
@@ -139,13 +139,13 @@ async def request_status(
     redis: Annotated[Redis, Depends(get_redis_client)],
 ):
     if not principal.user_id or principal.is_service:
-        raise HTTPException(status_code=404, detail="Luna request unavailable")
+        raise HTTPException(status_code=404, detail="Lena request unavailable")
     try:
         result = await queue.status(redis, principal.user_id, str(job_id))
     except (RedisError, ValueError):
-        raise HTTPException(status_code=503, detail="Luna status unavailable") from None
+        raise HTTPException(status_code=503, detail="Lena status unavailable") from None
     if result is None:
-        raise HTTPException(status_code=404, detail="Luna request unavailable")
+        raise HTTPException(status_code=404, detail="Lena request unavailable")
     response.headers["Cache-Control"] = "no-store"
     return {key: value for key, value in result.items() if key != "user_id"}
 
@@ -154,7 +154,7 @@ async def request_status(
 async def claim_request(
     response: Response,
     redis: Annotated[Redis, Depends(get_redis_client)],
-    worker_key: Annotated[str | None, Header(alias="X-Public-Luna-Worker-Key")] = None,
+    worker_key: Annotated[str | None, Header(alias="X-Public-Lena-Worker-Key")] = None,
 ):
     _worker_key(worker_key)
     response.headers["Cache-Control"] = "no-store"
@@ -163,7 +163,7 @@ async def claim_request(
     try:
         item = await queue.claim(redis)
     except (RedisError, ValueError):
-        raise HTTPException(status_code=503, detail="Luna queue unavailable") from None
+        raise HTTPException(status_code=503, detail="Lena queue unavailable") from None
     if item is None:
         return {"state": "idle"}
     job_id, lease, payload = item
@@ -177,7 +177,7 @@ async def complete_request(
     body: LunaCompletion,
     response: Response,
     redis: Annotated[Redis, Depends(get_redis_client)],
-    worker_key: Annotated[str | None, Header(alias="X-Public-Luna-Worker-Key")] = None,
+    worker_key: Annotated[str | None, Header(alias="X-Public-Lena-Worker-Key")] = None,
 ):
     _worker_key(worker_key)
     if body.state == "failed" and body.answer:
@@ -198,9 +198,9 @@ async def complete_request(
         )
     except RedisError:
         raise HTTPException(
-            status_code=503, detail="Luna completion unavailable"
+            status_code=503, detail="Lena completion unavailable"
         ) from None
     if outcome != "finished":
-        raise HTTPException(status_code=409, detail="Luna lease is stale or expired")
+        raise HTTPException(status_code=409, detail="Lena lease is stale or expired")
     response.headers["Cache-Control"] = "no-store"
     return {"state": "finished"}

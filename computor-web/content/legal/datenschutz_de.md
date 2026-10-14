@@ -14,12 +14,12 @@ Bestimmungen zum Datenschutz und zur Datensicherheit, insbesondere nach dem
 ## Das Wichtigste in Kürze
 
 - Wir verarbeiten nur, was wir brauchen, um Ihnen Konto, Kurse,
-  Arbeitsumgebung, automatische Tests, Chat und angefragte Luna-Lernhilfe bereitzustellen.
+  Arbeitsumgebung, automatische Tests, Chat und angefragte Lena-Lernhilfe bereitzustellen.
 - Keine Werbung, kein Tracking, keine Analyse-Werkzeuge, keine Einbindung von
   Diensten Dritter in die Webseiten, kein Verkauf von Daten, keine Auswertung
   Ihrer Daten zum Training von KI-Modellen.
 - Nur technisch notwendige Cookies, daher kein Cookie-Banner.
-- Die Plattformserver stehen in Deutschland (Hetzner); Luna läuft an der TU Graz in Österreich.
+- Die Plattformserver stehen in Deutschland (Hetzner); Lena läuft an der TU Graz in Österreich.
 - Sie registrieren sich mit bestätigter E-Mail-Adresse und Passwort. Öffentliche Beispiele benötigen kein Konto.
 - Sie können die Löschung Ihres Kontos jederzeit verlangen: privacy@computor.at.
 
@@ -177,11 +177,11 @@ anwendbar.
 Speicherdauer: bis zur Erledigung, danach höchstens drei Jahre zur
 Nachvollziehbarkeit und zur Abwehr von Ansprüchen.
 
-### 4.8 Luna-Lernhilfe
+### 4.8 Lena-Lernhilfe
 
-Wenn Sie Luna fragen, verarbeiten wir Ihre Frage, den von Ihnen ausgewählten
+Wenn Sie Lena fragen, verarbeiten wir Ihre Frage, den von Ihnen ausgewählten
 Text, die für Sie sichtbare Aufgabenbeschreibung und die erzeugte Antwort.
-Luna gibt Lernhilfe, führt keinen Code aus und entscheidet keine Noten.
+Lena gibt Lernhilfe, führt keinen Code aus und entscheidet keine Noten.
 Die Inferenz erfolgt auf Rechnern der TU Graz in Österreich, ohne externen
 KI-Anbieter und ohne Training von Modellen mit Ihren Daten.
 
@@ -214,7 +214,7 @@ Alle Dienste der Plattform (Anmeldung mit Keycloak, Git-Server Forgejo,
 Datenbank, Dateispeicher, Testsystem, Workspaces mit Coder, Chat mit Zulip)
 betreiben wir selbst. Schriftarten werden von unseren eigenen Servern
 geladen. Wir binden keine Content-Delivery-Netzwerke, Analyse-, Werbe- oder
-externe KI-Dienste ein. Luna betreibt die TU Graz selbst.
+externe KI-Dienste ein. Lena betreibt die TU Graz selbst.
 
 | Empfänger | Rolle | Ort | Grundlage |
 |---|---|---|---|
@@ -262,9 +262,9 @@ jedoch nicht möglich.
 |---|---|
 | Konto, Kurseinschreibungen, Abgaben, Git-Repositories, Testergebnisse | bis zur Löschung Ihres Kontos |
 | Workspace-Dateien (Home-Verzeichnis) | bis zur Löschung Ihres Kontos |
-| Luna-Anfragen | höchstens 15 Minuten; Entfernung bei Fertigstellung |
-| Luna-Antworten | 24 Stunden, nur für die anfragende Person |
-| Luna-Inferenz-Caches | begrenzte Kapazität; Ersatz bei Kapazitätsbedarf oder Leeren |
+| Lena-Anfragen | höchstens 15 Minuten; Entfernung bei Fertigstellung |
+| Lena-Antworten | 24 Stunden, nur für die anfragende Person |
+| Lena-Inferenz-Caches | begrenzte Kapazität; Ersatz bei Kapazitätsbedarf oder Leeren |
 | Chat-Konto und Nachrichten | bis Sie Nachrichten oder Ihr Chat-Konto löschen bzw. dessen Löschung verlangen |
 | Zugriffsprotokolle des Webservers (Logdaten) | 14 Tage |
 | Sicherheitsmeldungen mit Kontozuordnung | 90 Tage |

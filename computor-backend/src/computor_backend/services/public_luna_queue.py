@@ -1,4 +1,4 @@
-"""Atomic, temporary admission for the outbound public Luna worker.
+"""Atomic, temporary admission for the outbound public Lena worker.
 
 Only request identifiers are indexed. The bounded prompt payload lives in a
 15-minute Redis value; the inference host does not persist it. Redis failures

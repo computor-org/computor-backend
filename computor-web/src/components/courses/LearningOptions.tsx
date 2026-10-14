@@ -17,7 +17,7 @@ export default function LearningOptions({ capacity = false }: { capacity?: boole
         <Link href="/learn" className="underline">Read courses</Link>
       </div>
       <p className="mt-3 text-sm text-muted">
-        Codespaces uses your GitHub quota. Sign in to submit work or ask Luna.
+        Codespaces uses your GitHub quota. Sign in to submit work or ask Lena.
       </p>
     </aside>
   );

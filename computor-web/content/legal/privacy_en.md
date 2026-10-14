@@ -14,11 +14,11 @@ Telecommunications Act (“TKG 2021”). The German version is authoritative.
 ## Summary
 
 - We process only what we need to provide your account, courses, workspace,
-  automatic tests, chat and the Luna help you request.
+  automatic tests, chat and the Lena help you request.
 - No advertising, no tracking, no analytics, no third-party services embedded
   in our web pages, no sale of data, no use of your data to train AI models.
 - Only technically necessary cookies, so there is no cookie banner.
-- Platform servers are in Germany (Hetzner); Luna inference runs at TU Graz in Austria.
+- Platform servers are in Germany (Hetzner); Lena inference runs at TU Graz in Austria.
 - You sign up with a verified email address and a password. Public examples need no account.
 - You can ask us to delete your account at any time: privacy@computor.at.
 
@@ -167,10 +167,10 @@ Regulation (EU) 2022/2065 (Digital Services Act, “DSA”), where applicable.
 Storage period: until the matter is closed, then at most three years for
 traceability and the defence of legal claims.
 
-### 4.8 Luna learning assistance
+### 4.8 Lena learning assistance
 
-When you ask Luna, we process your question, the text you choose to submit,
-the assignment description visible to you and the generated answer. Luna gives
+When you ask Lena, we process your question, the text you choose to submit,
+the assignment description visible to you and the generated answer. Lena gives
 learning help; it does not run your code or decide grades. Inference takes place
 on TU Graz machines in Austria, without an external AI provider or model training.
 
@@ -201,7 +201,7 @@ telemetry without question, submitted-text or answer contents.
 
 We run all services of the platform ourselves (sign-in with Keycloak, Forgejo
 Git server, database, file storage, test system, workspaces with Coder, chat
-with Zulip). Fonts are served from our own servers. We do not embed content delivery networks, analytics, advertising or external AI services. Luna is operated by TU Graz.
+with Zulip). Fonts are served from our own servers. We do not embed content delivery networks, analytics, advertising or external AI services. Lena is operated by TU Graz.
 
 | Recipient | Role | Location | Basis |
 |---|---|---|---|
@@ -247,9 +247,9 @@ Without these cookies, however, signing in is not possible.
 |---|---|
 | Account, course enrolments, submissions, Git repositories, test results | until your account is deleted |
 | Workspace files (home directory) | until your account is deleted |
-| Luna requests | at most 15 minutes; removed on completion |
-| Luna answers | 24 hours, visible only to the author |
-| Luna inference caches | bounded capacity; replacement on capacity pressure or clearing |
+| Lena requests | at most 15 minutes; removed on completion |
+| Lena answers | 24 hours, visible only to the author |
+| Lena inference caches | bounded capacity; replacement on capacity pressure or clearing |
 | Chat account and messages | until you delete messages or your chat account, or ask us to delete it |
 | Web server access logs (log data) | 14 days |
 | Security alerts attributed to an account | 90 days |

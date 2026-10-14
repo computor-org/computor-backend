@@ -1,4 +1,4 @@
-"""Exercise Luna admission errors through the real ASGI exception stack."""
+"""Exercise Lena admission errors through the real ASGI exception stack."""
 
 import json
 from types import SimpleNamespace
@@ -63,9 +63,9 @@ def assert_private(caplog, response):
 
 
 @pytest.mark.parametrize("outcome,expected", [
-    ("pending", "A Luna request is already pending"),
-    ("full", "Luna is busy; try again later"),
-    ("quota", "Luna request limit reached"),
+    ("pending", "A Lena request is already pending"),
+    ("full", "Lena is busy; try again later"),
+    ("quota", "Lena request limit reached"),
 ])
 def test_admission_returns_429_without_logging_text(luna_client, monkeypatch, caplog, outcome, expected):
     async def reject(_redis, _user_id, _body):
@@ -100,7 +100,7 @@ def test_oversized_request_returns_413_without_logging_text(luna_client, monkeyp
         json=payload(question=SENTINEL + "q" * (6000 - len(SENTINEL)), submitted_text="s" * 16000),
     )
     assert response.status_code == 413
-    assert response.json() == {"message": "Luna request is too large"}
+    assert response.json() == {"message": "Lena request is too large"}
     assert_private(caplog, response)
 
 
@@ -111,7 +111,7 @@ def test_other_authenticated_user_cannot_read_queued_job(luna_client, caplog):
     job_id = submitted.json()["id"]
     duplicate = client.post("/public-luna/requests", json=payload())
     assert duplicate.status_code == 429
-    assert duplicate.json() == {"message": "A Luna request is already pending"}
+    assert duplicate.json() == {"message": "A Lena request is already pending"}
     assert_private(caplog, duplicate)
     actor["user_id"] = "another-owned-learner"
     denied = client.get(f"/public-luna/requests/{job_id}")
