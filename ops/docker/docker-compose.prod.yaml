@@ -87,6 +87,7 @@ services:
       DEPLOYMENTS_DIR: /deployments
       API_ADMIN_EMAIL: ${API_ADMIN_EMAIL}
       API_ADMIN_PASSWORD: ${API_ADMIN_PASSWORD}
+      TUTOR_AGENT_USER_ID: ${TUTOR_AGENT_USER_ID:-}
       # Bootstrap uses the same pinned secret as the testing worker to create
       # or repair its service token. It is never written to deployment YAML.
       TESTING_WORKER_TOKEN: ${TESTING_WORKER_TOKEN:-}

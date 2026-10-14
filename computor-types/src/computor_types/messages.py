@@ -149,6 +149,7 @@ class MessageMentionRef(BaseModel):
     id: str = Field(..., description="User ID of the mentioned user")
     given_name: Optional[str] = Field(None, max_length=255, description="Mentioned user's given name")
     family_name: Optional[str] = Field(None, max_length=255, description="Mentioned user's family name")
+    aliases: List[str] = Field(default_factory=list, description="Supported mention handles for this user")
     course_role_id: Optional[str] = Field(
         None, description="Mentioned user's course role within the message's course, if any"
     )

@@ -9,7 +9,7 @@ visibility — then reconcile the ``message_mention`` rows that power fast
 """
 import re
 from typing import Optional, List, Dict
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from computor_backend.exceptions import BadRequestException
@@ -18,6 +18,8 @@ from computor_backend.model.course import CourseMember
 from computor_backend.model.auth import User
 from computor_types.messages import MESSAGE_TARGET_FIELDS, MessageMentionRef
 from .audience import course_ids_for_messages, get_message_recipient_user_ids
+from .mention_text import TUTOR_ALIASES, resolve_plain_mentions
+from computor_backend.settings import settings
 
 
 MENTION_PATTERN = re.compile(r'@\[[^\]]*\]\(([0-9a-fA-F-]{36})\)')
@@ -132,6 +134,58 @@ def sync_message_mentions(message_id, content: Optional[str], db: Session) -> No
         db.commit()
 
 
+def _mentionable_query(message_like, db: Session):
+    audience = message_audience_user_ids(message_like, db)
+    q = db.query(User).filter(User.archived_at.is_(None), User.banned_at.is_(None))
+    if audience is not None:
+        q = q.filter(User.id.in_(audience))
+    return q
+
+
+def mention_ref(user: User) -> MessageMentionRef:
+    tutor = str(user.id).lower() == str(settings.TUTOR_AGENT_USER_ID).lower()
+    return MessageMentionRef(
+        id=str(user.id), given_name="Lena" if tutor else user.given_name,
+        family_name=user.family_name, aliases=list(TUTOR_ALIASES) if tutor else [],
+    )
+
+
+def resolve_message_mentions(message_like, content: Optional[str], db: Session) -> Optional[str]:
+    """Resolve plain names against the complete authorized message audience."""
+    if not content or "@" not in content:
+        return content
+    resolved = {}
+
+    def lookup(name):
+        key = "__tutor__" if name in TUTOR_ALIASES else name
+        if key in resolved:
+            return resolved[key]
+        query = _mentionable_query(message_like, db)
+        if name in TUTOR_ALIASES:
+            if not settings.TUTOR_AGENT_USER_ID:
+                return None
+            query = query.filter(User.id == settings.TUTOR_AGENT_USER_ID)
+        else:
+            query = query.filter(or_(func.lower(User.given_name) == name,
+                                     func.lower(User.family_name) == name))
+        # Exact matching over the full audience: two rows prove ambiguity;
+        # one proves uniqueness. Autocomplete pagination is never used here.
+        matches = query.limit(2).all()
+        if len(matches) > 1:
+            raise BadRequestException(detail={
+                "message": f"@{name} is ambiguous. Choose a person from autocomplete.",
+                "ambiguous_mention": name,
+            })
+        if not matches:
+            resolved[key] = None
+            return None
+        ref = mention_ref(matches[0])
+        resolved[key] = ref.id, " ".join(filter(None, (ref.given_name, ref.family_name)))
+        return resolved[key]
+
+    return resolve_plain_mentions(content, lookup)
+
+
 def list_mentionable_users(
     message_like,
     db: Session,
@@ -140,15 +194,19 @@ def list_mentionable_users(
 ) -> List[User]:
     """Users who may be @mentioned in a message with ``message_like``'s scope —
     i.e. its audience — optionally narrowed by a name search."""
-    audience = message_audience_user_ids(message_like, db)
-    q = db.query(User).filter(User.archived_at.is_(None))
-    if audience is not None:
-        if not audience:
-            return []
-        q = q.filter(User.id.in_(audience))
+    q = _mentionable_query(message_like, db)
     if search:
+        needle = search.casefold().lstrip("@")
         like = f"%{search}%"
-        q = q.filter(or_(User.given_name.ilike(like), User.family_name.ilike(like)))
+        if needle in TUTOR_ALIASES:
+            # Exact reserved handles always offer the configured tutor, even
+            # if many humans have that name and would fill the result page.
+            name_filter = User.id == settings.TUTOR_AGENT_USER_ID
+        else:
+            name_filter = or_(User.given_name.ilike(like), User.family_name.ilike(like))
+            if settings.TUTOR_AGENT_USER_ID and any(needle in a for a in TUTOR_ALIASES):
+                name_filter = or_(name_filter, User.id == settings.TUTOR_AGENT_USER_ID)
+        q = q.filter(name_filter)
     q = q.order_by(User.family_name, User.given_name)
     return q.limit(limit).all()
 
