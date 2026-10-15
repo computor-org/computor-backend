@@ -416,6 +416,12 @@ def main():
     token = get_admin_token(base, admin, admin_pass)
     ensure_realm_settings(base, realm, token)
     ensure_account_console_scopes(base, realm, token)
+    if os.environ.get("KEYCLOAK_ABUSE_PROTECTION") == "true":
+        from setup_abuse import configure
+        configure(base, realm, token, os.environ.get("KEYCLOAK_ABUSE_SECRET", ""),
+                  cost=int(os.environ.get("KEYCLOAK_ABUSE_COST", "10000")),
+                  ttl=int(os.environ.get("KEYCLOAK_ABUSE_TTL", "300")))
+        _log("signup/recovery abuse protection reconciled")
 
     if not active:
         _log("no enabled providers — nothing else to configure")
