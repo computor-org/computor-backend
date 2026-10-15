@@ -464,5 +464,6 @@
     }
   ],
   "users": [],
-  "loginTheme": "computor"
+  "loginTheme": "computor",
+  "emailTheme": "computor"
 }
