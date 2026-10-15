@@ -1,0 +1,8 @@
+# Opt-in providers for public signup/recovery protection (issues#490).
+services:
+  keycloak:
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/providers:/opt/keycloak/providers:ro
+  keycloak-idp-setup:
+    volumes:
+      - ../keycloak/setup_abuse.py:/setup_abuse.py:ro

@@ -93,6 +93,9 @@ assemble_compose_files() {
         if [ "$environment" = "prod" ]; then
             COMPOSE_FILES="$COMPOSE_FILES -f ${d}/docker-compose.keycloak-prod.yaml"
         fi
+        if [ "${KEYCLOAK_ABUSE_PROTECTION:-false}" = "true" ]; then
+            COMPOSE_FILES="$COMPOSE_FILES -f ${d}/docker-compose.keycloak-abuse.yaml"
+        fi
     fi
 
     if [ "${GIT_SERVER:-}" = "forgejo" ] || [ "${FORGEJO_DETECTED:-}" = "true" ]; then

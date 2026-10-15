@@ -175,3 +175,5 @@ script, then re-ask existing users in a maintenance window as above.
 - The `.env` file is created in the project root, not in ops/
 - All Docker Compose files use relative paths from the project root
 - The `docker/postgres-init/` directory in the project root contains database initialization scripts
+
+Public signup/recovery anti-abuse: [provider, tests and targeted deployment](keycloak/ABUSE_PROTECTION.md).

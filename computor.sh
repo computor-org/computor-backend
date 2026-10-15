@@ -319,6 +319,11 @@ cmd_up() {
         create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/keycloak-db"
         create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/keycloak/imports"
         create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/keycloak/themes"
+        if [ "${KEYCLOAK_ABUSE_PROTECTION:-false}" = "true" ]; then
+            [ -n "${KEYCLOAK_ABUSE_SECRET:-}" ] || die "Set persistent KEYCLOAK_ABUSE_SECRET before enabling abuse protection"
+            create_dir_if_needed "${SYSTEM_DEPLOYMENT_PATH}/keycloak/providers"
+            "${REPO_ROOT}/ops/keycloak/build_abuse.sh" "${SYSTEM_DEPLOYMENT_PATH}/keycloak/providers"
+        fi
 
         # Copy realm config, substituting the client secrets from .env. Both placeholders
         # are hex (no '/'), so the /-delimited sed is safe. PLACEHOLDER_CLIENT_SECRET is not

@@ -137,3 +137,16 @@ jobs:
       - run: yarn build
       - run: npx playwright install --with-deps chromium
       - run: yarn test:e2e e2e/public-learning.spec.ts e2e/course-card-layout.spec.ts e2e/workspace-launch.spec.ts --workers=2
+
+  keycloak-abuse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Build and test Keycloak provider
+        run: ops/keycloak/build_abuse.sh /tmp/computor-keycloak-providers
+      - name: Pull isolated Keycloak/Postgres test images
+        run: |
+          docker pull quay.io/keycloak/keycloak:26.7.4
+          docker pull postgres:16.15
+      - name: Exercise signup and recovery on isolated Keycloak/Postgres
+        run: python3 ops/keycloak/test_abuse_live.py --provider /tmp/computor-keycloak-providers/computor-keycloak-abuse.jar

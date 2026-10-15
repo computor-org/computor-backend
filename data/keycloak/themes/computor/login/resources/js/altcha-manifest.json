@@ -1,0 +1,10 @@
+{
+  "package": "altcha",
+  "version": "3.0.11",
+  "source": "https://registry.npmjs.org/altcha/-/altcha-3.0.11.tgz",
+  "sha256": {
+    "altcha-3.0.11.min.js": "8c9f48071aed102577302e6c079bbdd59567a03175603e877ff5a53091b0c761",
+    "altcha-de-3.0.11.js": "5716ff30d25be855e5c8f597e77d2fefc898bf1df292fbb470834724255dd265",
+    "ALTCHA-LICENSE.txt": "bee1fb9d9c97d42c12c22332c5250f2fb1ef5c2321f6f82beb23e3b77be50a29"
+  }
+}
