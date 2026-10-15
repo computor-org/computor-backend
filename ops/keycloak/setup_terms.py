@@ -37,6 +37,10 @@ Env:
   KEYCLOAK_REALM                target realm (default: computor)
   KEYCLOAK_ADMIN /
   KEYCLOAK_ADMIN_PASSWORD       master-realm admin credentials
+  KEYCLOAK_AUTOMATION_CLIENT_ID /
+  KEYCLOAK_AUTOMATION_CLIENT_SECRET
+                                optional master-realm service-account client
+                                (client_credentials); used instead of the above
 """
 
 import argparse
@@ -47,7 +51,7 @@ import urllib.parse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from setup_identity_providers import _request, get_admin_token  # noqa: E402
+from setup_identity_providers import _request, automation_form, get_admin_token  # noqa: E402
 
 TEXTS_FILE = Path(__file__).resolve().parent / "computor-at-terms.json"
 TERMS_ALIASES = ("TERMS_AND_CONDITIONS", "terms_and_conditions")
@@ -190,8 +194,12 @@ def main() -> None:
     realm = os.environ.get("KEYCLOAK_REALM", "computor")
     admin = os.environ.get("KEYCLOAK_ADMIN")
     admin_pass = os.environ.get("KEYCLOAK_ADMIN_PASSWORD")
-    if not admin or not admin_pass:
-        raise SystemExit("KEYCLOAK_ADMIN / KEYCLOAK_ADMIN_PASSWORD must be set")
+    if (not admin or not admin_pass) and automation_form() is None:
+        raise SystemExit(
+            "KEYCLOAK_ADMIN / KEYCLOAK_ADMIN_PASSWORD or "
+            "KEYCLOAK_AUTOMATION_CLIENT_ID / KEYCLOAK_AUTOMATION_CLIENT_SECRET "
+            "must be set"
+        )
 
     texts = json.loads(TEXTS_FILE.read_text(encoding="utf-8"))
     kc = Keycloak(base, realm, get_admin_token(base, admin, admin_pass), args.dry_run)

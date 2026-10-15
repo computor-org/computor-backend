@@ -131,3 +131,60 @@ def test_no_user_is_ever_modified(run):
     with pytest.raises(SystemExit):  # the old bulk option is gone (argparse error)
         run(fake, "--require-for-existing-users")
     assert not any(p.startswith("/users") for _, p in fake.writes)
+
+
+def _capture_token_form(monkeypatch, **env):
+    for key in ("KEYCLOAK_AUTOMATION_CLIENT_ID", "KEYCLOAK_AUTOMATION_CLIENT_SECRET"):
+        monkeypatch.delenv(key, raising=False)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    sent = {}
+
+    def fake_request(method, url, form_body=None, **kw):
+        sent["url"] = url
+        sent["form"] = form_body
+        return 200, {"access_token": "tok"}
+
+    monkeypatch.setattr(sys.modules["setup_identity_providers"], "_request", fake_request)
+    token = setup_terms.get_admin_token("http://kc", "admin", "pw", timeout_s=1)
+    assert token == "tok"
+    return sent
+
+
+def test_admin_token_uses_client_credentials_when_automation_vars_set(monkeypatch):
+    sent = _capture_token_form(
+        monkeypatch,
+        KEYCLOAK_AUTOMATION_CLIENT_ID="automation",
+        KEYCLOAK_AUTOMATION_CLIENT_SECRET="s3cret",
+    )
+    assert sent["url"] == "http://kc/realms/master/protocol/openid-connect/token"
+    assert sent["form"] == {
+        "grant_type": "client_credentials",
+        "client_id": "automation",
+        "client_secret": "s3cret",
+    }
+
+
+def test_admin_token_uses_password_grant_otherwise(monkeypatch):
+    sent = _capture_token_form(monkeypatch)
+    assert sent["form"] == {
+        "grant_type": "password",
+        "username": "admin",
+        "password": "pw",
+        "client_id": "admin-cli",
+    }
+
+
+def test_main_accepts_automation_credentials_without_admin_password(monkeypatch):
+    monkeypatch.delenv("KEYCLOAK_ADMIN", raising=False)
+    monkeypatch.delenv("KEYCLOAK_ADMIN_PASSWORD", raising=False)
+    monkeypatch.setenv("KEYCLOAK_AUTOMATION_CLIENT_ID", "automation")
+    monkeypatch.setenv("KEYCLOAK_AUTOMATION_CLIENT_SECRET", "s3cret")
+    fake = FakeKeycloak()
+    monkeypatch.setattr(setup_terms, "_request", fake.request)
+    monkeypatch.setattr(setup_terms, "_raw_text_request", fake.raw_text)
+    monkeypatch.setattr(setup_terms, "get_admin_token", lambda *a: "token")
+    monkeypatch.setenv("COMPUTOR_LEGAL_PROFILE", "computor-at")
+    monkeypatch.setattr(sys, "argv", ["setup_terms.py"])
+    setup_terms.main()
+    assert _enabled(fake)

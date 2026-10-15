@@ -146,7 +146,8 @@ computor.at's. The script refuses to run unless `COMPUTOR_LEGAL_PROFILE=computor
 is set. On the computor.at host, from the repository root:
 
 ```bash
-# Preview, then apply (Keycloak URL and admin credentials come from .env)
+# Preview, then apply (Keycloak URL and admin credentials come from .env; optionally set
+# KEYCLOAK_AUTOMATION_CLIENT_ID/_SECRET to use a master-realm service-account client instead)
 docker run --rm --network computor-network --env-file .env \
   -e COMPUTOR_LEGAL_PROFILE=computor-at \
   -v "$PWD/ops/keycloak:/kc:ro" python:3.13-slim \

@@ -38,6 +38,10 @@ class KeycloakAdminClient:
         self.realm = os.environ.get("KEYCLOAK_REALM", "computor")
         self.admin_username = os.environ.get("KEYCLOAK_ADMIN", "admin")
         self.admin_password = os.environ.get("KEYCLOAK_ADMIN_PASSWORD", "admin_password")
+        # Optional service-account client (client_credentials) for admin calls;
+        # when both are set it replaces the admin password grant.
+        self.automation_client_id = os.environ.get("KEYCLOAK_AUTOMATION_CLIENT_ID", "")
+        self.automation_client_secret = os.environ.get("KEYCLOAK_AUTOMATION_CLIENT_SECRET", "")
         self.client_id = os.environ.get("KEYCLOAK_CLIENT_ID", "computor-backend")
         self.client_secret = os.environ.get("KEYCLOAK_CLIENT_SECRET", "computor-backend-secret")
         self._access_token = None
@@ -51,13 +55,20 @@ class KeycloakAdminClient:
         
         token_url = f"{self.server_url}/realms/master/protocol/openid-connect/token"
         
-        data = {
-            "grant_type": "password",
-            "username": self.admin_username,
-            "password": self.admin_password,
-            "client_id": "admin-cli",
-            "scope": "openid"
-        }
+        if self.automation_client_id and self.automation_client_secret:
+            data = {
+                "grant_type": "client_credentials",
+                "client_id": self.automation_client_id,
+                "client_secret": self.automation_client_secret,
+            }
+        else:
+            data = {
+                "grant_type": "password",
+                "username": self.admin_username,
+                "password": self.admin_password,
+                "client_id": "admin-cli",
+                "scope": "openid"
+            }
         
         async with httpx.AsyncClient(verify=self.verify_ssl, timeout=30.0) as client:
             response = await client.post(
