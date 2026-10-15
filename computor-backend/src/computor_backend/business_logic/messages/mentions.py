@@ -195,19 +195,20 @@ def list_mentionable_users(
     """Users who may be @mentioned in a message with ``message_like``'s scope —
     i.e. its audience — optionally narrowed by a name search."""
     q = _mentionable_query(message_like, db)
+    tutor = settings.TUTOR_AGENT_USER_ID
     if search:
-        needle = search.casefold().lstrip("@")
+        needle = search.lower().lstrip("@")
         like = f"%{search}%"
-        if needle in TUTOR_ALIASES:
-            # Exact reserved handles always offer the configured tutor, even
-            # if many humans have that name and would fill the result page.
-            name_filter = User.id == settings.TUTOR_AGENT_USER_ID
-        else:
-            name_filter = or_(User.given_name.ilike(like), User.family_name.ilike(like))
-            if settings.TUTOR_AGENT_USER_ID and any(needle in a for a in TUTOR_ALIASES):
-                name_filter = or_(name_filter, User.id == settings.TUTOR_AGENT_USER_ID)
+        name_filter = or_(User.given_name.ilike(like), User.family_name.ilike(like))
+        if tutor and any(needle in a for a in TUTOR_ALIASES):
+            name_filter = or_(name_filter, User.id == tutor)
         q = q.filter(name_filter)
-    q = q.order_by(User.family_name, User.given_name)
+    if tutor:
+        # The configured tutor is listed first, so humans with the same name
+        # cannot crowd it off the page; those humans stay selectable.
+        q = q.order_by((User.id == tutor).desc(), User.family_name, User.given_name)
+    else:
+        q = q.order_by(User.family_name, User.given_name)
     return q.limit(limit).all()
 
 

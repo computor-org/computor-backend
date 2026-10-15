@@ -34,11 +34,14 @@ can be resolved; aliases do not grant access or add course membership.
 
 An exact, unique human given/family name also resolves when sent. Ambiguous
 human names return an error asking the learner to choose from autocomplete.
-Unknown names remain visibly unlinked text. Autocomplete results are not used
-to infer uniqueness; the backend queries exact names against the full audience.
+Unknown names remain visibly unlinked text. Autocomplete lists the configured
+tutor first; humans with the same name remain selectable. Autocomplete results
+are not used to infer uniqueness; the backend queries exact names against the
+full audience.
 
-Code blocks, inline code, email addresses, escaped `\@lena` and longer names
-such as `@lenabelle` stay literal text. Ctrl/Cmd+Enter sends, even with the
+Code blocks, inline code, email addresses, URLs such as
+`https://medium.com/@ai`, escaped `\@lena` and longer names such as
+`@lenabelle` stay literal text. Ctrl/Cmd+Enter sends, even with the
 dropdown open; plain Enter or Tab can select its highlighted candidate.
 
 ## Internal compatibility names
