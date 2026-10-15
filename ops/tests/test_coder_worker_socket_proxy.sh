@@ -78,8 +78,8 @@ PROBES
 
 # Image names: only under $reg (@R@), checked on build t=, tag repo=, push and
 # delete. @T@ is this run's image; it is built by the 200 build probe below.
-# The push of an absent image passes the proxy; dockerd answers 200 and
-# streams "does not exist", so nothing leaves the host.
+# The push of an absent image passes the proxy ("pass": anything but 403);
+# dockerd answers 200 or 400 depending on its version, and pushes nothing.
 name_probes=$(cat <<'PROBES'
 403 POST /build?t=alpine:3
 403 POST /build?t=evil.example/@T@:x
@@ -96,7 +96,7 @@ name_probes=$(cat <<'PROBES'
 201 POST /v1.41/images/@R@/@T@:probe/tag?repo=@R@/@T@&tag=probe2
 403 POST /images/alpine:3/push?tag=3
 403 POST /v1.41/images/docker.io/library/alpine/push?tag=3
-200 POST /v1.41/images/@R@/cwsp-absent-@T@/push?tag=x
+pass POST /v1.41/images/@R@/cwsp-absent-@T@/push?tag=x
 403 DELETE /images/alpine:3
 403 DELETE /v1.41/images/@R@1/x:1
 200 DELETE /v1.41/images/@R@/@T@:probe2
@@ -160,7 +160,7 @@ else
 fi
 
 echo "$out"
-failed=$(echo "$out" | awk '$1 != $2' | wc -l)
+failed=$(echo "$out" | awk '$1 == "pass" ? $2 == "403" : $1 != $2' | wc -l)
 if [ "$failed" -ne 0 ]; then
     echo "FAIL: $failed probe(s) did not get the expected status" >&2
     exit 1
