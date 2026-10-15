@@ -22,8 +22,7 @@ being migrated. Existing UUID mentions labelled Luna continue to resolve.
 
 Deploy the backend before the extension update. Without a configured tutor
 identity, reserved tutor handles stay ordinary text rather than selecting a
-same-named human. The public Ask Lena form uses a separate restricted worker;
-its existing enable flag and credentials remain applicable.
+same-named human.
 
 ## Resolution rules
 
@@ -43,11 +42,3 @@ Code blocks, inline code, email addresses, URLs such as
 `https://medium.com/@ai`, escaped `\@lena` and longer names such as
 `@lenabelle` stay literal text. Ctrl/Cmd+Enter sends, even with the
 dropdown open; plain Enter or Tab can select its highlighted candidate.
-
-## Internal compatibility names
-
-The public-worker module, `/public-luna` routes, `X-Public-Luna-Worker-Key`
-header, `PUBLIC_LUNA_*` environment variables, `luna-public` gateway alias,
-launchd service identifiers and browser storage keys retain their existing
-names. They are internal compatibility contracts, not the displayed tutor
-name. Renaming them independently would break installed workers or clients.
