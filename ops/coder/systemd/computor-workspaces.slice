@@ -6,8 +6,10 @@
 #   sudo systemctl daemon-reload && sudo systemctl start computor-workspaces.slice
 # then set CODER_WORKSPACE_CGROUP_PARENT=computor-workspaces.slice in .env and
 # re-push the templates. Per-container caps (memory, memory_swap, cpus) come
-# from the templates; this slice bounds their sum and the total task count,
-# which the docker Terraform provider cannot limit per container.
+# from the templates; this slice bounds their sum and the total task count.
+# The per-workspace task count, which the docker Terraform provider cannot
+# limit, comes from the drop-in in computor-workspaces-.slice.d/ applied to
+# each workspace's child slice.
 #
 # Size the values to the host, leaving headroom for dockerd, Coder, the
 # temporal workers and the OS.

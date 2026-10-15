@@ -31,17 +31,22 @@ resource "docker_container" "workspace" {
   # exhaust the host. Safe non-zero defaults in variables.tf; per-template
   # overrides come from the workspace template settings (memory_mb,
   # cpu_shares; cpus/storage_size via the extra-variable overrides).
-  # memory_swap = memory disables swap. The kreuzwerker/docker provider
-  # (4.6.0) has no per-container pids limit: fork bombs are bounded by the
-  # aggregate systemd slice (TasksMax=) that cgroup_parent places every
-  # workspace in (CODER_WORKSPACE_CGROUP_PARENT, e.g.
-  # computor-workspaces.slice). storage_opts size needs overlay2 on xfs with
-  # pquota; on ext4 leave storage_size empty (dockerd rejects it).
+  # memory_swap = memory disables swap. storage_opts size needs overlay2 on
+  # xfs with pquota; on ext4 leave storage_size empty (dockerd rejects it).
+  #
+  # Process count: the kreuzwerker/docker provider (4.6.0) has no pids_limit,
+  # so the kernel limit comes from systemd. With a slice parent
+  # (CODER_WORKSPACE_CGROUP_PARENT, e.g. computor-workspaces.slice) each
+  # workspace gets its own child slice, computor-workspaces-<id>.slice, nested
+  # below the aggregate. The host drop-in computor-workspaces-.slice.d/ (see
+  # ops/coder/systemd/) gives every such child TasksMax=, so a fork bomb hits
+  # its own workspace's limit, and the aggregate TasksMax= still bounds the
+  # sum. A cgroupfs-style parent (no .slice suffix) is used unchanged.
   memory        = var.memory_mb
   memory_swap   = var.memory_mb
   cpu_shares    = var.cpu_shares
   cpus          = var.cpus != "" && var.cpus != "0" ? var.cpus : null
-  cgroup_parent = var.cgroup_parent != "" ? var.cgroup_parent : null
+  cgroup_parent = local.workspace_cgroup_parent
   storage_opts  = var.storage_size != "" ? { size = var.storage_size } : null
 
   # Root policy (see allow_root). no-new-privileges makes the kernel refuse the
@@ -49,6 +54,15 @@ resource "docker_container" "workspace" {
   # is no root-less image variant to maintain. Fixed for the container's life —
   # changing the policy replaces the container.
   security_opts = local.root_enabled ? [] : ["no-new-privileges:true"]
+
+  # Capabilities: drop all, add back only what root mode needs (sudo, apt,
+  # chown in the home). Without root every process is uid 1000 and
+  # no-new-privileges blocks setuid and file capabilities, so it needs none.
+  # Names in Docker's stored CAP_ form, so the read-back matches the config.
+  capabilities {
+    drop = ["ALL"]
+    add  = local.root_enabled ? local.root_capabilities : []
+  }
 
   # Fix for agent connection: replace localhost URLs with internal Coder URL
   # The init script contains URLs like http://localhost/bin/...
