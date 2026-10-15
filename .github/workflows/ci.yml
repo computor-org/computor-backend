@@ -51,6 +51,12 @@ jobs:
           computor-backend/src/computor_backend/tests/test_compose_testing_bounds.py
           computor-backend/src/computor_backend/tests/test_workspace_launch_context.py
           computor-backend/src/computor_backend/tests/test_student_description_download.py
+          computor-backend/src/computor_backend/tests/test_forgejo_image_pin.py
+          computor-backend/src/computor_backend/tests/test_forgejo_clone_token_persistence.py
+          computor-backend/src/computor_backend/tests/test_forgejo_ensure_user.py
+          computor-backend/src/computor_backend/tests/test_forgejo_naming.py
+          computor-backend/src/computor_backend/tests/test_forgejo_repo_delete.py
+          computor-backend/src/computor_backend/tests/test_forgejo_template_read_heal.py
 
   public-course-contract:
     runs-on: ubuntu-latest
