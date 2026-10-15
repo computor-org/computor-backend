@@ -467,6 +467,7 @@
   ],
   "users": [],
   "loginTheme": "computor",
+  "emailTheme": "computor",
   "requiredActions": [
     {
       "alias": "VERIFY_PROFILE",

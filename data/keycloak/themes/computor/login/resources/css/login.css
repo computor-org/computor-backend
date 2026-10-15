@@ -9,8 +9,10 @@
   /* This theme is light-only: PatternFly pins the card and fields white, and
      there is no dark palette to switch to. Say so, so a browser set to dark
      does not hand the credential fields dark UA form control and autofill
-     colours on top of a light card. */
-  color-scheme: light;
+     colours on top of a light card. `only` also opts out of Chromium's
+     automatic dark mode: Gmail's in-app browser on Android otherwise inverts
+     the page, leaving the gray-900 submit button black-on-black (issues#478). */
+  color-scheme: only light;
 
   --ct-gray-900: #111827;
   --ct-gray-800: #1f2937;
@@ -238,6 +240,109 @@ a:hover {
 
 .pf-c-input-group:focus-within .pf-c-button.pf-m-control {
   border-color: var(--ct-blue-500) !important;
+}
+
+/* ---- Language switcher ---------------------------------------------- */
+/*
+ * The stock keycloak theme hides the locale menu in its own css/login.css and
+ * reveals it on hover. This theme shadows that file (see the page-background
+ * note above), so the rule was lost and the menu sat permanently open over the
+ * first form field (issues#476, #478). Restore it, and also open on
+ * focus-within so it works by keyboard and by tap on touch screens, which have
+ * no hover.
+ */
+#kc-locale-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+#kc-locale ul {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  min-width: 10rem;
+  margin: 4px 0 0;
+  padding: 4px 0;
+  background: #ffffff;
+  border: 1px solid var(--ct-gray-200);
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}
+
+#kc-locale-dropdown:hover ul,
+#kc-locale-dropdown:focus-within ul {
+  display: block;
+}
+
+#kc-current-locale-link {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  cursor: pointer;
+  color: var(--ct-gray-600);
+  font-size: 0.875rem;
+}
+
+button#kc-current-locale-link::after {
+  content: "\2c5";
+  margin-left: 4px;
+}
+
+#kc-locale ul a {
+  display: block;
+  padding: 8px 14px;
+  color: var(--ct-gray-700);
+  font-size: 0.875rem;
+}
+
+#kc-locale ul a:hover,
+#kc-locale ul a:focus {
+  background: var(--ct-gray-200);
+  text-decoration: none;
+}
+
+/* ---- Terms of use --------------------------------------------------- */
+/* PatternFly resets list bullets and margins, so the summary rendered as one
+   unbroken block of text (issues#478). Give it back list structure and air. */
+#kc-terms-text {
+  color: var(--ct-gray-700);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+#kc-terms-text p {
+  margin: 0 0 12px;
+}
+
+#kc-terms-text ul {
+  list-style: disc;
+  margin: 0 0 16px;
+  padding-left: 1.25rem;
+}
+
+#kc-terms-text li {
+  margin-bottom: 8px;
+}
+
+/* Accept and decline stacked with no gap, and the catch-all submit rule above
+   painted decline as a second primary button. */
+#kc-terms-text + .form-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+#kc-decline {
+  background: #ffffff !important;
+  border: 1px solid var(--ct-gray-300) !important;
+  color: var(--ct-gray-700) !important;
+}
+
+#kc-decline:hover {
+  background: var(--ct-gray-200) !important;
 }
 
 /* ---- Alerts / errors ------------------------------------------------ */
