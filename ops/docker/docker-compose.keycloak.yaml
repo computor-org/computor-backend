@@ -141,6 +141,8 @@ services:
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-computor}
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
+      KEYCLOAK_AUTOMATION_CLIENT_ID: ${KEYCLOAK_AUTOMATION_CLIENT_ID:-}
+      KEYCLOAK_AUTOMATION_CLIENT_SECRET: ${KEYCLOAK_AUTOMATION_CLIENT_SECRET:-}
       IDENTITY_PROVIDERS_FILE: /idp/identity-providers.json
     volumes:
       - ../keycloak/setup_identity_providers.py:/setup_identity_providers.py:ro

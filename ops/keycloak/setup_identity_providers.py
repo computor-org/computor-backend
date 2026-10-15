@@ -36,6 +36,11 @@ Env:
   KEYCLOAK_REALM                target realm (default: computor)
   KEYCLOAK_ADMIN /
   KEYCLOAK_ADMIN_PASSWORD       master-realm admin credentials
+  KEYCLOAK_AUTOMATION_CLIENT_ID /
+  KEYCLOAK_AUTOMATION_CLIENT_SECRET
+                                optional master-realm service-account client
+                                (client_credentials); when both are set they are
+                                used instead of KEYCLOAK_ADMIN / _PASSWORD
   IDENTITY_PROVIDERS_FILE       providers JSON path (default: /idp/identity-providers.json)
   IDP_<NAME>_CLIENT_SECRET      one per provider, named by its "clientSecretEnv"
 """
@@ -100,6 +105,19 @@ def _parse(raw):
         return raw.decode("utf-8", "replace")
 
 
+def automation_form():
+    """client_credentials form when both automation env vars are set, else None."""
+    client_id = os.environ.get("KEYCLOAK_AUTOMATION_CLIENT_ID")
+    client_secret = os.environ.get("KEYCLOAK_AUTOMATION_CLIENT_SECRET")
+    if client_id and client_secret:
+        return {
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": client_secret,
+        }
+    return None
+
+
 def get_admin_token(base, realm_user, realm_pass, timeout_s=None, sleep=time.sleep,
                     clock=time.monotonic):
     """Obtain a master-realm admin token, retrying with exponential backoff.
@@ -110,6 +128,14 @@ def get_admin_token(base, realm_user, realm_pass, timeout_s=None, sleep=time.sle
     """
     if timeout_s is None:
         timeout_s = float(os.environ.get("IDP_SETUP_AUTH_TIMEOUT", "300"))
+    form = automation_form()
+    if form is None:
+        form = {
+            "grant_type": "password",
+            "username": realm_user,
+            "password": realm_pass,
+            "client_id": "admin-cli",
+        }
     url = f"{base}/realms/master/protocol/openid-connect/token"
     deadline = clock() + timeout_s
     delay = 2.0
@@ -120,12 +146,7 @@ def get_admin_token(base, realm_user, realm_pass, timeout_s=None, sleep=time.sle
             status, body = _request(
                 "POST",
                 url,
-                form_body={
-                    "grant_type": "password",
-                    "username": realm_user,
-                    "password": realm_pass,
-                    "client_id": "admin-cli",
-                },
+                form_body=form,
             )
         except (urllib.error.URLError, OSError) as e:
             status, body = None, f"transport error: {e}"
@@ -350,9 +371,13 @@ def main():
 
     active = [p for p in providers if p.get("enabled", True)]
 
-    if not admin or not admin_pass:
+    if (not admin or not admin_pass) and automation_form() is None:
         if active:
-            raise SystemExit("KEYCLOAK_ADMIN / KEYCLOAK_ADMIN_PASSWORD must be set")
+            raise SystemExit(
+                "KEYCLOAK_ADMIN / KEYCLOAK_ADMIN_PASSWORD or "
+                "KEYCLOAK_AUTOMATION_CLIENT_ID / KEYCLOAK_AUTOMATION_CLIENT_SECRET "
+                "must be set"
+            )
         _log("no admin credentials — skipping realm settings reconcile")
         return
 
