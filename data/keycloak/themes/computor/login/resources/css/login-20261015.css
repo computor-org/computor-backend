@@ -106,6 +106,27 @@ body.login-pf,
   text-align: center;
 }
 
+/* Keycloak emits the "* required fields" note before the title, in two grid
+   columns (col-md-12, col-md-10) that this layout does not size: the note sat
+   above an off-centre title on the registration page (issues#478). Stack the
+   title first, full width, with the note right-aligned beneath it. */
+.login-pf-header > div:not(#kc-locale) {
+  display: flex;
+  flex-direction: column-reverse;
+}
+.login-pf-header > div:not(#kc-locale) > div {
+  width: 100%;
+  float: none;
+  padding: 0;
+}
+.login-pf-header span.subtitle {
+  display: block;
+  text-align: right;
+  font-size: 0.75rem;
+  color: var(--ct-gray-600);
+  margin-top: 4px;
+}
+
 /* ---- Labels & inputs ------------------------------------------------ */
 /* PatternFly sizes form labels off --pf-global--FontSize--sm, which lands at
    12px. computor-web's form labels are 14px; match that here — this is a form
@@ -399,4 +420,9 @@ input[aria-invalid="true"]:focus,
 .checkbox label {
   color: var(--ct-gray-600);
   font-size: 0.875rem;
+}
+
+/* "« Back to login" sat directly on the Register button. */
+#kc-register-form #kc-form-options {
+  margin-bottom: 16px;
 }
