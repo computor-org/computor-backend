@@ -1,0 +1,11 @@
+[Unit]
+Description=Watch for Computor coder worker host-operation requests
+
+[Path]
+# Keep in sync with COMPUTOR_HOSTOPS_DIR (default /var/lib/computor/coder-hostops)
+# and the worker's COMPUTOR_HOSTOPS_HOST_DIR mount.
+DirectoryNotEmpty=/var/lib/computor/coder-hostops/requests
+Unit=computor-coder-hostops.service
+
+[Install]
+WantedBy=paths.target

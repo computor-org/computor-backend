@@ -30,6 +30,10 @@ jobs:
           computor-backend/src/computor_backend/tests/test_coder_forwardauth.py
           computor-backend/src/computor_backend/tests/test_coder_provision_errors.py
           computor-backend/src/computor_backend/tests/test_coder_image_cleanup.py
+          computor-backend/src/computor_backend/tests/test_coder_hostops.py
+          computor-backend/src/computor_backend/tests/test_coder_worker_docker_compose.py
+          computor-backend/src/computor_backend/tests/test_workspace_volumes.py
+          computor-backend/src/computor_backend/tests/test_workspace_slice_verification.py
           computor-backend/src/computor_backend/tests/test_coder_source_repo_pinning.py
           computor-backend/src/computor_backend/tests/test_coder_workspace_image_pinning.py
           computor-backend/src/computor_backend/tests/test_coder_template_push_deadline.py

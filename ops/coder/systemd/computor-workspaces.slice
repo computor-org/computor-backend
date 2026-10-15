@@ -3,7 +3,9 @@
 # Install on the worker (dockerd must use the systemd cgroup driver, the
 # default on cgroup v2 hosts):
 #   sudo install -m 0644 computor-workspaces.slice /etc/systemd/system/
-#   sudo systemctl daemon-reload && sudo systemctl start computor-workspaces.slice
+#   sudo systemctl daemon-reload && sudo systemctl enable --now computor-workspaces.slice
+# (enabled, so it is active after a reboot: the coder worker reads its limits
+# from the host cgroup tree and refuses a slice that does not exist yet)
 # then set CODER_WORKSPACE_CGROUP_PARENT=computor-workspaces.slice in .env and
 # re-push the templates. Per-container caps (memory, memory_swap, cpus) come
 # from the templates; this slice bounds their sum and the total task count.
@@ -26,3 +28,6 @@ CPUAccounting=yes
 CPUQuota=1200%
 TasksAccounting=yes
 TasksMax=20000
+
+[Install]
+WantedBy=slices.target

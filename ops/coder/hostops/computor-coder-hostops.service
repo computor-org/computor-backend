@@ -1,0 +1,16 @@
+[Unit]
+Description=Computor coder worker host operations (volume chown, registry GC)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/computor-coder-hostops
+ExecStart=/usr/local/sbin/computor-coder-hostops.sh
+# A chown over a large home, or a collection waiting for a push, is slow.
+TimeoutStartSec=45min
+Nice=10
+IOSchedulingClass=idle
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=yes
