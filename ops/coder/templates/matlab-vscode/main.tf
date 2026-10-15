@@ -86,6 +86,24 @@ locals {
   # Exactly ONE network: attaching both would restore egress through the
   # non-internal one (see docker-compose.coder.yaml).
   ws_net = local.internet_enabled ? var.docker_network : var.docker_network_offline
+
+  # Own child slice per workspace below a systemd slice parent (container.tf).
+  # Dashes nest systemd slices, so the workspace UUID loses its dashes.
+  workspace_cgroup_parent = var.cgroup_parent == "" ? null : (
+    endswith(var.cgroup_parent, ".slice")
+    ? "${trimsuffix(var.cgroup_parent, ".slice")}-${replace(data.coder_workspace.me.id, "-", "")}.slice"
+    : var.cgroup_parent
+  )
+
+  # Bounding set when root is enabled, found by leave-one-out tests of sudo,
+  # apt-get install, pip, chown/chmod of home files and kill: SETUID/SETGID
+  # (sudo), DAC_OVERRIDE (apt), CHOWN, FOWNER, KILL; AUDIT_WRITE keeps sudo
+  # from printing an audit error on every call. Docker's default also grants
+  # FSETID, MKNOD, NET_BIND_SERVICE, NET_RAW, SETFCAP, SETPCAP and SYS_CHROOT.
+  root_capabilities = [
+    "CAP_AUDIT_WRITE", "CAP_CHOWN", "CAP_DAC_OVERRIDE", "CAP_FOWNER",
+    "CAP_KILL", "CAP_SETGID", "CAP_SETUID",
+  ]
 }
 
 # Per-USER credential the workspace app requires and the ingress injects, so a

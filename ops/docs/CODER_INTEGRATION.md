@@ -162,12 +162,19 @@ that can be enforced is in place.
 |---|---|---|
 | RAM per workspace | `memory_mb` (default 3072, MATLAB 6144), swap off | template; always pushed explicitly |
 | CPU per workspace | `cpus` (default 2) | template; always pushed explicitly |
+| Processes per workspace | `TasksMax` of each `computor-workspaces-<id>.slice` (drop-in `computor-workspaces-.slice.d/`) | worker host |
 | Sum of all workspaces, **process count** | `MemoryMax`, `CPUQuota`, `TasksMax` of `computor-workspaces.slice` | worker host; **required** when public |
+| Capabilities | all dropped; with root, only those sudo/apt need; no-new-privileges without root | template |
 | Writable image layer | `storage_size` (overlay2 on xfs+pquota only) | template variable, opt-in |
 | Home/scratch volumes | host disk watchdog (below) | worker host |
 
 The kreuzwerker/docker provider has no per-container pids limit and dockerd has
-no default one, so the slice's `TasksMax` is the fork-bomb bound.
+no default one, so systemd supplies the fork-bomb bound. With a `.slice`
+parent, each template places its workspace in its own child slice
+`computor-workspaces-<workspace id without dashes>.slice`. The drop-in
+`ops/coder/systemd/computor-workspaces-.slice.d/50-per-workspace.conf` gives
+every child `TasksMax=4096`; the aggregate slice's `TasksMax` bounds the sum.
+Without the drop-in, a child slice is unlimited and only the aggregate applies.
 
 A slice name alone proves nothing: Docker creates an unknown slice on the fly
 with no limits. With `COMPUTOR_PUBLIC_DEPLOYMENT=true`, the coder worker starts
@@ -182,6 +189,9 @@ Install on the worker host:
 
 ```bash
 sudo install -m 0644 ops/coder/systemd/computor-workspaces.slice /etc/systemd/system/
+sudo install -d /etc/systemd/system/computor-workspaces-.slice.d
+sudo install -m 0644 ops/coder/systemd/computor-workspaces-.slice.d/50-per-workspace.conf \
+    /etc/systemd/system/computor-workspaces-.slice.d/
 sudo systemctl daemon-reload && sudo systemctl start computor-workspaces.slice
 # .env on the control plane:
 #   COMPUTOR_PUBLIC_DEPLOYMENT=true
