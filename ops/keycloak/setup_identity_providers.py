@@ -346,6 +346,38 @@ def ensure_realm_settings(base, realm, token):
     _log(f"realm '{realm}': disabled username editing")
 
 
+ACCOUNT_CONSOLE_SCOPES = ("web-origins", "openid", "profile", "roles", "email")
+
+
+def ensure_account_console_scopes(base, realm, token):
+    """Give Keycloak's built-in account-console client the realm's default
+    scopes. The realm JSON defines its own clientScopes, so the built-in
+    clients created at import get none; without `roles` the account token
+    carries no account roles and the account page fails with HTTP 403."""
+    admin = f"{base}/admin/realms/{realm}"
+    status, clients = _request("GET", f"{admin}/clients?clientId=account-console", token=token)
+    if status != 200 or not clients:
+        _log(f"realm '{realm}': no account-console client; skipping its scopes")
+        return
+    client_id = clients[0]["id"]
+    status, scopes = _request("GET", f"{admin}/client-scopes", token=token)
+    if status != 200:
+        raise RuntimeError(f"reading client scopes of '{realm}' failed: {status}")
+    by_name = {scope["name"]: scope["id"] for scope in scopes}
+    status, current = _request("GET", f"{admin}/clients/{client_id}/default-client-scopes", token=token)
+    if status != 200:
+        raise RuntimeError(f"reading account-console scopes failed: {status}")
+    have = {scope["name"] for scope in current}
+    for name in ACCOUNT_CONSOLE_SCOPES:
+        if name in have or name not in by_name:
+            continue
+        st, resp = _request("PUT", f"{admin}/clients/{client_id}/default-client-scopes/{by_name[name]}",
+                            token=token)
+        if st not in (200, 204):
+            raise RuntimeError(f"adding scope '{name}' to account-console failed: {st} {resp}")
+        _log(f"realm '{realm}': account-console default scope '{name}' added")
+
+
 def main():
     base = (
         os.environ.get("KEYCLOAK_SERVER_URL_INTERNAL")
@@ -383,6 +415,7 @@ def main():
 
     token = get_admin_token(base, admin, admin_pass)
     ensure_realm_settings(base, realm, token)
+    ensure_account_console_scopes(base, realm, token)
 
     if not active:
         _log("no enabled providers — nothing else to configure")
