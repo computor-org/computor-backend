@@ -24,7 +24,7 @@ from .permissions import (
     _check_course_family_write_permission,
     _check_organization_write_permission,
 )
-from .mentions import validate_message_mentions, _transient_message_for_targets
+from .mentions import resolve_message_mentions, validate_message_mentions, _transient_message_for_targets
 from .read_status import list_messages_with_read_status
 
 
@@ -214,8 +214,10 @@ def create_message_with_author(
     # cannot mention a user who could not see the message. The relation rows
     # are written post-persist via ``sync_message_mentions`` (the message
     # needs an id first).
+    message_like = _transient_message_for_targets(model_dump, permissions.user_id)
+    model_dump['content'] = resolve_message_mentions(message_like, model_dump.get('content'), db)
     validate_message_mentions(
-        _transient_message_for_targets(model_dump, permissions.user_id),
+        message_like,
         model_dump.get('content'),
         db,
     )
