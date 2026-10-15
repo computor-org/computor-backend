@@ -136,16 +136,21 @@ class WorkerSettings(BaseSettings):
     )
     # Old: os.environ.get("CODER_URL", coder_url)  -- same override-a-param shape.
     coder_url: Optional[str] = Field(default=None, validation_alias="CODER_URL")
-    # Registry container name, used by the image-cleanup activity to exec tag
-    # removal + garbage collection (the registry's HTTP API is unreachable from
-    # the worker network by design; see docker-compose.coder.yaml). Matches the
-    # container_name pinned there.
-    coder_registry_container: str = Field(
-        default="computor-coder-registry",
-        validation_alias="CODER_REGISTRY_CONTAINER",
-    )
     docker_socket_path: str = Field(
         default="/var/run/docker.sock", validation_alias="DOCKER_SOCKET_PATH"
+    )
+    # Docker endpoint, e.g. tcp://coder-worker-socket-proxy:2375. Takes
+    # precedence over docker_socket_path, which stays the fallback for dev
+    # setups that still mount the socket.
+    docker_host: Optional[str] = Field(default=None, validation_alias="DOCKER_HOST")
+    # Spool shared with the host-side computor-coder-hostops units (registry
+    # GC, volume-ownership repair): the operations that need a container or
+    # exec, which the worker's Docker proxy refuses. See ops/coder/hostops.
+    hostops_dir: str = Field(default="/hostops", validation_alias="COMPUTOR_HOSTOPS_DIR")
+    # The host's cgroup2 tree, bind-mounted read-only, from which the workspace
+    # slice limits are read.
+    host_cgroup_root: str = Field(
+        default="/host/sys/fs/cgroup", validation_alias="COMPUTOR_HOST_CGROUP_ROOT"
     )
 
     # --- testing backends (testing/backends.py) ---------------------------

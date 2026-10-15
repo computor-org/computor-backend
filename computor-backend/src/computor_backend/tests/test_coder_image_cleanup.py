@@ -4,8 +4,8 @@ Every build+push run mints a fresh ``vYYYYMMDD-HHMMSS`` tag, so the build
 host's docker daemon and the local registry accumulated one image generation
 per rebuild (multi-GB for the MATLAB templates). The cleanup activity keeps
 ``:latest`` plus the IMAGE_VERSIONS_TO_KEEP newest versioned tags per repo and
-removes the rest — locally by untagging, in the registry via exec'd tag-dir
-removal + garbage collection.
+removes the rest — locally by untagging, in the registry by asking the host's
+computor-coder-hostops units for tag-dir removal + garbage collection.
 """
 
 import json
@@ -56,6 +56,37 @@ def _write_manifest(tmp_path, key, image_name):
     )
 
 
+def _settings():
+    settings = MagicMock()
+    settings.coder_registry_host = None
+    settings.docker_host = None
+    settings.docker_socket_path = "/var/run/docker.sock"
+    return settings
+
+
+def _run_cleanup(tmp_path, client, answer):
+    """Run the activity with a faked docker client and host answer; return
+    (result, the request the host was sent)."""
+    docker_mod = MagicMock()
+    docker_mod.DockerClient.return_value = client
+    sent = {}
+
+    def submit(action, fields, timeout, heartbeat=None):
+        sent["action"], sent["fields"] = action, fields
+        return answer
+
+    with patch.dict(sys.modules, {"docker": docker_mod}), patch(
+        "computor_backend.tasks.temporal_coder_setup.get_worker_settings",
+        return_value=_settings(),
+    ), patch(
+        "computor_backend.tasks.temporal_coder_setup.coder_hostops.submit", submit
+    ):
+        result = cleanup_stale_workspace_images(
+            ["vscode"], str(tmp_path), "localhost:5000"
+        )
+    return result, sent
+
+
 def test_cleanup_prunes_local_and_registry(tmp_path):
     _write_manifest(tmp_path, "vscode", "computor-workspace-vscode")
     repo = "localhost:5000/computor-workspace-vscode"
@@ -67,47 +98,29 @@ def test_cleanup_prunes_local_and_registry(tmp_path):
         _image([f"{repo}:v20260713-092229"]),
         _image([f"{repo}:v20260710-185325"]),
     ]
-    registry = MagicMock()
-    tags_dir = (
-        "/var/lib/registry/docker/registry/v2/repositories/"
-        "computor-workspace-vscode/_manifests/tags"
-    )
-    registry.exec_run.side_effect = [
-        (0, b"latest\nv20260710-185325\nv20260713-092229\n"
-            b"v20260714-223158\nv20260714-225625\n"),  # ls
-        (0, b""),                                       # rm -rf
-        (0, b"blob eligible for deletion\n"),           # garbage-collect
-    ]
-    client.containers.get.return_value = registry
-
-    docker_mod = MagicMock()
-    docker_mod.DockerClient.return_value = client
-    settings = MagicMock()
-    settings.coder_registry_host = None
-    settings.docker_socket_path = "/var/run/docker.sock"
-    settings.coder_registry_container = "computor-coder-registry"
-
-    with patch.dict(sys.modules, {"docker": docker_mod}), patch(
-        "computor_backend.tasks.temporal_coder_setup.get_worker_settings",
-        return_value=settings,
-    ):
-        result = cleanup_stale_workspace_images(
-            ["vscode"], str(tmp_path), "localhost:5000"
-        )
+    stale = ["v20260713-092229", "v20260710-185325"]
+    answer = {
+        "status": "ok",
+        "removed": [f"computor-workspace-vscode:{t}" for t in stale]
+        + ["someone-else:v20260101-000000"],
+        "gc": "exit=0: blob eligible for deletion",
+    }
+    result, sent = _run_cleanup(tmp_path, client, answer)
 
     assert result["success"] is True
     # The two oldest versioned tags go; :latest and the newest two survive.
-    stale = ["v20260713-092229", "v20260710-185325"]
     assert result["removed_local"] == {"computor-workspace-vscode": stale}
+    # Only repos this run asked about are reported back.
     assert result["removed_registry"] == {"computor-workspace-vscode": stale}
+    assert result["gc"] == "exit=0: blob eligible for deletion"
     removed = [c.kwargs["image"] for c in client.images.remove.call_args_list]
     assert removed == [f"{repo}:{t}" for t in stale]
-
-    rm_call = registry.exec_run.call_args_list[1].args[0]
-    assert rm_call[:2] == ["rm", "-rf"]
-    assert set(rm_call[2:]) == {f"{tags_dir}/{t}" for t in stale}
-    gc_call = registry.exec_run.call_args_list[2].args[0]
-    assert gc_call[:2] == ["registry", "garbage-collect"]
+    # The registry part is the host's job now: no exec, no container lookup.
+    client.containers.get.assert_not_called()
+    assert sent["action"] == "registry-gc"
+    assert sent["fields"] == [
+        ("keep", str(IMAGE_VERSIONS_TO_KEEP)), ("repo", "computor-workspace-vscode"),
+    ]
 
 
 def test_cleanup_keeps_in_use_images_and_never_raises(tmp_path):
@@ -123,26 +136,12 @@ def test_cleanup_keeps_in_use_images_and_never_raises(tmp_path):
         _image([f"{repo}:v20260710-185325"]),
     ]
     client.images.remove.side_effect = Exception("409 image is in use")
-    client.containers.get.side_effect = Exception("no such container")
-
-    docker_mod = MagicMock()
-    docker_mod.DockerClient.return_value = client
-    settings = MagicMock()
-    settings.coder_registry_host = None
-    settings.docker_socket_path = "/var/run/docker.sock"
-    settings.coder_registry_container = "computor-coder-registry"
-
-    with patch.dict(sys.modules, {"docker": docker_mod}), patch(
-        "computor_backend.tasks.temporal_coder_setup.get_worker_settings",
-        return_value=settings,
-    ):
-        result = cleanup_stale_workspace_images(
-            ["vscode"], str(tmp_path), "localhost:5000"
-        )
+    answer = {"status": "error", "message": "host operations are not set up"}
+    result, _ = _run_cleanup(tmp_path, client, answer)
 
     assert result["removed_local"] == {}
     assert len(result["skipped_in_use"]) == 1
-    # Registry container unavailable is reported, not raised.
+    # A host that does not answer is reported, not raised.
     assert result["success"] is False
-    assert any("unavailable" in e for e in result["errors"])
+    assert any("not set up" in e for e in result["errors"])
     assert IMAGE_VERSIONS_TO_KEEP == 2  # retention contract the tests encode

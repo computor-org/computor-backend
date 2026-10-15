@@ -130,7 +130,8 @@ def test_concurrent_builds_each_pin_their_own_image(tmp_path, monkeypatch):
             tcs,
             "get_worker_settings",
             lambda: SimpleNamespace(
-                coder_registry_host=None, docker_socket_path="/var/run/docker.sock"
+                coder_registry_host=None, docker_host=None,
+                docker_socket_path="/var/run/docker.sock",
             ),
         )
         # The race window: stall every build right after it finishes, so the

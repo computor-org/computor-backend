@@ -269,9 +269,11 @@ If Coder fails to start:
 4. **HTTPS** is expected to be terminated upstream (e.g. nginx in front of
    Traefik:8080). No TLS inside the compose stack.
 5. **Docker socket** is exposed read-only to Traefik via `tecnativa/docker-socket-proxy`
-   in production (dev mounts the socket directly). Coder and `temporal-worker-coder`
-   need RW socket access for container provisioning and image builds; both run
-   with `no-new-privileges`.
+   in production (dev mounts the socket directly). `temporal-worker-coder` uses
+   its own allowlist proxy (`coder-worker-socket-proxy`: builds, image push and
+   volume inspect/delete, no container create or exec; see
+   `ops/docs/CODER_INTEGRATION.md`). Coder still needs RW socket access for
+   container provisioning and runs with `no-new-privileges`.
 6. **Coder registry isolation:** `coder-registry` is deliberately left off the
    `computor-network`, so workspace containers (which DO live on that network)
    can't reach it over TCP. The host docker daemon talks to it via the

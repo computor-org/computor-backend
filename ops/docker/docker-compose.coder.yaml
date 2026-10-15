@@ -212,6 +212,31 @@ services:
       timeout: 5s
       retries: 5
 
+  # Docker API for temporal-worker-coder: a fixed method+path allowlist (build,
+  # image tag/push/inspect/untag, distribution inspect, volume inspect/delete,
+  # system df). No container create or exec, so the worker no longer holds a
+  # root-equivalent socket. The rules are in haproxy.cfg.template; the env
+  # switches of the upstream image are not consulted by it. Reachable only on
+  # the internal coder-worker-docker network.
+  coder-worker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0@sha256:9e4b9e7517a6b660f2cc903a19b257b1852d5b3344794e3ea334ff00ae677ac2
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-worker-socket-proxy
+    networks:
+      - coder-worker-docker
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    volumes:
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
+      - ./coder-worker-socket-proxy/haproxy.cfg.template:/usr/local/etc/haproxy/haproxy.cfg.template:ro
+    labels:
+      - "traefik.enable=false"
+
   # Temporal worker for Coder tasks (image building, template pushing)
   # Triggered via API endpoints: POST /coder/admin/images/build, POST /coder/admin/templates/push
   temporal-worker-coder:
@@ -219,8 +244,6 @@ services:
     build:
       context: ../../
       dockerfile: ./docker/temporal-worker-coder/Dockerfile
-    networks:
-      - computor-network
     restart: unless-stopped
     # Must be >= TEMPORAL_GRACEFUL_SHUTDOWN_SECONDS (default 300s), or Docker
     # SIGKILLs the worker while it is still draining a live run.
@@ -232,12 +255,18 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
+    networks:
+      - computor-network
+      - coder-worker-docker
     volumes:
-      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
       - ${SYSTEM_DEPLOYMENT_PATH}/coder/templates:/templates:ro
-    group_add:
-      - "${DOCKER_GID}"
+      # Spool for the host-side operations (volume chown, registry GC):
+      # install ops/coder/hostops on this host first.
+      - ${COMPUTOR_HOSTOPS_HOST_DIR:-/var/lib/computor/coder-hostops}:/hostops
+      # Host cgroup2 tree, read-only: the workspace slice limits are read here.
+      - /sys/fs/cgroup:/host/sys/fs/cgroup:ro
     environment:
+      DOCKER_HOST: tcp://coder-worker-socket-proxy:2375
       TEMPORAL_HOST: temporal
       TEMPORAL_PORT: 7233
       CODER_URL: http://coder:7080
@@ -246,11 +275,11 @@ services:
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
       CODER_TEMPLATES_DIR: /templates
       # localhost:5000 (not coder-registry:5000): the worker calls the host
-      # docker daemon via the socket, so this name is resolved from the daemon's
+      # docker daemon via the proxy, so this name is resolved from the daemon's
       # perspective. localhost:5000 reaches the registry's port binding and is
       # also auto-treated by docker as an insecure (HTTP) registry, so no TLS.
       CODER_REGISTRY_HOST: localhost:5000
-      # This worker talks to Coder, the docker socket and the registry, and for
+      # This worker talks to Coder, the docker proxy and the registry, and for
       # a long time to nothing else. Rolling workspaces onto a new template
       # version broke that: it reissues each owner's workspace app credential,
       # whose key version lives in the database. Without these the backend's
@@ -278,7 +307,7 @@ services:
       # app secrets, which this worker's Coder admin login can read anyway.
       TOKEN_SECRET: ${TOKEN_SECRET:?must be set in .env}
       # Public deployments: push/rollout verify the workspace slice's real
-      # memory/cpu/pids limits through this worker's docker socket first.
+      # memory/cpu/pids limits first, read from the host cgroup mount above.
       COMPUTOR_PUBLIC_DEPLOYMENT: ${COMPUTOR_PUBLIC_DEPLOYMENT:-false}
       PUBLIC_TEST_MAX_INFLIGHT: ${PUBLIC_TEST_MAX_INFLIGHT:-100}
       CODER_WORKSPACE_CGROUP_PARENT: ${CODER_WORKSPACE_CGROUP_PARENT:-}
@@ -290,8 +319,15 @@ services:
     depends_on:
       coder:
         condition: service_healthy
+      coder-worker-socket-proxy:
+        condition: service_started
 
 networks:
+  # temporal-worker-coder <-> coder-worker-socket-proxy only. Internal: the
+  # proxy needs no egress, and no other service can reach the Docker API.
+  coder-worker-docker:
+    internal: true
+
   # Isolated bridge for Coder workspace containers. Workspaces are untrusted, so
   # they must NOT share computor-network with the platform's databases, IdP
   # (Keycloak), object store (MinIO), Redis, Temporal, etc. Only Traefik

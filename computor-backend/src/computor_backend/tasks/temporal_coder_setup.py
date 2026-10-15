@@ -27,6 +27,7 @@ from temporalio import activity, workflow
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError
 
+from . import coder_hostops
 from .registry import register_task
 from .temporal_base import BaseWorkflow, WorkflowResult
 from .worker_settings import get_worker_settings
@@ -46,7 +47,29 @@ IMAGE_VERSIONS_TO_KEEP = 2
 # chronological.
 _VERSION_TAG_RE = re.compile(r"^v\d{8}-\d{6}(-[0-9a-f]{6})?$")
 
-_REGISTRY_REPO_ROOT = "/var/lib/registry/docker/registry/v2/repositories"
+# How long the cleanup / repair activities wait for the host's answer. Below
+# their start_to_close timeouts (10 and 5 minutes) so the activity reports the
+# stall instead of being cancelled.
+HOSTOPS_GC_TIMEOUT_SECONDS = 8 * 60
+HOSTOPS_REPAIR_TIMEOUT_SECONDS = 4 * 60
+
+
+def _heartbeat_if_in_activity() -> None:
+    if activity.in_activity():
+        activity.heartbeat()
+
+
+def _docker_client():
+    """Docker client for the configured endpoint.
+
+    DOCKER_HOST (tcp://coder-worker-socket-proxy:2375 in compose) wins; the
+    unix socket path is the fallback for setups that still mount the socket.
+    """
+    import docker as docker_sdk
+
+    settings = get_worker_settings()
+    base_url = settings.docker_host or "unix://" + settings.docker_socket_path
+    return docker_sdk.DockerClient(base_url=base_url)
 
 
 def _stale_version_tags(tags: List[str]) -> List[str]:
@@ -277,7 +300,7 @@ def build_workspace_image(
     )
 
     try:
-        client = docker_sdk.DockerClient(base_url="unix://" + settings.docker_socket_path)
+        client = _docker_client()
 
         # Stream the build instead of images.build(), which blocks until the
         # whole build is done: a cold MATLAB build runs longer than any sane
@@ -312,15 +335,19 @@ def build_workspace_image(
             client.api.tag(image_id, repo, tag=t)
 
         # Push every tag, streaming for the same heartbeat reason — a multi-GB
-        # MATLAB layer push is minutes on its own.
-        for t in push_tags:
-            for push_chunk in client.images.push(repo, tag=t, stream=True, decode=True):
-                activity.heartbeat()
-                if push_chunk.get("error"):
-                    raise RuntimeError(
-                        f"push failed for {repo}:{t}: {push_chunk['error']}"
-                    )
-            logger.info(f"Pushed {repo}:{t}")
+        # MATLAB layer push is minutes on its own. The shared lock keeps the
+        # host's registry garbage collection from running mid-push.
+        with coder_hostops.registry_push_lock(heartbeat=activity.heartbeat):
+            for t in push_tags:
+                for push_chunk in client.images.push(
+                    repo, tag=t, stream=True, decode=True
+                ):
+                    activity.heartbeat()
+                    if push_chunk.get("error"):
+                        raise RuntimeError(
+                            f"push failed for {repo}:{t}: {push_chunk['error']}"
+                        )
+                logger.info(f"Pushed {repo}:{t}")
 
         # The digest the template version pins is the one the daemon recorded
         # for pushing this image ID to this repo (RepoDigests) — not a lookup
@@ -369,10 +396,11 @@ def cleanup_stale_workspace_images(
 
     * on the host daemon by untagging — an image whose last tag is held by a
       container docker refuses to delete, so in-use images survive;
-    * in the registry by removing stale tag directories via exec in the
-      registry container (its HTTP API is unreachable from the worker — the
-      registry is deliberately network-isolated), then one
-      ``registry garbage-collect --delete-untagged`` pass to reclaim blobs.
+    * in the registry by the host's computor-coder-hostops units, which
+      remove the stale tag directories and run one
+      ``registry garbage-collect --delete-untagged`` pass to reclaim blobs
+      (the registry is deliberately network-isolated, and the worker's Docker
+      proxy refuses exec).
 
     Only safe once template pushes have re-pinned every processed template to
     this run's tag, and while no other build is pushing (GC racing a push can
@@ -382,8 +410,6 @@ def cleanup_stale_workspace_images(
     BLOCKING activity (docker SDK), plain ``def`` for the worker thread pool.
     Best-effort by design: always returns a result dict, never raises.
     """
-    import docker as docker_sdk
-
     settings = get_worker_settings()
     if settings.coder_registry_host is not None:
         registry_host = settings.coder_registry_host
@@ -399,7 +425,7 @@ def cleanup_stale_workspace_images(
     errors: List[str] = []
 
     try:
-        client = docker_sdk.DockerClient(base_url="unix://" + settings.docker_socket_path)
+        client = _docker_client()
     except Exception as e:
         return {"success": False, "error": f"docker connect failed: {e}"}
 
@@ -424,43 +450,27 @@ def cleanup_stale_workspace_images(
             except Exception as e:
                 skipped.append(f"{repo}:{tag}: {e}")
 
-    # Registry: drop stale tag references, then garbage-collect blobs.
+    # Registry: the host drops stale tag references and garbage-collects
+    # blobs (computor-coder-hostops). The worker's Docker proxy refuses the
+    # exec this used to be, and the registry's HTTP API is unreachable from
+    # here by design. Waiting for the answer keeps this the last step of the
+    # push workflow; registry.lock keeps a later push out of the collection.
     gc_summary = None
-    try:
-        registry = client.containers.get(settings.coder_registry_container)
-    except Exception as e:
-        registry = None
-        errors.append(
-            f"registry container {settings.coder_registry_container!r} unavailable: {e}"
+    if image_names:
+        answer = coder_hostops.submit(
+            "registry-gc",
+            [("keep", str(IMAGE_VERSIONS_TO_KEEP))]
+            + [("repo", name) for name in image_names],
+            timeout=HOSTOPS_GC_TIMEOUT_SECONDS,
+            heartbeat=_heartbeat_if_in_activity,
         )
-
-    if registry is not None:
-        stale_dirs = []
-        for name in image_names:
-            tags_dir = f"{_REGISTRY_REPO_ROOT}/{name}/_manifests/tags"
-            code, out = registry.exec_run(["ls", "-1", tags_dir])
-            if code != 0:
-                continue  # repo not (yet) in the registry
-            for tag in _stale_version_tags(out.decode(errors="replace").split()):
-                stale_dirs.append(f"{tags_dir}/{tag}")
+        for entry in answer.get("removed") or []:
+            name, _, tag = str(entry).rpartition(":")
+            if name in image_names and tag:
                 removed_registry.setdefault(name, []).append(tag)
-        if stale_dirs:
-            code, out = registry.exec_run(["rm", "-rf", *stale_dirs])
-            if code != 0:
-                errors.append(
-                    f"registry tag removal failed: {out.decode(errors='replace')[:300]}"
-                )
-            else:
-                # Removing a tag dir only unlinks the reference; GC deletes the
-                # now-untagged manifests and any blobs no manifest uses.
-                code, out = registry.exec_run(
-                    ["registry", "garbage-collect", "--delete-untagged",
-                     "/etc/docker/registry/config.yml"]
-                )
-                tail = out.decode(errors="replace").strip().splitlines()[-3:]
-                gc_summary = f"exit={code}: " + " | ".join(tail)
-                if code != 0:
-                    errors.append(f"registry GC failed: {gc_summary}")
+        gc_summary = str(answer.get("gc") or "") or None
+        if answer.get("status") != "ok":
+            errors.append(f"registry cleanup: {answer.get('message') or 'failed'}")
 
     result = {
         "success": not errors,
@@ -483,9 +493,7 @@ def _registry_digest(repo: str, tag: str) -> str:
     """
     import docker as docker_sdk
 
-    client = docker_sdk.DockerClient(
-        base_url="unix://" + get_worker_settings().docker_socket_path
-    )
+    client = _docker_client()
     try:
         return client.images.get_registry_data(f"{repo}:{tag}").id
     finally:
@@ -1505,18 +1513,13 @@ async def discover_template_operations(
 # departed user's home was unreclaimable, sizes invisible, and files a
 # root-enabled workspace left behind unfixable once root was switched off.
 #
-# These run here rather than in the backend because only this worker has the
-# docker socket. Same shape as the image-cleanup activity: blocking, plain def,
+# These run here rather than in the backend because only this worker has
+# Docker access (through its allowlist proxy) and the host-operations spool. Same shape as the image-cleanup activity: blocking, plain def,
 # best-effort, always returns a dict.
 # ---------------------------------------------------------------------------
 
 HOME_VOLUME_PREFIX = "coder-home-"
 SCRATCH_VOLUME_PREFIX = "coder-scratch-"
-
-# Small image used to fix ownership from outside the workspace. Pulled on first
-# use if the daemon does not have it.
-REPAIR_IMAGE = "alpine:3"
-
 
 def _is_workspace_volume(name: str) -> bool:
     return name.startswith(HOME_VOLUME_PREFIX) or name.startswith(SCRATCH_VOLUME_PREFIX)
@@ -1534,7 +1537,7 @@ def list_workspace_volumes() -> Dict[str, Any]:
 
     settings = get_worker_settings()
     try:
-        client = docker_sdk.DockerClient(base_url="unix://" + settings.docker_socket_path)
+        client = _docker_client()
     except Exception as e:
         return {"success": False, "error": f"docker connect failed: {e}", "volumes": []}
 
@@ -1593,7 +1596,7 @@ def delete_workspace_volume(name: str) -> Dict[str, Any]:
 
     settings = get_worker_settings()
     try:
-        client = docker_sdk.DockerClient(base_url="unix://" + settings.docker_socket_path)
+        client = _docker_client()
         client.volumes.get(name).remove()
     except Exception as e:
         message = str(e)
@@ -1610,28 +1613,41 @@ def delete_workspace_volume(name: str) -> Dict[str, Any]:
 # per-container pids limit, so the systemd slice every workspace is placed in
 # (Terraform cgroup_parent) is the process-count and aggregate bound. Docker
 # silently creates a missing slice with NO limits, so a configured name proves
-# nothing: a throwaway container is started in the slice with the host cgroup
-# namespace and reads the slice's own memory.max / cpu.max / pids.max.
-_SLICE_CHECK_SCRIPT = (
-    'c=$(sed -n "s/^0:://p" /proc/self/cgroup); '
-    'd=/sys/fs/cgroup$(dirname "$c"); '
-    'echo "path=$(dirname "$c")"; '
-    'for f in memory.max cpu.max pids.max; do '
-    'echo "$f=$(cat "$d/$f" 2>/dev/null || echo missing)"; done'
-)
+# nothing: the slice's own memory.max / cpu.max / pids.max are read from the
+# host's cgroup2 tree, bind-mounted read-only into this worker (it used to
+# start a probe container in the slice, which the worker's Docker proxy no
+# longer allows).
+_SLICE_LIMIT_FILES = ("memory.max", "cpu.max", "pids.max")
+_SLICE_UNIT_RE = re.compile(r"^[A-Za-z0-9_.:\\]+(-[A-Za-z0-9_.:\\]+)*\.slice$")
 
 
 def public_deployment() -> bool:
     return os.environ.get("COMPUTOR_PUBLIC_DEPLOYMENT", "").strip().lower() == "true"
 
 
-def parse_slice_limits(output: str) -> Dict[str, Any]:
-    """Judge the check container's output. Fails closed on anything unexpected."""
-    values: Dict[str, str] = {}
-    for line in output.splitlines():
-        if "=" in line:
-            key, value = line.split("=", 1)
-            values[key.strip()] = value.strip()
+def slice_cgroup_path(cgroup_parent: str) -> Optional[str]:
+    """Cgroup path of Docker's ``cgroup_parent`` under the systemd driver.
+
+    systemd nests a slice under every dash prefix of its name:
+    ``a-b.slice`` lives at ``/a.slice/a-b.slice``. An absolute path is taken
+    as given (cgroupfs driver). Anything else, or a path escaping the root,
+    yields None.
+    """
+    if cgroup_parent.startswith("/"):
+        parts = [p for p in cgroup_parent.split("/") if p]
+        if not parts or any(p in (".", "..") for p in parts):
+            return None
+        return "/" + "/".join(parts)
+    if not _SLICE_UNIT_RE.match(cgroup_parent):
+        return None
+    pieces = cgroup_parent[: -len(".slice")].split("-")
+    return "/" + "/".join(
+        "-".join(pieces[: i + 1]) + ".slice" for i in range(len(pieces))
+    )
+
+
+def judge_slice_limits(values: Dict[str, str]) -> Dict[str, Any]:
+    """Judge a slice's limit values. Fails closed on anything unexpected."""
     problems = []
     path = values.get("path", "")
     if not path or path in ("/", "."):
@@ -1652,10 +1668,31 @@ def parse_slice_limits(output: str) -> Dict[str, Any]:
     }
 
 
+def parse_slice_limits(output: str) -> Dict[str, Any]:
+    """Judge ``key=value`` slice output (path, memory.max, cpu.max, pids.max)."""
+    values: Dict[str, str] = {}
+    for line in output.splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip()
+    return judge_slice_limits(values)
+
+
+def read_slice_limits(cgroup_root: str, cgroup_path: str) -> Dict[str, str]:
+    """Read the slice's limit files below the mounted host cgroup root."""
+    directory = os.path.join(cgroup_root, cgroup_path.lstrip("/"))
+    values = {"path": cgroup_path}
+    for name in _SLICE_LIMIT_FILES:
+        try:
+            with open(os.path.join(directory, name), encoding="ascii") as fh:
+                values[name] = fh.read(256).strip()
+        except OSError:
+            values[name] = "missing"
+    return values
+
+
 def verify_workspace_slice_limits(cgroup_parent: Optional[str] = None) -> Dict[str, Any]:
     """Verify the configured workspace slice has memory, CPU and pids limits."""
-    import docker as docker_sdk
-
     cgroup_parent = (
         cgroup_parent
         if cgroup_parent is not None
@@ -1663,23 +1700,30 @@ def verify_workspace_slice_limits(cgroup_parent: Optional[str] = None) -> Dict[s
     ).strip()
     if not cgroup_parent:
         return {"success": False, "limits": {}, "error": "CODER_WORKSPACE_CGROUP_PARENT is not set"}
-    settings = get_worker_settings()
-    try:
-        client = docker_sdk.DockerClient(base_url="unix://" + settings.docker_socket_path)
-        output = client.containers.run(
-            REPAIR_IMAGE,
-            command=["sh", "-c", _SLICE_CHECK_SCRIPT],
-            cgroup_parent=cgroup_parent,
-            cgroupns="host",
-            remove=True,
-            network_disabled=True,
-            read_only=True,
-        )
-    except Exception as e:  # noqa: BLE001 - any failure means "not verified"
-        return {"success": False, "limits": {}, "error": f"slice check failed: {e}"}
-    if isinstance(output, bytes):
-        output = output.decode("utf-8", "replace")
-    result = parse_slice_limits(output)
+    cgroup_path = slice_cgroup_path(cgroup_parent)
+    if cgroup_path is None:
+        return {
+            "success": False, "limits": {}, "cgroup_parent": cgroup_parent,
+            "error": f"'{cgroup_parent}' is neither a systemd slice name nor a cgroup path",
+        }
+    cgroup_root = get_worker_settings().host_cgroup_root
+    if not os.path.isfile(os.path.join(cgroup_root, "cgroup.controllers")):
+        return {
+            "success": False, "limits": {}, "cgroup_parent": cgroup_parent,
+            "error": (
+                f"host cgroup2 tree is not mounted at {cgroup_root} "
+                "(bind /sys/fs/cgroup read-only into the coder worker)"
+            ),
+        }
+    if not os.path.isdir(os.path.join(cgroup_root, cgroup_path.lstrip("/"))):
+        return {
+            "success": False, "limits": {"path": cgroup_path}, "cgroup_parent": cgroup_parent,
+            "error": (
+                f"workspace slice '{cgroup_parent}' is not active on the host "
+                f"(no {cgroup_path}); systemctl enable --now {cgroup_parent}"
+            ),
+        }
+    result = judge_slice_limits(read_slice_limits(cgroup_root, cgroup_path))
     result["cgroup_parent"] = cgroup_parent
     if result["error"]:
         result["error"] = f"workspace slice '{cgroup_parent}' is not limited: {result['error']}"
@@ -1710,24 +1754,21 @@ def repair_volume_ownership(name: str) -> Dict[str, Any]:
     home. Once the template's root is switched off nothing inside the workspace
     can chown them, so the user is left with directories they cannot write and,
     in the MATLAB templates, a startup that aborts on them.
-    """
-    import docker as docker_sdk
 
+    The chown runs on the host (computor-coder-hostops): it needs a container
+    with the volume mounted, which the worker's Docker proxy refuses.
+    """
     if not _is_workspace_volume(name):
         return {"success": False, "error": f"'{name}' is not a workspace volume"}
 
-    settings = get_worker_settings()
-    try:
-        client = docker_sdk.DockerClient(base_url="unix://" + settings.docker_socket_path)
-        client.containers.run(
-            REPAIR_IMAGE,
-            command=["chown", "-R", "1000:1000", "/vol"],
-            volumes={name: {"bind": "/vol", "mode": "rw"}},
-            remove=True,
-            network_disabled=True,
-        )
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+    answer = coder_hostops.submit(
+        "chown-volume",
+        [("volume", name)],
+        timeout=HOSTOPS_REPAIR_TIMEOUT_SECONDS,
+        heartbeat=_heartbeat_if_in_activity,
+    )
+    if answer.get("status") != "ok":
+        return {"success": False, "error": str(answer.get("message") or "repair failed")}
     return {"success": True, "message": f"Ownership of '{name}' reset to uid 1000"}
 
 
