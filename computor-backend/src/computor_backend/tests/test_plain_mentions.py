@@ -31,6 +31,8 @@ def test_each_plain_alias_resolves(alias):
     "mail@lena", "mail@lena.example", r"\@lena", "`@lena`", "``@lena `code` ``",
     "```python\n@lena\n```", "~~~\n@lena\n~~~", "    @lena", "\t@lena",
     "@lena@example.org", f"@[Luna Tutor]({TUTOR})",
+    "see https://medium.com/@ai now", "<https://example.org/@lena>",
+    "www.example.org/@luna", "docs/@ai",
 ])
 def test_literals_do_not_resolve_or_lookup(content):
     lookup = MagicMock()
@@ -42,6 +44,12 @@ def test_prose_after_code_and_punctuation_resolve():
     content = "```\n@luna\n```\nPlease ask (@ai), then @lena."
     result = resolve_plain_mentions(content, lambda name: (TUTOR, "Lena Tutor"))
     assert result == f"```\n@luna\n```\nPlease ask ({TOKEN}), then {TOKEN}."
+
+
+def test_lookup_key_matches_sql_lower_not_casefold():
+    seen = []
+    resolve_plain_mentions("@Strauß", lambda name: seen.append(name))
+    assert seen == ["strauß"]
 
 
 def test_unknown_and_substring_tokens_stay_plain():
@@ -122,6 +130,17 @@ def test_autocomplete_aliases_offer_one_canonical_tutor(audience_db, query):
 def test_exact_tutor_handle_cannot_be_crowded_out_by_same_named_humans(audience_db):
     users = mentions.list_mentionable_users(None, audience_db, search="lena", limit=1)
     assert [str(user.id) for user in users] == [TUTOR]
+
+
+def test_exact_tutor_handle_keeps_same_named_humans_selectable(audience_db):
+    users = mentions.list_mentionable_users(None, audience_db, search="lena")
+    assert [str(user.id) for user in users] == [TUTOR, HUMAN]
+
+
+def test_unconfigured_tutor_does_not_hide_human_names(audience_db, monkeypatch):
+    monkeypatch.setattr(mentions.settings, "TUTOR_AGENT_USER_ID", None)
+    users = mentions.list_mentionable_users(None, audience_db, search="lena")
+    assert [str(user.id) for user in users] == [HUMAN]
 
 
 def test_create_and_reply_normalize_content_after_resolving_scope(audience_db, monkeypatch):

@@ -4,8 +4,11 @@ from collections.abc import Callable
 
 
 TUTOR_ALIASES = ("lena", "luna", "ai")
-TOKEN = re.compile(r"(?<![\w@.+-])@([\w][\w.-]*)", re.UNICODE)
+# A handle never continues a word, address or path (``a/@ai``, ``x@ai``).
+TOKEN = re.compile(r"(?<![\w@.+/-])@([\w][\w.-]*)", re.UNICODE)
 STRUCTURED = re.compile(r"@\[[^\]]*\]\([0-9a-fA-F-]{36}\)")
+# Bare and autolinked URLs, e.g. https://medium.com/@ai, stay literal.
+URL = re.compile(r"(?:\b[a-zA-Z][a-zA-Z0-9+.-]*://|\bwww\.)[^\s<>]*")
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
 
 
@@ -41,6 +44,8 @@ def prose_mask(content: str) -> list[bool]:
         last = ticks[end].end()
         mask[start.start():last] = [False] * (last - start.start())
         i = end + 1
+    for match in URL.finditer(content):
+        mask[match.start():match.end()] = [False] * len(match[0])
     for match in STRUCTURED.finditer(content):
         mask[match.start():match.end()] = [False] * len(match[0])
     return mask
@@ -68,7 +73,8 @@ def resolve_plain_mentions(content: str, lookup: Callable[[str], tuple[str, str]
         trailing = match[1][len(name):]
         if not name or (match.end() < len(content) and content[match.end()] == "@"):
             return match[0]
-        target = lookup(name.casefold())
+        # lower(), not casefold(): the SQL lookup compares with lower().
+        target = lookup(name.lower())
         if target is None:
             return match[0]
         user_id, display = target
