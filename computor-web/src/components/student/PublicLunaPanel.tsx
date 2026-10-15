@@ -46,7 +46,7 @@ export default function PublicLunaPanel({ assignmentId }: { assignmentId: string
         }
       } catch {
         if (active) {
-          setError('Luna request expired or unavailable. Try again.');
+          setError('Lena request expired or unavailable. Try again.');
           setBusy(false);
           setJobId(null);
           window.sessionStorage.removeItem(jobKey(assignmentId));
@@ -72,14 +72,14 @@ export default function PublicLunaPanel({ assignmentId }: { assignmentId: string
       setResult({ state: 'queued' });
     } catch (cause) {
       setBusy(false);
-      setError(cause instanceof Error ? cause.message : 'Luna is unavailable.');
+      setError(cause instanceof Error ? cause.message : 'Lena is unavailable.');
     }
   }
 
   if (!course?.public || !available) return null;
 
   return (
-    <SectionCard title="Ask Luna (AI tutor)">
+    <SectionCard title="Ask Lena (AI tutor)">
       <form onSubmit={submit} className="space-y-3">
         <label className="block text-sm font-medium text-body" htmlFor="luna-question">Question</label>
         <textarea
@@ -102,12 +102,12 @@ export default function PublicLunaPanel({ assignmentId }: { assignmentId: string
           value={submittedText}
           onChange={(event) => setSubmittedText(event.target.value)}
         />
-        <Button type="submit" loading={busy} loadingLabel="Waiting for Luna…">Ask Luna</Button>
+        <Button type="submit" loading={busy} loadingLabel="Waiting for Lena…">Ask Lena</Button>
       </form>
       {error && <p role="alert" className="mt-3 text-sm text-danger-text">{error}</p>}
       {result?.state === 'queued' && <p className="mt-3 text-sm text-muted">Queued</p>}
-      {result?.state === 'running' && <p className="mt-3 text-sm text-muted">Luna is answering…</p>}
-      {result?.state === 'failed' && <p className="mt-3 text-sm text-muted">Luna could not answer. Try again.</p>}
+      {result?.state === 'running' && <p className="mt-3 text-sm text-muted">Lena is answering…</p>}
+      {result?.state === 'failed' && <p className="mt-3 text-sm text-muted">Lena could not answer. Try again.</p>}
       {result?.state === 'done' && (
         <div className="mt-3">
           <LunaAnswer answer={result.answer} />

@@ -1,5 +1,6 @@
 import os
 import threading
+from uuid import UUID
 
 class BackendSettings:
     _instance = None
@@ -27,6 +28,10 @@ class BackendSettings:
         # Bootstrap admin: provisioned in Keycloak on startup (email is the username).
         self.API_ADMIN_EMAIL = os.environ.get("API_ADMIN_EMAIL", None)
         self.API_ADMIN_PASSWORD = os.environ.get("API_ADMIN_PASSWORD", None)
+
+        # Existing tutor identity: names and legacy aliases never select a human.
+        tutor_id = os.environ.get("TUTOR_AGENT_USER_ID")
+        self.TUTOR_AGENT_USER_ID = str(UUID(tutor_id)) if tutor_id else None
 
         # GDPR consent gate (middleware/consent.py). The gate is additionally
         # inactive while no policy_versions row is effective, so this flag is

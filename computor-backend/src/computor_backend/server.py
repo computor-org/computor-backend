@@ -397,7 +397,7 @@ origins = [
 
 # Middleware order (last added = outermost = runs first):
 # 1. CORS (outermost) - ensures CORS headers on all responses including 503/403
-# 2. Public Luna privacy - contains text-bearing errors before server logging
+# 2. Public Lena privacy - contains text-bearing errors before server logging
 # 3. Maintenance - blocks non-GET for non-admins during maintenance
 # 4. Consent gate - 403 consent_required for authenticated users without
 #    current GDPR consent. Auth in this app is a per-route dependency, so the

@@ -4,7 +4,7 @@ const API = 'http://localhost:8000';
 const COURSE = '00000000-0000-0000-0000-000000000001';
 const ASSIGNMENT = '00000000-0000-0000-0000-000000000002';
 const JOB = '00000000-0000-0000-0000-000000000003';
-// Luna writes Markdown (issues#457); the HTML, image and script link are model
+// Lena writes Markdown (issues#457); the HTML, image and script link are model
 // output that must not become markup, a request or a clickable link.
 const ANSWER = [
   '**Hint:** `range(3)` is *not* empty. <script>alert(1)</script>',
@@ -57,15 +57,15 @@ async function setup(page: Page, enabled: boolean) {
   return sent;
 }
 
-test('public Luna form appears only when enabled and renders the answer as Markdown', async ({ page }) => {
+test('public Lena form appears only when enabled and renders the answer as Markdown', async ({ page }) => {
   const sent = await setup(page, true);
   const fetched: string[] = [];
   page.on('request', (request) => { fetched.push(request.url()); });
   await page.goto(`/courses/${COURSE}/student/assignments/${ASSIGNMENT}`);
-  await expect(page.getByRole('heading', { name: 'Ask Luna' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Ask Lena' })).toBeVisible();
   await page.getByLabel('Question').fill('Why is it empty?');
   await page.getByLabel('Your code or result').fill('for x in []: print(x)');
-  await page.getByRole('button', { name: 'Ask Luna' }).click();
+  await page.getByRole('button', { name: 'Ask Lena' }).click();
 
   const answer = page.getByTestId('luna-answer');
   await expect(answer.locator('strong')).toHaveText('Hint:');
@@ -93,9 +93,9 @@ test('public Luna form appears only when enabled and renders the answer as Markd
     question: 'Why is it empty?', submitted_text: 'for x in []: print(x)' }]);
 });
 
-test('disabled public Luna leaves the assignment page usable', async ({ page }) => {
+test('disabled public Lena leaves the assignment page usable', async ({ page }) => {
   await setup(page, false);
   await page.goto(`/courses/${COURSE}/student/assignments/${ASSIGNMENT}`);
   await expect(page.getByRole('heading', { name: 'Description' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Ask Luna' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Ask Lena' })).toHaveCount(0);
 });

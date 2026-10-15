@@ -67,7 +67,7 @@ refuse new launches, leaving local VS Code and Codespaces available.
 
 Verified, signed-in learners can join public courses and submit work. Once
 `PUBLIC_LUNA_ENABLED=true` and the restricted worker are deployed, an assignment
-page also shows a short Ask Luna form. A learner sends a question and selected
+page also shows a short Ask Lena form. A learner sends a question and selected
 code or result text; the backend adds only the visible assignment description.
 It does not fetch repositories, reference solutions, hidden tests, or other
 learners' work. Existing course messages remain a separate teaching channel.
@@ -81,7 +81,7 @@ restricted `luna-public` Slopgate credential to batched Qwen on faepmac2, and
 posts one answer. It has no general Computor API token, inbound listener, tool
 bridge, or code execution capability. Before enabling it, verify that the
 model host writes no content logs.
-Luna availability is off by default and the UI hides the form until enabled.
+Lena availability is off by default and the UI hides the form until enabled.
 
 The extension keeps its existing publisher and ID and uses supported server
 capabilities so one Marketplace version works with both 26.10 and main.

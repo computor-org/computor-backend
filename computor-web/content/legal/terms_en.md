@@ -56,7 +56,7 @@ using your account, please report it immediately to security@computor.at.
 
 3.1 We provide free of charge: courses and exercises, a programming
 environment in the browser (“workspace”), automatic testing of your
-submissions, Git repositories for your submissions, a chat and optional Luna learning assistance.
+submissions, Git repositories for your submissions, a chat and optional Lena learning assistance.
 
 3.2 We operate the platform with the care customary for a university learning
 service. Where possible, we announce maintenance on the platform in advance.
@@ -78,7 +78,7 @@ certificate or a confirmation of competence. If a university course uses
 results for an assessment, the responsible teacher decides under the
 applicable regulations.
 
-3.6 Luna provides AI-generated learning help from the question and text you
+3.6 Lena provides AI-generated learning help from the question and text you
 send and your visible assignment. It cannot execute code or grade your work.
 Check its answers; they can be incorrect. Requests and answers are handled
 temporarily as described in the Privacy notice, including bounded inference

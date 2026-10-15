@@ -53,6 +53,8 @@ from computor_backend.business_logic.messages import (
     get_message_thread,
     invalidate_dashboard_views_for_message,
     list_mentionable_users,
+    mention_ref,
+    resolve_message_mentions,
     list_messages_with_read_status,
     list_messages_with_filters,
     mark_author_as_reader,
@@ -95,7 +97,7 @@ async def create_message(
     mark_author_as_reader(message.id, permissions.user_id, db)
 
     # Persist @mention relations (already gated in create_message_with_author).
-    sync_message_mentions(message.id, payload.content, db)
+    sync_message_mentions(message.id, model_dump['content'], db)
 
     # Create audit log entry using repository
     message_repo = MessageRepository(db, cache)
@@ -172,7 +174,7 @@ async def list_mentionable_users_endpoint(
 
     users = list_mentionable_users(message_like, db, search=params.search, limit=params.limit)
     return [
-        MessageMentionRef(id=str(u.id), given_name=u.given_name, family_name=u.family_name)
+        mention_ref(u)
         for u in users
     ]
 
@@ -262,6 +264,7 @@ async def update_message(
     # Gate @mentions in the new content against the message's (unchanged)
     # audience before applying the edit.
     if payload.content is not None:
+        payload.content = resolve_message_mentions(existing, payload.content, db)
         validate_message_mentions(existing, payload.content, db)
 
     # Hold an edited subject to the same per-kind rule as create, against

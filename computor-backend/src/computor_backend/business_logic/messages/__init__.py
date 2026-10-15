@@ -39,6 +39,8 @@ from .mentions import (
     validate_message_mentions,
     sync_message_mentions,
     list_mentionable_users,
+    mention_ref,
+    resolve_message_mentions,
 )
 from .cache import (
     invalidate_dashboard_views_for_message,
@@ -89,6 +91,8 @@ __all__ = [
     "extract_mention_user_ids",
     "message_audience_user_ids",
     "validate_message_mentions",
+    "mention_ref",
+    "resolve_message_mentions",
     "sync_message_mentions",
     "list_mentionable_users",
     "invalidate_dashboard_views_for_message",

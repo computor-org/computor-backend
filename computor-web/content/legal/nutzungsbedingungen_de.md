@@ -53,7 +53,7 @@ anderer Ihr Konto nutzt, melden Sie das bitte umgehend an security@computor.at.
 
 3.1 Wir stellen unentgeltlich bereit: Kurse und Übungsaufgaben, eine
 Programmierumgebung im Browser („Workspace“), die automatische Prüfung Ihrer
-Abgaben, Git-Repositories für Ihre Abgaben, einen Chat und optionale Luna-Lernhilfe.
+Abgaben, Git-Repositories für Ihre Abgaben, einen Chat und optionale Lena-Lernhilfe.
 
 3.2 Wir betreiben die Plattform mit der Sorgfalt, die für ein universitäres
 Lernangebot üblich ist. Wartungsarbeiten kündigen wir, soweit möglich, vorher
@@ -77,8 +77,8 @@ kein Zeugnis und keine Bestätigung von Kenntnissen. Zieht eine
 Lehrveranstaltung Ergebnisse für eine Beurteilung heran, entscheidet die
 jeweilige Lehrperson nach den dafür geltenden Vorschriften.
 
-3.6 Luna erzeugt KI-Lernhilfe aus Ihrer Frage, Ihrem ausgewählten Text und
-der sichtbaren Aufgabe. Luna führt keinen Code aus und bewertet keine Abgaben.
+3.6 Lena erzeugt KI-Lernhilfe aus Ihrer Frage, Ihrem ausgewählten Text und
+der sichtbaren Aufgabe. Lena führt keinen Code aus und bewertet keine Abgaben.
 Prüfen Sie Antworten; sie können falsch sein. Anfragen und Antworten werden wie
 in der Datenschutzerklärung beschrieben vorübergehend verarbeitet, einschließlich
 begrenzter Inferenz-Caches. Ihre Inhalte werden weder protokolliert noch zum

@@ -1,4 +1,4 @@
-"""Synthetic public Luna queue behavior against Redis-compatible Lua execution."""
+"""Synthetic public Lena queue behavior against Redis-compatible Lua execution."""
 
 import asyncio
 

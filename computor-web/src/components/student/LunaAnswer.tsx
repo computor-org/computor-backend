@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import { mathMarkdownPlugins } from '@/src/components/markdownMath';
 
 /**
- * A Luna tutor answer, which the model writes as Markdown (issues#457).
+ * A Lena tutor answer, which the model writes as Markdown (issues#457).
  * The text is model output, so it gets no more than formatting: raw HTML is
  * dropped, images show only their alt text (nothing is fetched on the
  * student's behalf) and only http(s) links stay clickable.

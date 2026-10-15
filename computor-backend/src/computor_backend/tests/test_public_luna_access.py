@@ -1,4 +1,4 @@
-"""Public Luna visibility and ownership against the real PostgreSQL schema."""
+"""Public Lena visibility and ownership against the real PostgreSQL schema."""
 
 import os
 import uuid
@@ -65,14 +65,14 @@ def world():
             db.add(CourseRole(id="_student", title="Student", builtin=True))
             db.flush()
         org = Organization(
-            title="Luna Test",
+            title="Lena Test",
             organization_type="organization",
             path=Ltree(f"luna_{suffix}"),
         )
         db.add(org)
         db.flush()
         family = CourseFamily(
-            title="Luna Test",
+            title="Lena Test",
             organization_id=org.id,
             path=Ltree(f"luna_{suffix}.family"),
         )
