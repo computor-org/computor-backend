@@ -37,6 +37,8 @@ restore() {
         find "$data/keycloak/providers" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
         cp -a "$release/providers/." "$data/keycloak/providers/"
         cp -p "$release/env" "$repo/.env"
+        # Older env files omit these keys; do not retain exports from the failed rollout.
+        unset KEYCLOAK_ABUSE_PROTECTION KEYCLOAK_ABUSE_SECRET KEYCLOAK_ABUSE_COST KEYCLOAK_ABUSE_TTL
         load_env; derive_public_urls prod; pin_project_name; assemble_compose_files prod
         compose up -d --no-deps keycloak || rc=1
     fi
