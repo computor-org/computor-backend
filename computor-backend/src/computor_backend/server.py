@@ -222,6 +222,7 @@ async def startup_logic():
                             f"{origin}/join/refused",                    # refused-registration logout target
                         ],
                         web_origins=[origin],
+                        base_url=f"{origin}/",
                     )
                     break
                 except Exception as e:
