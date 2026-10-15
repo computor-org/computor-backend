@@ -64,6 +64,15 @@ jobs:
           computor-backend/src/computor_backend/tests/test_forgejo_repo_delete.py
           computor-backend/src/computor_backend/tests/test_forgejo_template_read_heal.py
 
+  coder-worker-socket-proxy:
+    # Behavioural check of the coder worker's Docker allowlist: the pinned
+    # proxy image with this repo's template, probed against the runner's
+    # daemon (container create/exec, pull, foreign image names -> 403).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - run: bash ops/tests/test_coder_worker_socket_proxy.sh
+
   public-course-contract:
     runs-on: ubuntu-latest
     services:

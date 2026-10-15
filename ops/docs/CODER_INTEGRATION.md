@@ -238,15 +238,28 @@ inspect, volume inspect/delete of `coder-home-*`/`coder-scratch-*` and
 `system df`. Container create and exec, volume create and image pull are
 refused, as are build parameters that leave the default build sandbox
 (`networkmode`, `cgroupparent`, `remote`, BuildKit `version`/`session`/`outputs`).
+Image names the worker builds, tags, pushes or removes must start with the
+proxy's `CODER_REGISTRY_HOST/` (compose sets it to the worker's value,
+`localhost:5000`), so the worker cannot retag an image the host runs by tag
+or push a host image to another registry.
 The upstream proxy's env switches filter only by path prefix, and any client
 allowed container create is root on the host; so the template replaces them.
-`ops/tests/test_coder_worker_socket_proxy.sh` probes it against a local daemon.
+`ops/tests/test_coder_worker_socket_proxy.sh` probes it against a local daemon
+(also run in CI).
+
+Builds remain root-adjacent by design: classic-builder `RUN` steps run as
+root in a default bridge container with egress, and a Dockerfile `ADD <url>`
+is fetched by dockerd itself, in the host network namespace. A template can
+therefore reach services listening on the worker host and the cloud metadata
+endpoint. This exposure predates the proxy (the raw socket allowed the same);
+restrict it with a host egress rule if templates are not trusted.
 
 The two operations that needed a container now run on the worker host, as
 root, from a spool the worker mounts at `/hostops`:
 
 - the volume-ownership repair (`chown -R 1000:1000` in a throwaway container
-  with no network and only the file capabilities);
+  with no network and only the file capabilities; its image is pinned by
+  digest, `COMPUTOR_REPAIR_IMAGE` overrides it);
 - registry tag pruning and `registry garbage-collect` after a template build,
   serialised against pushes by `registry.lock`.
 
@@ -265,6 +278,12 @@ sudo install -m 0644 ops/coder/hostops/computor-coder-hostops.tmpfiles \
 sudo systemd-tmpfiles --create /etc/tmpfiles.d/computor-coder-hostops.conf
 sudo systemctl daemon-reload && sudo systemctl enable --now computor-coder-hostops.path
 ```
+
+The tmpfiles entry gives uid 1000 (the worker's user) write access to the
+spool's `requests/`. Check that the worker image runs as uid 1000
+(`docker run --rm --entrypoint id <worker image>`) and that no other host
+account has uid 1000 (`getent passwd 1000`); such an account could queue
+chown or GC requests (limited to workspace volumes and the registry).
 
 Without them, repairs fail with "host operations are not set up" and builds
 skip the registry garbage collection (reported in the build result).

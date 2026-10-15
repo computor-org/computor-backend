@@ -234,6 +234,10 @@ services:
     volumes:
       - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
       - ./coder-worker-socket-proxy/haproxy.cfg.template:/usr/local/etc/haproxy/haproxy.cfg.template:ro
+    environment:
+      # Only image names under this registry may be built, tagged, pushed or
+      # removed. Must equal temporal-worker-coder's CODER_REGISTRY_HOST.
+      CODER_REGISTRY_HOST: localhost:5000
     labels:
       - "traefik.enable=false"
 

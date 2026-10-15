@@ -66,6 +66,9 @@ def test_proxy_uses_the_allowlist_and_is_private(config):
     assert list(proxy["networks"]) == ["coder-worker-docker"]
     assert config["networks"]["coder-worker-docker"]["internal"] is True
     assert "ports" not in proxy
+    # The proxy admits image names only under the registry the worker pushes to.
+    worker = config["services"]["temporal-worker-coder"]
+    assert proxy["environment"]["CODER_REGISTRY_HOST"] == worker["environment"]["CODER_REGISTRY_HOST"]
 
 
 def test_allowlist_has_no_container_or_exec_route():
