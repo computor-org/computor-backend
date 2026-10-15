@@ -29,6 +29,15 @@
 # build: networkmode (host network namespace), cgroupparent, remote (the
 # daemon fetching a URL from the host), version / session / outputs (BuildKit,
 # whose RUN --network=host entitlement dockerd grants by default).
+#
+# Image names the worker creates, pushes or removes must lie in its own
+# registry, ${CODER_REGISTRY_HOST} (set on this container; it must match the
+# worker's CODER_REGISTRY_HOST, and unset nothing matches): the /build t=
+# parameter (exactly one), the tag repo= parameter (exactly one), the image
+# pushed and the image deleted. Otherwise the worker could retag an image the
+# host runs by tag (e.g. a compose service image) or push a host image to an
+# outside registry. Tag and push carry no form body (Docker would read repo=
+# from a urlencoded body before the query), so only no body type or JSON.
 global
     log stdout format raw daemon "${LOG_LEVEL}"
     pidfile /run/haproxy.pid
@@ -82,19 +91,40 @@ frontend dockerfrontend
     acl build       path,url_dec -m reg -i ^(/v[0-9.]+)?/build$
     acl images_list path,url_dec -m reg -i ^(/v[0-9.]+)?/images/json$
     acl image_json  path,url_dec -m reg -i ^(/v[0-9.]+)?/images/[a-z0-9_./:@-]+/json$
-    acl image_tag   path,url_dec -m reg -i ^(/v[0-9.]+)?/images/[a-z0-9_./:@-]+/(tag|push)$
+    acl image_tag   path,url_dec -m reg -i ^(/v[0-9.]+)?/images/[a-z0-9_./:@-]+/tag$
+    acl image_push  path,url_dec -m reg -i ^(/v[0-9.]+)?/images/[a-z0-9_./:@-]+/push$
     acl image_one   path,url_dec -m reg -i ^(/v[0-9.]+)?/images/[a-z0-9_./:@-]+$
     acl dist_json   path,url_dec -m reg -i ^(/v[0-9.]+)?/distribution/[a-z0-9_./:@-]+/json$
     acl system_df   path,url_dec -m reg -i ^(/v[0-9.]+)?/system/df$
     acl volumes     path,url_dec -m reg -i ^(/v[0-9.]+)?/volumes(/[a-z0-9][a-z0-9_.-]*)?$
     acl ws_volume   path,url_dec -m reg -i ^(/v[0-9.]+)?/volumes/coder-(home|scratch)-[a-z0-9_.-]+$
 
-    acl tar_body    req.fhdr_cnt(content-type) eq 1
+    acl one_type    req.fhdr_cnt(content-type) eq 1
     acl tar_type    req.fhdr(content-type) -m str -i application/tar application/x-tar
     acl build_param query,url_dec -m reg -i (^|&)(networkmode|cgroupparent|remote|version|session|outputs)=
 
+    # Registry prefix, compared literally (-m beg; a regex would let the dots
+    # of a host name match any character).
+    acl reg_path    path,url_dec,regsub(^/v[0-9.]+/,/) -m beg "/images/${CODER_REGISTRY_HOST}/"
+    acl reg_t       urlp(t),url_dec -m beg "${CODER_REGISTRY_HOST}/"
+    acl reg_repo    urlp(repo),url_dec -m beg "${CODER_REGISTRY_HOST}/"
+    acl multi_t     query,url_dec -m reg (^|&)t=.*&t=
+    acl multi_repo  query,url_dec -m reg (^|&)repo=.*&repo=
+    acl no_type     req.fhdr_cnt(content-type) eq 0
+    acl json_type   req.fhdr(content-type) -m reg -i ^application/json[[:space:]]*(;.*)?$
+
     http-request deny if build build_param
-    http-request deny if build !tar_body
+    http-request deny if build !reg_t
+    http-request deny if build multi_t
+    http-request deny if image_tag !reg_repo
+    http-request deny if image_tag multi_repo
+    http-request deny if image_push !reg_path
+    http-request deny if image_one METH_DELETE !reg_path
+    http-request deny if image_tag !no_type !one_type
+    http-request deny if image_tag !no_type !json_type
+    http-request deny if image_push !no_type !one_type
+    http-request deny if image_push !no_type !json_type
+    http-request deny if build !one_type
     http-request deny if build !tar_type
 
     http-request allow if handshake METH_GET
@@ -102,6 +132,7 @@ frontend dockerfrontend
     http-request allow if images_list METH_GET
     http-request allow if image_json METH_GET
     http-request allow if image_tag METH_POST
+    http-request allow if image_push METH_POST
     http-request allow if image_one METH_DELETE
     http-request allow if dist_json METH_GET
     http-request allow if system_df METH_GET
@@ -109,5 +140,5 @@ frontend dockerfrontend
     http-request allow if ws_volume METH_DELETE
     http-request deny
 
-    use_backend dockerlong if build || image_tag
+    use_backend dockerlong if build || image_push
     default_backend dockerbackend

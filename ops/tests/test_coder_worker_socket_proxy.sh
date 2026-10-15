@@ -4,8 +4,10 @@
 # Starts coder-worker-socket-proxy (pinned image + this repo's allowlist) on a
 # private internal network against the local daemon and probes it from a
 # client container: the calls the worker makes must pass, container
-# create/exec, volume create and the risky build parameters must get 403.
-# Nothing it refuses is ever created; requires a local Docker daemon.
+# create/exec, volume create, the risky build parameters and image names
+# outside the registry must get 403. Nothing it refuses is ever created; the
+# one image it builds (FROM scratch, a label) is removed again. Requires a
+# local Docker daemon; nothing is pushed anywhere.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -14,8 +16,10 @@ proxy_image="tecnativa/docker-socket-proxy:0.3.0@sha256:9e4b9e7517a6b660f2cc903a
 curl_image="${CURL_IMAGE:-curlimages/curl:8.10.1}"
 cli_image="${CLI_IMAGE:-docker:28.5.1-cli}"
 tag="cwsp-test-$$"
+reg="localhost:5000"  # CODER_REGISTRY_HOST of the proxy; no registry needed
 
 cleanup() {
+    docker image rm -f "$reg/$tag:probe" "$reg/$tag:probe2" >/dev/null 2>&1 || true
     docker rm -f "$tag-proxy" >/dev/null 2>&1 || true
     docker network rm "$tag-net" >/dev/null 2>&1 || true
 }
@@ -23,7 +27,7 @@ trap cleanup EXIT
 
 docker network create --internal "$tag-net" >/dev/null
 docker run -d --name "$tag-proxy" --network "$tag-net" \
-    --security-opt no-new-privileges:true \
+    --security-opt no-new-privileges:true -e "CODER_REGISTRY_HOST=$reg" \
     -v /var/run/docker.sock:/var/run/docker.sock:ro \
     -v "$template:/usr/local/etc/haproxy/haproxy.cfg.template:ro" \
     "$proxy_image" >/dev/null
@@ -67,12 +71,42 @@ build_probes=$(cat <<'PROBES'
 403 cgroupparent=foo.slice
 403 remote=http://127.0.0.1:2375/
 403 version=2
-403 t=x&version=1&version=2
+403 version=1&version=2
 403 outputs=type=local
 PROBES
 )
 
+# Image names: only under $reg (@R@), checked on build t=, tag repo=, push and
+# delete. @T@ is this run's image; it is built by the 200 build probe below.
+# The push of an absent image passes the proxy; dockerd answers 200 and
+# streams "does not exist", so nothing leaves the host.
+name_probes=$(cat <<'PROBES'
+403 POST /build?t=alpine:3
+403 POST /build?t=evil.example/@T@:x
+403 POST /build?t=@R@1/@T@:x
+403 POST /build?t=@R@/@T@:x&t=alpine:3
+403 POST /build?%74=alpine:3
+403 POST /build?
+200 POST /build?t=@R@/@T@:probe
+403 POST /images/@R@/@T@:probe/tag?repo=alpine&tag=3
+403 POST /images/@R@/@T@:probe/tag?repo=docker.io/library/alpine&tag=3
+403 POST /images/@R@/@T@:probe/tag?repo=evil.example/x&tag=1
+403 POST /images/@R@/@T@:probe/tag?repo=@R@/x&repo=alpine&tag=3
+403 POST /v1.41/images/@R@/@T@:probe/tag?repo=%61lpine&tag=3
+201 POST /v1.41/images/@R@/@T@:probe/tag?repo=@R@/@T@&tag=probe2
+403 POST /images/alpine:3/push?tag=3
+403 POST /v1.41/images/docker.io/library/alpine/push?tag=3
+200 POST /v1.41/images/@R@/cwsp-absent-@T@/push?tag=x
+403 DELETE /images/alpine:3
+403 DELETE /v1.41/images/@R@1/x:1
+200 DELETE /v1.41/images/@R@/@T@:probe2
+PROBES
+)
+name_probes=${name_probes//@R@/$reg}
+name_probes=${name_probes//@T@/$tag}
+
 out=$(docker run --rm --network "$tag-net" -e "P=$probes" -e "B=$build_probes" \
+    -e "N=$name_probes" -e "T=$reg/$tag:deny" \
     -e "H=http://$tag-proxy:2375" --entrypoint sh "$curl_image" -c '
 set -u
 for _ in $(seq 1 30); do wget -q -O /dev/null "$H/_ping" && break; sleep 0.5; done
@@ -81,12 +115,27 @@ echo "$P" | while read -r want method path body; do
         -H "Content-Type: application/json" ${body:+--data "$body"} "$H$path")
     echo "$want $got $method $path"
 done
-tar_ctx=$(mktemp); printf "FROM scratch\n" > /tmp/Dockerfile; tar -C /tmp -cf "$tar_ctx" Dockerfile
+tar_ctx=$(mktemp); printf "FROM scratch\nLABEL cwsp=probe\n" > /tmp/Dockerfile
+tar -C /tmp -cf "$tar_ctx" Dockerfile
+# A registry tag first, so the parameter itself is what is refused.
 echo "$B" | while read -r want query; do
     got=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-        -H "Content-Type: application/x-tar" --data-binary "@$tar_ctx" "$H/build?$query")
-    echo "$want $got POST /build?$query"
+        -H "Content-Type: application/x-tar" --data-binary "@$tar_ctx" "$H/build?t=$T&$query")
+    echo "$want $got POST /build?t=$T&$query"
 done
+echo "$N" | while read -r want method path; do
+    case $path in
+        */build*) set -- -H "Content-Type: application/x-tar" --data-binary "@$tar_ctx" ;;
+        *) set -- ;;
+    esac
+    got=$(curl -s -o /dev/null -w "%{http_code}" -X "$method" "$@" "$H$path")
+    echo "$want $got $method $path"
+done
+# Tag and push read no form body: a urlencoded repo= would beat the query.
+got=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+    -H "Content-Type: application/x-www-form-urlencoded" --data "repo=alpine&tag=3" \
+    "$H/images/$T/tag?repo=${T%%:*}&tag=x")
+echo "403 $got POST /images/{n}/tag (urlencoded body)"
 # Form parameters in a urlencoded body take precedence over the query.
 got=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
     -H "Content-Type: application/x-www-form-urlencoded" \

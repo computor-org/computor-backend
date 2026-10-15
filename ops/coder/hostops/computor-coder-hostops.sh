@@ -29,14 +29,17 @@
 # Env (from /etc/default/computor-coder-hostops via the systemd unit):
 #   COMPUTOR_HOSTOPS_DIR          spool (default /var/lib/computor/coder-hostops)
 #   COMPUTOR_REGISTRY_CONTAINER   registry container (default computor-coder-registry)
-#   COMPUTOR_REPAIR_IMAGE         image for the chown (default alpine:3)
+#   COMPUTOR_REPAIR_IMAGE         image for the chown (default: alpine 3.24.2,
+#                                 pinned by digest; a tag could be moved by any
+#                                 Docker client on this host, the digest cannot)
 #   COMPUTOR_REGISTRY_LOCK_WAIT   seconds to wait for running pushes (default 1800)
 set -uo pipefail
 export LC_ALL=C
 
 dir="${COMPUTOR_HOSTOPS_DIR:-/var/lib/computor/coder-hostops}"
 registry="${COMPUTOR_REGISTRY_CONTAINER:-computor-coder-registry}"
-repair_image="${COMPUTOR_REPAIR_IMAGE:-alpine:3}"
+# alpine:3.24.2 = alpine:3 on 2026-10-15 (OCI index digest from Docker Hub).
+repair_image="${COMPUTOR_REPAIR_IMAGE:-alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6}"
 lock_wait="${COMPUTOR_REGISTRY_LOCK_WAIT:-1800}"
 docker="${DOCKER:-docker}"
 
