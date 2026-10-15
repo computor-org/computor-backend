@@ -329,7 +329,7 @@ class KeycloakAdminClient:
                 logger.error(f"Failed to delete user: {response.status_code} - {response.text}")
                 response.raise_for_status()
     
-    async def ensure_client_redirect_uris(self, redirect_uris: list[str], web_origins: list[str], client_id: str | None = None) -> None:
+    async def ensure_client_redirect_uris(self, redirect_uris: list[str], web_origins: list[str], client_id: str | None = None, base_url: str | None = None) -> None:
         """Add the given redirect URIs and web origins to a Keycloak client (idempotent).
 
         Defaults to this deployment's backend client (self.client_id); pass client_id
@@ -340,6 +340,12 @@ class KeycloakAdminClient:
         For the backend client, pass both the login callback and the app-root URI: its
         post.logout.redirect.uris is "+", meaning it reuses the valid redirect URIs, so
         the app-root entry is also what makes logout's post_logout_redirect_uri accepted.
+
+        ``base_url`` sets the client's rootUrl/baseUrl. Keycloak links its
+        "Back to application" pages there — e.g. after an email-verification link
+        is opened in a different browser than the one that registered — and the
+        realm import ships http://localhost:8000, which a deployment never
+        overwrote (issues#478).
         """
         target_client_id = client_id or self.client_id
         token = await self._get_admin_token()
@@ -365,12 +371,16 @@ class KeycloakAdminClient:
             merged_uris = current_uris | set(redirect_uris)
             merged_origins = current_origins | set(web_origins)
 
-            if merged_uris == current_uris and merged_origins == current_origins:
-                return  # nothing new to add
+            url_fields = {"rootUrl": base_url, "baseUrl": base_url} if base_url else {}
+            urls_current = all(kc_client.get(k) == v for k, v in url_fields.items())
+
+            if merged_uris == current_uris and merged_origins == current_origins and urls_current:
+                return  # nothing to change
 
             updated = {
                 "redirectUris": sorted(merged_uris),
                 "webOrigins": sorted(merged_origins),
+                **url_fields,
             }
             put_resp = await client.put(
                 f"{clients_url}/{internal_id}",
