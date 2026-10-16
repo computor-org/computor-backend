@@ -9,7 +9,8 @@ from urllib.parse import urlencode
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 import httpx
-from jose import jwt, JWTError
+import jwt
+from jwt import InvalidTokenError as JWTError
 
 from computor_backend.plugins.base import (
     AuthenticationPlugin,
@@ -73,7 +74,7 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
             author="Computor Team",
             provider_name="Keycloak",
             provider_type=AuthenticationType.OIDC,
-            requires=["httpx", "python-jose"],
+            requires=["httpx", "PyJWT"],
             homepage="https://www.keycloak.org/"
         )
     
@@ -391,11 +392,10 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
             try:
                 return jwt.decode(
                     token,
-                    key,
+                    jwt.PyJWK.from_dict(key, algorithm="RS256").key,
                     algorithms=["RS256"],
                     audience=self.keycloak_config.client_id,
                     issuer=issuer,
-                    options={"verify_at_hash": False},  # Skip at_hash verification
                 )
             except JWTError as exc:
                 last_error = exc

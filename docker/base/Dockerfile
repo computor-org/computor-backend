@@ -72,6 +72,10 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 # pip never fetches an unpinned build backend. The exported
 # files stay in the image for the testing worker (testing-worker.txt).
 COPY --from=lock-export --chown=worker:worker /locks /home/worker/.computor-locks
+COPY --chown=worker:worker docker/base/packaging.lock /home/worker/.computor-locks/packaging.txt
+RUN pip install --user --no-warn-script-location --no-cache-dir \
+        --require-hashes --no-deps --only-binary :all: \
+        -r .computor-locks/packaging.txt
 RUN pip install --user --no-warn-script-location --no-cache-dir \
         --require-hashes --no-deps --no-build-isolation \
         --only-binary :all: --no-binary grapheme \
