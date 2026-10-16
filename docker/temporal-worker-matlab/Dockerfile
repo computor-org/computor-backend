@@ -120,6 +120,11 @@ COPY --from=pybase --chown=matlab:matlab /home/worker/computor-backend  /home/wo
 # Copy the matlab-server.py script
 COPY --chown=matlab:matlab docker/temporal-worker-matlab/matlab-server.py /home/worker/matlab-server.py
 
+# The PPA helper and its Python HTTP/OAuth/apt dependencies are build tools.
+# They are unused by MATLAB or the worker; remove them from the runtime image.
+RUN apt-get purge --yes software-properties-common python3-software-properties \
+        python3-oauthlib python3-httplib2 python3-apt
+
 USER matlab
 WORKDIR /home/matlab
 
