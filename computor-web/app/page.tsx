@@ -87,6 +87,11 @@ export default function Home() {
               mit Python erlernen können — <em>Schritt für Schritt</em>, mit automatisiertem Feedback
               und einer integrierten <em>AI-Assistentin</em>.
             </p>
+            <p className="text-base text-muted max-w-2xl mx-auto">
+              Die Kurse decken Python-Grundlagen, Funktionen, Datenstrukturen, Visualisierungen
+              und Datenanalyse ab — von den ersten Schritten bis hin zu Differentialgleichungen
+              und objektorientierter Programmierung.
+            </p>
           </div>
 
           {/* CTA Buttons */}
