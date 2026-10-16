@@ -8,16 +8,16 @@ export default function LearningOptions({ capacity = false }: { capacity?: boole
   return (
     <aside aria-label="Learning options" className="rounded-lg border border-rule bg-surface p-5 text-left">
       <h3 className="text-lg font-semibold text-fg">
-        {capacity ? 'Hosted workspaces are full. Keep working:' : 'Choose where to work'}
+        {capacity ? 'Gehostete Arbeitsumgebungen sind voll. Weiterarbeiten:' : 'Wo möchten Sie arbeiten?'}
       </h3>
       <div className="mt-3 flex flex-wrap gap-4 text-accent-text">
-        {!capacity && <Link href="/workspaces" className="underline">Hosted workspace</Link>}
+        {!capacity && <Link href="/workspaces" className="underline">Gehostete Arbeitsumgebung</Link>}
         <a href={COMPUTOR_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="underline">Desktop VS Code</a>
         <a href={CODESPACES_URL} target="_blank" rel="noopener noreferrer" className="underline">GitHub Codespaces</a>
-        <Link href="/learn" className="underline">Read courses</Link>
+        <Link href="/learn" className="underline">Kurse anschauen</Link>
       </div>
       <p className="mt-3 text-sm text-muted">
-        Codespaces uses your GitHub quota. Sign in to submit work or ask Lena.
+        Codespaces verwendet Ihr GitHub-Kontingent. Melden Sie sich an, um Aufgaben einzureichen oder Lena zu fragen.
       </p>
     </aside>
   );

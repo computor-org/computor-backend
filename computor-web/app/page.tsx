@@ -79,11 +79,13 @@ export default function Home() {
           {/* Hero Title */}
           <div className="space-y-4">
             <h2 className="text-5xl md:text-6xl font-bold text-fg">
-              Learn Programming with{' '}
+              Programmieren lernen mit{' '}
               <span className="text-accent-text">Computor</span>
             </h2>
             <p className="text-xl text-muted max-w-2xl mx-auto">
-              A comprehensive educational platform for programming courses, assignments, and automated testing.
+              Wir bieten Ihnen eine interaktive Lernumgebung, in der Sie die Grundlagen der Programmierung
+              mit Python erlernen können — <em>Schritt für Schritt</em>, mit automatisiertem Feedback
+              und einer integrierten <em>AI-Assistentin</em>.
             </p>
           </div>
 
@@ -97,7 +99,7 @@ export default function Home() {
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                <span>Download VS Code Extension</span>
+                <span>VS Code Extension herunterladen</span>
               </button>
             ) : null}
             {gettingStartedUrl ? (
@@ -108,6 +110,64 @@ export default function Home() {
                 Get Started →
               </button>
             ) : null}
+          </div>
+          <p className="text-muted text-base">
+            Unsere verfügbaren Kurse finden Sie unter der Schaltfläche „Get Started →".
+          </p>
+
+          {/* Getting Started */}
+          <div className="bg-surface rounded-2xl shadow-lg p-8 border border-rule space-y-4 text-left">
+            <h3 className="text-2xl font-bold text-fg">Getting Started</h3>
+            <p className="text-muted leading-relaxed">
+              Zur Bearbeitung der Aufgaben benötigen Sie unsere <em>Kursumgebung</em>. Sie können entweder
+              direkt hier im Browser arbeiten oder die lokale VS Code-Installation verwenden. Dafür
+              müssen Sie zuerst einen Account auf der Computor-Plattform erstellen. Danach können Sie
+              die <em>Kursumgebung</em> starten und die Aufgaben bearbeiten.
+            </p>
+            <p className="text-muted leading-relaxed">
+              Als erstes empfehlen wir Ihnen den Kurs <strong className="text-fg">Data Science mit Python &ndash; Grundlagen</strong>.
+              Die erste Aufgabe finden Sie in <strong className="text-fg">Woche 1</strong> unter dem Titel{' '}
+              <em>&ldquo;Mathematische Konstanten&rdquo;</em> und führt Sie in Variablen und Datentypen in Python ein.
+            </p>
+          </div>
+
+          {/* Info cards: Arbeitsablauf, AI-Assistenz */}
+          <div className="grid md:grid-cols-2 gap-6 text-left">
+            <div className="bg-surface rounded-xl shadow-lg p-6 border border-rule space-y-3">
+              <div className="flex items-center space-x-3">
+                <svg className="h-7 w-7 text-accent-text shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <h4 className="text-lg font-bold text-fg">Arbeitsablauf</h4>
+              </div>
+              <p className="text-muted text-sm leading-relaxed">
+                In der <em>Kursumgebung</em> werden Ihnen die Aufgaben in Form von <em>Python-Dateien</em> bereitgestellt,
+                die Sie bearbeiten und ausführen können. Sie können diese auch direkt testen und einreichen.
+                Verwenden Sie dafür die Schaltflächen im Aufgabenbaum neben dem jeweiligen Aufgabennamen.
+                Um Ihre Arbeitsfortschritte ohne Testen/Einreichen zu speichern, können Sie die Schaltfläche{' '}
+                <em>Commit Assignment</em> verwenden.
+              </p>
+            </div>
+
+            <div className="bg-surface rounded-xl shadow-lg p-6 border border-rule space-y-3">
+              <div className="flex items-center space-x-3">
+                <svg className="h-7 w-7 text-accent-text shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+                <h4 className="text-lg font-bold text-fg">AI-Assistenz</h4>
+              </div>
+              <p className="text-muted text-sm leading-relaxed">
+                Für Hilfe bei der Bearbeitung der Aufgaben stellen wir Ihnen unsere AI-Assistentin{' '}
+                <em className="text-fg">Lena</em> zur Verfügung. Sie können sie direkt in der Kursumgebung
+                nutzen, um Fragen zu stellen oder <em>Hinweise</em> zu erhalten. Gehen Sie dafür bei den
+                Schaltflächen im Aufgabenbaum auf <em>Show Messages</em>.
+                Markieren Sie dann in Ihrer Frage mittels{' '}
+                <code className="bg-accent-wash text-accent-text px-1 rounded text-xs">@ai</code> oder{' '}
+                <code className="bg-accent-wash text-accent-text px-1 rounded text-xs">@lena</code> die
+                AI-Assistentin, um eine Antwort zu erhalten. Beachten Sie, dass Lena nur als Hilfsmittel
+                dient und keine vollständigen Lösungen liefert.
+              </p>
+            </div>
           </div>
 
           {/* VS Code Extension Card */}
@@ -121,21 +181,37 @@ export default function Home() {
               </h3>
             </div>
             <p className="text-muted mb-6 max-w-2xl mx-auto">
-              Code directly in VS Code with our powerful extension. Submit assignments, run tests, and get instant feedback - all without leaving your editor.
+              Programmieren Sie direkt in VS Code mit unserer Extension. Aufgaben einreichen, Tests ausführen und sofortiges Feedback erhalten — ohne den Editor zu verlassen.
             </p>
             <div className="flex flex-wrap gap-4 justify-center">
               <div className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium">
-                ✓ Instant Testing
+                ✓ Sofortiges Testen
               </div>
               <div className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium">
-                ✓ Auto Submission
+                ✓ Automatisches Einreichen
               </div>
               <div className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium">
-                ✓ Live Feedback
+                ✓ Live-Feedback
               </div>
               <div className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium">
-                ✓ Git Integration
+                ✓ Git-Integration
               </div>
+            </div>
+            <div className="mt-6 pt-6 border-t border-rule text-left">
+              <p className="text-sm font-semibold text-fg mb-1">Troubleshooting</p>
+              <p className="text-sm text-muted leading-relaxed">
+                Sollte die Kursumgebung nicht verfügbar sein, können Sie weiterhin Ihre lokalen
+                Arbeitsumgebungen nutzen. Nehmen Sie dafür den{' '}
+                <a
+                  href="https://gitlab.tugraz.at/computor/vscode-extension/-/blob/main/GETTING_STARTED.md?ref_type=heads"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent-text hover:underline font-medium"
+                >
+                  Getting Started Guide
+                </a>{' '}
+                zur Hilfe.
+              </p>
             </div>
           </div>
 
@@ -146,10 +222,10 @@ export default function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
               <h3 className="text-xl font-bold text-fg mb-2">
-                Interactive Courses
+                Interaktive Kurse
               </h3>
               <p className="text-muted">
-                Structured programming courses with hands-on assignments and projects.
+                Strukturierte Programmierkurse mit praxisnahen Aufgaben und Projekten.
               </p>
             </div>
             <div className="bg-surface rounded-xl shadow-lg p-6 border border-rule">
@@ -157,10 +233,10 @@ export default function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
               </svg>
               <h3 className="text-xl font-bold text-fg mb-2">
-                Automated Testing
+                Automatisiertes Testen
               </h3>
               <p className="text-muted">
-                Submit your code and get instant feedback with automated test runners.
+                Code einreichen und sofortiges Feedback durch automatisierte Tests erhalten.
               </p>
             </div>
             <div className="bg-surface rounded-xl shadow-lg p-6 border border-rule">
@@ -168,16 +244,17 @@ export default function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
               </svg>
               <h3 className="text-xl font-bold text-fg mb-2">
-                Collaborative Learning
+                Gemeinsames Lernen
               </h3>
               <p className="text-muted">
-                Work in groups, share solutions, and learn together with peers.
+                In Gruppen arbeiten, Lösungen teilen und gemeinsam mit anderen lernen.
               </p>
             </div>
           </div>
 
           <div className="mt-12"><LearningOptions /></div>
           <PublicCourseCatalog signedIn={!!user} />
+
         </div>
       </main>
 
@@ -185,7 +262,7 @@ export default function Home() {
       <footer className="fixed bottom-0 inset-x-0 z-40 border-t bg-surface">
         <div className="container mx-auto px-4 py-4">
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-center text-muted">
-            <p>&copy; 2026 Computor. Educational Platform for Programming.</p>
+            <p>&copy; 2026 Computor. Interaktive Lernplattform für Programmierung.</p>
             <LegalLinks className="text-sm" />
             <NetideeNotice />
           </div>
