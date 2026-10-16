@@ -61,7 +61,8 @@ dependencies = [
     "pytest-asyncio==1.4.0",
     "temporalio==1.5.1",
     "httpx==0.27.0",
-    "python-jose[cryptography]==3.5.0",
+    "PyJWT[crypto]==2.15.1",
+    "Mako>=1.4.3",
     "python-multipart>=0.0.22",
     "Pyro5==5.15",
     "uvicorn[standard]==0.35.0",
@@ -102,6 +103,8 @@ testing-worker = ["computor-testing"]
 # A security fix newer than the cutoff is taken per package with
 # exclude-newer-package, and named in the PR.
 exclude-newer = "2026-09-22T14:13:07Z"
+# Reviewed security fixes for JWT verification and template traversal.
+exclude-newer-package = { pyjwt = "2026-10-16T07:00:00Z", mako = "2026-10-16T07:00:00Z" }
 
 [tool.uv.sources]
 computor-client = { path = "../computor-client" }

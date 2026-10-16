@@ -36,6 +36,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_keycloak_healthcheck.py
           computor-backend/src/computor_backend/tests/test_keycloak_idp_setup_retry.py
           computor-backend/src/computor_backend/tests/test_keycloak_account_console_scopes.py
+          computor-backend/src/computor_backend/tests/test_keycloak_token_verification.py
           computor-backend/src/computor_backend/tests/test_log_redaction.py
           computor-backend/src/computor_backend/tests/test_password_hashing.py
           computor-backend/src/computor_backend/tests/test_route_shadowing.py

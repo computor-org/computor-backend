@@ -149,7 +149,7 @@ services:
 
   # Temporal server
   temporal:
-    image: temporalio/auto-setup:1.27.0@sha256:501a883b1c4a4168eb5000c368495e7eb7106dbadefc75b7fd886be0108456b9
+    image: temporalio/auto-setup:1.29.7@sha256:f14912b699cf73015ad5c4fc18d522d4b014db90e794039214dfb7c022c2644f
     security_opt:
       - "no-new-privileges:true"
     logging:
@@ -178,7 +178,7 @@ services:
     labels:
       - "traefik.enable=false"
     healthcheck:
-      test: ["CMD", "tctl", "--address", "temporal:7233", "cluster", "health"]
+      test: ["CMD", "temporal", "--address", "temporal:7233", "operator", "cluster", "health"]
       interval: 10s
       timeout: 5s
       retries: 5
