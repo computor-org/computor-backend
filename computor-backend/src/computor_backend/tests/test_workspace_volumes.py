@@ -1,7 +1,7 @@
 """Workspace volume activities: what they refuse, and what they report.
 
-These run on the coder worker because only it has the docker socket; the tests
-drive the plain functions with a faked docker client.
+These run on the coder worker because only it has Docker access; the tests
+drive the plain functions with a faked docker client and host spool.
 """
 
 from unittest.mock import MagicMock, patch
@@ -110,15 +110,29 @@ def test_a_volume_in_use_is_refused_with_a_usable_message():
     assert "stop the workspace first" in result["error"]
 
 
-def test_repair_chowns_to_the_workspace_user():
+def test_repair_is_handed_to_the_host_not_run_as_a_container():
+    """The worker's Docker proxy refuses container create, so the chown is a
+    host request; nothing goes through the docker client."""
     client = _docker()
-    with _patch(client):
+    sent = {}
+
+    def submit(action, fields, timeout, heartbeat=None):
+        sent["action"], sent["fields"] = action, fields
+        return {"status": "ok", "message": "done"}
+
+    with _patch(client), patch(
+        "computor_backend.tasks.temporal_coder_setup.coder_hostops.submit", submit
+    ):
         result = repair_volume_ownership("coder-home-abc")
     assert result["success"] is True
-    _, kwargs = client.containers.run.call_args
-    args, _ = client.containers.run.call_args
-    assert kwargs["command"] == ["chown", "-R", "1000:1000", "/vol"]
-    assert kwargs["volumes"] == {"coder-home-abc": {"bind": "/vol", "mode": "rw"}}
-    # Nothing in a chown needs the network, and this container mounts a
-    # user's home.
-    assert kwargs["network_disabled"] is True
+    assert sent == {"action": "chown-volume", "fields": [("volume", "coder-home-abc")]}
+    client.containers.run.assert_not_called()
+
+
+def test_repair_reports_a_host_failure():
+    with patch(
+        "computor_backend.tasks.temporal_coder_setup.coder_hostops.submit",
+        lambda *a, **k: {"status": "error", "message": "host did not answer"},
+    ):
+        result = repair_volume_ownership("coder-home-abc")
+    assert result == {"success": False, "error": "host did not answer"}

@@ -1,0 +1,10 @@
+# systemd-tmpfiles: the spool shared with the coder worker (mounted at
+# /hostops). 1000 is the worker image's uid (useradd worker in
+# docker/coder-runtime/Dockerfile). Leftover answers expire after a day.
+d /var/lib/computor                        0755 root root -
+d /var/lib/computor/coder-hostops          0755 root root -
+d /var/lib/computor/coder-hostops/.work    0700 root root -
+d /var/lib/computor/coder-hostops/staging  0700 1000 1000 1d
+d /var/lib/computor/coder-hostops/requests 0700 1000 1000 -
+d /var/lib/computor/coder-hostops/results  0700 1000 1000 1d
+f /var/lib/computor/coder-hostops/registry.lock 0644 root root -

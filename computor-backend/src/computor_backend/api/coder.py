@@ -1298,8 +1298,8 @@ async def _require_verified_workspace_limits() -> None:
     """Public deployments: refuse workspace creation/start and template
     push/rollout unless the coder worker has verified, within the last five
     minutes, that the workspace slice really carries memory, CPU and pids
-    limits. Only the worker has the docker socket, so the check is a Temporal
-    round trip; failures (including a missing worker) fail closed."""
+    limits. Only the worker sees the worker host's cgroup tree, so the check is
+    a Temporal round trip; failures (including a missing worker) fail closed."""
     global _SLICE_VERIFIED_AT
     import time
 
