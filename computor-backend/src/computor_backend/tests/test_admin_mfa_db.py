@@ -169,19 +169,116 @@ def test_keycloak_targets(db, people):
     assert f"kc-student-{suffix}" not in everyone_required
 
 
-def test_startup_marks_elevated_principals_stale(db, people, monkeypatch):
-    """Principals cached before the gate existed must be rebuilt through it."""
-    import contextlib
 
-    from computor_backend import database
-    from computor_backend.business_logic import admin_mfa
-    from computor_backend.permissions import principal_invalidation
+# ---------------------------------------------------------------------------
+# Review gaps: self-token escalation, refresh after promotion, warm caches
+# ---------------------------------------------------------------------------
+
+from computor_backend.tests.test_admin_mfa import FakeRedis, plugin  # noqa: E402,F401 (fixture)
+
+
+def test_restricted_admin_cannot_trade_session_for_api_token(db, people, enforced):
+    """The password-only admin's POST /api-tokens must not yield a ctp_ token."""
+    from computor_backend.business_logic.api_tokens import create_api_token
+    from computor_backend.exceptions import MfaRequiredException
+    from computor_backend.model.service import ApiToken
+    from computor_types.api_tokens import ApiTokenCreate
 
     users, _, _ = people
-    stamped = []
-    monkeypatch.setattr(database, "get_db_session", lambda: contextlib.nullcontext(db))
-    monkeypatch.setattr(principal_invalidation, "invalidate_user_principals", lambda ids: stamped.extend(ids))
-    admin_mfa.invalidate_elevated_principals()
-    expected = {str(users[n].id) for n in ("manager", "admin", "service", "nokeycloak")}
-    assert expected <= set(stamped)
-    assert str(users["student"].id) not in stamped
+    restricted = _build(db, users["admin"], gated=True, verified=False)
+    with pytest.raises(MfaRequiredException):
+        create_api_token(ApiTokenCreate(name="bypass"), restricted, db)
+    assert db.query(ApiToken).filter(ApiToken.user_id == users["admin"].id).count() == 0
+    # Deliberate: a credential that is not an SSO session keeps the owner's roles.
+    assert _build(db, users["admin"], gated=False, verified=False).is_admin is True
+
+
+def _wire_sso(monkeypatch, db, redis):
+    import contextlib
+
+    from computor_backend import redis_cache
+    from computor_backend.business_logic import auth as auth_logic
+    from computor_backend.business_logic import instance_limits
+    from computor_backend.permissions import auth as auth_module
+
+    async def client():
+        return redis
+
+    async def touch(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(redis_cache, "get_redis_client", client)
+    monkeypatch.setattr(auth_module, "get_redis_client", client)
+    monkeypatch.setattr(auth_logic, "get_redis_client", client)
+    monkeypatch.setattr(auth_logic, "touch_login_seat", touch)
+    monkeypatch.setattr(auth_logic, "login_idle_seconds", lambda db: 3600)
+    monkeypatch.setattr(instance_limits, "touch_login_seat", touch)
+    monkeypatch.setattr(instance_limits, "login_idle_seconds", lambda db: 3600)
+    monkeypatch.setattr(auth_module, "get_db_session", lambda: contextlib.nullcontext(db))
+
+
+@pytest.mark.asyncio
+async def test_password_only_refresh_after_promotion_stays_restricted(db, people, enforced, plugin, monkeypatch):
+    """Signed in as an ordinary user without OTP, promoted to _admin, then refreshed."""
+    from types import SimpleNamespace
+
+    from computor_backend.business_logic import auth as auth_logic
+    from computor_backend.permissions.auth import SSOAuthCredentials, _resolve_principal
+
+    users, _, suffix = people
+    kc_plugin, id_token = plugin
+    redis = FakeRedis()
+    _wire_sso(monkeypatch, db, redis)
+
+    async def refresh(refresh_token):
+        # Keycloak re-states the session's amr: a password-only session has none.
+        return await kc_plugin._build_auth_result_from_tokens(
+            {"id_token": id_token(sub=f"kc-student-{suffix}", amr=[]), "access_token": "at",
+             "refresh_token": "rt-2"})
+
+    kc_plugin.refresh_token = refresh
+
+    async def ready(name):
+        return kc_plugin
+
+    monkeypatch.setattr(auth_logic, "get_plugin_registry", lambda: SimpleNamespace(
+        get_enabled_plugins=lambda: ["keycloak"], ensure_plugin_ready=ready))
+
+    student = users["student"]
+    db.add(UserRole(user_id=student.id, role_id="_admin"))  # promotion after sign-in
+    db.flush()
+    refreshed = await auth_logic.refresh_sso_token("rt-1", "keycloak", None, db)
+    principal = await _resolve_principal(SSOAuthCredentials(token=refreshed["access_token"]))
+    assert principal.user_id == str(student.id)
+    assert principal.is_admin is False and principal.withheld_roles == ["_admin"]
+
+
+@pytest.mark.asyncio
+async def test_enforcement_switch_with_warm_cache_and_failed_invalidation(db, people, monkeypatch):
+    """Redis refuses every invalidation write; the policy stamp still re-gates warm entries."""
+    import json as _json
+
+    from computor_backend.permissions.auth import SSOAuthCredentials, _resolve_principal
+    from computor_backend.utils.token_hash import hash_token
+
+    users, _, _ = people
+    redis = FakeRedis()
+    _wire_sso(monkeypatch, db, redis)
+    redis.data["sso_session:" + hash_token("pw-session")] = _json.dumps(
+        {"user_id": str(users["admin"].id), "provider": "keycloak"})
+    credentials = SSOAuthCredentials(token="pw-session")
+    monkeypatch.setenv("KEYCLOAK_ENABLED", "true")
+
+    monkeypatch.setenv("KEYCLOAK_ADMIN_MFA", "false")
+    assert (await _resolve_principal(credentials)).is_admin is True  # cached, pre-enforcement
+
+    redis.fail = True  # no stale stamp, no new cache entry can be written
+    monkeypatch.setenv("KEYCLOAK_ADMIN_MFA", "true")
+    for _ in range(2):
+        principal = await _resolve_principal(credentials)
+        assert principal.is_admin is False and principal.withheld_roles == ["_admin"]
+
+    redis.fail = False
+    await _resolve_principal(credentials)  # cached under enforcement
+    monkeypatch.setenv("KEYCLOAK_ADMIN_MFA", "false")
+    assert (await _resolve_principal(credentials)).is_admin is True

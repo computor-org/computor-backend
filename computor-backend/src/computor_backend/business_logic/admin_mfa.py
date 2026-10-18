@@ -253,26 +253,3 @@ async def sync_on_login(user_id: str) -> None:
             await reconcile_admin_mfa([user_id])
     except Exception:
         logger.warning("Admin MFA login sync failed for user %s", user_id, exc_info=True)
-
-
-def invalidate_elevated_principals() -> int:
-    """Mark cached Principals of every elevated user stale.
-
-    Principals cached before the gate was switched on carry the full role set
-    for up to AUTH_CACHE_TTL; the stale stamp makes the next request rebuild
-    them through the gate. Called once at startup when enforcement is on.
-    """
-    from computor_backend.database import get_db_session
-    from computor_backend.model.role import UserRole
-    from computor_backend.permissions.principal_invalidation import invalidate_user_principals
-
-    with get_db_session() as db:
-        user_ids = {
-            str(row[0])
-            for row in db.query(UserRole.user_id)
-            .filter(~UserRole.role_id.in_(NON_ELEVATED_GLOBAL_ROLES))
-            .distinct()
-            .all()
-        }
-    invalidate_user_principals(user_ids)
-    return len(user_ids)

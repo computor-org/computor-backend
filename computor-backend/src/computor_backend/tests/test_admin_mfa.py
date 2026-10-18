@@ -361,3 +361,225 @@ def test_endpoint_refusal_names_mfa_and_ordinary_endpoint_works(monkeypatch):
     assert refused.status_code == 403
     assert refused.json()["error_code"] == "AUTHZ_007"
     assert client.get("/ordinary", headers=headers).json() == {"roles": ["_workspace_user"]}
+
+
+# ---------------------------------------------------------------------------
+# API tokens from a session without second factor (review P1: self-minting)
+# ---------------------------------------------------------------------------
+
+def _restricted(user_id="u"):
+    from computor_backend.permissions.principal import Principal
+
+    return Principal(user_id=user_id, roles=["_workspace_user"], withheld_roles=["_admin"])
+
+
+class _NoDb:
+    """Any database use means the refusal came too late."""
+
+    def __getattr__(self, name):
+        raise AssertionError(f"database touched: {name}")
+
+
+def test_restricted_session_cannot_mint_any_api_token():
+    from computor_backend.business_logic import api_tokens
+    from computor_backend.exceptions import MfaRequiredException
+    from computor_types.api_tokens import ApiTokenAdminCreate, ApiTokenCreate
+
+    principal = _restricted()
+    with pytest.raises(MfaRequiredException) as own:
+        api_tokens.create_api_token(ApiTokenCreate(name="bypass"), principal, _NoDb())
+    assert own.value.error_code == "AUTHZ_007"
+    with pytest.raises(MfaRequiredException):
+        api_tokens.create_api_token_admin(
+            ApiTokenAdminCreate(name="bypass", user_id="u", predefined_token="ctp_" + "A" * 32),
+            principal, _NoDb())
+    with pytest.raises(MfaRequiredException):  # refused before any old token is revoked
+        run(api_tokens.get_or_create_singleton_token(ApiTokenCreate(name="cli"), principal, _NoDb()))
+
+
+def test_token_gate_spares_unrestricted_callers_and_other_targets():
+    from computor_backend.business_logic.api_tokens import assert_token_not_mfa_restricted
+    from computor_backend.exceptions import MfaRequiredException
+    from computor_backend.permissions.principal import Principal
+
+    # API-token / service / OTP sessions: nothing withheld, automation unchanged.
+    assert_token_not_mfa_restricted(Principal(user_id="u", roles=["_admin"]))
+    assert_token_not_mfa_restricted(Principal(user_id="u", roles=["_admin"]), "u")
+    # A workspace token for someone else carries their roles, not the caller's.
+    assert_token_not_mfa_restricted(_restricted(), "student")
+    with pytest.raises(MfaRequiredException):
+        assert_token_not_mfa_restricted(_restricted(), "u")
+
+
+def test_api_token_endpoint_refuses_restricted_session(monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from computor_backend.api.api_tokens import api_tokens_router
+    from computor_backend.database import get_db
+    from computor_backend.exceptions.error_handlers import register_exception_handlers
+    from computor_backend.permissions import auth as auth_module
+
+    async def resolve(credentials):
+        return _restricted()
+
+    monkeypatch.setattr(auth_module, "_resolve_principal", resolve)
+    app = FastAPI()
+    register_exception_handlers(app)
+    app.include_router(api_tokens_router, prefix="/api-tokens")
+    app.dependency_overrides[get_db] = lambda: _NoDb()
+    client = TestClient(app)
+    headers = {"Authorization": "Bearer password-only-session"}
+    for path, body in (("/api-tokens", {"name": "bypass"}),
+                       ("/api-tokens/admin/create",
+                        {"name": "bypass", "user_id": "u", "predefined_token": "ctp_" + "A" * 32})):
+        response = client.post(path, json=body, headers=headers)
+        assert response.status_code == 403, response.text
+        assert response.json()["error_code"] == "AUTHZ_007"
+
+
+# ---------------------------------------------------------------------------
+# Principal cache vs. policy changes (review P1: best-effort invalidation)
+# ---------------------------------------------------------------------------
+
+class FakeRedis:
+    def __init__(self, fail=False):
+        self.data, self.fail = {}, fail
+
+    async def get(self, key):
+        return self.data.get(key)
+
+    async def mget(self, *keys):
+        return [self.data.get(k) for k in keys]
+
+    async def set(self, key, value, ex=None):
+        if self.fail and not key.startswith("sso_session:"):
+            raise ConnectionError("redis down")  # cache and invalidation writes
+        self.data[key] = value
+
+    async def delete(self, *keys):
+        for k in keys:
+            self.data.pop(k, None)
+
+
+@pytest.fixture
+def redis(monkeypatch):
+    from computor_backend import redis_cache
+    from computor_backend.permissions import api_token_cache
+    from computor_backend.permissions import auth as auth_module
+
+    fake = FakeRedis()
+
+    async def client():
+        return fake
+
+    monkeypatch.setattr(auth_module, "get_redis_client", client)
+    monkeypatch.setattr(redis_cache, "get_redis_client", client)
+
+    async def not_revoked(_):
+        return False
+
+    monkeypatch.setattr(api_token_cache, "is_token_revoked", not_revoked)
+    return fake
+
+
+def _cache_admin(redis, token, **fields):
+    from computor_backend.permissions.auth import principal_cache_key
+    from computor_backend.permissions.principal import Principal
+
+    principal = Principal(user_id="admin-1", roles=["_admin"], built_at=time.time(), **fields)
+    data = json.loads(principal.model_dump_json())
+    if "mfa_policy" not in fields:
+        data.pop("mfa_policy", None)  # written before the stamp existed
+    redis.data[principal_cache_key("sso_permissions", token)] = json.dumps(data)
+    return principal_cache_key("sso_permissions", token)
+
+
+@pytest.mark.parametrize("stamp, enforce, current", [
+    (None, True, False),       # cached before the rollout, invalidation lost
+    ("v1:off", True, False),   # cached while enforcement was off
+    ("v1:on", False, False),   # enforcement switched off: restrictions re-evaluated
+    ("v1:on", True, True),
+    ("v1:off", False, True),
+])
+def test_cache_hit_requires_current_mfa_policy(redis, monkeypatch, stamp, enforce, current):
+    from computor_backend.permissions.auth import _get_cached_principal, get_current_cached_principal_data
+
+    monkeypatch.setenv("KEYCLOAK_ENABLED", "true")
+    monkeypatch.setenv("KEYCLOAK_ADMIN_MFA", "true" if enforce else "false")
+    key = _cache_admin(redis, "tok", **({} if stamp is None else {"mfa_policy": stamp}))
+    assert (run(_get_cached_principal(key)) is not None) is current
+    assert (run(get_current_cached_principal_data(key)) is not None) is current
+
+
+def test_policy_change_with_warm_cache_rebuilds_through_the_gate(redis, monkeypatch):
+    """A warm admin principal, no invalidation at all: the next request is gated."""
+    import contextlib
+
+    from computor_backend.permissions import auth as auth_module
+    from computor_backend.permissions.auth import (
+        AuthenticationResult,
+        SSOAuthCredentials,
+        _resolve_principal,
+    )
+
+    builds = []
+
+    async def authenticate_sso(token, db):
+        return AuthenticationResult.for_sso_session("admin-1", ["_admin"], {"provider": "keycloak"})
+
+    def build(auth_result, db):
+        builds.append(auth_result)
+        withheld = ["_admin"] if mfa.admin_mfa_enforced() and not auth_result.mfa_verified else []
+        from computor_backend.permissions.principal import Principal
+
+        return Principal(user_id=auth_result.user_id, built_at=time.time(),
+                         roles=[r for r in auth_result.role_ids if r not in withheld], withheld_roles=withheld,
+                         mfa_policy=mfa.mfa_policy_stamp())
+
+    monkeypatch.setattr(auth_module.AuthenticationService, "authenticate_sso", staticmethod(authenticate_sso))
+    monkeypatch.setattr(auth_module.PrincipalBuilder, "build", staticmethod(build))
+    monkeypatch.setattr(auth_module, "get_db_session", lambda: contextlib.nullcontext(None))
+    monkeypatch.setenv("KEYCLOAK_ENABLED", "true")
+    credentials = SSOAuthCredentials(token="password-only-session")
+
+    monkeypatch.setenv("KEYCLOAK_ADMIN_MFA", "false")
+    assert run(_resolve_principal(credentials)).is_admin is True
+    assert run(_resolve_principal(credentials)).is_admin is True and len(builds) == 1  # warm hit
+
+    monkeypatch.setenv("KEYCLOAK_ADMIN_MFA", "true")
+    gated = run(_resolve_principal(credentials))
+    assert gated.is_admin is False and gated.withheld_roles == ["_admin"] and len(builds) == 2
+
+    monkeypatch.setenv("KEYCLOAK_ADMIN_MFA", "false")
+    assert run(_resolve_principal(credentials)).is_admin is True and len(builds) == 3
+
+
+def test_maintenance_bypass_ignores_principals_that_are_not_current(redis, monkeypatch, enforced):
+    from computor_backend.middleware.maintenance import MaintenanceMiddleware
+    from computor_backend.permissions.auth import BANNED_FLAG_PREFIX, principal_stale_key
+
+    check = MaintenanceMiddleware._check_principal_cache
+    middleware = SimpleNamespace()
+    _cache_admin(redis, "pre-policy")
+    assert run(check(middleware, "sso_permissions", "pre-policy")) is False
+    _cache_admin(redis, "current", mfa_policy=mfa.mfa_policy_stamp())
+    assert run(check(middleware, "sso_permissions", "current")) is True
+    redis.data[principal_stale_key("admin-1")] = str(time.time() + 1)
+    assert run(check(middleware, "sso_permissions", "current")) is False
+    del redis.data[principal_stale_key("admin-1")]
+    redis.data[f"{BANNED_FLAG_PREFIX}admin-1"] = "1"
+    assert run(check(middleware, "sso_permissions", "current")) is False
+
+
+def test_principal_lookup_does_not_report_pre_policy_admin(redis, enforced):
+    from computor_backend.middleware.principal_lookup import resolve_principal_from_scope
+
+    _cache_admin(redis, "pre-policy")
+    scope = {"type": "http", "headers": [(b"authorization", b"Bearer pre-policy")]}
+    assert run(resolve_principal_from_scope(scope)) is None  # no live session behind it
+    from computor_backend.utils.token_hash import hash_token
+
+    redis.data["sso_session:" + hash_token("pre-policy")] = json.dumps({"user_id": "admin-1"})
+    resolved = run(resolve_principal_from_scope(scope))
+    assert resolved is None or resolved["is_admin"] is False

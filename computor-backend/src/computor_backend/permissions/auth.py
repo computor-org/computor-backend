@@ -31,7 +31,7 @@ import logging
 
 # Import refactored permission components
 from computor_backend.permissions.principal import Principal, build_claims
-from computor_backend.auth.mfa import admin_mfa_enforced, elevated_roles
+from computor_backend.auth.mfa import admin_mfa_enforced, elevated_roles, mfa_policy_stamp
 from computor_backend.permissions.core import (
     db_get_claims,
     db_get_course_claims,
@@ -122,8 +122,11 @@ async def _get_cached_principal(
     Returns the Principal on a cache hit for a live credential, or ``None`` on a
     cache miss or a deserialization/Redis error (fail-open to the DB path).
 
-    Three gates run here because neither the DB nor the token cache is consulted
+    Four gates run here because neither the DB nor the token cache is consulted
     on a cache hit:
+    - a treated-as-miss ``None`` when the Principal was built under a different
+      admin-MFA policy (``mfa_policy_stamp``, #485), so switching enforcement on
+      or off never depends on a cache invalidation having succeeded;
     - ``ForbiddenException`` when the cached user has been banned (the DB ban
       gate in ``PrincipalBuilder.build`` never runs on a hit);
     - a treated-as-miss ``None`` when the user's permissions changed after this
@@ -145,6 +148,12 @@ async def _get_cached_principal(
         if cached_data:
             logger.debug(f"Principal cache hit for {cache_key[:16]}...")
             principal = Principal.model_validate(json.loads(cached_data), from_attributes=True)
+            if principal.mfa_policy != mfa_policy_stamp():
+                logger.debug(
+                    f"Cached Principal for user {principal.user_id} predates the "
+                    "current admin MFA policy; rebuilding"
+                )
+                return None
             banned_flag, stale_stamp = await cache.mget(
                 f"{BANNED_FLAG_PREFIX}{principal.user_id}",
                 principal_stale_key(principal.user_id),
@@ -173,6 +182,36 @@ async def _get_cached_principal(
     except Exception as e:
         logger.warning(f"Cache retrieval error: {e}")
     return None
+
+
+async def get_current_cached_principal_data(cache_key: str) -> Optional[dict]:
+    """Cached Principal as a plain dict for pure-ASGI middleware readers.
+
+    The middlewares (middleware/principal_lookup.py, middleware/maintenance.py)
+    read the principal cache without running authentication. They apply the
+    same gates as ``_get_cached_principal``: an entry built under another
+    admin-MFA policy, of a banned user, or older than the user's stale stamp is
+    not current and yields ``None``. Raises on Redis errors; callers decide what
+    an unresolved principal means.
+    """
+    cache = await get_redis_client()
+    cached_data = await cache.get(cache_key)
+    if not cached_data:
+        return None
+    data = json.loads(cached_data)
+    user_id = data.get("user_id")
+    if not user_id or data.get("mfa_policy") != mfa_policy_stamp():
+        return None
+    banned_flag, stale_stamp = await cache.mget(
+        f"{BANNED_FLAG_PREFIX}{user_id}", principal_stale_key(user_id)
+    )
+    if banned_flag:
+        return None
+    if stale_stamp is not None:
+        built_at = data.get("built_at")
+        if built_at is None or float(built_at) <= float(stale_stamp):
+            return None
+    return data
 
 
 async def _store_principal(cache_key: str, principal: Principal) -> None:
@@ -410,13 +449,15 @@ class PrincipalBuilder:
 
         # Admin MFA (#485): an SSO session without second-factor evidence keeps
         # ordinary access but not _admin / global manager roles or their claims.
+        # The policy is read once, so the recorded stamp matches the decision.
+        enforced = admin_mfa_enforced()
         withheld = []
         role_ids = list(auth_result.role_ids)
         if (
             getattr(auth_result, "mfa_gated", False)
             and not getattr(auth_result, "mfa_verified", False)
             and not is_service
-            and admin_mfa_enforced()
+            and enforced
         ):
             withheld = elevated_roles(role_ids)
             if withheld:
@@ -455,6 +496,7 @@ class PrincipalBuilder:
             is_service=is_service,
             built_at=built_at,
             withheld_roles=withheld,
+            mfa_policy=mfa_policy_stamp(enforced),
         )
     
     @staticmethod

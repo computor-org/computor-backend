@@ -21,6 +21,7 @@ import hashlib
 import hmac
 import html
 import importlib.util
+import itertools
 import json
 import os
 import queue
@@ -430,10 +431,86 @@ class Checks:
         require(self.flow_shape() == self.shape, 'Re-applying after rollback differs from the first apply')
         self.ok('configure() after rollback reproduces the same realm state')
 
+    # -- interruption ----------------------------------------------------------
+    @contextlib.contextmanager
+    def interrupted_at(self, call, after):
+        """Make setup_mfa's ``call``-th admin request fail, before sending or after it was applied."""
+        real, count = setup_mfa._request, [0]
+
+        def flaky(*args, **kwargs):
+            count[0] += 1
+            if count[0] == call and not after:
+                raise ConnectionError(f'injected failure before call {call}')
+            result = real(*args, **kwargs)
+            if count[0] == call:
+                raise ConnectionError(f'injected failure after call {call}')
+            return result
+
+        setup_mfa._request = flaky
+        try:
+            yield count
+        finally:
+            setup_mfa._request = real
+
+    def flows(self):
+        return sorted(f['alias'] for f in self.api('GET', self.root + '/authentication/flows')[1])
+
+    def bound_shape(self):
+        shape = self.flow_shape()
+        return {k: shape[k] for k in ('browser', 'reset')}
+
+    def interruption_checks(self):
+        """configure()/rollback() interrupted at every admin call against the real server."""
+        setup_mfa.rollback(self.base, self.realm, self.token)
+        before, before_flows = self.bound_shape(), self.flows()
+        configured = {k: self.shape[k] for k in ('browser', 'reset')}
+        with self.interrupted_at(0, False) as count:
+            setup_mfa.configure(self.base, self.realm, self.token)
+        total = count[0]
+        setup_mfa.rollback(self.base, self.realm, self.token)
+        for call in range(1, total + 1):
+            for after in (False, True):
+                with self.interrupted_at(call, after):
+                    try:
+                        setup_mfa.configure(self.base, self.realm, self.token)
+                    except ConnectionError:
+                        pass
+                    else:
+                        raise AssertionError(f'call {call} was not interrupted')
+                state = self.bound_shape()
+                require(state in (before, configured), f'call {call}: bound flows half-configured: {state}')
+                if after:
+                    setup_mfa.configure(self.base, self.realm, self.token)
+                    require(self.bound_shape() == configured, f'call {call}: retry did not converge')
+                setup_mfa.rollback(self.base, self.realm, self.token)
+                require(self.bound_shape() == before and self.flows() == before_flows,
+                        f'call {call}: rollback left {sorted(set(self.flows()) - set(before_flows))}')
+        self.ok(f'configure() interrupted at each of its {total} admin calls never binds a partial flow; '
+                'retry converges and rollback leaves no orphans')
+        rollback_calls = None
+        for call in itertools.count(1):
+            setup_mfa.configure(self.base, self.realm, self.token)
+            with self.interrupted_at(call, call % 2 == 0) as count:
+                try:
+                    setup_mfa.rollback(self.base, self.realm, self.token)
+                except ConnectionError:
+                    pass
+                else:
+                    rollback_calls = count[0]
+            require(self.bound_shape() in (before, configured), f'rollback call {call}: half rolled back')
+            setup_mfa.rollback(self.base, self.realm, self.token)
+            require(self.bound_shape() == before and self.flows() == before_flows, f'rollback call {call}')
+            if rollback_calls is not None:
+                break
+        self.ok(f'rollback() interrupted at each of its {rollback_calls} admin calls can be re-run')
+        setup_mfa.configure(self.base, self.realm, self.token)
+        require(self.flow_shape() == self.shape, 'configure() after the interruption runs differs')
+
     def run(self):
         try:
             self.setup()
             self.run_checks()
+            self.interruption_checks()
             return {'realm': self.realm, 'legacy': self.legacy, 'checks': self.checked, 'evidence': self.evidence}
         finally:
             self.api('DELETE', self.root)

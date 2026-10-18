@@ -48,6 +48,26 @@ def admin_mfa_enforced() -> bool:
     return os.environ.get("KEYCLOAK_ADMIN_MFA", "false").lower() in _TRUE
 
 
+# Bump when the meaning of the gate changes, so principals cached under the
+# old rules are rebuilt (see mfa_policy_stamp).
+MFA_POLICY_VERSION = 1
+
+
+def mfa_policy_stamp(enforced: bool | None = None) -> str:
+    """The admin-MFA policy a Principal was built under.
+
+    ``PrincipalBuilder.build`` records it on every Principal and each reader of
+    the principal cache treats a different value as a cache miss. Switching
+    enforcement on or off (or bumping MFA_POLICY_VERSION) therefore re-evaluates
+    every cached principal on its next use, without relying on a successful
+    invalidation of the cache. Entries cached before the stamp existed carry
+    none and are rebuilt too.
+    """
+    if enforced is None:
+        enforced = admin_mfa_enforced()
+    return f"v{MFA_POLICY_VERSION}:{'on' if enforced else 'off'}"
+
+
 def is_elevated_global_role(role_id: str | None) -> bool:
     return bool(role_id) and role_id not in NON_ELEVATED_GLOBAL_ROLES
 

@@ -16,10 +16,14 @@ What it reconciles, idempotently:
   copied "user configured" 2FA subflow gets a negated role condition, so role
   holders see exactly one OTP prompt and everyone else keeps today's
   behaviour (OTP only when they enrolled one voluntarily).
-* the bound reset-credentials flow: a role holder must enter the current OTP
-  to finish an e-mail password reset, and the "Reset OTP" step (which deletes
-  the authenticator after a reset) is skipped for role holders. Otherwise
-  control of the mailbox alone would let anyone enrol a new authenticator.
+* a reset-credentials flow ``computor-reset-mfa`` (a copy of the bound one): a
+  role holder must enter the current OTP to finish an e-mail password reset,
+  and the "Reset OTP" step (which deletes the authenticator after a reset) is
+  skipped for role holders. Otherwise control of the mailbox alone would let
+  anyone enrol a new authenticator.
+* both copies are edited while unbound, record the flow they were copied from
+  (for --rollback) and are bound together only once both are complete. An
+  interrupted run is resumed by the next one; the bound flows are never edited.
 * the CONFIGURE_TOTP required action is enabled.
 * ``amr`` and ``acr`` protocol mappers on the backend client, so the ID token
   carries evidence of the second factor. The backend withholds elevated roles
@@ -30,6 +34,7 @@ Stdlib only, like setup_identity_providers.py.
 import argparse
 import json
 import os
+import re
 import shlex
 import urllib.parse
 from pathlib import Path
@@ -49,6 +54,9 @@ ADMIN_GROUP = 'administrators'
 # nothing for executions without one (verified against 26.7.4: plain OTP logins
 # yield ``"amr": []``). The role-gated OTP executions therefore carry ``otp``.
 AMR_OTP = {'default.reference.value': 'otp', 'default.reference.maxAge': '0'}
+# Keycloak 26.7 masks these values when a config is read back (GET returns
+# MASKED for both), so they can be written but not compared.
+MASKED = '**********'
 MAPPERS = (
     ('amr', 'oidc-amr-mapper',
      {'id.token.claim': 'true', 'access.token.claim': 'true', 'introspection.token.claim': 'true'}),
@@ -95,6 +103,52 @@ def _role_condition(kc, execution):
     return config.get('condUserRole'), str(config.get('negate', 'false')).lower() == 'true'
 
 
+def _is_ours(execution, conditions, suffix):
+    """Whether a subflow execution is the role-gated OTP subflow ``suffix``.
+
+    Recognised by its stable alias (``<flow> <suffix>``; Keycloak prefixes the
+    aliases of copied subflows the same way) or, for subflows made by earlier
+    revisions, by the positive role condition inside it.
+    """
+    name = execution.get('displayName') or ''
+    return bool(execution.get('authenticationFlow')) and (
+        name == suffix or name.endswith(' ' + suffix) or (ROLE, False) in conditions)
+
+
+def _unconfigured_role_condition(kids):
+    """A conditional-user-role left without config by an interrupted run."""
+    return next((k for k in kids if k.get('providerId') == 'conditional-user-role'
+                 and not k.get('authenticationConfig')), None)
+
+
+class Gate:
+    """Where one flow gets its role-gated OTP step.
+
+    ``parent`` picks the subflow that receives it from the execution list
+    (None: the top level of the flow). Conditional subflows next to it that
+    contain one of ``factors`` get a negated role condition, so role holders
+    are asked for one code, not two.
+    """
+
+    def __init__(self, suffix, factor, factors, parent=None):
+        self.suffix, self.factor, self.factors, self.parent = suffix, factor, factors, parent
+
+
+def _username_password_forms(executions):
+    index = next((i for i, e in enumerate(executions) if e.get('authenticationFlow') and any(
+        k.get('providerId') in ('auth-username-password-form', 'auth-username-form')
+        for k in children(executions, i))), None)
+    if index is None:
+        raise RuntimeError('Cannot locate the username/password subflow of the browser flow')
+    return index
+
+
+BROWSER_GATE = Gate(BROWSER_SUBFLOW, 'auth-otp-form',
+                    ('auth-otp-form', 'conditional-user-configured', 'conditional-credential'),
+                    parent=_username_password_forms)
+RESET_GATE = Gate(RESET_SUBFLOW, 'auth-otp-form', ('reset-otp',))
+
+
 class FlowEditor:
     def __init__(self, kc, alias):
         self.kc, self.alias = kc, alias
@@ -107,6 +161,28 @@ class FlowEditor:
             self.kc.request('PUT', '/authentication/flows/' + _q(self.alias) + '/executions',
                             dict(execution, requirement=requirement))
 
+    def config_alias(self, execution):
+        return f'{self.alias}-{execution["providerId"]}-{execution["id"][:8]}'
+
+    def configure_execution(self, execution, config):
+        """Give ``execution`` the values in ``config`` (create or merge its config).
+
+        A masked value cannot be compared. It is trusted only in a config this
+        script created (its alias; the POST sets alias and values at once) and
+        rewritten otherwise.
+        """
+        if not execution.get('authenticationConfig'):
+            self.kc.request('POST', '/authentication/executions/' + execution['id'] + '/config',
+                            {'alias': self.config_alias(execution), 'config': dict(config)})
+            return
+        path = '/authentication/config/' + execution['authenticationConfig']
+        current = self.kc.request('GET', path)
+        values = current.get('config', {})
+        ours = current.get('alias') == self.config_alias(execution)
+        if any(values.get(k) != v and not (ours and values.get(k) == MASKED) for k, v in config.items()):
+            self.kc.request('PUT', path, dict(current, config={
+                **{k: v for k, v in values.items() if v != MASKED}, **config}))
+
     def add_execution(self, parent_alias, provider, requirement, config=None):
         before = {e['id'] for e in self.executions()}
         self.kc.request('POST', '/authentication/flows/' + _q(parent_alias) + '/executions/execution',
@@ -114,8 +190,7 @@ class FlowEditor:
         added = next(e for e in self.executions() if e['id'] not in before)
         self.set_requirement(added, requirement)
         if config is not None:
-            self.kc.request('POST', '/authentication/executions/' + added['id'] + '/config',
-                            {'alias': f'{parent_alias}-{provider}-{added["id"][:8]}', 'config': config})
+            self.configure_execution(added, config)
         return added
 
     def add_subflow(self, parent_alias, alias, description):
@@ -126,62 +201,141 @@ class FlowEditor:
         self.set_requirement(added, 'CONDITIONAL')
         return added
 
-    def ensure_mfa(self, parent_index, subflow_alias, factor_provider, existing_factor_providers):
-        """Under the subflow at ``parent_index`` (None = top level): add the
-        role-gated OTP subflow and exclude role holders from the existing
-        conditional subflows that contain one of ``existing_factor_providers``."""
+    def layout(self, gate):
+        """(parent alias, our subflow with its children or None, the other 2FA subflows)."""
         executions = self.executions()
-        if parent_index is None:
+        if gate.parent is None:
             parent_alias, siblings = self.alias, [e for e in executions if e['level'] == 0]
         else:
-            parent_alias, siblings = executions[parent_index]['displayName'], children(executions, parent_index)
-        ours = None
+            index = gate.parent(executions)
+            parent_alias, siblings = executions[index]['displayName'], children(executions, index)
+        ours, others = None, []
         for sibling in siblings:
-            if not sibling.get('authenticationFlow') or sibling.get('requirement') != 'CONDITIONAL':
+            if not sibling.get('authenticationFlow'):
                 continue
             index = next(i for i, e in enumerate(executions) if e['id'] == sibling['id'])
             kids = children(executions, index)
-            conditions = [c for c in (_role_condition(self.kc, k) for k in kids) if c]
-            if (ROLE, False) in conditions:
-                ours = sibling
-            elif any(k.get('providerId') in existing_factor_providers for k in kids):
-                if (ROLE, True) not in conditions:
-                    self.add_execution(sibling['displayName'], 'conditional-user-role', 'REQUIRED',
-                                       {'condUserRole': ROLE, 'negate': 'true'})
+            conditions = {k['id']: _role_condition(self.kc, k) for k in kids}
+            if _is_ours(sibling, set(conditions.values()), gate.suffix):
+                ours = ours or (sibling, kids, conditions)
+            elif sibling.get('requirement') == 'CONDITIONAL' and any(
+                    k.get('providerId') in gate.factors for k in kids):
+                others.append((sibling, kids, conditions))
+        return parent_alias, ours, others
+
+    def _role_gate(self, kids, conditions, negate):
+        """Child condition for ``(ROLE, negate)``, adopting one an interrupted run left unconfigured."""
+        found = next((k for k in kids if conditions.get(k['id']) == (ROLE, negate)), None)
+        return found or _unconfigured_role_condition(kids)
+
+    def ensure_mfa(self, gate):
+        """Add the role-gated OTP subflow and exclude role holders from the other 2FA subflows.
+
+        Every step looks for what an earlier, possibly interrupted, run left
+        behind (by alias or by provider inside our subflow) and completes it
+        instead of adding a duplicate.
+        """
+        _, _, others = self.layout(gate)
+        for sibling, kids, conditions in others:
+            found = self._role_gate(kids, conditions, True)
+            if found is None:
+                self.add_execution(sibling['displayName'], 'conditional-user-role', 'REQUIRED',
+                                   {'condUserRole': ROLE, 'negate': 'true'})
+            else:
+                self.set_requirement(found, 'REQUIRED')
+                self.configure_execution(found, {'condUserRole': ROLE, 'negate': 'true'})
+        parent_alias, ours, _ = self.layout(gate)
         if ours is None:
-            ours = self.add_subflow(parent_alias, subflow_alias,
-                                    f'One-time code for holders of the {ROLE} realm role')
-            self.add_execution(ours['displayName'], 'conditional-user-role', 'REQUIRED',
+            self.add_subflow(parent_alias, f'{self.alias} {gate.suffix}',
+                             f'One-time code for holders of the {ROLE} realm role')
+            _, ours, _ = self.layout(gate)
+        subflow, kids, conditions = ours
+        self.set_requirement(subflow, 'CONDITIONAL')
+        condition = self._role_gate(kids, conditions, False)
+        if condition is None:
+            self.add_execution(subflow['displayName'], 'conditional-user-role', 'REQUIRED',
                                {'condUserRole': ROLE, 'negate': 'false'})
-            self.add_execution(ours['displayName'], factor_provider, 'REQUIRED', dict(AMR_OTP))
-            return
-        executions = self.executions()
-        index = next(i for i, e in enumerate(executions) if e['id'] == ours['id'])
-        self.set_requirement(executions[index], 'CONDITIONAL')
-        factor = next((k for k in children(executions, index) if k.get('providerId') == factor_provider), None)
+        else:
+            self.set_requirement(condition, 'REQUIRED')
+            self.configure_execution(condition, {'condUserRole': ROLE, 'negate': 'false'})
+        factor = next((k for k in kids if k.get('providerId') == gate.factor), None)
         if factor is None:
-            self.add_execution(ours['displayName'], factor_provider, 'REQUIRED', dict(AMR_OTP))
-            return
-        self.set_requirement(factor, 'REQUIRED')
-        if not factor.get('authenticationConfig'):
-            self.kc.request('POST', '/authentication/executions/' + factor['id'] + '/config',
-                            {'alias': f'{ours["displayName"]}-amr-{factor["id"][:8]}', 'config': dict(AMR_OTP)})
-            return
-        path = '/authentication/config/' + factor['authenticationConfig']
-        current = self.kc.request('GET', path)
-        if any(current.get('config', {}).get(k) != v for k, v in AMR_OTP.items()):
-            self.kc.request('PUT', path, dict(current, config={**current.get('config', {}), **AMR_OTP}))
+            self.add_execution(subflow['displayName'], gate.factor, 'REQUIRED', AMR_OTP)
+        else:
+            self.set_requirement(factor, 'REQUIRED')
+            self.configure_execution(factor, AMR_OTP)
+
+    def problems(self, gate):
+        """What keeps the flow from enforcing the gate; empty when it is complete."""
+        found = []
+        _, ours, others = self.layout(gate)
+        for sibling, kids, conditions in others:
+            if not any(conditions.get(k['id']) == (ROLE, True) and k.get('requirement') == 'REQUIRED'
+                       for k in kids):
+                found.append(f'{self.alias}: {sibling["displayName"]!r} lacks the negated role condition')
+        if ours is None:
+            return found + [f'{self.alias}: role-gated OTP subflow missing']
+        subflow, kids, conditions = ours
+        if subflow.get('requirement') != 'CONDITIONAL':
+            found.append(f'{self.alias}: {subflow["displayName"]!r} is not CONDITIONAL')
+        if not any(conditions.get(k['id']) == (ROLE, False) and k.get('requirement') == 'REQUIRED' for k in kids):
+            found.append(f'{self.alias}: {subflow["displayName"]!r} lacks the role condition')
+        factor = next((k for k in kids if k.get('providerId') == gate.factor and k.get('requirement') == 'REQUIRED'),
+                      None)
+        if factor is None or not factor.get('authenticationConfig'):
+            found.append(f'{self.alias}: {subflow["displayName"]!r} lacks a configured {gate.factor}')
+        else:
+            config = self.kc.request('GET', '/authentication/config/' + factor['authenticationConfig']).get('config', {})
+            if any(config.get(k) not in (v, MASKED) for k, v in AMR_OTP.items()):
+                found.append(f'{self.alias}: {gate.factor} does not emit amr "otp"')
+        return found
 
 
-def _bound_copy(kc, settings, key, default, target):
-    """Alias of a non-built-in flow bound as ``key``, copying a built-in one."""
-    current = settings.get(key) or default
-    flows = {f['alias']: f for f in kc.request('GET', '/authentication/flows')}
-    if current in flows and not flows[current].get('builtIn'):
-        return current
-    if target not in flows:
-        kc.request('POST', '/authentication/flows/' + _q(current) + '/copy', {'newName': target})
-    return target
+# A copy's description records the flow it was copied from, so rollback can
+# rebind exactly that flow even after the copy has been bound.
+ORIGIN_TAG = 'computor-mfa-origin='
+_ORIGIN_RE = re.compile(re.escape(ORIGIN_TAG) + r'("(?:[^"\\]|\\.)*")')
+
+
+def _origin(flow):
+    match = _ORIGIN_RE.search((flow or {}).get('description') or '')
+    if not match:
+        return None
+    try:
+        return json.loads(match.group(1))
+    except ValueError:
+        return None
+
+
+def _top_flows(kc):
+    return {f['alias']: f for f in kc.request('GET', '/authentication/flows')}
+
+
+def prepare_copy(kc, settings, key, default, target):
+    """(alias, origin) of our flow for binding ``key``, an unbound copy of the bound flow.
+
+    The bound flow is never edited. A copy left by an interrupted run is resumed
+    when it was taken from the flow that is still bound; a copy of anything else
+    (or one whose origin record was not written) is deleted and taken again.
+    When our copy is already bound, it is returned with its recorded origin.
+    """
+    bound = settings.get(key) or default
+    flows = _top_flows(kc)
+    if bound == target:
+        origin = _origin(flows.get(target))
+        return target, origin if origin and origin != target else default
+    existing = flows.get(target)
+    if existing is not None and _origin(existing) != bound:
+        kc.request('DELETE', '/authentication/flows/' + existing['id'])
+        existing = None
+    if existing is None:
+        kc.request('POST', '/authentication/flows/' + _q(bound) + '/copy', {'newName': target})
+        copy = _top_flows(kc)[target]
+        kc.request('PUT', '/authentication/flows/' + copy['id'],
+                   dict({k: copy.get(k) for k in ('id', 'alias', 'providerId', 'topLevel', 'builtIn')},
+                        description=f'{ORIGIN_TAG}{json.dumps(bound)} Admin MFA copy (issues#485); '
+                                    'setup_mfa.py --rollback rebinds the origin.'))
+    return target, bound
 
 
 def ensure_role(kc):
@@ -226,6 +380,13 @@ def ensure_client_mappers(kc, client_id):
 
 
 def configure(base, realm, token, client_id='computor-backend', apply=True):
+    """Reconcile the realm; safe to re-run after an interruption at any point.
+
+    The MFA steps are built in unbound copies of the bound browser and
+    reset-credentials flows. Both are bound in one realm update, and only after
+    a read-back shows them complete, so an interrupted run never leaves a
+    half-configured flow in use. A re-run resumes the copies.
+    """
     kc = Client(base, realm, token)
     settings = kc.request('GET', '')
     plan = {'role': ROLE, 'browserFlow': settings.get('browserFlow'),
@@ -237,22 +398,19 @@ def configure(base, realm, token, client_id='computor-backend', apply=True):
     plan['administratorsGroupMapped'] = ensure_group_role(kc, role)
     ensure_required_action(kc)
 
-    browser = _bound_copy(kc, settings, 'browserFlow', 'browser', BROWSER_FLOW)
-    editor = FlowEditor(kc, browser)
-    executions = editor.executions()
-    forms = next((i for i, e in enumerate(executions) if e.get('authenticationFlow') and any(
-        k.get('providerId') in ('auth-username-password-form', 'auth-username-form')
-        for k in children(executions, i))), None)
-    if forms is None:
-        raise RuntimeError(f'Cannot locate the username/password subflow of {browser!r}')
-    editor.ensure_mfa(forms, BROWSER_SUBFLOW, 'auth-otp-form',
-                      ('auth-otp-form', 'conditional-user-configured', 'conditional-credential'))
-
-    reset = _bound_copy(kc, settings, 'resetCredentialsFlow', 'reset credentials', RESET_FLOW)
-    FlowEditor(kc, reset).ensure_mfa(None, RESET_SUBFLOW, 'auth-otp-form', ('reset-otp',))
-
+    browser, _ = prepare_copy(kc, settings, 'browserFlow', 'browser', BROWSER_FLOW)
+    reset, _ = prepare_copy(kc, settings, 'resetCredentialsFlow', 'reset credentials', RESET_FLOW)
+    gates = ((FlowEditor(kc, browser), BROWSER_GATE), (FlowEditor(kc, reset), RESET_GATE))
+    for editor, gate in gates:
+        editor.ensure_mfa(gate)
     ensure_client_mappers(kc, client_id)
-    kc.request('PUT', '', {'browserFlow': browser, 'resetCredentialsFlow': reset})
+
+    missing = [problem for editor, gate in gates for problem in editor.problems(gate)]
+    if missing:
+        raise RuntimeError('MFA flows incomplete, left unbound: ' + '; '.join(missing))
+    wanted = {'browserFlow': browser, 'resetCredentialsFlow': reset}
+    if any(settings.get(key) != alias for key, alias in wanted.items()):
+        kc.request('PUT', '', wanted)
     stored = kc.request('GET', '')
     if stored.get('browserFlow') != browser or stored.get('resetCredentialsFlow') != reset:
         raise RuntimeError('MFA flow bindings did not persist')
@@ -260,46 +418,73 @@ def configure(base, realm, token, client_id='computor-backend', apply=True):
     return plan
 
 
-def _remove_mfa_executions(kc, alias):
-    """Delete the role-gated subflow and the negated role conditions from ``alias``."""
-    editor = FlowEditor(kc, alias)
-    for execution in editor.executions():
-        condition = _role_condition(kc, execution)
-        if condition == (ROLE, True):
-            kc.request('DELETE', '/authentication/executions/' + execution['id'])
-    executions = editor.executions()
+def _mfa_execution(kc, executions):
+    """First execution of ours in a flow: a negated role condition or a role-gated OTP subflow."""
     for index, execution in enumerate(executions):
-        if execution.get('authenticationFlow') and any(
-                _role_condition(kc, k) == (ROLE, False) for k in children(executions, index)):
-            kc.request('DELETE', '/authentication/executions/' + execution['id'])
-            return
+        if _role_condition(kc, execution) == (ROLE, True):
+            return execution
+        if execution.get('authenticationFlow'):
+            conditions = {_role_condition(kc, k) for k in children(executions, index)}
+            if any(_is_ours(execution, conditions, suffix) for suffix in (BROWSER_SUBFLOW, RESET_SUBFLOW)):
+                return execution
+    return None
+
+
+def _remove_mfa_executions(kc, alias):
+    """Delete every role-gated subflow and negated role condition from ``alias``; returns the count."""
+    editor, removed = FlowEditor(kc, alias), 0
+    while True:
+        execution = _mfa_execution(kc, editor.executions())
+        if execution is None:
+            return removed
+        kc.request('DELETE', '/authentication/executions/' + execution['id'])
+        removed += 1
 
 
 def rollback(base, realm, token):
-    """Undo configure(): rebind the built-in browser flow and strip the reset-flow gates.
+    """Undo configure(): rebind the original flows and remove what configure() made.
+
+    Each binding that points at our copy goes back to the flow recorded in the
+    copy (the built-in flow when there is no record). Then our copies are
+    deleted, bound or not, including those an interrupted configure() left
+    behind, and MFA steps that earlier revisions edited into other custom flows
+    are stripped. Safe to re-run.
 
     Deleting only the role is NOT a rollback: Keycloak's conditional-user-role
     returns false for an unknown role even when negated (26.7.4 bytecode), which
     would silently switch off the OTP prompt for voluntarily enrolled users too.
-    The role, the unbound computor-browser-mfa copy and the token mappers stay;
-    they are inert. Pending CONFIGURE_TOTP actions stay too (other policies,
-    such as the mail team's, set them); remove them per user if unwanted.
+    The role and the token mappers stay; they are inert. Pending CONFIGURE_TOTP
+    actions stay too (other policies, such as the mail team's, set them);
+    remove them per user if unwanted.
     """
     kc = Client(base, realm, token)
     settings = kc.request('GET', '')
+    flows = _top_flows(kc)
     changes = {}
-    flows = {f['alias']: f for f in kc.request('GET', '/authentication/flows')}
     for key, ours, builtin in (('browserFlow', BROWSER_FLOW, 'browser'),
                                ('resetCredentialsFlow', RESET_FLOW, 'reset credentials')):
-        bound = settings.get(key) or builtin
-        if bound == ours:
-            changes[key] = builtin
-        elif bound in flows and not flows[bound].get('builtIn'):
-            _remove_mfa_executions(kc, bound)  # a copy made by someone else, edited in place
+        if (settings.get(key) or builtin) == ours:
+            origin = _origin(flows.get(ours))
+            changes[key] = origin if origin in flows and origin not in (BROWSER_FLOW, RESET_FLOW) else builtin
     if changes:
         kc.request('PUT', '', changes)
     stored = kc.request('GET', '')
-    return {'browserFlow': stored.get('browserFlow'), 'resetCredentialsFlow': stored.get('resetCredentialsFlow')}
+    if stored.get('browserFlow') in (BROWSER_FLOW, RESET_FLOW) or \
+            stored.get('resetCredentialsFlow') in (BROWSER_FLOW, RESET_FLOW):
+        raise RuntimeError('Rollback did not rebind the original flows')
+    deleted = []
+    for alias in (BROWSER_FLOW, RESET_FLOW):
+        if alias in flows:
+            kc.request('DELETE', '/authentication/flows/' + flows[alias]['id'])
+            deleted.append(alias)
+    stripped = {}
+    for alias, flow in _top_flows(kc).items():
+        if not flow.get('builtIn'):
+            count = _remove_mfa_executions(kc, alias)
+            if count:
+                stripped[alias] = count
+    return {'browserFlow': stored.get('browserFlow'), 'resetCredentialsFlow': stored.get('resetCredentialsFlow'),
+            'deletedFlows': deleted, 'strippedExecutions': stripped}
 
 
 def status(base, realm, token):
@@ -325,7 +510,7 @@ def main():
     parser.add_argument('--apply', action='store_true', help='change the realm (default: print the plan)')
     parser.add_argument('--status', action='store_true', help='read-only report of role members and OTP state')
     parser.add_argument('--rollback', action='store_true',
-                        help='rebind the built-in browser flow and remove the reset-flow gates')
+                        help='rebind the original flows and delete the MFA flow copies')
     args = parser.parse_args()
     if args.env:
         for line in Path(args.env).read_text().splitlines():
