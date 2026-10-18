@@ -15,6 +15,11 @@ Idempotent; run after ``alembic upgrade head`` with the app owner's
 credentials (docker/api/startup.bash, api.sh, migrations.sh). No-op when
 CODER_WORKER_DB_PASSWORD is unset, so deployments without Coder are untouched.
 
+Since #421 the coder worker no longer connects: the rollout resolves the
+credentials on the control-plane queue (tasks/temporal_coder_setup.py
+``resolve_workspace_app_credentials``). The role is kept until every
+deployment runs a backend with that change; then this script can go.
+
 Env: CODER_WORKER_DB_USER (default computor_coder_worker),
 CODER_WORKER_DB_PASSWORD, plus the usual POSTGRES_* of the app owner.
 """

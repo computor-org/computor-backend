@@ -325,6 +325,13 @@ services:
       # path/TCP allow-list) — this works under the DEFAULT seccomp profile, so
       # no custom profile is needed (#240, #241).
       - "no-new-privileges:true"
+    # Non-root (above) with an empty capability bounding set (#421): Landlock,
+    # rlimits and oom_score_adj need no capability. The root filesystem stays
+    # writable: startup installs PYTHON_TEST_REQUIREMENTS / R packages into the
+    # image, and the example cache (/tmp/examples) has no eviction, so a
+    # bounded tmpfs would eventually fill and fail grading.
+    cap_drop:
+      - ALL
     logging:
       driver: json-file
       options:
