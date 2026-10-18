@@ -232,6 +232,31 @@ def test_control_plane_applies_current_credentials(monkeypatch, coder):
     assert coder.updates == [("w1", "v2", ("s-ualice", "h-ualice")), ("w9", "v2", None)]
 
 
+def test_control_plane_setup_errors_carry_no_secret(monkeypatch, coder):
+    """A settings error quoting the admin password must not reach Temporal history."""
+    import contextlib
+
+    from temporalio.exceptions import ApplicationError
+
+    from computor_backend import database
+    from computor_backend.coder import client as coder_client
+
+    secret = "pw-SECRET-123"
+    monkeypatch.setattr(database, "get_db_session", lambda: contextlib.nullcontext(object()))
+
+    def broken_client(*args, **kwargs):
+        raise ValueError(f"CODER_ADMIN_EMAIL missing; CODER_ADMIN_PASSWORD={secret}")
+
+    monkeypatch.setattr(coder_client, "CoderClient", broken_client)
+    with pytest.raises(ApplicationError) as raised:
+        asyncio.run(setup.apply_workspace_credential_updates("v2", [
+            {"id": "w1", "name": "w1", "owner_name": "ualice"}]))
+    error = raised.value
+    assert error.message == "credential update failed (ValueError)"
+    assert secret not in str(error) and secret not in repr(error.details)
+    assert error.__cause__ is None and error.__context__ is None
+
+
 def _run_workflow(monkeypatch, fail_apply=False, patched=True, pending=True):
     from temporalio.exceptions import ActivityError, ApplicationError, RetryState
 

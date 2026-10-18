@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional
 
 from temporalio import activity, workflow
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ActivityError
+from temporalio.exceptions import ActivityError, ApplicationError
 
 from . import coder_hostops
 from .registry import register_task
@@ -1407,30 +1407,44 @@ async def apply_workspace_credential_updates(
     """
     from computor_backend.coder.client import CoderClient
 
-    owners = sorted({w["owner_name"] for w in workspaces if w.get("owner_name")})
-    credentials = await asyncio.to_thread(_current_owner_credentials, owners)
-
     updated_now = 0
     errors: List[str] = []
-    async with CoderClient() as client:
-        for w in workspaces:
-            try:
-                ok = await client.update_workspace_to_version(
-                    w["id"],
-                    version_id,
-                    credentials=credentials.get(w.get("owner_name") or ""),
-                )
-            except Exception as e:  # noqa: BLE001 - collect per-workspace failures
-                # Only the exception type goes into the result (history); the
-                # full error stays in this worker's log.
-                logger.exception(f"Credential update of workspace {w['name']} failed")
-                errors.append(f"{w['name']}: update failed ({type(e).__name__})")
-                continue
-            if ok:
-                updated_now += 1
-            else:
-                errors.append(w["name"])
+    failure = None
+    try:
+        owners = sorted({w["owner_name"] for w in workspaces if w.get("owner_name")})
+        credentials = await asyncio.to_thread(_current_owner_credentials, owners)
+        async with CoderClient() as client:
+            updated_now = await _update_workspaces(client, version_id, workspaces, credentials, errors)
+    except Exception as e:  # noqa: BLE001 - setup errors can embed secrets
+        logger.exception("Control-plane credential update failed")
+        failure = type(e).__name__
+    if failure is not None:
+        # Raised outside the handler: no message, __cause__ or __context__ of
+        # the original (e.g. a settings error quoting a password) enters history.
+        raise ApplicationError(f"credential update failed ({failure})")
     return {"updated_now": updated_now, "errors": errors}
+
+
+async def _update_workspaces(client, version_id, workspaces, credentials, errors) -> int:
+    updated_now = 0
+    for w in workspaces:
+        try:
+            ok = await client.update_workspace_to_version(
+                w["id"],
+                version_id,
+                credentials=credentials.get(w.get("owner_name") or ""),
+            )
+        except Exception as e:  # noqa: BLE001 - collect per-workspace failures
+            # Only the exception type goes into the result (history); the
+            # full error stays in this worker's log.
+            logger.exception(f"Credential update of workspace {w['name']} failed")
+            errors.append(f"{w['name']}: update failed ({type(e).__name__})")
+            continue
+        if ok:
+            updated_now += 1
+        else:
+            errors.append(w["name"])
+    return updated_now
 
 
 async def _apply_pending_updates(result: Dict[str, Any]) -> Dict[str, Any]:
