@@ -288,6 +288,44 @@ chown or GC requests (limited to workspace volumes and the registry).
 Without them, repairs fail with "host operations are not set up" and builds
 skip the registry garbage collection (reported in the build result).
 
+### Execution-side privileges
+
+The services that run next to untrusted workspaces hold as little as they can
+(`ops/docker/docker-compose.{coder,prod}.yaml`, checked by
+`tests/test_worker_privileges.py`):
+
+| Service | User | Capabilities | Root filesystem |
+|---|---|---|---|
+| `temporal-worker-coder` | 1000 | none | read-only, `/tmp` tmpfs (`CODER_WORKER_TMP_SIZE`, 1g) |
+| `workspace-ingress` | 65534 | none | read-only |
+| `coder-socket-proxy`, `coder-worker-socket-proxy` | 0 (owns the socket) | none | writable (the entrypoint renders haproxy.cfg) |
+| `temporal-worker-testing` | 23100 | none | writable (startup installs, example cache) |
+
+All of them also set `no-new-privileges`.
+
+`temporal-worker-coder` holds no database credentials and no `TOKEN_SECRET`.
+A rollout that updates running workspaces needs each owner's current
+workspace app credential. The coder worker enables automatic updates and
+returns the running, out-of-date workspaces (ids and owner names only). The
+workflow passes them to `apply_workspace_credential_updates` on the
+control-plane queue `computor-tasks` (`temporal-worker`). That worker derives
+each credential from `TOKEN_SECRET` and the database and sends the update
+build to Coder itself, using the Coder admin settings it shares with the API
+(`CODER_URL`, `CODER_ADMIN_*`). Temporal stores activity inputs and results
+unencrypted, so neither the secret nor its bearer-equivalent Argon2 hash may
+appear in them; `tests/test_rollout_history_secrets.py` checks the history on
+a local Temporal server. The activity is registered on `computor-tasks` only
+(`QUEUE_ACTIVITIES`), not on the coder or testing workers. Deploy the control
+plane first, so that its workers know that activity. A worker host `.env`
+needs neither `TOKEN_SECRET` nor `CODER_WORKER_DB_PASSWORD`. The restricted role
+`computor_coder_worker` is still created at API startup, but nothing uses it
+any more.
+
+Temporal itself is not authenticated, so a client that reaches it can start
+workflows on any queue. Moving the secrets keeps them off the execution host's
+disk and environment. It does not stop a compromised worker host from calling
+control-plane activities.
+
 ## Troubleshooting
 
 ### Port Conflicts

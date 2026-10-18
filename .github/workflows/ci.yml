@@ -32,6 +32,8 @@ jobs:
           computor-backend/src/computor_backend/tests/test_coder_image_cleanup.py
           computor-backend/src/computor_backend/tests/test_coder_hostops.py
           computor-backend/src/computor_backend/tests/test_coder_worker_docker_compose.py
+          computor-backend/src/computor_backend/tests/test_worker_privileges.py
+          computor-backend/src/computor_backend/tests/test_rollout_history_secrets.py
           computor-backend/src/computor_backend/tests/test_workspace_volumes.py
           computor-backend/src/computor_backend/tests/test_workspace_slice_verification.py
           computor-backend/src/computor_backend/tests/test_coder_source_repo_pinning.py

@@ -26,7 +26,7 @@ cleanup() {
 trap cleanup EXIT
 
 docker network create --internal "$tag-net" >/dev/null
-docker run -d --name "$tag-proxy" --network "$tag-net" \
+docker run -d --name "$tag-proxy" --network "$tag-net" --cap-drop ALL \
     --security-opt no-new-privileges:true -e "CODER_REGISTRY_HOST=$reg" \
     -v /var/run/docker.sock:/var/run/docker.sock:ro \
     -v "$template:/usr/local/etc/haproxy/haproxy.cfg.template:ro" \

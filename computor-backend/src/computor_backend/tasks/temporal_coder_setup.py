@@ -25,7 +25,7 @@ from typing import Any, Dict, List, Optional
 
 from temporalio import activity, workflow
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ActivityError
+from temporalio.exceptions import ActivityError, ApplicationError
 
 from . import coder_hostops
 from .registry import register_task
@@ -38,6 +38,13 @@ logger = logging.getLogger(__name__)
 # tag just pinned by the template push plus rollback targets. Older versions
 # are untagged on the build host and deleted from the registry.
 IMAGE_VERSIONS_TO_KEEP = 2
+
+# Queue of the control-plane workers (temporal-worker), which hold TOKEN_SECRET
+# and database access. The coder worker runs on the execution host without
+# either, so per-user workspace credentials are derived and applied there
+# (#421).
+CONTROL_PLANE_TASK_QUEUE = "computor-tasks"
+_ROLLOUT_CREDENTIALS_PATCH = "rollout-credentials-applied-on-control-plane"
 
 # Auto-generated tag shape ("v" + workflow.now timestamp). Only tags matching
 # this are ever cleanup candidates — :latest, admin-chosen custom tags and
@@ -1273,6 +1280,7 @@ async def rollout_template_workspaces(
     template_key: str,
     templates_dir: str,
     update_running: bool = True,
+    defer_running_updates: bool = False,
 ) -> Dict[str, Any]:
     """Roll every workspace of one template onto its active version.
 
@@ -1288,6 +1296,14 @@ async def rollout_template_workspaces(
     is working in right now is never rebuilt under them — it updates on its
     next natural stop/start. The admin "roll out" button keeps the default and
     force-rebuilds running workspaces too.
+
+    ``defer_running_updates`` (set by the rollout workflow): running workspaces
+    are not rebuilt here but listed in ``pending_updates`` (ids, names and
+    owner names only). The control plane rebuilds them with the owners' current
+    app credentials (``apply_workspace_credential_updates``). This worker holds
+    neither TOKEN_SECRET nor database access (#421), and no credential passes
+    through Temporal. Without it (histories started before that change) running
+    workspaces are rebuilt here with their existing credential.
     """
     from computor_backend.coder.client import CoderClient
 
@@ -1304,6 +1320,7 @@ async def rollout_template_workspaces(
     updated_now = 0
     auto_on_start = 0
     already_current = 0
+    pending: List[Dict[str, str]] = []
     errors: List[str] = []
 
     try:
@@ -1313,25 +1330,6 @@ async def rollout_template_workspaces(
                 w for w in await client.list_all_workspaces()
                 if w.template_name == coder_template_name
             ]
-
-            # The owner's CURRENT app credential, resolved once per owner before
-            # the Coder loop so the database session stays short. The client
-            # cannot do this itself: the key version lives in the database.
-            # Owners with no Computor user behind them (Coder's own admin, a
-            # deleted user) map to None and keep their existing credential.
-            credentials_by_owner: dict[str, Optional[tuple[str, str]]] = {}
-            owner_names = {w.owner_name for w in targets if w.owner_name}
-            if update_running and owner_names:
-                from computor_backend.coder.service import (
-                    workspace_app_credentials_for_owner,
-                )
-                from computor_backend.database import get_db_session
-
-                with get_db_session() as db:
-                    for owner_name in owner_names:
-                        credentials_by_owner[owner_name] = (
-                            workspace_app_credentials_for_owner(db, owner_name)
-                        )
 
             for w in targets:
                 try:
@@ -1347,12 +1345,14 @@ async def rollout_template_workspaces(
 
                     status = w.latest_build_status.value if w.latest_build_status else ""
                     is_up = w.latest_build_transition == "start" and status in ("succeeded", "running")
-                    if is_up and update_running:
-                        if await client.update_workspace_to_version(
-                            w.id,
-                            version_id,
-                            credentials=credentials_by_owner.get(w.owner_name),
-                        ):
+                    if is_up and update_running and defer_running_updates:
+                        pending.append({
+                            "id": str(w.id),
+                            "name": w.name,
+                            "owner_name": w.owner_name or "",
+                        })
+                    elif is_up and update_running:
+                        if await client.update_workspace_to_version(w.id, version_id):
                             updated_now += 1
                         else:
                             errors.append(w.name)
@@ -1369,11 +1369,117 @@ async def rollout_template_workspaces(
             "updated_now": updated_now,
             "auto_update_on_start": auto_on_start,
             "already_current": already_current,
+            "pending_updates": pending,
             "errors": errors,
         }
     except Exception as e:  # noqa: BLE001
         logger.exception(f"Rollout failed for {template_key}")
         return {"success": False, "template": template_key, "error": str(e)}
+
+
+def _current_owner_credentials(owner_names: List[str]) -> Dict[str, Optional[tuple]]:
+    """``(secret, argon2 hash)`` per Coder owner, or None (DB + TOKEN_SECRET)."""
+    from computor_backend.coder.service import workspace_app_credentials_for_owner
+    from computor_backend.database import get_db_session
+
+    with get_db_session() as db:
+        return {
+            owner: workspace_app_credentials_for_owner(db, owner)
+            for owner in owner_names
+        }
+
+
+@activity.defn(name="apply_workspace_credential_updates")
+async def apply_workspace_credential_updates(
+    version_id: str,
+    workspaces: List[Dict[str, str]],
+) -> Dict[str, Any]:
+    """Rebuild running workspaces onto ``version_id`` with current credentials.
+
+    Control plane only (``QUEUE_ACTIVITIES``): derives each owner's workspace
+    app credential (TOKEN_SECRET and the key version in the database) and
+    hands it straight to Coder. The input holds workspace ids and owner names,
+    the result counts and workspace names, so neither the secret nor its hash
+    enters Temporal history.
+
+    An owner without a Computor user (Coder's own ``admin``) keeps the
+    credential of its previous build.
+    """
+    from computor_backend.coder.client import CoderClient
+
+    updated_now = 0
+    errors: List[str] = []
+    failure = None
+    try:
+        owners = sorted({w["owner_name"] for w in workspaces if w.get("owner_name")})
+        credentials = await asyncio.to_thread(_current_owner_credentials, owners)
+        async with CoderClient() as client:
+            updated_now = await _update_workspaces(client, version_id, workspaces, credentials, errors)
+    except Exception as e:  # noqa: BLE001 - setup errors can embed secrets
+        logger.exception("Control-plane credential update failed")
+        failure = type(e).__name__
+    if failure is not None:
+        # Raised outside the handler: no message, __cause__ or __context__ of
+        # the original (e.g. a settings error quoting a password) enters history.
+        raise ApplicationError(f"credential update failed ({failure})")
+    return {"updated_now": updated_now, "errors": errors}
+
+
+async def _update_workspaces(client, version_id, workspaces, credentials, errors) -> int:
+    updated_now = 0
+    for w in workspaces:
+        try:
+            ok = await client.update_workspace_to_version(
+                w["id"],
+                version_id,
+                credentials=credentials.get(w.get("owner_name") or ""),
+            )
+        except Exception as e:  # noqa: BLE001 - collect per-workspace failures
+            # Only the exception type goes into the result (history); the
+            # full error stays in this worker's log.
+            logger.exception(f"Credential update of workspace {w['name']} failed")
+            errors.append(f"{w['name']}: update failed ({type(e).__name__})")
+            continue
+        if ok:
+            updated_now += 1
+        else:
+            errors.append(w["name"])
+    return updated_now
+
+
+async def _apply_pending_updates(result: Dict[str, Any]) -> Dict[str, Any]:
+    """Workflow helper: rebuild the deferred running workspaces on the control plane."""
+    pending = result.pop("pending_updates", None) or []
+    if not pending:
+        return result
+    try:
+        applied = await workflow.execute_activity(
+            apply_workspace_credential_updates,
+            args=[result["active_version"], pending],
+            task_queue=CONTROL_PLANE_TASK_QUEUE,
+            # Bounded wait for a control-plane worker: without one, fail the
+            # template instead of hanging the rollout.
+            schedule_to_start_timeout=timedelta(minutes=5),
+            start_to_close_timeout=timedelta(minutes=20),
+            retry_policy=RetryPolicy(
+                initial_interval=timedelta(seconds=5),
+                backoff_coefficient=2.0,
+                maximum_attempts=2,
+            ),
+        )
+    except ActivityError as e:
+        return {
+            **result,
+            "success": False,
+            "error": f"could not update running workspaces on the control plane: {e.cause or e}",
+        }
+    errors = list(result.get("errors", [])) + list(applied.get("errors", []))
+    return {
+        **result,
+        "updated_now": result.get("updated_now", 0) + applied.get("updated_now", 0),
+        "errors": errors,
+        "success": len(errors) == 0,
+    }
 
 
 @register_task
@@ -1439,9 +1545,11 @@ class RolloutWorkspacesWorkflow(BaseWorkflow):
             _update_template_progress(
                 self._progress, key, status="running", phase="rolling_out"
             )
+            # Histories started before this change replay without the deferral.
+            deferred = workflow.patched(_ROLLOUT_CREDENTIALS_PATCH)
             result = await workflow.execute_activity(
                 rollout_template_workspaces,
-                args=[key, templates_dir],
+                args=[key, templates_dir, True, True] if deferred else [key, templates_dir],
                 start_to_close_timeout=timedelta(minutes=20),
                 retry_policy=RetryPolicy(
                     initial_interval=timedelta(seconds=5),
@@ -1449,6 +1557,8 @@ class RolloutWorkspacesWorkflow(BaseWorkflow):
                     maximum_attempts=2,
                 ),
             )
+            if deferred:
+                result = await _apply_pending_updates(result)
             results.append(result)
             ok = bool(result.get("success"))
             _update_template_progress(
@@ -1850,3 +1960,11 @@ ACTIVITIES = [
     rollout_template_workspaces,
     verify_workspace_slice,
 ]
+
+# Registered only on the named queue's worker (registry.list_activities). The
+# credential update needs TOKEN_SECRET and the database, which only the
+# control plane holds; on any other worker a misrouted call must fail as an
+# unknown activity instead of running there.
+QUEUE_ACTIVITIES = {
+    CONTROL_PLANE_TASK_QUEUE: [apply_workspace_credential_updates],
+}

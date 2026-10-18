@@ -63,10 +63,4 @@ services:
     environment:
       TEMPORAL_HOST: ${WORKERHOST_CONTROL_ADDR}
       TEMPORAL_PORT: ${WORKERHOST_TEMPORAL_PORT:-7233}
-      # Workspace credential rotation reads the app database (see the comment
-      # in docker-compose.coder.yaml) — reached over the wg link.
-      POSTGRES_HOST: ${WORKERHOST_CONTROL_ADDR}
-      POSTGRES_PORT: ${WORKERHOST_POSTGRES_PORT:-5432}
-      # Must equal the control plane's value: the role is created there.
-      POSTGRES_PASSWORD: ${CODER_WORKER_DB_PASSWORD:?copy CODER_WORKER_DB_PASSWORD from the control-plane .env}
       BACKEND_EXTERNAL_URL: ${BACKEND_EXTERNAL_URL:?set BACKEND_EXTERNAL_URL in .env (e.g. http://<control wg addr>:8000)}

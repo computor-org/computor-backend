@@ -101,7 +101,6 @@ class TemporalWorker:
         # records their activities), then derive registration from the registry.
         import_task_modules()
         workflows = task_registry.list_workflows()
-        activities = task_registry.list_activities()
 
         # Blocking activities are registered as sync ``def`` functions; Temporal
         # requires an activity_executor to run them (and would error at Worker
@@ -137,6 +136,9 @@ class TemporalWorker:
 
         # Create a worker for each task queue
         for task_queue in self.task_queues:
+            # Per queue: control-plane-only activities (QUEUE_ACTIVITIES) are
+            # absent from the coder and testing workers.
+            activities = task_registry.list_activities(task_queue)
             logger.info(f"Creating worker for queue: {task_queue}")
             activity_executor = ThreadPoolExecutor(
                 max_workers=max_workers,
@@ -155,7 +157,8 @@ class TemporalWorker:
             self.workers.append(worker)
             logger.info(
                 f"Worker created for queue: {task_queue} "
-                f"(activity thread pool max_workers={max_workers}, "
+                f"({len(activities)} activities, "
+                f"activity thread pool max_workers={max_workers}, "
                 f"max_concurrent_activities={max_concurrent_activities or 'SDK default'})"
             )
 
@@ -176,7 +179,7 @@ class TemporalWorker:
             f"Graceful shutdown timeout: {graceful_shutdown.total_seconds():.0f}s "
             f"(container stop_grace_period must be at least this long)"
         )
-        logger.info(f"Registered {len(workflows)} workflows and {len(activities)} activities")
+        logger.info(f"Registered {len(workflows)} workflows on each queue")
 
         # Start heartbeat loop and workers concurrently
         try:

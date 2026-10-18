@@ -15,6 +15,10 @@ services:
     networks:
       - computor-network
     restart: unless-stopped
+    # No capabilities (#421): haproxy runs as the socket's owner, uid 0, so
+    # owner permission bits suffice; nothing needs DAC_OVERRIDE or the rest.
+    cap_drop:
+      - ALL
     security_opt:
       - "no-new-privileges:true"
     logging:
@@ -48,6 +52,15 @@ services:
     image: traefik:v3.7.13@sha256:24841fe2de7304c149343d877d2923b4c8800a38ba015dea9174c23b20e344a0
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}workspace-ingress
     restart: unless-stopped
+    # Least privilege (#421): nobody, no capabilities, immutable root
+    # filesystem. Port 80 inside the container needs no NET_BIND_SERVICE:
+    # Docker sets net.ipv4.ip_unprivileged_port_start=0 in the container's
+    # network namespace. It reads the Docker API through coder-socket-proxy
+    # (TCP) and its routes from the read-only file provider.
+    user: "65534:65534"
+    cap_drop:
+      - ALL
+    read_only: true
     security_opt:
       - "no-new-privileges:true"
     logging:
@@ -224,6 +237,9 @@ services:
     networks:
       - coder-worker-docker
     restart: unless-stopped
+    # As coder-socket-proxy: uid 0 owns the socket, no capability is needed.
+    cap_drop:
+      - ALL
     security_opt:
       - "no-new-privileges:true"
     logging:
@@ -252,8 +268,16 @@ services:
     # Must be >= TEMPORAL_GRACEFUL_SHUTDOWN_SECONDS (default 300s), or Docker
     # SIGKILLs the worker while it is still draining a live run.
     stop_grace_period: 330s
+    # Least privilege (#421): uid 1000 with no capabilities, no setuid
+    # escalation and an immutable root filesystem.
+    user: "1000:1000"
+    cap_drop:
+      - ALL
     security_opt:
       - "no-new-privileges:true"
+    read_only: true
+    tmpfs:
+      - /tmp:size=${CODER_WORKER_TMP_SIZE:-1g},mode=1777
     logging:
       driver: json-file
       options:
@@ -283,33 +307,16 @@ services:
       # perspective. localhost:5000 reaches the registry's port binding and is
       # also auto-treated by docker as an insecure (HTTP) registry, so no TLS.
       CODER_REGISTRY_HOST: localhost:5000
-      # This worker talks to Coder, the docker proxy and the registry, and for
-      # a long time to nothing else. Rolling workspaces onto a new template
-      # version broke that: it reissues each owner's workspace app credential,
-      # whose key version lives in the database. Without these the backend's
-      # defaults apply — localhost:5432, which inside this container is this
-      # container — and a rollout fails on connection refused. It fails only
-      # once a workspace exists, because the lookup is skipped when the
-      # template has no workspaces to roll.
-      #
-      # NOT the app owner: a restricted login role (SELECT on user.id and
-      # user.workspace_app_key_version only, read-only transactions), created
-      # by computor_backend/scripts/ensure_coder_worker_db_role.py at API
-      # startup. computor.sh generates CODER_WORKER_DB_PASSWORD when missing.
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5437
-      POSTGRES_USER: ${CODER_WORKER_DB_USER:-computor_coder_worker}
-      POSTGRES_PASSWORD: ${CODER_WORKER_DB_PASSWORD:?must be set in .env (computor.sh generates it)}
-      POSTGRES_DB: ${POSTGRES_DB}
-      # Still required: the workspace app secret is HMAC(TOKEN_SECRET, user id
-      # [:key version]) (coder/service.py). The rollout re-derives the owner's
-      # CURRENT credential so a workspace that missed a rotation push, or was
-      # built before app auth existed, is healed; missing, the derivation
-      # raises and the rollout silently carries the previous credential
-      # forward. TOKEN_SECRET also encrypts stored git tokens at rest; the role
-      # above cannot read those ciphertexts, so here it only yields workspace
-      # app secrets, which this worker's Coder admin login can read anyway.
-      TOKEN_SECRET: ${TOKEN_SECRET:?must be set in .env}
+      # No database credentials and no TOKEN_SECRET (#421): running
+      # workspaces are rebuilt with their owners' current app credential by
+      # the control-plane worker (apply_workspace_credential_updates on the
+      # computor-tasks queue), which holds both. This worker talks to Coder,
+      # the Docker proxy, the registry and Temporal only.
+      # The root filesystem is read-only; scratch (docker-py build-context
+      # tars, coder CLI state) goes to the bounded /tmp tmpfs. HOME stays
+      # /home/worker: the Python packages live in its ~/.local.
+      XDG_CONFIG_HOME: /tmp/.config
+      XDG_CACHE_HOME: /tmp/.cache
       # Public deployments: push/rollout verify the workspace slice's real
       # memory/cpu/pids limits first, read from the host cgroup mount above.
       COMPUTOR_PUBLIC_DEPLOYMENT: ${COMPUTOR_PUBLIC_DEPLOYMENT:-false}
