@@ -113,6 +113,9 @@ frontend dockerfrontend
     acl no_type     req.fhdr_cnt(content-type) eq 0
     acl json_type   req.fhdr(content-type) -m reg -i ^application/json[[:space:]]*(;.*)?$
 
+    # HAProxy's urlp() also splits on ";", Docker's query parser does not:
+    # "?x=1;t=<allowed>&t=<outside>" would pass reg_t and multi_t yet tag outside.
+    http-request deny if { query -m sub ";" }
     http-request deny if build build_param
     http-request deny if build !reg_t
     http-request deny if build multi_t

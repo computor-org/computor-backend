@@ -85,6 +85,8 @@ name_probes=$(cat <<'PROBES'
 403 POST /build?t=evil.example/@T@:x
 403 POST /build?t=@R@1/@T@:x
 403 POST /build?t=@R@/@T@:x&t=alpine:3
+403 POST /build?foo=x;t=@R@/@T@:x&t=alpine:3
+403 POST /images/@R@/@T@:probe/tag?x=1;repo=@R@/x&repo=alpine&tag=3
 403 POST /build?%74=alpine:3
 403 POST /build?
 200 POST /build?t=@R@/@T@:probe
