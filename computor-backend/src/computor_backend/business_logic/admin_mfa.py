@@ -5,8 +5,9 @@ Every human holding ``_admin`` or another elevated global role (see
 the browser flow set up by ops/keycloak/setup_mfa.py turns into a mandatory OTP
 prompt. A holder without an OTP credential also gets the ``CONFIGURE_TOTP``
 required action, so the next sign-in enrols an authenticator. When the last
-elevated role goes, the realm role is removed again (and a still-pending
-``CONFIGURE_TOTP`` with it); an authenticator the user enrolled stays.
+elevated role goes, the realm role is removed again. A pending
+``CONFIGURE_TOTP`` and an enrolled authenticator stay: other policies (the
+computor.at mail team) require OTP as well.
 
 Triggers:
 * startup: full reconcile, which also prunes the role from former holders;
@@ -170,8 +171,8 @@ async def apply_keycloak_membership(
         )
         if response.status_code != 404:
             response.raise_for_status()
-        if not await _has_otp(kc, kc_user_id):
-            await _set_configure_totp(kc, kc_user_id, False)
+        # A pending CONFIGURE_TOTP is left alone: other policies set it too
+        # (computor.at's mail team requires OTP of its members).
         summary["revoked"].append(kc_user_id)
 
     if any(summary.values()):

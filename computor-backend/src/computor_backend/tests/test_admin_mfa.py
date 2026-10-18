@@ -254,7 +254,7 @@ def test_sync_is_idempotent():
     assert kc.users["a"]["requiredActions"] == ["CONFIGURE_TOTP"]
 
 
-def test_prune_revokes_former_holders_and_pending_enrolment():
+def test_prune_revokes_former_holders_only_the_role():
     kc = FakeKeycloak({
         "keeps": {"role": True, "otp": True},
         "former": {"role": True, "requiredActions": ["VERIFY_EMAIL", "CONFIGURE_TOTP"]},
@@ -263,7 +263,8 @@ def test_prune_revokes_former_holders_and_pending_enrolment():
     summary = run(admin_mfa.apply_keycloak_membership({"keeps"}, prune=True, kc=kc))
     assert summary["revoked"] == ["former", "former_enrolled"]
     assert kc.users["keeps"]["role"] and not kc.users["former"]["role"]
-    assert kc.users["former"]["requiredActions"] == ["VERIFY_EMAIL"]
+    # Another policy (mail team OTP) may have set CONFIGURE_TOTP: keep it.
+    assert kc.users["former"]["requiredActions"] == ["VERIFY_EMAIL", "CONFIGURE_TOTP"]
     assert kc.users["former_enrolled"]["otp"], "an enrolled authenticator is kept"
 
 

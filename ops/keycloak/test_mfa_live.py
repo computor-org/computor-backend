@@ -417,7 +417,6 @@ class Checks:
         after = self.flow_shape()
         require({k: after[k] for k in ('browser', 'reset')} == {k: self.before[k] for k in ('browser', 'reset')},
                 f'Rollback did not restore the original flows: {result}')
-        require('groupadmin' not in result['clearedPendingEnrolment'], 'group-only member has no direct role')
         browser = self.browser()
         self.password(browser, 'groupadmin')
         require(browser.page[2], 'After rollback a user without authenticator is still forced to enrol')

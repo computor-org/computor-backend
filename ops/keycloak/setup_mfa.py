@@ -282,8 +282,8 @@ def rollback(base, realm, token):
     returns false for an unknown role even when negated (26.7.4 bytecode), which
     would silently switch off the OTP prompt for voluntarily enrolled users too.
     The role, the unbound computor-browser-mfa copy and the token mappers stay;
-    they are inert. Pending CONFIGURE_TOTP actions of role members without an
-    authenticator are cleared.
+    they are inert. Pending CONFIGURE_TOTP actions stay too (other policies,
+    such as the mail team's, set them); remove them per user if unwanted.
     """
     kc = Client(base, realm, token)
     settings = kc.request('GET', '')
@@ -298,18 +298,8 @@ def rollback(base, realm, token):
             _remove_mfa_executions(kc, bound)  # a copy made by someone else, edited in place
     if changes:
         kc.request('PUT', '', changes)
-    cleared = []
-    for user in kc.request('GET', '/roles/' + _q(ROLE) + '/users?max=1000', allow=(404,)) or []:
-        credentials = kc.request('GET', '/users/' + user['id'] + '/credentials') or []
-        full = kc.request('GET', '/users/' + user['id'])
-        if 'CONFIGURE_TOTP' in (full.get('requiredActions') or []) and not any(
-                c.get('type') == 'otp' for c in credentials):
-            full['requiredActions'] = [a for a in full['requiredActions'] if a != 'CONFIGURE_TOTP']
-            kc.request('PUT', '/users/' + user['id'], full)
-            cleared.append(user['username'])
     stored = kc.request('GET', '')
-    return {'browserFlow': stored.get('browserFlow'), 'resetCredentialsFlow': stored.get('resetCredentialsFlow'),
-            'clearedPendingEnrolment': cleared}
+    return {'browserFlow': stored.get('browserFlow'), 'resetCredentialsFlow': stored.get('resetCredentialsFlow')}
 
 
 def status(base, realm, token):

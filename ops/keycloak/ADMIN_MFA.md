@@ -84,8 +84,9 @@ echo KEYCLOAK_ADMIN_MFA=false >> .env
 Do not just delete the realm role. Keycloak's role condition is false for an
 unknown role even when negated, so the OTP prompt would also stop for users
 who enrolled voluntarily. Rollback leaves the role, the unbound flow copy, the
-token mappers and enrolled authenticators in place. They are inert, and
-re-applying is idempotent.
+token mappers, enrolled authenticators and pending "Configure OTP" actions in
+place. Remove those actions per user if unwanted; other policies such as
+the mail team's OTP set them too. Re-applying is idempotent.
 
 ## Limits
 
