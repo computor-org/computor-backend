@@ -12,7 +12,7 @@ import from here, so adding a new module only requires editing the
 import importlib
 import os
 import sys
-from typing import Callable, Dict, List, Type
+from typing import Callable, Dict, List, Optional, Type
 
 
 # Single source of truth for the Temporal task modules. Adding a new module
@@ -91,10 +91,15 @@ class TaskRegistry:
         """All registered workflow classes, in registration order."""
         return list(self._tasks.values())
 
-    def list_activities(self) -> List[Callable]:
+    def list_activities(self, task_queue: Optional[str] = None) -> List[Callable]:
         """
-        All activity functions the worker should register, derived from the
-        ``ACTIVITIES`` list of every module that registered a workflow.
+        Activity functions a worker on ``task_queue`` should register.
+
+        The shared ``ACTIVITIES`` list of every module that registered a
+        workflow, plus the entries of its ``QUEUE_ACTIVITIES`` mapping (queue
+        name -> activities) for ``task_queue`` only. Queue-bound activities
+        need secrets only that queue's workers hold, so no other worker may
+        execute them. Without ``task_queue`` only the shared ones are listed.
 
         De-duplicated by function identity while preserving order.
         """
@@ -102,7 +107,11 @@ class TaskRegistry:
         seen = set()
         for module_name in self._modules:
             module = sys.modules.get(module_name)
-            for activity_fn in getattr(module, "ACTIVITIES", []) or []:
+            module_activities = list(getattr(module, "ACTIVITIES", []) or [])
+            if task_queue is not None:
+                queue_bound = getattr(module, "QUEUE_ACTIVITIES", {}) or {}
+                module_activities += list(queue_bound.get(task_queue, []))
+            for activity_fn in module_activities:
                 if activity_fn not in seen:
                     seen.add(activity_fn)
                     activities.append(activity_fn)

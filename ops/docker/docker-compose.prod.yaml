@@ -291,6 +291,14 @@ services:
       - GIT_SERVER_URL=${GIT_SERVER_URL_INTERNAL}
       - GIT_SERVER_ADMIN_USERNAME=${GIT_SERVER_ADMIN_USERNAME}
       - GIT_SERVER_ADMIN_PASSWORD=${GIT_SERVER_ADMIN_PASSWORD}
+      # Coder admin access for apply_workspace_credential_updates (#421): the
+      # rollout rebuilds running workspaces with their owners' current app
+      # credential from here, so the credential never reaches the coder
+      # worker or Temporal history.
+      - CODER_URL=${CODER_URL:-}
+      - CODER_ADMIN_EMAIL=${CODER_ADMIN_EMAIL:-}
+      - CODER_ADMIN_PASSWORD=${CODER_ADMIN_PASSWORD:-}
+      - CODER_ADMIN_API_SECRET=${CODER_ADMIN_API_SECRET:-}
     volumes:
       - ${SYSTEM_DEPLOYMENT_PATH}/shared:${API_ROOT_PATH}/shared
     depends_on:

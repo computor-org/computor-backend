@@ -307,11 +307,11 @@ services:
       # perspective. localhost:5000 reaches the registry's port binding and is
       # also auto-treated by docker as an insecure (HTTP) registry, so no TLS.
       CODER_REGISTRY_HOST: localhost:5000
-      # No database credentials and no TOKEN_SECRET (#421): the rollout gets
-      # each owner's current workspace app credential from the control-plane
-      # worker (resolve_workspace_app_credentials on the computor-tasks
-      # queue), which holds both. This worker talks to Coder, the Docker proxy,
-      # the registry and Temporal only.
+      # No database credentials and no TOKEN_SECRET (#421): running
+      # workspaces are rebuilt with their owners' current app credential by
+      # the control-plane worker (apply_workspace_credential_updates on the
+      # computor-tasks queue), which holds both. This worker talks to Coder,
+      # the Docker proxy, the registry and Temporal only.
       # The root filesystem is read-only; scratch (docker-py build-context
       # tars, coder CLI state) goes to the bounded /tmp tmpfs. HOME stays
       # /home/worker: the Python packages live in its ~/.local.

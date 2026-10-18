@@ -305,12 +305,19 @@ All of them also set `no-new-privileges`.
 
 `temporal-worker-coder` holds no database credentials and no `TOKEN_SECRET`.
 A rollout that updates running workspaces needs each owner's current
-workspace app credential. The workflow lists the owners on the coder worker
-and resolves their credentials with `resolve_workspace_app_credentials` on the
-control-plane queue `computor-tasks` (`temporal-worker`, which has both). It
-passes them to the rollout activity. Deploy the control plane first, so that
-its workers know that activity. A worker host `.env` needs neither
-`TOKEN_SECRET` nor `CODER_WORKER_DB_PASSWORD`. The restricted role
+workspace app credential. The coder worker enables automatic updates and
+returns the running, out-of-date workspaces (ids and owner names only). The
+workflow passes them to `apply_workspace_credential_updates` on the
+control-plane queue `computor-tasks` (`temporal-worker`). That worker derives
+each credential from `TOKEN_SECRET` and the database and sends the update
+build to Coder itself, using the Coder admin settings it shares with the API
+(`CODER_URL`, `CODER_ADMIN_*`). Temporal stores activity inputs and results
+unencrypted, so neither the secret nor its bearer-equivalent Argon2 hash may
+appear in them; `tests/test_rollout_history_secrets.py` checks the history on
+a local Temporal server. The activity is registered on `computor-tasks` only
+(`QUEUE_ACTIVITIES`), not on the coder or testing workers. Deploy the control
+plane first, so that its workers know that activity. A worker host `.env`
+needs neither `TOKEN_SECRET` nor `CODER_WORKER_DB_PASSWORD`. The restricted role
 `computor_coder_worker` is still created at API startup, but nothing uses it
 any more.
 

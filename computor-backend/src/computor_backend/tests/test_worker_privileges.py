@@ -2,9 +2,11 @@
 
 The compose half renders ops/docker the way the split worker host does
 (base + prod + coder + workerhost) and the single-host way, and checks the
-security settings that reach Docker. The workflow half checks that the coder
-worker gets workspace credentials from the control plane and never derives
-them itself (no TOKEN_SECRET, no database on the execution host).
+security settings that reach Docker. The workflow half checks that running
+workspaces are rebuilt with their credentials on the control plane, which is
+the only worker that registers that activity (no TOKEN_SECRET, no database on
+the execution host). test_rollout_history_secrets.py checks the Temporal
+history on a real server.
 """
 
 import asyncio
@@ -39,6 +41,12 @@ def test_coder_worker_holds_no_control_plane_secret(services):
     assert {"CODER_ADMIN_PASSWORD", "TEMPORAL_HOST", "DOCKER_HOST"} <= set(env)
 
 
+def test_control_plane_worker_can_reach_coder(services):
+    # apply_workspace_credential_updates sends the update builds itself.
+    env = services["temporal-worker"]["environment"]
+    assert {"CODER_URL", "CODER_ADMIN_EMAIL", "CODER_ADMIN_PASSWORD", "TOKEN_SECRET"} <= set(env)
+
+
 def test_ingress_is_unprivileged_and_immutable(services):
     ingress = services["workspace-ingress"]
     assert ingress["user"] == "65534:65534"
@@ -64,31 +72,69 @@ def test_testing_worker_is_unprivileged(services):
     assert not worker.get("volumes")  # nothing from the host
 
 
-# --- credentials come from the control plane ---------------------------------
+# --- credentials are derived and applied on the control plane ----------------
 
 
 def test_control_plane_queue_is_the_default_worker_queue():
     assert setup.CONTROL_PLANE_TASK_QUEUE == DEFAULT_TASK_QUEUE
-    names = {getattr(a, "__temporal_activity_definition").name for a in setup.ACTIVITIES}
-    assert {"list_template_workspace_owners", "resolve_workspace_app_credentials"} <= names
-
-
-def test_resolve_credentials_uses_the_database(monkeypatch):
-    import contextlib
-
-    from computor_backend import database
-    from computor_backend.coder import service
-
-    db = object()
-    monkeypatch.setattr(database, "get_db_session", lambda: contextlib.nullcontext(db))
-    monkeypatch.setattr(
-        service, "workspace_app_credentials_for_owner",
-        lambda session, owner: ("s-" + owner, "h-" + owner) if session is db and owner != "admin" else None,
-    )
-    assert setup.resolve_workspace_app_credentials(["ualice", "admin"]) == {
-        "ualice": ["s-ualice", "h-ualice"],
-        "admin": None,
+    shared = {a.__temporal_activity_definition.name for a in setup.ACTIVITIES}
+    assert "apply_workspace_credential_updates" not in shared
+    assert setup.QUEUE_ACTIVITIES == {
+        DEFAULT_TASK_QUEUE: [setup.apply_workspace_credential_updates],
     }
+
+
+def _registered_names(task_queue):
+    from computor_backend.tasks.registry import import_task_modules, task_registry
+
+    import_task_modules()
+    return {
+        a.__temporal_activity_definition.name
+        for a in task_registry.list_activities(task_queue)
+    }
+
+
+@pytest.mark.parametrize("queue", ["coder-tasks", "testing", "testing-matlab"])
+def test_credential_update_is_absent_from_execution_workers(queue):
+    names = _registered_names(queue)
+    assert "rollout_template_workspaces" in names  # shared ones still there
+    assert "apply_workspace_credential_updates" not in names
+
+
+def test_credential_update_is_registered_on_the_control_plane():
+    assert "apply_workspace_credential_updates" in _registered_names(DEFAULT_TASK_QUEUE)
+
+
+def test_temporal_worker_registers_per_queue(monkeypatch):
+    """The real TemporalWorker.start hands each queue's Worker its own list."""
+    from computor_backend.tasks import temporal_worker
+
+    created = {}
+
+    class _Worker:
+        def __init__(self, client, *, task_queue, activities, **kwargs):
+            created[task_queue] = {
+                getattr(a, "__temporal_activity_definition").name for a in activities
+            }
+
+        async def run(self):
+            return None
+
+        async def shutdown(self):
+            return None
+
+    async def _client():
+        return SimpleNamespace()
+
+    monkeypatch.setattr(temporal_worker, "Worker", _Worker)
+    monkeypatch.setattr(temporal_worker, "get_temporal_client", _client)
+    worker = temporal_worker.TemporalWorker(
+        task_queues=[DEFAULT_TASK_QUEUE, "coder-tasks", "testing"], heartbeat_interval=0
+    )
+    asyncio.run(worker.start())
+    assert "apply_workspace_credential_updates" in created[DEFAULT_TASK_QUEUE]
+    assert "apply_workspace_credential_updates" not in created["coder-tasks"]
+    assert "apply_workspace_credential_updates" not in created["testing"]
 
 
 class _FakeCoder:
@@ -142,20 +188,51 @@ def coder(monkeypatch):
     return fake
 
 
-def test_rollout_applies_the_supplied_credentials_without_the_database(coder):
-    result = asyncio.run(setup.rollout_template_workspaces(
-        "vscode", "/t", True, {"ualice": ["sa", "ha"], "ubob": None},
-    ))
+def test_deferred_rollout_lists_running_workspaces_without_rebuilding(coder):
+    result = asyncio.run(setup.rollout_template_workspaces("vscode", "/t", True, True))
     assert result["success"], result
-    assert coder.updates == [("w1", "v2", ("sa", "ha")), ("w2", "v2", None)]
+    assert coder.updates == []
+    assert result["pending_updates"] == [
+        {"id": "w1", "name": "w1", "owner_name": "ualice"},
+        {"id": "w2", "name": "w2", "owner_name": "ubob"},
+    ]
+    assert result["active_version"] == "v2"
 
 
-def test_owner_listing_is_per_template(coder):
-    assert asyncio.run(setup.list_template_workspace_owners("vscode", "/t")) == ["ualice", "ubob"]
-    assert asyncio.run(setup.list_template_workspace_owners("unknown", "/t")) == []
+def test_legacy_rollout_rebuilds_with_the_existing_credential(coder):
+    result = asyncio.run(setup.rollout_template_workspaces("vscode", "/t"))
+    assert result["success"], result
+    assert coder.updates == [("w1", "v2", None), ("w2", "v2", None)]
+    assert result["pending_updates"] == []
 
 
-def _run_workflow(monkeypatch, fail_resolve=False, patched=True):
+def test_gentle_rollout_only_sets_auto_update(coder):
+    result = asyncio.run(setup.rollout_template_workspaces("vscode", "/t", False, True))
+    assert result["success"] and result["auto_update_on_start"] == 2, result
+    assert coder.updates == [] and result["pending_updates"] == []
+
+
+def test_control_plane_applies_current_credentials(monkeypatch, coder):
+    import contextlib
+
+    from computor_backend import database
+    from computor_backend.coder import service
+
+    db = object()
+    monkeypatch.setattr(database, "get_db_session", lambda: contextlib.nullcontext(db))
+    monkeypatch.setattr(
+        service, "workspace_app_credentials_for_owner",
+        lambda session, owner: ("s-" + owner, "h-" + owner) if session is db and owner != "admin" else None,
+    )
+    result = asyncio.run(setup.apply_workspace_credential_updates("v2", [
+        {"id": "w1", "name": "w1", "owner_name": "ualice"},
+        {"id": "w9", "name": "w9", "owner_name": "admin"},
+    ]))
+    assert result == {"updated_now": 2, "errors": []}
+    assert coder.updates == [("w1", "v2", ("s-ualice", "h-ualice")), ("w9", "v2", None)]
+
+
+def _run_workflow(monkeypatch, fail_apply=False, patched=True, pending=True):
     from temporalio.exceptions import ActivityError, ApplicationError, RetryState
 
     calls = []
@@ -165,17 +242,20 @@ def _run_workflow(monkeypatch, fail_resolve=False, patched=True):
         calls.append((name, task_queue, args))
         if name == "discover_template_operations":
             return [{"dir_name": "vscode", "coder_template_name": "vscode-ws"}]
-        if name == "list_template_workspace_owners":
-            return ["ualice"]
-        if name == "resolve_workspace_app_credentials":
-            if fail_resolve:
+        if name == "rollout_template_workspaces":
+            return {
+                "success": True, "template": "vscode-ws", "active_version": "v2",
+                "updated_now": 0, "errors": [],
+                "pending_updates": [{"id": "w1", "name": "w1", "owner_name": "ualice"}]
+                if pending else [],
+            }
+        if name == "apply_workspace_credential_updates":
+            if fail_apply:
                 raise ActivityError(
                     "failed", scheduled_event_id=1, started_event_id=2, identity="t",
-                    activity_type=name, activity_id="1", retry_state=RetryState.MAXIMUM_ATTEMPTS_REACHED,
-                ) from ApplicationError("not registered")
-            return {"ualice": ["s", "h"]}
-        if name == "rollout_template_workspaces":
-            return {"success": True, "template": "vscode-ws", "errors": []}
+                    activity_type=name, activity_id="1", retry_state=RetryState.TIMEOUT,
+                ) from ApplicationError("no control-plane worker")
+            return {"updated_now": 1, "errors": []}
         raise AssertionError(name)
 
     monkeypatch.setattr(setup.workflow, "execute_activity", execute_activity)
@@ -184,26 +264,35 @@ def _run_workflow(monkeypatch, fail_resolve=False, patched=True):
     return result, calls
 
 
-def test_workflow_resolves_credentials_on_the_control_plane(monkeypatch):
+def test_workflow_applies_credentials_on_the_control_plane(monkeypatch):
     result, calls = _run_workflow(monkeypatch)
     assert result.status == "completed", result
     assert [c[:2] for c in calls] == [
         ("discover_template_operations", None),
-        ("list_template_workspace_owners", None),  # coder worker
-        ("resolve_workspace_app_credentials", DEFAULT_TASK_QUEUE),  # control plane
-        ("rollout_template_workspaces", None),
+        ("rollout_template_workspaces", None),  # coder worker
+        ("apply_workspace_credential_updates", DEFAULT_TASK_QUEUE),  # control plane
     ]
-    assert calls[-1][2] == ["vscode", "/t", True, {"ualice": ["s", "h"]}]
+    assert calls[1][2] == ["vscode", "/t", True, True]
+    assert calls[2][2] == ["v2", [{"id": "w1", "name": "w1", "owner_name": "ualice"}]]
+    rollout = result.result["rollouts"][0]
+    assert rollout["updated_now"] == 1 and "pending_updates" not in rollout
 
 
-def test_workflow_fails_the_template_when_credentials_cannot_be_resolved(monkeypatch):
-    result, calls = _run_workflow(monkeypatch, fail_resolve=True)
+def test_workflow_skips_the_control_plane_without_running_workspaces(monkeypatch):
+    result, calls = _run_workflow(monkeypatch, pending=False)
+    assert result.status == "completed"
+    assert "apply_workspace_credential_updates" not in [c[0] for c in calls]
+
+
+def test_workflow_fails_the_template_when_the_control_plane_is_unavailable(monkeypatch):
+    result, _ = _run_workflow(monkeypatch, fail_apply=True)
     assert result.status == "completed_with_errors"
-    assert "rollout_template_workspaces" not in [c[0] for c in calls]
-    assert "could not resolve workspace credentials" in result.result["rollouts"][0]["error"]
+    rollout = result.result["rollouts"][0]
+    assert not rollout["success"]
+    assert "could not update running workspaces on the control plane" in rollout["error"]
 
 
-def test_workflow_replays_old_histories_without_the_lookup(monkeypatch):
+def test_workflow_replays_old_histories_without_the_deferral(monkeypatch):
     _, calls = _run_workflow(monkeypatch, patched=False)
     assert [c[0] for c in calls] == ["discover_template_operations", "rollout_template_workspaces"]
     assert calls[-1][2] == ["vscode", "/t"]
