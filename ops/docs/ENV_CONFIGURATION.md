@@ -116,9 +116,9 @@ literal after it — `${CONTAINER_NAME_PREFIX:-}coder` drops the prefix off
 production entirely, which is how Coder broke in b9339eba.
 
 Several things resolve Coder by container name and will not find it if the names
-drift: `ops/lib/common.sh` (`CODER_DETECTED`) and the worker's
-`coder_registry_container` setting (`CODER_REGISTRY_CONTAINER`, default
-`computor-coder-registry`).
+drift: `ops/lib/common.sh` (`CODER_DETECTED`) and the worker host's
+`computor-coder-hostops` units (`COMPUTOR_REGISTRY_CONTAINER` in
+`/etc/default/computor-coder-hostops`, default `computor-coder-registry`).
 
 ### Fail-Closed Variables
 

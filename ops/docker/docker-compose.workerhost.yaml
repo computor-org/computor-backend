@@ -15,7 +15,11 @@
 #     -f docker-compose.coder.yaml -f docker-compose.workerhost.yaml \
 #     up -d --build \
 #       temporal-worker-testing coder-socket-proxy workspace-ingress \
-#       coder-postgres coder coder-registry temporal-worker-coder
+#       coder-postgres coder coder-registry coder-worker-socket-proxy \
+#       temporal-worker-coder
+#
+# temporal-worker-coder also needs the host-side units in ops/coder/hostops
+# (volume chown, registry GC) installed on this host.
 #
 # depends_on of the cross-host services is reset because Temporal, Postgres,
 # Redis and MinIO do not run on this host. Required .env on the worker host:
@@ -52,7 +56,10 @@ services:
       - "${WORKERHOST_BIND_ADDRESS:?set WORKERHOST_BIND_ADDRESS in .env (wg address of this host)}:${WORKERHOST_INGRESS_PORT:-8081}:80"
 
   temporal-worker-coder:
-    depends_on: !reset []
+    # Only its Docker proxy runs on this host among its dependencies.
+    depends_on: !override
+      coder-worker-socket-proxy:
+        condition: service_started
     environment:
       TEMPORAL_HOST: ${WORKERHOST_CONTROL_ADDR}
       TEMPORAL_PORT: ${WORKERHOST_TEMPORAL_PORT:-7233}
