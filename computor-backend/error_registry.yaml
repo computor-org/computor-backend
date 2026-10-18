@@ -266,6 +266,29 @@ errors:
       - "Retry the action"
     documentation_url: "/docs/consent"
 
+  - code: AUTHZ_007
+    http_status: 403
+    category: authorization
+    severity: warning
+    title: "Two-Factor Sign-In Required"
+    message:
+      plain: "Your administrator and manager rights need a sign-in with a one-time code. Sign out, then sign in again and enter the code from your authenticator app."
+      markdown: "**Two-Factor Sign-In Required**\n\nYour administrator and manager rights need a sign-in with a one-time code. Sign out, then sign in again and enter the code from your authenticator app. Ordinary access keeps working in the meantime."
+      html: "<strong>Two-Factor Sign-In Required</strong><p>Your administrator and manager rights need a sign-in with a one-time code. Sign out, then sign in again and enter the code from your authenticator app. Ordinary access keeps working in the meantime.</p>"
+    internal_description: "The request was refused while the caller's elevated global roles were withheld because the SSO session's Keycloak ID token had no second factor in its amr claim (issues#485, auth/mfa.py)."
+    affected_functions:
+      - "PrincipalBuilder.build"
+      - "computor_exception_handler"
+    common_causes:
+      - "First sign-in after enrolling an authenticator (the enrolment login itself carries no OTP evidence)"
+      - "Session started before the role was granted or before admin MFA was enabled"
+      - "Signed in through an external identity provider that bypasses the Keycloak OTP step"
+    resolution_steps:
+      - "Sign out of Computor"
+      - "Sign in again and enter the one-time code"
+      - "If the authenticator is lost, ask a Keycloak master-realm administrator to reset it"
+    documentation_url: "/docs/authentication#admin-mfa"
+
   - code: AUTHZ_010
     http_status: 403
     category: authorization

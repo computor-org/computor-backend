@@ -31,6 +31,7 @@ import logging
 
 # Import refactored permission components
 from computor_backend.permissions.principal import Principal, build_claims
+from computor_backend.auth.mfa import admin_mfa_enforced, elevated_roles
 from computor_backend.permissions.core import (
     db_get_claims,
     db_get_course_claims,
@@ -190,11 +191,23 @@ async def _store_principal(cache_key: str, principal: Principal) -> None:
 
 class AuthenticationResult:
     """Result of authentication containing user info and roles"""
-    
+
     def __init__(self, user_id: str, role_ids: List[str], provider: str = "unknown"):
         self.user_id = user_id
         self.role_ids = role_ids
         self.provider = provider
+        # Interactive sessions must prove a second factor before elevated
+        # roles apply (#485). API tokens and service accounts are not gated.
+        self.mfa_gated = False
+        self.mfa_verified = False
+
+    @classmethod
+    def for_sso_session(cls, user_id: str, role_ids: List[str], session_data: dict) -> "AuthenticationResult":
+        """Result for a backend session minted by an SSO login (sso_session:*)."""
+        result = cls(user_id, role_ids, session_data.get("provider", "sso"))
+        result.mfa_gated = True
+        result.mfa_verified = session_data.get("mfa") is True
+        return result
 
 
 class AuthenticationService:
@@ -252,7 +265,7 @@ class AuthenticationService:
             await touch_login_seat(user_id, login_idle_seconds(db))
 
             logger.info(f"SSO authentication successful for user {user_id} via {provider}")
-            return AuthenticationResult(user_id, role_ids, provider)
+            return AuthenticationResult.for_sso_session(user_id, role_ids, session_data)
 
         except json.JSONDecodeError:
             raise UnauthorizedException(detail="Invalid session data format")
@@ -373,8 +386,48 @@ class PrincipalBuilder:
         # (_get_cached_principal) discards this snapshot rather than miss it.
         built_at = time.time()
 
+        # Load ``is_service`` and the ban marker in one query. This is the
+        # single place both SSO and API-token auth resolve the User row, and it
+        # runs on every cache MISS and every websocket auth — so it is the
+        # durable ban gate (source of truth). Reject banned users before a
+        # Principal is ever constructed.
+        row = (
+            db.query(User.is_service, User.banned_at)
+            .filter(User.id == auth_result.user_id)
+            .first()
+        )
+        if row is not None and row.banned_at is not None:
+            raise ForbiddenException(
+                error_code="AUTHZ_002",
+                detail="User account is banned",
+            )
+        # Surface ``User.is_service`` on the principal so endpoints can
+        # distinguish a worker / system account from a regular user
+        # without re-querying the DB. Used by worker-facing endpoints
+        # (e.g. tutor test ``input/download``) to bypass per-user
+        # ownership checks for the test-runner service account.
+        is_service = bool(row.is_service) if row is not None else False
+
+        # Admin MFA (#485): an SSO session without second-factor evidence keeps
+        # ordinary access but not _admin / global manager roles or their claims.
+        withheld = []
+        role_ids = list(auth_result.role_ids)
+        if (
+            getattr(auth_result, "mfa_gated", False)
+            and not getattr(auth_result, "mfa_verified", False)
+            and not is_service
+            and admin_mfa_enforced()
+        ):
+            withheld = elevated_roles(role_ids)
+            if withheld:
+                role_ids = [r for r in role_ids if r not in withheld]
+                logger.info(
+                    f"Withholding {sorted(withheld)} from user {auth_result.user_id}: "
+                    "SSO session lacks second-factor evidence"
+                )
+
         # Get user claims from database
-        claim_values = db_get_claims(auth_result.user_id, db)
+        claim_values = db_get_claims(auth_result.user_id, db, exclude_roles=withheld)
 
         # Get scoped claims (course / organization / course_family). Each
         # emits ``("permissions", "<scope>:<role>:<scope_id>")`` tuples
@@ -394,35 +447,14 @@ class PrincipalBuilder:
         # Build structured claims
         claims = build_claims(claim_values)
 
-        # Surface ``User.is_service`` on the principal so endpoints can
-        # distinguish a worker / system account from a regular user
-        # without re-querying the DB. Used by worker-facing endpoints
-        # (e.g. tutor test ``input/download``) to bypass per-user
-        # ownership checks for the test-runner service account.
-        # Load ``is_service`` and the ban marker in one query. This is the
-        # single place both SSO and API-token auth resolve the User row, and it
-        # runs on every cache MISS and every websocket auth — so it is the
-        # durable ban gate (source of truth). Reject banned users before a
-        # Principal is ever constructed.
-        row = (
-            db.query(User.is_service, User.banned_at)
-            .filter(User.id == auth_result.user_id)
-            .first()
-        )
-        if row is not None and row.banned_at is not None:
-            raise ForbiddenException(
-                error_code="AUTHZ_002",
-                detail="User account is banned",
-            )
-        is_service = bool(row.is_service) if row is not None else False
-
         # Create Principal
         return Principal(
             user_id=auth_result.user_id,
-            roles=auth_result.role_ids,
+            roles=role_ids,
             claims=claims,
             is_service=is_service,
             built_at=built_at,
+            withheld_roles=withheld,
         )
     
     @staticmethod
@@ -484,17 +516,31 @@ def parse_authorization_header(request: Request) -> Optional[SSOAuthCredentials 
     raise UnauthorizedException(detail=f"Unsupported auth scheme: {scheme}")
 
 
+def _note_withheld_roles(request: Optional[Request], principal: Principal) -> Principal:
+    """Let the 403 handler explain withheld roles (exceptions/error_handlers.py)."""
+    if request is not None and principal.withheld_roles:
+        request.state.mfa_withheld_roles = list(principal.withheld_roles)
+    return principal
+
+
 async def get_current_principal(
     credentials: Annotated[
         SSOAuthCredentials | ApiTokenCredentials,
         Depends(parse_authorization_header)
-    ]
+    ],
+    request: Request = None,
 ) -> Principal:
     """
     Main dependency for getting the current authenticated principal.
 
     Supports: API Token (X-API-Token), SSO Bearer token.
     """
+    return _note_withheld_roles(request, await _resolve_principal(credentials))
+
+
+async def _resolve_principal(
+    credentials: SSOAuthCredentials | ApiTokenCredentials,
+) -> Principal:
 
     # For cacheable auth methods, check cache FIRST before creating DB connection
     cache_key = None
@@ -574,7 +620,8 @@ async def get_current_principal_optional(
                     credentials.token, db
                 )
                 cache_key = principal_cache_key("sso_permissions", credentials.token)
-                return await PrincipalBuilder.build_with_cache(auth_result, cache_key, db)
+                principal = await PrincipalBuilder.build_with_cache(auth_result, cache_key, db)
+                return _note_withheld_roles(request, principal)
 
             else:
                 return None

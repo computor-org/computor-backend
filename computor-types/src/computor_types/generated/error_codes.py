@@ -22,6 +22,7 @@ class ErrorCode(str, Enum):
     AUTHZ_004 = "AUTHZ_004"  # Insufficient Course Role
     AUTHZ_005 = "AUTHZ_005"  # Role Escalation Denied
     AUTHZ_006 = "AUTHZ_006"  # Privacy Policy Consent Required
+    AUTHZ_007 = "AUTHZ_007"  # Two-Factor Sign-In Required
     AUTHZ_010 = "AUTHZ_010"  # Service Account Required
     VAL_001 = "VAL_001"  # Invalid Request Data
     VAL_002 = "VAL_002"  # Missing Required Field
@@ -124,6 +125,7 @@ ERROR_CATEGORIES = {
     ErrorCode.AUTHZ_004: "authorization",
     ErrorCode.AUTHZ_005: "authorization",
     ErrorCode.AUTHZ_006: "authorization",
+    ErrorCode.AUTHZ_007: "authorization",
     ErrorCode.AUTHZ_010: "authorization",
     ErrorCode.VAL_001: "validation",
     ErrorCode.VAL_002: "validation",

@@ -719,6 +719,9 @@ async def handle_sso_callback(
         # Stored so /auth/{provider}/logout can pass id_token_hint to Keycloak
         # and skip its logout-confirmation prompt.
         "id_token": (auth_result.session_data or {}).get("id_token"),
+        # Second-factor evidence (#485): without it, elevated roles are withheld
+        # from this session (permissions/auth.py PrincipalBuilder.build).
+        "mfa": (auth_result.session_data or {}).get("mfa") is True,
     }
 
     # Store session in Redis with TTL. authenticate_sso() in permissions/auth.py
@@ -734,6 +737,11 @@ async def handle_sso_callback(
 
     if enroll_pilot:
         await enroll_in_pilot_courses(db, user_primitives["id"])
+
+    # Elevated users must hold Keycloak's computor-mfa-required role (#485).
+    from computor_backend.business_logic.admin_mfa import sync_on_login
+
+    await sync_on_login(user_primitives["id"])
 
     # Store tokens in Redis if available
     if auth_result.access_token:
@@ -850,6 +858,8 @@ async def refresh_sso_token(
             # As at login: without it, logout after any refresh reached
             # Keycloak with no id_token_hint and stopped at its confirmation page.
             "id_token": (auth_result.session_data or {}).get("id_token"),
+            # The refreshed ID token re-states the Keycloak session's amr (#485).
+            "mfa": (auth_result.session_data or {}).get("mfa") is True,
         }
 
         # Store new session in Redis — keyed by token HASH to match authenticate_sso() lookup.
@@ -982,7 +992,10 @@ async def ensure_keycloak_admin(email: str, password: str) -> None:
         # Information") at login — clearing requiredActions cannot suppress
         # that, so backfill blank names (never clobber ones set by a human).
         existing = await kc.get_user(kc_user_id) or {}
-        updates: Dict[str, Any] = {"requiredActions": [], "emailVerified": True}
+        # Clear stuck required actions, except a pending authenticator
+        # enrolment: the admin MFA sync (#485) sets CONFIGURE_TOTP on purpose.
+        pending = [a for a in existing.get("requiredActions") or [] if a == "CONFIGURE_TOTP"]
+        updates: Dict[str, Any] = {"requiredActions": pending, "emailVerified": True}
         if not existing.get("firstName"):
             updates["firstName"] = "System"
         if not existing.get("lastName"):

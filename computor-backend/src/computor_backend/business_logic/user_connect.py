@@ -485,6 +485,11 @@ def connect_users(
     )
 
     invalidate_user_principals([target_user_id])
+    if roles_merged:
+        # Same bypass for the Keycloak MFA role sync (#485).
+        from computor_backend.business_logic.admin_mfa import schedule_admin_mfa_sync
+
+        schedule_admin_mfa_sync([target_user_id])
 
     logger.info(
         "Connected pre-provisioned user %s (%s) into %s: %d membership(s), %d profile(s), %d role(s)",

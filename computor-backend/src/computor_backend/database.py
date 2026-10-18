@@ -97,6 +97,7 @@ def _drop_post_commit_callbacks(session: Session) -> None:
 # ---------------------------------------------------------------------------
 
 _PERMISSION_STALE_KEY = "permission_stale_user_ids"
+_GLOBAL_ROLE_CHANGED_KEY = "global_role_changed_user_ids"
 
 
 def _permission_membership_models() -> tuple:
@@ -113,6 +114,7 @@ def _permission_membership_models() -> tuple:
 def _track_permission_membership_writes(session: Session, flush_context) -> None:
     # ``new``/``dirty``/``deleted`` still show the pre-flush state here.
     membership_models = _permission_membership_models()
+    user_role_model = membership_models[0]
     affected = None
     for obj in session.new.union(session.dirty).union(session.deleted):
         if isinstance(obj, membership_models):
@@ -121,6 +123,22 @@ def _track_permission_membership_writes(session: Session, flush_context) -> None
                 if affected is None:
                     affected = session.info.setdefault(_PERMISSION_STALE_KEY, set())
                 affected.add(str(user_id))
+                if isinstance(obj, user_role_model):
+                    session.info.setdefault(_GLOBAL_ROLE_CHANGED_KEY, set()).add(str(user_id))
+
+
+@event.listens_for(SessionLocal, "after_commit")
+def _sync_admin_mfa(session: Session) -> None:
+    """Global role grants/revocations reach Keycloak's MFA role (#485)."""
+    user_ids = session.info.pop(_GLOBAL_ROLE_CHANGED_KEY, None)
+    if not user_ids:
+        return
+    try:
+        from computor_backend.business_logic.admin_mfa import schedule_admin_mfa_sync
+
+        schedule_admin_mfa_sync(user_ids)
+    except Exception:  # must never break the request
+        logger.warning("Scheduling the admin MFA sync failed", exc_info=True)
 
 
 @event.listens_for(SessionLocal, "after_commit")
@@ -141,6 +159,7 @@ def _invalidate_stale_principals(session: Session) -> None:
 @event.listens_for(SessionLocal, "after_rollback")
 def _drop_stale_principal_tracking(session: Session) -> None:
     session.info.pop(_PERMISSION_STALE_KEY, None)
+    session.info.pop(_GLOBAL_ROLE_CHANGED_KEY, None)
 
 def _get_db(user_id: str | None = None) -> Generator[Session, None, None]:
     """

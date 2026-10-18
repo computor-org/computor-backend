@@ -19,7 +19,8 @@ ops/
 │
 ├── keycloak/                  # IdP registration one-shot (stdlib-only python),
 │                              # mounted by docker-compose.keycloak.yaml; plus
-│                              # setup_terms.py (computor.at only, see below)
+│                              # setup_terms.py (computor.at only, see below);
+│                              # setup_mfa.py: mandatory admin TOTP (ADMIN_MFA.md)
 │
 ├── lib/                       # Shared bash library for ./computor.sh
 │   ├── common.sh              # env loading, COMPOSE_FILES assembly, maintenance

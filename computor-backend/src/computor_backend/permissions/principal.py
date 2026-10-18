@@ -192,6 +192,11 @@ class Principal(BaseModel):
     roles: List[str] = Field(default_factory=list)
     claims: Claims = Field(default_factory=Claims)
 
+    # Elevated global roles the user holds but this credential may not use:
+    # an SSO session without second-factor evidence (#485, auth/mfa.py).
+    # They are absent from ``roles`` and contribute no claims.
+    withheld_roles: List[str] = Field(default_factory=list)
+
     class Config:
         arbitrary_types_allowed = True
     

@@ -30,6 +30,17 @@ async def computor_exception_handler(request: Request, exc: ComputorException) -
     is ONLY included when DEBUG_MODE is 'dev', 'development', or 'local'.
     In production, this sensitive information is hidden from API responses.
     """
+    # Admin MFA (#485): a refusal that may stem from roles withheld for lack
+    # of a second factor says so, instead of a bare "insufficient permissions".
+    if (
+        exc.status_code == 403
+        and exc.error_code not in ("AUTHZ_006", "AUTHZ_007")
+        and getattr(request.state, "mfa_withheld_roles", None)
+    ):
+        from computor_backend.exceptions.exceptions import MfaRequiredException
+
+        exc = MfaRequiredException()
+
     # Determine if we should include debug info (only in development/local mode)
     # Can be force-disabled via DISABLE_API_DEBUG_INFO env var for security
     include_debug = (
