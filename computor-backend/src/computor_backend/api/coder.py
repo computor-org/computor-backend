@@ -972,6 +972,9 @@ async def get_coder_session(
 ) -> CoderSessionResponse:
     """Login to Coder and get a session token."""
     _check_workspace_access(permissions, "session")
+    # A Coder session can read the caller's workspace build parameters,
+    # including the COMPUTOR_AUTH_TOKEN API token (#485).
+    assert_token_not_mfa_restricted(permissions)
     try:
         user = get_user_by_id(db, cache, str(permissions.user_id))
         session_token = await client.login_user(get_user_email(user), request.password)

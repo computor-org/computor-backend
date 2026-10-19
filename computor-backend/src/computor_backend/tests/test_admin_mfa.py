@@ -583,3 +583,126 @@ def test_principal_lookup_does_not_report_pre_policy_admin(redis, enforced):
     redis.data["sso_session:" + hash_token("pre-policy")] = json.dumps({"user_id": "admin-1"})
     resolved = run(resolve_principal_from_scope(scope))
     assert resolved is None or resolved["is_admin"] is False
+
+
+# ---------------------------------------------------------------------------
+# Workspaces carry an API token (review a353b P1: workspace bypass)
+# ---------------------------------------------------------------------------
+
+class _ForwardedRequest:
+    def __init__(self, uri):
+        self.headers = {"X-Forwarded-Uri": uri}
+        self.url = SimpleNamespace(path="/auth/verify-coder-access")
+        self.method = "GET"
+
+
+WORKSPACE_USER = "9f1c2d3e-4a5b-4c6d-8e7f-001122334455"
+
+
+@pytest.mark.parametrize("withheld", [["_admin"], ["_user_manager"], ["_workspace_maintainer"]])
+def test_restricted_session_gets_no_token_bearing_workspace(monkeypatch, withheld):
+    from computor_backend.api import auth as auth_api
+    from computor_backend.coder.naming import encode_coder_username
+    from computor_backend.permissions.principal import Principal
+
+    monkeypatch.setattr(auth_api, "bump_workspace_activity", lambda *_a: None)
+    restricted = Principal(user_id=WORKSPACE_USER, roles=["_workspace_user"],
+                           withheld_roles=withheld)
+    own = f"/coder/{encode_coder_username(WORKSPACE_USER)}/workspace/"
+    for uri in (own, "/coder/admin/workspace/"):
+        response = run(auth_api.verify_coder_access(_ForwardedRequest(uri), restricted))
+        assert response.status_code == 403, uri
+        assert json.loads(response.body)["error_code"] == "AUTHZ_007"
+
+
+def test_workspace_access_unchanged_without_withheld_roles(monkeypatch):
+    from computor_backend.api import auth as auth_api
+    from computor_backend.coder.naming import encode_coder_username
+    from computor_backend.permissions.principal import Principal
+
+    monkeypatch.setattr(auth_api, "bump_workspace_activity", lambda *_a: None)
+    own = f"/coder/{encode_coder_username(WORKSPACE_USER)}/workspace/"
+    student = Principal(user_id=WORKSPACE_USER, roles=["_workspace_user"])
+    assert run(auth_api.verify_coder_access(_ForwardedRequest(own), student)).status_code == 200
+    admin_with_otp = Principal(user_id=WORKSPACE_USER, roles=["_admin"])
+    assert run(auth_api.verify_coder_access(_ForwardedRequest(own), admin_with_otp)).status_code == 200
+    assert run(auth_api.verify_coder_access(
+        _ForwardedRequest("/coder/admin/workspace/"), admin_with_otp)).status_code == 200
+
+
+def test_restricted_session_gets_no_coder_session(monkeypatch):
+    from computor_types.coder import CoderLoginRequest
+
+    from computor_backend.api import coder as coder_api
+    from computor_backend.exceptions import MfaRequiredException
+
+    class _Client:
+        async def login_user(self, *_a):
+            raise AssertionError("Coder login reached")
+
+    # The restricted session keeps workspace:session through _workspace_user.
+    monkeypatch.setattr(coder_api, "_check_workspace_access", lambda *_a: None)
+    with pytest.raises(MfaRequiredException):
+        run(coder_api.get_coder_session(
+            CoderLoginRequest(password="pw"), _restricted(), None, _Client(), _NoDb(), None))
+
+
+# ---------------------------------------------------------------------------
+# WebSocket reauth adopts the new principal (review a353b P2)
+# ---------------------------------------------------------------------------
+
+def test_websocket_reauth_drops_authority_the_new_session_lacks(monkeypatch):
+    from contextlib import nullcontext
+
+    from computor_backend.permissions.principal import Principal
+    from computor_backend.websocket import connection_manager as cm
+    from computor_backend.websocket import handlers as ws_handlers
+    from computor_backend.websocket.auth import WebSocketCredential
+
+    async def _noop(*_a, **_k):
+        return None
+
+    monkeypatch.setattr(cm.pubsub, "subscribe", _noop)
+    monkeypatch.setattr(cm.pubsub, "unsubscribe", _noop)
+    sent = []
+
+    async def _record(_conn, payload):
+        sent.append(payload)
+
+    monkeypatch.setattr(ws_handlers.manager, "send_to_connection", _record)
+    monkeypatch.setattr(ws_handlers, "get_db_session", lambda: nullcontext(_NoDb()))
+
+    class _Socket:
+        def __init__(self):
+            self.closed = []
+
+        async def close(self, code, reason=""):
+            self.closed.append(code)
+
+    manager = cm.ConnectionManager()
+    monkeypatch.setattr(ws_handlers, "manager", manager)
+    monkeypatch.setattr(manager, "send_to_connection", _record)
+    admin = Principal(user_id="admin-1", roles=["_admin"])
+    socket = _Socket()
+    connection = cm.Connection(websocket=socket, principal=admin)
+    subscribed, failed = run(manager.subscribe(
+        connection, ["user:admin-1", "user:student-7", "global"], _NoDb()))
+    assert sorted(subscribed) == ["global", "user:admin-1", "user:student-7"] and not failed
+
+    restricted = Principal(user_id="admin-1", roles=["_workspace_user"], withheld_roles=["_admin"])
+
+    async def _authenticate(_token, refresh_session_ttl):
+        return restricted, WebSocketCredential(kind="sso")
+
+    monkeypatch.setattr(ws_handlers, "authenticate_websocket_token", _authenticate)
+    run(ws_handlers.handle_reauth(connection, SimpleNamespace(token="password-only")))
+
+    assert connection.principal is restricted
+    assert connection.subscriptions == {"user:admin-1", "global"}
+    assert [m["channel"] for m in sent if m.get("type") == "channel:error"] == ["user:student-7"]
+    assert sent[-1]["type"] == "system:reauthed"
+    assert "admin-1" not in manager._channel_subscribers.get("user:student-7", set())
+    # Later subscriptions are decided by the new principal, too.
+    _, failed = run(manager.subscribe(connection, ["user:student-7"], _NoDb()))
+    assert failed and failed[0][0] == "user:student-7"
+    assert socket.closed == []

@@ -32,6 +32,12 @@ sign-in.
   ("sign out and sign in again with your code") on admin actions. Such a
   session also cannot create API tokens (`/api-tokens`, the predefined-token
   endpoint) or a workspace auto-login token for its own account: `AUTHZ_007`.
+  It cannot open any workspace either (ForwardAuth answers 403 `AUTHZ_007`)
+  or obtain a Coder session, because every workspace holds an API token
+  (`COMPUTOR_AUTH_TOKEN`) with its owner's full roles. Ordinary users are
+  unaffected.
+- A WebSocket that re-authenticates (`system:reauth`) takes the new session's
+  roles; subscriptions the new session may not read are dropped.
 - Every cached permission set records the MFA policy it was built under. When
   `KEYCLOAK_ADMIN_MFA` changes, cached sessions are re-evaluated on their next
   request, also by the maintenance-mode bypass; no cache flush is needed.

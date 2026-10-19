@@ -387,6 +387,27 @@ class ConnectionManager:
                 await pubsub.unsubscribe(channel)
                 del self._channel_subscribers[channel]
 
+    async def revalidate_subscriptions(
+        self,
+        connection: Connection,
+        db: Session,
+    ) -> list[tuple[str, str]]:
+        """Re-check every subscription against ``connection.principal``.
+
+        Called after ``system:reauth`` replaced the principal: a same-user
+        credential can carry less authority than the one that opened the
+        socket (e.g. a session without second factor, #485), so channels the
+        new principal may not read are dropped. Returns (channel, reason) for
+        each dropped channel.
+        """
+        revoked = []
+        for channel in sorted(connection.subscriptions):
+            can_access, reason = await self._can_subscribe(connection.principal, channel, db)
+            if not can_access:
+                await self._unsubscribe_connection(connection, channel)
+                revoked.append((channel, reason))
+        return revoked
+
     async def _can_subscribe(
         self,
         principal: Principal,

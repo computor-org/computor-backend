@@ -21,6 +21,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from computor_backend.auth.mfa import mfa_policy_stamp
 from computor_backend.business_logic import consent as consent_logic
 from computor_backend.business_logic.consent import ConsentService
 from computor_backend.exceptions import BadRequestException, NotFoundException
@@ -50,6 +51,9 @@ class FakeRedis:
         for key in keys:
             self.store.pop(key, None)
 
+    async def mget(self, *keys):
+        return [self.store.get(key) for key in keys]
+
 
 @pytest.fixture
 def fake_redis(monkeypatch):
@@ -59,6 +63,9 @@ def fake_redis(monkeypatch):
         return redis
 
     monkeypatch.setattr("computor_backend.redis_cache.get_redis_client", _get_redis_client)
+    # The principal lookup goes through permissions.auth, which applies the
+    # ban flag, stale stamp and MFA policy stamp (#485) with its own import.
+    monkeypatch.setattr("computor_backend.permissions.auth.get_redis_client", _get_redis_client)
     return redis
 
 
@@ -131,7 +138,9 @@ def client(app):
 
 def seed_principal(redis, token, user_id, is_service=False, prefix="sso_permissions"):
     key = hashlib.sha256(f"{prefix}:{token}".encode()).hexdigest()
-    redis.store[key] = json.dumps({"user_id": user_id, "is_service": is_service})
+    redis.store[key] = json.dumps(
+        {"user_id": user_id, "is_service": is_service, "mfa_policy": mfa_policy_stamp()}
+    )
 
 
 def bearer(token=TOKEN):

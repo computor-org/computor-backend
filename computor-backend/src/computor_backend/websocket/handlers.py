@@ -280,6 +280,10 @@ async def handle_reauth(connection: Connection, event: WSReauth):
     token here, so the connection keeps its subscriptions instead of dropping
     and re-establishing all of them a minute later.
 
+    The new principal replaces the old one, and every subscription is checked
+    again against it; channels it may no longer read are dropped with a
+    ``channel:error`` (#485: a same-user credential can carry less authority).
+
     The new credential must belong to the same user. A socket is not a place to
     change identity: its subscriptions were authorised against the principal
     that opened it, and swapping that principal underneath them would hand the
@@ -311,9 +315,33 @@ async def handle_reauth(connection: Connection, event: WSReauth):
         await _reject_reauth(connection, "Token belongs to a different user")
         return
 
+    # The new credential decides what the socket may do from now on. It can
+    # carry less authority than the one that opened the socket (an admin
+    # re-arming with a session whose roles are withheld for lack of a second
+    # factor, #485), so the old principal must not survive the reauth and
+    # every existing subscription is re-checked against the new one.
+    connection.principal = principal
+    revoked = []
+    if connection.subscriptions:
+        try:
+            with get_db_session() as db:
+                revoked = await manager.revalidate_subscriptions(connection, db)
+        except Exception:
+            logger.exception(
+                f"WebSocket reauth: revalidating subscriptions failed for user={principal.user_id}"
+            )
+            await _reject_reauth(connection, "Could not revalidate subscriptions")
+            return
+
     connection.credential = credential
+    for channel, reason in revoked:
+        await manager.send_to_connection(connection, WSChannelError(
+            channel=channel,
+            reason=reason,
+        ).model_dump())
     logger.info(
         f"WebSocket reauthenticated: user={principal.user_id} expires_at={credential.expires_at}"
+        + (f", dropped {len(revoked)} subscription(s)" if revoked else "")
     )
     await manager.send_to_connection(connection, WSReauthed(
         user_id=str(principal.user_id),

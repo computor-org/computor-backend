@@ -67,11 +67,12 @@ class FakeWebSocket:
 
 @dataclass
 class FakeConnection:
-    """A Connection stand-in — the watchdog only touches these three fields."""
+    """A Connection stand-in with the fields the watchdog and reauth touch."""
 
     principal: SimpleNamespace
     credential: object = None
     websocket: FakeWebSocket = field(default_factory=FakeWebSocket)
+    subscriptions: set = field(default_factory=set)
 
 
 def _connection(credential=None, user_id="u-1") -> FakeConnection:

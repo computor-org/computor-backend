@@ -31,6 +31,7 @@ from computor_backend.permissions.auth import (
     principal_stale_key,
 )
 from computor_backend.permissions.principal import Principal
+from computor_backend.auth.mfa import mfa_policy_stamp
 from computor_backend.websocket.pubsub import CHANNEL_PREFIX
 
 
@@ -66,7 +67,9 @@ class FakeSyncRedis:
 
 
 def _cached(built_at):
-    return Principal(user_id=USER_ID, roles=["user"], built_at=built_at).model_dump_json()
+    return Principal(
+        user_id=USER_ID, roles=["user"], built_at=built_at, mfa_policy=mfa_policy_stamp()
+    ).model_dump_json()
 
 
 def _patched_redis(redis):
