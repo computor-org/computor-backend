@@ -22,6 +22,7 @@ from computor_backend.business_logic.registration_admission import (
     record_invite,
 )
 from computor_backend.exceptions import (
+    MfaRequiredException,
     BadRequestException,
     ForbiddenException,
     NotFoundException,
@@ -54,6 +55,9 @@ def _require_invite_manager(principal: Principal, db: Session) -> None:
     """Raise ForbiddenException unless caller is admin or has _user_manager role."""
     if principal.is_admin:
         return
+    if "_user_manager" in principal.withheld_roles:
+        # Held, but this session lacks second-factor evidence (#485).
+        raise MfaRequiredException()
     user_role = db.query(UserRole).filter(
         UserRole.user_id == principal.user_id,
         UserRole.role_id == "_user_manager",

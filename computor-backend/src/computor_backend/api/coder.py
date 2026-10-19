@@ -124,6 +124,7 @@ from computor_backend.business_logic.course_workspaces import (
 )
 from computor_types.course_workspaces import CourseWorkspaceAdminListResponse
 from computor_backend.database import get_db
+from computor_backend.business_logic.api_tokens import assert_token_not_mfa_restricted
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.redis_cache import get_cache, get_redis_client
@@ -567,6 +568,9 @@ async def provision_workspace(
                 )
         else:
             target_user = get_user_by_id(db, cache, str(permissions.user_id))
+        # The workspace auto-login token is a ctp_ token carrying the target's
+        # full role set; a session without its second factor gets none (#485).
+        assert_token_not_mfa_restricted(permissions, target_user.id)
 
         # Admission: the per-template seat quota (max running workspaces across
         # ALL users, admins included) and the instance-wide cap on concurrent
@@ -968,6 +972,9 @@ async def get_coder_session(
 ) -> CoderSessionResponse:
     """Login to Coder and get a session token."""
     _check_workspace_access(permissions, "session")
+    # A Coder session can read the caller's workspace build parameters,
+    # including the COMPUTOR_AUTH_TOKEN API token (#485).
+    assert_token_not_mfa_restricted(permissions)
     try:
         user = get_user_by_id(db, cache, str(permissions.user_id))
         session_token = await client.login_user(get_user_email(user), request.password)

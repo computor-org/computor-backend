@@ -71,6 +71,7 @@ export const ErrorCodes = {
   AUTHZ_004: "AUTHZ_004", // Insufficient Course Role
   AUTHZ_005: "AUTHZ_005", // Role Escalation Denied
   AUTHZ_006: "AUTHZ_006", // Privacy Policy Consent Required
+  AUTHZ_007: "AUTHZ_007", // Two-Factor Sign-In Required
   AUTHZ_010: "AUTHZ_010", // Service Account Required
   VAL_001: "VAL_001", // Invalid Request Data
   VAL_002: "VAL_002", // Missing Required Field
@@ -321,6 +322,20 @@ export const ERROR_DEFINITIONS: Record<string, ErrorDefinition> = {
     },
     retryAfter: undefined,
     documentationUrl: "/docs/consent",
+  },
+  AUTHZ_007: {
+    code: "AUTHZ_007",
+    httpStatus: 403,
+    category: ErrorCategory.AUTHORIZATION,
+    severity: ErrorSeverity.WARNING,
+    title: "Two-Factor Sign-In Required",
+    message: {
+      plain: "Your administrator and manager rights need a sign-in with a one-time code. Sign out, then sign in again and enter the code from your authenticator app.",
+      markdown: "**Two-Factor Sign-In Required**\n\nYour administrator and manager rights need a sign-in with a one-time code. Sign out, then sign in again and enter the code from your authenticator app. Ordinary access keeps working in the meantime.",
+      html: "<strong>Two-Factor Sign-In Required</strong><p>Your administrator and manager rights need a sign-in with a one-time code. Sign out, then sign in again and enter the code from your authenticator app. Ordinary access keeps working in the meantime.</p>",
+    },
+    retryAfter: undefined,
+    documentationUrl: "/docs/authentication#admin-mfa",
   },
   AUTHZ_010: {
     code: "AUTHZ_010",

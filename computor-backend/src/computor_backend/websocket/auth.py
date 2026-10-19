@@ -218,7 +218,6 @@ async def _authenticate_sso_token(
     try:
         session_data = json.loads(session_data_raw)
         user_id = session_data.get("user_id")
-        provider = session_data.get("provider", "sso")
 
         if not user_id:
             raise WebSocketAuthError(WS_CLOSE_AUTH_FAILED, "Invalid session data")
@@ -232,8 +231,8 @@ async def _authenticate_sso_token(
             )
             role_ids = [r[0] for r in results if r[0] is not None]
 
-            # Build authentication result
-            auth_result = AuthenticationResult(user_id, role_ids, provider)
+            # Build authentication result (SSO sessions are MFA-gated, #485)
+            auth_result = AuthenticationResult.for_sso_session(user_id, role_ids, session_data)
 
             # Build Principal with full claims
             principal = PrincipalBuilder.build(auth_result, db)

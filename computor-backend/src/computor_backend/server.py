@@ -186,6 +186,26 @@ async def startup_logic():
         else:
             print("[STARTUP] API_ADMIN_EMAIL/API_ADMIN_PASSWORD not set — skipping admin provisioning")
 
+        # Admin MFA (#485): every elevated backend user holds Keycloak's
+        # computor-mfa-required role, former holders lose it, and holders
+        # without an authenticator are asked to enrol at their next sign-in.
+        from computor_backend.auth.mfa import admin_mfa_enforced
+        if admin_mfa_enforced():
+            # Principals cached under another policy are rebuilt on their next
+            # use (auth/mfa.py:mfa_policy_stamp); no cache invalidation needed.
+            import asyncio
+            from computor_backend.business_logic.admin_mfa import reconcile_admin_mfa
+            for attempt in range(1, 6):
+                try:
+                    summary = await reconcile_admin_mfa()
+                    print(f"[STARTUP] Admin MFA reconciled: { {k: len(v) for k, v in (summary or {}).items()} }")
+                    break
+                except Exception as e:
+                    if attempt == 5:
+                        print(f"[STARTUP] Admin MFA reconcile failed after retries (non-fatal): {e}")
+                    else:
+                        await asyncio.sleep(3)
+
         # A git server refuses to create a second account for an address it
         # already knows. When the bootstrap admin shares its email with the git
         # server's own admin, the platform admin therefore never gets a git

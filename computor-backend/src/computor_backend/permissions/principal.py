@@ -192,6 +192,15 @@ class Principal(BaseModel):
     roles: List[str] = Field(default_factory=list)
     claims: Claims = Field(default_factory=Claims)
 
+    # Elevated global roles the user holds but this credential may not use:
+    # an SSO session without second-factor evidence (#485, auth/mfa.py).
+    # They are absent from ``roles`` and contribute no claims.
+    withheld_roles: List[str] = Field(default_factory=list)
+
+    # auth/mfa.py:mfa_policy_stamp() at build time. A cached Principal whose
+    # stamp differs from the current policy is rebuilt (None: pre-#485 entry).
+    mfa_policy: Optional[str] = None
+
     class Config:
         arbitrary_types_allowed = True
     

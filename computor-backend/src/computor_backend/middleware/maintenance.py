@@ -8,8 +8,6 @@ while allowing GET/HEAD/OPTIONS requests for read-only access.
 Admin users are NOT blocked - their requests pass through during maintenance.
 """
 
-import hashlib
-import json
 import logging
 import time
 from typing import Optional, Tuple
@@ -198,19 +196,21 @@ class MaintenanceMiddleware:
         """
         Check if a cached Principal indicates admin status.
 
-        Uses the same cache key format as permissions/auth.py:
-            sha256(f"{prefix}:{token}").hexdigest()
+        Uses permissions/auth.py's key and its cache-hit gates: an entry built
+        under another admin-MFA policy (#485), of a banned user or older than
+        the user's stale stamp does not count.
         """
         try:
-            from computor_backend.redis_cache import get_redis_client
+            from computor_backend.permissions.auth import (
+                get_current_cached_principal_data,
+                principal_cache_key,
+            )
 
-            cache_key = hashlib.sha256(f"{prefix}:{token}".encode()).hexdigest()
-            redis = await get_redis_client()
-            cached_data = await redis.get(cache_key)
-
-            if cached_data:
-                principal_data = json.loads(cached_data)
-                return principal_data.get("is_admin", False)
+            principal_data = await get_current_cached_principal_data(
+                principal_cache_key(prefix, token)
+            )
+            if principal_data:
+                return bool(principal_data.get("is_admin", False))
         except Exception:
             # Cache lookup failed — fall through and treat as non-admin to keep
             # the maintenance gate strict. Logged at debug to avoid spamming on

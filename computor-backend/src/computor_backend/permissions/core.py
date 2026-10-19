@@ -303,21 +303,22 @@ def can_perform_with_parents(
 
 
 # Database helper functions (keep existing implementations)
-def db_get_claims(user_id: str, db: Session) -> List[tuple]:
-    """Get claims for a user from database"""
+def db_get_claims(user_id: str, db: Session, exclude_roles=()) -> List[tuple]:
+    """Get claims for a user from database, ignoring ``exclude_roles``."""
     from computor_backend.model.role import RoleClaim
     from computor_backend.model.auth import User
-    
-    values = (
+
+    query = (
         db.query(RoleClaim.claim_type, RoleClaim.claim_value)
         .select_from(User)
         .join(UserRole, UserRole.user_id == User.id)
         .join(Role, Role.id == UserRole.role_id)
         .join(RoleClaim, RoleClaim.role_id == Role.id)
         .filter(User.id == user_id)
-        .distinct(RoleClaim.claim_type, RoleClaim.claim_value)
-        .all()
     )
+    if exclude_roles:
+        query = query.filter(~UserRole.role_id.in_(list(exclude_roles)))
+    values = query.distinct(RoleClaim.claim_type, RoleClaim.claim_value).all()
     
     # Convert to list and add default permissions
     values = list(values)

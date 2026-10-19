@@ -1,7 +1,7 @@
 """Per-target write-permission checks for message creation."""
 from sqlalchemy.orm import Session
 
-from computor_backend.exceptions import ForbiddenException, NotImplementedException
+from computor_backend.exceptions import ForbiddenException, NotImplementedException, MfaRequiredException
 from computor_backend.permissions.principal import Principal, course_role_hierarchy
 from computor_backend.permissions.roles import CourseRole, ScopeRole
 from computor_backend.model.course import (
@@ -58,6 +58,9 @@ def _check_global_write_permission(permissions: Principal, db: Session) -> None:
     """
     if permissions.is_admin:
         return
+    if "_user_manager" in permissions.withheld_roles:
+        # Held, but this session lacks second-factor evidence (#485).
+        raise MfaRequiredException()
 
     has_role = db.query(
         db.query(UserRole.user_id)

@@ -11,6 +11,7 @@ from computor_backend.exceptions import (
     BadRequestException,
     NotFoundException,
     ForbiddenException,
+    MfaRequiredException,
 )
 from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.principal import Principal
@@ -212,6 +213,29 @@ def assert_may_grant_scopes(
     )
 
 
+def assert_token_not_mfa_restricted(permissions: Principal, target_user_id=None) -> None:
+    """Refuse a new API token to a session whose elevated roles are withheld (#485).
+
+    An API token carries its owner's full role set and is not MFA-gated
+    (``AuthenticationResult`` for ``ctp_*`` tokens), so a password-only SSO
+    session of an administrator could otherwise trade itself for an
+    unrestricted credential. ``target_user_id=None`` refuses any token (the
+    ``/api-tokens`` endpoints); with a target, only a token for the caller's
+    own account is refused (workspace auto-login tokens provisioned for others
+    carry the target's roles, not the caller's).
+
+    Tokens that already exist, and sessions with second-factor evidence or
+    authenticated by an API token, are unaffected: automation keeps working.
+    """
+    if not permissions.withheld_roles:
+        return
+    if target_user_id is not None and str(target_user_id) != str(permissions.user_id):
+        return
+    raise MfaRequiredException(
+        context={"withheld_roles": sorted(permissions.withheld_roles)},
+    )
+
+
 def assert_may_mint_token_for(user, permissions: Principal) -> None:
     """Gate minting a token on behalf of another user.
 
@@ -270,6 +294,7 @@ def create_api_token(
         BadRequestException: If user not found or token generation fails
         ForbiddenException: If minting for another user without the authority
     """
+    assert_token_not_mfa_restricted(permissions)
     target_user_id = token_data.user_id or permissions.user_id
 
     # Verify user exists
@@ -589,6 +614,8 @@ def create_api_token_admin(
         ForbiddenException: If minting for another user without the authority
         BadRequestException: If user not found or token format invalid
     """
+    assert_token_not_mfa_restricted(permissions)
+
     # Verify user exists
     user_repo = UserRepository(db, cache)
     user = user_repo.get_by_id_optional(token_data.user_id)
@@ -715,6 +742,8 @@ async def get_or_create_singleton_token(
     """
     from computor_backend.permissions.api_token_cache import revoke_token_caches
 
+    # Before revoking anything: a refused session must not lose its tokens.
+    assert_token_not_mfa_restricted(permissions)
     target_user_id = token_data.user_id or str(permissions.user_id)
     token_repo = ApiTokenRepository(db, cache)
 

@@ -12,6 +12,7 @@ import httpx
 import jwt
 from jwt import InvalidTokenError as JWTError
 
+from computor_backend.auth.mfa import amr_values, has_mfa_evidence
 from computor_backend.plugins.base import (
     AuthenticationPlugin,
     AuthResult,
@@ -290,6 +291,10 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
                 # Kept so logout can pass id_token_hint to Keycloak's
                 # end_session_endpoint and skip the logout confirmation page.
                 "id_token": id_token,
+                # Second-factor evidence from the verified ID token (#485);
+                # see auth/mfa.py.
+                "amr": amr_values(claims),
+                "mfa": has_mfa_evidence(claims),
             }
         )
 

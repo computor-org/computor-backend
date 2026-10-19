@@ -28,6 +28,7 @@ from computor_backend.exceptions.exceptions import (
 
     # Authorization exceptions (403)
     ForbiddenException,
+    MfaRequiredException,
     CourseAccessDeniedException,
 
     # Validation exceptions (400)
@@ -103,6 +104,7 @@ __all__ = [
 
     # Authorization
     "ForbiddenException",
+    "MfaRequiredException",
     "CourseAccessDeniedException",
 
     # Validation

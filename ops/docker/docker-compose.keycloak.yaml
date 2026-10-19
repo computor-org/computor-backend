@@ -143,9 +143,13 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
       KEYCLOAK_AUTOMATION_CLIENT_ID: ${KEYCLOAK_AUTOMATION_CLIENT_ID:-}
       KEYCLOAK_AUTOMATION_CLIENT_SECRET: ${KEYCLOAK_AUTOMATION_CLIENT_SECRET:-}
+      # Mandatory TOTP for admins/managers (issues#485, ops/keycloak/setup_mfa.py).
+      # Off in dev; the prod overlay defaults it to true.
+      KEYCLOAK_ADMIN_MFA: ${KEYCLOAK_ADMIN_MFA:-false}
       IDENTITY_PROVIDERS_FILE: /idp/identity-providers.json
     volumes:
       - ../keycloak/setup_identity_providers.py:/setup_identity_providers.py:ro
+      - ../keycloak/setup_mfa.py:/setup_mfa.py:ro
       - ${SYSTEM_DEPLOYMENT_PATH}/keycloak/idp:/idp:ro
     entrypoint: ["python3", "/setup_identity_providers.py"]
     depends_on:

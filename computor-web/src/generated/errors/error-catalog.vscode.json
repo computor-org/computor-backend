@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "error_count": 84,
+  "error_count": 85,
   "errors": {
     "AUTH_001": {
       "code": "AUTH_001",
@@ -142,6 +142,19 @@
         "plain": "You must accept the current privacy policy before you can continue.",
         "markdown": "**Privacy Policy Consent Required**\n\nYou must review and accept the current privacy policy before you can continue. Open the Computor web app to give your consent.",
         "html": "<strong>Privacy Policy Consent Required</strong><p>You must review and accept the current privacy policy before you can continue. Open the Computor web app to give your consent.</p>"
+      },
+      "retry_after": null
+    },
+    "AUTHZ_007": {
+      "code": "AUTHZ_007",
+      "http_status": 403,
+      "category": "authorization",
+      "severity": "warning",
+      "title": "Two-Factor Sign-In Required",
+      "message": {
+        "plain": "Your administrator and manager rights need a sign-in with a one-time code. Sign out, then sign in again and enter the code from your authenticator app.",
+        "markdown": "**Two-Factor Sign-In Required**\n\nYour administrator and manager rights need a sign-in with a one-time code. Sign out, then sign in again and enter the code from your authenticator app. Ordinary access keeps working in the meantime.",
+        "html": "<strong>Two-Factor Sign-In Required</strong><p>Your administrator and manager rights need a sign-in with a one-time code. Sign out, then sign in again and enter the code from your authenticator app. Ordinary access keeps working in the meantime.</p>"
       },
       "retry_after": null
     },

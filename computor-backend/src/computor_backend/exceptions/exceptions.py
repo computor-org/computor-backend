@@ -278,6 +278,18 @@ class ForbiddenException(ComputorException):
         self.status_code = status.HTTP_403_FORBIDDEN
 
 
+class MfaRequiredException(ForbiddenException):
+    """Elevated roles withheld: the session lacks second-factor evidence (#485)."""
+
+    def __init__(self, **kwargs):
+        from computor_backend.exceptions.error_registry import get_error_definition
+
+        # Explicit detail: ComputorException passes detail=None up to
+        # HTTPException, which would turn it into "Internal Server Error".
+        kwargs.setdefault("detail", get_error_definition("AUTHZ_007").message.plain)
+        super().__init__(error_code="AUTHZ_007", **kwargs)
+
+
 class CourseAccessDeniedException(ComputorException):
     """Course access denied - 403"""
 

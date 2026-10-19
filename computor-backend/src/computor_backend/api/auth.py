@@ -25,6 +25,7 @@ from computor_backend.coder.keepalive import bump_workspace_activity
 from computor_backend.coder.naming import coder_username_matches_user
 from computor_backend.database import get_db
 from computor_backend.permissions.auth import get_current_principal, parse_authorization_header
+from computor_backend.exceptions.error_registry import get_error_definition
 from computor_backend.exceptions import (
     ComputorException,
     UnauthorizedException,
@@ -899,6 +900,27 @@ async def verify_coder_access(
         )
 
     url_owner, workspace_name = segments  # owner e.g. "u0232de59-..." or "admin"
+
+    # Every workspace carries an API token in its environment
+    # (COMPUTOR_AUTH_TOKEN, ops/coder/templates/*/agent.tf). For the caller's
+    # own workspace that token holds the caller's full roles and is not
+    # MFA-gated, so a session whose elevated roles are withheld for lack of a
+    # second factor (#485) would regain them by reading it from a terminal.
+    # Such sessions get no workspace until the user signs in with a code; the
+    # owner check below still applies to everyone else, so ordinary users are
+    # unaffected (they never have withheld roles).
+    if principal.withheld_roles:
+        logger.info(
+            "Refused workspace %s/%s to user %s: elevated roles withheld (no second factor)",
+            url_owner, workspace_name, principal.user_id,
+        )
+        return JSONResponse(
+            status_code=403,
+            content={
+                "error_code": "AUTHZ_007",
+                "detail": get_error_definition("AUTHZ_007").message.plain,
+            },
+        )
 
     logger.debug(
         "ForwardAuth request for workspace %s/%s by user %s",

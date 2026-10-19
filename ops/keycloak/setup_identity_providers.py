@@ -43,6 +43,7 @@ Env:
                                 used instead of KEYCLOAK_ADMIN / _PASSWORD
   IDENTITY_PROVIDERS_FILE       providers JSON path (default: /idp/identity-providers.json)
   IDP_<NAME>_CLIENT_SECRET      one per provider, named by its "clientSecretEnv"
+  KEYCLOAK_ADMIN_MFA            "true": reconcile mandatory admin TOTP (setup_mfa.py)
 """
 
 import json
@@ -422,6 +423,11 @@ def main():
                   cost=int(os.environ.get("KEYCLOAK_ABUSE_COST", "10000")),
                   ttl=int(os.environ.get("KEYCLOAK_ABUSE_TTL", "300")))
         _log("signup/recovery abuse protection reconciled")
+    if os.environ.get("KEYCLOAK_ADMIN_MFA") == "true":
+        # After abuse protection: both edit the bound reset-credentials flow.
+        from setup_mfa import configure as configure_mfa
+        configure_mfa(base, realm, token, os.environ.get("KEYCLOAK_CLIENT_ID", "computor-backend"))
+        _log("admin MFA (computor-mfa-required -> TOTP) reconciled")
 
     if not active:
         _log("no enabled providers — nothing else to configure")

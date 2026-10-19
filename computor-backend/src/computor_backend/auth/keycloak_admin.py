@@ -85,6 +85,28 @@ class KeycloakAdminClient:
             self._access_token = token_data["access_token"]
             return self._access_token
     
+    async def admin_request(
+        self,
+        method: str,
+        path: str,
+        json: Any = None,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> httpx.Response:
+        """Raw realm admin call: ``path`` is relative to /admin/realms/<realm>.
+
+        Returns the response without raising, so callers can branch on 404.
+        """
+        token = await self._get_admin_token()
+        url = f"{self.server_url}/admin/realms/{self.realm}{path}"
+        async with httpx.AsyncClient(verify=self.verify_ssl, timeout=30.0) as client:
+            return await client.request(
+                method,
+                url,
+                json=json,
+                params=params,
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
     async def create_user(self, user: KeycloakUser) -> str:
         """
         Create a new user in Keycloak.

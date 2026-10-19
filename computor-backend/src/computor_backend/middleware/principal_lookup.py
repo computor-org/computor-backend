@@ -97,19 +97,17 @@ async def _check_principal_cache(prefix: str, token: str) -> Optional[dict]:
     The cache key is derived via permissions/auth.py:principal_cache_key so the
     shared principal cache stays byte-identical across this middleware and the
     auth dependency (a divergence here would silently miss every warm entry).
+    Entries built under another admin-MFA policy, of banned users or older than
+    the user's stale stamp are not returned (permissions/auth.py:
+    get_current_cached_principal_data), so the maintenance bypass never acts on
+    roles the auth dependency would no longer grant.
     """
-    from computor_backend.redis_cache import get_redis_client
-    from computor_backend.permissions.auth import principal_cache_key
+    from computor_backend.permissions.auth import (
+        get_current_cached_principal_data,
+        principal_cache_key,
+    )
 
-    cache_key = principal_cache_key(prefix, token)
-    redis = await get_redis_client()
-    cached_data = await redis.get(cache_key)
-    if not cached_data:
-        return None
-    principal_data = json.loads(cached_data)
-    if not principal_data.get("user_id"):
-        return None
-    return principal_data
+    return await get_current_cached_principal_data(principal_cache_key(prefix, token))
 
 
 async def _api_token_revoked(token: str) -> bool:

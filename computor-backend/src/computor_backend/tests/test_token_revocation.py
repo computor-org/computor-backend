@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from computor_backend.auth.mfa import mfa_policy_stamp
 from computor_backend.exceptions import UnauthorizedException
 from computor_backend.permissions import api_token_cache
 from computor_backend.permissions.api_token_cache import (
@@ -52,7 +53,10 @@ class FakeRedis:
 
 
 def _principal_json():
-    return Principal(user_id="11111111-1111-1111-1111-111111111111", roles=["user"]).model_dump_json()
+    return Principal(
+        user_id="11111111-1111-1111-1111-111111111111", roles=["user"],
+        mfa_policy=mfa_policy_stamp(),
+    ).model_dump_json()
 
 
 @pytest.mark.asyncio

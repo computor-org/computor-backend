@@ -43,6 +43,7 @@ from computor_backend.business_logic.instance_limits import (
     user_is_staff,
 )
 from computor_backend.business_logic.public_workspace_capacity import reserve_public_container
+from computor_backend.business_logic.api_tokens import assert_token_not_mfa_restricted
 from computor_backend.exceptions import (
     BadRequestException,
     ComputorException,
@@ -713,6 +714,9 @@ async def provision_student_workspaces(
             outcomes.append(outcome)
             continue
         try:
+            # The workspace token carries the member's roles; a lecturer whose
+            # own elevated roles are withheld (#485) gets none for themselves.
+            assert_token_not_mfa_restricted(permissions, member.user_id)
             if has_admission_checks:
                 # Re-provisioning an existing workspace must not count itself.
                 exclude_id = None

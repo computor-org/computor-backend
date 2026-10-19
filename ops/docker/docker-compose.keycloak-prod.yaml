@@ -21,6 +21,12 @@ services:
       # Dev is unaffected (direct port access, no proxy) — this overlay is prod-only.
       KC_PROXY_HEADERS: "xforwarded"
 
+  keycloak-idp-setup:
+    environment:
+      # Mandatory TOTP for admins/managers (issues#485): flow, role and amr
+      # mapper are reconciled on every boot. Set KEYCLOAK_ADMIN_MFA=false to opt out.
+      KEYCLOAK_ADMIN_MFA: "${KEYCLOAK_ADMIN_MFA:-true}"
+
   uvicorn:
     depends_on:
       keycloak:
@@ -35,3 +41,6 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD:?}"
       KEYCLOAK_AUTOMATION_CLIENT_ID: "${KEYCLOAK_AUTOMATION_CLIENT_ID:-}"
       KEYCLOAK_AUTOMATION_CLIENT_SECRET: "${KEYCLOAK_AUTOMATION_CLIENT_SECRET:-}"
+      # Must match keycloak-idp-setup above: the backend withholds elevated
+      # roles from SSO sessions without OTP evidence and syncs the MFA role.
+      KEYCLOAK_ADMIN_MFA: "${KEYCLOAK_ADMIN_MFA:-true}"

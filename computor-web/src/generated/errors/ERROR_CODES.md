@@ -1,7 +1,7 @@
 # Error Code Reference
 
 **Auto-generated documentation**
-**Total errors:** 84
+**Total errors:** 85
 
 To regenerate: `bash generate_error_codes.sh`
 
@@ -387,6 +387,35 @@ The GDPR consent gate (ConsentGateMiddleware) blocked the request: the authentic
 1. Open the Computor web app
 2. Review and accept the current privacy policy on the consent page
 3. Retry the action
+
+---
+
+### AUTHZ_007 - Two-Factor Sign-In Required
+
+**HTTP Status:** `403`  
+**Severity:** `warning`  
+**Category:** `authorization`  
+**Documentation:** [/docs/authentication#admin-mfa](/docs/authentication#admin-mfa)  
+
+**Description:**  
+The request was refused while the caller's elevated global roles were withheld because the SSO session's Keycloak ID token had no second factor in its amr claim (issues#485, auth/mfa.py).
+
+**User Message:**  
+> Your administrator and manager rights need a sign-in with a one-time code. Sign out, then sign in again and enter the code from your authenticator app.
+
+**Affected Functions:**
+- `PrincipalBuilder.build`
+- `computor_exception_handler`
+
+**Common Causes:**
+- First sign-in after enrolling an authenticator (the enrolment login itself carries no OTP evidence)
+- Session started before the role was granted or before admin MFA was enabled
+- Signed in through an external identity provider that bypasses the Keycloak OTP step
+
+**Resolution Steps:**
+1. Sign out of Computor
+2. Sign in again and enter the one-time code
+3. If the authenticator is lost, ask a Keycloak master-realm administrator to reset it
 
 ---
 

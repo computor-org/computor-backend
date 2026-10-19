@@ -45,6 +45,8 @@ jobs:
           computor-backend/src/computor_backend/tests/test_keycloak_account_console_scopes.py
           computor-backend/src/computor_backend/tests/test_keycloak_token_verification.py
           computor-backend/src/computor_backend/tests/test_keycloak_logout.py
+          computor-backend/src/computor_backend/tests/test_admin_mfa.py
+          computor-backend/src/computor_backend/tests/test_admin_mfa_setup.py
           computor-backend/src/computor_backend/tests/test_log_redaction.py
           computor-backend/src/computor_backend/tests/test_public_luna_log_privacy.py
           computor-backend/src/computor_backend/tests/test_public_luna_queue.py
@@ -111,6 +113,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_public_luna_access.py
           computor-backend/src/computor_backend/tests/test_public_testing_admission.py
           computor-backend/src/computor_backend/tests/test_public_workspace_capacity.py
+          computor-backend/src/computor_backend/tests/test_admin_mfa_db.py
 
   grading-isolation:
     # Hostile-snippet tests for grading jobs (#237). Sandbox-dependent cases
@@ -166,3 +169,17 @@ jobs:
           docker pull postgres:16.15
       - name: Exercise signup and recovery on isolated Keycloak/Postgres
         run: python3 ops/keycloak/test_abuse_live.py --provider /tmp/computor-keycloak-providers/computor-keycloak-abuse.jar
+
+  keycloak-admin-mfa:
+    # Mandatory admin TOTP (issues#485) against a real Keycloak: flows, OTP,
+    # e-mail reset, backend role sync and the backend's amr evidence check.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+      - run: uv sync --project computor-backend --python 3.12 --locked --extra dev
+      - run: docker pull quay.io/keycloak/keycloak:26.7.4
+      - env:
+          CODER_ADMIN_EMAIL: ci@example.invalid
+          CODER_ADMIN_PASSWORD: synthetic-test-password
+        run: uv run --project computor-backend python ops/keycloak/test_mfa_live.py
