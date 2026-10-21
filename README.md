@@ -175,4 +175,4 @@ Start at **[docs/README.md](docs/README.md)** — the index and quick start. Fro
 
 ## License
 
-MIT
+Code: MIT (see [LICENSE](LICENSE)). Documentation (`docs/` and Markdown guides): CC BY 4.0 (see [LICENSE-DOCS](LICENSE-DOCS)).
