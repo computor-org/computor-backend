@@ -81,6 +81,7 @@ from computor_backend.api.course_workspaces import course_workspaces_router
 from computor_backend.api.course_deployment import course_deployment_router
 from computor_backend.api.course_member_import import course_member_import_router
 from computor_backend.api.course_member_gradings import course_member_gradings_router
+from computor_backend.api.course_analytics import course_analytics_router
 from computor_backend.api.workspace_roles import workspace_roles_router
 from computor_backend.api.maintenance import maintenance_router
 from computor_backend.api.system_limits import system_limits_router
@@ -694,6 +695,13 @@ app.include_router(
     course_member_gradings_router,
     prefix="/course-member-gradings",
     tags=["course-member-gradings", "progress"],
+    dependencies=[Depends(get_current_principal)]
+)
+
+app.include_router(
+    course_analytics_router,
+    prefix="/course-analytics",
+    tags=["course-analytics", "progress"],
     dependencies=[Depends(get_current_principal)]
 )
 
