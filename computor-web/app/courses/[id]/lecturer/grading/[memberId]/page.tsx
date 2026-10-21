@@ -14,6 +14,7 @@ import { CourseMemberGradingsClient } from '@/src/generated/clients/CourseMember
 import ProgressBar from '@/src/components/progress/ProgressBar';
 import ContentTree from '@/src/components/progress/ContentTree';
 import SubmissionCurve from '@/src/components/progress/SubmissionCurve';
+import StudentActivity from '@/src/components/progress/StudentActivity';
 import { usePersistedCourseDate } from '@/src/hooks/usePersistedCourseDate';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 
@@ -229,6 +230,9 @@ export default function StudentProgressPage() {
                 startDate={startDate}
                 dueDate={dueDate}
               />
+
+              {/* Flags, attempt timeline and history of runs/submissions/feedback */}
+              <StudentActivity courseMemberId={memberId} dueAt={dueDate} />
 
               {/* Charts Row */}
               <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">

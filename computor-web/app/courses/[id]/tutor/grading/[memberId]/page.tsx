@@ -1,0 +1,190 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
+import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
+import PageHeader from '@/src/components/PageHeader';
+import ErrorBanner from '@/src/components/ErrorBanner';
+import EmptyState from '@/src/components/EmptyState';
+import Panel from '@/src/components/ui/Panel';
+import Score from '@/src/components/ui/Score';
+import Badge from '@/src/components/Badge';
+import GradingStatusBadge from '@/src/components/student/gradingStatus';
+import GradingPanel from '@/src/components/student/GradingPanel';
+import TestResultTree, { type TestRunResult } from '@/src/components/student/TestResultTree';
+import TutorGradeForm from '@/src/components/tutor/TutorGradeForm';
+import { memberName, tutorsClient } from '@/src/components/tutor/tutorData';
+import { useResource } from '@/src/hooks/useResource';
+import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
+import type { CourseContentStudentList, TutorGradeCreate } from 'types/generated';
+
+/** Read `?content=` once on the client; avoids a Suspense boundary for useSearchParams. */
+function initialContent(): string | null {
+  if (typeof window === 'undefined') return null;
+  return new URLSearchParams(window.location.search).get('content');
+}
+
+function isAssignment(c: CourseContentStudentList): boolean {
+  return c.course_content_kind_id !== 'unit';
+}
+
+/**
+ * One student's assignments for a tutor: the latest test result, earlier
+ * grades and feedback, and the form to grade the latest submission.
+ */
+export default function TutorStudentGradingPage() {
+  const params = useParams();
+  const courseId = params.id as string;
+  const memberId = params.memberId as string;
+  const [selected, setSelected] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Deep link from the submissions queue (?content=<id>).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelected(initialContent());
+  }, []);
+
+  const member = useResource(
+    () => tutorsClient.tutorGetCourseMembersEndpointTutorsCourseMembersCourseMemberIdGet({ courseMemberId: memberId }),
+    [memberId],
+  );
+  const contents = useResource(
+    () => tutorsClient.tutorListCourseContentsEndpointTutorsCourseMembersCourseMemberIdCourseContentsGet({ courseMemberId: memberId }),
+    [memberId],
+  );
+  const detail = useResource(
+    () =>
+      selected
+        ? tutorsClient.tutorGetCourseContentsEndpointTutorsCourseMembersCourseMemberIdCourseContentsCourseContentIdGet({
+            courseMemberId: memberId,
+            courseContentId: selected,
+          })
+        : Promise.resolve(null),
+    [memberId, selected],
+  );
+
+  const name = member.data ? memberName(member.data) : 'Student';
+  const crumbs = useCourseCrumbs(
+    courseId,
+    { label: 'Tutor', href: `/courses/${courseId}/tutor` },
+    { label: 'Grading', href: `/courses/${courseId}/tutor/grading` },
+    name,
+  );
+
+  const assignments = (contents.data ?? []).filter(isAssignment).sort((a, b) => a.path.localeCompare(b.path));
+  const item = detail.data;
+  const group = item?.submission_group ?? null;
+  const resultJson = item?.result?.result_json as TestRunResult | undefined;
+
+  function select(id: string) {
+    setSelected(id);
+    const url = new URL(window.location.href);
+    url.searchParams.set('content', id);
+    window.history.replaceState(null, '', url.toString());
+  }
+
+  async function grade(body: TutorGradeCreate) {
+    if (!selected) return;
+    await tutorsClient.tutorUpdateCourseContentsEndpointTutorsCourseMembersCourseMemberIdCourseContentsCourseContentIdPatch({
+      courseMemberId: memberId,
+      courseContentId: selected,
+      body,
+    });
+    await Promise.all([detail.refresh(), contents.refresh()]);
+  }
+
+  return (
+    <AuthenticatedLayout>
+      <ListPageLayout>
+        <PageHeader breadcrumbs={crumbs} title={name} subtitle={member.data?.user?.email ?? undefined} />
+        <ScrollArea>
+          <ErrorBanner>{member.error || contents.error}</ErrorBanner>
+          <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 items-start">
+            <Panel padding="none">
+              <div className="px-4 py-3 border-b border-rule">
+                <h3 className="text-sm font-semibold text-fg">Assignments</h3>
+              </div>
+              {contents.loading ? (
+                <div className="h-40 bg-sunken animate-pulse" />
+              ) : assignments.length === 0 ? (
+                <div className="p-4"><EmptyState compact title="No assignments." /></div>
+              ) : (
+                <ul className="divide-y divide-rule-soft">
+                  {assignments.map((c) => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onClick={() => select(c.id)}
+                        className={`w-full text-left px-4 py-2.5 hover:bg-accent-wash/50 ${selected === c.id ? 'bg-accent-wash' : ''}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium text-fg truncate">{c.title || c.path}</span>
+                          {(c.unreviewed_count ?? 0) > 0 && <Badge tone="warning">to review</Badge>}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Score value={c.result?.result ?? null} />
+                          <span className="text-xs text-subtle">
+                            {c.submission_count} submission{c.submission_count === 1 ? '' : 's'} · {c.result_count} runs
+                          </span>
+                          <GradingStatusBadge status={c.status ?? null} />
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
+
+            <div className="space-y-4">
+              {!selected ? (
+                <EmptyState compact title="Choose an assignment on the left." />
+              ) : detail.loading ? (
+                <div className="h-64 bg-sunken rounded-lg animate-pulse" />
+              ) : detail.error ? (
+                <ErrorBanner>{detail.error}</ErrorBanner>
+              ) : item ? (
+                <>
+                  <Panel className="space-y-2">
+                    <h3 className="text-sm font-semibold text-fg">{item.title || item.path}</h3>
+                    <p className="text-sm text-muted">
+                      Latest test result: <Score value={item.result?.result ?? null} decimals={1} /> ·{' '}
+                      {item.submission_count} submission{item.submission_count === 1 ? '' : 's'} ·{' '}
+                      {item.result_count} test runs
+                    </p>
+                  </Panel>
+
+                  <Panel className="space-y-3">
+                    <h3 className="text-sm font-semibold text-fg">Grade the latest submission</h3>
+                    {group?.latest_submitted_artifact_id ? (
+                      <TutorGradeForm
+                        key={`${selected}-${group.latest_submitted_artifact_id}`}
+                        artifactId={group.latest_submitted_artifact_id}
+                        initialPercent={item.result?.result ?? null}
+                        onSubmit={grade}
+                      />
+                    ) : (
+                      <EmptyState compact title="Nothing submitted yet." description="Grading needs an official submission." />
+                    )}
+                  </Panel>
+
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-fg">Grades and feedback</h3>
+                    <GradingPanel group={group} submitted={item.submitted} audience="staff" />
+                  </div>
+
+                  {resultJson?.tests && resultJson.tests.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-fg">Latest test details</h3>
+                      <TestResultTree tests={resultJson.tests} />
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </div>
+          </div>
+        </ScrollArea>
+      </ListPageLayout>
+    </AuthenticatedLayout>
+  );
+}

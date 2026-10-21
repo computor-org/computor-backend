@@ -1576,3 +1576,154 @@ export interface TutorCourseMemberList {
   unread_message_count?: number | null;
   user: UserList;
 }
+
+/**
+ * One concrete failing run that produced an error group.
+ */
+export interface TypicalErrorExample {
+  result_id: string;
+  course_member_id: string;
+  student_name?: string | null;
+  created_at?: string | null;
+  /** The original, un-normalized message of this run */
+  message?: string | null;
+}
+
+/**
+ * A failing test and normalized message shared by one or more runs.
+ */
+export interface TypicalError {
+  course_content_id: string;
+  course_content_title?: string | null;
+  /** Failing test, as 'collection / test' */
+  test_name: string;
+  /** Normalized message: numbers, quoted values and paths replaced by placeholders */
+  message: string;
+  /** Number of failing runs in this group */
+  occurrences: number;
+  /** Distinct course members with at least one such run */
+  affected_students: number;
+  first_seen_at?: string | null;
+  last_seen_at?: string | null;
+  /** Up to three example runs, newest first */
+  examples?: TypicalErrorExample[];
+}
+
+/**
+ * Aggregated failing tests for a course or one assignment.
+ */
+export interface TypicalErrorsGet {
+  course_id: string;
+  course_content_id?: string | null;
+  /** Test runs whose stored report was read */
+  results_scanned: number;
+  /** Scanned runs for which no stored test report was available */
+  results_without_report: number;
+  /** True when more runs exist than were scanned (newest runs are scanned first) */
+  truncated: boolean;
+  errors?: TypicalError[];
+}
+
+/**
+ * One entry of a student's chronological history.
+ */
+export interface ActivityEvent {
+  /** 'test_run', 'submission' or 'grading' */
+  kind: string;
+  at: string;
+  course_content_id: string;
+  course_content_title?: string | null;
+  result_id?: string | null;
+  artifact_id?: string | null;
+  /** 0.0-1.0; test result or human grade */
+  grade?: number | null;
+  /** Test system status for runs, grading status slug for gradings */
+  status?: string | null;
+  /** Test run executed on an official submission */
+  is_submission?: boolean;
+  feedback?: string | null;
+  graded_by?: string | null;
+}
+
+/**
+ * Attempt timeline ("Bearbeitungsverlauf") of one student on one assignment.
+ */
+export interface AttemptTimeline {
+  course_content_id: string;
+  course_content_title?: string | null;
+  test_runs?: number;
+  submissions?: number;
+  first_activity_at?: string | null;
+  last_activity_at?: string | null;
+  first_submission_at?: string | null;
+  last_submission_at?: string | null;
+  /** First test run that reached the full score */
+  first_full_score_at?: string | null;
+  best_grade?: number | null;
+  latest_grade?: number | null;
+  /** Distinct calendar days (UTC) with a run or submission */
+  active_days?: number;
+  /** Median time between consecutive test runs */
+  median_gap_minutes?: number | null;
+  /** Estimate: sum of gaps between consecutive runs that are at most session_gap_minutes apart. Work without test runs is not visible. */
+  estimated_active_minutes?: number | null;
+  /** Due date minus last submission in hours (negative = after the due date); only with due_at */
+  hours_before_due?: number | null;
+}
+
+/**
+ * A rule that fired for a student, with the evidence behind it.
+ */
+export interface FlagReason {
+  /** many_failed_attempts | last_minute | late_submission | sudden_jump | inactive | low_progress */
+  code: string;
+  /** 'info' or 'warning' */
+  severity: string;
+  title: string;
+  /** Plain-language explanation with the numbers that triggered it */
+  reason: string;
+  course_content_id?: string | null;
+  course_content_title?: string | null;
+}
+
+/**
+ * Description of one rule and its threshold, as applied to this response.
+ */
+export interface FlagRule {
+  code: string;
+  title: string;
+  description: string;
+}
+
+/**
+ * History, attempt timelines and flags for one course member.
+ */
+export interface StudentActivityGet {
+  course_member_id: string;
+  course_id: string;
+  due_at?: string | null;
+  session_gap_minutes: number;
+  /** Newest first */
+  events?: ActivityEvent[];
+  timelines?: AttemptTimeline[];
+  flags?: FlagReason[];
+  rules?: FlagRule[];
+}
+
+export interface StudentFlags {
+  course_member_id: string;
+  student_name?: string | null;
+  student_id?: string | null;
+  flags?: FlagReason[];
+}
+
+/**
+ * Rule-based flags ("Auffälligkeiten") for every student of a course.
+ */
+export interface CourseFlagsGet {
+  course_id: string;
+  due_at?: string | null;
+  rules?: FlagRule[];
+  /** Only students with at least one flag */
+  students?: StudentFlags[];
+}
