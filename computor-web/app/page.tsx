@@ -6,17 +6,11 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import PublicCourseCatalog from '@/src/components/courses/PublicCourseCatalog';
-import LearningOptions, { COMPUTOR_EXTENSION_URL } from '@/src/components/courses/LearningOptions';
+import LearningOptions from '@/src/components/courses/LearningOptions';
 import LegalLinks from '@/src/components/LegalLinks';
 import NetideeNotice from '@/src/components/NetideeNotice';
 import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
 
-const GUIDE_URL = 'https://github.com/computor-org/computor-vscode/blob/main/docs/quick-start.md';
-const guideLink = (label: string) => (
-  <a href={GUIDE_URL} target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline font-medium">
-    {label}
-  </a>
-);
 const mention = (name: string) => <code className="bg-accent-wash text-accent-text px-1 rounded text-xs">{name}</code>;
 
 const COPY = {
@@ -26,25 +20,14 @@ const COPY = {
     heroTitle: 'Programmieren lernen mit',
     heroLead: 'Programmieren Schritt für Schritt.',
     heroScope: 'Die Kurse reichen von den ersten Schritten über Funktionen, Datenstrukturen und Visualisierung bis zu Datenanalyse, Differentialgleichungen und objektorientierter Programmierung.',
-    download: 'VS-Code-Erweiterung herunterladen',
     toCourses: 'Zu den Kursen →',
     startTitle: 'Erste Schritte',
-    startHow: 'Du arbeitest direkt im Browser oder in VS Code auf deinem eigenen Rechner. Leg dazu ein Konto an und starte die Kursumgebung.',
+    startHow: 'Alles läuft im Browser, ohne Installation. Leg ein Konto an, öffne einen Kurs und starte die Kursumgebung.',
     startFirst: <>Beginne am besten mit <strong className="text-fg">Data Science mit Python &ndash; Grundlagen</strong>. Die erste Aufgabe, <em>&bdquo;Mathematische Konstanten&ldquo;</em> in Woche 1, führt in Variablen und Datentypen ein.</>,
     workflowTitle: 'Arbeitsablauf',
     workflow: <>Jede Aufgabe ist eine Python-Datei, die du bearbeitest und ausführst. Mit den Schaltflächen neben dem Aufgabennamen testest du deine Lösung und reichst sie ein. <em>Commit Assignment</em> speichert deinen Zwischenstand, ohne zu testen oder einzureichen.</>,
     lenaTitle: 'KI-Tutorin Lena',
     lena: <>Lena beantwortet Fragen zu den Aufgaben und gibt Hinweise, aber keine fertigen Lösungen. Öffne im Aufgabenbaum <em>Show Messages</em> und erwähne in deiner Frage {mention('@lena')} oder {mention('@ai')}.</>,
-    extensionTitle: 'Computor-Erweiterung für VS Code',
-    extension: 'Aufgaben bearbeiten, testen und einreichen, ohne VS Code zu verlassen.',
-    badges: ['Sofortiges Testen', 'Automatisches Einreichen', 'Live-Feedback', 'Git-Integration'],
-    offlineTitle: 'Kursumgebung nicht erreichbar?',
-    offline: <>Dann arbeite lokal in VS Code weiter. Die {guideLink('Kurzanleitung')} erklärt die Einrichtung.</>,
-    features: [
-      ['Interaktive Kurse', 'Strukturierte Programmierkurse mit praxisnahen Aufgaben und Projekten.'],
-      ['Automatisiertes Testen', 'Code einreichen und sofort Feedback aus automatischen Tests erhalten.'],
-      ['Gemeinsames Lernen', 'In Gruppen arbeiten, Lösungen teilen und gemeinsam mit anderen lernen.'],
-    ],
     footer: 'Interaktive Lernplattform für Programmierung.',
   },
   en: {
@@ -53,25 +36,14 @@ const COPY = {
     heroTitle: 'Learn programming with',
     heroLead: 'Programming step by step.',
     heroScope: 'The courses range from first steps through functions, data structures and visualization to data analysis, differential equations and object-oriented programming.',
-    download: 'Download the VS Code extension',
     toCourses: 'Browse courses →',
     startTitle: 'Getting started',
-    startHow: 'Work directly in the browser or in VS Code on your own computer. Create an account, then start the course environment.',
+    startHow: 'Everything runs in the browser, no installation needed. Create an account, open a course and start the course environment.',
     startFirst: <>We recommend starting with <strong className="text-fg">Data Science mit Python &ndash; Grundlagen</strong>. Its first task, <em>&ldquo;Mathematical Constants&rdquo;</em> in week 1, introduces variables and data types.</>,
     workflowTitle: 'How it works',
     workflow: <>Each task is a Python file that you edit and run. The buttons next to the task name test and submit your solution. <em>Commit Assignment</em> saves your progress without testing or submitting.</>,
     lenaTitle: 'Lena, the AI tutor',
     lena: <>Lena answers questions about the tasks and gives hints, but no complete solutions. Open <em>Show Messages</em> in the task tree and mention {mention('@lena')} or {mention('@ai')} in your question.</>,
-    extensionTitle: 'Computor VS Code extension',
-    extension: 'Edit, test and submit assignments without leaving VS Code.',
-    badges: ['Instant testing', 'Automatic submission', 'Live feedback', 'Git integration'],
-    offlineTitle: 'Course environment unavailable?',
-    offline: <>Keep working locally in VS Code. The {guideLink('quick start guide')} explains the setup.</>,
-    features: [
-      ['Interactive courses', 'Structured programming courses with hands-on assignments and projects.'],
-      ['Automated testing', 'Submit your code and get immediate feedback from automated tests.'],
-      ['Learning together', 'Work in groups, share solutions and learn with your peers.'],
-    ],
     footer: 'Interactive learning platform for programming.',
   },
 };
@@ -84,7 +56,6 @@ export default function Home() {
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
-  const extensionUrl = COMPUTOR_EXTENSION_URL;
   const gettingStartedUrl = '/learn';
 
   // `/` is the public landing page and stays viewable when signed in (the header
@@ -96,11 +67,6 @@ export default function Home() {
     router.push('/');
   };
 
-  const handleDownload = () => {
-    if (extensionUrl) {
-      window.open(extensionUrl, '_blank', 'noopener,noreferrer');
-    }
-  };
 
   const handleGettingStarted = () => {
     if (gettingStartedUrl) {
@@ -164,21 +130,10 @@ export default function Home() {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            {extensionUrl ? (
-              <button
-                className="px-8 py-4 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-all transform hover:scale-105 font-semibold text-lg shadow-lg flex items-center space-x-2"
-                onClick={handleDownload}
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                <span>{t.download}</span>
-              </button>
-            ) : null}
             {gettingStartedUrl ? (
               <button
                 onClick={handleGettingStarted}
-                className="px-8 py-4 bg-surface text-accent-text rounded-lg border-2 border-accent hover:bg-accent-wash transition-all font-semibold text-lg"
+                className="px-8 py-4 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-all transform hover:scale-105 font-semibold text-lg shadow-lg"
               >
                 {t.toCourses}
               </button>
@@ -219,71 +174,6 @@ export default function Home() {
               </div>
               <p className="text-muted text-sm leading-relaxed">
                 {t.lena}
-              </p>
-            </div>
-          </div>
-
-          {/* VS Code Extension Card */}
-          <div className="mt-16 bg-surface rounded-2xl shadow-xl p-8 border border-rule">
-            <div className="flex items-center justify-center space-x-3 mb-4">
-              <svg className="h-10 w-10 text-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-              </svg>
-              <h3 className="text-2xl font-bold text-fg">
-                {t.extensionTitle}
-              </h3>
-            </div>
-            <p className="text-muted mb-6 max-w-2xl mx-auto">
-              {t.extension}
-            </p>
-            <div className="flex flex-wrap gap-4 justify-center">
-              {t.badges.map(badge => (
-                <div key={badge} className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium">
-                  ✓ {badge}
-                </div>
-              ))}
-            </div>
-            <div className="mt-6 pt-6 border-t border-rule text-left">
-              <p className="text-sm font-semibold text-fg mb-1">{t.offlineTitle}</p>
-              <p className="text-sm text-muted leading-relaxed">
-                {t.offline}
-              </p>
-            </div>
-          </div>
-
-          {/* Features Grid */}
-          <div className="grid md:grid-cols-3 gap-8 mt-16">
-            <div className="bg-surface rounded-xl shadow-lg p-6 border border-rule">
-              <svg className="h-12 w-12 text-accent-text mb-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-              <h3 className="text-xl font-bold text-fg mb-2">
-                {t.features[0][0]}
-              </h3>
-              <p className="text-muted">
-                {t.features[0][1]}
-              </p>
-            </div>
-            <div className="bg-surface rounded-xl shadow-lg p-6 border border-rule">
-              <svg className="h-12 w-12 text-accent-text mb-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-              </svg>
-              <h3 className="text-xl font-bold text-fg mb-2">
-                {t.features[1][0]}
-              </h3>
-              <p className="text-muted">
-                {t.features[1][1]}
-              </p>
-            </div>
-            <div className="bg-surface rounded-xl shadow-lg p-6 border border-rule">
-              <svg className="h-12 w-12 text-accent-text mb-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-              <h3 className="text-xl font-bold text-fg mb-2">
-                {t.features[2][0]}
-              </h3>
-              <p className="text-muted">
-                {t.features[2][1]}
               </p>
             </div>
           </div>
