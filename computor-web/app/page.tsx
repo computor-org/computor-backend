@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import PublicCourseCatalog from '@/src/components/courses/PublicCourseCatalog';
-import LearningOptions from '@/src/components/courses/LearningOptions';
+import { CODESPACES_URL, COMPUTOR_EXTENSION_URL } from '@/src/components/courses/LearningOptions';
 import LegalLinks from '@/src/components/LegalLinks';
 import NetideeNotice from '@/src/components/NetideeNotice';
 import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
@@ -19,15 +19,15 @@ const COPY = {
     signOut: 'Abmelden',
     heroTitle: 'Programmieren lernen mit',
     heroLead: 'Programmieren Schritt für Schritt.',
-    heroScope: 'Die Kurse reichen von den ersten Schritten über Funktionen, Datenstrukturen und Visualisierung bis zu Datenanalyse, Differentialgleichungen und objektorientierter Programmierung.',
-    toCourses: 'Zu den Kursen →',
-    startTitle: 'Erste Schritte',
-    startHow: 'Alles läuft im Browser, ohne Installation. Leg ein Konto an, öffne einen Kurs und starte die Kursumgebung.',
-    startFirst: <>Beginne am besten mit <strong className="text-fg">Data Science mit Python &ndash; Grundlagen</strong>. Die erste Aufgabe, <em>&bdquo;Mathematische Konstanten&ldquo;</em> in Woche 1, führt in Variablen und Datentypen ein.</>,
-    workflowTitle: 'Arbeitsablauf',
-    workflow: <>Jede Aufgabe ist eine Python-Datei, die du bearbeitest und ausführst. Mit den Schaltflächen neben dem Aufgabennamen testest du deine Lösung und reichst sie ein. <em>Commit Assignment</em> speichert deinen Zwischenstand, ohne zu testen oder einzureichen.</>,
-    lenaTitle: 'KI-Tutorin Lena',
-    lena: <>Lena beantwortet Fragen zu den Aufgaben und gibt Hinweise, aber keine fertigen Lösungen. Öffne im Aufgabenbaum <em>Show Messages</em> und erwähne in deiner Frage {mention('@lena')} oder {mention('@ai')}.</>,
+    heroScope: 'Offene Kurse zu Python und Data Science, von den ersten Schritten bis zu Datenanalyse und Differentialgleichungen.',
+    toCourses: 'Kurse ohne Anmeldung entdecken →',
+    toWork: 'Anmelden und üben',
+    steps: [
+      ['1', 'Kurse lesen', <>Alle Kurse sind ohne Konto lesbar. Beginne mit <strong className="text-fg">Data Science mit Python &ndash; Grundlagen</strong>, Woche 1.</>],
+      ['2', 'Im Browser üben', <>Mit Konto startest du die Kursumgebung im Browser, ohne Installation. Dort bearbeitest du die Aufgaben, testest sie und reichst sie ein.</>],
+      ['3', 'Lena fragen', <>Die KI-Tutorin Lena gibt Hinweise statt fertiger Lösungen. Erwähne {mention('@lena')} in den Nachrichten zu einer Aufgabe.</>],
+    ],
+    local: 'Lieber lokal arbeiten?',
     footer: 'Interaktive Lernplattform für Programmierung.',
   },
   en: {
@@ -35,18 +35,18 @@ const COPY = {
     signOut: 'Sign out',
     heroTitle: 'Learn programming with',
     heroLead: 'Programming step by step.',
-    heroScope: 'The courses range from first steps through functions, data structures and visualization to data analysis, differential equations and object-oriented programming.',
-    toCourses: 'Browse courses →',
-    startTitle: 'Getting started',
-    startHow: 'Everything runs in the browser, no installation needed. Create an account, open a course and start the course environment.',
-    startFirst: <>We recommend starting with <strong className="text-fg">Data Science mit Python &ndash; Grundlagen</strong>. Its first task, <em>&ldquo;Mathematical Constants&rdquo;</em> in week 1, introduces variables and data types.</>,
-    workflowTitle: 'How it works',
-    workflow: <>Each task is a Python file that you edit and run. The buttons next to the task name test and submit your solution. <em>Commit Assignment</em> saves your progress without testing or submitting.</>,
-    lenaTitle: 'Lena, the AI tutor',
-    lena: <>Lena answers questions about the tasks and gives hints, but no complete solutions. Open <em>Show Messages</em> in the task tree and mention {mention('@lena')} or {mention('@ai')} in your question.</>,
+    heroScope: 'Open courses on Python and data science, from first steps to data analysis and differential equations.',
+    toCourses: 'Explore courses without an account →',
+    toWork: 'Sign in and practise',
+    steps: [
+      ['1', 'Read the courses', <>All courses are readable without an account. Start with <strong className="text-fg">Data Science mit Python &ndash; Grundlagen</strong>, week 1.</>],
+      ['2', 'Practise in the browser', <>With an account you start the course environment in the browser, no installation needed. There you edit, test and submit the tasks.</>],
+      ['3', 'Ask Lena', <>Lena, the AI tutor, gives hints instead of complete solutions. Mention {mention('@lena')} in the messages of a task.</>],
+    ],
+    local: 'Prefer to work locally?',
     footer: 'Interactive learning platform for programming.',
   },
-};
+} as const;
 
 export default function Home() {
   const router = useRouter();
@@ -68,11 +68,6 @@ export default function Home() {
   };
 
 
-  const handleGettingStarted = () => {
-    if (gettingStartedUrl) {
-      router.push(gettingStartedUrl);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-accent-wash via-canvas to-accent-wash">
@@ -112,73 +107,55 @@ export default function Home() {
       </header>
 
       {/* Hero Section */}
-      <main className="container mx-auto px-4 pt-16 pb-32">
-        <div className="max-w-4xl mx-auto text-center space-y-8">
-          {/* Hero Title */}
-          <div className="space-y-4">
-            <h2 className="text-5xl md:text-6xl font-bold text-fg">
+      <main className="container mx-auto px-4 pt-10 pb-28">
+        <div className="max-w-5xl mx-auto text-center space-y-8">
+          <div className="space-y-3">
+            <h2 className="text-4xl md:text-5xl font-bold text-fg">
               {t.heroTitle}{' '}
               <span className="text-accent-text">Computor</span>
             </h2>
-            <p className="text-xl text-muted max-w-2xl mx-auto">
-              {t.heroLead}
-            </p>
-            <p className="text-base text-muted max-w-2xl mx-auto">
-              {t.heroScope}
-            </p>
+            <p className="text-xl text-muted">{t.heroLead}</p>
+            <p className="text-base text-muted max-w-2xl mx-auto">{t.heroScope}</p>
           </div>
 
-          {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            {gettingStartedUrl ? (
-              <button
-                onClick={handleGettingStarted}
-                className="px-8 py-4 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-all transform hover:scale-105 font-semibold text-lg shadow-lg"
+            <Link
+              href={gettingStartedUrl}
+              className="px-8 py-4 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-all transform hover:scale-105 font-semibold text-lg shadow-lg"
+            >
+              {t.toCourses}
+            </Link>
+            {!user && (
+              <Link
+                href="/login"
+                className="px-8 py-4 bg-surface text-accent-text rounded-lg border-2 border-accent hover:bg-accent-wash transition-all font-semibold text-lg"
               >
-                {t.toCourses}
-              </button>
-            ) : null}
+                {t.toWork}
+              </Link>
+            )}
           </div>
 
-          {/* Getting Started */}
-          <div className="bg-surface rounded-2xl shadow-lg p-8 border border-rule space-y-4 text-left">
-            <h3 className="text-2xl font-bold text-fg">{t.startTitle}</h3>
-            <p className="text-muted leading-relaxed">
-              {t.startHow}
-            </p>
-            <p className="text-muted leading-relaxed">
-              {t.startFirst}
-            </p>
-          </div>
+          <ol className="grid md:grid-cols-3 gap-6 text-left">
+            {t.steps.map(([number, title, body]) => (
+              <li key={number} className="bg-surface rounded-xl shadow-lg p-6 border border-rule space-y-2">
+                <div className="flex items-center space-x-3">
+                  <span className="h-8 w-8 shrink-0 rounded-full bg-accent-wash text-accent-text font-bold flex items-center justify-center">
+                    {number}
+                  </span>
+                  <h3 className="text-lg font-bold text-fg">{title}</h3>
+                </div>
+                <p className="text-muted text-sm leading-relaxed">{body}</p>
+              </li>
+            ))}
+          </ol>
 
-          {/* Info cards: workflow, Lena */}
-          <div className="grid md:grid-cols-2 gap-6 text-left">
-            <div className="bg-surface rounded-xl shadow-lg p-6 border border-rule space-y-3">
-              <div className="flex items-center space-x-3">
-                <svg className="h-7 w-7 text-accent-text shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                <h4 className="text-lg font-bold text-fg">{t.workflowTitle}</h4>
-              </div>
-              <p className="text-muted text-sm leading-relaxed">
-                {t.workflow}
-              </p>
-            </div>
+          <p className="text-sm text-muted">
+            {t.local}{' '}
+            <a href={COMPUTOR_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline">Desktop VS Code</a>
+            {' · '}
+            <a href={CODESPACES_URL} target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline">GitHub Codespaces</a>
+          </p>
 
-            <div className="bg-surface rounded-xl shadow-lg p-6 border border-rule space-y-3">
-              <div className="flex items-center space-x-3">
-                <svg className="h-7 w-7 text-accent-text shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                </svg>
-                <h4 className="text-lg font-bold text-fg">{t.lenaTitle}</h4>
-              </div>
-              <p className="text-muted text-sm leading-relaxed">
-                {t.lena}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-12"><LearningOptions language={language} /></div>
           <PublicCourseCatalog signedIn={!!user} />
         </div>
       </main>
