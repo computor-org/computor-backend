@@ -1,11 +1,12 @@
 import type { UiLanguage } from '@/src/hooks/useBrowserLanguage';
 import type { PublicLearningCourseOutline } from '@/src/types/publicLearning';
 
-const UNIT_TITLE = /^Week (\d+)$/;
+const UNIT_TITLE = /^(?:Week|Woche) (\d+)$/;
 
 /**
  * Title of an outline item in `language`. Exercises take the first Markdown
- * heading of that language's variant; units named "Week N" become "Woche N".
+ * heading of that language's variant; units named "Week N" or "Woche N"
+ * follow the language.
  * Anything else keeps the published title.
  */
 export function localizedTitle(
@@ -20,6 +21,6 @@ export function localizedTitle(
   const heading = markdown?.match(/^#\s+(.+?)\s*#*\s*$/m)?.[1];
   if (heading) return heading;
   const unit = title.match(UNIT_TITLE);
-  if (unit && language === 'de') return `Woche ${unit[1]}`;
+  if (unit) return language === 'de' ? `Woche ${unit[1]}` : `Week ${unit[1]}`;
   return title;
 }

@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { mathMarkdownPlugins } from '@/src/components/markdownMath';
 import { formatUsage } from '@/src/utils/limits';
 import { useResource } from '@/src/hooks/useResource';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
@@ -23,6 +23,16 @@ import GradingStatusBadge from '@/src/components/student/gradingStatus';
 import TestRunHistory from '@/src/components/student/TestRunHistory';
 import PublicLunaPanel from '@/src/components/student/PublicLunaPanel';
 import { displayName } from '@/src/utils/displayName';
+import {
+  descriptionHeading,
+  fetchStudentDescription,
+  localizedUnitTitle,
+  plainHeading,
+  resolveContentLanguage,
+  withoutLeadingHeading,
+} from '@/src/components/student/studentDescription';
+import { UserClient } from '@/src/generated/clients/UserClient';
+import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { StudentsClient } from '@/src/generated/clients/StudentsClient';
 import { ResultsClient } from '@/src/generated/clients/ResultsClient';
 import { SubmissionsClient } from '@/src/generated/clients/SubmissionsClient';
@@ -30,6 +40,16 @@ import { SubmissionsClient } from '@/src/generated/clients/SubmissionsClient';
 const studentsClient = new StudentsClient();
 const resultsClient = new ResultsClient();
 const submissionsClient = new SubmissionsClient();
+const userClient = new UserClient();
+const coursesClient = new CoursesClient();
+
+/** Profile language if the learner chose one, else the course's, else English. */
+async function contentLanguage(courseId: string): Promise<string> {
+  const user = await userClient.getCurrentUserEndpointUserGet({}).catch(() => null);
+  if (user?.profile?.language_code) return resolveContentLanguage(user.profile.language_code);
+  const course = await coursesClient.getCoursesCoursesIdGet({ id: courseId }).catch(() => null);
+  return resolveContentLanguage(null, course?.language_code);
+}
 
 /**
  * One assignment, as the student sees it.
@@ -48,9 +68,13 @@ export default function AssignmentDetailPage() {
     const assignment = await studentsClient.studentGetCourseContentEndpointStudentsCourseContentsCourseContentIdGet(
       { courseContentId: assignmentId },
     );
+    // The released README in the reading language; the stored title and the
+    // example's meta description are only the fallback.
+    const language = await contentLanguage(courseId);
+    const readme = await fetchStudentDescription(assignmentId, language).catch(() => null);
     const submissionGroupId = assignment.submission_group?.id;
     // Nothing has been attempted yet — there is no group to hang runs off.
-    if (!submissionGroupId) return { assignment, results: [], artifacts: [] };
+    if (!submissionGroupId) return { assignment, language, readme, results: [], artifacts: [] };
 
     // The artifacts are only here to say which runs were official submissions;
     // a Result carries the artifact id but not its `submit` flag.
@@ -62,12 +86,14 @@ export default function AssignmentDetailPage() {
       }),
       submissionsClient.listSubmissionArtifactsSubmissionsArtifactsGet({ submissionGroupId }),
     ]);
-    return { assignment, results, artifacts };
-  }, [assignmentId]);
+    return { assignment, language, readme, results, artifacts };
+  }, [assignmentId, courseId]);
 
   const assignment = data?.assignment ?? null;
   const group = assignment?.submission_group ?? null;
-  const name = displayName(assignment, 'Assignment');
+  const readme = data?.readme ?? null;
+  const readmeHeading = descriptionHeading(readme?.markdown);
+  const name = readmeHeading ? plainHeading(readmeHeading) : localizedUnitTitle(displayName(assignment, 'Assignment'), data?.language ?? 'en');
   const crumbs = useCourseCrumbs(
     courseId,
     { label: 'Assignments', href: `/courses/${courseId}/student/assignments` },
@@ -80,7 +106,10 @@ export default function AssignmentDetailPage() {
   const testScore = assignment?.result?.result ?? resultData?.result_value ?? null;
   // Assignments carry no description of their own — the text belongs to the
   // example version that was deployed onto them.
-  const description = assignment?.description || assignment?.deployment?.example_version?.description;
+  // The page title already shows the README heading, so it is not repeated.
+  const description = readme
+    ? (readmeHeading ? withoutLeadingHeading(readme.markdown) : readme.markdown)
+    : assignment?.description || assignment?.deployment?.example_version?.description;
   const repository = group?.repository ?? null;
   const members = group?.members ?? [];
 
@@ -142,7 +171,21 @@ export default function AssignmentDetailPage() {
             <SectionCard title="Description">
               {description ? (
                 <div className="prose markdown max-w-none">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{description}</ReactMarkdown>
+                  <ReactMarkdown
+                    {...mathMarkdownPlugins}
+                    skipHtml
+                    components={{
+                      img: ({ src, alt }) => {
+                        const image = typeof src === 'string' ? readme?.images[src.replace(/^\.\//, '')] : undefined;
+                        if (!image) return <span>{alt ?? ''}</span>;
+                        // Inline data URL from the released archive; no dimensions are known.
+                        // eslint-disable-next-line @next/next/no-img-element
+                        return <img src={image} alt={alt ?? ''} className="max-w-full h-auto rounded-md" />;
+                      },
+                    }}
+                  >
+                    {description}
+                  </ReactMarkdown>
                 </div>
               ) : (
                 <EmptyState compact title="No description." />
