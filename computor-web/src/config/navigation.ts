@@ -137,16 +137,13 @@ export const userMgmtNavigation: NavItem[] = [
 ];
 
 /**
- * The tutor view is not built yet.
+ * The tutor view: a review queue and per-student grading, backed by `/tutors`.
  *
  * The backend hands out the `tutor` view to `_tutor` *and every role above it*
- * (see COURSE_ROLE_VIEW_MAP in business_logic/users.py), so leaving the entry in
- * meant every lecturer, maintainer and owner had a nav item that dead-ended on a
- * "Coming Soon" page wearing the 404 illustration. Hidden here rather than
- * deleted so switching it back on is this one line; the routes still exist and
- * answer honestly if someone has the URL.
+ * (see COURSE_ROLE_VIEW_MAP in business_logic/users.py), so lecturers see it
+ * too. The switch stays so the entry can be hidden again in one line.
  */
-const TUTOR_VIEW_ENABLED = false;
+const TUTOR_VIEW_ENABLED = true;
 
 // Navigation structure for view-based navigation (when in course context).
 //
@@ -174,8 +171,10 @@ export const getViewNavigation = (courseId: string): NavItem[] =>
       path: `/courses/${courseId}/tutor`,
       icon: 'tutor',
       ownPage: true,
-      // Filtered out below until the view exists. Its sub-pages (submissions,
-      // grading) are stubs too, which is why it has none listed here.
+      subItems: [
+        { id: 'tutor-submissions', label: 'Submissions', path: `/courses/${courseId}/tutor/submissions` },
+        { id: 'tutor-grading', label: 'Grading', path: `/courses/${courseId}/tutor/grading` },
+      ],
     },
     {
       id: 'lecturer-view',
@@ -189,6 +188,7 @@ export const getViewNavigation = (courseId: string): NavItem[] =>
         { id: 'lecturer-assignments', label: 'Assignments', path: `/courses/${courseId}/lecturer/assignments` },
         { id: 'lecturer-templates', label: 'Templates', path: `/courses/${courseId}/lecturer/templates` },
         { id: 'lecturer-grading', label: 'Grading', path: `/courses/${courseId}/lecturer/grading` },
+        { id: 'lecturer-typical-errors', label: 'Typical errors', path: `/courses/${courseId}/lecturer/typical-errors` },
         { id: 'lecturer-members', label: 'Course members', path: `/courses/${courseId}/lecturer/members` },
         { id: 'lecturer-groups', label: 'Course groups', path: `/courses/${courseId}/lecturer/groups` },
         { id: 'lecturer-workspaces', label: 'Workspaces', path: `/courses/${courseId}/lecturer/workspaces` },

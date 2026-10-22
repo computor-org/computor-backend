@@ -27,7 +27,7 @@ const STATUS_TONE: Record<TaskStatus, Tone> = {
   started: 'warning',
 };
 
-function statusTone(status: TaskStatus | null | undefined): Tone {
+export function statusTone(status: TaskStatus | null | undefined): Tone {
   return (status && STATUS_TONE[status]) || 'muted';
 }
 

@@ -104,10 +104,14 @@ function GradingRow({ entry }: { entry: SubmissionGroupGradingList }) {
 export default function GradingPanel({
   group,
   submitted,
+  audience = 'student',
 }: {
   group: SubmissionGroupStudentGet | null | undefined;
   submitted?: boolean | null;
+  /** Wording only: the student reads "your submission", staff read "the submission". */
+  audience?: 'student' | 'staff';
 }) {
+  const staff = audience === 'staff';
   const current = currentGrading(group);
   // A group can carry a headline grade without a gradings array behind it, so
   // the flat fields are the fallback rather than an alternative source.
@@ -120,9 +124,13 @@ export default function GradingPanel({
         compact
         title={submitted ? 'Not reviewed yet.' : 'Not graded yet.'}
         description={
-          submitted
-            ? 'Your submission is waiting for a tutor to look at it.'
-            : 'Submit your work to have it graded.'
+          staff
+            ? submitted
+              ? 'The submission is waiting for a review.'
+              : 'Nothing has been submitted yet.'
+            : submitted
+              ? 'Your submission is waiting for a tutor to look at it.'
+              : 'Submit your work to have it graded.'
         }
       />
     );
@@ -137,8 +145,8 @@ export default function GradingPanel({
     <>
       {isStaleGrading(group, current) && (
         <Notice tone="warning">
-          This grade was given on an earlier submission. Your most recent submission has not been
-          graded yet.
+          This grade was given on an earlier submission. {staff ? 'The' : 'Your'} most recent
+          submission has not been graded yet.
         </Notice>
       )}
 
