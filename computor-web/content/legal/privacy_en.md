@@ -282,8 +282,7 @@ itself requires a minimum age of 13.
 
 All connections are encrypted (TLS). User code runs in separate containers
 with resource limits. Server access is restricted to the operations team.
-Please report security vulnerabilities to security@computor.at or
-confidentially via https://github.com/computor-org/feedback/security/advisories/new.
+Please report security vulnerabilities confidentially to security@computor.at.
 
 ## 12. Changes to this notice
 

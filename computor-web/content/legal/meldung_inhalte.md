@@ -60,8 +60,7 @@ Kommission, das Europäische Gremium für digitale Dienste sowie für
 Nutzer*innen (Art. 11 und 12 der Verordnung (EU) 2022/2065, „DSA“):
 **abuse@computor.at**. Sprachen: Deutsch, Englisch.
 
-Sicherheitslücken melden Sie bitte an security@computor.at oder vertraulich
-über https://github.com/computor-org/feedback/security/advisories/new.
+Sicherheitslücken melden Sie bitte vertraulich an security@computor.at.
 
 ---
 
@@ -121,5 +120,4 @@ Commission, the European Board for Digital Services and for users (Articles 11
 and 12 of Regulation (EU) 2022/2065, “DSA”): **abuse@computor.at**.
 Languages: German, English.
 
-Please report security vulnerabilities to security@computor.at or
-confidentially via https://github.com/computor-org/feedback/security/advisories/new.
+Please report security vulnerabilities confidentially to security@computor.at.

@@ -7,7 +7,7 @@ import { useParams } from 'next/navigation';
 import { InvitesClient } from '@/src/generated/clients/InvitesClient';
 import type { InviteStatusPublic } from 'types/generated';
 import { ssoAuthService } from '@/src/services/authInstances';
-import { WAITLIST_URL } from '@/src/utils/registration';
+import { WAITLIST_ADDRESS, WAITLIST_URL } from '@/src/utils/registration';
 
 const invitesClient = new InvitesClient();
 
@@ -99,9 +99,9 @@ export default function JoinPage() {
             <h1 className="text-xl font-semibold text-fg mb-2">This invite can&apos;t be used</h1>
             <p className="text-sm text-muted mb-4">{problem}</p>
             <p className="text-sm text-muted">
-              Want in? Join the waitlist by leaving a note at{' '}
+              Want in? Join the waitlist by writing to{' '}
               <a href={WAITLIST_URL} className="text-accent-text underline">
-                github.com/computor-org/feedback
+                {WAITLIST_ADDRESS}
               </a>
               . Already have an account?{' '}
               <Link href="/login" className="text-accent-text underline">

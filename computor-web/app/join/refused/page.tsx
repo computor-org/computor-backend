@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSyncExternalStore } from 'react';
-import { WAITLIST_URL } from '@/src/utils/registration';
+import { WAITLIST_ADDRESS, WAITLIST_URL } from '@/src/utils/registration';
 
 const MESSAGES: Record<string, { title: string; body: string }> = {
   full: {
@@ -62,9 +62,9 @@ export default function JoinRefusedPage() {
             <p className="text-sm text-muted mb-4">{message.body}</p>
             {waitlist && (
               <p className="text-sm text-muted">
-                Want to be let in when places open up? Join the waitlist by leaving a note at{' '}
+                Want to be let in when places open up? Join the waitlist by writing to{' '}
                 <a href={WAITLIST_URL} className="text-accent-text underline">
-                  github.com/computor-org/feedback
+                  {WAITLIST_ADDRESS}
                 </a>
                 .
               </p>

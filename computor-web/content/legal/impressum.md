@@ -31,9 +31,8 @@ Projektleitung: Assoc.Prof. Dr. Christopher Albert
 - Allgemeine Anfragen: contact@computor.at
 - Missbrauch und rechtswidrige Inhalte: abuse@computor.at (siehe [Inhalte melden](/report))
 - Datenschutz: privacy@computor.at oder datenschutz@tugraz.at (siehe [Datenschutzerklärung](/privacy))
-- Sicherheitslücken: security@computor.at oder vertraulich über
-  https://github.com/computor-org/feedback/security/advisories/new
-- Fehler und Verbesserungsvorschläge: https://github.com/computor-org/feedback
+- Sicherheitslücken: security@computor.at
+- Fehler und Verbesserungsvorschläge: contact@computor.at
 
 Die Angebote computor.at und chat.computor.at werden vom ITPcp im Rahmen der
 Lehre, Weiterbildung und Wissenschaftskommunikation der TU Graz betrieben.
@@ -123,9 +122,8 @@ Project lead: Assoc.Prof. Dr. Christopher Albert
 - General enquiries: contact@computor.at
 - Abuse and illegal content: abuse@computor.at (see [Report content](/report))
 - Data protection: privacy@computor.at or datenschutz@tugraz.at (see [Privacy notice](/privacy))
-- Security vulnerabilities: security@computor.at or confidentially via
-  https://github.com/computor-org/feedback/security/advisories/new
-- Bugs and suggestions: https://github.com/computor-org/feedback
+- Security vulnerabilities: security@computor.at
+- Bugs and suggestions: contact@computor.at
 
 computor.at and chat.computor.at are operated by ITPcp as part of TU Graz's
 teaching, continuing education and science communication.
