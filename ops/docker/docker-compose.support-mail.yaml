@@ -23,9 +23,10 @@ services:
       - computor-network
       - support-mail
     # The mail host's certificate names mail.computor.at; reach it on the
-    # support bridge gateway rather than the public address.
+    # support bridge gateway rather than the public address. (SUPPORT_MAIL_HOST_IP
+    # only differs in test stacks where the mail host is a container.)
     extra_hosts:
-      - "${SUPPORT_MAIL_HOST:-mail.computor.at}:${SUPPORT_MAIL_GATEWAY:-172.31.252.1}"
+      - "${SUPPORT_MAIL_HOST:-mail.computor.at}:${SUPPORT_MAIL_HOST_IP:-${SUPPORT_MAIL_GATEWAY:-172.31.252.1}}"
     restart: unless-stopped
     stop_grace_period: 60s
     security_opt:
