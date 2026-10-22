@@ -382,6 +382,7 @@ def test_reporter_sees_only_own_reports_and_never_internal_notes(db, people):
     assert str(mine.id) in listed and str(other.id) not in listed
     reported = service.list_tickets(TicketQuery(scope="reported"), p["reporter"], db)[0]
     assert {t.id for t in reported} == {str(mine.id)}
+    assert all(t.assignee is None or t.assignee.email is None for t in reported)
     with pytest.raises(NotFoundException):
         service.get_ticket(str(other.id), p["reporter"], db)
 

@@ -101,7 +101,12 @@ def list_tickets(params: TicketQuery, principal: Principal, db: Session) -> Tupl
                            Ticket.number.desc())
             .offset(params.skip).limit(params.limit).all())
     counts = _counts([str(t.id) for t in rows], principal, db)
-    return [_to_list(t, counts.get(str(t.id), 0)) for t in rows], total
+    items = [_to_list(t, counts.get(str(t.id), 0)) for t in rows]
+    if not access.sees_internal(principal):
+        for item in items:  # a reporter sees who handles it, not the team's address
+            if item.assignee is not None:
+                item.assignee.email = None
+    return items, total
 
 
 def _message_dto(m: Message, attachments: List[TicketAttachment], authors: Dict[str, User]) -> TicketMessageGet:
