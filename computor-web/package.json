@@ -32,15 +32,15 @@
     "postcss-selector-parser": "^7.1.6"
   },
   "devDependencies": {
-    "@playwright/test": "1.60.0",
+    "@playwright/test": "1.64.0",
     "@tailwindcss/postcss": "^4",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^20",
+    "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^9",
+    "eslint": "^10",
     "eslint-config-next": "16.3.8",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^7"
   }
 }
