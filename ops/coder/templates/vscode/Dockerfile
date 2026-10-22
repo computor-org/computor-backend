@@ -135,6 +135,10 @@ ENV COMPUTOR_FIGURES_DIR=/tmp/computor-figures \
 ARG EXTENSION_REPO_SHA=""
 LABEL computor.extension.revision="${EXTENSION_REPO_SHA}"
 
+# Brings the extension up to the instance's approved version in place, at
+# start and periodically (startup.sh.tftpl; README.md "Extension updates").
+COPY extension-sync.mjs /opt/computor/extension-sync.mjs
+
 # Copy VSIX from builder stage
 COPY --from=vsix-builder --chown=coder:coder /tmp/extension.vsix /opt/code-server/extension.vsix
 

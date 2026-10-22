@@ -257,6 +257,19 @@ os.replace(temporary, path)
 print("settings.json: set " + ", ".join(changed))
 MERGE_EOF
 
+# The Computor extension follows the version this instance approves, in place:
+# newer than the image's copy -> installed before code-server starts, so a
+# stopped workspace picks it up on its next start (README.md "Extension
+# updates"). Bounded; every failure keeps the installed extension.
+export COMPUTOR_EXTENSION_UPDATE_MARKER=/tmp/computor-extension-update.json
+computor_extension_sync() {
+  COMPUTOR_BACKEND_URL="${computor_backend_url}" timeout "$1" \
+    /usr/lib/code-server/lib/node /opt/computor/extension-sync.mjs \
+    >>/tmp/computor-extension-sync.log 2>&1 || true
+}
+computor_extension_sync 120
+tail -n 1 /tmp/computor-extension-sync.log 2>/dev/null || true
+
 # code-server compares its session cookie against HASHED_PASSWORD, so handing it
 # the argon2 hash of the per-user app secret lets the ingress inject a
 # ready-made session — the user never sees a login page, while a request that
@@ -296,3 +309,12 @@ for _ in $(seq 1 120); do
   curl -s -o /dev/null --max-time 1 "http://127.0.0.1:${code_server_port}/" && break
   sleep 1
 done
+
+# A running workspace checks again every 30 minutes; the running extension
+# offers a window reload once a newer version is installed. Deploying a new pin
+# therefore reaches every running workspace within the interval.
+(
+  while sleep 1800; do
+    computor_extension_sync 600
+  done
+) >/dev/null 2>&1 &
