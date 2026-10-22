@@ -2,7 +2,7 @@
 FROM node:20-bookworm@sha256:8f693eaa7e0a8e71560c9a82b55fd54c2ae920a2ba5d2cde28bac7d1c01c9ba5 AS vsix-builder
 
 ARG EXTENSION_REPO_URL=https://github.com/computor-org/computor-vscode.git
-ARG EXTENSION_REPO_REF="release/2026.10"
+ARG EXTENSION_REPO_REF="main"
 # The commit EXTENSION_REPO_REF pointed at when the build was submitted,
 # resolved and passed in by build_workspace_image (see the template's
 # source_repos manifest key). It exists to move this stage's cache key: docker

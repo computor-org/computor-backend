@@ -153,9 +153,10 @@ what keeps the datastores out of reach.
 ## Extension updates
 
 The `vscode` and `matlab-vscode` images build the Computor extension from the
-`source_repos` ref at image build time. On top of that, each instance approves
-an extension version, and workspaces move to it in place: no rebuild, no new
-workspace, nothing in the home touched.
+`source_repos` ref at image build time: computor-vscode `main` (the 2027.3
+line) on backend `main`, `release/2026.10` on backend `release/2026.10`. On top
+of that, each instance approves an extension version, and workspaces move to it
+in place: no rebuild, no new workspace, nothing in the home touched.
 
 - **Approved version** = the newest non-yanked release version (`x.y.z`) of
   `computor-org.computor` in the instance's own extension registry
