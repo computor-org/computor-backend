@@ -11,6 +11,8 @@ import {
 import EmptyState from '@/src/components/EmptyState';
 import PublicLearnShell from '@/src/components/learn/PublicLearnShell';
 import PublicMarkdown from '@/src/components/learn/PublicMarkdown';
+import { localizedTitle } from '@/src/components/learn/localize';
+import { setUiLanguage, useBrowserLanguage, type UiLanguage } from '@/src/hooks/useBrowserLanguage';
 import type {
   PublicLearningContent,
   PublicLearningContentSummary,
@@ -22,15 +24,83 @@ const LANGUAGE_LABEL: Record<string, string> = {
   en: 'English',
 };
 
+const COPY = {
+  de: {
+    outline: 'Kursübersicht',
+    welcomeLink: 'Willkommen',
+    practiseTitle: 'Selbst an den Aufgaben arbeiten?',
+    catalog: 'Zum Kurskatalog',
+    signIn: 'Anmelden und beitreten',
+    notFound: 'Kurs nicht gefunden.',
+    loadFailed: 'Der Kurs konnte nicht geladen werden.',
+    loadingCourse: 'Kurs wird geladen…',
+    unavailable: 'Kurs nicht verfügbar',
+    courses: 'Kurse',
+    counts: (units: number, exercises: number) => `${units} Wochen · ${exercises} Aufgaben`,
+    startHere: 'Hier beginnen',
+    welcome: 'Willkommen',
+    noWelcome: 'Wähle links eine Aufgabe oder beginne mit der ersten.',
+    startWith: (title: string) => `Mit „${title}“ beginnen`,
+    loadingContent: 'Inhalt wird geladen…',
+    contentUnavailable: 'Inhalt nicht verfügbar',
+    itemFailed: 'Dieser Inhalt konnte nicht geladen werden.',
+    exercise: 'Aufgabe',
+    material: 'Kursmaterial',
+    language: 'Sprache',
+    noDescription: 'Für diesen Inhalt gibt es keine Beschreibung.',
+    navigation: 'Aufgabennavigation',
+    sourceTitle: 'Quelle, Lizenz und Weiterverwendung',
+    source: <>Die Kursmaterialien liegen auf{' '}<a href={PUBLIC_COURSES_URL} target="_blank" rel="noreferrer" className="text-accent-text hover:underline">GitHub</a>. Veröffentlichte Materialien stehen unter der{' '}<a href="/learning/LICENSE.txt" target="_blank" rel="noreferrer" className="text-accent-text hover:underline">MIT-Lizenz</a>.</>,
+  },
+  en: {
+    outline: 'Course outline',
+    welcomeLink: 'Welcome',
+    practiseTitle: 'Want to work on the exercises?',
+    catalog: 'Open the course catalog',
+    signIn: 'Sign in to join',
+    notFound: 'Course not found.',
+    loadFailed: 'Could not load this course.',
+    loadingCourse: 'Loading course…',
+    unavailable: 'Course unavailable',
+    courses: 'Courses',
+    counts: (units: number, exercises: number) => `${units} weeks · ${exercises} exercises`,
+    startHere: 'Start here',
+    welcome: 'Welcome',
+    noWelcome: 'Pick an exercise on the left or start with the first one.',
+    startWith: (title: string) => `Start with ${title}`,
+    loadingContent: 'Loading content…',
+    contentUnavailable: 'Course content unavailable',
+    itemFailed: 'This item could not be loaded.',
+    exercise: 'Exercise',
+    material: 'Course material',
+    language: 'Language',
+    noDescription: 'No description is available for this item.',
+    navigation: 'Exercise navigation',
+    sourceTitle: 'Source, license and reuse',
+    source: <>The course material is on{' '}<a href={PUBLIC_COURSES_URL} target="_blank" rel="noreferrer" className="text-accent-text hover:underline">GitHub</a>. Published material is under the{' '}<a href="/learning/LICENSE.txt" target="_blank" rel="noreferrer" className="text-accent-text hover:underline">MIT license</a>.</>,
+  },
+};
+
+type Copy = (typeof COPY)[UiLanguage];
+
+/** Drop the leading Markdown heading; the page shows it as the item title. */
+function withoutTitleHeading(markdown: string): string {
+  return markdown.replace(/^\s*#\s+.*(?:\r?\n|$)/, '');
+}
+
 function OutlineLinks({
   outline,
   activeContentId,
+  language,
+  t,
 }: {
   outline: PublicLearningCourseOutline;
   activeContentId?: string;
+  language: UiLanguage;
+  t: Copy;
 }) {
   return (
-    <nav aria-label="Course outline" className="space-y-0.5">
+    <nav aria-label={t.outline} className="space-y-0.5">
       <Link
         href={`/learn/${outline.id}`}
         className={`block rounded-md px-3 py-2 text-sm font-medium ${
@@ -39,7 +109,7 @@ function OutlineLinks({
             : 'text-body hover:bg-sunken'
         }`}
       >
-        Welcome / Start here
+        {t.welcomeLink}
       </Link>
       {outline.contents.filter(item => item.id !== outline.welcome_content_id).map((item) => (
         <Link
@@ -54,23 +124,23 @@ function OutlineLinks({
           }`}
           style={{ paddingLeft: `${0.75 + item.depth * 1.1}rem` }}
         >
-          <span className="block truncate">{item.title}</span>
+          <span className="block truncate">{localizedTitle(outline, item.id, item.title, language)}</span>
         </Link>
       ))}
     </nav>
   );
 }
 
-function ReaderActions({ signedIn }: { signedIn: boolean }) {
+function ReaderActions({ signedIn, t }: { signedIn: boolean; t: Copy }) {
   const computorHref = signedIn
     ? '/courses/catalog'
     : `/login?next=${encodeURIComponent('/courses/catalog')}`;
   return (
     <div className="rounded-lg border border-rule bg-surface p-4">
-      <p className="text-sm font-semibold text-fg">Want to work on the exercises?</p>
+      <p className="text-sm font-semibold text-fg">{t.practiseTitle}</p>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm">
         <Link href={computorHref} className="text-accent-text hover:underline">
-          {signedIn ? 'Open course catalog' : 'Sign in to join'}
+          {signedIn ? t.catalog : t.signIn}
         </Link>
         <a href={COMPUTOR_EXTENSION_URL} target="_blank" rel="noreferrer" className="text-accent-text hover:underline">
           Desktop VS Code
@@ -94,27 +164,26 @@ export default function PublicCourseReader({
   const [loaded, setLoaded] = useState<{
     courseId: string; outline: PublicLearningCourseOutline | null; error: string | null;
   } | null>(null);
-  const [requestedLanguage, setRequestedLanguage] = useState<string | null>(() => {
-    const lang = typeof navigator === 'undefined' ? '' : navigator.language.split('-')[0].toLowerCase();
-    return ['de', 'en'].includes(lang) ? lang : null;
-  });
+  const uiLanguage = useBrowserLanguage();
+  const t = COPY[uiLanguage];
   const outline = loaded?.courseId === courseId ? loaded.outline : null;
   const outlineLoading = loaded?.courseId !== courseId;
-  const error = loaded?.courseId === courseId ? loaded.error : null;
+  const errorCode = loaded?.courseId === courseId ? loaded.error : null;
+  const error = errorCode === 'not-found' ? t.notFound : errorCode ? t.loadFailed : null;
   const contentLoading = false;
 
   useEffect(() => {
     let cancelled = false;
     fetch(`/learning/courses/${encodeURIComponent(courseId)}.json`, { credentials: 'omit' })
       .then(async response => {
-        if (!response.ok) throw new Error(response.status === 404 ? 'Course not found.' : 'Could not load this course.');
+        if (!response.ok) throw new Error(response.status === 404 ? 'not-found' : 'load-failed');
         return response.json() as Promise<PublicLearningCourseOutline>;
       })
       .then(data => {
         if (!cancelled) setLoaded({ courseId, outline: data, error: null });
       })
       .catch(err => {
-        if (!cancelled) setLoaded({ courseId, outline: null, error: err instanceof Error ? err.message : 'Could not load this course.' });
+        if (!cancelled) setLoaded({ courseId, outline: null, error: err instanceof Error && err.message === 'not-found' ? 'not-found' : 'load-failed' });
       });
     return () => { cancelled = true; };
   }, [courseId]);
@@ -124,10 +193,10 @@ export default function PublicCourseReader({
   const material = activeContentId && outline && Object.hasOwn(outline.materials, activeContentId)
     ? outline.materials[activeContentId] : undefined;
   const languages = Object.keys(material?.markdown_variants ?? {});
-  const language = [requestedLanguage, outline?.language_code, 'en', 'de']
+  const language = [uiLanguage, outline?.language_code, 'en', 'de']
     .find(value => value && languages.includes(value)) ?? languages[0];
   const content: PublicLearningContent | null = material ? {
-    ...material, markdown: material.markdown_variants[language ?? ''] ?? '',
+    ...material, markdown: withoutTitleHeading(material.markdown_variants[language ?? ''] ?? ''),
     selected_language: language, available_languages: languages,
   } : null;
 
@@ -151,35 +220,35 @@ export default function PublicCourseReader({
     <PublicLearnShell>
       <div className="container mx-auto max-w-7xl px-4 py-8">
         {outlineLoading ? (
-          <div className="py-24 text-center text-muted">Loading course…</div>
+          <div className="py-24 text-center text-muted">{t.loadingCourse}</div>
         ) : !outline ? (
-          <EmptyState title="Course unavailable" description={error ?? 'This public course could not be loaded.'} />
+          <EmptyState title={t.unavailable} description={error ?? t.loadFailed} />
         ) : (
           <>
             <div className="mb-6">
               <div className="text-sm text-muted">
-                <Link href="/learn" className="text-accent-text hover:underline">Courses</Link>
+                <Link href="/learn" className="text-accent-text hover:underline">{t.courses}</Link>
                 <span className="mx-2">/</span>
                 <span>{outline.title}</span>
               </div>
               <h1 className="mt-2 text-3xl font-bold text-fg">{outline.title}</h1>
               <p className="mt-2 text-sm text-muted">
-                {outline.unit_count} units · {outline.exercise_count} exercises
+                {t.counts(outline.unit_count, outline.exercise_count)}
                 {outline.language_code ? ` · ${outline.language_code.toUpperCase()}` : ''}
               </p>
             </div>
 
             <details className="md:hidden mb-5 rounded-lg border border-rule bg-surface p-3">
-              <summary className="cursor-pointer font-medium">Course outline</summary>
+              <summary className="cursor-pointer font-medium">{t.outline}</summary>
               <div className="mt-3 max-h-[55vh] overflow-y-auto">
-                <OutlineLinks outline={outline} activeContentId={activeContentId} />
+                <OutlineLinks outline={outline} activeContentId={activeContentId} language={uiLanguage} t={t} />
               </div>
             </details>
 
             <div className="grid gap-8 md:grid-cols-[18rem_minmax(0,1fr)]">
               <aside className="hidden md:block">
                 <div className="sticky top-20 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-lg border border-rule bg-surface p-3 scroll-slim">
-                  <OutlineLinks outline={outline} activeContentId={activeContentId} />
+                  <OutlineLinks outline={outline} activeContentId={activeContentId} language={uiLanguage} t={t} />
                 </div>
               </aside>
 
@@ -192,46 +261,46 @@ export default function PublicCourseReader({
 
                 {!activeContentId ? (
                   <section className="rounded-lg border border-rule bg-surface p-6 md:p-8">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-accent-text">Start here</p>
-                    <h2 className="mt-2 text-2xl font-bold text-fg">Welcome</h2>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-accent-text">{t.startHere}</p>
+                    <h2 className="mt-2 text-2xl font-bold text-fg">{t.welcome}</h2>
                     {outline.description ? (
                       <div className="mt-4 whitespace-pre-wrap text-body leading-7">{outline.description}</div>
                     ) : (
-                      <p className="mt-4 text-muted">Browse the course outline and start with the first exercise.</p>
+                      <p className="mt-4 text-muted">{t.noWelcome}</p>
                     )}
                     {firstExercise && (
                       <Link
                         href={`/learn/${outline.id}/content/${firstExercise.id}`}
                         className="mt-6 inline-block rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent-hover"
                       >
-                        Start with {firstExercise.title}
+                        {t.startWith(localizedTitle(outline, firstExercise.id, firstExercise.title, uiLanguage))}
                       </Link>
                     )}
                   </section>
                 ) : contentLoading ? (
                   <div className="rounded-lg border border-rule bg-surface p-10 text-center text-muted">
-                    Loading content…
+                    {t.loadingContent}
                   </div>
                 ) : !content ? (
-                  <EmptyState compact title="Course content unavailable" description={error ?? 'This item could not be loaded.'} />
+                  <EmptyState compact title={t.contentUnavailable} description={error ?? t.itemFailed} />
                 ) : (
                   <section className="rounded-lg border border-rule bg-surface p-6 md:p-8">
                     <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-                          {content.is_submittable ? 'Exercise' : 'Course material'}
+                          {content.is_submittable ? t.exercise : t.material}
                         </p>
-                        <h2 className="mt-1 text-2xl font-bold text-fg">{content.title}</h2>
+                        <h2 className="mt-1 text-2xl font-bold text-fg">{localizedTitle(outline, content.id, content.title, (content.selected_language ?? uiLanguage) as UiLanguage)}</h2>
                       </div>
                       {content.available_languages.length > 1 && (
-                        <div className="flex rounded-lg border border-rule-strong p-1" aria-label="Language">
+                        <div className="flex rounded-lg border border-rule-strong p-1" aria-label={t.language}>
                           {content.available_languages.map(language => (
                             <button
                               type="button"
                               key={language}
-                              onClick={() => setRequestedLanguage(language)}
+                              onClick={() => setUiLanguage(language as UiLanguage)}
                               className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-                                (requestedLanguage ?? content.selected_language) === language
+                                content.selected_language === language
                                   ? 'bg-accent text-on-accent'
                                   : 'text-muted hover:bg-sunken'
                               }`}
@@ -247,45 +316,35 @@ export default function PublicCourseReader({
                     ) : content.description ? (
                       <p className="whitespace-pre-wrap leading-7 text-body">{content.description}</p>
                     ) : (
-                      <EmptyState compact title="No learner-facing description is available for this item." />
+                      <EmptyState compact title={t.noDescription} />
                     )}
                   </section>
                 )}
 
                 {activeContentId && (
-                  <nav aria-label="Exercise navigation" className="flex items-center justify-between gap-4">
+                  <nav aria-label={t.navigation} className="flex items-center justify-between gap-4">
                     <div>
                       {previous && (
                         <Link href={`/learn/${outline.id}/content/${previous.id}`} className="text-sm text-accent-text hover:underline">
-                          ← {previous.title}
+                          ← {localizedTitle(outline, previous.id, previous.title, uiLanguage)}
                         </Link>
                       )}
                     </div>
                     <div className="text-right">
                       {next && (
                         <Link href={`/learn/${outline.id}/content/${next.id}`} className="text-sm text-accent-text hover:underline">
-                          {next.title} →
+                          {localizedTitle(outline, next.id, next.title, uiLanguage)} →
                         </Link>
                       )}
                     </div>
                   </nav>
                 )}
 
-                <ReaderActions signedIn={Boolean(user)} />
+                <ReaderActions signedIn={Boolean(user)} t={t} />
 
                 <details className="text-sm text-muted">
-                  <summary className="cursor-pointer hover:text-fg">Source, license and reuse</summary>
-                  <p className="mt-2">
-                    The learner-facing source mirror is available on{' '}
-                    <a href={PUBLIC_COURSES_URL} target="_blank" rel="noreferrer" className="text-accent-text hover:underline">
-                      GitHub
-                    </a>
-                    . Published material retains its{' '}
-                    <a href="/learning/LICENSE.txt" target="_blank" rel="noreferrer" className="text-accent-text hover:underline">
-                      MIT copyright and permission notice
-                    </a>
-                    .
-                  </p>
+                  <summary className="cursor-pointer hover:text-fg">{t.sourceTitle}</summary>
+                  <p className="mt-2">{t.source}</p>
                 </details>
               </article>
             </div>

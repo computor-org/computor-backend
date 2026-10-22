@@ -4,17 +4,49 @@ import { useSyncExternalStore } from 'react';
 
 export type UiLanguage = 'de' | 'en';
 
-const subscribe = () => () => {};
+const STORAGE_KEY = 'computor.language';
+const CHANGE_EVENT = 'computor-language-change';
 
-function browserLanguage(): UiLanguage {
+function storedLanguage(): UiLanguage | null {
+  try {
+    const value = window.localStorage.getItem(STORAGE_KEY);
+    return value === 'de' || value === 'en' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function currentLanguage(): UiLanguage {
+  const stored = storedLanguage();
+  if (stored) return stored;
   const preferred = (navigator.languages?.[0] ?? navigator.language ?? '').toLowerCase();
   return preferred.startsWith('de') ? 'de' : 'en';
 }
 
+function subscribe(onChange: () => void) {
+  window.addEventListener('storage', onChange);
+  window.addEventListener(CHANGE_EVENT, onChange);
+  return () => {
+    window.removeEventListener('storage', onChange);
+    window.removeEventListener(CHANGE_EVENT, onChange);
+  };
+}
+
+/** Remember an explicit language choice for all public pages. */
+export function setUiLanguage(language: UiLanguage) {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, language);
+  } catch {
+    // Without storage the choice lasts until the next page load.
+  }
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
 /**
- * German for German-language browsers, English otherwise. The server render
- * uses `fallback`, and the browser preference applies on hydration.
+ * The visitor's explicit choice, else German for German-language browsers and
+ * English otherwise. The server render uses `fallback`; the browser value
+ * applies on hydration.
  */
 export function useBrowserLanguage(fallback: UiLanguage = 'de'): UiLanguage {
-  return useSyncExternalStore(subscribe, browserLanguage, () => fallback);
+  return useSyncExternalStore(subscribe, currentLanguage, () => fallback);
 }

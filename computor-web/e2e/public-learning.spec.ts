@@ -23,9 +23,9 @@ test('anonymous reading uses only static files even when the API is unavailable'
     if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method())) mutations.push(request.url());
   });
   await page.goto('/learn');
-  await expect(page.getByRole('link', { name: 'Browse course' })).toHaveCount(3);
+  await expect(page.getByRole('link', { name: 'Open course' })).toHaveCount(3);
   await expect(page.getByText('python-beginner.yaml')).toHaveCount(0);
-  await page.getByRole('link', { name: 'Browse course' }).first().click();
+  await page.getByRole('link', { name: 'Open course' }).first().click();
   await expect(page).toHaveURL(new RegExp(`/learn/${COURSE}$`));
   await expect(page.getByRole('heading', { name: 'Welcome', exact: true })).toBeVisible();
   await page.getByRole('link', { name: /Start with Mathematical Constants/ }).click();
