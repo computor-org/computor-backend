@@ -159,7 +159,7 @@ jobs:
       - run: yarn test:public-learning
       - run: yarn build
       - run: npx playwright install --with-deps chromium
-      - run: yarn test:e2e e2e/public-learning.spec.ts e2e/course-card-layout.spec.ts e2e/workspace-launch.spec.ts e2e/teacher-dashboard.spec.ts --workers=2
+      - run: yarn test:e2e e2e/public-learning.spec.ts e2e/course-card-layout.spec.ts e2e/workspace-launch.spec.ts e2e/teacher-dashboard.spec.ts e2e/support-tickets.spec.ts --workers=2
 
   keycloak-abuse:
     runs-on: ubuntu-latest
