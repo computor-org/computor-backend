@@ -340,7 +340,9 @@ async def test_a_repaired_configuration_recovers_without_a_restart():
             assert seen == []
 
         # Once it expires, the next request re-probes and finds the fixed token.
-        issue_health._state = issue_health.replace(issue_health.current_health(), checked_at=0.0)
+        # (monotonic time starts near boot, so 0.0 is not "long ago" on a fresh CI runner)
+        expired = issue_health.time.monotonic() - issue_health.REPROBE_TTL_SECONDS - 1
+        issue_health._state = issue_health.replace(issue_health.current_health(), checked_at=expired)
         with github_says(payload={"private": True, "has_issues": True}):
             assert (await issue_health.ensure_probed()).available
 
