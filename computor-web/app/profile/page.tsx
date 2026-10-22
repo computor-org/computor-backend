@@ -201,8 +201,8 @@ export default function ProfilePage() {
                   <Field label="Website">
                     <input className={inputCls} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" />
                   </Field>
-                  <Field label="Language" hint="ISO 639-1 code, e.g. en, de.">
-                    <input className={inputCls} value={languageCode} onChange={(e) => setLanguageCode(e.target.value)} placeholder="en" maxLength={2} />
+                  <Field label="Language" hint="ISO 639-1 code, e.g. en, de. Leave empty to read each course in its own language.">
+                    <input className={inputCls} value={languageCode} onChange={(e) => setLanguageCode(e.target.value)} placeholder="course language" maxLength={2} />
                   </Field>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
