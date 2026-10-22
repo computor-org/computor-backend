@@ -243,3 +243,39 @@ def test_every_flag_code_has_a_rule_description():
         "last_minute",
         "late_submission",
     }
+
+
+def test_report_downloads_do_not_block_the_event_loop(monkeypatch):
+    """The MinIO client is synchronous; downloads must run off the event loop."""
+    import asyncio
+    import time
+
+    from computor_backend.business_logic import course_analytics
+    from computor_backend.services import result_storage
+
+    async def slow_blocking_retrieve(result_id):
+        time.sleep(0.2)
+        return {"id": result_id}
+
+    monkeypatch.setattr(result_storage, "retrieve_result_json", slow_blocking_retrieve)
+
+    async def scenario():
+        finished = []
+
+        async def fetch():
+            report = await course_analytics._default_fetch("r1")
+            finished.append("fetch")
+            return report
+
+        async def ticker():
+            for _ in range(5):
+                await asyncio.sleep(0.01)
+            finished.append("ticker")
+
+        report, _ = await asyncio.gather(fetch(), ticker())
+        return report, finished
+
+    report, finished = asyncio.run(scenario())
+    assert report == {"id": "r1"}
+    # A blocking download would hold the loop for 0.2 s and finish first.
+    assert finished == ["ticker", "fetch"]

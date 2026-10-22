@@ -609,10 +609,16 @@ def _content_titles(db: Session, course_id: str) -> dict[str, str | None]:
 ReportFetcher = Callable[[str], Awaitable[dict[str, Any] | None]]
 
 
-async def _default_fetch(result_id: str) -> dict[str, Any] | None:
+def _fetch_blocking(result_id: str) -> dict[str, Any] | None:
     from computor_backend.services.result_storage import retrieve_result_json
 
-    return await retrieve_result_json(result_id)
+    return asyncio.run(retrieve_result_json(result_id))
+
+
+async def _default_fetch(result_id: str) -> dict[str, Any] | None:
+    # The MinIO client is synchronous: awaiting it directly would run every
+    # download of a large scan on the event loop and stall all other requests.
+    return await asyncio.to_thread(_fetch_blocking, result_id)
 
 
 async def get_typical_errors(
@@ -652,7 +658,8 @@ async def get_typical_errors(
     rows = rows[:max_results]
 
     fetch = fetch_report or _default_fetch
-    semaphore = asyncio.Semaphore(16)
+    # Below the MinIO client's default connection pool size (10).
+    semaphore = asyncio.Semaphore(8)
 
     async def _load(row) -> ReportedRun:
         async with semaphore:
