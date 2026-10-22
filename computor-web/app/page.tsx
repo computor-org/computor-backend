@@ -2,17 +2,72 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import PublicCourseCatalog from '@/src/components/courses/PublicCourseCatalog';
-import LearningOptions, { COMPUTOR_EXTENSION_URL } from '@/src/components/courses/LearningOptions';
+import { CODESPACES_URL, COMPUTOR_EXTENSION_URL } from '@/src/components/courses/LearningOptions';
 import LegalLinks from '@/src/components/LegalLinks';
 import NetideeNotice from '@/src/components/NetideeNotice';
+import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
+
+const mention = (name: string) => <code className="bg-accent-wash text-accent-text px-1 rounded text-xs">{name}</code>;
+
+const ICON_PATHS = {
+  book: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+  code: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4',
+  chat: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z',
+};
+
+const Icon = ({ name, className }: { name: keyof typeof ICON_PATHS; className: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICON_PATHS[name]} />
+  </svg>
+);
+
+const COPY = {
+  de: {
+    signIn: 'Anmelden',
+    signOut: 'Abmelden',
+    heroTitle: 'Programmieren lernen mit',
+    heroLead: 'Programmieren Schritt für Schritt.',
+    heroScope: 'Offene Kurse zu Python und Data Science, von den ersten Schritten bis zu Datenanalyse und Differentialgleichungen.',
+    toCourses: 'Kurse ohne Anmeldung entdecken →',
+    toWork: 'Anmelden und üben',
+    steps: [
+      ['book', 'Kurse lesen', <>Alle Kurse sind ohne Konto lesbar. Beginne mit <strong className="text-fg">Data Science mit Python &ndash; Grundlagen</strong>, Woche 1.</>],
+      ['code', 'Im Browser üben', <>Mit Konto startest du die Kursumgebung im Browser, ohne Installation. Dort bearbeitest du die Aufgaben, testest sie und reichst sie ein.</>],
+      ['chat', 'Lena fragen', <>Die KI-Tutorin Lena gibt Hinweise statt fertiger Lösungen. Erwähne {mention('@lena')} in den Nachrichten zu einer Aufgabe.</>],
+    ],
+    local: 'Lieber lokal arbeiten?',
+    footer: 'Interaktive Lernplattform für Programmierung.',
+  },
+  en: {
+    signIn: 'Sign in',
+    signOut: 'Sign out',
+    heroTitle: 'Learn programming with',
+    heroLead: 'Programming step by step.',
+    heroScope: 'Open courses on Python and data science, from first steps to data analysis and differential equations.',
+    toCourses: 'Explore courses without an account →',
+    toWork: 'Sign in and practise',
+    steps: [
+      ['book', 'Read the courses', <>All courses are readable without an account. Start with <strong className="text-fg">Data Science mit Python &ndash; Grundlagen</strong>, week 1.</>],
+      ['code', 'Practise in the browser', <>With an account you start the course environment in the browser, no installation needed. There you edit, test and submit the tasks.</>],
+      ['chat', 'Ask Lena', <>Lena, the AI tutor, gives hints instead of complete solutions. Mention {mention('@lena')} in the messages of a task.</>],
+    ],
+    local: 'Prefer to work locally?',
+    footer: 'Interactive learning platform for programming.',
+  },
+} as const;
 
 export default function Home() {
   const router = useRouter();
   const { user, logout } = useAuth();
-  const extensionUrl = COMPUTOR_EXTENSION_URL;
+  const language = useBrowserLanguage();
+  const t = COPY[language];
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
   const gettingStartedUrl = '/learn';
 
   // `/` is the public landing page and stays viewable when signed in (the header
@@ -24,17 +79,7 @@ export default function Home() {
     router.push('/');
   };
 
-  const handleDownload = () => {
-    if (extensionUrl) {
-      window.open(extensionUrl, '_blank', 'noopener,noreferrer');
-    }
-  };
 
-  const handleGettingStarted = () => {
-    if (gettingStartedUrl) {
-      router.push(gettingStartedUrl);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-accent-wash via-canvas to-accent-wash">
@@ -57,7 +102,7 @@ export default function Home() {
                 onClick={handleLogout}
                 className="px-4 py-2 bg-surface text-danger-text border-2 border-danger rounded-lg hover:bg-danger-wash transition-colors font-medium"
               >
-                Sign Out
+                {t.signOut}
               </button>
             </div>
           ) : (
@@ -66,7 +111,7 @@ export default function Home() {
                 href="/login"
                 className="px-4 py-2 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-colors font-medium"
               >
-                Sign In
+                {t.signIn}
               </Link>
             </div>
           )}
@@ -74,109 +119,51 @@ export default function Home() {
       </header>
 
       {/* Hero Section */}
-      <main className="container mx-auto px-4 pt-16 pb-32">
-        <div className="max-w-4xl mx-auto text-center space-y-8">
-          {/* Hero Title */}
-          <div className="space-y-4">
-            <h2 className="text-5xl md:text-6xl font-bold text-fg">
-              Learn Programming with{' '}
+      <main className="container mx-auto px-4 pt-10 pb-28">
+        <div className="max-w-5xl mx-auto text-center space-y-8">
+          <div className="space-y-3">
+            <h2 className="text-4xl md:text-5xl font-bold text-fg">
+              {t.heroTitle}{' '}
               <span className="text-accent-text">Computor</span>
             </h2>
-            <p className="text-xl text-muted max-w-2xl mx-auto">
-              A comprehensive educational platform for programming courses, assignments, and automated testing.
-            </p>
+            <p className="text-xl text-muted">{t.heroLead}</p>
+            <p className="text-base text-muted max-w-2xl mx-auto">{t.heroScope}</p>
           </div>
 
-          {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            {extensionUrl ? (
-              <button
-                className="px-8 py-4 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-all transform hover:scale-105 font-semibold text-lg shadow-lg flex items-center space-x-2"
-                onClick={handleDownload}
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                <span>Download VS Code Extension</span>
-              </button>
-            ) : null}
-            {gettingStartedUrl ? (
-              <button
-                onClick={handleGettingStarted}
+            <Link
+              href={gettingStartedUrl}
+              className="px-8 py-4 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-all transform hover:scale-105 font-semibold text-lg shadow-lg"
+            >
+              {t.toCourses}
+            </Link>
+            {!user && (
+              <Link
+                href="/login"
                 className="px-8 py-4 bg-surface text-accent-text rounded-lg border-2 border-accent hover:bg-accent-wash transition-all font-semibold text-lg"
               >
-                Get Started →
-              </button>
-            ) : null}
+                {t.toWork}
+              </Link>
+            )}
           </div>
 
-          {/* VS Code Extension Card */}
-          <div className="mt-16 bg-surface rounded-2xl shadow-xl p-8 border border-rule">
-            <div className="flex items-center justify-center space-x-3 mb-4">
-              <svg className="h-10 w-10 text-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-              </svg>
-              <h3 className="text-2xl font-bold text-fg">
-                Computor VS Code Extension
-              </h3>
-            </div>
-            <p className="text-muted mb-6 max-w-2xl mx-auto">
-              Code directly in VS Code with our powerful extension. Submit assignments, run tests, and get instant feedback - all without leaving your editor.
-            </p>
-            <div className="flex flex-wrap gap-4 justify-center">
-              <div className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium">
-                ✓ Instant Testing
+          <div className="grid md:grid-cols-3 gap-8">
+            {t.steps.map(([icon, title, body]) => (
+              <div key={icon} className="bg-surface rounded-xl shadow-lg p-6 border border-rule">
+                <Icon name={icon} className="h-12 w-12 text-accent-text mb-4 mx-auto" />
+                <h3 className="text-xl font-bold text-fg mb-2">{title}</h3>
+                <p className="text-muted">{body}</p>
               </div>
-              <div className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium">
-                ✓ Auto Submission
-              </div>
-              <div className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium">
-                ✓ Live Feedback
-              </div>
-              <div className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium">
-                ✓ Git Integration
-              </div>
-            </div>
+            ))}
           </div>
 
-          {/* Features Grid */}
-          <div className="grid md:grid-cols-3 gap-8 mt-16">
-            <div className="bg-surface rounded-xl shadow-lg p-6 border border-rule">
-              <svg className="h-12 w-12 text-accent-text mb-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
-              <h3 className="text-xl font-bold text-fg mb-2">
-                Interactive Courses
-              </h3>
-              <p className="text-muted">
-                Structured programming courses with hands-on assignments and projects.
-              </p>
-            </div>
-            <div className="bg-surface rounded-xl shadow-lg p-6 border border-rule">
-              <svg className="h-12 w-12 text-accent-text mb-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-              </svg>
-              <h3 className="text-xl font-bold text-fg mb-2">
-                Automated Testing
-              </h3>
-              <p className="text-muted">
-                Submit your code and get instant feedback with automated test runners.
-              </p>
-            </div>
-            <div className="bg-surface rounded-xl shadow-lg p-6 border border-rule">
-              <svg className="h-12 w-12 text-accent-text mb-4 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-              <h3 className="text-xl font-bold text-fg mb-2">
-                Collaborative Learning
-              </h3>
-              <p className="text-muted">
-                Work in groups, share solutions, and learn together with peers.
-              </p>
-            </div>
+          <div className="flex flex-wrap items-center justify-center gap-3 text-muted">
+            <Icon name="code" className="h-5 w-5 text-accent-text" />
+            <span>{t.local}</span>
+            <a href={COMPUTOR_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium hover:underline">Desktop VS Code</a>
+            <a href={CODESPACES_URL} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium hover:underline">GitHub Codespaces</a>
           </div>
 
-          <div className="mt-12"><LearningOptions /></div>
           <PublicCourseCatalog signedIn={!!user} />
         </div>
       </main>
@@ -185,7 +172,7 @@ export default function Home() {
       <footer className="fixed bottom-0 inset-x-0 z-40 border-t bg-surface">
         <div className="container mx-auto px-4 py-4">
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-center text-muted">
-            <p>&copy; 2026 Computor. Educational Platform for Programming.</p>
+            <p>&copy; 2026 Computor. {t.footer}</p>
             <LegalLinks className="text-sm" />
             <NetideeNotice />
           </div>
