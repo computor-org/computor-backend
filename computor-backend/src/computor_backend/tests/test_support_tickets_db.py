@@ -161,6 +161,15 @@ def test_status_follows_conversation(db, people):
     assert db.get(Ticket, t).status == "open"
 
 
+def test_inbox_mail_from_a_team_address_is_incoming(db, people):
+    # E.g. Zulip's Django error reports, sent as contact@ to contact@.
+    r = _ingest(db, _raw(_mid("zulip"), "[Django] ERROR", frm="contact@computor.at"))
+    ticket = db.get(Ticket, r.ticket_id)
+    assert ticket.status == "open" and ticket.reporter_email == "contact@computor.at"
+    msg = db.query(Message).filter(Message.ticket_id == r.ticket_id).one()
+    assert msg.properties["mail"]["direction"] == "in"
+
+
 def test_security_address_restricts_ticket(db, people):
     users, p = people
     sec = _ingest(db, _raw(_mid("sec"), "Vuln", to="security@computor.at"))
