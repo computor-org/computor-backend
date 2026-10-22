@@ -1,6 +1,6 @@
 # Datenschutzerklärung computor.at
 
-Version 1.1, gültig ab 01.10.2026
+Version 1.2, gültig ab 22.10.2026
 
 In dieser Datenschutzerklärung informieren wir Sie über die Verarbeitung
 personenbezogener Daten auf der Lernplattform computor.at und im Chat
@@ -77,7 +77,7 @@ können Sie ohne Konto lesen.
 Datenkategorien: Kurseinschreibungen, Gruppenzugehörigkeit, Ihr Programmcode
 und sonstige Abgaben, Git-Repositories mit ihrer Versionsgeschichte (auf
 unserem eigenen Git-Server Forgejo), automatische Testergebnisse, Punkte,
-Feedback von Lehrenden, Zeitstempel.
+Feedback von Lehrenden, Nachrichten zu Aufgaben, Zeitstempel.
 
 Zweck: Durchführung der Kurse, automatische Prüfung Ihres Codes, Feedback und
 Betreuung durch Lehrende und Tutor*innen.
@@ -179,17 +179,29 @@ Nachvollziehbarkeit und zur Abwehr von Ansprüchen.
 
 ### 4.8 Lena-Lernhilfe
 
-Wenn Sie Lena fragen, verarbeiten wir Ihre Frage, den von Ihnen ausgewählten
-Text, die für Sie sichtbare Aufgabenbeschreibung und die erzeugte Antwort.
-Lena gibt Lernhilfe, führt keinen Code aus und entscheidet keine Noten.
-Die Inferenz erfolgt auf Rechnern der TU Graz in Österreich, ohne externen
-KI-Anbieter und ohne Training von Modellen mit Ihren Daten.
+Lena steht auf zwei Wegen zur Verfügung: über die Schaltfläche „Lena fragen“
+bei einer Aufgabe und in Nachrichten zu einer Aufgabe. Lena wird nur tätig,
+wenn Sie Lena auf einem dieser Wege ansprechen. Lena gibt Lernhilfe, führt
+keinen Code aus und entscheidet keine Noten.
+
+**Schaltfläche „Lena fragen“:** Wir verarbeiten Ihre Frage, den von Ihnen
+ausgewählten Text, die für Sie sichtbare Aufgabenbeschreibung und die erzeugte
+Antwort.
+
+**Nachrichten zu einer Aufgabe:** Wenn Sie Lena in einer Nachricht erwähnen
+(@lena), verarbeiten wir diese Nachricht, die früheren Nachrichten im selben
+Verlauf, die Aufgabenbeschreibung, Ihre letzte Abgabe zu dieser Aufgabe und
+deren Testergebnisse. Lenas Antwort wird als Nachricht im Verlauf gespeichert.
+Sie ist wie Ihre anderen Nachrichten zu Aufgaben für Sie sowie für die
+Lehrenden und Tutor*innen des Kurses sichtbar.
+Auf beiden Wegen erfolgt die Inferenz auf Rechnern der TU Graz in Österreich,
+ohne externen KI-Anbieter und ohne Training von Modellen mit Ihren Daten.
 
 Rechtsgrundlage: Art. 6 Abs. 1 lit. e DSGVO iVm §§ 2 und 3 UG.
 
-Die Anfrage liegt auf computor.at höchstens 15 Minuten vor und wird nach
+Eine Anfrage über die Schaltfläche liegt auf computor.at höchstens 15 Minuten vor und wird nach
 Fertigstellung entfernt; die Antwort ist danach 24 Stunden nur für Sie abrufbar.
-Der Inferenz-Worker erstellt keine Dateien oder Inhaltsprotokolle von Fragen
+Die Lena-Dienste erstellen keine Dateien oder Inhaltsprotokolle von Fragen
 und Antworten. Das Modell verwendet begrenzte Speicher- und lokale
 Festplatten-Caches zur Wiederverwendung von Berechnungen. Einträge werden bei
 Kapazitätsbedarf oder beim Leeren ersetzt; eine feste zeitliche Ablaufgrenze
@@ -262,8 +274,9 @@ jedoch nicht möglich.
 |---|---|
 | Konto, Kurseinschreibungen, Abgaben, Git-Repositories, Testergebnisse | bis zur Löschung Ihres Kontos |
 | Workspace-Dateien (Home-Verzeichnis) | bis zur Löschung Ihres Kontos |
-| Lena-Anfragen | höchstens 15 Minuten; Entfernung bei Fertigstellung |
-| Lena-Antworten | 24 Stunden, nur für die anfragende Person |
+| Nachrichten zu Aufgaben, auch Antworten von Lena | bis zur Löschung Ihres Kontos |
+| Lena-Anfragen über die Schaltfläche | höchstens 15 Minuten; Entfernung bei Fertigstellung |
+| Lena-Antworten über die Schaltfläche | 24 Stunden, nur für die anfragende Person |
 | Lena-Inferenz-Caches | begrenzte Kapazität; Ersatz bei Kapazitätsbedarf oder Leeren |
 | Chat-Konto und Nachrichten | bis Sie Nachrichten oder Ihr Chat-Konto löschen bzw. dessen Löschung verlangen |
 | Zugriffsprotokolle des Webservers (Logdaten) | 14 Tage |

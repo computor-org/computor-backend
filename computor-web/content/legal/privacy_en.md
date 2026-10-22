@@ -1,6 +1,6 @@
 # Privacy Notice computor.at
 
-Version 1.1, effective 1 October 2026
+Version 1.2, effective 22 October 2026
 
 In this privacy notice, we inform you about how personal data are processed on
 the learning platform computor.at and in the chat chat.computor.at. This
@@ -73,7 +73,7 @@ does not require an account.
 Categories of data: course enrolments, group membership, your code and other
 submissions, Git repositories with their history (on our own Forgejo Git
 server), automatic test results, points, feedback from teaching staff,
-timestamps.
+messages about assignments, timestamps.
 
 Purpose: running the courses, automatically testing your code, feedback and
 support by teaching staff and tutors.
@@ -169,16 +169,28 @@ traceability and the defence of legal claims.
 
 ### 4.8 Lena learning assistance
 
-When you ask Lena, we process your question, the text you choose to submit,
-the assignment description visible to you and the generated answer. Lena gives
-learning help; it does not run your code or decide grades. Inference takes place
-on TU Graz machines in Austria, without an external AI provider or model training.
+Lena is available in two ways: the "Ask Lena" button on an assignment and
+messages about an assignment. Lena acts only when you address Lena in one of
+these ways. Lena gives learning help; it does not run your code or decide grades.
+
+**"Ask Lena" button:** we process your question, the text you choose to submit,
+the assignment description visible to you and the generated answer.
+
+**Messages about an assignment:** when you mention Lena in a message (@lena), we
+process that message, the earlier messages in the same thread, the assignment
+description, your latest submission for this assignment and its test results.
+Lena's answer is stored as a message in the thread. Like your other messages
+about assignments, it is visible to you and to the course's teaching staff and
+tutors.
+
+In both cases inference takes place on TU Graz machines in Austria, without an
+external AI provider or model training.
 
 Legal basis: Art. 6(1)(e) GDPR in conjunction with §§ 2 and 3 UG.
 
-The request is held temporarily on computor.at for at most 15 minutes; after
+A request made with the button is held temporarily on computor.at for at most 15 minutes; after
 completion it is removed, and only you can retrieve the answer for 24 hours.
-The inference worker keeps no prompt or answer files or content logs. The model
+The Lena services keep no prompt or answer files or content logs. The model
 uses bounded memory and local disk caches to reuse computations. Cache entries
 are replaced when capacity is needed or the cache is cleared; they have no fixed
 time-based expiry. These caches are private to the inference service and are
@@ -247,8 +259,9 @@ Without these cookies, however, signing in is not possible.
 |---|---|
 | Account, course enrolments, submissions, Git repositories, test results | until your account is deleted |
 | Workspace files (home directory) | until your account is deleted |
-| Lena requests | at most 15 minutes; removed on completion |
-| Lena answers | 24 hours, visible only to the author |
+| Messages about assignments, including Lena's answers | until your account is deleted |
+| Lena requests made with the button | at most 15 minutes; removed on completion |
+| Lena answers to the button | 24 hours, visible only to the author |
 | Lena inference caches | bounded capacity; replacement on capacity pressure or clearing |
 | Chat account and messages | until you delete messages or your chat account, or ask us to delete it |
 | Web server access logs (log data) | 14 days |
