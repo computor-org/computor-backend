@@ -118,8 +118,7 @@ g) Veröffentlichung von Lösungen zu beurteilten Aufgaben, wenn der Kurs das
 
 5.2 Sicherheitsforschung an der Plattform ist nur nach vorheriger Absprache
 mit security@computor.at erlaubt. Gefundene Sicherheitslücken melden Sie bitte
-an security@computor.at oder vertraulich über
-https://github.com/computor-org/feedback/security/advisories/new. Gegen
+vertraulich an security@computor.at. Gegen
 Personen, die eine Lücke in gutem Glauben und vertraulich melden, ohne Daten
 anderer abzurufen oder den Betrieb zu stören, werden wir wegen dieser Meldung
 keine rechtlichen Schritte einleiten.
@@ -260,4 +259,4 @@ Sammel- oder Verbandsklagen.
 - Missbrauch und rechtswidrige Inhalte: abuse@computor.at, siehe [Inhalte melden](/report)
 - Datenschutz: privacy@computor.at oder datenschutz@tugraz.at
 - Sicherheit: security@computor.at
-- Fehler und Vorschläge: https://github.com/computor-org/feedback
+- Fehler und Vorschläge: contact@computor.at

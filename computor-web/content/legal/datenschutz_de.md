@@ -303,8 +303,7 @@ verlangt ein Mindestalter von 13 Jahren.
 Alle Verbindungen sind verschlüsselt (TLS). Code von Nutzer*innen läuft in
 voneinander getrennten Containern mit Ressourcengrenzen. Der Zugang zu den
 Servern ist auf das Betriebsteam beschränkt. Sicherheitslücken melden Sie
-bitte an security@computor.at oder vertraulich über
-https://github.com/computor-org/feedback/security/advisories/new.
+bitte vertraulich an security@computor.at.
 
 ## 12. Änderungen dieser Datenschutzerklärung
 

@@ -56,8 +56,7 @@ Bedienbarkeit und Zugänglichkeit sind uns dabei ein großes Anliegen.
 Sollten Ihnen Barrieren auffallen, die Sie in der Benutzung unserer Website
 behindern, so bitten wir Sie, uns diese mitzuteilen. Bitte senden Sie
 sämtliche Anregungen an contact@computor.at. Beschreiben Sie bitte das Problem
-und führen Sie die URL der betroffenen Webseite an. Sie können Barrieren auch
-öffentlich unter https://github.com/computor-org/feedback melden.
+und führen Sie die URL der betroffenen Webseite an.
 
 ### Durchsetzungsverfahren
 
@@ -127,8 +126,7 @@ Usability and accessibility are of great concern to us.
 
 If you notice any barriers that prevent you from using our website, please let
 us know at contact@computor.at. Please describe the problem and provide the URL
-of the page in question. You can also report barriers publicly at
-https://github.com/computor-org/feedback.
+of the page in question.
 
 ### Enforcement procedure
 
