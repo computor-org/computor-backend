@@ -17,20 +17,92 @@ import { inputCls } from '@/src/components/ui/tokens';
 import { useResource } from '@/src/hooks/useResource';
 import { useSupportCapabilities } from '@/src/hooks/useSupportCapabilities';
 import { useNotify } from '@/src/contexts/NotificationContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { supportClient, type TicketScope, type TicketStatus } from '@/src/clients/SupportClient';
-import { STATUS_LABEL, STATUS_TONE, formatDateTime, userLabel } from '@/src/utils/support';
+import { STATUS_TONE, userLabel } from '@/src/utils/support';
 
 const PAGE_SIZE = 50;
 
-const SCOPE_TABS: { id: TicketScope; label: string }[] = [
-  { id: 'unassigned', label: 'Unassigned' },
-  { id: 'mine', label: 'Mine' },
-  { id: 'all', label: 'All' },
-];
+const SCOPES: TicketScope[] = ['unassigned', 'mine', 'all'];
+const STATUSES: TicketStatus[] = ['open', 'in_progress', 'waiting', 'done'];
+
+function formatDateTime(iso: string | null | undefined, locale: string | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(locale);
+}
+
+const COPY = {
+  de: {
+    forbidden: 'Du hast keinen Zugriff auf Support-Anfragen.',
+    importStarted: 'Mail-Import gestartet',
+    importFailed: 'Der Mail-Import konnte nicht gestartet werden',
+    title: 'Support',
+    subtitle: 'Team-Mails und Problemmeldungen.',
+    checking: 'Wird geprüft …',
+    checkMail: 'Jetzt Mails abrufen',
+    tabs: { unassigned: 'Nicht zugewiesen', mine: 'Meine', all: 'Alle' } as Record<TicketScope, string>,
+    count: (n: number) => (n === 1 ? '1 Anfrage' : `${n} Anfragen`),
+    statusFilter: 'Statusfilter',
+    anyStatus: 'Beliebiger Status',
+    status: { open: 'Offen', in_progress: 'In Bearbeitung', waiting: 'Wartet', done: 'Erledigt' } as Record<TicketStatus, string>,
+    searchLabel: 'Anfragen suchen',
+    searchPlaceholder: 'Betreff, Absender suchen …',
+    search: 'Suchen',
+    loading: 'Wird geladen …',
+    empty: 'Keine passenden Anfragen.',
+    subject: 'Betreff',
+    reporter: 'Absender',
+    teamAddress: 'Team-Adresse',
+    statusCol: 'Status',
+    assignee: 'Zugewiesen an',
+    lastActivity: 'Letzte Aktivität',
+    noSubject: '(kein Betreff)',
+    restrictedTitle: 'Eingeschränkte Anfrage',
+    restricted: 'eingeschränkt',
+    page: (n: number, total: number) => `Seite ${n} von ${total}`,
+    previous: 'Zurück',
+    next: 'Weiter',
+  },
+  en: {
+    forbidden: 'You do not have access to support tickets.',
+    importStarted: 'Mail import started',
+    importFailed: 'Could not start the mail import',
+    title: 'Support',
+    subtitle: 'Team mail and problem reports.',
+    checking: 'Checking…',
+    checkMail: 'Check mail now',
+    tabs: { unassigned: 'Unassigned', mine: 'Mine', all: 'All' } as Record<TicketScope, string>,
+    count: (n: number) => `${n} ticket${n === 1 ? '' : 's'}`,
+    statusFilter: 'Status filter',
+    anyStatus: 'Any status',
+    status: { open: 'Open', in_progress: 'In progress', waiting: 'Waiting', done: 'Done' } as Record<TicketStatus, string>,
+    searchLabel: 'Search tickets',
+    searchPlaceholder: 'Search subject, reporter…',
+    search: 'Search',
+    loading: 'Loading…',
+    empty: 'No tickets match.',
+    subject: 'Subject',
+    reporter: 'Reporter',
+    teamAddress: 'Team address',
+    statusCol: 'Status',
+    assignee: 'Assignee',
+    lastActivity: 'Last activity',
+    noSubject: '(no subject)',
+    restrictedTitle: 'Restricted ticket',
+    restricted: 'restricted',
+    page: (n: number, total: number) => `Page ${n} of ${total}`,
+    previous: 'Previous',
+    next: 'Next',
+  },
+};
 
 export default function SupportPage() {
   const { capabilities, loading: capsLoading } = useSupportCapabilities();
   const notify = useNotify();
+  const language = useUiLanguage();
+  const t = COPY[language];
+  const locale = language === 'de' ? 'de-AT' : undefined;
   const canView = !!capabilities?.can_view;
 
   const [scope, setScope] = useState<TicketScope>('unassigned');
@@ -51,20 +123,20 @@ export default function SupportPage() {
 
   if (capsLoading) return <PageLoading width="wide" />;
   if (!canView) {
-    return <Forbidden message="You do not have access to support tickets." />;
+    return <Forbidden message={t.forbidden} />;
   }
 
   const checkMail = async () => {
     setImporting(true);
     try {
       await supportClient.importNow();
-      notify('Mail import started', 'info');
+      notify(t.importStarted, 'info');
       setTimeout(() => {
         void refresh();
         setImporting(false);
       }, 4000);
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Could not start the mail import', 'error');
+      notify(e instanceof Error ? e.message : t.importFailed, 'error');
       setImporting(false);
     }
   };
@@ -73,20 +145,20 @@ export default function SupportPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Support' }]}
-          title="Support"
-          subtitle="Team mail and problem reports."
+          breadcrumbs={[{ label: t.title }]}
+          title={t.title}
+          subtitle={t.subtitle}
           actions={
             capabilities?.can_manage ? (
-              <Button variant="secondary" onClick={checkMail} loading={importing} loadingLabel="Checking…">
-                Check mail now
+              <Button variant="secondary" onClick={checkMail} loading={importing} loadingLabel={t.checking}>
+                {t.checkMail}
               </Button>
             ) : undefined
           }
         />
 
         <Tabs
-          tabs={SCOPE_TABS}
+          tabs={SCOPES.map((id) => ({ id, label: t.tabs[id] }))}
           active={scope}
           onSelect={(id) => {
             setScope(id);
@@ -95,10 +167,10 @@ export default function SupportPage() {
         />
 
         <Toolbar
-          end={<span className="text-sm text-muted">{total} ticket{total === 1 ? '' : 's'}</span>}
+          end={<span className="text-sm text-muted">{t.count(total)}</span>}
         >
           <select
-            aria-label="Status filter"
+            aria-label={t.statusFilter}
             value={status}
             onChange={(e) => {
               setStatus(e.target.value as TicketStatus | '');
@@ -106,10 +178,10 @@ export default function SupportPage() {
             }}
             className={`${inputCls} !w-auto`}
           >
-            <option value="">Any status</option>
-            {(Object.keys(STATUS_LABEL) as TicketStatus[]).map((s) => (
+            <option value="">{t.anyStatus}</option>
+            {STATUSES.map((s) => (
               <option key={s} value={s}>
-                {STATUS_LABEL[s]}
+                {t.status[s]}
               </option>
             ))}
           </select>
@@ -123,15 +195,15 @@ export default function SupportPage() {
           >
             <input
               type="search"
-              aria-label="Search tickets"
+              aria-label={t.searchLabel}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search subject, reporter…"
+              placeholder={t.searchPlaceholder}
               maxLength={200}
               className={`${inputCls} !w-64`}
             />
             <Button type="submit" variant="secondary">
-              Search
+              {t.search}
             </Button>
           </form>
         </Toolbar>
@@ -139,56 +211,56 @@ export default function SupportPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <ListLoading>Loading…</ListLoading>
+          <ListLoading>{t.loading}</ListLoading>
         ) : items.length === 0 ? (
-          <EmptyState compact title="No tickets match." />
+          <EmptyState compact title={t.empty} />
         ) : (
           <ScrollPanel>
             <Table>
               <Thead>
                 <Tr>
                   <Th>#</Th>
-                  <Th>Subject</Th>
-                  <Th>Reporter</Th>
-                  <Th>Team address</Th>
-                  <Th>Status</Th>
-                  <Th>Assignee</Th>
-                  <Th>Last activity</Th>
+                  <Th>{t.subject}</Th>
+                  <Th>{t.reporter}</Th>
+                  <Th>{t.teamAddress}</Th>
+                  <Th>{t.statusCol}</Th>
+                  <Th>{t.assignee}</Th>
+                  <Th>{t.lastActivity}</Th>
                 </Tr>
               </Thead>
               <Tbody>
-                {items.map((t) => (
-                  <Tr key={t.id}>
+                {items.map((row) => (
+                  <Tr key={row.id}>
                     <Td>
-                      <span className="font-mono text-xs">{t.number}</span>
+                      <span className="font-mono text-xs">{row.number}</span>
                     </Td>
                     <Td>
-                      <Link href={`/support/${t.id}`} className="font-medium text-accent-text hover:underline">
-                        {t.subject || '(no subject)'}
+                      <Link href={`/support/${row.id}`} className="font-medium text-accent-text hover:underline">
+                        {row.subject || t.noSubject}
                       </Link>
-                      {t.restricted && (
-                        <Badge tone="warning" className="ml-2" title="Restricted ticket">
-                          restricted
+                      {row.restricted && (
+                        <Badge tone="warning" className="ml-2" title={t.restrictedTitle}>
+                          {t.restricted}
                         </Badge>
                       )}
                     </Td>
                     <Td>
-                      <div>{t.reporter_name || t.reporter_email || '—'}</div>
-                      {t.reporter_name && t.reporter_email && (
-                        <div className="text-xs text-muted">{t.reporter_email}</div>
+                      <div>{row.reporter_name || row.reporter_email || '—'}</div>
+                      {row.reporter_name && row.reporter_email && (
+                        <div className="text-xs text-muted">{row.reporter_email}</div>
                       )}
                     </Td>
                     <Td>
-                      <span className="text-xs text-muted">{t.mailbox_address ?? '—'}</span>
+                      <span className="text-xs text-muted">{row.mailbox_address ?? '—'}</span>
                     </Td>
                     <Td>
-                      <Badge tone={STATUS_TONE[t.status]} pill>
-                        {STATUS_LABEL[t.status]}
+                      <Badge tone={STATUS_TONE[row.status]} pill>
+                        {t.status[row.status]}
                       </Badge>
                     </Td>
-                    <Td>{t.assignee ? userLabel(t.assignee) : <span className="text-subtle">—</span>}</Td>
+                    <Td>{row.assignee ? userLabel(row.assignee) : <span className="text-subtle">—</span>}</Td>
                     <Td>
-                      <span className="text-xs text-muted">{formatDateTime(t.last_message_at ?? t.updated_at)}</span>
+                      <span className="text-xs text-muted">{formatDateTime(row.last_message_at ?? row.updated_at, locale)}</span>
                     </Td>
                   </Tr>
                 ))}
@@ -200,14 +272,14 @@ export default function SupportPage() {
         {total > PAGE_SIZE && (
           <div className="shrink-0 flex items-center justify-between text-sm text-muted">
             <span>
-              Page {page + 1} of {pageCount}
+              {t.page(page + 1, pageCount)}
             </span>
             <div className="flex gap-2">
               <Button variant="secondary" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>
-                Previous
+                {t.previous}
               </Button>
               <Button variant="secondary" size="sm" disabled={page + 1 >= pageCount} onClick={() => setPage(page + 1)}>
-                Next
+                {t.next}
               </Button>
             </div>
           </div>

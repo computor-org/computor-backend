@@ -12,6 +12,38 @@ import {
   workspaceLaunchUrl,
 } from '@/src/utils/workspaceLaunch';
 import { templateLabel, type TemplateOption } from './templateOptions';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+
+const COPY = {
+  de: {
+    chooseType: 'Wähle eine Art von Arbeitsumgebung.',
+    notCreated: 'Die Arbeitsumgebung wurde nicht erstellt.',
+    created: 'Arbeitsumgebung erstellt, sie öffnet sich in einem neuen Tab',
+    createFailed: 'Die Arbeitsumgebung konnte nicht erstellt werden',
+    heading: 'Neue Arbeitsumgebung mit eigenem Namen',
+    type: 'Art',
+    name: 'Name',
+    optional: '(optional)',
+    create: 'Erstellen',
+    creating: 'Wird erstellt …',
+    cancel: 'Abbrechen',
+    hint: 'Kleinbuchstaben, Ziffern und Bindestriche. Standardmäßig wird ein Name aus der Art abgeleitet',
+  },
+  en: {
+    chooseType: 'Choose a workspace type.',
+    notCreated: 'The workspace was not created.',
+    created: 'Workspace created — opening in a new tab',
+    createFailed: 'Failed to create workspace',
+    heading: 'New workspace with a custom name',
+    type: 'Type',
+    name: 'Name',
+    optional: '(optional)',
+    create: 'Create',
+    creating: 'Creating…',
+    cancel: 'Cancel',
+    hint: 'Lowercase letters, digits and hyphens. Defaults to a name derived from the type',
+  },
+};
 
 const coderClient = new CoderClient();
 
@@ -36,6 +68,7 @@ export default function NewWorkspaceForm({
   onCreated: () => void;
 }) {
   const notify = useNotify();
+  const t = COPY[useUiLanguage()];
   const [template, setTemplate] = useState(options[0]?.name ?? '');
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -43,7 +76,7 @@ export default function NewWorkspaceForm({
 
   const handleSubmit = async () => {
     if (!template) {
-      setError('Choose a workspace type.');
+      setError(t.chooseType);
       return;
     }
     setSubmitting(true);
@@ -59,12 +92,12 @@ export default function NewWorkspaceForm({
         body: { template, workspace_name: name.trim() || null },
       });
       const workspaceName = result.workspace?.name;
-      if (!workspaceName) throw new Error('The workspace was not created.');
+      if (!workspaceName) throw new Error(t.notCreated);
 
       const launchUrl = workspaceLaunchUrl(result.user.username, workspaceName);
       if (tab) {
         tab.location.replace(launchUrl);
-        notify('Workspace created — opening in a new tab', 'success');
+        notify(t.created, 'success');
       } else {
         // Popup blocked: this tab goes instead.
         window.location.href = launchUrl;
@@ -75,7 +108,7 @@ export default function NewWorkspaceForm({
     } catch (err) {
       tab?.close();
       // e.g. 409: that name is already taken by a workspace of another type
-      setError(err instanceof Error ? err.message : 'Failed to create workspace');
+      setError(err instanceof Error ? err.message : t.createFailed);
     } finally {
       setSubmitting(false);
     }
@@ -83,11 +116,11 @@ export default function NewWorkspaceForm({
 
   return (
     <div className="rounded-lg border border-rule bg-surface p-4">
-      <h3 className="text-sm font-semibold text-fg">New workspace with a custom name</h3>
+      <h3 className="text-sm font-semibold text-fg">{t.heading}</h3>
       <ErrorBanner>{error}</ErrorBanner>
       <div className="mt-3 flex flex-wrap items-end gap-3">
         <label className="min-w-[14rem] flex-1">
-          <span className="mb-1 block text-xs font-medium text-body">Type</span>
+          <span className="mb-1 block text-xs font-medium text-body">{t.type}</span>
           <select
             value={template}
             onChange={(e) => setTemplate(e.target.value)}
@@ -102,7 +135,7 @@ export default function NewWorkspaceForm({
         </label>
         <label className="min-w-[14rem] flex-1">
           <span className="mb-1 block text-xs font-medium text-body">
-            Name <span className="font-normal text-subtle">(optional)</span>
+            {t.name} <span className="font-normal text-subtle">{t.optional}</span>
           </span>
           <input
             type="text"
@@ -114,16 +147,16 @@ export default function NewWorkspaceForm({
           />
         </label>
         <div className="flex gap-2 pb-0.5">
-          <Button onClick={handleSubmit} loading={submitting} loadingLabel="Creating…">
-            Create
+          <Button onClick={handleSubmit} loading={submitting} loadingLabel={t.creating}>
+            {t.create}
           </Button>
           <Button variant="secondary" onClick={onClose} disabled={submitting}>
-            Cancel
+            {t.cancel}
           </Button>
         </div>
       </div>
       <p className="mt-2 text-xs text-muted">
-        Lowercase letters, digits and hyphens. Defaults to a name derived from the type
+        {t.hint}
         {template ? ` ("${derivedWorkspaceName(template)}")` : ''}.
       </p>
     </div>

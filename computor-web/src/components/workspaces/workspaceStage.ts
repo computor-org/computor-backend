@@ -1,6 +1,38 @@
 import type { AgentLifecycle } from '@/src/types/workspaces';
 import { AGENT_LIFECYCLE_GAVE_UP } from '@/src/types/workspaces';
+import type { UiLanguage } from '@/src/hooks/useUiLanguage';
 import { categorizeStatus, type StatusCategory } from './WorkspaceStatusBadge';
+
+const COPY = {
+  de: {
+    failed: 'Fehlgeschlagen',
+    deleting: 'Wird gelöscht',
+    stopping: 'Wird gestoppt',
+    canceling: 'Wird abgebrochen',
+    starting: 'Wird gestartet',
+    queued: 'In Warteschlange',
+    running: 'Läuft',
+    ready: 'Bereit',
+    startupIncomplete: 'Läuft (Start unvollständig)',
+    preparing: 'Editor wird vorbereitet',
+    stopped: 'Gestoppt',
+    unknown: 'Unbekannt',
+  },
+  en: {
+    failed: 'Failed',
+    deleting: 'Deleting',
+    stopping: 'Stopping',
+    canceling: 'Canceling',
+    starting: 'Starting',
+    queued: 'Queued',
+    running: 'Running',
+    ready: 'Ready',
+    startupIncomplete: 'Running (startup incomplete)',
+    preparing: 'Preparing the editor',
+    stopped: 'Stopped',
+    unknown: 'Unknown',
+  },
+};
 
 /**
  * What one workspace is doing, in a word.
@@ -31,22 +63,24 @@ export function workspaceStage(
   transition?: string | null,
   /** From the details endpoint; the list endpoint has no agent information. */
   agentLifecycle?: AgentLifecycle | string | null,
+  language: UiLanguage = 'en',
 ): WorkspaceStage {
+  const t = COPY[language];
   const category: StatusCategory = categorizeStatus(status, transition);
   const stopping = transition === 'stop';
   const deleting = transition === 'delete';
 
   if (category === 'failed') {
-    return { label: 'Failed', settled: true };
+    return { label: t.failed, settled: true };
   }
 
   if (category === 'pending') {
     const s = (status || '').toLowerCase();
-    if (deleting || s === 'deleting') return { label: 'Deleting', settled: false };
-    if (stopping || s === 'stopping') return { label: 'Stopping', settled: false };
-    if (s === 'canceling') return { label: 'Canceling', settled: false };
-    if (s === 'starting') return { label: 'Starting', settled: false };
-    return { label: 'Queued', settled: false };
+    if (deleting || s === 'deleting') return { label: t.deleting, settled: false };
+    if (stopping || s === 'stopping') return { label: t.stopping, settled: false };
+    if (s === 'canceling') return { label: t.canceling, settled: false };
+    if (s === 'starting') return { label: t.starting, settled: false };
+    return { label: t.queued, settled: false };
   }
 
   if (category === 'running') {
@@ -54,23 +88,23 @@ export function workspaceStage(
     // the agent still has a startup script to finish. Only the details endpoint
     // knows; from the list, `running` is as far as we can honestly claim.
     if (agentLifecycle === undefined || agentLifecycle === null) {
-      return { label: 'Running', settled: true };
+      return { label: t.running, settled: true };
     }
     if (agentLifecycle === 'ready') {
-      return { label: 'Ready', settled: true };
+      return { label: t.ready, settled: true };
     }
     if (AGENT_LIFECYCLE_GAVE_UP.includes(agentLifecycle)) {
       // Running, but its startup script is never reporting ready. Not a build
       // failure — the workspace opens — so settled: waiting longer changes
       // nothing.
-      return { label: 'Running (startup incomplete)', settled: true };
+      return { label: t.startupIncomplete, settled: true };
     }
-    return { label: 'Preparing the editor', settled: false };
+    return { label: t.preparing, settled: false };
   }
 
   if (category === 'stopped') {
-    return { label: 'Stopped', settled: true };
+    return { label: t.stopped, settled: true };
   }
 
-  return { label: 'Unknown', settled: true };
+  return { label: t.unknown, settled: true };
 }

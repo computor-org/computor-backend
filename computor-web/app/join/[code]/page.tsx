@@ -8,8 +8,48 @@ import { InvitesClient } from '@/src/generated/clients/InvitesClient';
 import type { InviteStatusPublic } from 'types/generated';
 import { ssoAuthService } from '@/src/services/authInstances';
 import { WAITLIST_URL } from '@/src/utils/registration';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const invitesClient = new InvitesClient();
+
+const COPY = {
+  de: {
+    checkFailed: 'Dieser Einladungslink konnte nicht geprüft werden.',
+    closed: 'Die Registrierung ist im Moment geschlossen.',
+    full: 'Die Pilotphase ist voll. Im Moment können keine neuen Konten angelegt werden.',
+    used: 'Dieser Einladungslink wurde bereits verwendet.',
+    expired: 'Dieser Einladungslink ist abgelaufen.',
+    invalid: 'Dieser Einladungslink ist ungültig.',
+    checking: 'Einladung wird geprüft …',
+    invited: 'Du bist eingeladen',
+    intro: 'Erstelle dein Computor-Konto mit GitHub oder mit deiner E-Mail-Adresse. Dieser Einladungslink funktioniert nur einmal.',
+    github: 'Mit GitHub anmelden',
+    email: 'Mit E-Mail registrieren',
+    emailNote: 'Bei der Registrierung mit E-Mail musst du deine Adresse bestätigen, bevor das Konto angelegt wird.',
+    unusable: 'Diese Einladung kann nicht verwendet werden',
+    waitlist: 'Du möchtest dabei sein? Setz dich auf die Warteliste, indem du eine Nachricht hinterlässt unter',
+    haveAccount: 'Du hast schon ein Konto?',
+    signIn: 'Anmelden',
+  },
+  en: {
+    checkFailed: 'Could not check this invite link.',
+    closed: 'Registration is closed right now.',
+    full: 'The pilot is full — no new accounts can be created right now.',
+    used: 'This invite link has already been used.',
+    expired: 'This invite link has expired.',
+    invalid: 'This invite link is not valid.',
+    checking: 'Checking your invite…',
+    invited: "You're invited",
+    intro: 'Create your Computor account with GitHub or with your email address. This invite link works once.',
+    github: 'Sign in with GitHub',
+    email: 'Register with email',
+    emailNote: 'With email you will be asked to confirm your address before the account is created.',
+    unusable: "This invite can't be used",
+    waitlist: 'Want in? Join the waitlist by leaving a note at',
+    haveAccount: 'Already have an account?',
+    signIn: 'Sign in',
+  },
+};
 
 /**
  * Where an invite link lands (/join/<code>).
@@ -23,6 +63,7 @@ const invitesClient = new InvitesClient();
  */
 export default function JoinPage() {
   const { code } = useParams<{ code: string }>();
+  const t = COPY[useUiLanguage()];
   const [status, setStatus] = useState<InviteStatusPublic | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -32,7 +73,7 @@ export default function JoinPage() {
       .getInviteStatusInvitesTokenStatusGet({ token: code })
       .then(setStatus)
       .catch((e) =>
-        setLoadError(e instanceof Error ? e.message : 'Could not check this invite link.'),
+        setLoadError(e instanceof Error ? e.message : ''),
       );
   }, [code]);
 
@@ -47,13 +88,13 @@ export default function JoinPage() {
   const usable =
     status?.status === 'valid' && status.registration_mode !== 'closed' && !status.full;
 
-  let problem: string | null = loadError;
+  let problem: string | null = loadError === null ? null : loadError || t.checkFailed;
   if (!problem && status && !usable) {
-    if (status.registration_mode === 'closed') problem = 'Registration is closed right now.';
-    else if (status.full) problem = 'The pilot is full — no new accounts can be created right now.';
-    else if (status.status === 'used') problem = 'This invite link has already been used.';
-    else if (status.status === 'expired') problem = 'This invite link has expired.';
-    else problem = 'This invite link is not valid.';
+    if (status.registration_mode === 'closed') problem = t.closed;
+    else if (status.full) problem = t.full;
+    else if (status.status === 'used') problem = t.used;
+    else if (status.status === 'expired') problem = t.expired;
+    else problem = t.invalid;
   }
 
   return (
@@ -64,48 +105,46 @@ export default function JoinPage() {
           <span className="text-lg font-semibold text-fg">Computor</span>
         </div>
 
-        {!status && !loadError && <div className="text-muted text-sm">Checking your invite…</div>}
+        {!status && loadError === null && <div className="text-muted text-sm">{t.checking}</div>}
 
         {usable && (
           <>
-            <h1 className="text-2xl font-bold text-fg mb-1">You&apos;re invited</h1>
+            <h1 className="text-2xl font-bold text-fg mb-1">{t.invited}</h1>
             <p className="text-sm text-muted mb-6">
-              Create your Computor account with GitHub or with your email address. This invite
-              link works once.
+              {t.intro}
             </p>
             <div className="space-y-3">
               <button
                 onClick={() => start('github')}
                 className="w-full py-2.5 px-4 bg-accent text-on-accent text-sm font-medium rounded-lg hover:bg-accent-hover transition-colors"
               >
-                Sign in with GitHub
+                {t.github}
               </button>
               <button
                 onClick={() => start('email')}
                 className="w-full py-2.5 px-4 border border-rule text-body text-sm font-medium rounded-lg hover:bg-sunken transition-colors"
               >
-                Register with email
+                {t.email}
               </button>
             </div>
             <p className="text-xs text-muted mt-4">
-              With email you will be asked to confirm your address before the account is
-              created.
+              {t.emailNote}
             </p>
           </>
         )}
 
         {problem && (
           <>
-            <h1 className="text-xl font-semibold text-fg mb-2">This invite can&apos;t be used</h1>
+            <h1 className="text-xl font-semibold text-fg mb-2">{t.unusable}</h1>
             <p className="text-sm text-muted mb-4">{problem}</p>
             <p className="text-sm text-muted">
-              Want in? Join the waitlist by leaving a note at{' '}
+              {t.waitlist}{' '}
               <a href={WAITLIST_URL} className="text-accent-text underline">
                 github.com/computor-org/feedback
               </a>
-              . Already have an account?{' '}
+              . {t.haveAccount}{' '}
               <Link href="/login" className="text-accent-text underline">
-                Sign in
+                {t.signIn}
               </Link>
               .
             </p>

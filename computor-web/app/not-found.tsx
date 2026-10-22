@@ -2,6 +2,7 @@
 
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import NotFound from '@/src/components/NotFound';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 /**
  * Global not-found boundary. Renders the unified NotFound inside the
@@ -9,12 +10,13 @@ import NotFound from '@/src/components/NotFound';
  * consistent "nothing here" page rather than Next's full-screen error.
  */
 export default function NotFoundPage() {
+  const de = useUiLanguage() === 'de';
   return (
     <AuthenticatedLayout>
       <NotFound
-        title="Nothing here yet"
-        message="There is nothing to show on this page."
-        backText="Back to Dashboard"
+        title={de ? 'Hier gibt es nichts' : 'Nothing here yet'}
+        message={de ? 'Auf dieser Seite gibt es nichts anzuzeigen.' : 'There is nothing to show on this page.'}
+        backText={de ? 'Zur Übersicht' : 'Back to Dashboard'}
       />
     </AuthenticatedLayout>
   );

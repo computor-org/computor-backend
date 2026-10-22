@@ -15,7 +15,8 @@ for (const c of CASES) {
     if (c.stamp) {
       await page.addInitScript((v) => localStorage.setItem('computor-theme', v), c.stamp);
     }
-    await page.goto('/login');
+    // A public page that stays put: /login hands off to SSO within milliseconds.
+    await page.goto('/');
 
     const read = await page.evaluate(() => {
       const s = getComputedStyle(document.documentElement);

@@ -13,11 +13,44 @@ import Badge from '@/src/components/Badge';
 import CourseCard, { CourseCardSkeleton, ViewCourseLink } from '@/src/components/courses/CourseCard';
 import { ButtonLink } from '@/src/components/ui/Button';
 import Toggle from '@/src/components/ui/Toggle';
+import { localizedRoleLabel } from '@/src/utils/courseRoles';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const coursesClient = new CoursesClient();
 
+const COPY = {
+  de: {
+    courses: 'Kurse',
+    loadingSubtitle: 'Alle Kurse durchsuchen, auf die du Zugriff hast',
+    subtitle: (n: number) => (n === 1 ? '1 Kurs, auf den du Zugriff hast' : `${n} Kurse, auf die du Zugriff hast`),
+    showArchived: 'Archivierte anzeigen',
+    showArchivedLabel: 'Archivierte Kurse anzeigen',
+    browseCatalog: 'Katalog durchsuchen',
+    newCourse: 'Neuer Kurs',
+    noCourses: 'Keine Kurse gefunden',
+    noAccess: 'Du hast noch keinen Zugriff auf Kurse.',
+    browse: 'Katalog durchsuchen',
+    archived: 'Archiviert',
+  },
+  en: {
+    courses: 'Courses',
+    loadingSubtitle: 'Browse and access all courses where you have permissions',
+    subtitle: (n: number) => `${n} ${n === 1 ? 'course' : 'courses'} where you have permissions`,
+    showArchived: 'Show archived',
+    showArchivedLabel: 'Show archived courses',
+    browseCatalog: 'Browse catalog',
+    newCourse: 'New course',
+    noCourses: 'No courses found',
+    noAccess: 'You do not have access to any courses yet.',
+    browse: 'Browse the catalog',
+    archived: 'Archived',
+  },
+};
+
 export default function CoursesPage() {
   const { courseRole, canCreateCourse, hasView, isAdmin } = usePermissions();
+  const language = useUiLanguage();
+  const t = COPY[language];
   const { data, loading, error } = useResource(() => coursesClient.listCoursesCoursesGet({}), []);
   // The server includes archived courses for staff (students never get them),
   // so staff can still reach one to unarchive or delete it. They are folded
@@ -33,25 +66,25 @@ export default function CoursesPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Courses' }]}
-          title="Courses"
+          breadcrumbs={[{ label: t.courses }]}
+          title={t.courses}
           subtitle={
             loading
-              ? 'Browse and access all courses where you have permissions'
-              : `${courses.length} ${courses.length === 1 ? 'course' : 'courses'} where you have permissions`
+              ? t.loadingSubtitle
+              : t.subtitle(courses.length)
           }
           actions={
             <>
               {isStaff && (
                 <label className="flex items-center gap-2 text-sm text-muted mr-2">
-                  <span>Show archived{archivedCount > 0 ? ` (${archivedCount})` : ''}</span>
-                  <Toggle checked={showArchived} onChange={setShowArchived} label="Show archived courses" />
+                  <span>{t.showArchived}{archivedCount > 0 ? ` (${archivedCount})` : ''}</span>
+                  <Toggle checked={showArchived} onChange={setShowArchived} label={t.showArchivedLabel} />
                 </label>
               )}
               <ButtonLink href="/courses/catalog" variant="secondary">
-                Browse catalog
+                {t.browseCatalog}
               </ButtonLink>
-              {canCreateCourse() && <ButtonLink href="/courses/create">New course</ButtonLink>}
+              {canCreateCourse() && <ButtonLink href="/courses/create">{t.newCourse}</ButtonLink>}
             </>
           }
         />
@@ -76,9 +109,9 @@ export default function CoursesPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
             }
-            title="No courses found"
-            description="You do not have access to any courses yet."
-            action={<ButtonLink href="/courses/catalog">Browse the catalog</ButtonLink>}
+            title={t.noCourses}
+            description={t.noAccess}
+            action={<ButtonLink href="/courses/catalog">{t.browse}</ButtonLink>}
           />
         )}
 
@@ -93,8 +126,8 @@ export default function CoursesPage() {
                 badge={
                   course.archived_at ? (
                     <span className="flex items-center gap-1 shrink-0">
-                      <Badge tone="muted">Archived</Badge>
-                      {courseRole(course.id) && <Badge tone="info">{courseRole(course.id)}</Badge>}
+                      <Badge tone="muted">{t.archived}</Badge>
+                      {courseRole(course.id) && <Badge tone="info">{localizedRoleLabel(courseRole(course.id)!, language)}</Badge>}
                     </span>
                   ) : undefined
                 }

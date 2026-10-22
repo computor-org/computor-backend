@@ -7,10 +7,66 @@ import remarkGfm from 'remark-gfm';
 import { useAuth } from '@/src/contexts/AuthContext';
 import Button from '@/src/components/ui/Button';
 import { API_BASE_URL, CONSENT_REDIRECT_KEY, apiGet, apiPost } from '@/src/utils/apiClient';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type {
   ConsentStatusGet as ConsentStatus,
   PolicyTextGet as PolicyText,
 } from 'types/generated';
+
+const COPY = {
+  de: {
+    policyFailed: (status: number) => `Die Datenschutzerklärung konnte nicht geladen werden (Status ${status})`,
+    statusFailed: (status: number) => `Der Einwilligungsstatus konnte nicht geladen werden (Status ${status})`,
+    genericError: 'Es ist ein Fehler aufgetreten',
+    updated: 'Die Datenschutzerklärung wurde aktualisiert, während du sie gelesen hast. Prüf und akzeptiere die neue Version.',
+    recordFailed: (status: number) => `Die Einwilligung konnte nicht gespeichert werden (Status ${status})`,
+    loading: 'Wird geladen …',
+    heading: 'Datenverarbeitung und Datenschutz',
+    versionLabel: 'Version der Datenschutzerklärung',
+    accepted: 'Du hast diese Datenschutzerklärung akzeptiert',
+    acceptedOn: (when: string) => ` am ${when}`,
+    withdrawIn: 'Du kannst deine Einwilligung jederzeit widerrufen unter',
+    settings: 'Einstellungen',
+    howHeading: 'Wie wir deine Daten verarbeiten',
+    howBody: 'Wir verarbeiten deine personenbezogenen Daten, um die Lehrveranstaltungen durchzuführen, in denen diese Plattform eingesetzt wird, zum Beispiel deinen Namen, deine E-Mail-Adresse, Kursanmeldungen und Abgaben. Die Details stehen in der Datenschutzerklärung unten.',
+    cookies: 'Cookies:',
+    cookiesBody: 'Diese Plattform verwendet nur unbedingt notwendige Cookies für die Authentifizierung (Single-Sign-on-Sitzung). Sie sind für den Betrieb nötig und brauchen keine Einwilligung. Sie werden hier nur zur Information aufgeführt.',
+    noticeHeading: 'Datenschutzerklärung',
+    notLoaded: 'Die Datenschutzerklärung konnte nicht geladen werden.',
+    agreePrefix: 'Ich habe die Datenschutzerklärung (Version',
+    agreeSuffix: ') gelesen und stimme der darin beschriebenen Verarbeitung meiner personenbezogenen Daten zu.',
+    withdrawNote: 'Du kannst deine Einwilligung jederzeit in den Einstellungen widerrufen.',
+    saving: 'Wird gespeichert …',
+    agree: 'Zustimmen und weiter',
+    locale: 'de-AT' as string | undefined,
+  },
+  en: {
+    policyFailed: (status: number) => `Failed to load the privacy notice (status ${status})`,
+    statusFailed: (status: number) => `Failed to load consent status (status ${status})`,
+    genericError: 'An error occurred',
+    updated: 'The privacy notice was updated while you were reading it. Please review and accept the new version.',
+    recordFailed: (status: number) => `Failed to record consent (status ${status})`,
+    loading: 'Loading...',
+    heading: 'Data Processing & Privacy',
+    versionLabel: 'Privacy notice version',
+    accepted: 'You accepted this privacy notice',
+    acceptedOn: (when: string) => ` on ${when}`,
+    withdrawIn: 'You can withdraw your consent at any time in',
+    settings: 'Settings',
+    howHeading: 'How we process your data',
+    howBody: 'We process your personal data to deliver the courses (Lehrveranstaltungen) in which this platform is used — for example your name, e-mail address, course enrollments and submissions. The details are described in the privacy notice below.',
+    cookies: 'Cookies:',
+    cookiesBody: 'this platform only uses strictly necessary cookies for authentication (single sign-on session). These are required for the platform to function and do not need your consent; they are listed here for your information only.',
+    noticeHeading: 'Privacy notice',
+    notLoaded: 'The privacy notice could not be loaded.',
+    agreePrefix: 'I have read the privacy notice (version',
+    agreeSuffix: ') and agree to the processing of my personal data as described in it.',
+    withdrawNote: 'You can withdraw your consent at any time in Settings.',
+    saving: 'Saving…',
+    agree: 'Agree and continue',
+    locale: undefined as string | undefined,
+  },
+};
 
 // Deliberately a standalone page (no AuthenticatedLayout): the sidebar/topbar
 // fire API calls that are blocked by the consent gate, and this page must work
@@ -18,6 +74,7 @@ import type {
 export default function ConsentPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const t = COPY[useUiLanguage()];
 
   const [status, setStatus] = useState<ConsentStatus | null>(null);
   const [policy, setPolicy] = useState<PolicyText | null>(null);
@@ -45,10 +102,10 @@ export default function ConsentPage() {
       : `${API_BASE_URL}/consent/policy`;
     const response = await apiGet(url);
     if (!response.ok) {
-      throw new Error(`Failed to load the privacy notice (status ${response.status})`);
+      throw new Error(t.policyFailed(response.status));
     }
     setPolicy(await response.json());
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
@@ -60,7 +117,7 @@ export default function ConsentPage() {
       try {
         const statusResponse = await apiGet(`${API_BASE_URL}/consent/status`);
         if (!statusResponse.ok) {
-          throw new Error(`Failed to load consent status (status ${statusResponse.status})`);
+          throw new Error(t.statusFailed(statusResponse.status));
         }
         const statusData: ConsentStatus = await statusResponse.json();
         setStatus(statusData);
@@ -74,19 +131,19 @@ export default function ConsentPage() {
 
         await fetchPolicy();
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
+        setError(err instanceof Error ? err.message : t.genericError);
       } finally {
         setLoading(false);
       }
     }
     init();
-  }, [authLoading, isAuthenticated, continueToApp, fetchPolicy]);
+  }, [authLoading, isAuthenticated, continueToApp, fetchPolicy, t]);
 
   const handleLanguageChange = async (lang: string) => {
     try {
       await fetchPolicy(lang);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : t.genericError);
     }
   };
 
@@ -107,16 +164,14 @@ export default function ConsentPage() {
         }
         await fetchPolicy(policy?.lang);
         setAccepted(false);
-        throw new Error(
-          'The privacy notice was updated while you were reading it. Please review and accept the new version.'
-        );
+        throw new Error(t.updated);
       }
       if (!response.ok) {
-        throw new Error(`Failed to record consent (status ${response.status})`);
+        throw new Error(t.recordFailed(response.status));
       }
       continueToApp();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : t.genericError);
       setSubmitting(false);
     }
   };
@@ -126,7 +181,7 @@ export default function ConsentPage() {
       <div className="min-h-screen flex items-center justify-center bg-canvas">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto"></div>
-          <p className="mt-4 text-muted">Loading...</p>
+          <p className="mt-4 text-muted">{t.loading}</p>
         </div>
       </div>
     );
@@ -136,10 +191,10 @@ export default function ConsentPage() {
     <div className="min-h-screen bg-canvas py-10 px-4">
       <div className="max-w-3xl mx-auto space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-fg">Data Processing &amp; Privacy</h1>
+          <h1 className="text-3xl font-bold text-fg">{t.heading}</h1>
           {status?.required_version && (
             <p className="mt-1 text-sm text-muted">
-              Privacy notice version <span className="font-mono">{status.required_version}</span>
+              {t.versionLabel} <span className="font-mono">{status.required_version}</span>
             </p>
           )}
         </div>
@@ -153,34 +208,29 @@ export default function ConsentPage() {
         {reviewMode && status?.has_consented && (
           <div className="bg-success-wash border border-success-line rounded-lg p-4">
             <p className="text-sm text-success-text">
-              You accepted this privacy notice
-              {status.granted_at ? ` on ${new Date(status.granted_at).toLocaleString()}` : ''}. You
-              can withdraw your consent at any time in{' '}
-              <a href="/settings" className="underline font-medium">Settings</a>.
+              {t.accepted}
+              {status.granted_at ? t.acceptedOn(new Date(status.granted_at).toLocaleString(t.locale)) : ''}.{' '}
+              {t.withdrawIn}{' '}
+              <a href="/settings" className="underline font-medium">{t.settings}</a>.
             </p>
           </div>
         )}
 
         <div className="bg-surface rounded-lg shadow border border-rule p-6 space-y-4">
-          <h2 className="text-xl font-semibold text-fg">How we process your data</h2>
+          <h2 className="text-xl font-semibold text-fg">{t.howHeading}</h2>
           <p className="text-body">
-            We process your personal data to deliver the courses (Lehrveranstaltungen) in which
-            this platform is used — for example your name, e-mail address, course enrollments and
-            submissions. The details are described in the privacy notice below.
+            {t.howBody}
           </p>
           <div className="bg-accent-wash border border-accent-line rounded-lg p-4">
             <p className="text-sm text-accent-text">
-              <span className="font-semibold">Cookies:</span> this platform only uses strictly
-              necessary cookies for authentication (single sign-on session). These are required
-              for the platform to function and do not need your consent; they are listed here for
-              your information only.
+              <span className="font-semibold">{t.cookies}</span> {t.cookiesBody}
             </p>
           </div>
         </div>
 
         <div className="bg-surface rounded-lg shadow border border-rule p-6 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-fg">Privacy notice</h2>
+            <h2 className="text-xl font-semibold text-fg">{t.noticeHeading}</h2>
             {policy?.languages && policy.languages.length > 1 && (
               <div className="flex gap-2">
                 {policy.languages.map((lang) => (
@@ -204,7 +254,7 @@ export default function ConsentPage() {
               </div>
             </div>
           ) : (
-            <p className="text-muted">The privacy notice could not be loaded.</p>
+            <p className="text-muted">{t.notLoaded}</p>
           )}
         </div>
 
@@ -218,22 +268,22 @@ export default function ConsentPage() {
                 className="mt-1 h-4 w-4 rounded border-rule-strong text-accent-text focus:ring-accent-line"
               />
               <span className="text-body">
-                I have read the privacy notice (version{' '}
-                <span className="font-mono">{status?.required_version}</span>) and agree to the
-                processing of my personal data as described in it.
+                {t.agreePrefix}{' '}
+                <span className="font-mono">{status?.required_version}</span>
+                {t.agreeSuffix}
               </span>
             </label>
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted">
-                You can withdraw your consent at any time in Settings.
+                {t.withdrawNote}
               </p>
               <Button
                 onClick={handleSubmit}
                 disabled={!accepted}
                 loading={submitting}
-                loadingLabel="Saving…"
+                loadingLabel={t.saving}
               >
-                Agree and continue
+                {t.agree}
               </Button>
             </div>
           </div>

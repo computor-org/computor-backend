@@ -2,6 +2,7 @@
 
 import AuthenticatedLayout from './AuthenticatedLayout';
 import NotFound from './NotFound';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 /**
  * Standard "you may not see this page" state — the role-gate render repeated
@@ -17,11 +18,12 @@ export default function Forbidden({
   backLink?: string;
   backText?: string;
 }) {
+  const de = useUiLanguage() === 'de';
   return (
     <AuthenticatedLayout>
       <NotFound
-        title="Not available"
-        message={message ?? 'You do not have access to this page.'}
+        title={de ? 'Nicht verfügbar' : 'Not available'}
+        message={message ?? (de ? 'Du hast keinen Zugriff auf diese Seite.' : 'You do not have access to this page.')}
         backLink={backLink}
         backText={backText}
       />

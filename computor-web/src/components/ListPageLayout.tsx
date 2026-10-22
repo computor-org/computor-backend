@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 /**
  * Full-height scaffold for pages with a fixed header over a scrolling body.
@@ -153,8 +154,9 @@ export function PageActions({
 }
 
 /** Centered, borderless placeholder that occupies the scroll body while loading. */
-export function ListLoading({ children = 'Loading…' }: { children?: ReactNode }) {
-  return <div className="flex-1 min-h-0 flex items-center justify-center text-muted">{children}</div>;
+export function ListLoading({ children }: { children?: ReactNode }) {
+  const language = useUiLanguage();
+  return <div className="flex-1 min-h-0 flex items-center justify-center text-muted">{children ?? (language === 'de' ? 'Wird geladen …' : 'Loading…')}</div>;
 }
 
 /**

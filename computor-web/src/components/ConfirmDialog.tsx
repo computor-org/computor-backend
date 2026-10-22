@@ -1,6 +1,7 @@
 'use client';
 
 import Modal from './Modal';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import Button from './ui/Button';
 
 interface ConfirmDialogProps {
@@ -20,12 +21,13 @@ export default function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   variant = 'default',
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const de = useUiLanguage() === 'de';
   if (!open) return null;
 
   return (
@@ -34,10 +36,10 @@ export default function ConfirmDialog({
         <p className="text-sm text-muted mb-6">{message}</p>
         <div className="flex justify-end gap-3">
           <Button variant="ghost" onClick={onCancel}>
-            {cancelLabel}
+            {cancelLabel ?? (de ? 'Abbrechen' : 'Cancel')}
           </Button>
           <Button variant={variant === 'danger' ? 'danger' : 'primary'} onClick={onConfirm}>
-            {confirmLabel}
+            {confirmLabel ?? (de ? 'Bestätigen' : 'Confirm')}
           </Button>
         </div>
       </div>

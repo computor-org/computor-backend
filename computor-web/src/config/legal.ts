@@ -52,3 +52,18 @@ const LINKS: Record<LegalProfile, LegalLink[]> = {
 };
 
 export const LEGAL_LINKS: LegalLink[] = LINKS[LEGAL_PROFILE];
+
+const ENGLISH: Record<string, { label: string; href?: string }> = {
+  Impressum: { label: 'Imprint' },
+  Datenschutz: { label: 'Privacy', href: '/privacy/en' },
+  Nutzungsbedingungen: { label: 'Terms', href: '/terms/en' },
+  Barrierefreiheit: { label: 'Accessibility' },
+  'Inhalte melden': { label: 'Report content' },
+};
+
+/** The English label of a footer link, and the English page where one exists. */
+export function englishLegalLink(link: LegalLink): LegalLink {
+  const english = ENGLISH[link.label];
+  if (!english) return link;
+  return { ...link, label: english.label, href: !link.external && english.href ? english.href : link.href };
+}

@@ -4,6 +4,24 @@ import { useCallback } from 'react';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import type { WorkspaceDetails, WorkspaceProvisionRequest } from '@/src/types/workspaces';
+import { useUiLanguage } from './useUiLanguage';
+
+const COPY = {
+  de: {
+    starting: 'Arbeitsumgebung wird gestartet …', startFailed: 'Starten fehlgeschlagen',
+    stopping: 'Arbeitsumgebung wird gestoppt …', stopFailed: 'Stoppen fehlgeschlagen',
+    deleted: 'Arbeitsumgebung gelöscht', deleteFailed: 'Löschen fehlgeschlagen',
+    provisioned: 'Arbeitsumgebung eingerichtet', provisionFailed: 'Einrichten fehlgeschlagen',
+    detailsFailed: 'Details konnten nicht geladen werden',
+  },
+  en: {
+    starting: 'Workspace starting...', startFailed: 'Failed to start',
+    stopping: 'Workspace stopping...', stopFailed: 'Failed to stop',
+    deleted: 'Workspace deleted', deleteFailed: 'Failed to delete',
+    provisioned: 'Workspace provisioned', provisionFailed: 'Provisioning failed',
+    detailsFailed: 'Failed to fetch details',
+  },
+};
 
 const coderClient = new CoderClient();
 
@@ -16,44 +34,45 @@ const coderClient = new CoderClient();
  */
 export function useWorkspaceActions(refresh: () => void) {
   const notify = useNotify();
+  const t = COPY[useUiLanguage()];
 
   const start = useCallback(
     async (owner: string, name: string) => {
       try {
         await coderClient.startWorkspace({ username: owner, workspaceName: name });
-        notify('Workspace starting...', 'success');
+        notify(t.starting, 'success');
         setTimeout(refresh, 2000);
       } catch (err) {
-        notify(err instanceof Error ? err.message : 'Failed to start', 'error');
+        notify(err instanceof Error ? err.message : t.startFailed, 'error');
       }
     },
-    [notify, refresh],
+    [notify, refresh, t],
   );
 
   const stop = useCallback(
     async (owner: string, name: string) => {
       try {
         await coderClient.stopWorkspace({ username: owner, workspaceName: name });
-        notify('Workspace stopping...', 'success');
+        notify(t.stopping, 'success');
         setTimeout(refresh, 2000);
       } catch (err) {
-        notify(err instanceof Error ? err.message : 'Failed to stop', 'error');
+        notify(err instanceof Error ? err.message : t.stopFailed, 'error');
       }
     },
-    [notify, refresh],
+    [notify, refresh, t],
   );
 
   const remove = useCallback(
     async (owner: string, name: string) => {
       try {
         await coderClient.deleteWorkspace({ username: owner, workspaceName: name });
-        notify('Workspace deleted', 'success');
+        notify(t.deleted, 'success');
         refresh();
       } catch (err) {
-        notify(err instanceof Error ? err.message : 'Failed to delete', 'error');
+        notify(err instanceof Error ? err.message : t.deleteFailed, 'error');
       }
     },
-    [notify, refresh],
+    [notify, refresh, t],
   );
 
   /** Provision with success/error notifications; true on success. */
@@ -61,15 +80,15 @@ export function useWorkspaceActions(refresh: () => void) {
     async (body: WorkspaceProvisionRequest): Promise<boolean> => {
       try {
         await coderClient.provisionWorkspace({ body });
-        notify('Workspace provisioned', 'success');
+        notify(t.provisioned, 'success');
         refresh();
         return true;
       } catch (err) {
-        notify(err instanceof Error ? err.message : 'Provisioning failed', 'error');
+        notify(err instanceof Error ? err.message : t.provisionFailed, 'error');
         return false;
       }
     },
-    [notify, refresh],
+    [notify, refresh, t],
   );
 
   /**
@@ -89,11 +108,11 @@ export function useWorkspaceActions(refresh: () => void) {
         }
         return details;
       } catch (err) {
-        notify(err instanceof Error ? err.message : 'Failed to fetch details', 'error');
+        notify(err instanceof Error ? err.message : t.detailsFailed, 'error');
         return null;
       }
     },
-    [notify],
+    [notify, t],
   );
 
   return { start, stop, remove, provision, openOrDetails };

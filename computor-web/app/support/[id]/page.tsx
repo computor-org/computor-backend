@@ -17,6 +17,7 @@ import { inputCls } from '@/src/components/ui/tokens';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { useResource } from '@/src/hooks/useResource';
+import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
 import { useSupportCapabilities } from '@/src/hooks/useSupportCapabilities';
 import {
   supportClient,
@@ -26,19 +27,131 @@ import {
   type TicketStatus,
   type TicketUpdate,
 } from '@/src/clients/SupportClient';
-import {
-  PRIORITY_LABEL,
-  STATUS_LABEL,
-  STATUS_TONE,
-  formatDateTime,
-  userLabel,
-} from '@/src/utils/support';
+import { STATUS_TONE, userLabel } from '@/src/utils/support';
 
 type ComposerMode = 'reply' | 'note';
+
+const STATUSES: TicketStatus[] = ['open', 'in_progress', 'waiting', 'done'];
+const PRIORITIES: TicketPriority[] = ['low', 'normal', 'high'];
+
+function formatDateTime(iso: string | null | undefined, locale: string | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(locale);
+}
+
+const COPY: Record<UiLanguage, {
+  forbidden: string; support: string; ticket: string; notFound: string; actionFailed: string; noSubject: string;
+  status: Record<TicketStatus, string>; priorities: Record<TicketPriority, string>;
+  priority: string; reporter: string; teamAddress: string; assignee: string; unassignedLower: string; restricted: string;
+  claim: string; unassigned: string; statusLabel: string; conversation: string; noteAdded: string; replyQueued: string;
+  events: string; by: string; supportTeam: string; unknownSender: string; internalBanner: string; received: string;
+  reply: string; delivery: Record<string, string>; to: string; deliveryFailed: string; retry: string;
+  replyByMail: string; internalNote: string; compose: string; internalHint: string; from: string; replyText: string;
+  notePlaceholder: string; replyPlaceholder: string; sending: string; addNote: string; sendReply: string;
+  confirmTitle: string; confirmMessage: (from: string, to: string) => string; send: string;
+}> = {
+  de: {
+    forbidden: 'Du hast keinen Zugriff auf Support-Anfragen.',
+    support: 'Support',
+    ticket: 'Anfrage',
+    notFound: 'Anfrage nicht gefunden.',
+    actionFailed: 'Aktion fehlgeschlagen',
+    noSubject: '(kein Betreff)',
+    status: { open: 'Offen', in_progress: 'In Bearbeitung', waiting: 'Wartet', done: 'Erledigt' },
+    priorities: { low: 'Niedrig', normal: 'Normal', high: 'Hoch' },
+    priority: 'Priorität',
+    reporter: 'Absender',
+    teamAddress: 'Team-Adresse',
+    assignee: 'Zugewiesen an',
+    unassignedLower: 'nicht zugewiesen',
+    restricted: 'eingeschränkt',
+    claim: 'Übernehmen',
+    unassigned: 'Nicht zugewiesen',
+    statusLabel: 'Status',
+    conversation: 'Unterhaltung',
+    noteAdded: 'Notiz hinzugefügt',
+    replyQueued: 'Antwort zum Versand eingereiht',
+    events: 'Ereignisse',
+    by: 'von',
+    supportTeam: 'Support-Team',
+    unknownSender: 'Unbekannter Absender',
+    internalBanner: 'Interne Notiz, für den Absender nicht sichtbar',
+    received: 'empfangen',
+    reply: 'Antwort',
+    delivery: { sent: 'gesendet', failed: 'fehlgeschlagen', queued: 'eingereiht', pending: 'ausstehend' },
+    to: 'An',
+    deliveryFailed: 'Zustellung fehlgeschlagen.',
+    retry: 'Erneut versuchen',
+    replyByMail: 'Per Mail antworten',
+    internalNote: 'Interne Notiz',
+    compose: 'Verfassen',
+    internalHint: 'Interne Notiz, für den Absender nicht sichtbar.',
+    from: 'Von',
+    replyText: 'Antworttext',
+    notePlaceholder: 'Interne Notiz schreiben …',
+    replyPlaceholder: 'Antwort an den Absender schreiben …',
+    sending: 'Wird gesendet …',
+    addNote: 'Notiz hinzufügen',
+    sendReply: 'Antwort senden',
+    confirmTitle: 'Antwort per Mail senden?',
+    confirmMessage: (from, to) => `Dies sendet eine E-Mail von ${from} an ${to}. Sie kann nicht zurückgeholt werden.`,
+    send: 'Senden',
+  },
+  en: {
+    forbidden: 'You do not have access to support tickets.',
+    support: 'Support',
+    ticket: 'Ticket',
+    notFound: 'Ticket not found.',
+    actionFailed: 'Action failed',
+    noSubject: '(no subject)',
+    status: { open: 'Open', in_progress: 'In progress', waiting: 'Waiting', done: 'Done' },
+    priorities: { low: 'Low', normal: 'Normal', high: 'High' },
+    priority: 'Priority',
+    reporter: 'Reporter',
+    teamAddress: 'Team address',
+    assignee: 'Assignee',
+    unassignedLower: 'unassigned',
+    restricted: 'restricted',
+    claim: 'Claim',
+    unassigned: 'Unassigned',
+    statusLabel: 'Status',
+    conversation: 'Conversation',
+    noteAdded: 'Note added',
+    replyQueued: 'Reply queued for sending',
+    events: 'Events',
+    by: 'by',
+    supportTeam: 'Support team',
+    unknownSender: 'Unknown sender',
+    internalBanner: 'Internal note - not visible to the reporter',
+    received: 'received',
+    reply: 'reply',
+    delivery: {},
+    to: 'To',
+    deliveryFailed: 'Delivery failed.',
+    retry: 'Retry',
+    replyByMail: 'Reply by mail',
+    internalNote: 'Internal note',
+    compose: 'Compose',
+    internalHint: 'Internal note - not visible to the reporter.',
+    from: 'From',
+    replyText: 'Reply text',
+    notePlaceholder: 'Write an internal note…',
+    replyPlaceholder: 'Write a reply to the reporter…',
+    sending: 'Sending…',
+    addNote: 'Add note',
+    sendReply: 'Send reply',
+    confirmTitle: 'Send reply by mail?',
+    confirmMessage: (from, to) => `This sends an email from ${from} to ${to}. It cannot be recalled.`,
+    send: 'Send',
+  },
+};
 
 export default function SupportTicketPage() {
   const id = useParams().id as string;
   const { user } = useAuth();
+  const language = useUiLanguage();
+  const t = COPY[language];
   const notify = useNotify();
   const { capabilities, loading: capsLoading } = useSupportCapabilities();
   const canView = !!capabilities?.can_view;
@@ -53,13 +166,13 @@ export default function SupportTicketPage() {
   const [busy, setBusy] = useState(false);
 
   if (capsLoading || (canView && loading && !ticket)) return <PageLoading />;
-  if (!canView) return <Forbidden message="You do not have access to support tickets." />;
+  if (!canView) return <Forbidden message={t.forbidden} />;
   if (!ticket) {
     return (
       <AuthenticatedLayout>
         <ListPageLayout>
-          <PageHeader breadcrumbs={[{ label: 'Support', href: '/support' }, { label: 'Ticket' }]} title="Ticket" />
-          <ErrorBanner>{error ?? 'Ticket not found.'}</ErrorBanner>
+          <PageHeader breadcrumbs={[{ label: t.support, href: '/support' }, { label: t.ticket }]} title={t.ticket} />
+          <ErrorBanner>{error ?? t.notFound}</ErrorBanner>
         </ListPageLayout>
       </AuthenticatedLayout>
     );
@@ -73,7 +186,7 @@ export default function SupportTicketPage() {
       setData(await fn());
       return true;
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Action failed');
+      setActionError(e instanceof Error ? e.message : t.actionFailed);
       return false;
     } finally {
       setBusy(false);
@@ -83,27 +196,28 @@ export default function SupportTicketPage() {
 
   const assignedToMe = !!user && ticket.assignee?.id === user.id;
   const events = ticket.events ?? [];
+  const locale = language === 'de' ? 'de-AT' : undefined;
 
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Support', href: '/support' }, { label: `#${ticket.number}` }]}
-          title={ticket.subject || '(no subject)'}
+          breadcrumbs={[{ label: t.support, href: '/support' }, { label: `#${ticket.number}` }]}
+          title={ticket.subject || t.noSubject}
           subtitle={
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
               <span className="font-mono">#{ticket.number}</span>
               <Badge tone={STATUS_TONE[ticket.status]} pill>
-                {STATUS_LABEL[ticket.status]}
+                {t.status[ticket.status]}
               </Badge>
-              <span>Priority: {PRIORITY_LABEL[ticket.priority]}</span>
+              <span>{t.priority}: {t.priorities[ticket.priority]}</span>
               <span>
-                Reporter: {ticket.reporter_name || ticket.reporter_email || '—'}
+                {t.reporter}: {ticket.reporter_name || ticket.reporter_email || '—'}
                 {ticket.reporter_name && ticket.reporter_email ? ` <${ticket.reporter_email}>` : ''}
               </span>
-              <span>Team address: {ticket.mailbox_address ?? '—'}</span>
-              <span>Assignee: {ticket.assignee ? userLabel(ticket.assignee) : 'unassigned'}</span>
-              {ticket.restricted && <Badge tone="warning">restricted</Badge>}
+              <span>{t.teamAddress}: {ticket.mailbox_address ?? '—'}</span>
+              <span>{t.assignee}: {ticket.assignee ? userLabel(ticket.assignee) : t.unassignedLower}</span>
+              {ticket.restricted && <Badge tone="warning">{t.restricted}</Badge>}
             </div>
           }
         />
@@ -115,11 +229,11 @@ export default function SupportTicketPage() {
             <div className="flex flex-wrap items-end gap-4 rounded-lg border border-rule bg-surface p-4">
               {!assignedToMe && (
                 <Button disabled={busy} onClick={() => act(() => supportClient.claim(ticket.id))}>
-                  Claim
+                  {t.claim}
                 </Button>
               )}
               <label className="text-sm text-muted">
-                Assignee
+                {t.assignee}
                 <select
                   className={`${inputCls} mt-1 !w-56`}
                   disabled={busy}
@@ -128,7 +242,7 @@ export default function SupportTicketPage() {
                     update(e.target.value ? { assignee_id: e.target.value } : { unassign: true })
                   }
                 >
-                  <option value="">Unassigned</option>
+                  <option value="">{t.unassigned}</option>
                   {(agents ?? []).map((a) => (
                     <option key={a.id} value={a.id}>
                       {userLabel(a)}
@@ -137,31 +251,31 @@ export default function SupportTicketPage() {
                 </select>
               </label>
               <label className="text-sm text-muted">
-                Status
+                {t.statusLabel}
                 <select
                   className={`${inputCls} mt-1 !w-40`}
                   disabled={busy}
                   value={ticket.status}
                   onChange={(e) => update({ status: e.target.value as TicketStatus })}
                 >
-                  {(Object.keys(STATUS_LABEL) as TicketStatus[]).map((s) => (
+                  {STATUSES.map((s) => (
                     <option key={s} value={s}>
-                      {STATUS_LABEL[s]}
+                      {t.status[s]}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="text-sm text-muted">
-                Priority
+                {t.priority}
                 <select
                   className={`${inputCls} mt-1 !w-32`}
                   disabled={busy}
                   value={ticket.priority}
                   onChange={(e) => update({ priority: e.target.value as TicketPriority })}
                 >
-                  {(Object.keys(PRIORITY_LABEL) as TicketPriority[]).map((p) => (
+                  {PRIORITIES.map((p) => (
                     <option key={p} value={p}>
-                      {PRIORITY_LABEL[p]}
+                      {t.priorities[p]}
                     </option>
                   ))}
                 </select>
@@ -169,7 +283,7 @@ export default function SupportTicketPage() {
             </div>
           )}
 
-          <section aria-label="Conversation" className="space-y-3">
+          <section aria-label={t.conversation} className="space-y-3">
             {ticket.messages.map((m) => (
               <MessageCard
                 key={m.id}
@@ -195,20 +309,20 @@ export default function SupportTicketPage() {
                   from_address: internal ? undefined : fromAddress || undefined,
                 }),
               );
-              if (ok) notify(internal ? 'Note added' : 'Reply queued for sending', 'success');
+              if (ok) notify(internal ? t.noteAdded : t.replyQueued, 'success');
               return ok;
             }}
           />
 
           <details className="rounded-lg border border-rule bg-surface p-4">
             <summary className="cursor-pointer text-sm font-medium text-fg">
-              Events ({events.length})
+              {t.events} ({events.length})
             </summary>
             <ul className="mt-3 space-y-1 text-sm text-muted">
               {events.map((ev) => (
                 <li key={ev.id}>
-                  <span className="text-xs">{formatDateTime(ev.created_at)}</span> — {ev.kind}
-                  {ev.actor ? ` by ${userLabel(ev.actor)}` : ''}
+                  <span className="text-xs">{formatDateTime(ev.created_at, locale)}</span> — {ev.kind}
+                  {ev.actor ? ` ${t.by} ${userLabel(ev.actor)}` : ''}
                   {Object.keys(ev.data ?? {}).length > 0 && (
                     <span className="ml-1 font-mono text-xs">{JSON.stringify(ev.data)}</span>
                   )}
@@ -235,10 +349,12 @@ function MessageCard({
   canRetry: boolean;
   onRetry: () => void;
 }) {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const internal = m.visibility === 'internal' || m.direction === 'note';
   const outgoing = m.direction === 'out';
   const sender =
-    userLabel(m.author) || m.from_name || m.from_address || (outgoing ? 'Support team' : 'Unknown sender');
+    userLabel(m.author) || m.from_name || m.from_address || (outgoing ? t.supportTeam : t.unknownSender);
 
   return (
     <article
@@ -252,30 +368,30 @@ function MessageCard({
     >
       {internal && (
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-warn-text">
-          Internal note - not visible to the reporter
+          {t.internalBanner}
         </p>
       )}
       <header className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
         <span className="font-medium text-fg">{sender}</span>
         {!internal && m.from_address && <span className="text-xs text-muted">&lt;{m.from_address}&gt;</span>}
-        {!internal && !outgoing && <Badge tone="muted">received</Badge>}
-        {outgoing && <Badge tone="info">reply</Badge>}
+        {!internal && !outgoing && <Badge tone="muted">{t.received}</Badge>}
+        {outgoing && <Badge tone="info">{t.reply}</Badge>}
         {outgoing && m.delivery_state && (
           <Badge
             tone={m.delivery_state === 'failed' ? 'error' : m.delivery_state === 'sent' ? 'success' : 'muted'}
           >
-            {m.delivery_state}
+            {t.delivery[m.delivery_state] ?? m.delivery_state}
           </Badge>
         )}
-        <span className="ml-auto text-xs text-muted">{formatDateTime(m.created_at)}</span>
+        <span className="ml-auto text-xs text-muted">{formatDateTime(m.created_at, language === 'de' ? 'de-AT' : undefined)}</span>
       </header>
-      {!internal && m.to.length > 0 && <p className="mb-2 text-xs text-muted">To: {m.to.join(', ')}</p>}
+      {!internal && m.to.length > 0 && <p className="mb-2 text-xs text-muted">{t.to}: {m.to.join(', ')}</p>}
       {outgoing && m.delivery_state === 'failed' && (
         <div className="mb-2 flex flex-wrap items-center gap-3">
-          <ErrorBanner>{m.delivery_error || 'Delivery failed.'}</ErrorBanner>
+          <ErrorBanner>{m.delivery_error || t.deliveryFailed}</ErrorBanner>
           {canRetry && (
             <Button size="sm" variant="secondary" disabled={busy} onClick={onRetry}>
-              Retry
+              {t.retry}
             </Button>
           )}
         </div>
@@ -299,6 +415,7 @@ function Composer({
   teamAddresses: string[];
   onSend: (content: string, internal: boolean, fromAddress: string) => Promise<boolean>;
 }) {
+  const t = COPY[useUiLanguage()];
   const [mode, setMode] = useState<ComposerMode>(canReply ? 'reply' : 'note');
   const [content, setContent] = useState('');
   const [from, setFrom] = useState(ticket.mailbox_address ?? '');
@@ -306,8 +423,8 @@ function Composer({
   const [sending, setSending] = useState(false);
 
   const tabs = [
-    ...(canReply ? [{ id: 'reply' as const, label: 'Reply by mail' }] : []),
-    ...(canNote ? [{ id: 'note' as const, label: 'Internal note' }] : []),
+    ...(canReply ? [{ id: 'reply' as const, label: t.replyByMail }] : []),
+    ...(canNote ? [{ id: 'note' as const, label: t.internalNote }] : []),
   ];
   if (tabs.length === 0) return null;
 
@@ -324,14 +441,14 @@ function Composer({
   };
 
   return (
-    <section aria-label="Compose" className="space-y-3 rounded-lg border border-rule bg-surface p-4">
+    <section aria-label={t.compose} className="space-y-3 rounded-lg border border-rule bg-surface p-4">
       <Tabs tabs={tabs} active={mode} onSelect={setMode} />
       {internal ? (
-        <p className="text-sm text-warn-text">Internal note - not visible to the reporter.</p>
+        <p className="text-sm text-warn-text">{t.internalHint}</p>
       ) : (
         <div className="flex flex-wrap items-end gap-4 text-sm text-muted">
           <label>
-            From
+            {t.from}
             <select
               className={`${inputCls} mt-1 !w-64`}
               value={effectiveFrom}
@@ -345,7 +462,7 @@ function Composer({
             </select>
           </label>
           <label>
-            To
+            {t.to}
             <input
               className={`${inputCls} mt-1 !w-64`}
               readOnly
@@ -360,24 +477,24 @@ function Composer({
         value={content}
         maxLength={100_000}
         onChange={(e) => setContent(e.target.value)}
-        aria-label={internal ? 'Internal note' : 'Reply text'}
-        placeholder={internal ? 'Write an internal note…' : 'Write a reply to the reporter…'}
+        aria-label={internal ? t.internalNote : t.replyText}
+        placeholder={internal ? t.notePlaceholder : t.replyPlaceholder}
       />
       <div className="flex justify-end">
         <Button
           disabled={empty || (!internal && (!effectiveFrom || !ticket.reporter_email))}
           loading={sending}
-          loadingLabel="Sending…"
+          loadingLabel={t.sending}
           onClick={() => (internal ? void send() : setConfirming(true))}
         >
-          {internal ? 'Add note' : 'Send reply'}
+          {internal ? t.addNote : t.sendReply}
         </Button>
       </div>
       <ConfirmDialog
         open={confirming}
-        title="Send reply by mail?"
-        message={`This sends an email from ${effectiveFrom} to ${ticket.reporter_email ?? ''}. It cannot be recalled.`}
-        confirmLabel="Send"
+        title={t.confirmTitle}
+        message={t.confirmMessage(effectiveFrom, ticket.reporter_email ?? '')}
+        confirmLabel={t.send}
         onConfirm={() => void send()}
         onCancel={() => setConfirming(false)}
       />

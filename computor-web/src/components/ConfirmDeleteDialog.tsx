@@ -4,6 +4,12 @@ import { useState, type ReactNode } from 'react';
 import Modal from './Modal';
 import Button from './ui/Button';
 import Notice from './ui/Notice';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+
+const COPY = {
+  de: { failed: 'Löschen fehlgeschlagen', typeBefore: 'Gib', typeAfter: 'ein, um zu bestätigen', cancel: 'Abbrechen', deleting: 'Wird gelöscht …', delete: 'Löschen' },
+  en: { failed: 'Delete failed', typeBefore: 'Type', typeAfter: 'to confirm', cancel: 'Cancel', deleting: 'Deleting…', delete: 'Delete' },
+};
 
 /**
  * Deliberate, type-to-confirm dialog for destructive deletes. The user must type
@@ -34,6 +40,7 @@ export default function ConfirmDeleteDialog({
   onConfirm: () => Promise<void>;
   onClose: () => void;
 }) {
+  const t = COPY[useUiLanguage()];
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +55,7 @@ export default function ConfirmDeleteDialog({
       // On success the caller navigates away; leave the dialog as-is.
     } catch (e) {
       setBusy(false);
-      setError(e instanceof Error ? e.message : 'Delete failed');
+      setError(e instanceof Error ? e.message : t.failed);
     }
   }
 
@@ -61,7 +68,7 @@ export default function ConfirmDeleteDialog({
         {error && <div className="p-3 bg-danger-wash border border-danger-line rounded text-sm text-danger-text">{error}</div>}
         <div>
           <label htmlFor="confirm-delete-input" className="block text-xs font-medium text-body mb-1">
-            Type <span className="font-mono font-semibold text-fg">{confirmWord}</span> to confirm
+            {t.typeBefore} <span className="font-mono font-semibold text-fg">{confirmWord}</span> {t.typeAfter}
           </label>
           <input
             id="confirm-delete-input"
@@ -75,10 +82,10 @@ export default function ConfirmDeleteDialog({
       </div>
       <div className="px-6 py-4 bg-canvas rounded-b-lg flex justify-end gap-2">
         <Button variant="ghost" onClick={onClose} disabled={busy}>
-          Cancel
+          {t.cancel}
         </Button>
         <Button variant="danger" onClick={go} disabled={!ready}>
-          {busy ? 'Deleting…' : 'Delete'}
+          {busy ? t.deleting : t.delete}
         </Button>
       </div>
     </Modal>

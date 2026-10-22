@@ -6,6 +6,7 @@ import { TokensClient } from '@/src/generated/clients/TokensClient';
 import { AccountsClient } from '@/src/generated/clients/AccountsClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -18,7 +19,7 @@ import type { ConsentStatusGet, InstanceStatusGet } from '@/src/generated/types/
 import { ConsentClient } from '@/src/generated/clients/ConsentClient';
 import { InstanceStatusClient } from '@/src/generated/clients/InstanceStatusClient';
 import DescriptionList from '@/src/components/DescriptionList';
-import { WEB_COMMIT, duration, shortCommit, stamp } from '@/src/utils/instanceStatus';
+import { WEB_COMMIT, duration, shortCommit } from '@/src/utils/instanceStatus';
 
 const tokensClient = new TokensClient();
 const accountsClient = new AccountsClient();
@@ -51,9 +52,148 @@ function Section({ title, description, children, actions }: {
   );
 }
 
-function fmtDate(s?: string | null): string {
-  return s ? new Date(s).toLocaleDateString() : '—';
+function fmtDate(s: string | null | undefined, language: UiLanguage): string {
+  return s ? new Date(s).toLocaleDateString(language === 'de' ? 'de-AT' : undefined) : '—';
 }
+
+function stamp(value: string | null | undefined, language: UiLanguage): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleString(language === 'de' ? 'de-AT' : undefined);
+}
+
+const COPY = {
+  de: {
+    loadFailed: 'Einstellungen konnten nicht geladen werden',
+    createFailed: 'Token konnte nicht erstellt werden',
+    consentLoadFailed: 'Einwilligungsstatus konnte nicht geladen werden',
+    withdrawFailed: 'Einwilligung konnte nicht widerrufen werden',
+    settings: 'Einstellungen',
+    subtitle: 'Verwalte dein Konto, die Sicherheit und den API-Zugriff.',
+    appearance: 'Darstellung',
+    appearanceDesc: 'So sieht Computor auf diesem Gerät aus. Wird nicht zwischen Geräten synchronisiert.',
+    accountSecurity: 'Konto und Sicherheit',
+    accountSecurityDesc: 'Passwort, E-Mail, Zwei-Faktor-Authentifizierung und aktive Sitzungen verwaltet dein Login-Anbieter.',
+    openConsole: 'Kontoverwaltung öffnen',
+    apiTokens: 'API-Tokens',
+    apiTokensDesc: 'Persönliche Zugriffstokens für die CLI, die VS-Code-Erweiterung und Skripte. Behandle sie wie Passwörter.',
+    tokenWarnStrong: 'Ein Token hat alle deine Berechtigungen.',
+    tokenWarn: 'Bereiche fügen nur Berechtigungen hinzu und nehmen nie welche weg. Wer eines dieser Tokens besitzt, kann alles tun, was du kannst.',
+    tokenCreated: 'Token erstellt. Kopiere es jetzt, du kannst es später nicht mehr sehen.',
+    copied: 'Kopiert',
+    copy: 'Kopieren',
+    dismiss: 'Schließen',
+    tokenName: 'Token-Name',
+    tokenNamePlaceholder: 'z. B. Laptop-CLI',
+    expires: 'Läuft ab (optional)',
+    creating: 'Wird erstellt …',
+    createToken: 'Token erstellen',
+    loading: 'Wird geladen …',
+    noTokens: 'Keine aktiven Tokens.',
+    created: 'erstellt',
+    expiresOn: 'läuft ab',
+    noExpiry: 'läuft nie ab',
+    lastUsed: 'zuletzt verwendet',
+    neverUsed: 'nie verwendet',
+    revokeTitle: 'Token widerrufen',
+    revokeMessage: (name: string) => `Wenn du „${name}“ widerrufst, wird es sofort ungültig. Alles, was es verwendet, funktioniert dann nicht mehr.`,
+    revoke: 'Widerrufen',
+    accounts: 'Konten',
+    accountsDesc: 'Deine Anmelde- und Git-Server-Identitäten.',
+    noAccounts: 'Noch keine Konten.',
+    builtIn: 'integriert',
+    unlinkTitle: 'Konto trennen',
+    unlinkMessage: (provider: string, id: string) => `${provider}-Konto „${id}“ trennen?`,
+    unlink: 'Trennen',
+    privacy: 'Datenschutz und Einwilligung',
+    privacyDesc: 'Sieh dir die aktuelle Datenschutzerklärung an und verwalte deine Einwilligung.',
+    noNotice: 'Aktuell ist keine Datenschutzerklärung hinterlegt.',
+    noticeVersion: 'Version der Datenschutzerklärung:',
+    consentGiven: (date: string) => `Einwilligung erteilt am ${date}.`,
+    notConsented: 'Du hast der aktuellen Datenschutzerklärung nicht zugestimmt.',
+    viewNotice: 'Datenschutzerklärung ansehen',
+    withdrawWarn: 'Wenn du die Einwilligung widerrufst, ist der Zugriff auf die Plattform gesperrt, bis du erneut zustimmst. Fortfahren?',
+    withdrawing: 'Wird widerrufen …',
+    yesWithdraw: 'Ja, widerrufen',
+    cancel: 'Abbrechen',
+    withdraw: 'Einwilligung widerrufen',
+    about: 'Über diese Instanz',
+    aboutDesc: 'Welche Version von Computor du nutzt und wann der Server zuletzt neu gestartet wurde.',
+    onlineSince: 'Server online seit',
+    up: 'Laufzeit',
+    version: 'Version',
+    lastUpdated: 'Zuletzt aktualisiert',
+    devBuild: 'Entwicklungsversion',
+    serverCommit: 'Server-Commit',
+    webApp: 'Web-App',
+    devServer: 'Entwicklungsserver',
+  },
+  en: {
+    loadFailed: 'Failed to load settings',
+    createFailed: 'Could not create token',
+    consentLoadFailed: 'Failed to load consent status',
+    withdrawFailed: 'Failed to withdraw consent',
+    settings: 'Settings',
+    subtitle: 'Manage your account, security, and API access.',
+    appearance: 'Appearance',
+    appearanceDesc: 'How Computor looks on this device. Not synced across devices.',
+    accountSecurity: 'Account & Security',
+    accountSecurityDesc: 'Password, email, two-factor authentication and active sessions are managed by your login provider.',
+    openConsole: 'Open account console',
+    apiTokens: 'API tokens',
+    apiTokensDesc: 'Personal access tokens for the CLI, VS Code extension and scripts. Treat them like passwords.',
+    tokenWarnStrong: 'A token acts with your full permissions.',
+    tokenWarn: 'Scopes only add permissions — they never remove any. Anyone holding one of these tokens can do anything you can.',
+    tokenCreated: 'Token created — copy it now. You won’t be able to see it again.',
+    copied: 'Copied',
+    copy: 'Copy',
+    dismiss: 'Dismiss',
+    tokenName: 'Token name',
+    tokenNamePlaceholder: 'e.g. laptop CLI',
+    expires: 'Expires (optional)',
+    creating: 'Creating…',
+    createToken: 'Create token',
+    loading: 'Loading…',
+    noTokens: 'No active tokens.',
+    created: 'created',
+    expiresOn: 'expires',
+    noExpiry: 'no expiry',
+    lastUsed: 'last used',
+    neverUsed: 'never used',
+    revokeTitle: 'Revoke token',
+    revokeMessage: (name: string) => `Revoking "${name}" immediately invalidates it. Anything using it will stop working.`,
+    revoke: 'Revoke',
+    accounts: 'Accounts',
+    accountsDesc: 'Your sign-in and Git-server identities.',
+    noAccounts: 'No accounts yet.',
+    builtIn: 'built-in',
+    unlinkTitle: 'Unlink account',
+    unlinkMessage: (provider: string, id: string) => `Unlink ${provider} account "${id}"?`,
+    unlink: 'Unlink',
+    privacy: 'Privacy & Consent',
+    privacyDesc: 'Review the current privacy notice and manage your consent.',
+    noNotice: 'No privacy notice is currently configured.',
+    noticeVersion: 'Privacy notice version:',
+    consentGiven: (date: string) => `Consent given on ${date}.`,
+    notConsented: 'You have not consented to the current privacy notice.',
+    viewNotice: 'View privacy notice',
+    withdrawWarn: 'Withdrawing consent will block access to the platform until you consent again. Continue?',
+    withdrawing: 'Withdrawing…',
+    yesWithdraw: 'Yes, withdraw',
+    cancel: 'Cancel',
+    withdraw: 'Withdraw consent',
+    about: 'About this instance',
+    aboutDesc: 'Which version of Computor you are using, and when the server last restarted.',
+    onlineSince: 'Server online since',
+    up: 'up',
+    version: 'Version',
+    lastUpdated: 'Last updated',
+    devBuild: 'development build',
+    serverCommit: 'Server commit',
+    webApp: 'Web app',
+    devServer: 'development server',
+  },
+};
 
 
 const consentClient = new ConsentClient();
@@ -61,6 +201,8 @@ export default function SettingsPage() {
   const router = useRouter();
   const { user: authUser, isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin } = usePermissions();
+  const language = useUiLanguage();
+  const t = COPY[language];
 
   const [tokens, setTokens] = useState<ApiTokenGet[]>([]);
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
@@ -103,7 +245,7 @@ export default function SettingsPage() {
       setAccounts(ac);
       setInstanceStatus(status);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load settings');
+      setError(e instanceof Error ? e.message : t.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -132,25 +274,26 @@ export default function SettingsPage() {
       setNewExpiry('');
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not create token');
+      setError(e instanceof Error ? e.message : t.createFailed);
     } finally {
       setCreating(false);
     }
   }
 
-  const activeTokens = tokens.filter((t) => !t.revoked_at);
+  const activeTokens = tokens.filter((tok) => !tok.revoked_at);
 
   useEffect(() => {
     async function fetchConsentStatus() {
       try {
         setConsentStatus(await consentClient.getConsentStatusConsentStatusGet({}));
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load consent status');
+        setError(err instanceof Error ? err.message : t.consentLoadFailed);
       } finally {
         setConsentLoading(false);
       }
     }
     fetchConsentStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleWithdraw = async () => {
@@ -161,42 +304,42 @@ export default function SettingsPage() {
       // Access is gated again; the consent page is the only place left to go.
       router.push('/consent');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to withdraw consent');
+      setError(err instanceof Error ? err.message : t.withdrawFailed);
       setWithdrawing(false);
       setConfirmWithdraw(false);
     }
   };
 
-  const onlineSince = stamp(instanceStatus?.started_at);
-  const lastUpdated = stamp(instanceStatus?.build_time);
+  const onlineSince = stamp(instanceStatus?.started_at, language);
+  const lastUpdated = stamp(instanceStatus?.build_time, language);
   const serverCommit = shortCommit(instanceStatus?.commit);
 
   return (
     <AuthenticatedLayout>
       <ListPageLayout width="narrow">
-        <PageHeader breadcrumbs={[{ label: 'Settings' }]} title="Settings" subtitle="Manage your account, security, and API access." />
+        <PageHeader breadcrumbs={[{ label: t.settings }]} title={t.settings} subtitle={t.subtitle} />
 
         <ErrorBanner>{error}</ErrorBanner>
 
         <ScrollArea>
           <div className="space-y-6">
             <Section
-              title="Appearance"
-              description="How Computor looks on this device. Not synced across devices."
+              title={t.appearance}
+              description={t.appearanceDesc}
             >
               <ThemePicker />
             </Section>
 
             {/* Account & Security — only shown when the account console is configured */}
             {accountConsoleUrl && (
-              <Section title="Account & Security" description="Password, email, two-factor authentication and active sessions are managed by your login provider.">
+              <Section title={t.accountSecurity} description={t.accountSecurityDesc}>
                 <a
                   href={accountConsoleUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover"
                 >
-                  Open account console
+                  {t.openConsole}
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
@@ -206,8 +349,8 @@ export default function SettingsPage() {
 
             {/* API Tokens */}
             <Section
-              title="API tokens"
-              description="Personal access tokens for the CLI, VS Code extension and scripts. Treat them like passwords."
+              title={t.apiTokens}
+              description={t.apiTokensDesc}
             >
               {/*
                 Scopes are additive claims (PrincipalBuilder.build), so a
@@ -215,14 +358,13 @@ export default function SettingsPage() {
                 the opposite; say it where the token is minted.
               */}
               <div className="mb-5 rounded-lg border border-warn-line bg-warn-wash p-3 text-sm text-warn-text">
-                <strong className="font-medium">A token acts with your full permissions.</strong>{' '}
-                Scopes only add permissions — they never remove any. Anyone holding one of these tokens
-                can do anything you can.
+                <strong className="font-medium">{t.tokenWarnStrong}</strong>{' '}
+                {t.tokenWarn}
               </div>
 
               {createdToken && (
                 <div className="mb-5 rounded-lg border border-success-line bg-success-wash p-4">
-                  <p className="text-sm font-medium text-success-text">Token created — copy it now. You won’t be able to see it again.</p>
+                  <p className="text-sm font-medium text-success-text">{t.tokenCreated}</p>
                   <div className="mt-2 flex items-center gap-2">
                     <code className="flex-1 font-mono text-xs bg-surface border border-success-line rounded px-2 py-1.5 break-all">{createdToken.token}</code>
                     <button
@@ -232,9 +374,9 @@ export default function SettingsPage() {
                       }}
                       className="px-3 py-1.5 text-xs font-medium bg-success text-on-accent rounded hover:bg-success-hover whitespace-nowrap"
                     >
-                      {copied ? 'Copied' : 'Copy'}
+                      {copied ? t.copied : t.copy}
                     </button>
-                    <button onClick={() => setCreatedToken(null)} className="px-3 py-1.5 text-xs text-muted hover:bg-sunken rounded">Dismiss</button>
+                    <button onClick={() => setCreatedToken(null)} className="px-3 py-1.5 text-xs text-muted hover:bg-sunken rounded">{t.dismiss}</button>
                   </div>
                 </div>
               )}
@@ -248,11 +390,11 @@ export default function SettingsPage() {
                 className="flex flex-wrap items-end gap-3 mb-5"
               >
                 <div className="flex-1 min-w-[12rem]">
-                  <label className="block text-xs font-medium text-body mb-1">Token name</label>
-                  <input className={inputCls} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. laptop CLI" />
+                  <label className="block text-xs font-medium text-body mb-1">{t.tokenName}</label>
+                  <input className={inputCls} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t.tokenNamePlaceholder} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-body mb-1">Expires (optional)</label>
+                  <label className="block text-xs font-medium text-body mb-1">{t.expires}</label>
                   <input type="date" className={inputCls} value={newExpiry} onChange={(e) => setNewExpiry(e.target.value)} />
                 </div>
                 <button
@@ -260,41 +402,41 @@ export default function SettingsPage() {
                   disabled={creating || !newName.trim()}
                   className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
                 >
-                  {creating ? 'Creating…' : 'Create token'}
+                  {creating ? t.creating : t.createToken}
                 </button>
               </form>
 
               {loading ? (
-                <div className="text-sm text-muted">Loading…</div>
+                <div className="text-sm text-muted">{t.loading}</div>
               ) : activeTokens.length === 0 ? (
-                <div className="text-sm text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">No active tokens.</div>
+                <div className="text-sm text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">{t.noTokens}</div>
               ) : (
                 <div className="border border-rule rounded-lg divide-y">
-                  {activeTokens.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between px-4 py-3 gap-4">
+                  {activeTokens.map((tok) => (
+                    <div key={tok.id} className="flex items-center justify-between px-4 py-3 gap-4">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-fg truncate">{t.name}</div>
+                        <div className="text-sm font-medium text-fg truncate">{tok.name}</div>
                         <div className="text-xs text-muted">
-                          <span className="font-mono">{t.token_prefix}…</span> · created {fmtDate(t.created_at)} ·{' '}
-                          {t.expires_at ? `expires ${fmtDate(t.expires_at)}` : 'no expiry'} ·{' '}
-                          {t.last_used_at ? `last used ${fmtDate(t.last_used_at)}` : 'never used'}
+                          <span className="font-mono">{tok.token_prefix}…</span> · {t.created} {fmtDate(tok.created_at, language)} ·{' '}
+                          {tok.expires_at ? `${t.expiresOn} ${fmtDate(tok.expires_at, language)}` : t.noExpiry} ·{' '}
+                          {tok.last_used_at ? `${t.lastUsed} ${fmtDate(tok.last_used_at, language)}` : t.neverUsed}
                         </div>
                       </div>
                       <button
                         onClick={() =>
                           setConfirm({
-                            title: 'Revoke token',
-                            message: `Revoking "${t.name}" immediately invalidates it. Anything using it will stop working.`,
-                            confirmWord: t.name,
+                            title: t.revokeTitle,
+                            message: t.revokeMessage(tok.name),
+                            confirmWord: tok.name,
                             onConfirm: async () => {
-                              await tokensClient.revokeTokenEndpointApiTokensTokenIdDelete({ tokenId: t.id });
+                              await tokensClient.revokeTokenEndpointApiTokensTokenIdDelete({ tokenId: tok.id });
                               await load();
                             },
                           })
                         }
                         className="text-sm text-danger-text hover:underline whitespace-nowrap"
                       >
-                        Revoke
+                        {t.revoke}
                       </button>
                     </div>
                   ))}
@@ -304,13 +446,13 @@ export default function SettingsPage() {
 
             {/* Accounts */}
             <Section
-              title="Accounts"
-              description="Your sign-in and Git-server identities."
+              title={t.accounts}
+              description={t.accountsDesc}
             >
               {loading ? (
-                <div className="text-sm text-muted">Loading…</div>
+                <div className="text-sm text-muted">{t.loading}</div>
               ) : accounts.length === 0 ? (
-                <div className="text-sm text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">No accounts yet.</div>
+                <div className="text-sm text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">{t.noAccounts}</div>
               ) : (
                 <div className="border border-rule rounded-lg divide-y">
                   {accounts.map((a) => (
@@ -318,7 +460,7 @@ export default function SettingsPage() {
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-fg capitalize flex items-center gap-2">
                           {a.type || a.provider}
-                          {a.builtin && <span className="px-2 py-0.5 text-xs font-medium rounded bg-sunken text-muted capitalize">built-in</span>}
+                          {a.builtin && <span className="px-2 py-0.5 text-xs font-medium rounded bg-sunken text-muted capitalize">{t.builtIn}</span>}
                         </div>
                         <div className="text-xs text-muted">
                           <span className="font-mono">{a.provider_account_id}</span> · {a.provider}
@@ -328,8 +470,8 @@ export default function SettingsPage() {
                         <button
                           onClick={() =>
                             setConfirm({
-                              title: 'Unlink account',
-                              message: `Unlink ${a.provider} account "${a.provider_account_id}"?`,
+                              title: t.unlinkTitle,
+                              message: t.unlinkMessage(a.provider, a.provider_account_id),
                               confirmWord: a.provider_account_id,
                               onConfirm: async () => {
                                 await accountsClient.deleteAccountsAccountsIdDelete({ id: a.id });
@@ -339,7 +481,7 @@ export default function SettingsPage() {
                           }
                           className="text-sm text-danger-text hover:underline whitespace-nowrap"
                         >
-                          Unlink
+                          {t.unlink}
                         </button>
                       )}
                     </div>
@@ -350,24 +492,24 @@ export default function SettingsPage() {
 
             {/* Privacy & Consent */}
             <Section
-              title="Privacy & Consent"
-              description="Review the current privacy notice and manage your consent."
+              title={t.privacy}
+              description={t.privacyDesc}
             >
               {consentLoading ? (
-                <div className="text-sm text-muted">Loading…</div>
+                <div className="text-sm text-muted">{t.loading}</div>
               ) : !consentStatus?.required_version ? (
-                <div className="text-sm text-muted">No privacy notice is currently configured.</div>
+                <div className="text-sm text-muted">{t.noNotice}</div>
               ) : (
                 <div className="space-y-4">
                   <div className="text-sm text-body space-y-1">
                     <p>
-                      Privacy notice version:{' '}
+                      {t.noticeVersion}{' '}
                       <span className="font-mono">{consentStatus.required_version}</span>
                     </p>
                     {consentStatus.has_consented && consentStatus.granted_at ? (
-                      <p>Consent given on {new Date(consentStatus.granted_at).toLocaleString()}.</p>
+                      <p>{t.consentGiven(new Date(consentStatus.granted_at).toLocaleString(language === 'de' ? 'de-AT' : undefined))}</p>
                     ) : (
-                      <p className="text-warn-text">You have not consented to the current privacy notice.</p>
+                      <p className="text-warn-text">{t.notConsented}</p>
                     )}
                   </div>
 
@@ -376,28 +518,28 @@ export default function SettingsPage() {
                       href="/consent?review=1"
                       className="px-4 py-2 rounded-lg border border-rule-strong text-body hover:bg-canvas text-sm font-medium"
                     >
-                      View privacy notice
+                      {t.viewNotice}
                     </a>
 
                     {consentStatus.has_consented && (
                       confirmWithdraw ? (
                         <div className="flex flex-wrap items-center gap-3">
                           <span className="text-sm text-muted">
-                            Withdrawing consent will block access to the platform until you consent again. Continue?
+                            {t.withdrawWarn}
                           </span>
                           <button
                             onClick={handleWithdraw}
                             disabled={withdrawing}
                             className="px-4 py-2 rounded-lg bg-danger text-on-accent hover:bg-danger-hover disabled:bg-faint text-sm font-medium"
                           >
-                            {withdrawing ? 'Withdrawing…' : 'Yes, withdraw'}
+                            {withdrawing ? t.withdrawing : t.yesWithdraw}
                           </button>
                           <button
                             onClick={() => setConfirmWithdraw(false)}
                             disabled={withdrawing}
                             className="px-4 py-2 rounded-lg border border-rule-strong text-body hover:bg-canvas text-sm font-medium"
                           >
-                            Cancel
+                            {t.cancel}
                           </button>
                         </div>
                       ) : (
@@ -405,7 +547,7 @@ export default function SettingsPage() {
                           onClick={() => setConfirmWithdraw(true)}
                           className="px-4 py-2 rounded-lg border border-danger-line text-danger-text hover:bg-danger-wash text-sm font-medium"
                         >
-                          Withdraw consent
+                          {t.withdraw}
                         </button>
                       )
                     )}
@@ -423,30 +565,30 @@ export default function SettingsPage() {
             */}
             {instanceStatus && (
               <Section
-                title="About this instance"
-                description="Which version of Computor you are using, and when the server last restarted."
+                title={t.about}
+                description={t.aboutDesc}
               >
                 <DescriptionList
                   items={[
                     {
-                      term: 'Server online since',
+                      term: t.onlineSince,
                       value: onlineSince
-                        ? `${onlineSince} · up ${duration(instanceStatus.uptime_seconds)}`
+                        ? `${onlineSince} · ${t.up} ${duration(instanceStatus.uptime_seconds)}`
                         : '—',
                     },
-                    { term: 'Version', value: instanceStatus.branch },
+                    { term: t.version, value: instanceStatus.branch },
                     {
-                      term: 'Last updated',
+                      term: t.lastUpdated,
                       // No build time means no build: the API is running from a
                       // working tree. Saying so beats a blank where a date belongs.
-                      value: lastUpdated ?? 'development build',
+                      value: lastUpdated ?? t.devBuild,
                     },
                     ...(serverCommit
-                      ? [{ term: 'Server commit', value: serverCommit, mono: true }]
+                      ? [{ term: t.serverCommit, value: serverCommit, mono: true }]
                       : []),
                     {
-                      term: 'Web app',
-                      value: WEB_COMMIT ? WEB_COMMIT.slice(0, 7) : 'development server',
+                      term: t.webApp,
+                      value: WEB_COMMIT ? WEB_COMMIT.slice(0, 7) : t.devServer,
                       mono: !!WEB_COMMIT,
                     },
                   ]}

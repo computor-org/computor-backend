@@ -21,6 +21,8 @@ export default defineConfig({
     baseURL: EXTERNAL ?? `http://localhost:${PORT}`,
     trace: 'on-first-retry',
     headless: true,
+    // English interface by default; ui-language.spec.ts covers German.
+    locale: 'en-US',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: EXTERNAL ? undefined : {

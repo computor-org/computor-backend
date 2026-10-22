@@ -12,6 +12,7 @@ import NetideeNotice from './NetideeNotice';
 import { LEGAL_LINKS } from '@/src/config/legal';
 import { API_BASE_URL, apiGet, redirectToConsent } from '@/src/utils/apiClient';
 import type { ConsentStatusGet as ConsentStatus } from 'types/generated';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 // Consent bootstrap check runs once per authenticated session per page load;
 // mid-session changes (withdrawal, policy version bump) are caught by the 403
@@ -22,6 +23,12 @@ let consentChecked = false;
 export default function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
+  const language = useUiLanguage();
+
+  // The root layout renders lang="en"; the signed-in interface follows the user.
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -51,7 +58,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
       <div className="min-h-screen flex items-center justify-center bg-canvas">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto"></div>
-          <p className="mt-4 text-muted">Loading...</p>
+          <p className="mt-4 text-muted">{language === 'de' ? 'Wird geladen …' : 'Loading...'}</p>
         </div>
       </div>
     );
@@ -91,7 +98,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
             covers page content. Absent under NEXT_PUBLIC_LEGAL_PROFILE=none. */}
         {LEGAL_LINKS.length > 0 && (
           <footer className="shrink-0 border-t border-rule bg-surface px-4 py-1.5 text-xs text-muted flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-            <LegalLinks />
+            <LegalLinks language={language} />
             <NetideeNotice compact />
           </footer>
         )}

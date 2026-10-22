@@ -2,6 +2,25 @@
 
 import Badge from '@/src/components/Badge';
 import Panel from '@/src/components/ui/Panel';
+import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
+
+const COPY = {
+  de: { test: 'Test', case: 'Fall', unknown: 'UNBEKANNT' },
+  en: { test: 'Test', case: 'Case', unknown: 'UNKNOWN' },
+};
+
+const RESULT_DE: Record<string, string> = {
+  PASSED: 'BESTANDEN',
+  FAILED: 'NICHT BESTANDEN',
+  SKIPPED: 'ÜBERSPRUNGEN',
+  ERROR: 'FEHLER',
+};
+
+/** The badge text for a tester result: the tester's own word in English, translated in German. */
+export function testResultLabel(result: string | null | undefined, language: UiLanguage): string {
+  if (!result) return COPY[language].unknown;
+  return language === 'de' ? (RESULT_DE[result] ?? result) : result;
+}
 
 /**
  * The tester's `result_json` payload. Not covered by the generated types — the
@@ -45,6 +64,8 @@ export interface TestRunResult {
  * A badge is the app's word for "state of a thing"; this uses it throughout.
  */
 export default function TestResultTree({ tests }: { tests: TestResult[] }) {
+  const language = useUiLanguage();
+  const t = COPY[language];
   if (tests.length === 0) return null;
 
   return (
@@ -55,14 +76,14 @@ export default function TestResultTree({ tests }: { tests: TestResult[] }) {
           <Panel key={test.name ?? idx} padding="none">
             <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-rule bg-canvas rounded-t-lg">
               <div className="min-w-0">
-                <h4 className="text-sm font-medium text-fg truncate">{test.name ?? 'Test'}</h4>
+                <h4 className="text-sm font-medium text-fg truncate">{test.name ?? t.test}</h4>
                 {test.type && <p className="text-xs text-muted">{test.type}</p>}
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 <span className="text-xs text-muted tabular-nums">
                   {test.summary.passed}/{test.summary.total}
                 </span>
-                <Badge tone={passed ? 'success' : 'error'}>{test.result ?? 'UNKNOWN'}</Badge>
+                <Badge tone={passed ? 'success' : 'error'}>{testResultLabel(test.result, language)}</Badge>
               </div>
             </div>
 
@@ -76,7 +97,7 @@ export default function TestResultTree({ tests }: { tests: TestResult[] }) {
                       className="flex items-start justify-between gap-3 px-4 py-2.5"
                     >
                       <div className="min-w-0">
-                        <p className="text-sm text-fg">{subtest.name ?? 'Case'}</p>
+                        <p className="text-sm text-fg">{subtest.name ?? t.case}</p>
                         {/* The message is only worth the space when it explains
                             a failure; on a pass it repeats the badge. */}
                         {subtest.resultMessage && !subPassed && (
@@ -84,7 +105,7 @@ export default function TestResultTree({ tests }: { tests: TestResult[] }) {
                         )}
                       </div>
                       <Badge tone={subPassed ? 'success' : 'error'} className="shrink-0">
-                        {subtest.result ?? 'UNKNOWN'}
+                        {testResultLabel(subtest.result, language)}
                       </Badge>
                     </li>
                   );

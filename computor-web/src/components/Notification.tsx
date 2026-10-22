@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 type NotificationType = 'success' | 'error' | 'warning' | 'info';
 
@@ -50,6 +51,7 @@ const typeIcons: Record<NotificationType, React.ReactElement> = {
  * rendering this directly.
  */
 export default function Notification({ message, type, onClose, duration = 5000 }: NotificationProps) {
+  const dismissLabel = useUiLanguage() === 'de' ? 'Hinweis schließen' : 'Dismiss notification';
   // `visible` drives the enter transition; `leaving` drives the exit one.
   const [visible, setVisible] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -100,7 +102,7 @@ export default function Notification({ message, type, onClose, duration = 5000 }
       <div className="flex items-start gap-3">
         <span className={styles.icon}>{typeIcons[type]}</span>
         <p className={`text-sm font-medium flex-1 ${styles.text}`}>{message}</p>
-        <button onClick={startLeave} aria-label="Dismiss notification" className="text-subtle hover:text-muted">
+        <button onClick={startLeave} aria-label={dismissLabel} className="text-subtle hover:text-muted">
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
