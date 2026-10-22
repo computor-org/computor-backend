@@ -195,6 +195,19 @@ print("settings.json: added " + ", ".join(sorted(missing)))
 MERGE_EOF
 fi
 
+# The Computor extension follows the version this instance approves, in place:
+# newer than the image's copy -> installed before code-server starts, so a
+# stopped workspace picks it up on its next start (README.md "Extension
+# updates"). Bounded; every failure keeps the installed extension.
+export COMPUTOR_EXTENSION_UPDATE_MARKER=/tmp/computor-extension-update.json
+computor_extension_sync() {
+  COMPUTOR_BACKEND_URL="${computor_backend_url}" timeout "$1" \
+    /usr/lib/code-server/lib/node /opt/computor/extension-sync.mjs \
+    >>/tmp/computor-extension-sync.log 2>&1 || true
+}
+computor_extension_sync 120
+tail -n 1 /tmp/computor-extension-sync.log 2>/dev/null || true
+
 # Start code-server in background
 # Configure abs-proxy-base-path for Traefik routing at /coder prefix
 # Bind to 0.0.0.0 so Traefik can reach it from outside the container
@@ -248,3 +261,12 @@ for _ in $(seq 1 120); do
   curl -s -o /dev/null --max-time 1 "http://127.0.0.1:${code_server_port}/" && break
   sleep 1
 done
+
+# A running workspace checks again every 30 minutes; the running extension
+# offers a window reload once a newer version is installed. Deploying a new pin
+# therefore reaches every running workspace within the interval.
+(
+  while sleep 1800; do
+    computor_extension_sync 600
+  done
+) >/dev/null 2>&1 &
