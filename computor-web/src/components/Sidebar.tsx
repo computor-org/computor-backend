@@ -11,11 +11,7 @@ import { useSupportCapabilities } from '@/src/hooks/useSupportCapabilities';
 import { icons } from './icons';
 import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
 
-// Baked at build time by computor.sh (docker/web/Dockerfile GIT_COMMIT arg);
-// unset in `next dev`, where the generic fallback is shown instead.
-const APP_VERSION = process.env.NEXT_PUBLIC_GIT_COMMIT
-  ? process.env.NEXT_PUBLIC_GIT_COMMIT.slice(0, 7)
-  : 'dev';
+import { APP_VERSION } from '@/src/utils/appVersion';
 import {
   NavItem,
   coursesNavigation,
@@ -38,6 +34,8 @@ const COPY = {
     sectionCollapse: (label: string) => `Bereich ${label} einklappen`,
     sectionExpand: (label: string) => `Bereich ${label} ausklappen`,
     version: 'Laufende Version (Git-Commit)',
+    report: 'Problem melden',
+    myReports: 'Meine Meldungen',
   },
   en: {
     back: 'Back to Courses',
@@ -47,6 +45,8 @@ const COPY = {
     sectionCollapse: (label: string) => `Collapse ${label} section`,
     sectionExpand: (label: string) => `Expand ${label} section`,
     version: 'Running version (git commit)',
+    report: 'Report a problem',
+    myReports: 'My reports',
   },
 };
 
@@ -104,6 +104,8 @@ export default function Sidebar() {
   const { isAdmin, isOrganizationManager, isUserManager, isWorkspaceUser, isWorkspaceMaintainer, isExampleManager, isServiceManager, showManagement } = usePermissions();
   const { capabilities: supportCaps } = useSupportCapabilities();
   const [collapsed, setCollapsed] = useState(false);
+  // Team members reach their own reports through the Support entry's tab.
+  const showMyReports = !supportCaps?.can_view;
 
   // Sub-sections the user has explicitly toggled open. The section containing
   // the active route is always rendered expanded (see renderNavItems), so this
@@ -228,7 +230,7 @@ export default function Sidebar() {
     );
 
     return (
-      <SidebarShell collapsed={collapsed} setCollapsed={setCollapsed} user={user} t={t}>
+      <SidebarShell collapsed={collapsed} setCollapsed={setCollapsed} user={user} t={t} showMyReports={showMyReports}>
         {/* Back to Courses Link */}
         <Link
           href="/courses"
@@ -265,7 +267,7 @@ export default function Sidebar() {
 
   // Default navigation
   return (
-    <SidebarShell collapsed={collapsed} setCollapsed={setCollapsed} user={user} t={t}>
+    <SidebarShell collapsed={collapsed} setCollapsed={setCollapsed} user={user} t={t} showMyReports={showMyReports}>
       {renderNavItems(coursesNavigation)}
       {(showManagement || isExampleManager) &&
         renderNavItems(
@@ -292,6 +294,41 @@ export default function Sidebar() {
   );
 }
 
+/** "Report a problem" for every signed-in user, and the user's own reports unless the Support entry already covers them. */
+function HelpLinks({
+  collapsed,
+  t,
+  showMyReports,
+}: {
+  collapsed: boolean;
+  t: (typeof COPY)[UiLanguage];
+  showMyReports: boolean;
+}) {
+  const pathname = usePathname();
+  const links = [
+    { href: `/problem?from=${encodeURIComponent(pathname)}`, label: t.report, active: pathname === '/problem' },
+    ...(showMyReports ? [{ href: '/support', label: t.myReports, active: pathname.startsWith('/support') }] : []),
+  ];
+  return (
+    <div className="p-2 border-t border-rule space-y-1">
+      {links.map((l) => (
+        <Link
+          key={l.href}
+          href={l.href}
+          title={collapsed ? l.label : undefined}
+          aria-label={collapsed ? l.label : undefined}
+          className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+            l.active ? 'bg-accent-wash text-accent-text' : 'text-body hover:bg-sunken'
+          }`}
+        >
+          <span className="text-muted">{icons.support}</span>
+          {!collapsed && <span className="font-medium">{l.label}</span>}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 /**
  * The sidebar's fixed chrome — collapse header, scrolling nav, logo footer.
  *
@@ -304,10 +341,12 @@ function SidebarShell({
   setCollapsed,
   user,
   t,
+  showMyReports,
   children,
 }: {
   collapsed: boolean;
   setCollapsed: (collapsed: boolean) => void;
+  showMyReports: boolean;
   user: { givenName?: string; familyName?: string } | null | undefined;
   t: (typeof COPY)[UiLanguage];
   children: React.ReactNode;
@@ -345,6 +384,8 @@ function SidebarShell({
       </div>
 
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto scroll-slim">{children}</nav>
+
+      <HelpLinks collapsed={collapsed} t={t} showMyReports={showMyReports} />
 
       {/* Footer - Logo & Version */}
       <div className="p-4 border-t border-rule">

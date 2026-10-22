@@ -25,7 +25,9 @@ from computor_types.support import (
     TicketList,
     TicketMessageCreate,
     TicketMessageGet,
+    TicketPublication,
     TicketQuery,
+    TicketReportInfo,
     TicketUpdate,
     TicketUserRef,
 )
@@ -86,6 +88,8 @@ def list_tickets(params: TicketQuery, principal: Principal, db: Session) -> Tupl
         query = query.filter(Ticket.assignee_id.is_(None))
     elif params.scope == "mine":
         query = query.filter(Ticket.assignee_id == principal.user_id)
+    elif params.scope == "reported":
+        query = query.filter(Ticket.reporter_user_id == principal.user_id)
     if params.status is not None:
         query = query.filter(Ticket.status == params.status.value)
     if params.search:
@@ -104,7 +108,7 @@ def _message_dto(m: Message, attachments: List[TicketAttachment], authors: Dict[
     mail = (m.properties or {}).get("mail") or {}
     if m.visibility == "internal":
         direction = "note"
-    elif mail.get("direction") == "in":
+    elif mail.get("direction") == "in" or (m.properties or {}).get("direction") == "in":
         direction = "in"
     else:
         direction = "out"
@@ -147,15 +151,36 @@ def get_ticket(ticket_id: str, principal: Principal, db: Session) -> TicketGet:
     author_ids = {str(m.author_id) for m in messages if m.author_id}
     authors = {str(u.id): u for u in db.query(User).filter(User.id.in_(author_ids)).all()} if author_ids else {}
     base = _to_list(ticket, len(messages))
+    team = access.sees_internal(principal)
+    dtos = [_message_dto(m, atts.get(str(m.id), []), authors) for m in messages]
+    if not team:
+        # A reporter sees who answered, not the team's addresses.
+        if base.assignee is not None:
+            base.assignee.email = None
+        for d in dtos:
+            if d.author is not None and d.author.id != str(principal.user_id):
+                d.author.email = None
+    props = ticket.properties or {}
+    report = props.get("report")
+    report_info = None
+    if isinstance(report, dict):
+        report_info = TicketReportInfo(
+            app=report.get("app"), version=report.get("version"), page=report.get("page"),
+            command=report.get("command"), context=report.get("context") or {})
+    publication = None
+    github = props.get("github")
+    if team and isinstance(github, dict) and github.get("report_id"):
+        publication = TicketPublication(
+            issue_number=github.get("issue_number"), issue_url=github.get("issue_url"),
+            report_id=str(github["report_id"]), published_at=github.get("published_at"))
     events: List[TicketEventGet] = []
-    if access.sees_internal(principal):
+    if team:
         rows = (db.query(TicketEvent).filter(TicketEvent.ticket_id == ticket.id)
                 .order_by(TicketEvent.created_at.asc()).all())
         events = [TicketEventGet(id=str(e.id), kind=e.kind, actor=_user_ref(e.actor),
                                  data=e.data or {}, created_at=e.created_at) for e in rows]
-    return TicketGet(**base.model_dump(),
-                     messages=[_message_dto(m, atts.get(str(m.id), []), authors) for m in messages],
-                     events=events)
+    return TicketGet(**base.model_dump(), messages=dtos, events=events,
+                     report=report_info, publication=publication)
 
 
 def _event(db: Session, ticket: Ticket, principal: Principal, kind: str, data: dict) -> None:
@@ -241,10 +266,10 @@ def add_message(ticket_id: str, payload: TicketMessageCreate, principal: Princip
         db.commit()
         return get_ticket(ticket_id, principal, db), None
 
+    if ticket.channel != "mail":
+        return _add_in_app_message(ticket, content, principal, db), None
     if not access.can_manage(principal):
         raise ForbiddenException(detail="Only support members can reply")
-    if ticket.channel != "mail":
-        raise BadRequestException(detail="Only mail tickets can be answered by mail")
     settings = get_support_settings()
     team = settings.team_address_list
     sender = (payload.from_address or ticket.mailbox_address or (team[0] if team else "")).strip().lower()
@@ -282,6 +307,38 @@ def add_message(ticket_id: str, payload: TicketMessageCreate, principal: Princip
     _touch(ticket)
     db.commit()
     return get_ticket(ticket_id, principal, db), str(msg.id)
+
+
+def _add_in_app_message(ticket: Ticket, content: str, principal: Principal, db: Session) -> TicketGet:
+    """Public message on a problem report (no mail): team reply or reporter follow-up.
+
+    The reporter reads it in the web app; nothing leaves Computor.
+    """
+    is_reporter = (ticket.reporter_user_id is not None
+                   and str(ticket.reporter_user_id) == str(principal.user_id))
+    if access.can_manage(principal):
+        direction = "in" if is_reporter else "out"
+    elif is_reporter:
+        direction = "in"
+    else:
+        raise ForbiddenException(detail="Only support members can reply")
+    msg = Message(ticket_id=ticket.id, author_id=principal.user_id, visibility="public", level=0,
+                  title=ticket.subject[:255], content=content, properties={"direction": direction})
+    db.add(msg)
+    db.flush()
+    _event(db, ticket, principal, "reply" if direction == "out" else "followup",
+           {"message_id": str(msg.id)})
+    if direction == "out":
+        if ticket.status in ("open", "in_progress"):
+            ticket.status = "waiting"
+        if ticket.assignee_id is None:
+            ticket.assignee_id = principal.user_id
+    elif ticket.status in ("waiting", "done"):
+        ticket.status = "in_progress" if ticket.assignee_id else "open"
+    ticket.last_message_at = datetime.now(timezone.utc)
+    _touch(ticket)
+    db.commit()
+    return get_ticket(str(ticket.id), principal, db)
 
 
 def mark_delivery_failed(message_id: str, error: str, db: Session) -> None:

@@ -24,6 +24,7 @@ from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.core import check_admin
 from computor_backend.permissions.principal import Principal
 from computor_backend.settings import settings
+from computor_backend.support.config import get_support_settings
 from computor_types.instance import (
     InstanceInfoGet,
     InstanceStatusGet,
@@ -58,9 +59,16 @@ def _issue_reporting() -> IssueReportingInfo:
     a private board is one users must not be pointed at, so only a *public*
     tracker's URL is ever disclosed.
     """
+    mode = get_support_settings().report_mode
+    if mode == "tickets":
+        # Reports become support tickets: no GitHub dependency, so always on.
+        return IssueReportingInfo(enabled=True, mode="tickets")
+    if mode == "off":
+        return IssueReportingInfo(enabled=False, mode="off")
     health = current_health()
     settings_ = get_issue_report_settings()
     return IssueReportingInfo(
+        mode="github",
         enabled=health.available,
         visibility=health.visibility,
         issues_url=settings_.issues_url if health.available and health.is_public else None,

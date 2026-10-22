@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSyncExternalStore } from 'react';
-import { WAITLIST_URL } from '@/src/utils/registration';
+import { WAITLIST_ADDRESS, WAITLIST_URL } from '@/src/utils/registration';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const MESSAGES_EN: Record<string, { title: string; body: string }> = {
@@ -55,13 +55,13 @@ const MESSAGES_DE: Record<string, { title: string; body: string }> = {
 const COPY = {
   de: {
     messages: MESSAGES_DE,
-    waitlist: 'Du möchtest zugelassen werden, sobald wieder Plätze frei sind? Setz dich auf die Warteliste, indem du eine Nachricht hinterlässt unter',
+    waitlist: 'Du möchtest zugelassen werden, sobald wieder Plätze frei sind? Setz dich auf die Warteliste, indem du eine Mail schreibst an',
     haveAccount: 'Du hast schon ein Konto?',
     signIn: 'Anmelden',
   },
   en: {
     messages: MESSAGES_EN,
-    waitlist: 'Want to be let in when places open up? Join the waitlist by leaving a note at',
+    waitlist: 'Want to be let in when places open up? Join the waitlist by writing to',
     haveAccount: 'Already have an account?',
     signIn: 'Sign in',
   },
@@ -104,7 +104,7 @@ export default function JoinRefusedPage() {
               <p className="text-sm text-muted">
                 {t.waitlist}{' '}
                 <a href={WAITLIST_URL} className="text-accent-text underline">
-                  github.com/computor-org/feedback
+                  {WAITLIST_ADDRESS}
                 </a>
                 .
               </p>

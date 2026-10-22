@@ -13,13 +13,14 @@ import { BaseEndpointClient } from '@/src/generated/clients/baseClient';
 
 export type TicketStatus = 'open' | 'in_progress' | 'waiting' | 'done';
 export type TicketPriority = 'low' | 'normal' | 'high';
-export type TicketScope = 'unassigned' | 'mine' | 'all';
+export type TicketScope = 'unassigned' | 'mine' | 'all' | 'reported';
 
 export interface SupportCapabilities {
   can_view: boolean;
   can_reply: boolean;
   can_manage: boolean;
   can_write_internal: boolean;
+  can_publish?: boolean;
   is_admin: boolean;
   team_addresses: string[];
 }
@@ -89,9 +90,76 @@ export interface TicketEvent {
   created_at: string;
 }
 
+/** Context a web or VS Code problem report was filed with (null for mail tickets). */
+export interface TicketReportInfo {
+  app?: string | null;
+  version?: string | null;
+  page?: string | null;
+  command?: string | null;
+  context?: Record<string, unknown> | null;
+}
+
+/** The GitHub issue a ticket was published as (team only). */
+export interface TicketPublication {
+  issue_number: number;
+  issue_url?: string | null;
+  report_id?: string | null;
+  published_at?: string | null;
+}
+
 export interface TicketGet extends TicketList {
   messages: TicketMessage[];
   events: TicketEvent[];
+  report?: TicketReportInfo | null;
+  publication?: TicketPublication | null;
+}
+
+export interface PublishDraft {
+  title: string;
+  body: string;
+}
+
+/** Fields of a problem report; sent as multipart to POST /issue-reports. */
+export interface ReportInput {
+  title?: string;
+  description: string;
+  expected?: string;
+  steps?: string;
+  context: Record<string, unknown>;
+  screenshot?: File | null;
+}
+
+export interface ReportReceipt {
+  report_id: string;
+  issue_number: number;
+  ticket_id?: string | null;
+  ticket_number?: number | null;
+  screenshot_attached: boolean;
+  log_attached: boolean;
+}
+
+/** A failed report submission; `retryAfter` (seconds) is set on HTTP 429. */
+export class ReportError extends Error {
+  constructor(message: string, readonly status: number, readonly retryAfter?: number) {
+    super(message);
+    this.name = 'ReportError';
+  }
+}
+
+export type IssueReportingMode = 'tickets' | 'github' | 'off';
+
+/** Reads GET /instance-info (public) and returns the reporting mode, or null when unknown. */
+export async function fetchIssueReportingMode(): Promise<{ enabled: boolean; mode: IssueReportingMode } | null> {
+  try {
+    const response = await apiFetch(`${API_BASE_URL}/instance-info`, { method: 'GET' });
+    if (!response.ok) return null;
+    const info = (await response.json()) as { issue_reporting?: { enabled?: boolean; mode?: IssueReportingMode | null } | null };
+    const ir = info.issue_reporting;
+    if (!ir) return { enabled: false, mode: 'off' };
+    return { enabled: !!ir.enabled, mode: ir.mode ?? 'github' };
+  } catch {
+    return null;
+  }
 }
 
 export interface TicketUpdate {
@@ -162,6 +230,14 @@ export class SupportClient extends BaseEndpointClient {
     return this.client.post<TicketGet>(this.buildPath('tickets', id, 'messages'), body);
   }
 
+  publishDraft(id: string): Promise<PublishDraft> {
+    return this.client.get<PublishDraft>(this.buildPath('tickets', id, 'publish-draft'));
+  }
+
+  publish(id: string, body: PublishDraft): Promise<TicketGet> {
+    return this.client.post<TicketGet>(this.buildPath('tickets', id, 'publish'), body);
+  }
+
   retryMessage(id: string, messageId: string): Promise<TicketGet> {
     return this.client.post<TicketGet>(this.buildPath('tickets', id, 'messages', messageId, 'retry'));
   }
@@ -185,6 +261,25 @@ export class SupportClient extends BaseEndpointClient {
     const buffer = await response.arrayBuffer();
     return new Blob([buffer], { type: 'application/octet-stream' });
   }
+}
+
+/** File a problem report (multipart). Throws ReportError; status 404 means reporting is off. */
+export async function createReport(input: ReportInput): Promise<ReportReceipt> {
+  const form = new FormData();
+  form.set('description', input.description);
+  if (input.title) form.set('title', input.title);
+  if (input.expected) form.set('expected', input.expected);
+  if (input.steps) form.set('steps', input.steps);
+  form.set('context', JSON.stringify(input.context));
+  form.set('channel', 'web');
+  if (input.screenshot) form.set('screenshot', input.screenshot, input.screenshot.name);
+  const response = await apiFetch(`${API_BASE_URL}/issue-reports`, { method: 'POST', body: form });
+  if (!response.ok) {
+    const err = await buildApiError(response);
+    const retry = Number(response.headers.get('Retry-After'));
+    throw new ReportError(err.message, response.status, Number.isFinite(retry) && retry > 0 ? retry : undefined);
+  }
+  return (await response.json()) as ReportReceipt;
 }
 
 export const supportClient = new SupportClient();

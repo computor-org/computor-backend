@@ -291,11 +291,214 @@ test('attachments download without navigating', async ({ page, context }) => {
   expect(page.url()).toContain(`/support/${T1}`);
 });
 
-test('a user without support access sees neither the entry nor tickets', async ({ page }) => {
-  const calls = await setup(page, { ...CAPS, can_view: false, can_reply: false, can_manage: false, can_write_internal: false });
+const NO_TEAM = { ...CAPS, can_view: false, can_reply: false, can_manage: false, can_write_internal: false };
+
+test('a user without support access sees only the own-reports scope', async ({ page }) => {
+  const calls = await setup(page, NO_TEAM);
   await page.goto('/support');
 
-  await expect(page.getByText('You do not have access to support tickets.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'My reports' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Cannot log in' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Unassigned' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Support', exact: true })).toHaveCount(0);
-  expect(ticketCalls(calls)).toHaveLength(0);
+  expect(lastTicketQuery(calls).get('scope')).toBe('reported');
+  expect(ticketCalls(calls).every((c) => new URLSearchParams(c.search).get('scope') === 'reported')).toBe(true);
+});
+
+const REPORT = {
+  app: 'computor-web',
+  version: 'abc1234',
+  page: '/courses',
+  command: null,
+  context: { client: 'computor-web', language: 'en-US' },
+};
+
+function reportDetail(over: Record<string, unknown> = {}, messages: unknown[] = []) {
+  return {
+    ...ticketRow(T1, 7, 'Button broken', false),
+    channel: 'web',
+    mailbox_address: null,
+    report: REPORT,
+    publication: null,
+    events: [],
+    messages: [
+      message({ id: 'r1', text: 'The button does nothing', from_address: null, from_name: 'Rita Reporter', to: [] }),
+      message({
+        id: 'r2',
+        direction: 'out',
+        author: { id: 'u-sup', given_name: 'Sam', family_name: 'Support' },
+        from_address: null,
+        to: [],
+        text: 'Thanks, we are on it',
+      }),
+      ...messages,
+    ],
+    ...over,
+  };
+}
+
+async function setupReport(
+  page: Page,
+  caps: typeof CAPS & { can_publish?: boolean },
+  opts: { signedIn?: boolean; reporting?: unknown } = {},
+) {
+  const { signedIn = true, reporting = { enabled: true, mode: 'tickets' } } = opts;
+  if (signedIn) {
+    await page.addInitScript((user) => {
+      sessionStorage.setItem('auth_user', JSON.stringify({
+        id: user.id, username: user.username, email: user.email,
+        givenName: user.given_name, familyName: user.family_name,
+        role: 'user', systemRoles: [],
+      }));
+      sessionStorage.setItem('auth_provider', 'sso');
+    }, USER);
+  }
+  const calls: Call[] = [];
+  const raw: string[] = [];
+  let current = reportDetail();
+  await page.route(`${API_ORIGIN}/**`, async (route) => {
+    const req = route.request();
+    const path = new URL(req.url()).pathname;
+    let body: Record<string, unknown> | null = null;
+    try {
+      body = req.postDataJSON();
+    } catch {
+      body = null;
+    }
+    calls.push({ method: req.method(), path, search: '', body });
+    if (!signedIn) return json(route, { detail: 'unauthorized' }, 401);
+    if (path.startsWith('/user/views')) return json(route, []);
+    if (path.endsWith('/user/scopes')) return json(route, { is_admin: false });
+    if (path.endsWith('/user')) return json(route, USER);
+    if (path.startsWith('/messages')) return json(route, []);
+    if (path === '/instance-info') return json(route, { issue_reporting: reporting });
+    if (path === '/support/capabilities') return json(route, caps);
+    if (path === '/support/agents') return json(route, []);
+    if (path === '/issue-reports') {
+      raw.push(req.postDataBuffer()?.toString('latin1') ?? '');
+      return json(route, {
+        report_id: T1, issue_number: 7, ticket_id: T1, ticket_number: 7,
+        screenshot_attached: true, log_attached: false,
+      }, 201);
+    }
+    if (path === `/support/tickets/${T1}/publish-draft`) return json(route, { title: 'Draft title', body: 'Draft body' });
+    if (path === `/support/tickets/${T1}/publish`) {
+      current = reportDetail({
+        publication: { issue_number: 42, issue_url: 'https://github.com/example/tracker/issues/42', report_id: T1, published_at: '2026-03-03T10:00:00Z' },
+      });
+      return json(route, current);
+    }
+    if (path === `/support/tickets/${T1}/messages`) return json(route, current);
+    if (path === `/support/tickets/${T1}`) return json(route, current);
+    return json(route, {});
+  });
+  return { calls, raw };
+}
+
+test('a reporter sees the own conversation and a reply box without team controls', async ({ page }) => {
+  const { calls } = await setupReport(page, NO_TEAM);
+  await page.goto(`/support/${T1}`);
+
+  await expect(page.getByText('The button does nothing')).toBeVisible();
+  await expect(page.getByText('Thanks, we are on it')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Internal note' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Claim' })).toHaveCount(0);
+  await expect(page.getByLabel('Status')).toHaveCount(0);
+  await expect(page.getByText('Events')).toHaveCount(0);
+  await expect(page.getByText('Report context')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Publish to GitHub' })).toHaveCount(0);
+
+  await page.getByLabel('Reply', { exact: true }).fill('Still broken');
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect.poll(() => calls.filter((c) => c.path === `/support/tickets/${T1}/messages`).length).toBe(1);
+  expect(calls.find((c) => c.path === `/support/tickets/${T1}/messages`)?.body).toEqual({
+    content: 'Still broken',
+    internal: false,
+  });
+});
+
+test('a team member sees the report context and an in-app reply box', async ({ page }) => {
+  const { calls } = await setupReport(page, { ...CAPS, can_publish: false });
+  await page.goto(`/support/${T1}`);
+
+  await expect(page.getByText('Report context')).toBeVisible();
+  await expect(page.getByText('abc1234')).toBeVisible();
+  await expect(page.getByText('/courses', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Publish to GitHub' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Reply by mail' })).toHaveCount(0);
+  await expect(page.getByLabel('From')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Reply in the app' }).click();
+  await page.getByLabel('Reply text').fill('Fixed now');
+  await page.getByRole('button', { name: 'Send reply' }).click();
+  await expect.poll(() => calls.filter((c) => c.path === `/support/tickets/${T1}/messages`).length).toBe(1);
+  expect(calls.find((c) => c.path === `/support/tickets/${T1}/messages`)?.body).toEqual({
+    content: 'Fixed now',
+    internal: false,
+  });
+});
+
+test('publishing needs can_publish and an explicit confirm', async ({ page }) => {
+  const { calls } = await setupReport(page, { ...CAPS, can_publish: true });
+  await page.goto(`/support/${T1}`);
+  const publishCalls = () => calls.filter((c) => c.path === `/support/tickets/${T1}/publish`);
+
+  await page.getByRole('button', { name: 'Publish to GitHub' }).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('must not identify the reporter');
+  await expect(page.getByLabel('Title')).toHaveValue('Draft title');
+  expect(publishCalls()).toHaveLength(0);
+
+  await page.getByRole('dialog').locator('textarea').fill('Edited body');
+  await page.getByRole('dialog').getByRole('button', { name: 'Publish', exact: true }).click();
+  await expect.poll(() => publishCalls().length).toBe(1);
+  expect(publishCalls()[0].body).toEqual({ title: 'Draft title', body: 'Edited body' });
+  await expect(page.getByRole('link', { name: 'Issue #42' })).toHaveAttribute(
+    'href',
+    'https://github.com/example/tracker/issues/42',
+  );
+  await expect(page.getByRole('button', { name: 'Publish to GitHub' })).toHaveCount(0);
+});
+
+test('the report form sends multipart with context and shows the ticket number', async ({ page }) => {
+  const { raw } = await setupReport(page, NO_TEAM);
+  await page.goto('/problem?from=%2Fcourses');
+
+  await expect(page.getByText('It is not published.', { exact: false })).toBeVisible();
+  await page.getByLabel('What is the problem?').fill('The button does nothing');
+  await page.getByLabel('Title (optional)').fill('Button');
+  await page.getByLabel(/Screenshot/).setInputFiles({
+    name: 'shot.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('89504e470d0a1a0a', 'hex'),
+  });
+  await page.getByRole('button', { name: 'Send report' }).click();
+
+  await expect(page.getByText('Ticket #7')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View your report' })).toHaveAttribute('href', `/support/${T1}`);
+  expect(raw).toHaveLength(1);
+  const body = raw[0];
+  expect(body).toContain('name="description"');
+  expect(body).toContain('The button does nothing');
+  expect(body).toContain('name="channel"');
+  expect(body).toContain('name="screenshot"; filename="shot.png"');
+  expect(body).toContain('"client":"computor-web"');
+  expect(body).toContain('"page":"/courses"');
+});
+
+test('the report form falls back to the contact address when reporting is off', async ({ page }) => {
+  await setupReport(page, NO_TEAM, { reporting: { enabled: false, mode: 'off' } });
+  await page.goto('/problem');
+
+  await expect(page.getByRole('link', { name: 'contact@computor.at' })).toHaveAttribute('href', 'mailto:contact@computor.at');
+  await expect(page.getByRole('button', { name: 'Send report' })).toHaveCount(0);
+});
+
+test('signed out, the report page asks for sign-in and shows the contact address', async ({ page }) => {
+  await setupReport(page, NO_TEAM, { signedIn: false });
+  await page.goto('/problem');
+
+  await expect(page.getByRole('heading', { name: 'Reporting needs a sign-in' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'contact@computor.at' })).toHaveAttribute('href', 'mailto:contact@computor.at');
+  await expect(page.getByRole('main').getByRole('link', { name: 'Sign in' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Send report' })).toHaveCount(0);
 });

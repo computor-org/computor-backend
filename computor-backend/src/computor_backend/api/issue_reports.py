@@ -12,6 +12,16 @@ instead:
 
 Clients are not expected to discover either by trial: ``GET /instance-info``
 reports ``issue_reporting.enabled`` so the entry point is hidden outright.
+
+Since issues#520 step 2 the deployment chooses where reports go
+(``SUPPORT_REPORT_MODE``, advertised as ``issue_reporting.mode``):
+
+* ``tickets`` (default): the report becomes a support ticket the reporter can
+  follow under ``/support``. GitHub is not involved; a support member may
+  publish an anonymised issue later. Older clients that only know the GitHub
+  shape keep working: they post here and get the ticket number back.
+* ``github``: the GitHub path described above.
+* ``off``: 404.
 """
 
 import json
@@ -43,6 +53,8 @@ from computor_backend.issue_reports.service import (
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.redis_cache import get_redis_client
+from computor_backend.support.config import get_support_settings
+from computor_backend.support.reports import create_report_ticket, resolve_channel
 from computor_types.issue_reports import (
     IssueReportCreate,
     IssueReportCreated,
@@ -60,6 +72,13 @@ async def require_issue_reporting() -> None:
     creation — so without one there is nothing here to call and the deployment
     says so with a 404 rather than advertising a feature it does not have.
     """
+    mode = get_support_settings().report_mode
+    if mode == "off":
+        raise EndpointNotFoundException(
+            detail="Issue reporting is not enabled on this deployment"
+        )
+    if mode == "tickets":
+        return
     settings = get_issue_report_settings()
     if not settings.configured or not settings.has_token:
         raise EndpointNotFoundException(
@@ -124,8 +143,14 @@ async def create_issue_report(
     steps: Annotated[str | None, Form()] = None,
     context: Annotated[str, Form()] = "{}",
     screenshot: Annotated[UploadFile | None, File()] = None,
+    log: Annotated[UploadFile | None, File()] = None,
+    channel: Annotated[str | None, Form()] = None,
 ) -> IssueReportCreated:
-    """Create a GitHub issue without exposing GitHub credentials to clients."""
+    """File a problem report: a support ticket, or (``github`` mode) a GitHub issue.
+
+    ``log`` (tickets mode only) is a plain-text log the user chose to attach;
+    ``channel`` is ``web`` or ``vscode`` and defaults from ``context.client``.
+    """
     await _enforce_rate_limit(permissions.get_user_id_or_throw(), cache)
 
     try:
@@ -142,6 +167,8 @@ async def create_issue_report(
         steps=steps,
         context=parsed_context,
     )
+    if get_support_settings().report_mode == "tickets":
+        return await _file_ticket(payload, permissions, db, screenshot, log, channel)
     try:
         return await submit_issue_report(payload, permissions, db, screenshot)
     except IssueReportNotConfigured as exc:
@@ -152,6 +179,40 @@ async def create_issue_report(
         raise IssueReportingUnavailableException(
             detail="The problem report could not be submitted. Please try again later."
         ) from exc
+
+
+async def _file_ticket(payload, principal, db, screenshot, log, channel) -> IssueReportCreated:
+    from computor_backend.issue_reports.service import _read_screenshot
+
+    shot = None
+    if screenshot is not None:
+        try:
+            contents, extension = await _read_screenshot(get_issue_report_settings(), screenshot)
+        except IssueReportSubmissionError as exc:
+            raise BadRequestException(detail=str(exc)) from exc
+        shot = (contents, (screenshot.content_type or "").lower(), f"screenshot{extension}")
+    log_part = None
+    if log is not None:
+        limit = get_support_settings().report_max_log_bytes
+        data = await log.read(limit + 1)
+        if len(data) > limit:
+            raise BadRequestException(detail="The attached log is too large")
+        if b"\x00" in data:
+            raise BadRequestException(detail="The attached log must be a text file")
+        if data:
+            log_part = (data, "computor.log")
+    ticket = create_report_ticket(
+        payload, resolve_channel(channel, payload.context), principal, db, shot, log_part
+    )
+    return IssueReportCreated(
+        report_id=str(ticket.id),
+        issue_number=int(ticket.number),
+        issue_url=None,
+        screenshot_attached=shot is not None,
+        ticket_id=str(ticket.id),
+        ticket_number=int(ticket.number),
+        log_attached=log_part is not None,
+    )
 
 
 @router.get("/{report_id}", response_model=IssueReportGet)

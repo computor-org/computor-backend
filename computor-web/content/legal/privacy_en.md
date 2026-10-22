@@ -160,6 +160,14 @@ it is resolved.
 If you email us or report content, we process your message and contact details
 to handle it.
 
+The same applies when you use "Report a problem" in the web app or in the VS
+Code extension: your description, any files you choose to attach (such as a
+screenshot or a log) and technical details of the program (application,
+version, page or command) are stored with your account as a request to our
+support team. You see replies in the web app. Nothing is published. The support
+team may copy a summary without any details about you into the project's
+non-public bug tracker.
+
 Legal basis: Art. 6(1)(e) GDPR in conjunction with §§ 2 and 3 UG; for reports
 of illegal content, Art. 6(1)(c) GDPR in conjunction with Articles 16 and 17 of
 Regulation (EU) 2022/2065 (Digital Services Act, “DSA”), where applicable.
@@ -306,8 +314,7 @@ learn that an account belongs to a person under 14, we delete it.
 
 All connections are encrypted (TLS). User code runs in separate containers
 with resource limits. Server access is restricted to the operations team.
-Please report security vulnerabilities to security@computor.at or
-confidentially via https://github.com/computor-org/feedback/security/advisories/new.
+Please report security vulnerabilities confidentially to security@computor.at.
 
 ## 12. Changes to this notice
 

@@ -6,8 +6,9 @@
 * ``_support_agent`` (AI): see unrestricted tickets and write internal notes
   only; never send, claim, assign, close or publish.
 * everyone else: no access. A Computor user who reported a ticket sees that
-  ticket's public messages only (never internal notes); the MVP creates
-  tickets from mail only, so this path is exercised by later steps.
+  ticket's public messages only (never internal notes, events or the
+  published GitHub link) and may add public follow-ups to it. Problem reports
+  from web and VS Code (step 2) are such tickets.
 
 Roles are global ``user_role`` rows; both support roles are elevated
 (auth/mfa.py) and can only be granted by an administrator

@@ -169,6 +169,15 @@ dessen Abschluss.
 Wenn Sie uns per E-Mail kontaktieren oder Inhalte melden, verarbeiten wir Ihre
 Nachricht und Ihre Kontaktdaten zur Bearbeitung.
 
+Dasselbe gilt, wenn Sie über „Problem melden“ in der Web-App oder in der
+VS-Code-Erweiterung ein Problem melden: Ihre Beschreibung, die von Ihnen selbst
+beigefügten Dateien (etwa ein Screenshot oder ein Protokoll) und technische
+Angaben zum Programm (Anwendung, Version, Seite oder Befehl) werden mit Ihrem
+Konto als Anfrage an unser Support-Team gespeichert. Antworten sehen Sie in der
+Web-App. Veröffentlicht wird nichts. Das Support-Team kann eine Zusammenfassung
+ohne Angaben zu Ihrer Person in das nicht öffentliche Fehlerverzeichnis des
+Projekts übernehmen.
+
 Rechtsgrundlage: Art. 6 Abs. 1 lit. e DSGVO iVm §§ 2 und 3 UG; bei Meldungen
 rechtswidriger Inhalte Art. 6 Abs. 1 lit. c DSGVO iVm Art. 16 und 17 der
 Verordnung (EU) 2022/2065 (Gesetz über digitale Dienste, „DSA“), soweit
@@ -327,8 +336,7 @@ ein Konto einer Person unter 14 Jahren gehört, löschen wir es.
 Alle Verbindungen sind verschlüsselt (TLS). Code von Nutzer*innen läuft in
 voneinander getrennten Containern mit Ressourcengrenzen. Der Zugang zu den
 Servern ist auf das Betriebsteam beschränkt. Sicherheitslücken melden Sie
-bitte an security@computor.at oder vertraulich über
-https://github.com/computor-org/feedback/security/advisories/new.
+bitte vertraulich an security@computor.at.
 
 ## 12. Änderungen dieser Datenschutzerklärung
 

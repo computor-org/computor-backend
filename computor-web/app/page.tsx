@@ -41,6 +41,7 @@ const COPY = {
     ],
     local: 'Lieber lokal arbeiten?',
     footer: 'Interaktive Lernplattform für Programmierung.',
+    report: 'Problem melden',
   },
   en: {
     signIn: 'Sign in',
@@ -57,6 +58,7 @@ const COPY = {
     ],
     local: 'Prefer to work locally?',
     footer: 'Interactive learning platform for programming.',
+    report: 'Report a problem',
   },
 } as const;
 
@@ -166,6 +168,11 @@ export default function Home() {
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-center text-muted">
             <p>&copy; 2026 Computor. {t.footer}</p>
             <LegalLinks className="text-sm" />
+            {user && (
+              <Link href="/problem" className="text-sm hover:text-accent-text hover:underline underline-offset-2">
+                {t.report}
+              </Link>
+            )}
             <NetideeNotice />
           </div>
         </div>

@@ -290,3 +290,46 @@ async def submit_issue_report(
         issue_url=issue_url if current_health().is_public else None,
         screenshot_attached=screenshot_url is not None,
     )
+
+
+async def publish_issue(title: str, body: str, reporter_user_id: str | None, db: Session) -> IssueReport:
+    """File one deliberately written, anonymised issue (support "publish to GitHub").
+
+    Used by the support queue (issues#520 step 2): a ``_support`` member edits
+    the text, so nothing the reporter wrote reaches the tracker unreviewed. The
+    ``issue_report`` row keeps the reporter link exactly as for a direct report,
+    and the issue body names nobody — only the opaque report id.
+    """
+    settings = _require_configuration()
+    repository = settings.reference.full_name
+    record = IssueReport(user_id=reporter_user_id or None, repository=repository)
+    db.add(record)
+    db.flush()
+    report_id = str(record.id)
+    full_body = "\n".join([
+        body.rstrip(),
+        "",
+        "## Report",
+        f"- id `{report_id}`",
+        "",
+        "_Published by the Computor support team from a support ticket. The reporter is "
+        "recorded in the deployment's database, not here._",
+    ])
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.post(
+            f"{settings.api_base}/repos/{repository}/issues",
+            headers=_github_headers(settings.token.strip()),
+            json={"title": title, "body": full_body, "labels": settings.label_list},
+        )
+    if response.status_code not in (200, 201):
+        logger.warning("GitHub issue creation (publish) failed with status %s", response.status_code)
+        if response.status_code in (401, 403, 404):
+            mark_unhealthy(f"GitHub rejected a submission with HTTP {response.status_code}")
+        raise IssueReportSubmissionError(
+            f"GitHub rejected the issue ({response.status_code}): {_error_detail(response)}"
+        )
+    issue = response.json()
+    record.issue_number = int(issue["number"])
+    record.issue_url = str(issue["html_url"])
+    db.flush()
+    return record

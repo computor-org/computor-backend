@@ -7,12 +7,12 @@ import ListPageLayout, { ScrollArea, PageLoading } from '@/src/components/ListPa
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
-import Forbidden from '@/src/components/Forbidden';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 import Button from '@/src/components/ui/Button';
 import Tabs from '@/src/components/ui/Tabs';
 import MessageBody from '@/src/components/support/MessageBody';
 import AttachmentList from '@/src/components/support/AttachmentList';
+import { ReportContext, PublishPanel } from '@/src/components/support/ReportPanels';
 import { inputCls } from '@/src/components/ui/tokens';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useNotify } from '@/src/contexts/NotificationContext';
@@ -41,7 +41,7 @@ function formatDateTime(iso: string | null | undefined, locale: string | undefin
 }
 
 const COPY: Record<UiLanguage, {
-  forbidden: string; support: string; ticket: string; notFound: string; actionFailed: string; noSubject: string;
+  support: string; ticket: string; notFound: string; actionFailed: string; noSubject: string;
   status: Record<TicketStatus, string>; priorities: Record<TicketPriority, string>;
   priority: string; reporter: string; teamAddress: string; assignee: string; unassignedLower: string; restricted: string;
   claim: string; unassigned: string; statusLabel: string; conversation: string; noteAdded: string; replyQueued: string;
@@ -50,9 +50,10 @@ const COPY: Record<UiLanguage, {
   replyByMail: string; internalNote: string; compose: string; internalHint: string; from: string; replyText: string;
   notePlaceholder: string; replyPlaceholder: string; sending: string; addNote: string; sendReply: string;
   confirmTitle: string; confirmMessage: (from: string, to: string) => string; send: string;
+  myReports: string; you: string; followUp: string; followUpPlaceholder: string; replyInApp: string;
+  replyInAppPlaceholder: string; replySent: string; followUpSent: string; reportedBy: string;
 }> = {
   de: {
-    forbidden: 'Du hast keinen Zugriff auf Support-Anfragen.',
     support: 'Support',
     ticket: 'Anfrage',
     notFound: 'Anfrage nicht gefunden.',
@@ -97,9 +98,17 @@ const COPY: Record<UiLanguage, {
     confirmTitle: 'Antwort per Mail senden?',
     confirmMessage: (from, to) => `Dies sendet eine E-Mail von ${from} an ${to}. Sie kann nicht zurückgeholt werden.`,
     send: 'Senden',
+    myReports: 'Meine Meldungen',
+    you: 'Du',
+    followUp: 'Antworten',
+    followUpPlaceholder: 'Ergänzung oder Antwort an das Support-Team schreiben …',
+    replyInApp: 'In der App antworten',
+    replyInAppPlaceholder: 'Antwort an die meldende Person schreiben (wird in der App angezeigt) …',
+    replySent: 'Antwort gesendet',
+    followUpSent: 'Nachricht gesendet',
+    reportedBy: 'Gemeldet von',
   },
   en: {
-    forbidden: 'You do not have access to support tickets.',
     support: 'Support',
     ticket: 'Ticket',
     notFound: 'Ticket not found.',
@@ -144,6 +153,15 @@ const COPY: Record<UiLanguage, {
     confirmTitle: 'Send reply by mail?',
     confirmMessage: (from, to) => `This sends an email from ${from} to ${to}. It cannot be recalled.`,
     send: 'Send',
+    myReports: 'My reports',
+    you: 'You',
+    followUp: 'Reply',
+    followUpPlaceholder: 'Write an addition or reply to the support team…',
+    replyInApp: 'Reply in the app',
+    replyInAppPlaceholder: 'Write a reply to the reporter (shown in the app)…',
+    replySent: 'Reply sent',
+    followUpSent: 'Message sent',
+    reportedBy: 'Reported by',
   },
 };
 
@@ -154,24 +172,23 @@ export default function SupportTicketPage() {
   const t = COPY[language];
   const notify = useNotify();
   const { capabilities, loading: capsLoading } = useSupportCapabilities();
-  const canView = !!capabilities?.can_view;
+  const isTeam = !!capabilities?.can_view;
   const canManage = !!capabilities?.can_manage;
 
   const { data: ticket, loading, error, setData } = useResource(() => supportClient.get(id), [id], {
-    enabled: canView,
+    enabled: !capsLoading,
   });
   const { data: agents } = useResource(() => supportClient.agents(), [], { enabled: canManage });
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (capsLoading || (canView && loading && !ticket)) return <PageLoading />;
-  if (!canView) return <Forbidden message={t.forbidden} />;
+  if (capsLoading || (loading && !ticket)) return <PageLoading />;
   if (!ticket) {
     return (
       <AuthenticatedLayout>
         <ListPageLayout>
-          <PageHeader breadcrumbs={[{ label: t.support, href: '/support' }, { label: t.ticket }]} title={t.ticket} />
+          <PageHeader breadcrumbs={[{ label: isTeam ? t.support : t.myReports, href: '/support' }, { label: t.ticket }]} title={t.ticket} />
           <ErrorBanner>{error ?? t.notFound}</ErrorBanner>
         </ListPageLayout>
       </AuthenticatedLayout>
@@ -197,12 +214,13 @@ export default function SupportTicketPage() {
   const assignedToMe = !!user && ticket.assignee?.id === user.id;
   const events = ticket.events ?? [];
   const locale = language === 'de' ? 'de-AT' : undefined;
+  const inApp = ticket.channel !== 'mail';
 
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: t.support, href: '/support' }, { label: `#${ticket.number}` }]}
+          breadcrumbs={[{ label: isTeam ? t.support : t.myReports, href: '/support' }, { label: `#${ticket.number}` }]}
           title={ticket.subject || t.noSubject}
           subtitle={
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
@@ -210,14 +228,18 @@ export default function SupportTicketPage() {
               <Badge tone={STATUS_TONE[ticket.status]} pill>
                 {t.status[ticket.status]}
               </Badge>
-              <span>{t.priority}: {t.priorities[ticket.priority]}</span>
-              <span>
-                {t.reporter}: {ticket.reporter_name || ticket.reporter_email || '—'}
-                {ticket.reporter_name && ticket.reporter_email ? ` <${ticket.reporter_email}>` : ''}
-              </span>
-              <span>{t.teamAddress}: {ticket.mailbox_address ?? '—'}</span>
-              <span>{t.assignee}: {ticket.assignee ? userLabel(ticket.assignee) : t.unassignedLower}</span>
-              {ticket.restricted && <Badge tone="warning">{t.restricted}</Badge>}
+              {isTeam && (
+                <>
+                  <span>{t.priority}: {t.priorities[ticket.priority]}</span>
+                  <span>
+                    {t.reporter}: {ticket.reporter_name || ticket.reporter_email || '—'}
+                    {ticket.reporter_name && ticket.reporter_email ? ` <${ticket.reporter_email}>` : ''}
+                  </span>
+                  {!inApp && <span>{t.teamAddress}: {ticket.mailbox_address ?? '—'}</span>}
+                  <span>{t.assignee}: {ticket.assignee ? userLabel(ticket.assignee) : t.unassignedLower}</span>
+                  {ticket.restricted && <Badge tone="warning">{t.restricted}</Badge>}
+                </>
+              )}
             </div>
           }
         />
@@ -283,6 +305,11 @@ export default function SupportTicketPage() {
             </div>
           )}
 
+          {isTeam && ticket.report && <ReportContext report={ticket.report} />}
+          {isTeam && (
+            <PublishPanel ticket={ticket} canPublish={!!capabilities?.can_publish} onPublished={setData} />
+          )}
+
           <section aria-label={t.conversation} className="space-y-3">
             {ticket.messages.map((m) => (
               <MessageCard
@@ -291,6 +318,8 @@ export default function SupportTicketPage() {
                 message={m}
                 busy={busy}
                 canRetry={!!capabilities?.can_reply}
+                isTeam={isTeam}
+                inApp={inApp}
                 onRetry={() => act(() => supportClient.retryMessage(ticket.id, m.id))}
               />
             ))}
@@ -298,23 +327,30 @@ export default function SupportTicketPage() {
 
           <Composer
             ticket={ticket}
-            canReply={!!capabilities?.can_reply}
-            canNote={!!capabilities?.can_write_internal}
+            isTeam={isTeam}
+            inApp={inApp}
+            canReply={isTeam ? !!capabilities?.can_reply : true}
+            canNote={isTeam && !!capabilities?.can_write_internal}
             teamAddresses={capabilities?.team_addresses ?? []}
             onSend={async (content, internal, fromAddress) => {
               const ok = await act(() =>
                 supportClient.addMessage(ticket.id, {
                   content,
                   internal,
-                  from_address: internal ? undefined : fromAddress || undefined,
+                  from_address: internal || inApp ? undefined : fromAddress || undefined,
                 }),
               );
-              if (ok) notify(internal ? t.noteAdded : t.replyQueued, 'success');
+              if (ok) {
+                notify(
+                  internal ? t.noteAdded : !inApp ? t.replyQueued : isTeam ? t.replySent : t.followUpSent,
+                  'success',
+                );
+              }
               return ok;
             }}
           />
 
-          <details className="rounded-lg border border-rule bg-surface p-4">
+          {isTeam && <details className="rounded-lg border border-rule bg-surface p-4">
             <summary className="cursor-pointer text-sm font-medium text-fg">
               {t.events} ({events.length})
             </summary>
@@ -329,7 +365,7 @@ export default function SupportTicketPage() {
                 </li>
               ))}
             </ul>
-          </details>
+          </details>}
         </ScrollArea>
       </ListPageLayout>
     </AuthenticatedLayout>
@@ -341,20 +377,28 @@ function MessageCard({
   message: m,
   busy,
   canRetry,
+  isTeam,
+  inApp,
   onRetry,
 }: {
   ticketId: string;
   message: TicketMessage;
   busy: boolean;
   canRetry: boolean;
+  isTeam: boolean;
+  inApp: boolean;
   onRetry: () => void;
 }) {
   const language = useUiLanguage();
   const t = COPY[language];
   const internal = m.visibility === 'internal' || m.direction === 'note';
   const outgoing = m.direction === 'out';
-  const sender =
-    userLabel(m.author) || m.from_name || m.from_address || (outgoing ? t.supportTeam : t.unknownSender);
+  const ownMessage = !isTeam && !outgoing && !internal;
+  const sender = ownMessage
+    ? t.you
+    : !isTeam && outgoing
+      ? t.supportTeam
+      : userLabel(m.author) || m.from_name || m.from_address || (outgoing ? t.supportTeam : t.unknownSender);
 
   return (
     <article
@@ -373,10 +417,10 @@ function MessageCard({
       )}
       <header className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
         <span className="font-medium text-fg">{sender}</span>
-        {!internal && m.from_address && <span className="text-xs text-muted">&lt;{m.from_address}&gt;</span>}
-        {!internal && !outgoing && <Badge tone="muted">{t.received}</Badge>}
-        {outgoing && <Badge tone="info">{t.reply}</Badge>}
-        {outgoing && m.delivery_state && (
+        {isTeam && !internal && m.from_address && <span className="text-xs text-muted">&lt;{m.from_address}&gt;</span>}
+        {isTeam && !inApp && !internal && !outgoing && <Badge tone="muted">{t.received}</Badge>}
+        {isTeam && outgoing && <Badge tone="info">{t.reply}</Badge>}
+        {isTeam && !inApp && outgoing && m.delivery_state && (
           <Badge
             tone={m.delivery_state === 'failed' ? 'error' : m.delivery_state === 'sent' ? 'success' : 'muted'}
           >
@@ -385,8 +429,8 @@ function MessageCard({
         )}
         <span className="ml-auto text-xs text-muted">{formatDateTime(m.created_at, language === 'de' ? 'de-AT' : undefined)}</span>
       </header>
-      {!internal && m.to.length > 0 && <p className="mb-2 text-xs text-muted">{t.to}: {m.to.join(', ')}</p>}
-      {outgoing && m.delivery_state === 'failed' && (
+      {isTeam && !inApp && !internal && m.to.length > 0 && <p className="mb-2 text-xs text-muted">{t.to}: {m.to.join(', ')}</p>}
+      {isTeam && !inApp && outgoing && m.delivery_state === 'failed' && (
         <div className="mb-2 flex flex-wrap items-center gap-3">
           <ErrorBanner>{m.delivery_error || t.deliveryFailed}</ErrorBanner>
           {canRetry && (
@@ -404,12 +448,16 @@ function MessageCard({
 
 function Composer({
   ticket,
+  isTeam,
+  inApp,
   canReply,
   canNote,
   teamAddresses,
   onSend,
 }: {
   ticket: TicketGet;
+  isTeam: boolean;
+  inApp: boolean;
   canReply: boolean;
   canNote: boolean;
   teamAddresses: string[];
@@ -423,7 +471,7 @@ function Composer({
   const [sending, setSending] = useState(false);
 
   const tabs = [
-    ...(canReply ? [{ id: 'reply' as const, label: t.replyByMail }] : []),
+    ...(canReply ? [{ id: 'reply' as const, label: !inApp ? t.replyByMail : isTeam ? t.replyInApp : t.followUp }] : []),
     ...(canNote ? [{ id: 'note' as const, label: t.internalNote }] : []),
   ];
   if (tabs.length === 0) return null;
@@ -442,10 +490,10 @@ function Composer({
 
   return (
     <section aria-label={t.compose} className="space-y-3 rounded-lg border border-rule bg-surface p-4">
-      <Tabs tabs={tabs} active={mode} onSelect={setMode} />
+      {tabs.length > 1 && <Tabs tabs={tabs} active={mode} onSelect={setMode} />}
       {internal ? (
         <p className="text-sm text-warn-text">{t.internalHint}</p>
-      ) : (
+      ) : inApp ? null : (
         <div className="flex flex-wrap items-end gap-4 text-sm text-muted">
           <label>
             {t.from}
@@ -477,17 +525,17 @@ function Composer({
         value={content}
         maxLength={100_000}
         onChange={(e) => setContent(e.target.value)}
-        aria-label={internal ? t.internalNote : t.replyText}
-        placeholder={internal ? t.notePlaceholder : t.replyPlaceholder}
+        aria-label={internal ? t.internalNote : inApp && !isTeam ? t.followUp : t.replyText}
+        placeholder={internal ? t.notePlaceholder : !inApp ? t.replyPlaceholder : isTeam ? t.replyInAppPlaceholder : t.followUpPlaceholder}
       />
       <div className="flex justify-end">
         <Button
-          disabled={empty || (!internal && (!effectiveFrom || !ticket.reporter_email))}
+          disabled={empty || (!internal && !inApp && (!effectiveFrom || !ticket.reporter_email))}
           loading={sending}
           loadingLabel={t.sending}
-          onClick={() => (internal ? void send() : setConfirming(true))}
+          onClick={() => (internal || inApp ? void send() : setConfirming(true))}
         >
-          {internal ? t.addNote : t.sendReply}
+          {internal ? t.addNote : inApp && !isTeam ? t.send : t.sendReply}
         </Button>
       </div>
       <ConfirmDialog
