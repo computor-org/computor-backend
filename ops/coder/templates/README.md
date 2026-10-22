@@ -150,6 +150,66 @@ workspace. That is how the dev backend is reached (it runs on the host, not in
 a container). Compose binds the platform's own ports to `127.0.0.1`, which is
 what keeps the datastores out of reach.
 
+## Extension updates
+
+The `vscode` and `matlab-vscode` images build the Computor extension from the
+`source_repos` ref at image build time. On top of that, each instance approves
+an extension version, and workspaces move to it in place: no rebuild, no new
+workspace, nothing in the home touched.
+
+- **Approved version** = the newest non-yanked release version (`x.y.z`) of
+  `computor-org.computor` in the instance's own extension registry
+  (`/extensions/computor-org.computor/versions`).
+- **The pin**: each backend branch carries
+  `computor-backend/src/computor_backend/coder/approved_extension.json`
+  (version + sha256 of a computor-vscode GitHub release). An instance follows
+  the extension line of the branch it deploys: `main` (computor.at) pins
+  2027.3.x, `release/2026.10` (code.tugraz.at) pins 2026.10.x. At startup the
+  backend registers the pinned release in its registry if it is missing: it
+  downloads the release VSIX once and publishes it only if its sha256 matches
+  the pin. A version an admin has yanked stays yanked.
+- **Releasing** a new extension version to an instance is one step on that
+  branch: `ops/coder/pin-extension.py <version>` (verifies the release VSIX
+  against its `SHA256SUMS` and rewrites the pin), commit, merge, deploy the
+  backend. CI checks the pin with `ops/coder/pin-extension.py --check`.
+  Yanking a version (`PATCH /extensions/computor-org.computor/versions/<version>`,
+  `{"yanked": true}`) withdraws it from workspaces that have not installed it.
+- **In the workspace**, `extension-sync.mjs` (copied to
+  `/opt/computor/extension-sync.mjs`, run with code-server's bundled node)
+  reads the registry through `computor-api` with the workspace token,
+  downloads the approved VSIX from the backend, checks its sha256 against the
+  registry entry and runs `code-server --install-extension --force` into
+  `/opt/code-server/extensions`. It installs only a version **newer** than the
+  installed one, so an image built later from a newer commit is never
+  shadowed; going back to an older version needs a template push.
+- **When**: once in the startup script before code-server starts (a stopped
+  workspace gets the approved version on its next start, without a reload), and
+  every 30 minutes while it runs. After an install it writes
+  `/tmp/computor-extension-update.json`; extension versions that know
+  `COMPUTOR_EXTENSION_UPDATE_MARKER` then offer "Reload Window". Nothing
+  reloads by force. Deploying a new pin (or publishing a version to the
+  registry by hand) is therefore the "update now" for all running workspaces,
+  within 30 minutes.
+- **Where it lives**: the extensions directory is in the container, not on the
+  home volume, so an in-place install lasts until the container is recreated
+  (stop/start); the startup run then installs it again. Nothing is written to
+  the home.
+- **Failures** (backend unreachable, expired token, empty registry, checksum
+  mismatch, install error) keep the installed extension and are logged in
+  `/tmp/computor-extension-sync.log`; the startup run is capped at 120 s.
+  Workspaces without internet are unaffected: the registry is the Computor API.
+- Only workspaces built from a template version that contains this mechanism
+  check the registry. Workspaces already running on an older template version
+  get it at their next start (`auto_update_on_start`).
+
+**Requirement for every template that ships the Computor extension** (its
+`source_repos` or `Dockerfile` names computor-vscode): copy `extension-sync.mjs`
+unchanged, `COPY extension-sync.mjs /opt/computor/extension-sync.mjs` in the
+Dockerfile, export `COMPUTOR_EXTENSION_UPDATE_MARKER`, run the sync before
+code-server starts and every 30 minutes after (see the `vscode` startup script).
+`test_workspace_extension_sync.py` fails for a template that ships the
+extension without this.
+
 ## Adding a new workspace type
 
 **From the web UI** — Workspaces → Administration → Templates → **New template** (or

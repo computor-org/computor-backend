@@ -54,6 +54,10 @@ jobs:
           computor-backend/src/computor_backend/tests/test_forgejo_naming.py
           computor-backend/src/computor_backend/tests/test_forgejo_repo_delete.py
           computor-backend/src/computor_backend/tests/test_forgejo_template_read_heal.py
+          computor-backend/src/computor_backend/tests/test_approved_extension.py
+          computor-backend/src/computor_backend/tests/test_workspace_extension_sync.py
+      - name: Approved extension pin matches its GitHub release
+        run: python3 ops/coder/pin-extension.py --check
 
   grading-isolation:
     # Hostile-snippet tests for grading jobs (#237). Sandbox-dependent cases
