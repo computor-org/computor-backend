@@ -174,6 +174,8 @@ class TemporalWorker:
             except NotImplementedError:  # pragma: no cover - non-POSIX
                 signal.signal(sig, lambda s, _f: self._request_shutdown(s))
 
+        await self._ensure_support_schedule()
+
         logger.info(f"Worker ready - listening on {len(self.task_queues)} queue(s)")
         logger.info(
             f"Graceful shutdown timeout: {graceful_shutdown.total_seconds():.0f}s "
@@ -193,6 +195,22 @@ class TemporalWorker:
             logger.error(f"Worker error: {e}", exc_info=True)
         finally:
             await self.shutdown()
+
+    async def _ensure_support_schedule(self) -> None:
+        """The support worker owns the periodic team-mailbox import (#520)."""
+        from computor_backend.support.config import SUPPORT_TASK_QUEUE, get_support_settings
+
+        if SUPPORT_TASK_QUEUE not in self.task_queues:
+            return
+        settings = get_support_settings()
+        if not settings.mail_enabled:
+            logger.info("Support mail bridge disabled (SUPPORT_MAIL_ENABLED is not true)")
+            return
+        from .temporal_support_mail import ensure_import_schedule
+        try:
+            await ensure_import_schedule(self.client, settings.mail_poll_seconds)
+        except Exception as e:  # the worker still serves replies without it
+            logger.error(f"Could not create the support mail import schedule: {e}", exc_info=True)
 
     def _request_shutdown(self, signum):
         """Begin a graceful shutdown (runs on the event loop)."""

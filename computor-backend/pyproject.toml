@@ -68,6 +68,8 @@ dependencies = [
     "uvicorn[standard]==0.35.0",
     "slowapi==0.1.9",
     "python-hcl2==8.1.2",
+    # Server-side allowlist HTML sanitiser for support-ticket mail (issues#520).
+    "nh3==0.3.7",
 ]
 
 [project.optional-dependencies]

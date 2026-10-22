@@ -1,8 +1,8 @@
 from typing import Optional
 
 from sqlalchemy import (
-    BigInteger, Column, DateTime, ForeignKey,
-    Index, String, text, Integer
+    BigInteger, CheckConstraint, Column, DateTime, ForeignKey,
+    Index, String, Text, text, Integer
 , func)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
@@ -23,13 +23,43 @@ class Message(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
         Index('msg_submission_group_archived_idx', 'submission_group_id', 'archived_at'),
         Index('msg_course_member_archived_idx', 'course_member_id', 'archived_at'),
         Index('msg_user_archived_idx', 'user_id', 'archived_at'),
+        Index('msg_ticket_created_idx', 'ticket_id', 'created_at'),
+        CheckConstraint(
+            "visibility IN ('public', 'internal')", name='msg_visibility_check'
+        ),
+        # Only ticket messages may lack an author (mail from outside), and
+        # only ticket messages may be internal.
+        CheckConstraint(
+            "author_id IS NOT NULL OR ticket_id IS NOT NULL", name='msg_author_or_ticket_check'
+        ),
+        CheckConstraint(
+            "visibility = 'public' OR ticket_id IS NOT NULL", name='msg_internal_ticket_only_check'
+        ),
+        # Ticket messages never carry a course/user scope target or a parent,
+        # so no course-messaging read path (scope filters, thread walks,
+        # unread counters) can reach them.
+        CheckConstraint(
+            "ticket_id IS NULL OR (parent_id IS NULL AND organization_id IS NULL"
+            " AND course_family_id IS NULL AND course_id IS NULL"
+            " AND course_content_id IS NULL AND course_group_id IS NULL"
+            " AND submission_group_id IS NULL AND course_member_id IS NULL"
+            " AND user_id IS NULL)",
+            name='msg_ticket_unscoped_check',
+        ),
     )
 
     properties = Column(JSONB)
     archived_at = Column(DateTime(timezone=True))
 
-    # Author of the message
-    author_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
+    # Author of the message. NULL only for ticket messages that came in by
+    # mail from outside (the sender is in ``properties['mail']``).
+    author_id = Column(ForeignKey('user.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+
+    # Support tickets (issues#520). A message with a ticket is served only by
+    # the /support endpoints; MessagePermissionHandler excludes it everywhere
+    # else. ``internal`` messages are team notes the reporter never sees.
+    ticket_id = Column(ForeignKey('ticket.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=True)
+    visibility = Column(String(16), nullable=False, server_default=text("'public'"))
 
     # Threading
     parent_id = Column(ForeignKey('message.id', ondelete='CASCADE', onupdate='RESTRICT'))
@@ -37,7 +67,7 @@ class Message(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
 
     # Content
     title = Column(String(255), nullable=True)
-    content = Column(String(16384), nullable=False)
+    content = Column(Text, nullable=False)
 
     # Targets (all nullable; if ALL are NULL = global message visible to all users)
     # Hierarchy: organization > course_family > course > course_content/course_group > submission_group > course_member > user
@@ -62,6 +92,7 @@ class Message(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     submission_group = relationship('SubmissionGroup', foreign_keys=[submission_group_id])
     course_member = relationship('CourseMember', foreign_keys=[course_member_id])
     user = relationship('User', foreign_keys=[user_id])
+    ticket = relationship('Ticket', back_populates='messages')
 
     message_reads = relationship('MessageRead', back_populates='message', cascade='all, delete-orphan')
     mentions = relationship('MessageMention', back_populates='message', cascade='all, delete-orphan')

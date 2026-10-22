@@ -37,7 +37,7 @@ export class ApiError extends Error {
  * `{ message, error_code, details }` (falling back to `detail`, then the raw
  * body text, then a status line). Never throws — always resolves to an ApiError.
  */
-async function buildApiError(response: Response): Promise<ApiError> {
+export async function buildApiError(response: Response): Promise<ApiError> {
   const status = response.status;
   const raw = await response.text().catch(() => '');
   let message = raw;

@@ -440,7 +440,14 @@ class MessagePermissionHandler(PermissionHandler):
         return False
 
     def build_query(self, principal: Principal, action: str, db: Session) -> Query:
-        base = db.query(self.entity)
+        # Support-ticket messages (issues#520) are served only by the /support
+        # endpoints, which apply the ticket rules (internal notes, restricted
+        # tickets). Excluded here for everyone, admins included, so they never
+        # surface in course messaging, unread counts, threads or mark-read.
+        base = db.query(self.entity).filter(
+            self.entity.ticket_id.is_(None),
+            self.entity.visibility == "public",
+        )
 
         if self.check_admin(principal):
             return base

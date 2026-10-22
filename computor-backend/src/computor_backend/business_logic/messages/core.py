@@ -133,7 +133,13 @@ def create_message_with_author(
 
     parent_message = None
     if model_dump.get('parent_id'):
-        parent_message = db.query(Message).filter(Message.id == model_dump['parent_id']).first()
+        # Ticket messages (issues#520) can never be the parent of a course
+        # message: replying would copy nothing, but the thread walk would
+        # then reach the ticket row. Treat them as nonexistent.
+        parent_message = db.query(Message).filter(
+            Message.id == model_dump['parent_id'],
+            Message.ticket_id.is_(None),
+        ).first()
         if not parent_message:
             raise BadRequestException(detail=f"Parent message {model_dump['parent_id']} not found")
 

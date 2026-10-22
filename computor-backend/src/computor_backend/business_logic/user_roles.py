@@ -12,7 +12,7 @@ from computor_backend.exceptions import (
 )
 from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.principal import Principal
-from computor_backend.permissions.roles import grants_system_admin
+from computor_backend.permissions.roles import grant_requires_admin
 from computor_backend.model.role import UserRole
 
 logger = logging.getLogger(__name__)
@@ -50,10 +50,10 @@ def delete_user_role(
     # non-admins, which would turn this deliberate denial into a
     # confusing "UserRole not found". Admin membership is openly
     # readable, so name the real reason instead (issue #403).
-    if not permissions.is_admin and grants_system_admin(str(role_id)):
+    if not permissions.is_admin and grant_requires_admin(str(role_id)):
         raise ForbiddenException(
             error_code="AUTHZ_005",
-            detail="Only administrators can remove the admin role",
+            detail="Only administrators can remove the admin or support roles",
             context={"user_id": str(user_id), "role_id": str(role_id)},
         )
 

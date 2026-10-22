@@ -1,0 +1,87 @@
+# Support-ticket mail bridge (computor-org/issues#520). Enabled by
+# SUPPORT_MAIL_ENABLED=true in .env (ops/lib/common.sh assemble_compose_files).
+#
+# One worker on the Temporal queue "support" imports the shared team mailbox
+# (Dovecot, IMAP) into tickets and sends replies (Postfix submission). It is the
+# ONLY container that holds the mailbox credentials and the only one attached to
+# the support-mail bridge, on whose gateway address the mail host's IMAP
+# listener for this credential lives (computor-infra prod/TEAMMAIL.md: Dovecot
+# passwd.imap allow_nets + nftables limit it to this bridge). The API never
+# touches mail; it queues replies as workflows on this queue.
+#
+# Credentials come from SUPPORT_MAIL_ENV_FILE (written by computor-infra on the
+# mail host, never committed): SUPPORT_IMAP_USER, SUPPORT_IMAP_PASSWORD,
+# SUPPORT_SMTP_USER, SUPPORT_SMTP_PASSWORD.
+services:
+  temporal-worker-support:
+    image: ${PREVIEW_IMAGE_PREFIX:-computor}-temporal-worker
+    build:
+      context: ../../
+      dockerfile: ./docker/temporal-worker/Dockerfile
+    command: ["python", "-m", "computor_backend.tasks.temporal_worker", "--queues=support"]
+    networks:
+      - computor-network
+      - support-mail
+    # The mail host's certificate names mail.computor.at; reach it on the
+    # support bridge gateway rather than the public address. (SUPPORT_MAIL_HOST_IP
+    # only differs in test stacks where the mail host is a container.)
+    extra_hosts:
+      - "${SUPPORT_MAIL_HOST:-mail.computor.at}:${SUPPORT_MAIL_HOST_IP:-${SUPPORT_MAIL_GATEWAY:-172.31.252.1}}"
+    restart: unless-stopped
+    stop_grace_period: 60s
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    env_file:
+      - ${SUPPORT_MAIL_ENV_FILE:-/opt/computor/mail/secrets/computor-support.env}
+    environment:
+      - TZ=UTC
+      - RUNNING_IN_DOCKER=true
+      - TEMPORAL_HOST=temporal
+      - TEMPORAL_PORT=7233
+      - TEMPORAL_NAMESPACE=default
+      - TEMPORAL_GRACEFUL_SHUTDOWN_SECONDS=30
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5437
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - DEBUG_MODE=${DEBUG_MODE}
+      - PYTHONPATH=/home/worker/computor-backend/src
+      - SUPPORT_MAIL_ENABLED=true
+      - SUPPORT_MAIL_POLL_SECONDS=${SUPPORT_MAIL_POLL_SECONDS:-120}
+      - SUPPORT_IMAP_HOST=${SUPPORT_MAIL_HOST:-mail.computor.at}
+      - SUPPORT_IMAP_PORT=993
+      - SUPPORT_SMTP_HOST=${SUPPORT_MAIL_HOST:-mail.computor.at}
+      - SUPPORT_SMTP_PORT=${SUPPORT_SMTP_PORT:-10588}
+      - SUPPORT_MAIL_TLS_VERIFY=${SUPPORT_MAIL_TLS_VERIFY:-true}
+      - SUPPORT_TEAM_ADDRESSES=${SUPPORT_TEAM_ADDRESSES:-contact@computor.at abuse@computor.at privacy@computor.at security@computor.at postmaster@computor.at}
+      - SUPPORT_RESTRICTED_ADDRESSES=${SUPPORT_RESTRICTED_ADDRESSES-security@computor.at}
+    depends_on:
+      - temporal
+      - postgres
+    labels:
+      - "traefik.enable=false"
+
+networks:
+  support-mail:
+    name: ${SUPPORT_MAIL_NETWORK:-computor-support-mail}
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: ${SUPPORT_MAIL_BRIDGE:-br-cmp-support}
+    ipam:
+      config:
+        - subnet: ${SUPPORT_MAIL_SUBNET:-172.31.252.0/24}
+          gateway: ${SUPPORT_MAIL_GATEWAY:-172.31.252.1}

@@ -128,6 +128,12 @@ assemble_compose_files() {
         fi
     fi
 
+    # Support-ticket mail bridge (issues#520): needs the mail host's service
+    # credential file, so it is opt-in per deployment.
+    if [ "${SUPPORT_MAIL_ENABLED:-}" = "true" ]; then
+        COMPOSE_FILES="$COMPOSE_FILES -f ${d}/docker-compose.support-mail.yaml"
+    fi
+
     # Self-update sidecar: prod-only, opt-in. The file-exists guard keeps a
     # UPDATE_ENABLED=true .env working on a checkout that predates the overlay.
     if [ "$environment" = "prod" ] && [ "${UPDATE_ENABLED:-}" = "true" ] \
