@@ -69,6 +69,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_forgejo_template_read_heal.py
           computor-backend/src/computor_backend/tests/test_course_analytics.py
           computor-backend/src/computor_backend/tests/test_support_mail.py
+          computor-backend/src/computor_backend/tests/test_issue_reports.py
           computor-backend/src/computor_backend/tests/test_approved_extension.py
           computor-backend/src/computor_backend/tests/test_workspace_extension_sync.py
       - name: Approved extension pin matches its GitHub release

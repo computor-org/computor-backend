@@ -8,10 +8,9 @@ import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
 import EmptyState from '@/src/components/EmptyState';
-import Forbidden from '@/src/components/Forbidden';
 import Tabs from '@/src/components/ui/Tabs';
 import Toolbar from '@/src/components/ui/Toolbar';
-import Button from '@/src/components/ui/Button';
+import Button, { ButtonLink } from '@/src/components/ui/Button';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/src/components/ui/Table';
 import { inputCls } from '@/src/components/ui/tokens';
 import { useResource } from '@/src/hooks/useResource';
@@ -23,7 +22,7 @@ import { STATUS_TONE, userLabel } from '@/src/utils/support';
 
 const PAGE_SIZE = 50;
 
-const SCOPES: TicketScope[] = ['unassigned', 'mine', 'all'];
+const TEAM_SCOPES: TicketScope[] = ['unassigned', 'mine', 'all', 'reported'];
 const STATUSES: TicketStatus[] = ['open', 'in_progress', 'waiting', 'done'];
 
 function formatDateTime(iso: string | null | undefined, locale: string | undefined): string {
@@ -34,14 +33,17 @@ function formatDateTime(iso: string | null | undefined, locale: string | undefin
 
 const COPY = {
   de: {
-    forbidden: 'Du hast keinen Zugriff auf Support-Anfragen.',
+    myTitle: 'Meine Meldungen',
+    mySubtitle: 'Deine Problemmeldungen an das Computor-Support-Team.',
+    report: 'Problem melden',
+    emptyMine: 'Du hast noch kein Problem gemeldet.',
     importStarted: 'Mail-Import gestartet',
     importFailed: 'Der Mail-Import konnte nicht gestartet werden',
     title: 'Support',
     subtitle: 'Team-Mails und Problemmeldungen.',
     checking: 'Wird geprüft …',
     checkMail: 'Jetzt Mails abrufen',
-    tabs: { unassigned: 'Nicht zugewiesen', mine: 'Meine', all: 'Alle' } as Record<TicketScope, string>,
+    tabs: { unassigned: 'Nicht zugewiesen', mine: 'Meine', all: 'Alle', reported: 'Meine Meldungen' } as Record<TicketScope, string>,
     count: (n: number) => (n === 1 ? '1 Anfrage' : `${n} Anfragen`),
     statusFilter: 'Statusfilter',
     anyStatus: 'Beliebiger Status',
@@ -65,14 +67,17 @@ const COPY = {
     next: 'Weiter',
   },
   en: {
-    forbidden: 'You do not have access to support tickets.',
+    myTitle: 'My reports',
+    mySubtitle: 'Your problem reports to the Computor support team.',
+    report: 'Report a problem',
+    emptyMine: 'You have not reported a problem yet.',
     importStarted: 'Mail import started',
     importFailed: 'Could not start the mail import',
     title: 'Support',
     subtitle: 'Team mail and problem reports.',
     checking: 'Checking…',
     checkMail: 'Check mail now',
-    tabs: { unassigned: 'Unassigned', mine: 'Mine', all: 'All' } as Record<TicketScope, string>,
+    tabs: { unassigned: 'Unassigned', mine: 'Mine', all: 'All', reported: 'My reports' } as Record<TicketScope, string>,
     count: (n: number) => `${n} ticket${n === 1 ? '' : 's'}`,
     statusFilter: 'Status filter',
     anyStatus: 'Any status',
@@ -106,6 +111,7 @@ export default function SupportPage() {
   const canView = !!capabilities?.can_view;
 
   const [scope, setScope] = useState<TicketScope>('unassigned');
+  const activeScope: TicketScope = canView ? scope : 'reported';
   const [status, setStatus] = useState<TicketStatus | ''>('');
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -113,18 +119,15 @@ export default function SupportPage() {
   const [importing, setImporting] = useState(false);
 
   const { data, loading, error, refresh } = useResource(
-    () => supportClient.list({ scope, status, search, skip: page * PAGE_SIZE, limit: PAGE_SIZE }),
-    [scope, status, search, page],
-    { enabled: canView },
+    () => supportClient.list({ scope: activeScope, status, search, skip: page * PAGE_SIZE, limit: PAGE_SIZE }),
+    [activeScope, status, search, page],
+    { enabled: !capsLoading },
   );
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   if (capsLoading) return <PageLoading width="wide" />;
-  if (!canView) {
-    return <Forbidden message={t.forbidden} />;
-  }
 
   const checkMail = async () => {
     setImporting(true);
@@ -145,26 +148,33 @@ export default function SupportPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: t.title }]}
-          title={t.title}
-          subtitle={t.subtitle}
+          breadcrumbs={[{ label: canView ? t.title : t.myTitle }]}
+          title={canView ? t.title : t.myTitle}
+          subtitle={canView ? t.subtitle : t.mySubtitle}
           actions={
-            capabilities?.can_manage ? (
-              <Button variant="secondary" onClick={checkMail} loading={importing} loadingLabel={t.checking}>
-                {t.checkMail}
-              </Button>
-            ) : undefined
+            <>
+              <ButtonLink variant="secondary" href="/problem?from=%2Fsupport">
+                {t.report}
+              </ButtonLink>
+              {capabilities?.can_manage && (
+                <Button variant="secondary" onClick={checkMail} loading={importing} loadingLabel={t.checking}>
+                  {t.checkMail}
+                </Button>
+              )}
+            </>
           }
         />
 
-        <Tabs
-          tabs={SCOPES.map((id) => ({ id, label: t.tabs[id] }))}
-          active={scope}
-          onSelect={(id) => {
-            setScope(id);
-            setPage(0);
-          }}
-        />
+        {canView && (
+          <Tabs
+            tabs={TEAM_SCOPES.map((id) => ({ id, label: t.tabs[id] }))}
+            active={scope}
+            onSelect={(id) => {
+              setScope(id);
+              setPage(0);
+            }}
+          />
+        )}
 
         <Toolbar
           end={<span className="text-sm text-muted">{t.count(total)}</span>}
@@ -213,7 +223,7 @@ export default function SupportPage() {
         {loading ? (
           <ListLoading>{t.loading}</ListLoading>
         ) : items.length === 0 ? (
-          <EmptyState compact title={t.empty} />
+          <EmptyState compact title={activeScope === 'reported' && !search && !status ? t.emptyMine : t.empty} />
         ) : (
           <ScrollPanel>
             <Table>
@@ -221,10 +231,10 @@ export default function SupportPage() {
                 <Tr>
                   <Th>#</Th>
                   <Th>{t.subject}</Th>
-                  <Th>{t.reporter}</Th>
-                  <Th>{t.teamAddress}</Th>
+                  {canView && <Th>{t.reporter}</Th>}
+                  {canView && <Th>{t.teamAddress}</Th>}
                   <Th>{t.statusCol}</Th>
-                  <Th>{t.assignee}</Th>
+                  {canView && <Th>{t.assignee}</Th>}
                   <Th>{t.lastActivity}</Th>
                 </Tr>
               </Thead>
@@ -244,21 +254,21 @@ export default function SupportPage() {
                         </Badge>
                       )}
                     </Td>
-                    <Td>
+                    {canView && <Td>
                       <div>{row.reporter_name || row.reporter_email || '—'}</div>
                       {row.reporter_name && row.reporter_email && (
                         <div className="text-xs text-muted">{row.reporter_email}</div>
                       )}
-                    </Td>
-                    <Td>
+                    </Td>}
+                    {canView && <Td>
                       <span className="text-xs text-muted">{row.mailbox_address ?? '—'}</span>
-                    </Td>
+                    </Td>}
                     <Td>
                       <Badge tone={STATUS_TONE[row.status]} pill>
                         {t.status[row.status]}
                       </Badge>
                     </Td>
-                    <Td>{row.assignee ? userLabel(row.assignee) : <span className="text-subtle">—</span>}</Td>
+                    {canView && <Td>{row.assignee ? userLabel(row.assignee) : <span className="text-subtle">—</span>}</Td>}
                     <Td>
                       <span className="text-xs text-muted">{formatDateTime(row.last_message_at ?? row.updated_at, locale)}</span>
                     </Td>

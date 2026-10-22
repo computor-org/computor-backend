@@ -7,7 +7,7 @@ import { useParams } from 'next/navigation';
 import { InvitesClient } from '@/src/generated/clients/InvitesClient';
 import type { InviteStatusPublic } from 'types/generated';
 import { ssoAuthService } from '@/src/services/authInstances';
-import { WAITLIST_URL } from '@/src/utils/registration';
+import { WAITLIST_ADDRESS, WAITLIST_URL } from '@/src/utils/registration';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const invitesClient = new InvitesClient();
@@ -27,7 +27,7 @@ const COPY = {
     email: 'Mit E-Mail registrieren',
     emailNote: 'Bei der Registrierung mit E-Mail musst du deine Adresse bestätigen, bevor das Konto angelegt wird.',
     unusable: 'Diese Einladung kann nicht verwendet werden',
-    waitlist: 'Du möchtest dabei sein? Setz dich auf die Warteliste, indem du eine Nachricht hinterlässt unter',
+    waitlist: 'Du möchtest dabei sein? Setz dich auf die Warteliste, indem du eine Mail schreibst an',
     haveAccount: 'Du hast schon ein Konto?',
     signIn: 'Anmelden',
   },
@@ -45,7 +45,7 @@ const COPY = {
     email: 'Register with email',
     emailNote: 'With email you will be asked to confirm your address before the account is created.',
     unusable: "This invite can't be used",
-    waitlist: 'Want in? Join the waitlist by leaving a note at',
+    waitlist: 'Want in? Join the waitlist by writing to',
     haveAccount: 'Already have an account?',
     signIn: 'Sign in',
   },
@@ -140,7 +140,7 @@ export default function JoinPage() {
             <p className="text-sm text-muted">
               {t.waitlist}{' '}
               <a href={WAITLIST_URL} className="text-accent-text underline">
-                github.com/computor-org/feedback
+                {WAITLIST_ADDRESS}
               </a>
               . {t.haveAccount}{' '}
               <Link href="/login" className="text-accent-text underline">

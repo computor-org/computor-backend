@@ -6,7 +6,7 @@ by the support Temporal worker (queue ``support``), the only container that
 can reach the mail host's IMAP listener (computor-infra prod/TEAMMAIL.md).
 """
 from functools import lru_cache
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -34,6 +34,14 @@ class SupportSettings(BaseSettings):
     sender_suffix: str = "via computor.at"
     # Domain used for generated Message-IDs.
     mail_domain: str = "computor.at"
+
+    # Where "Report a Problem" goes (issues#520 step 2): ``tickets`` files a
+    # support ticket (the default), ``github`` keeps the older direct GitHub
+    # issue path, ``off`` hides the entry point. Clients read it from
+    # ``GET /instance-info`` (``issue_reporting.mode``).
+    report_mode: Literal["tickets", "github", "off"] = "tickets"
+    # Largest log file a reporter may attach to a problem report.
+    report_max_log_bytes: int = Field(1024 * 1024, ge=0)
 
     # Mail bridge (support worker only).
     mail_enabled: bool = False

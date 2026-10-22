@@ -13,10 +13,10 @@ from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
 from computor_backend.database import get_db
-from computor_backend.exceptions import ForbiddenException
+from computor_backend.exceptions import ForbiddenException, IssueReportingUnavailableException
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
-from computor_backend.support import access, service
+from computor_backend.support import access, reports, service
 from computor_backend.support.config import SUPPORT_TASK_QUEUE, get_support_settings
 from computor_types.support import (
     SupportAgentRef,
@@ -24,6 +24,7 @@ from computor_types.support import (
     TicketGet,
     TicketList,
     TicketMessageCreate,
+    TicketPublishDraft,
     TicketQuery,
     TicketUpdate,
 )
@@ -32,12 +33,21 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _github_publish_available() -> bool:
+    from computor_backend.issue_reports.config import get_issue_report_settings
+    from computor_backend.issue_reports.health import current_health
+
+    settings = get_issue_report_settings()
+    return bool(settings.configured and settings.has_token and current_health().available)
+
+
 @router.get("/capabilities", response_model=SupportCapabilities)
 async def support_capabilities(
     principal: Annotated[Principal, Depends(get_current_principal)],
 ):
     """What the caller may do in the support queue (UI gating only)."""
     return SupportCapabilities(
+        can_publish=access.can_manage(principal) and _github_publish_available(),
         can_view=access.can_view_team_queue(principal),
         can_reply=access.can_manage(principal),
         can_manage=access.can_manage(principal),
@@ -189,3 +199,53 @@ async def download_attachment(
             "Cache-Control": "private, no-store",
         },
     )
+
+
+@router.get("/tickets/{ticket_id}/publish-draft", response_model=TicketPublishDraft)
+async def get_publish_draft(
+    ticket_id: str,
+    principal: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db, scope="function"),
+):
+    """Suggested title/text for publishing; identity-shaped context keys removed.
+
+    The support member must still read and edit it: the reporter's own words
+    can name people.
+    """
+    ticket = service.get_ticket_or_404(ticket_id, principal, db)
+    return reports.publish_draft(ticket, principal, db)
+
+
+@router.post("/tickets/{ticket_id}/publish", response_model=TicketGet)
+async def publish_ticket(
+    ticket_id: str,
+    payload: TicketPublishDraft,
+    principal: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db, scope="function"),
+):
+    """Publish an anonymised GitHub issue for this ticket (``_support`` only, once).
+
+    Nothing is posted automatically: this is the one deliberate step from a
+    ticket to the tracker. The reporter link stays in ``issue_report``.
+    """
+    from computor_backend.issue_reports.health import ensure_probed
+    from computor_backend.issue_reports.service import (
+        IssueReportNotConfigured,
+        IssueReportSubmissionError,
+    )
+
+    if not access.can_manage(principal):
+        raise ForbiddenException(detail="Only support members can publish tickets")
+    ticket = service.get_ticket_or_404(ticket_id, principal, db)
+    health = await ensure_probed()
+    if not health.available:
+        raise IssueReportingUnavailableException(detail="Publishing to GitHub is not available")
+    try:
+        await reports.publish_ticket(ticket, payload.title, payload.body, principal, db)
+    except (IssueReportNotConfigured, IssueReportSubmissionError) as exc:
+        db.rollback()
+        logger.warning("publish ticket %s failed: %s", ticket_id, exc)
+        raise IssueReportingUnavailableException(
+            detail="The ticket could not be published to GitHub."
+        ) from exc
+    return service.get_ticket(ticket_id, principal, db)

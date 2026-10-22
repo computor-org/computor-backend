@@ -36,7 +36,7 @@ class TicketPriority(str, Enum):
     HIGH = "high"
 
 
-TicketScope = Literal["unassigned", "mine", "all"]
+TicketScope = Literal["unassigned", "mine", "all", "reported"]
 MessageVisibility = Literal["public", "internal"]
 
 
@@ -108,12 +108,46 @@ class TicketEventGet(BaseModel):
     created_at: datetime
 
 
+class TicketReportInfo(BaseModel):
+    """Client context of a problem report (channel ``web`` / ``vscode``)."""
+
+    app: Optional[str] = Field(None, description="Client that filed it, e.g. computor-vscode.")
+    version: Optional[str] = Field(None, description="Client version.")
+    page: Optional[str] = Field(None, description="Web page the report was filed from.")
+    command: Optional[str] = Field(None, description="Editor command or view, if any.")
+    context: dict = Field(default_factory=dict, description="Diagnostic context (credentials removed).")
+
+
+class TicketPublication(BaseModel):
+    """The anonymised GitHub issue a support member published (team only)."""
+
+    issue_number: Optional[int] = None
+    issue_url: Optional[str] = None
+    report_id: str
+    published_at: Optional[datetime] = None
+
+
 class TicketGet(TicketList):
     messages: List[TicketMessageGet] = Field(default_factory=list)
     events: List[TicketEventGet] = Field(default_factory=list)
+    report: Optional[TicketReportInfo] = Field(
+        None, description="Problem-report context; null for mail tickets."
+    )
+    publication: Optional[TicketPublication] = Field(
+        None, description="Published GitHub issue; only ever returned to the support team."
+    )
+
+
+class TicketPublishDraft(BaseModel):
+    """Title and text of the issue to publish. Must not identify the reporter."""
+
+    title: str = Field(min_length=1, max_length=160)
+    body: str = Field(min_length=1, max_length=20_000)
 
 
 class TicketQuery(BaseModel):
+    """``scope``: ``reported`` lists the caller's own problem reports."""
+
     scope: TicketScope = "all"
     status: Optional[TicketStatus] = None
     search: Optional[str] = Field(None, max_length=200)
@@ -148,6 +182,10 @@ class SupportCapabilities(BaseModel):
     can_write_internal: bool
     is_admin: bool
     team_addresses: List[str] = Field(default_factory=list)
+    can_publish: bool = Field(
+        False, description="May publish a ticket as an anonymised GitHub issue "
+        "(support member, and the deployment has a working GitHub token)."
+    )
 
 
 class SupportAgentRef(TicketUserRef):

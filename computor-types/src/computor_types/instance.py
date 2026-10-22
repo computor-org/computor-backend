@@ -36,6 +36,14 @@ class IssueReportingInfo(BaseModel):
         description="Whether to offer a reporting entry point at all. False when "
         "the deployment has no tracker configured or its probe is failing.",
     )
+    mode: Optional[Literal["tickets", "github", "off"]] = Field(
+        None,
+        description="Where reports go. ``tickets``: the backend files a support "
+        "ticket the reporter can follow in the web app (``/support``). ``github``: "
+        "the older GitHub issue path (``visibility``/``issues_url`` apply). "
+        "``off``: no entry point. Absent on backends that predate support tickets "
+        "(the 2026.10 line); clients then treat the deployment as ``github``.",
+    )
     visibility: Optional[Literal["public", "private"]] = Field(
         None,
         description="Visibility of the configured repository; null while unknown.",

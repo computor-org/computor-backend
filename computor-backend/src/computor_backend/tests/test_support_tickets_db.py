@@ -336,3 +336,115 @@ def test_only_admins_grant_support_roles(db, people):
     # Existing support assignments are invisible to the manager's delete query.
     deletable = handler.build_query(manager, "delete", db)
     assert deletable.filter(UserRole.role_id == "_support").count() == 0
+
+
+# ------------------------------------------------- problem reports (step 2)
+
+
+def _report(db, principal, description="The test run hangs", channel="vscode", **ctx):
+    from computor_backend.support.reports import create_report_ticket
+    from computor_types.issue_reports import IssueReportCreate
+
+    payload = IssueReportCreate(description=description, context={
+        "client": "computor-vscode", "client_version": "2027.3.6", "command": "computor.test",
+        "api_token": "secret-value", **ctx})
+    return create_report_ticket(payload, channel, principal, db,
+                                log=(b"log line\n", "computor.log"))
+
+
+def test_report_becomes_an_open_ticket_for_the_support_queue(db, people):
+    users, p = people
+    ticket = _report(db, p["reporter"])
+    assert (ticket.channel, ticket.status, ticket.restricted) == ("vscode", "open", False)
+    assert str(ticket.reporter_user_id) == str(users["reporter"].id)
+    assert ticket.reporter_email == users["reporter"].email
+    team_view = service.get_ticket(str(ticket.id), p["steffi"], db)
+    assert team_view.report.app == "computor-vscode"
+    assert team_view.report.command == "computor.test"
+    # Credentials never reach the stored context.
+    assert team_view.report.context["api_token"] == "[redacted]"
+    assert team_view.messages[0].direction == "in"
+    assert [a.filename for a in team_view.messages[0].attachments] == ["computor.log"]
+    unassigned = service.list_tickets(TicketQuery(scope="unassigned"), p["steffi"], db)[0]
+    assert str(ticket.id) in {t.id for t in unassigned}
+
+
+def test_reporter_sees_only_own_reports_and_never_internal_notes(db, people):
+    users, p = people
+    mine = _report(db, p["reporter"])
+    other = _report(db, p["student"], description="Someone else's problem")
+    service.add_message(str(mine.id), TicketMessageCreate(content="looks like a worker crash",
+                                                          internal=True), p["steffi"], db)
+    service.add_message(str(mine.id), TicketMessageCreate(content="Thanks, we are on it"),
+                        p["steffi"], db)
+
+    listed = {t.id for t in service.list_tickets(TicketQuery(scope="all"), p["reporter"], db)[0]}
+    assert str(mine.id) in listed and str(other.id) not in listed
+    reported = service.list_tickets(TicketQuery(scope="reported"), p["reporter"], db)[0]
+    assert {t.id for t in reported} == {str(mine.id)}
+    assert all(t.assignee is None or t.assignee.email is None for t in reported)
+    with pytest.raises(NotFoundException):
+        service.get_ticket(str(other.id), p["reporter"], db)
+
+    view = service.get_ticket(str(mine.id), p["reporter"], db)
+    # One transaction gives equal created_at, so compare as a set here.
+    assert "Thanks, we are on it" in {m.text for m in view.messages}
+    assert all(m.visibility == "public" for m in view.messages)
+    assert "looks like a worker crash" not in {m.text for m in view.messages}
+    assert view.events == [] and view.publication is None
+    # The team member's address is not shown to the reporter.
+    assert view.assignee is not None and view.assignee.email is None
+    assert view.status == "waiting"
+
+
+def test_reporter_follow_up_reopens_and_cannot_write_notes(db, people):
+    users, p = people
+    ticket = _report(db, p["reporter"])
+    service.add_message(str(ticket.id), TicketMessageCreate(content="Which file?"), p["steffi"], db)
+    view, to_send = service.add_message(str(ticket.id), TicketMessageCreate(content="main.py"),
+                                        p["reporter"], db)
+    assert to_send is None  # in-app only, never mail
+    assert view.status == "in_progress"
+    assert {m.text: m.direction for m in view.messages}["main.py"] == "in"
+    assert {m.text: m.direction for m in view.messages}["Which file?"] == "out"
+    with pytest.raises(ForbiddenException):
+        service.add_message(str(ticket.id), TicketMessageCreate(content="x", internal=True),
+                            p["reporter"], db)
+    # Another ordinary user cannot reach it at all; the AI agent cannot reply publicly.
+    with pytest.raises(NotFoundException):
+        service.add_message(str(ticket.id), TicketMessageCreate(content="hi"), p["student"], db)
+    with pytest.raises(ForbiddenException):
+        service.add_message(str(ticket.id), TicketMessageCreate(content="hi"), p["agent"], db)
+
+
+def test_publish_is_deliberate_support_only_and_anonymised(db, people):
+    from unittest.mock import patch
+
+    from computor_backend.support import reports
+
+    users, p = people
+    ticket = _report(db, p["reporter"], description="Crash", user_email="leak@test.local")
+    for who in ("agent", "reporter"):
+        with pytest.raises((ForbiddenException, NotFoundException)):
+            reports.publish_draft(service.get_ticket_or_404(str(ticket.id), p[who], db)
+                                  if who == "agent" else ticket, p[who], db)
+    draft = reports.publish_draft(ticket, p["steffi"], db)
+    assert "leak@test.local" not in draft.body and users["reporter"].email not in draft.body
+    assert "secret-value" not in draft.body
+
+    sent = {}
+
+    async def fake_publish(title, body, reporter_user_id, db_):
+        sent.update(title=title, body=body, reporter=reporter_user_id)
+        return type("R", (), {"id": "r-1", "repository": "computor-org/issues",
+                              "issue_number": 7, "issue_url": "https://github.com/x/7"})()
+
+    import asyncio
+
+    with patch("computor_backend.issue_reports.service.publish_issue", fake_publish):
+        asyncio.run(reports.publish_ticket(ticket, draft.title, draft.body, p["steffi"], db))
+        with pytest.raises(Exception):
+            asyncio.run(reports.publish_ticket(ticket, draft.title, draft.body, p["steffi"], db))
+    assert sent["reporter"] == str(users["reporter"].id)
+    assert service.get_ticket(str(ticket.id), p["steffi"], db).publication.issue_number == 7
+    assert service.get_ticket(str(ticket.id), p["reporter"], db).publication is None

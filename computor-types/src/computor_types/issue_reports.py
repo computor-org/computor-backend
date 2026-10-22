@@ -30,10 +30,24 @@ class IssueReportCreated(BaseModel):
     report_id: str = Field(
         description="Opaque identifier for this report, safe to show the reporter."
     )
-    issue_number: int = Field(description="Issue number in the configured tracker.")
+    issue_number: int = Field(
+        description="Issue number in the configured tracker; the ticket number when "
+        "the report became a support ticket."
+    )
     issue_url: Optional[AnyHttpUrl] = Field(
         default=None,
         description="Link to the created issue; null when the tracker is private.",
+    )
+    ticket_id: Optional[str] = Field(
+        default=None,
+        description="Support ticket the report became (``issue_reporting.mode == "
+        "'tickets'``); null on the GitHub path.",
+    )
+    ticket_number: Optional[int] = Field(
+        default=None, description="Human-facing number of that ticket."
+    )
+    log_attached: bool = Field(
+        default=False, description="Whether an attached log file was stored with the ticket."
     )
     screenshot_attached: bool = Field(
         default=False,

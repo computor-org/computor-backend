@@ -15,6 +15,7 @@ from computor_backend.issue_reports import config as issue_config
 from computor_backend.issue_reports import health as issue_health
 from computor_backend.issue_reports import service as issue_reports
 from computor_backend.permissions.principal import Principal
+from computor_backend.support import config as support_config
 from computor_types.issue_reports import IssueReportCreate
 
 
@@ -26,15 +27,19 @@ def configured(**overrides):
         "GITHUB_ISSUE_REPORT_TOKEN": "server-token",
         "GITHUB_ISSUE_REPORT_LABELS": "Testing",
         "GITHUB_ISSUE_REPORT_BRANCH": "main",
+        # These tests cover the GitHub path; tickets mode has its own below.
+        "SUPPORT_REPORT_MODE": "github",
     }
     env.update(overrides)
     with patch.dict(os.environ, env, clear=False):
         issue_config.get_issue_report_settings.cache_clear()
+        support_config.get_support_settings.cache_clear()
         issue_health.reset_health()
         try:
             yield
         finally:
             issue_config.get_issue_report_settings.cache_clear()
+            support_config.get_support_settings.cache_clear()
             issue_health.reset_health()
 
 
@@ -335,7 +340,9 @@ async def test_a_repaired_configuration_recovers_without_a_restart():
             assert seen == []
 
         # Once it expires, the next request re-probes and finds the fixed token.
-        issue_health._state = issue_health.replace(issue_health.current_health(), checked_at=0.0)
+        # (monotonic time starts near boot, so 0.0 is not "long ago" on a fresh CI runner)
+        expired = issue_health.time.monotonic() - issue_health.REPROBE_TTL_SECONDS - 1
+        issue_health._state = issue_health.replace(issue_health.current_health(), checked_at=expired)
         with github_says(payload={"private": True, "has_issues": True}):
             assert (await issue_health.ensure_probed()).available
 
@@ -721,3 +728,128 @@ async def test_the_probe_flags_a_token_that_cannot_store_screenshots():
     assert health.available
     assert not health.can_store_screenshots
     assert "Contents: Read and write" in issue_health.describe(health)
+
+
+# ---------------------------------------------------------------------------
+# Tickets mode (issues#520 step 2): reports become support tickets, no GitHub
+# ---------------------------------------------------------------------------
+
+
+def _instance_reporting():
+    from computor_backend.api.instance import _issue_reporting
+
+    return _issue_reporting()
+
+
+def test_instance_info_advertises_tickets_mode_without_github():
+    """Tickets mode is on even with no tracker at all: the button no longer needs GitHub."""
+    with configured(SUPPORT_REPORT_MODE="tickets", GITHUB_ISSUE_REPORT_REPOSITORY="",
+                    GITHUB_ISSUE_REPORT_TOKEN=""):
+        info = _instance_reporting()
+    assert info.mode == "tickets"
+    assert info.enabled is True
+    assert info.issues_url is None and info.visibility is None
+
+
+def test_instance_info_off_mode_hides_the_entry_point():
+    with configured(SUPPORT_REPORT_MODE="off"):
+        info = _instance_reporting()
+    assert (info.mode, info.enabled) == ("off", False)
+
+
+def test_instance_info_github_mode_keeps_the_probe_verdict():
+    with configured():
+        issue_health._record(True, "", "private")
+        info = _instance_reporting()
+    assert (info.mode, info.enabled, info.visibility) == ("github", True, "private")
+
+
+def test_default_mode_is_tickets():
+    with patch.dict(os.environ, {}, clear=False):
+        os.environ.pop("SUPPORT_REPORT_MODE", None)
+        support_config.get_support_settings.cache_clear()
+        try:
+            assert support_config.get_support_settings().report_mode == "tickets"
+        finally:
+            support_config.get_support_settings.cache_clear()
+
+
+def test_off_mode_endpoint_is_404():
+    with configured(SUPPORT_REPORT_MODE="off"):
+        response = _client().post("/issue-reports", data={"description": "broken"})
+    assert response.status_code == 404
+
+
+def _ticket_capture(store):
+    def fake(payload, channel, principal, db, screenshot=None, log=None):
+        store.update(payload=payload, channel=channel, screenshot=screenshot, log=log)
+        return SimpleNamespace(id="00000000-0000-0000-0000-000000000042", number=42)
+    return fake
+
+
+def test_tickets_mode_files_a_ticket_and_never_calls_github():
+    """An old client (2027.3.5: no channel field) still gets a usable receipt."""
+    store: dict = {}
+    calls: list[dict] = []
+    from computor_backend.api import issue_reports as issue_api
+
+    with configured(SUPPORT_REPORT_MODE="tickets", GITHUB_ISSUE_REPORT_TOKEN=""), patch.object(
+        issue_api, "create_report_ticket", _ticket_capture(store)
+    ), patch.object(issue_reports.httpx, "AsyncClient", lambda **kwargs: _GitHubClient(calls)):
+        response = _client().post("/issue-reports", data={
+            "description": "broken", "context": json.dumps({"client": "computor-vscode"}),
+        })
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["ticket_number"] == 42 and body["issue_number"] == 42
+    assert body["issue_url"] is None
+    assert store["channel"] == "vscode"
+    assert calls == []
+
+
+def test_tickets_mode_stores_a_chosen_log_and_explicit_channel():
+    store: dict = {}
+    from computor_backend.api import issue_reports as issue_api
+
+    with configured(SUPPORT_REPORT_MODE="tickets"), patch.object(
+        issue_api, "create_report_ticket", _ticket_capture(store)
+    ):
+        response = _client().post(
+            "/issue-reports",
+            data={"description": "broken", "channel": "web"},
+            files={"log": ("x.log", b"line 1\nline 2\n", "text/plain")},
+        )
+    assert response.status_code == 201, response.text
+    assert response.json()["log_attached"] is True
+    assert store["channel"] == "web"
+    assert store["log"] == (b"line 1\nline 2\n", "computor.log")
+
+
+def test_tickets_mode_refuses_a_binary_or_oversized_log():
+    from computor_backend.api import issue_reports as issue_api
+
+    with configured(SUPPORT_REPORT_MODE="tickets", SUPPORT_REPORT_MAX_LOG_BYTES="8"), patch.object(
+        issue_api, "create_report_ticket", _ticket_capture({})
+    ):
+        too_big = _client().post("/issue-reports", data={"description": "x"},
+                                  files={"log": ("x.log", b"0123456789", "text/plain")})
+    with configured(SUPPORT_REPORT_MODE="tickets"), patch.object(
+        issue_api, "create_report_ticket", _ticket_capture({})
+    ):
+        binary = _client().post("/issue-reports", data={"description": "x"},
+                                files={"log": ("x.log", b"a\x00b", "text/plain")})
+    assert too_big.status_code == 400
+    assert binary.status_code == 400
+
+
+def test_tickets_mode_is_rate_limited_too():
+    cache = _Cache()
+    from computor_backend.api import issue_reports as issue_api
+
+    with configured(SUPPORT_REPORT_MODE="tickets"), patch.object(
+        issue_api, "create_report_ticket", _ticket_capture({})
+    ):
+        client = _client(cache)
+        first = client.post("/issue-reports", data={"description": "broken"})
+        second = client.post("/issue-reports", data={"description": "again"})
+    assert (first.status_code, second.status_code) == (201, 429)

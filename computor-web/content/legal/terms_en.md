@@ -126,8 +126,7 @@ g) publishing solutions to graded exercises where the course prohibits this,
 
 5.2 Security research on the platform is only permitted with prior agreement
 via security@computor.at. Please report vulnerabilities to
-security@computor.at or confidentially via
-https://github.com/computor-org/feedback/security/advisories/new. We will not
+security@computor.at, confidentially. We will not
 take legal action because of the report against anyone who reports a
 vulnerability in good faith and confidentially, without accessing other
 people's data or disrupting operations.
@@ -257,4 +256,5 @@ representative actions.
 - Abuse and illegal content: abuse@computor.at, see [Report content](/report)
 - Data protection: privacy@computor.at or datenschutz@tugraz.at
 - Security: security@computor.at
-- Bugs and suggestions: https://github.com/computor-org/feedback
+- Bugs and suggestions: "Report a problem" in the web app and in the VS Code
+  extension, or contact@computor.at
