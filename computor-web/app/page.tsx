@@ -33,9 +33,9 @@ const COPY = {
     heroLead: 'Programmieren Schritt für Schritt.',
     heroScope: 'Offene Kurse zu Python und Data Science, von den ersten Schritten bis zu Datenanalyse und Differentialgleichungen.',
     toCourses: 'Kurse ohne Anmeldung entdecken →',
-    toWork: 'Anmelden und üben',
+    allCourses: 'Alle Kurse',
     steps: [
-      ['book', 'Kurse lesen', <>Alle Kurse sind ohne Konto lesbar. Beginne mit <strong className="text-fg">Data Science mit Python &ndash; Grundlagen</strong>, Woche 1.</>],
+      ['book', 'Kurse lesen', <>Ohne Konto lesbar. Beginne mit den Grundlagen, Woche 1.</>],
       ['code', 'Im Browser üben', <>Mit Konto startest du die Kursumgebung im Browser, ohne Installation. Dort bearbeitest du die Aufgaben, testest sie und reichst sie ein.</>],
       ['chat', 'Lena fragen', <>Die KI-Tutorin Lena gibt Hinweise statt fertiger Lösungen. Erwähne {mention('@lena')} in den Nachrichten zu einer Aufgabe.</>],
     ],
@@ -49,9 +49,9 @@ const COPY = {
     heroLead: 'Programming step by step.',
     heroScope: 'Open courses on Python and data science, from first steps to data analysis and differential equations.',
     toCourses: 'Explore courses without an account →',
-    toWork: 'Sign in and practise',
+    allCourses: 'All courses',
     steps: [
-      ['book', 'Read the courses', <>All courses are readable without an account. Start with <strong className="text-fg">Data Science mit Python &ndash; Grundlagen</strong>, week 1.</>],
+      ['book', 'Read the courses', <>Readable without an account. Start with the basics, week 1.</>],
       ['code', 'Practise in the browser', <>With an account you start the course environment in the browser, no installation needed. There you edit, test and submit the tasks.</>],
       ['chat', 'Ask Lena', <>Lena, the AI tutor, gives hints instead of complete solutions. Mention {mention('@lena')} in the messages of a task.</>],
     ],
@@ -137,14 +137,6 @@ export default function Home() {
             >
               {t.toCourses}
             </Link>
-            {!user && (
-              <Link
-                href="/login"
-                className="px-8 py-4 bg-surface text-accent-text rounded-lg border-2 border-accent hover:bg-accent-wash transition-all font-semibold text-lg"
-              >
-                {t.toWork}
-              </Link>
-            )}
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -153,6 +145,7 @@ export default function Home() {
                 <Icon name={icon} className="h-12 w-12 text-accent-text mb-4 mx-auto" />
                 <h3 className="text-xl font-bold text-fg mb-2">{title}</h3>
                 <p className="text-muted">{body}</p>
+                {icon === 'book' && <div className="mt-3"><PublicCourseCatalog fallbackLabel={t.allCourses} /></div>}
               </div>
             ))}
           </div>
@@ -164,7 +157,6 @@ export default function Home() {
             <a href={CODESPACES_URL} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium hover:underline">GitHub Codespaces</a>
           </div>
 
-          <PublicCourseCatalog signedIn={!!user} />
         </div>
       </main>
 

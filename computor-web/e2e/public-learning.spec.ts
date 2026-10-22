@@ -90,11 +90,11 @@ test('math parsing leaves literal dollars and LaTeX inside code unchanged', asyn
   await expect(page.locator('article .katex')).toHaveCount(1);
 });
 
-test('landing shows open registration and static courses with no pilot or invite claim', async ({ page }) => {
+test('landing shows static courses, one sign-in link and no pilot or invite claim', async ({ page }) => {
   const calls: string[] = [];
   await blockApi(page, calls);
   await page.goto('/');
-  await expect(page.getByText('Offen zur Anmeldung / Open for registration')).toBeVisible();
+  await expect(page.getByRole('link', { name: /^(Anmelden|Sign in)$/ })).toHaveCount(1);
   await expect(page.getByText(/Pilotbetrieb|join with an invite link|Teilnahme mit Einladungslink/)).toHaveCount(0);
   await page.getByRole('link', { name: /Data Science mit Python – Grundlagen/ }).click();
   await expect(page).toHaveURL(/\/learn\/python-beginner$/);
