@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useCourseViews } from '@/src/hooks/useCourseViews';
+import { useSupportCapabilities } from '@/src/hooks/useSupportCapabilities';
 import { icons } from './icons';
 
 // Baked at build time by computor.sh (docker/web/Dockerfile GIT_COMMIT arg);
@@ -22,6 +23,7 @@ import {
   adminNavigation,
   userMgmtNavigation,
   servicesNavigation,
+  supportNavigation,
   getViewNavigation,
   pathMatches,
 } from '@/src/config/navigation';
@@ -30,6 +32,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
   const { isAdmin, isOrganizationManager, isUserManager, isWorkspaceUser, isWorkspaceMaintainer, isExampleManager, isServiceManager, showManagement } = usePermissions();
+  const { capabilities: supportCaps } = useSupportCapabilities();
   const [collapsed, setCollapsed] = useState(false);
 
   // Sub-sections the user has explicitly toggled open. The section containing
@@ -213,6 +216,7 @@ export default function Sidebar() {
       {isUserManager && renderNavItems(userMgmtNavigation)}
       {isWorkspaceUser && renderNavItems(getWorkspacesNavigation(isWorkspaceMaintainer))}
       {isServiceManager && renderNavItems(servicesNavigation)}
+      {supportCaps?.can_view && renderNavItems(supportNavigation)}
       {isAdmin && renderNavItems(adminNavigation)}
     </SidebarShell>
   );

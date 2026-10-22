@@ -103,6 +103,17 @@ export const servicesNavigation: NavItem[] = [
   },
 ];
 
+// Support tickets — shown only when GET /support/capabilities reports can_view.
+export const supportNavigation: NavItem[] = [
+  {
+    id: 'support',
+    label: 'Support',
+    path: '/support',
+    icon: 'support',
+    ownPage: true,
+  },
+];
+
 // Admin-only navigation items
 export const adminNavigation: NavItem[] = [
   {
