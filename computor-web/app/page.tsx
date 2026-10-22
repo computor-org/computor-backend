@@ -13,6 +13,18 @@ import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
 
 const mention = (name: string) => <code className="bg-accent-wash text-accent-text px-1 rounded text-xs">{name}</code>;
 
+const ICON_PATHS = {
+  book: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+  code: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4',
+  chat: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z',
+};
+
+const Icon = ({ name, className }: { name: keyof typeof ICON_PATHS; className: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICON_PATHS[name]} />
+  </svg>
+);
+
 const COPY = {
   de: {
     signIn: 'Anmelden',
@@ -23,9 +35,9 @@ const COPY = {
     toCourses: 'Kurse ohne Anmeldung entdecken →',
     toWork: 'Anmelden und üben',
     steps: [
-      ['1', 'Kurse lesen', <>Alle Kurse sind ohne Konto lesbar. Beginne mit <strong className="text-fg">Data Science mit Python &ndash; Grundlagen</strong>, Woche 1.</>],
-      ['2', 'Im Browser üben', <>Mit Konto startest du die Kursumgebung im Browser, ohne Installation. Dort bearbeitest du die Aufgaben, testest sie und reichst sie ein.</>],
-      ['3', 'Lena fragen', <>Die KI-Tutorin Lena gibt Hinweise statt fertiger Lösungen. Erwähne {mention('@lena')} in den Nachrichten zu einer Aufgabe.</>],
+      ['book', 'Kurse lesen', <>Alle Kurse sind ohne Konto lesbar. Beginne mit <strong className="text-fg">Data Science mit Python &ndash; Grundlagen</strong>, Woche 1.</>],
+      ['code', 'Im Browser üben', <>Mit Konto startest du die Kursumgebung im Browser, ohne Installation. Dort bearbeitest du die Aufgaben, testest sie und reichst sie ein.</>],
+      ['chat', 'Lena fragen', <>Die KI-Tutorin Lena gibt Hinweise statt fertiger Lösungen. Erwähne {mention('@lena')} in den Nachrichten zu einer Aufgabe.</>],
     ],
     local: 'Lieber lokal arbeiten?',
     footer: 'Interaktive Lernplattform für Programmierung.',
@@ -39,9 +51,9 @@ const COPY = {
     toCourses: 'Explore courses without an account →',
     toWork: 'Sign in and practise',
     steps: [
-      ['1', 'Read the courses', <>All courses are readable without an account. Start with <strong className="text-fg">Data Science mit Python &ndash; Grundlagen</strong>, week 1.</>],
-      ['2', 'Practise in the browser', <>With an account you start the course environment in the browser, no installation needed. There you edit, test and submit the tasks.</>],
-      ['3', 'Ask Lena', <>Lena, the AI tutor, gives hints instead of complete solutions. Mention {mention('@lena')} in the messages of a task.</>],
+      ['book', 'Read the courses', <>All courses are readable without an account. Start with <strong className="text-fg">Data Science mit Python &ndash; Grundlagen</strong>, week 1.</>],
+      ['code', 'Practise in the browser', <>With an account you start the course environment in the browser, no installation needed. There you edit, test and submit the tasks.</>],
+      ['chat', 'Ask Lena', <>Lena, the AI tutor, gives hints instead of complete solutions. Mention {mention('@lena')} in the messages of a task.</>],
     ],
     local: 'Prefer to work locally?',
     footer: 'Interactive learning platform for programming.',
@@ -135,26 +147,22 @@ export default function Home() {
             )}
           </div>
 
-          <ol className="grid md:grid-cols-3 gap-6 text-left">
-            {t.steps.map(([number, title, body]) => (
-              <li key={number} className="bg-surface rounded-xl shadow-lg p-6 border border-rule space-y-2">
-                <div className="flex items-center space-x-3">
-                  <span className="h-8 w-8 shrink-0 rounded-full bg-accent-wash text-accent-text font-bold flex items-center justify-center">
-                    {number}
-                  </span>
-                  <h3 className="text-lg font-bold text-fg">{title}</h3>
-                </div>
-                <p className="text-muted text-sm leading-relaxed">{body}</p>
-              </li>
+          <div className="grid md:grid-cols-3 gap-8">
+            {t.steps.map(([icon, title, body]) => (
+              <div key={icon} className="bg-surface rounded-xl shadow-lg p-6 border border-rule">
+                <Icon name={icon} className="h-12 w-12 text-accent-text mb-4 mx-auto" />
+                <h3 className="text-xl font-bold text-fg mb-2">{title}</h3>
+                <p className="text-muted">{body}</p>
+              </div>
             ))}
-          </ol>
+          </div>
 
-          <p className="text-sm text-muted">
-            {t.local}{' '}
-            <a href={COMPUTOR_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline">Desktop VS Code</a>
-            {' · '}
-            <a href={CODESPACES_URL} target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline">GitHub Codespaces</a>
-          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3 text-muted">
+            <Icon name="code" className="h-5 w-5 text-accent-text" />
+            <span>{t.local}</span>
+            <a href={COMPUTOR_EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium hover:underline">Desktop VS Code</a>
+            <a href={CODESPACES_URL} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium hover:underline">GitHub Codespaces</a>
+          </div>
 
           <PublicCourseCatalog signedIn={!!user} />
         </div>
