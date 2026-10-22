@@ -1,6 +1,6 @@
 # Nutzungsbedingungen computor.at
 
-Version 1.1, gültig ab 01.10.2026
+Version 1.2, gültig ab 22.10.2026
 
 ## Das Wichtigste in Kürze
 
@@ -77,10 +77,13 @@ kein Zeugnis und keine Bestätigung von Kenntnissen. Zieht eine
 Lehrveranstaltung Ergebnisse für eine Beurteilung heran, entscheidet die
 jeweilige Lehrperson nach den dafür geltenden Vorschriften.
 
-3.6 Lena erzeugt KI-Lernhilfe aus Ihrer Frage, Ihrem ausgewählten Text und
-der sichtbaren Aufgabe. Lena führt keinen Code aus und bewertet keine Abgaben.
-Prüfen Sie Antworten; sie können falsch sein. Anfragen und Antworten werden wie
-in der Datenschutzerklärung beschrieben vorübergehend verarbeitet, einschließlich
+3.6 Lena erzeugt KI-Lernhilfe, wenn Sie Lena fragen. Über die Schaltfläche
+„Lena fragen“ nutzt Lena Ihre Frage, Ihren ausgewählten Text und die sichtbare
+Aufgabe. Wenn Sie Lena in einer Nachricht zu einer Aufgabe erwähnen, nutzt Lena
+außerdem den Nachrichtenverlauf, Ihre letzte Abgabe und deren Testergebnisse und
+antwortet im Verlauf. Lena führt keinen Code aus und bewertet keine Abgaben.
+Prüfen Sie Antworten, denn sie können falsch sein. Anfragen und Antworten werden
+wie in der Datenschutzerklärung beschrieben verarbeitet, einschließlich
 begrenzter Inferenz-Caches. Ihre Inhalte werden weder protokolliert noch zum
 Modelltraining verwendet. Verfügbarkeit und Anfragegrenzen hängen von der
 Kapazität ab. Öffentliche Beispiele können Sie auch mit Desktop-VS-Code oder
