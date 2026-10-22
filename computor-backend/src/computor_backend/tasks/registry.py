@@ -29,6 +29,7 @@ TEMPORAL_TASK_MODULES: List[str] = [
     ".temporal_student_repository",
     ".temporal_tutor_testing",
     ".temporal_coder_setup",
+    ".temporal_support_mail",
 ]
 
 # Demo/example workflows are only imported (and therefore only registered /

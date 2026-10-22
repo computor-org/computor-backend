@@ -141,7 +141,10 @@ async def list_mentionable_users_endpoint(
     see). Global scope (no target) requires a ``search`` term.
     """
     if params.parent_id:
-        parent = db.query(Message).filter(Message.id == params.parent_id).first()
+        parent = db.query(Message).filter(
+            Message.id == params.parent_id,
+            Message.ticket_id.is_(None),  # ticket rows are not course threads
+        ).first()
         if not parent:
             raise BadRequestException(detail=f"Parent message {params.parent_id} not found")
         message_like = parent

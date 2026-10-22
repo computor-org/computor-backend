@@ -72,6 +72,7 @@ from computor_backend.api.examples import examples_router
 from computor_backend.api.extensions import extensions_router
 from computor_backend.api.course_member_comments import router as course_member_comments_router
 from computor_backend.api.issue_reports import router as issue_reports_router
+from computor_backend.api.support import router as support_router
 from computor_backend.api.messages import messages_router
 from computor_backend.api.services import services_router
 from computor_backend.api.api_tokens import api_tokens_router
@@ -770,6 +771,13 @@ app.include_router(
     issue_reports_router,
     prefix="/issue-reports",
     tags=["issue reports"],
+    dependencies=[Depends(get_current_principal)],
+)
+
+app.include_router(
+    support_router,
+    prefix="/support",
+    tags=["support"],
     dependencies=[Depends(get_current_principal)],
 )
 

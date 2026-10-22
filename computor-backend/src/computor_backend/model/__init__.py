@@ -32,6 +32,7 @@ from .invite import InviteLink
 from .git_server import GitServer, CourseGitBinding, CourseMemberGitRepository
 from .consent import PolicyVersion, UserConsent
 from .issue_report import IssueReport
+from .support import Ticket, TicketEvent, TicketMailMessage, TicketAttachment, SupportMailState
 from .workspace import WorkspaceTemplateSettings, CourseWorkspaceTemplate, CourseWorkspaceSettings
 from .instance import InstanceSettings
 
@@ -56,6 +57,7 @@ from . import (
     git_server,
     consent,
     issue_report,
+    support,
     workspace,
     instance,
 )

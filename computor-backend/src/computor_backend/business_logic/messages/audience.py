@@ -38,6 +38,11 @@ def get_message_recipient_user_ids(message: Message, db: Session, include_global
     """
     user_ids: set[str] = set()
 
+    # Support-ticket messages (issues#520) have no course audience; they are
+    # never broadcast on message channels.
+    if getattr(message, "ticket_id", None):
+        return user_ids
+
     if message.author_id:
         user_ids.add(str(message.author_id))
 

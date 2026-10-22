@@ -34,7 +34,7 @@ from computor_backend.model.invite import InviteLink
 from computor_backend.model.role import Role, UserRole
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
-from computor_backend.permissions.roles import grants_system_admin
+from computor_backend.permissions.roles import grant_requires_admin, grants_system_admin
 from computor_backend.redis_cache import get_redis_client
 from computor_backend.utils.client_info import trusted_client_ip
 from computor_types.invites import (
@@ -93,10 +93,10 @@ async def create_invite(
         # Acceptance assigns the invite's roles directly, bypassing the
         # UserRolePermissionHandler escalation guard — so the same rule
         # must hold here: only admins may hand out admin roles.
-        if not principal.is_admin and any(grants_system_admin(r) for r in requested_roles):
+        if not principal.is_admin and any(grant_requires_admin(r) for r in requested_roles):
             raise ForbiddenException(
                 error_code="AUTHZ_005",
-                detail="Only administrators can create invites that grant the admin role",
+                detail="Only administrators can create invites that grant the admin or support roles",
                 context={"roles": requested_roles},
             )
 
@@ -393,13 +393,13 @@ async def accept_invite(
         # guard (or whose creator has since lost admin) must not remain a
         # stored escalation. The other roles are still granted.
         roles_to_grant = list(invite_roles)
-        admin_roles = [r for r in roles_to_grant if grants_system_admin(r)]
+        admin_roles = [r for r in roles_to_grant if grant_requires_admin(r)]
         if admin_roles and not _creator_is_admin(invite, db):
             logger.warning(
                 f"Invite {invite_id}: skipping admin role(s) {admin_roles} — "
                 f"creator {created_by} is not an admin"
             )
-            roles_to_grant = [r for r in roles_to_grant if not grants_system_admin(r)]
+            roles_to_grant = [r for r in roles_to_grant if not grant_requires_admin(r)]
         held = {
             row[0]
             for row in db.query(UserRole.role_id).filter(UserRole.user_id == str(user.id))

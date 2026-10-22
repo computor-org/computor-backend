@@ -58,6 +58,20 @@ def grants_system_admin(role_id: str) -> bool:
     return role_id.endswith(SystemRole.ADMIN.value)
 
 
+# Global roles that only an administrator may grant or revoke, besides the
+# admin roles themselves: the support roles read the team mailbox (abuse,
+# privacy and security reports), which a user manager must not be able to
+# hand to themselves (issues#520).
+SUPPORT_ROLE = "_support"
+SUPPORT_AGENT_ROLE = "_support_agent"
+ADMIN_GRANTED_ROLES = frozenset({SUPPORT_ROLE, SUPPORT_AGENT_ROLE})
+
+
+def grant_requires_admin(role_id: str) -> bool:
+    """True if only an administrator may grant or revoke ``role_id``."""
+    return grants_system_admin(role_id) or role_id in ADMIN_GRANTED_ROLES
+
+
 def _course_roles_at_or_above(role: CourseRole) -> Tuple[str, ...]:
     return tuple(course_role_hierarchy.get_allowed_roles(role.value))
 

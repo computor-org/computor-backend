@@ -13,7 +13,11 @@ from sqlalchemy.orm import Session, Query
 from computor_backend.permissions.handlers import PermissionHandler
 from computor_backend.permissions.principal import Principal
 from computor_backend.exceptions import ForbiddenException
-from computor_backend.permissions.roles import CourseRole, grants_system_admin
+from computor_backend.permissions.roles import (
+    ADMIN_GRANTED_ROLES,
+    CourseRole,
+    grant_requires_admin,
+)
 
 __all__ = [
     "ReadOnlyPermissionHandler",
@@ -108,10 +112,10 @@ class UserRolePermissionHandler(PermissionHandler):
 
         # Even with the claim, only admins may grant an admin role.
         target_role = context.get("role_id") if context else None
-        if target_role and grants_system_admin(target_role):
+        if target_role and grant_requires_admin(target_role):
             raise ForbiddenException(
                 error_code="AUTHZ_005",
-                detail="Only administrators can grant the admin role",
+                detail="Only administrators can grant the admin or support roles",
                 context={"role_id": target_role},
             )
 
@@ -129,7 +133,8 @@ class UserRolePermissionHandler(PermissionHandler):
             # admin assignment by (user_id, role_id) get a clean
             # NotFound, not a successful update / delete.
             return db.query(self.entity).filter(
-                ~self.entity.role_id.endswith("_admin", autoescape=True)
+                ~self.entity.role_id.endswith("_admin", autoescape=True),
+                ~self.entity.role_id.in_(sorted(ADMIN_GRANTED_ROLES)),
             )
 
         raise ForbiddenException(detail={"entity": self.resource_name})

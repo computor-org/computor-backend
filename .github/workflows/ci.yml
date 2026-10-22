@@ -68,6 +68,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_forgejo_repo_delete.py
           computor-backend/src/computor_backend/tests/test_forgejo_template_read_heal.py
           computor-backend/src/computor_backend/tests/test_course_analytics.py
+          computor-backend/src/computor_backend/tests/test_support_mail.py
 
   coder-worker-socket-proxy:
     # Behavioural check of the coder worker's Docker allowlist: the pinned
@@ -116,6 +117,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_public_workspace_capacity.py
           computor-backend/src/computor_backend/tests/test_admin_mfa_db.py
           computor-backend/src/computor_backend/tests/test_course_analytics_db.py
+          computor-backend/src/computor_backend/tests/test_support_tickets_db.py
 
   grading-isolation:
     # Hostile-snippet tests for grading jobs (#237). Sandbox-dependent cases
