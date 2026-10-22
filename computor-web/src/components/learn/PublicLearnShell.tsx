@@ -2,15 +2,26 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import LegalLinks from '@/src/components/LegalLinks';
 import NetideeNotice from '@/src/components/NetideeNotice';
+import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
+
+const COPY = {
+  de: { courses: 'Kurse', signIn: 'Anmelden', signOut: 'Abmelden' },
+  en: { courses: 'Courses', signIn: 'Sign in', signOut: 'Sign out' },
+};
 
 export default function PublicLearnShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { user, logout } = useAuth();
+  const language = useBrowserLanguage();
+  const t = COPY[language];
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
 
   async function signOut() {
     await logout();
@@ -26,17 +37,17 @@ export default function PublicLearnShell({ children }: { children: ReactNode }) 
             <span className="font-bold text-xl truncate">Computor Learn</span>
           </Link>
           <div className="flex items-center gap-3 text-sm">
-            <Link href="/learn" className="text-accent-text hover:underline">Courses</Link>
+            <Link href="/learn" className="text-accent-text hover:underline">{t.courses}</Link>
             {user ? (
               <>
                 <Link href="/dashboard" className="text-accent-text hover:underline">Dashboard</Link>
                 <button type="button" onClick={signOut} className="text-muted hover:text-fg">
-                  Sign out
+                  {t.signOut}
                 </button>
               </>
             ) : (
               <Link href="/login?next=%2Fcourses%2Fcatalog" className="text-accent-text hover:underline">
-                Sign in
+                {t.signIn}
               </Link>
             )}
           </div>
