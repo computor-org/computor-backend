@@ -10,10 +10,10 @@ export const COMPUTOR_EXTENSION_URL = 'https://marketplace.visualstudio.com/item
 const COPY = {
   de: {
     full: 'Alle Arbeitsumgebungen im Browser sind belegt. Weiterarbeiten mit:',
-    choose: 'Wo möchten Sie arbeiten?',
+    choose: 'Wo möchtest du arbeiten?',
     hosted: 'Im Browser arbeiten',
     read: 'Kurse anschauen',
-    note: 'Codespaces nutzt Ihr GitHub-Kontingent. Zum Einreichen und für Fragen an Lena melden Sie sich an.',
+    note: 'Codespaces nutzt dein GitHub-Kontingent. Zum Einreichen und für Fragen an Lena melde dich an.',
   },
   en: {
     full: 'Hosted workspaces are full. Keep working:',
