@@ -112,6 +112,10 @@ RUN curl -fsSL \
 ARG EXTENSION_REPO_SHA=""
 LABEL computor.extension.revision="${EXTENSION_REPO_SHA}"
 
+# Brings the extension up to the instance's approved version in place, at
+# start and periodically (startup.sh.tftpl; README.md "Extension updates").
+COPY extension-sync.mjs /opt/computor/extension-sync.mjs
+
 COPY --from=vsix-builder --chown=coder:coder \
     /tmp/computor-extension.vsix /tmp/computor-extension.vsix
 

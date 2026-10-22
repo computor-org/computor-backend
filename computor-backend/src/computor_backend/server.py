@@ -299,6 +299,15 @@ async def startup_logic():
 
     # If Coder is enabled, wait for it and ensure admin user exists
     if os.environ.get("CODER_ENABLED", "false").lower() in ("true", "1"):
+        # Workspaces install the registry's newest extension version in place;
+        # this deploy's pin (coder/approved_extension.json) is what it approves.
+        # Best-effort: a failure keeps whatever the registry already holds.
+        from computor_backend.coder.approved_extension import ensure_approved_extension
+        try:
+            print(f"[STARTUP] {await ensure_approved_extension()}")
+        except Exception as e:
+            print(f"[STARTUP] Approved extension not registered (non-fatal): {e}")
+
         from computor_backend.coder.client import CoderClient
         from computor_backend.coder.config import get_coder_settings
 
