@@ -1,6 +1,6 @@
 # Terms of Use computor.at
 
-Version 1.1, effective 1 October 2026
+Version 1.2, effective 22 October 2026
 
 This is a translation. The German version (Nutzungsbedingungen) is
 authoritative.
@@ -78,11 +78,13 @@ certificate or a confirmation of competence. If a university course uses
 results for an assessment, the responsible teacher decides under the
 applicable regulations.
 
-3.6 Lena provides AI-generated learning help from the question and text you
-send and your visible assignment. It cannot execute code or grade your work.
-Check its answers; they can be incorrect. Requests and answers are handled
-temporarily as described in the Privacy notice, including bounded inference
-caches. Their contents are not logged or used to train models. Availability and
+3.6 Lena provides AI-generated learning help when you ask Lena. With the
+"Ask Lena" button, Lena uses your question, the text you send and your visible
+assignment. When you mention Lena in a message about an assignment, Lena also
+uses the message thread, your latest submission and its test results, and
+answers in the thread. Lena cannot execute code or grade your work. Check its
+answers, because they can be incorrect. Requests and answers are handled as
+described in the Privacy notice, including bounded inference caches. Their contents are not logged or used to train models. Availability and
 request limits depend on capacity. Public examples also work with desktop
 VS Code or optional GitHub Codespaces under GitHub's own terms.
 
