@@ -8,12 +8,28 @@ import {
   subscribeTheme,
   type ThemePreference,
 } from '@/src/utils/theme';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
-const OPTIONS: { value: ThemePreference; label: string; hint: string }[] = [
-  { value: 'system', label: 'System', hint: 'Follow your operating system' },
-  { value: 'light', label: 'Light', hint: 'Always light' },
-  { value: 'dark', label: 'Dark', hint: 'Always dark' },
-];
+type Option = { value: ThemePreference; label: string; hint: string };
+
+const COPY: Record<'de' | 'en', { legend: string; options: Option[] }> = {
+  de: {
+    legend: 'Darstellung',
+    options: [
+      { value: 'system', label: 'System', hint: 'Folgt deinem Betriebssystem' },
+      { value: 'light', label: 'Hell', hint: 'Immer hell' },
+      { value: 'dark', label: 'Dunkel', hint: 'Immer dunkel' },
+    ],
+  },
+  en: {
+    legend: 'Appearance',
+    options: [
+      { value: 'system', label: 'System', hint: 'Follow your operating system' },
+      { value: 'light', label: 'Light', hint: 'Always light' },
+      { value: 'dark', label: 'Dark', hint: 'Always dark' },
+    ],
+  },
+};
 
 /**
  * Appearance preference.
@@ -26,12 +42,13 @@ const OPTIONS: { value: ThemePreference; label: string; hint: string }[] = [
  * applies it before first paint — so this only has to show which option is on.
  */
 export default function ThemePicker() {
+  const t = COPY[useUiLanguage()];
   const preference = useSyncExternalStore(subscribeTheme, readTheme, getServerTheme);
 
   return (
     <fieldset className="flex flex-wrap gap-2">
-      <legend className="sr-only">Appearance</legend>
-      {OPTIONS.map((option) => {
+      <legend className="sr-only">{t.legend}</legend>
+      {t.options.map((option) => {
         const active = preference === option.value;
         return (
           <button

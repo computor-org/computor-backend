@@ -7,6 +7,7 @@ import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClie
 import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
 import { UserClient } from '@/src/generated/clients/UserClient';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useCascadeDelete } from '@/src/hooks/useCascadeDelete';
@@ -24,6 +25,7 @@ import Button, { ButtonLink } from '@/src/components/ui/Button';
 import Notice from '@/src/components/ui/Notice';
 import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import { displayName } from '@/src/utils/displayName';
+import { localizedRoleLabel } from '@/src/utils/courseRoles';
 import type { PersonalCloneCredentialGet } from 'types/generated';
 
 const coursesClient = new CoursesClient();
@@ -32,12 +34,156 @@ const organizationsClient = new OrganizationsClient();
 
 const userClient = new UserClient();
 
-/** What a repository mode means to the person who owns it, rather than the
-    word the binding stores. */
-const REPO_MODE_LABEL: Record<string, string> = {
-  managed: 'Hosted for you',
-  external: 'Your own repository',
-  download: 'Download only',
+const COPY = {
+  de: {
+    // What a repository mode means to the person who owns it, rather than the
+    // word the binding stores.
+    repoModeLabel: {
+      managed: 'Für dich gehostet',
+      external: 'Dein eigenes Repository',
+      download: 'Nur Download',
+    } as Record<string, string>,
+    // Role labels as usePermissions().courseRole returns them.
+    copied: 'Kopiert.',
+    copyFailed: 'Kopieren in die Zwischenablage nicht möglich',
+    copy: 'Kopieren',
+    courseArchived: 'Kurs archiviert.',
+    courseUnarchived: 'Kurs wiederhergestellt.',
+    updateFailed: 'Kurs konnte nicht aktualisiert werden',
+    gitChecked: 'Git-Zugriff geprüft. Dein Repository ist erreichbar.',
+    gitCheckFailed: 'Git-Zugriff konnte nicht geprüft werden',
+    notFound: 'Kurs nicht gefunden',
+    courses: 'Kurse',
+    untitled: 'Kurs ohne Titel',
+    untitledShort: 'Ohne Titel',
+    archived: 'Archiviert',
+    edit: 'Bearbeiten',
+    unarchive: 'Wiederherstellen',
+    archive: 'Archivieren',
+    delete: 'Löschen',
+    archivedNotice:
+      'Archiviert: Studierende sehen diesen Kurs nicht mehr und können nichts einreichen. Eigentümer können ihn wiederherstellen.',
+    about: 'Über diesen Kurs',
+    yourRole: 'Deine Rolle',
+    organization: 'Organisation',
+    courseFamily: 'Kursfamilie',
+    language: 'Sprache',
+    created: 'Erstellt',
+    lastUpdated: 'Zuletzt geändert',
+    workspaces: 'Arbeitsumgebungen',
+    yourRepository: 'Dein Repository',
+    ready: 'Bereit',
+    notSetUp: 'Noch nicht eingerichtet',
+    checking: 'Wird geprüft …',
+    checkAccess: 'Zugriff prüfen',
+    repoSetUp:
+      'Automatisch eingerichtet, als du diesen Kurs in VS Code geöffnet hast. Deine Arbeit wird von dort hochgeladen. Hier ist nichts zu tun.',
+    repository: 'Repository',
+    browse: 'Ansehen',
+    noRepoStaff:
+      'Für dich wurde noch kein Repository erstellt. Mitglieder erhalten es automatisch, wenn sie den Kurs zum ersten Mal in VS Code öffnen. „Zugriff prüfen“ erstellt deines jetzt und gewährt dir als Lehrperson erneut Zugriff auf die Vorlagen- und Referenz-Repositories.',
+    noRepoStudent:
+      'Hier ist nichts zu tun. Dein Repository wird für dich erstellt, sobald du diesen Kurs zum ersten Mal in VS Code öffnest, in einer Computor-Arbeitsumgebung oder mit der Computor-Erweiterung.',
+    outsideVscode: 'Außerhalb von VS Code arbeiten?',
+    outsideIntroBefore:
+      'Eine Computor-Arbeitsumgebung richtet Git für dich ein. Hier findest du die Angaben, um das Repository von Hand zu klonen. Mit ',
+    outsideIntroAfter: ' erstellst du es und zeigst die Zugangsdaten an.',
+    outsideStaff:
+      ' Als Lehrperson gewährt dieser Aufruf dir außerdem erneut Zugriff auf die Kursvorlage und die Referenz-Repositories.',
+    hosting: 'Hosting',
+    gitServer: 'Git-Server',
+    cloneHttps: 'Klonen (HTTPS)',
+    credentialTitle: 'Deine persönlichen Git-Zugangsdaten. Behandle sie wie ein Passwort.',
+    credentialBody:
+      'Sie sind unabhängig von den Zugangsdaten deiner Arbeitsumgebung und funktionieren immer weiter, egal was die Arbeitsumgebung tut. Wenn du den Zugriff erneut prüfst, werden dieselben angezeigt. Klonen in einem Schritt:',
+    username: 'Benutzername',
+    token: 'Token',
+    gitConfiguration: 'Git-Konfiguration',
+    delivery: 'Bereitstellung',
+    defaultBranch: 'Standard-Branch',
+    studentRepos: 'Repositories der Studierenden',
+    status: 'Status',
+    locked: 'Gesperrt',
+    editable: 'Bearbeitbar',
+    template: 'Vorlage',
+    noGitBinding: 'Für diesen Kurs ist keine Git-Anbindung konfiguriert.',
+    deleteTitle: (name: string) => `Kurs „${name}“ löschen?`,
+    deleteMessage:
+      'Dadurch werden der Kurs, seine Mitglieder, Aufgaben, Abgaben und Ergebnisse sowie seine Vorlagen- und Referenz-Repositories dauerhaft gelöscht. Das kann nicht rückgängig gemacht werden.',
+  },
+  en: {
+    repoModeLabel: {
+      managed: 'Hosted for you',
+      external: 'Your own repository',
+      download: 'Download only',
+    } as Record<string, string>,
+    copied: 'Copied.',
+    copyFailed: 'Could not copy to clipboard',
+    copy: 'Copy',
+    courseArchived: 'Course archived.',
+    courseUnarchived: 'Course unarchived.',
+    updateFailed: 'Could not update the course',
+    gitChecked: 'Git access checked — your repository is reachable.',
+    gitCheckFailed: 'Could not check git access',
+    notFound: 'Course not found',
+    courses: 'Courses',
+    untitled: 'Untitled Course',
+    untitledShort: 'Untitled',
+    archived: 'Archived',
+    edit: 'Edit',
+    unarchive: 'Unarchive',
+    archive: 'Archive',
+    delete: 'Delete',
+    archivedNotice:
+      'Archived: students no longer see this course and cannot submit. An owner can unarchive it.',
+    about: 'About',
+    yourRole: 'Your role',
+    organization: 'Organization',
+    courseFamily: 'Course family',
+    language: 'Language',
+    created: 'Created',
+    lastUpdated: 'Last updated',
+    workspaces: 'Workspaces',
+    yourRepository: 'Your repository',
+    ready: 'Ready',
+    notSetUp: 'Not set up yet',
+    checking: 'Checking…',
+    checkAccess: 'Check access',
+    repoSetUp:
+      'Set up automatically when you opened this course in VS Code. Your work is pushed from there — nothing here needs doing.',
+    repository: 'Repository',
+    browse: 'Browse',
+    noRepoStaff:
+      'No repository has been created for you yet. Members get one automatically the first time they open the course in VS Code; Check access creates yours now and re-grants your staff access to the template and reference repositories.',
+    noRepoStudent:
+      'Nothing to do here. Your repository is created for you the first time you open this course in VS Code — in a Computor workspace or with the Computor extension.',
+    outsideVscode: 'Working outside VS Code?',
+    outsideIntroBefore:
+      'A Computor workspace configures git for you. These are the details for cloning the repository by hand; use ',
+    outsideIntroAfter: ' to create it and reveal the credential.',
+    outsideStaff:
+      ' As staff, that call also re-grants your access to the course template and reference repositories.',
+    hosting: 'Hosting',
+    gitServer: 'Git server',
+    cloneHttps: 'Clone (HTTPS)',
+    credentialTitle: 'Your personal git credential — treat it like a password.',
+    credentialBody:
+      'It is independent of the credential your workspace manages, so it keeps working no matter what the workspace does; checking access again shows the same one. Clone in one step:',
+    username: 'Username',
+    token: 'Token',
+    gitConfiguration: 'Git configuration',
+    delivery: 'Delivery',
+    defaultBranch: 'Default branch',
+    studentRepos: 'Student repos',
+    status: 'Status',
+    locked: 'Locked',
+    editable: 'Editable',
+    template: 'Template',
+    noGitBinding: 'No git binding configured for this course.',
+    deleteTitle: (name: string) => `Delete course “${name}”?`,
+    deleteMessage:
+      'This permanently deletes the course, its members, assignments, submissions and results, and its template and reference repositories. It is irreversible.',
+  },
 };
 
 const PROVIDER_LABEL: Record<string, string> = {
@@ -47,6 +193,7 @@ const PROVIDER_LABEL: Record<string, string> = {
 
 /** A value nobody wants to select by hand — a clone URL, a token. */
 function CopyValue({ value }: { value: string }) {
+  const t = COPY[useUiLanguage()];
   const notify = useNotify();
   return (
     <span className="inline-flex items-start gap-2">
@@ -57,17 +204,19 @@ function CopyValue({ value }: { value: string }) {
         onClick={() =>
           navigator.clipboard
             ?.writeText(value)
-            .then(() => notify('Copied.', 'success'))
-            .catch(() => notify('Could not copy to clipboard', 'error'))
+            .then(() => notify(t.copied, 'success'))
+            .catch(() => notify(t.copyFailed, 'error'))
         }
       >
-        Copy
+        {t.copy}
       </Button>
     </span>
   );
 }
 
 export default function CoursePage() {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const courseId = useParams().id as string;
   const router = useRouter();
   const { refreshPermissions } = useAuth();
@@ -115,7 +264,8 @@ export default function CoursePage() {
 
   // The caller's own standing in this course, as a label ('Student',
   // 'Lecturer', …) or null when they hold no course role.
-  const myRole = courseRole(courseId);
+  const roleEnglish = courseRole(courseId);
+  const myRole = roleEnglish && (localizedRoleLabel(roleEnglish, language));
 
   const notify = useNotify();
   const [ensuring, setEnsuring] = useState(false);
@@ -131,10 +281,10 @@ export default function CoursePage() {
     try {
       if (archived) await coursesClient.routeCoursesCoursesIdArchivePatch({ id: courseId });
       else await coursesClient.unarchiveCoursesCoursesIdUnarchivePatch({ id: courseId });
-      notify(archived ? 'Course archived.' : 'Course unarchived.', 'success');
+      notify(archived ? t.courseArchived : t.courseUnarchived, 'success');
       await reload();
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Could not update the course', 'error');
+      notify(e instanceof Error ? e.message : t.updateFailed, 'error');
     } finally {
       setArchiving(false);
     }
@@ -172,10 +322,10 @@ export default function CoursePage() {
       // The credential is only reachable from inside the disclosure, so open it
       // rather than leaving the freshly-fetched token hidden behind a summary.
       if (cred?.clone_token) setCloneOpen(true);
-      notify('Git access checked — your repository is reachable.', 'success');
+      notify(t.gitChecked, 'success');
       await reload(); // refresh the persisted repository details below
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Could not check git access', 'error');
+      notify(e instanceof Error ? e.message : t.gitCheckFailed, 'error');
     } finally {
       setEnsuring(false);
     }
@@ -195,7 +345,7 @@ export default function CoursePage() {
     return (
       <AuthenticatedLayout>
         <div className="p-6">
-          <ErrorBanner>{error || 'Course not found'}</ErrorBanner>
+          <ErrorBanner>{error || t.notFound}</ErrorBanner>
         </div>
       </AuthenticatedLayout>
     );
@@ -205,30 +355,31 @@ export default function CoursePage() {
   // the flat Courses list when those aren't readable (e.g. for students).
   const crumbs: { label: string; href?: string }[] = [];
   if (organization)
-    crumbs.push({ label: displayName(organization), href: `/organizations/${organization.id}` });
+    crumbs.push({ label: displayName(organization, t.untitledShort), href: `/organizations/${organization.id}` });
   if (courseFamily)
-    crumbs.push({ label: displayName(courseFamily), href: `/course-families/${courseFamily.id}` });
-  if (crumbs.length === 0) crumbs.push({ label: 'Courses', href: '/courses' });
-  crumbs.push({ label: displayName(course, 'Untitled Course') });
+    crumbs.push({ label: displayName(courseFamily, t.untitledShort), href: `/course-families/${courseFamily.id}` });
+  if (crumbs.length === 0) crumbs.push({ label: t.courses, href: '/courses' });
+  crumbs.push({ label: displayName(course, t.untitled) });
 
   type Fact = { term: string; value: ReactNode; mono?: boolean };
   const facts = (items: (Fact | false | null | undefined | '')[]): Fact[] =>
     items.filter(Boolean) as Fact[];
 
   const isArchived = Boolean(course.archived_at);
+  const dateLocale = language === 'de' ? 'de-AT' : undefined;
 
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
           breadcrumbs={crumbs}
-          title={displayName(course, 'Untitled Course')}
-          subtitle={isArchived && <Badge tone="muted">Archived</Badge>}
+          title={displayName(course, t.untitled)}
+          subtitle={isArchived && <Badge tone="muted">{t.archived}</Badge>}
           actions={
             <>
               {canManage && (
                 <ButtonLink href={`/courses/${courseId}/edit`} variant="secondary">
-                  Edit
+                  {t.edit}
                 </ButtonLink>
               )}
               {canArchiveCourse(courseId) && (
@@ -236,14 +387,14 @@ export default function CoursePage() {
                   variant="secondary"
                   onClick={() => setArchived(!isArchived)}
                   loading={archiving}
-                  loadingLabel={isArchived ? 'Unarchive' : 'Archive'}
+                  loadingLabel={isArchived ? t.unarchive : t.archive}
                 >
-                  {isArchived ? 'Unarchive' : 'Archive'}
+                  {isArchived ? t.unarchive : t.archive}
                 </Button>
               )}
               {canDeleteCourse(courseId) && (
-                <Button variant="dangerGhost" onClick={del.begin} loading={del.opening} loadingLabel="Delete">
-                  Delete
+                <Button variant="dangerGhost" onClick={del.begin} loading={del.opening} loadingLabel={t.delete}>
+                  {t.delete}
                 </Button>
               )}
             </>
@@ -253,7 +404,7 @@ export default function CoursePage() {
         <ScrollArea>
         {isArchived && (
           <Notice tone="info">
-            Archived: students no longer see this course and cannot submit. An owner can unarchive it.
+            {t.archivedNotice}
           </Notice>
         )}
         {/* About — description + the few facts worth showing (no identifiers).
@@ -264,26 +415,26 @@ export default function CoursePage() {
             "Your role" leads because it is the only line here that is about the
             reader. The record timestamps are administrative trivia to everyone
             below the lecturer cohort, so a student is not shown them. */}
-        <SectionCard title="About">
+        <SectionCard title={t.about}>
           {course.description && <p className="text-body">{course.description}</p>}
           <DescriptionList
             items={facts([
-              myRole && { term: 'Your role', value: <Badge tone="info">{myRole}</Badge> },
-              organization && { term: 'Organization', value: displayName(organization) },
-              courseFamily && { term: 'Course family', value: displayName(courseFamily) },
+              myRole && { term: t.yourRole, value: <Badge tone="info">{myRole}</Badge> },
+              organization && { term: t.organization, value: displayName(organization, t.untitledShort) },
+              courseFamily && { term: t.courseFamily, value: displayName(courseFamily, t.untitledShort) },
               course.language_code && {
-                term: 'Language',
+                term: t.language,
                 value: <span className="uppercase">{course.language_code}</span>,
               },
               canManageMembers &&
                 course.created_at && {
-                  term: 'Created',
-                  value: new Date(course.created_at).toLocaleDateString(),
+                  term: t.created,
+                  value: new Date(course.created_at).toLocaleDateString(dateLocale),
                 },
               canManageMembers &&
                 course.updated_at && {
-                  term: 'Last updated',
-                  value: new Date(course.updated_at).toLocaleDateString(),
+                  term: t.lastUpdated,
+                  value: new Date(course.updated_at).toLocaleDateString(dateLocale),
                 },
             ])}
           />
@@ -297,7 +448,7 @@ export default function CoursePage() {
         {(isAdmin || myRole != null) && (
           <CourseWorkspaceLaunchButtons
             courseId={courseId}
-            title="Workspaces"
+            title={t.workspaces}
             className="bg-surface rounded-lg border border-rule p-6"
           />
         )}
@@ -311,16 +462,16 @@ export default function CoursePage() {
             loudest button on the page. */}
         {gitConfigured && (
           <SectionCard
-            title="Your repository"
+            title={t.yourRepository}
             action={
               <div className="flex items-center gap-2">
                 {myRepo ? (
-                  <Badge tone="success" pill>Ready</Badge>
+                  <Badge tone="success" pill>{t.ready}</Badge>
                 ) : (
-                  <Badge tone="muted" pill>Not set up yet</Badge>
+                  <Badge tone="muted" pill>{t.notSetUp}</Badge>
                 )}
-                <Button size="sm" variant="secondary" onClick={ensureGitAccess} loading={ensuring} loadingLabel="Checking…">
-                  Check access
+                <Button size="sm" variant="secondary" onClick={ensureGitAccess} loading={ensuring} loadingLabel={t.checking}>
+                  {t.checkAccess}
                 </Button>
               </div>
             }
@@ -328,14 +479,13 @@ export default function CoursePage() {
             {myRepo ? (
               <>
                 <p className="text-sm text-muted">
-                  Set up automatically when you opened this course in VS Code. Your work is
-                  pushed from there — nothing here needs doing.
+                  {t.repoSetUp}
                 </p>
                 <DescriptionList
                   items={facts([
-                    myRepo.repo_ref && { term: 'Repository', value: myRepo.repo_ref, mono: true },
+                    myRepo.repo_ref && { term: t.repository, value: myRepo.repo_ref, mono: true },
                     myRepo.web_url && {
-                      term: 'Browse',
+                      term: t.browse,
                       value: (
                         <a
                           href={myRepo.web_url}
@@ -356,14 +506,11 @@ export default function CoursePage() {
               // would not explain: it re-grants their access to the canonical
               // template and reference repositories.
               <p className="text-sm text-muted">
-                No repository has been created for you yet. Members get one automatically the
-                first time they open the course in VS Code; Check access creates yours now and
-                re-grants your staff access to the template and reference repositories.
+                {t.noRepoStaff}
               </p>
             ) : (
               <p className="text-sm text-muted">
-                Nothing to do here. Your repository is created for you the first time you open
-                this course in VS Code — in a Computor workspace or with the Computor extension.
+                {t.noRepoStudent}
               </p>
             )}
 
@@ -376,27 +523,25 @@ export default function CoursePage() {
               onToggle={(e) => setCloneOpen(e.currentTarget.open)}
             >
               <summary className="cursor-pointer text-sm text-body marker:text-muted">
-                Working outside VS Code?
+                {t.outsideVscode}
               </summary>
               <div className="mt-3 space-y-3">
                 <p className="text-sm text-muted">
-                  A Computor workspace configures git for you. These are the details for cloning
-                  the repository by hand; use <span className="font-medium">Check access</span> to
-                  create it and reveal the credential.
-                  {canManage
-                    ? ' As staff, that call also re-grants your access to the course template and reference repositories.'
-                    : ''}
+                  {t.outsideIntroBefore}
+                  <span className="font-medium">{t.checkAccess}</span>
+                  {t.outsideIntroAfter}
+                  {canManage ? t.outsideStaff : ''}
                 </p>
                 {myRepo && (
                   <DescriptionList
                     items={facts([
-                      { term: 'Hosting', value: REPO_MODE_LABEL[myRepo.mode] ?? myRepo.mode },
+                      { term: t.hosting, value: t.repoModeLabel[myRepo.mode] ?? myRepo.mode },
                       myRepo.provider_type && {
-                        term: 'Git server',
+                        term: t.gitServer,
                         value: PROVIDER_LABEL[myRepo.provider_type] ?? myRepo.provider_type,
                       },
                       myRepo.http_url && {
-                        term: 'Clone (HTTPS)',
+                        term: t.cloneHttps,
                         value: <CopyValue value={myRepo.http_url} />,
                       },
                     ])}
@@ -405,23 +550,21 @@ export default function CoursePage() {
                 {personalCred?.clone_token && (
                   <Notice tone="warning">
                     <p className="font-medium">
-                      Your personal git credential — treat it like a password.
+                      {t.credentialTitle}
                     </p>
                     <p className="mt-1">
-                      It is independent of the credential your workspace manages, so it keeps
-                      working no matter what the workspace does; checking access again shows the
-                      same one. Clone in one step:
+                      {t.credentialBody}
                     </p>
                     <div className="mt-2">
                       {personalCred.clone_command && <CopyValue value={personalCred.clone_command} />}
                     </div>
                     <dl className="mt-2 space-y-1">
                       <div className="flex gap-2">
-                        <dt className="w-20 shrink-0">Username</dt>
+                        <dt className="w-20 shrink-0">{t.username}</dt>
                         <dd><CopyValue value={personalCred.clone_username ?? ''} /></dd>
                       </div>
                       <div className="flex gap-2">
-                        <dt className="w-20 shrink-0">Token</dt>
+                        <dt className="w-20 shrink-0">{t.token}</dt>
                         <dd><CopyValue value={personalCred.clone_token} /></dd>
                       </div>
                     </dl>
@@ -435,33 +578,33 @@ export default function CoursePage() {
         {/* Git configuration — the course's binding. Its own card: it describes
             the course, not the reader, and only the lecturer cohort sees it. */}
         {canManageMembers && (
-          <SectionCard title="Git configuration">
+          <SectionCard title={t.gitConfiguration}>
             {gitBinding ? (
               <DescriptionList
                 items={facts([
-                  { term: 'Delivery', value: gitBinding.delivery },
+                  { term: t.delivery, value: gitBinding.delivery },
                   gitBinding.default_branch && {
-                    term: 'Default branch',
+                    term: t.defaultBranch,
                     value: gitBinding.default_branch,
                     mono: true,
                   },
                   gitBinding.student_repo_modes &&
                     gitBinding.student_repo_modes.length > 0 && {
-                      term: 'Student repos',
+                      term: t.studentRepos,
                       value: gitBinding.student_repo_modes.join(', '),
                     },
                   {
-                    term: 'Status',
+                    term: t.status,
                     value: gitBinding.locked ? (
                       <Badge tone="warning" title={gitBinding.lock_reason ?? undefined}>
-                        Locked
+                        {t.locked}
                       </Badge>
                     ) : (
-                      <Badge tone="success">Editable</Badge>
+                      <Badge tone="success">{t.editable}</Badge>
                     ),
                   },
                   (gitBinding.template_url || gitBinding.template_repo) && {
-                    term: 'Template',
+                    term: t.template,
                     value: gitBinding.template_url ? (
                       <a
                         href={gitBinding.template_url}
@@ -478,7 +621,7 @@ export default function CoursePage() {
                 ])}
               />
             ) : (
-              <p className="text-sm text-muted">No git binding configured for this course.</p>
+              <p className="text-sm text-muted">{t.noGitBinding}</p>
             )}
           </SectionCard>
         )}
@@ -488,8 +631,8 @@ export default function CoursePage() {
 
       {del.preview && (
         <ConfirmDeleteDialog
-          title={`Delete course “${displayName(course, 'Untitled Course')}”?`}
-          message="This permanently deletes the course, its members, assignments, submissions and results, and its template and reference repositories. It is irreversible."
+          title={t.deleteTitle(displayName(course, t.untitled))}
+          message={t.deleteMessage}
           confirmWord={course.path}
           preview={<CascadeDeletePreview result={del.preview} />}
           blockedReason={del.preview.blocked_reason}

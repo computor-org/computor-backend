@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { useParams } from 'next/navigation';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useResource } from '@/src/hooks/useResource';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
@@ -20,6 +21,46 @@ import TreeRow, { TreeRows } from '@/src/components/ui/TreeRow';
 import { formatUsageCompact } from '@/src/utils/limits';
 import type { CourseContentStudentList } from 'types/generated';
 
+const COPY = {
+  de: {
+    title: 'Aufgaben',
+    fetchFailed: 'Kursinhalte konnten nicht geladen werden',
+    subtitle: (units: number, assignments: number) =>
+      `${units} ${units === 1 ? 'Einheit' : 'Einheiten'} · ${assignments} ${assignments === 1 ? 'Aufgabe' : 'Aufgaben'}`,
+    emptyTitle: 'Noch keine Aufgaben',
+    emptyDescription: 'Aufgaben erscheinen hier, sobald deine Lehrenden sie veröffentlichen.',
+    collapseAll: 'Alle einklappen',
+    expandAll: 'Alle ausklappen',
+    items: (n: number) => (n === 1 ? '1 Element' : `${n} Elemente`),
+    submitted: 'Eingereicht',
+    notSubmitted: 'Nicht eingereicht',
+    usageTitle: 'Testläufe und Abgaben im Verhältnis zu deinem Kontingent',
+    testsSuffix: 'T',
+    submissionsSuffix: 'A',
+    latestResult: 'Letztes Testergebnis',
+    grade: 'Bewertung',
+    open: 'Öffnen',
+  },
+  en: {
+    title: 'Assignments',
+    fetchFailed: 'Failed to fetch course contents',
+    subtitle: (units: number, assignments: number) => `${units} units · ${assignments} assignments`,
+    emptyTitle: 'No assignments yet',
+    emptyDescription: 'Assignments will appear here once they are published by your instructor.',
+    collapseAll: 'Collapse all',
+    expandAll: 'Expand all',
+    items: (n: number) => `${n} ${n === 1 ? 'item' : 'items'}`,
+    submitted: 'Submitted',
+    notSubmitted: 'Not submitted',
+    usageTitle: 'Test runs and submissions used, against your budget',
+    testsSuffix: 'T',
+    submissionsSuffix: 'S',
+    latestResult: 'Latest test result',
+    grade: 'Grade',
+    open: 'Open',
+  },
+};
+
 /**
  * A student's view of the course content tree.
  *
@@ -34,11 +75,13 @@ import type { CourseContentStudentList } from 'types/generated';
  */
 export default function StudentCourseContentsPage() {
   const courseId = useParams().id as string;
-  const crumbs = useCourseCrumbs(courseId, 'Assignments');
+  const language = useUiLanguage();
+  const t = COPY[language];
+  const crumbs = useCourseCrumbs(courseId, t.title);
 
   const { data, loading, error } = useResource(async () => {
     const response = await apiFetch(`${API_BASE_URL}/students/course-contents?course_id=${courseId}`);
-    if (!response.ok) throw new Error('Failed to fetch course contents');
+    if (!response.ok) throw new Error(t.fetchFailed);
     return (await response.json()) as CourseContentStudentList[];
   }, [courseId]);
   const courseContents = useMemo(() => data ?? [], [data]);
@@ -56,8 +99,8 @@ export default function StudentCourseContentsPage() {
       <ListPageLayout>
         <PageHeader
           breadcrumbs={crumbs}
-          title="Assignments"
-          subtitle={loading ? undefined : `${units} units · ${assignments} assignments`}
+          title={t.title}
+          subtitle={loading ? undefined : t.subtitle(units, assignments)}
         />
 
         <ErrorBanner>{error}</ErrorBanner>
@@ -73,17 +116,17 @@ export default function StudentCourseContentsPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 }
-                title="No assignments yet"
-                description="Assignments will appear here once they are published by your instructor."
+                title={t.emptyTitle}
+                description={t.emptyDescription}
               />
             ) : (
               <>
                 <Toolbar>
                   <Button variant="ghost" size="sm" onClick={() => setAllExpanded(false)}>
-                    Collapse all
+                    {t.collapseAll}
                   </Button>
                   <Button variant="ghost" size="sm" onClick={() => setAllExpanded(true)}>
-                    Expand all
+                    {t.expandAll}
                   </Button>
                 </Toolbar>
 
@@ -104,7 +147,7 @@ export default function StudentCourseContentsPage() {
                       >
                         {!isAssignment && hasChildren && (
                           <Badge tone="muted" className="shrink-0">
-                            {childCount} {childCount === 1 ? 'item' : 'items'}
+                            {t.items(childCount)}
                           </Badge>
                         )}
 
@@ -114,34 +157,34 @@ export default function StudentCourseContentsPage() {
                                 the default state of most of a semester, and a
                                 grey chip on every row of 72 would say nothing. */}
                             {isGradingVerdict(item.status) && (
-                              <GradingStatusBadge status={item.status} className="shrink-0" />
+                              <GradingStatusBadge status={item.status} language={language} className="shrink-0" />
                             )}
 
                             {item.submitted ? (
                               <Badge tone="success" className="shrink-0">
-                                Submitted
+                                {t.submitted}
                               </Badge>
                             ) : (
                               <Badge tone="warning" className="shrink-0">
-                                Not submitted
+                                {t.notSubmitted}
                               </Badge>
                             )}
 
                             <Badge
                               tone="muted"
                               className="shrink-0 tabular-nums"
-                              title="Test runs and submissions used, against your budget"
+                              title={t.usageTitle}
                             >
-                              {formatUsageCompact(item.result_count, item.max_test_runs)}T /{' '}
-                              {formatUsageCompact(item.submission_count, item.max_submissions)}S
+                              {formatUsageCompact(item.result_count, item.max_test_runs)}{t.testsSuffix} /{' '}
+                              {formatUsageCompact(item.submission_count, item.max_submissions)}{t.submissionsSuffix}
                             </Badge>
 
                             {/* Two numbers, always in the same two slots: what
                                 the tests said, then what a human said. */}
-                            <span className="shrink-0 w-14 text-right" title="Latest test result">
+                            <span className="shrink-0 w-14 text-right" title={t.latestResult}>
                               <Score value={item.result ? (item.result.result ?? 0) : null} />
                             </span>
-                            <span className="shrink-0 w-14 text-right" title="Grade">
+                            <span className="shrink-0 w-14 text-right" title={t.grade}>
                               <Score value={item.submission_group?.grading ?? null} />
                             </span>
                           </>
@@ -154,7 +197,7 @@ export default function StudentCourseContentsPage() {
                             size="xs"
                             className="shrink-0"
                           >
-                            Open
+                            {t.open}
                           </ButtonLink>
                         )}
                       </TreeRow>

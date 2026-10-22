@@ -32,6 +32,19 @@ export const COURSE_ROLE_LABEL: Record<string, string> = {
   _owner: 'Owner',
 };
 
+const GERMAN_ROLE_LABEL: Record<string, string> = {
+  Student: 'Studierende',
+  Tutor: 'Tutor',
+  Lecturer: 'Lehrende',
+  Maintainer: 'Maintainer',
+  Owner: 'Eigentümer',
+};
+
+/** An English role label ('Student', 'Lecturer', …) in the interface language. */
+export function localizedRoleLabel(label: string, language: 'de' | 'en'): string {
+  return language === 'de' ? GERMAN_ROLE_LABEL[label] ?? label : label;
+}
+
 export function courseRoleLabel(roleId?: string | null): string {
   if (!roleId) return '—';
   return COURSE_ROLE_LABEL[roleId] ?? roleId.replace(/^_/, '');

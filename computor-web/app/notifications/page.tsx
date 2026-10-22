@@ -1,6 +1,7 @@
 'use client';
 
 import { useResource } from '@/src/hooks/useResource';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -11,9 +12,30 @@ import type { MessageList } from 'types/generated';
 
 const messagesClient = new MessagesClient();
 
-function authorName(m: MessageList): string {
+const COPY = {
+  de: {
+    title: 'Mitteilungen',
+    subtitle: 'Ankündigungen an alle Nutzenden dieser Computor-Instanz.',
+    loading: 'Wird geladen …',
+    empty: 'Keine Mitteilungen.',
+    new: 'neu',
+    system: 'System',
+    locale: 'de-AT' as string | undefined,
+  },
+  en: {
+    title: 'Notifications',
+    subtitle: 'Announcements broadcast to everyone on this Computor instance.',
+    loading: 'Loading…',
+    empty: 'No notifications.',
+    new: 'new',
+    system: 'System',
+    locale: undefined as string | undefined,
+  },
+};
+
+function authorName(m: MessageList, fallback: string): string {
   const n = [m.author?.given_name, m.author?.family_name].filter(Boolean).join(' ');
-  return n || 'System';
+  return n || fallback;
 }
 
 // `level` is a severity hint; map it to a left-accent color (default: info).
@@ -23,11 +45,12 @@ function levelAccent(level: number): string {
   return 'border-l-blue-400';
 }
 
-function fmtWhen(s?: string | null): string {
-  return s ? new Date(s).toLocaleString() : '';
+function fmtWhen(s: string | null | undefined, locale: string | undefined): string {
+  return s ? new Date(s).toLocaleString(locale) : '';
 }
 
 export default function NotificationsPage() {
+  const t = COPY[useUiLanguage()];
   const { data, loading, error } = useResource(async () => {
     const items = await messagesClient.listMessagesMessagesGet({ scope: 'global', limit: 100 });
     items.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
@@ -47,19 +70,19 @@ export default function NotificationsPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Notifications' }]}
-          title="Notifications"
-          subtitle="Announcements broadcast to everyone on this Computor instance."
+          breadcrumbs={[{ label: t.title }]}
+          title={t.title}
+          subtitle={t.subtitle}
         />
 
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <ListLoading>Loading…</ListLoading>
+          <ListLoading>{t.loading}</ListLoading>
         ) : messages.length === 0 ? (
           <ScrollArea>
             <div className="text-muted border border-dashed border-rule-strong rounded-lg p-8 text-center">
-              No notifications.
+              {t.empty}
             </div>
           </ScrollArea>
         ) : (
@@ -76,10 +99,10 @@ export default function NotificationsPage() {
                       {m.title && <div className="text-sm font-semibold text-fg">{m.title}</div>}
                       <div className="text-sm text-body whitespace-pre-wrap">{m.content}</div>
                     </div>
-                    {isNew && <Badge color="blue" className="shrink-0 mt-0.5">new</Badge>}
+                    {isNew && <Badge color="blue" className="shrink-0 mt-0.5">{t.new}</Badge>}
                   </div>
                   <div className="mt-2 text-xs text-subtle">
-                    {authorName(m)} · {fmtWhen(m.created_at)}
+                    {authorName(m, t.system)} · {fmtWhen(m.created_at, t.locale)}
                   </div>
                 </div>
               );

@@ -12,12 +12,70 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import Avatar, { rgbIntToHex } from '@/src/components/Avatar';
 import { Field } from '@/src/components/FormPanel';
 import { inputCls } from '@/src/components/ui/tokens';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type { UserGet } from 'types/generated';
 
 const usersClient = new UsersClient();
 const profilesClient = new ProfilesClient();
 
 const DEFAULT_AVATAR_HEX = '#2563eb';
+
+const COPY = {
+  de: {
+    loadFailed: 'Profil konnte nicht geladen werden',
+    saveFailed: 'Speichern fehlgeschlagen',
+    breadcrumb: 'Mein Profil',
+    title: 'Mein Profil',
+    subtitle: 'Deine Identität und dein öffentliches Profil in Computor.',
+    saved: 'Gespeichert',
+    saving: 'Wird gespeichert …',
+    save: 'Änderungen speichern',
+    loading: 'Wird geladen …',
+    joined: (date: string) => `beigetreten am ${date}`,
+    firstName: 'Vorname',
+    lastName: 'Nachname',
+    email: 'E-Mail',
+    emailHint: 'Die E-Mail-Adresse wird von deinem Login-Anbieter verwaltet. Ändere sie in den Einstellungen unter Konto und Sicherheit.',
+    nickname: 'Spitzname',
+    nicknameHint: 'Ein kurzer öffentlicher Name (Buchstaben, Ziffern, - und _).',
+    bio: 'Über mich',
+    website: 'Website',
+    language: 'Sprache',
+    languageHint: 'Automatisch bedeutet: Die Oberfläche folgt deinem Browser und jeder Kurs wird in seiner eigenen Sprache gelesen.',
+    languageAuto: 'Automatisch (Browser)',
+    avatarImage: 'Avatar-Bild-URL',
+    avatarImageHint: 'HTTPS-Bild, ersetzt die farbigen Initialen.',
+    avatarColor: 'Avatar-Farbe',
+    avatarColorHint: 'Für die Initialen, wenn kein Bild gesetzt ist.',
+  },
+  en: {
+    loadFailed: 'Failed to load profile',
+    saveFailed: 'Save failed',
+    breadcrumb: 'My Profile',
+    title: 'My profile',
+    subtitle: 'Your identity and public profile across Computor.',
+    saved: 'Saved',
+    saving: 'Saving…',
+    save: 'Save changes',
+    loading: 'Loading…',
+    joined: (date: string) => `joined ${date}`,
+    firstName: 'First name',
+    lastName: 'Last name',
+    email: 'Email',
+    emailHint: 'Email is managed by your login provider — change it under Account & Security in Settings.',
+    nickname: 'Nickname',
+    nicknameHint: 'A short public handle (letters, numbers, - and _).',
+    bio: 'Bio',
+    website: 'Website',
+    language: 'Language',
+    languageHint: 'Automatic means the interface follows your browser and each course is read in its own language.',
+    languageAuto: 'Automatic (browser)',
+    avatarImage: 'Avatar image URL',
+    avatarImageHint: 'HTTPS image; overrides the colored initials.',
+    avatarColor: 'Avatar color',
+    avatarColorHint: 'Used for the initials badge when no image is set.',
+  },
+};
 
 function roleLabel(role: string): string {
   return role.replace(/^_/, '').replace(/_/g, ' ');
@@ -26,7 +84,9 @@ function roleLabel(role: string): string {
 
 const userClient = new UserClient();
 export default function ProfilePage() {
-  const { user: authUser, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user: authUser, isAuthenticated, isLoading: authLoading, setProfileLanguage } = useAuth();
+  const language = useUiLanguage();
+  const t = COPY[language];
 
   const [user, setUser] = useState<UserGet | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,7 +125,7 @@ export default function ProfilePage() {
         const u = await userClient.getCurrentUserEndpointUserGet({});
         if (!cancelled) hydrate(u);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load profile');
+        if (!cancelled) setError(e instanceof Error ? e.message : t.loadFailed);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -73,6 +133,7 @@ export default function ProfilePage() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAuthenticated]);
 
   async function save() {
@@ -108,9 +169,10 @@ export default function ProfilePage() {
 
       // Re-read so the header + avatar reflect what was saved.
       hydrate(await userClient.getCurrentUserEndpointUserGet({}));
+      setProfileLanguage(languageCode.trim() || null);
       setSaved(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed');
+      setError(e instanceof Error ? e.message : t.saveFailed);
     } finally {
       setSaving(false);
     }
@@ -123,20 +185,20 @@ export default function ProfilePage() {
     <AuthenticatedLayout>
       <ListPageLayout width="narrow">
         <PageHeader
-          breadcrumbs={[{ label: 'My Profile' }]}
-          title="My profile"
-          subtitle="Your identity and public profile across Computor."
+          breadcrumbs={[{ label: t.breadcrumb }]}
+          title={t.title}
+          subtitle={t.subtitle}
           actions={
             user ? (
               <div className="flex items-center gap-3">
-                {saved && <span className="text-sm text-success-text">Saved</span>}
+                {saved && <span className="text-sm text-success-text">{t.saved}</span>}
                 <button
                   type="submit"
                   form="profile-form"
                   disabled={saving}
                   className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
                 >
-                  {saving ? 'Saving…' : 'Save changes'}
+                  {saving ? t.saving : t.save}
                 </button>
               </div>
             ) : undefined
@@ -148,7 +210,7 @@ export default function ProfilePage() {
         <ScrollArea>
           <div className="space-y-6">
         {loading ? (
-          <div className="text-muted">Loading…</div>
+          <div className="text-muted">{t.loading}</div>
         ) : !user ? null : (
           <>
             {/* Identity card */}
@@ -163,7 +225,7 @@ export default function ProfilePage() {
                   ))}
                   {user.created_at && (
                     <span className="px-2 py-0.5 text-xs rounded bg-sunken text-muted">
-                      joined {new Date(user.created_at).toLocaleDateString()}
+                      {t.joined(new Date(user.created_at).toLocaleDateString(language === 'de' ? 'de-AT' : undefined))}
                     </span>
                   )}
                 </div>
@@ -181,35 +243,42 @@ export default function ProfilePage() {
             >
               <div className="p-6 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="First name">
+                  <Field label={t.firstName}>
                     <input className={inputCls} value={givenName} onChange={(e) => setGivenName(e.target.value)} />
                   </Field>
-                  <Field label="Last name">
+                  <Field label={t.lastName}>
                     <input className={inputCls} value={familyName} onChange={(e) => setFamilyName(e.target.value)} />
                   </Field>
                 </div>
-                <Field label="Email" hint="Email is managed by your login provider — change it under Account & Security in Settings.">
+                <Field label={t.email} hint={t.emailHint}>
                   <input className={`${inputCls} bg-canvas text-muted`} value={user.email ?? ''} disabled />
                 </Field>
-                <Field label="Nickname" hint="A short public handle (letters, numbers, - and _).">
+                <Field label={t.nickname} hint={t.nicknameHint}>
                   <input className={inputCls} value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="jdoe" />
                 </Field>
-                <Field label="Bio">
+                <Field label={t.bio}>
                   <textarea className={inputCls} rows={3} value={bio} onChange={(e) => setBio(e.target.value)} />
                 </Field>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Website">
+                  <Field label={t.website}>
                     <input className={inputCls} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" />
                   </Field>
-                  <Field label="Language" hint="ISO 639-1 code, e.g. en, de. Leave empty to read each course in its own language.">
-                    <input className={inputCls} value={languageCode} onChange={(e) => setLanguageCode(e.target.value)} placeholder="course language" maxLength={2} />
+                  <Field label={t.language} hint={t.languageHint}>
+                    <select className={inputCls} value={languageCode} onChange={(e) => setLanguageCode(e.target.value)}>
+                      <option value="">{t.languageAuto}</option>
+                      <option value="de">Deutsch</option>
+                      <option value="en">English</option>
+                      {languageCode !== '' && languageCode !== 'de' && languageCode !== 'en' && (
+                        <option value={languageCode}>{languageCode}</option>
+                      )}
+                    </select>
                   </Field>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Avatar image URL" hint="HTTPS image; overrides the colored initials.">
+                  <Field label={t.avatarImage} hint={t.avatarImageHint}>
                     <input className={inputCls} value={avatarImage} onChange={(e) => setAvatarImage(e.target.value)} placeholder="https://…" />
                   </Field>
-                  <Field label="Avatar color" hint="Used for the initials badge when no image is set.">
+                  <Field label={t.avatarColor} hint={t.avatarColorHint}>
                     <input
                       type="color"
                       className="h-10 w-16 border border-rule-strong rounded cursor-pointer"

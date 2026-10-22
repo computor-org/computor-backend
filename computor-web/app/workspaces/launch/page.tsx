@@ -12,9 +12,49 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
 import { CoderClient } from '@/src/clients/CoderClient';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { AGENT_LIFECYCLE_GAVE_UP, type WorkspaceDetails, type WorkspaceLaunchContext } from '@/src/types/workspaces';
 
 const coderClient = new CoderClient();
+
+const COPY = {
+  de: {
+    courseNotSelected: 'Der Kurs konnte in deiner Arbeitsumgebung nicht ausgewählt werden. Versuch es noch einmal.',
+    courseNotSelectedShort: 'Der Kurs konnte in deiner Arbeitsumgebung nicht ausgewählt werden.',
+    startFailed: 'Die Arbeitsumgebung konnte nicht gestartet werden.',
+    startRequestFailed: 'Die Arbeitsumgebung konnte nicht gestartet werden.',
+    tooSlow: 'Das Starten dieser Arbeitsumgebung dauert länger als erwartet.',
+    notCreated: 'Die Arbeitsumgebung wurde nicht erstellt.',
+    missingTarget: 'Diesem Link fehlt die Arbeitsumgebung, die geöffnet werden soll.',
+    starting: 'Wird gestartet',
+    creatingYours: 'Deine Arbeitsumgebung wird erstellt',
+    couldNotOpen: 'Die Arbeitsumgebung konnte nicht geöffnet werden',
+    startingTitle: (name: string) => `${name} wird gestartet …`,
+    startingWorkspaceTitle: 'Arbeitsumgebung wird gestartet …',
+    startingYours: 'Deine Arbeitsumgebung wird gestartet',
+    retry: 'Erneut versuchen',
+    back: 'Zurück zu den Arbeitsumgebungen',
+    opensAutomatically: 'Dieser Tab öffnet sich automatisch, sobald die Arbeitsumgebung bereit ist.',
+  },
+  en: {
+    courseNotSelected: 'The course could not be selected in your workspace. Please retry.',
+    courseNotSelectedShort: 'The course could not be selected in your workspace.',
+    startFailed: 'The workspace failed to start.',
+    startRequestFailed: 'Failed to start the workspace.',
+    tooSlow: 'This workspace is taking longer than expected to start.',
+    notCreated: 'The workspace was not created.',
+    missingTarget: 'This link is missing the workspace to open.',
+    starting: 'Starting',
+    creatingYours: 'Creating your workspace',
+    couldNotOpen: 'Could not open the workspace',
+    startingTitle: (name: string) => `Starting ${name}…`,
+    startingWorkspaceTitle: 'Starting workspace…',
+    startingYours: 'Starting your workspace',
+    retry: 'Retry',
+    back: 'Back to workspaces',
+    opensAutomatically: 'This tab opens automatically when it is ready.',
+  },
+};
 
 const POLL_MS = 2000;
 /**
@@ -47,6 +87,15 @@ function LaunchWorkspace() {
   // opener replaces the URL (or closes the tab) once provisioning returns.
   const creating = Boolean(useSearchParam('creating'));
   const hasTarget = Boolean(owner && name);
+
+  const language = useUiLanguage();
+  const t = COPY[language];
+  // Callbacks below read the copy through a ref, so a language change neither
+  // restarts timers nor refetches the poll.
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
 
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -91,7 +140,7 @@ function LaunchWorkspace() {
     });
     const context = await contextRequest.current;
     if (context.course_id !== courseId) {
-      throw new Error('The course could not be selected in your workspace. Please retry.');
+      throw new Error(tRef.current.courseNotSelected);
     }
   }, [owner, name, courseId]);
 
@@ -109,7 +158,7 @@ function LaunchWorkspace() {
       // our start request can be told apart from a build that actually failed.
       if (categorizeStatus(polled.status) === 'failed') {
         if (startRequested.current && leftFailedBehind.current) {
-          failLaunch('The workspace failed to start.');
+          failLaunch(tRef.current.startFailed);
         }
       } else {
         leftFailedBehind.current = true;
@@ -130,7 +179,7 @@ function LaunchWorkspace() {
       // replace(), not href: Back should return to the app, not to this waiter.
       window.location.replace(url);
     } catch (err) {
-      failLaunch(err instanceof Error ? err.message : 'The course could not be selected in your workspace.');
+      failLaunch(err instanceof Error ? err.message : tRef.current.courseNotSelectedShort);
     }
   }, [handOffCourse, failLaunch]);
 
@@ -141,7 +190,7 @@ function LaunchWorkspace() {
     if (!hasTarget) return;
     const id = setTimeout(() => {
       if (!redirected.current) {
-        failLaunch('This workspace is taking longer than expected to start.');
+        failLaunch(tRef.current.tooSlow);
       }
     }, OVERALL_TIMEOUT_MS);
     return () => clearTimeout(id);
@@ -149,7 +198,7 @@ function LaunchWorkspace() {
 
   useEffect(() => {
     if (hasTarget || !creating) return;
-    const id = setTimeout(() => failLaunch('The workspace was not created.'), CREATING_TIMEOUT_MS);
+    const id = setTimeout(() => failLaunch(tRef.current.notCreated), CREATING_TIMEOUT_MS);
     return () => clearTimeout(id);
   }, [hasTarget, creating, failLaunch]);
 
@@ -198,7 +247,7 @@ function LaunchWorkspace() {
           return coderClient.startWorkspace({ username: owner, workspaceName: name });
         })
         .catch((err) =>
-          failLaunch(err instanceof Error ? err.message : 'Failed to start the workspace.'),
+          failLaunch(err instanceof Error ? err.message : tRef.current.startRequestFailed),
         );
     }
   }, [details, error, hasTarget, owner, name, openWorkspace, handOffCourse, failLaunch]);
@@ -207,32 +256,32 @@ function LaunchWorkspace() {
     ? (terminalError ?? error)
     : creating
       ? terminalError
-      : 'This link is missing the workspace to open.';
+      : t.missingTarget;
 
   // The stage in words — 'Starting', 'Preparing the editor'. Before the first
   // poll lands (and while `creating` has no workspace to poll at all) there is
   // no status to map, so say what we know is happening.
   const stage = details
-    ? workspaceStage(details.status, undefined, details.agent_lifecycle)
-    : { label: hasTarget ? 'Starting' : 'Creating your workspace' };
+    ? workspaceStage(details.status, undefined, details.agent_lifecycle, language)
+    : { label: hasTarget ? t.starting : t.creatingYours };
 
   useEffect(() => {
     document.title = errorMessage
-      ? 'Could not open the workspace'
+      ? t.couldNotOpen
       : name
-        ? `Starting ${name}…`
-        : 'Starting workspace…';
-  }, [errorMessage, name]);
+        ? t.startingTitle(name)
+        : t.startingWorkspaceTitle;
+  }, [errorMessage, name, t]);
 
   return errorMessage ? (
     <div className="max-w-md w-full text-center space-y-4">
-      <h1 className="text-xl font-semibold text-fg">Could not open the workspace</h1>
+      <h1 className="text-xl font-semibold text-fg">{t.couldNotOpen}</h1>
       <p className="text-muted">{errorMessage}</p>
-      <LearningOptions capacity />
+      <LearningOptions capacity language={language} />
       <div className="flex items-center justify-center gap-3 pt-2">
-        {hasTarget && <Button onClick={() => window.location.reload()}>Retry</Button>}
+        {hasTarget && <Button onClick={() => window.location.reload()}>{t.retry}</Button>}
         <Link href="/workspaces" className="text-sm text-accent-text hover:underline">
-          Back to workspaces
+          {t.back}
         </Link>
       </div>
     </div>
@@ -240,7 +289,7 @@ function LaunchWorkspace() {
     <div className="w-full max-w-sm space-y-5" aria-live="polite">
       <div className="space-y-1 text-center">
         <h1 className="text-lg font-semibold text-fg">
-          {hasTarget ? 'Starting your workspace' : 'Creating your workspace'}
+          {hasTarget ? t.startingYours : t.creatingYours}
         </h1>
         {name && <p className="text-sm text-muted">{name}</p>}
       </div>
@@ -257,7 +306,7 @@ function LaunchWorkspace() {
       </div>
 
       <p className="text-xs text-subtle text-center">
-        This tab opens automatically when it is ready.
+        {t.opensAutomatically}
       </p>
     </div>
   );

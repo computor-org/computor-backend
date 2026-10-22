@@ -5,6 +5,13 @@ import { ReactNode } from 'react';
 import Badge from '@/src/components/Badge';
 import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import { displayName } from '@/src/utils/displayName';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { localizedRoleLabel } from '@/src/utils/courseRoles';
+
+const COPY = {
+  de: { untitled: 'Kurs ohne Titel', view: 'Kurs ansehen' },
+  en: { untitled: 'Untitled Course', view: 'View Course' },
+};
 
 /**
  * One course tile, shared by the course list and the public catalog.
@@ -31,13 +38,15 @@ export default function CourseCard({
   badge?: ReactNode;
   footer?: ReactNode;
 }) {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const body = (
     <>
       <div className="flex flex-col items-start mb-4 gap-2 min-w-0">
         <h3 className="text-lg font-semibold text-fg line-clamp-2">
-          {displayName(course, 'Untitled Course')}
+          {displayName(course, t.untitled)}
         </h3>
-        {badge ?? (role && <Badge color="blue" className="shrink-0">{role}</Badge>)}
+        {badge ?? (role && <Badge color="blue" className="shrink-0">{localizedRoleLabel(role, language)}</Badge>)}
       </div>
 
       <div className="space-y-2 mb-4 flex-grow">
@@ -83,12 +92,13 @@ export default function CourseCard({
 
 /** The "View Course →" footer used by the course list. */
 export function ViewCourseLink({ courseId }: { courseId: string }) {
+  const t = COPY[useUiLanguage()];
   return (
     <Link
       href={`/courses/${courseId}`}
       className="text-sm text-accent-text hover:text-accent-text font-medium flex items-center"
     >
-      View Course
+      {t.view}
       <svg className="ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
       </svg>

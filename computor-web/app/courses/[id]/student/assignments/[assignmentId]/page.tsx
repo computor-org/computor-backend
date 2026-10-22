@@ -16,7 +16,8 @@ import Panel from '@/src/components/ui/Panel';
 import Score, { formatScore, scoreTone } from '@/src/components/ui/Score';
 import StatGrid, { StatCard } from '@/src/components/ui/StatGrid';
 import { ButtonLink } from '@/src/components/ui/Button';
-import TestResultTree from '@/src/components/student/TestResultTree';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import TestResultTree, { testResultLabel } from '@/src/components/student/TestResultTree';
 import type { TestRunResult } from '@/src/components/student/TestResultTree';
 import GradingPanel from '@/src/components/student/GradingPanel';
 import GradingStatusBadge from '@/src/components/student/gradingStatus';
@@ -43,6 +44,69 @@ const submissionsClient = new SubmissionsClient();
 const userClient = new UserClient();
 const coursesClient = new CoursesClient();
 
+const COPY = {
+  de: {
+    assignment: 'Aufgabe',
+    assignments: 'Aufgaben',
+    notFound: 'Aufgabe nicht gefunden',
+    submitted: 'Eingereicht',
+    notSubmitted: 'Nicht eingereicht',
+    unreadTitle: 'Ungelesenes Feedback zu dieser Aufgabe',
+    newCount: (n: number) => `${n} neu`,
+    invisible: 'Für Studierende unsichtbar',
+    invisibleTitle: 'Studierende können diese Aufgabe derzeit nicht sehen.',
+    grade: 'Bewertung',
+    latestTestResult: 'Letztes Testergebnis',
+    testRuns: 'Testläufe',
+    submissions: 'Abgaben',
+    grading: 'Bewertung',
+    description: 'Beschreibung',
+    noDescription: 'Keine Beschreibung.',
+    noTestRun: 'Noch kein Testlauf.',
+    noTestRunHint: 'Führe die Tests aus, um hier Ergebnisse zu sehen.',
+    summary: (passed: number, failed: number) => `${passed} bestanden · ${failed} nicht bestanden`,
+    skipped: (n: number) => ` · ${n} übersprungen`,
+    total: (n: number) => `${n} gesamt`,
+    history: 'Testlauf-Verlauf',
+    yourSubmission: 'Deine Abgabe',
+    openRepository: 'Repository öffnen',
+    repository: 'Repository',
+    groupSize: 'Gruppengröße',
+    teamMembers: 'Teammitglieder',
+    notStarted: 'Du hast diese Aufgabe noch nicht begonnen.',
+  },
+  en: {
+    assignment: 'Assignment',
+    assignments: 'Assignments',
+    notFound: 'Assignment not found',
+    submitted: 'Submitted',
+    notSubmitted: 'Not submitted',
+    unreadTitle: 'Unread feedback on this assignment',
+    newCount: (n: number) => `${n} new`,
+    invisible: 'Invisible to students',
+    invisibleTitle: 'Students cannot currently see this assignment.',
+    grade: 'Grade',
+    latestTestResult: 'Latest test result',
+    testRuns: 'Test runs',
+    submissions: 'Submissions',
+    grading: 'Grading',
+    description: 'Description',
+    noDescription: 'No description.',
+    noTestRun: 'No test run yet.',
+    noTestRunHint: 'Run the tests to see results here.',
+    summary: (passed: number, failed: number) => `${passed} passed · ${failed} failed`,
+    skipped: (n: number) => ` · ${n} skipped`,
+    total: (n: number) => `${n} total`,
+    history: 'Test run history',
+    yourSubmission: 'Your submission',
+    openRepository: 'Open repository',
+    repository: 'Repository',
+    groupSize: 'Group size',
+    teamMembers: 'Team members',
+    notStarted: 'You have not started this assignment yet.',
+  },
+};
+
 /** Profile language if the learner chose one, else the course's, else English. */
 async function contentLanguage(courseId: string): Promise<string> {
   const user = await userClient.getCurrentUserEndpointUserGet({}).catch(() => null);
@@ -60,6 +124,8 @@ async function contentLanguage(courseId: string): Promise<string> {
  * result is one section among several, as it is in the VS Code extension.
  */
 export default function AssignmentDetailPage() {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const params = useParams();
   const courseId = params.id as string;
   const assignmentId = params.assignmentId as string;
@@ -93,10 +159,10 @@ export default function AssignmentDetailPage() {
   const group = assignment?.submission_group ?? null;
   const readme = data?.readme ?? null;
   const readmeHeading = descriptionHeading(readme?.markdown);
-  const name = readmeHeading ? plainHeading(readmeHeading) : localizedUnitTitle(displayName(assignment, 'Assignment'), data?.language ?? 'en');
+  const name = readmeHeading ? plainHeading(readmeHeading) : localizedUnitTitle(displayName(assignment, t.assignment), data?.language ?? 'en');
   const crumbs = useCourseCrumbs(
     courseId,
-    { label: 'Assignments', href: `/courses/${courseId}/student/assignments` },
+    { label: t.assignments, href: `/courses/${courseId}/student/assignments` },
     name,
   );
 
@@ -119,22 +185,22 @@ export default function AssignmentDetailPage() {
         breadcrumbs={crumbs}
         title={name}
         loading={loading}
-        error={error || (!loading && !assignment ? 'Assignment not found' : null)}
+        error={error || (!loading && !assignment ? t.notFound : null)}
         subtitle={
           assignment && (
             <div className="flex flex-wrap items-center gap-2">
               <GradingStatusBadge status={assignment.status} />
               <Badge tone={assignment.submitted ? 'success' : 'warning'}>
-                {assignment.submitted ? 'Submitted' : 'Not submitted'}
+                {assignment.submitted ? t.submitted : t.notSubmitted}
               </Badge>
               {(assignment.unread_message_count ?? 0) > 0 && (
-                <Badge tone="info" title="Unread feedback on this assignment">
-                  {assignment.unread_message_count} new
+                <Badge tone="info" title={t.unreadTitle}>
+                  {t.newCount(assignment.unread_message_count ?? 0)}
                 </Badge>
               )}
               {assignment.visible_effective === false && (
-                <Badge tone="muted" title="Students cannot currently see this assignment.">
-                  Invisible to students
+                <Badge tone="muted" title={t.invisibleTitle}>
+                  {t.invisible}
                 </Badge>
               )}
             </div>
@@ -145,30 +211,30 @@ export default function AssignmentDetailPage() {
           <>
             <StatGrid columns={4}>
               <StatCard
-                label="Grade"
+                label={t.grade}
                 value={formatScore(group?.grading, 1)}
                 tone={scoreTone(group?.grading)}
               />
               <StatCard
-                label="Latest test result"
+                label={t.latestTestResult}
                 value={formatScore(testScore, 1)}
                 tone={scoreTone(testScore)}
               />
               <StatCard
-                label="Test runs"
+                label={t.testRuns}
                 value={formatUsage(assignment.result_count, assignment.max_test_runs)}
               />
               <StatCard
-                label="Submissions"
+                label={t.submissions}
                 value={formatUsage(assignment.submission_count, assignment.max_submissions)}
               />
             </StatGrid>
 
-            <SectionCard title="Grading">
+            <SectionCard title={t.grading}>
               <GradingPanel group={group} submitted={assignment.submitted} />
             </SectionCard>
 
-            <SectionCard title="Description">
+            <SectionCard title={t.description}>
               {description ? (
                 <div className="prose markdown max-w-none">
                   <ReactMarkdown
@@ -188,14 +254,14 @@ export default function AssignmentDetailPage() {
                   </ReactMarkdown>
                 </div>
               ) : (
-                <EmptyState compact title="No description." />
+                <EmptyState compact title={t.noDescription} />
               )}
             </SectionCard>
 
-            <PublicLunaPanel key={assignmentId} assignmentId={assignmentId} />
+            <PublicLunaPanel key={assignmentId} assignmentId={assignmentId} language={language} />
 
             <SectionCard
-              title="Latest test result"
+              title={t.latestTestResult}
               action={resultData && <Score value={testScore} decimals={1} />}
             >
               {resultData ? (
@@ -203,13 +269,13 @@ export default function AssignmentDetailPage() {
                   <Panel padding="compact" className="bg-canvas">
                     <div className="flex flex-wrap items-center gap-4 text-sm">
                       <Badge tone={resultData.result === 'PASSED' ? 'success' : 'error'}>
-                        {resultData.result ?? 'UNKNOWN'}
+                        {testResultLabel(resultData.result, language)}
                       </Badge>
                       <span className="text-muted">
-                        {resultData.summary.passed} passed · {resultData.summary.failed} failed
-                        {resultData.summary.skipped > 0 && ` · ${resultData.summary.skipped} skipped`}
+                        {t.summary(resultData.summary.passed, resultData.summary.failed)}
+                        {resultData.summary.skipped > 0 && t.skipped(resultData.summary.skipped)}
                         {' · '}
-                        {resultData.summary.total} total
+                        {t.total(resultData.summary.total)}
                       </span>
                     </div>
                   </Panel>
@@ -217,20 +283,20 @@ export default function AssignmentDetailPage() {
                   <TestResultTree tests={resultData.tests ?? []} />
                 </>
               ) : (
-                <EmptyState compact title="No test run yet." description="Run the tests to see results here." />
+                <EmptyState compact title={t.noTestRun} description={t.noTestRunHint} />
               )}
             </SectionCard>
 
-            <SectionCard title="Test run history">
+            <SectionCard title={t.history}>
               <TestRunHistory results={data?.results ?? []} artifacts={data?.artifacts ?? []} />
             </SectionCard>
 
             <SectionCard
-              title="Your submission"
+              title={t.yourSubmission}
               action={
                 repository?.web_url && (
                   <ButtonLink href={repository.web_url} variant="secondary" size="sm">
-                    Open repository
+                    {t.openRepository}
                   </ButtonLink>
                 )
               }
@@ -239,16 +305,16 @@ export default function AssignmentDetailPage() {
                 <>
                   <DescriptionList
                     items={[
-                      { term: 'Repository', value: repository?.full_path ?? '—', mono: true },
+                      { term: t.repository, value: repository?.full_path ?? '—', mono: true },
                       {
-                        term: 'Group size',
+                        term: t.groupSize,
                         value: `${group.current_group_size ?? members.length} / ${assignment.max_group_size || 1}`,
                       },
                     ]}
                   />
                   {members.length > 1 && (
                     <div className="space-y-1">
-                      <h3 className="text-sm font-semibold text-fg">Team members</h3>
+                      <h3 className="text-sm font-semibold text-fg">{t.teamMembers}</h3>
                       <ul className="text-sm text-body">
                         {members.map((m) => (
                           <li key={m.id}>{m.full_name || m.username}</li>
@@ -258,7 +324,7 @@ export default function AssignmentDetailPage() {
                   )}
                 </>
               ) : (
-                <EmptyState compact title="You have not started this assignment yet." />
+                <EmptyState compact title={t.notStarted} />
               )}
             </SectionCard>
           </>

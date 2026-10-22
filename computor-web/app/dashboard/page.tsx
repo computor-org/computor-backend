@@ -18,6 +18,7 @@ import NeedsAttention, {
 import InviteFriendCard from '@/src/components/dashboard/InviteFriendCard';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { useResource } from '@/src/hooks/useResource';
 import { displayName } from '@/src/utils/displayName';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
@@ -30,14 +31,57 @@ const studentsClient = new StudentsClient();
 const messagesClient = new MessagesClient();
 const coderClient = new CoderClient();
 
+const COPY = {
+  de: {
+    dashboard: 'Übersicht',
+    viewAll: 'Alle anzeigen',
+    untitledCourse: 'Kurs ohne Titel',
+    course: 'Kurs',
+    welcome: (name?: string) => `Willkommen zurück, ${name}`,
+    sentBack: (n: number) =>
+      n === 1 ? '1 Aufgabe wurde von Tutoren zurückgegeben.' : `${n} Aufgaben wurden von Tutoren zurückgegeben.`,
+    notEnrolled: 'Du bist noch in keinem Kurs.',
+    nothingWaiting: 'Im Moment wartet nichts auf dich.',
+    announcements: 'Ankündigungen',
+    new: 'Neu',
+    announcement: 'Ankündigung',
+    yourCourses: 'Deine Kurse',
+    noCourses: 'Noch keine Kurse',
+    noAccess: 'Du hast noch keinen Zugriff auf Kurse.',
+    browse: 'Katalog durchsuchen',
+    sentBackHeading: 'Zur Korrektur zurückgegeben',
+    workspaces: 'Deine Arbeitsumgebungen',
+  },
+  en: {
+    dashboard: 'Dashboard',
+    viewAll: 'View all',
+    untitledCourse: 'Untitled Course',
+    course: 'Course',
+    welcome: (name?: string) => `Welcome back, ${name}`,
+    sentBack: (n: number) => `${n} ${n === 1 ? 'assignment' : 'assignments'} sent back by a tutor.`,
+    notEnrolled: "You're not enrolled in any courses yet.",
+    nothingWaiting: 'Nothing is waiting on you right now.',
+    announcements: 'Announcements',
+    new: 'New',
+    announcement: 'Announcement',
+    yourCourses: 'Your courses',
+    noCourses: 'No courses yet',
+    noAccess: 'You do not have access to any courses yet.',
+    browse: 'Browse the catalog',
+    sentBackHeading: 'Sent back for correction',
+    workspaces: 'Your workspaces',
+  },
+};
+
 /** Section heading with an optional "see all" link. */
 function SectionHeading({ title, href, linkLabel }: { title: string; href?: string; linkLabel?: string }) {
+  const t = COPY[useUiLanguage()];
   return (
     <div className="flex items-baseline justify-between gap-3 mb-3">
       <h2 className="text-lg font-semibold text-fg">{title}</h2>
       {href && (
         <Link href={href} className="text-sm text-accent-text hover:underline shrink-0">
-          {linkLabel ?? 'View all'}
+          {linkLabel ?? t.viewAll}
         </Link>
       )}
     </div>
@@ -59,10 +103,10 @@ function SectionHeading({ title, href, linkLabel }: { title: string; href?: stri
 export default function DashboardPage() {
   const { user } = useAuth();
   const { courseRole } = usePermissions();
+  const t = COPY[useUiLanguage()];
 
   const { data, loading, error } = useResource(async () => {
     const courses = await coursesClient.listCoursesCoursesGet({});
-    const courseTitles = new Map(courses.map((c) => [c.id, displayName(c, 'Untitled Course')]));
 
     // Each of these is optional decoration on the page: a student with no
     // workspace access, or a deployment with messaging disabled, should still
@@ -107,14 +151,15 @@ export default function DashboardPage() {
 
     return {
       courses,
-      attention: selectNeedsAttention(contents, courseTitles),
+      contents,
       workspaces,
       announcements,
     };
   }, []);
 
   const courses = data?.courses ?? [];
-  const attention = data?.attention ?? [];
+  const courseTitles = new Map(courses.map((c) => [c.id, displayName(c, t.untitledCourse)]));
+  const attention = selectNeedsAttention(Array.isArray(data?.contents) ? data.contents : [], courseTitles, DEFAULT_REASONS, t.course);
   const workspaces = data?.workspaces ?? [];
   const announcements = data?.announcements ?? [];
   const runningWorkspaces = workspaces.filter(
@@ -125,16 +170,16 @@ export default function DashboardPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Dashboard' }]}
-          title={`Welcome back, ${user?.givenName || user?.username}`}
+          breadcrumbs={[{ label: t.dashboard }]}
+          title={t.welcome(user?.givenName || user?.username)}
           subtitle={
             loading
               ? undefined
               : attention.length > 0
-                ? `${attention.length} ${attention.length === 1 ? 'assignment' : 'assignments'} sent back by a tutor.`
+                ? t.sentBack(attention.length)
                 : courses.length === 0
-                  ? "You're not enrolled in any courses yet."
-                  : 'Nothing is waiting on you right now.'
+                  ? t.notEnrolled
+                  : t.nothingWaiting
           }
         />
 
@@ -146,7 +191,7 @@ export default function DashboardPage() {
           <ScrollArea>
             {announcements.length > 0 && (
               <section>
-                <SectionHeading title="Announcements" href="/notifications" />
+                <SectionHeading title={t.announcements} href="/notifications" />
                 <Panel padding="none">
                   <div className="divide-y divide-rule-soft">
                     {announcements.map((m) => (
@@ -156,11 +201,11 @@ export default function DashboardPage() {
                         className="flex items-start gap-3 px-4 py-3 hover:bg-canvas transition-colors"
                       >
                         <Badge tone="info" className="shrink-0 mt-0.5">
-                          New
+                          {t.new}
                         </Badge>
                         <div className="min-w-0">
                           <div className="text-sm font-medium text-fg truncate">
-                            {m.title || 'Announcement'}
+                            {m.title || t.announcement}
                           </div>
                           <div className="text-xs text-muted line-clamp-2">{m.content}</div>
                         </div>
@@ -172,12 +217,12 @@ export default function DashboardPage() {
             )}
 
             <section>
-              <SectionHeading title="Your courses" href="/courses" />
+              <SectionHeading title={t.yourCourses} href="/courses" />
               {courses.length === 0 ? (
                 <EmptyState
-                  title="No courses yet"
-                  description="You do not have access to any courses yet."
-                  action={<ButtonLink href="/courses/catalog">Browse the catalog</ButtonLink>}
+                  title={t.noCourses}
+                  description={t.noAccess}
+                  action={<ButtonLink href="/courses/catalog">{t.browse}</ButtonLink>}
                 />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -196,7 +241,7 @@ export default function DashboardPage() {
 
             {attention.length > 0 && (
               <section>
-                <SectionHeading title="Sent back for correction" />
+                <SectionHeading title={t.sentBackHeading} />
                 <NeedsAttention items={attention} />
               </section>
             )}
@@ -205,7 +250,7 @@ export default function DashboardPage() {
 
             {runningWorkspaces.length > 0 && (
               <section>
-                <SectionHeading title="Your workspaces" href="/workspaces" />
+                <SectionHeading title={t.workspaces} href="/workspaces" />
                 <Panel padding="none">
                   <div className="divide-y divide-rule-soft">
                     {runningWorkspaces.map((ws) => (

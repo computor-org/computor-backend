@@ -101,6 +101,10 @@ export function buildTemplateOptions(
   return options.sort(byLabel);
 }
 
+/** The German hover text for a type this server has not set up. */
+export const UNAVAILABLE_REASON_DE =
+  'Diese Art von Arbeitsumgebung ist auf diesem Server noch nicht eingerichtet. Wende dich an die Administration.';
+
 /**
  * A type a course allows that the templates listing does not offer.
  *
@@ -174,8 +178,9 @@ export function courseTemplateOption(
 }
 
 /** Short state word for a card's second line. */
-export function availabilityLabel(option: TemplateOption): string {
+export function availabilityLabel(option: TemplateOption, language: 'de' | 'en' = 'en'): string {
   if (option.availability === 'available') return '';
   if (option.stage) return option.stage.label;
+  if (language === 'de') return option.availability === 'failed' ? 'Nicht verfügbar' : 'Noch nicht eingerichtet';
   return option.availability === 'failed' ? 'Not available' : 'Not set up yet';
 }

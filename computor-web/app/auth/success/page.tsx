@@ -3,9 +3,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { ssoAuthService } from '@/src/services/authInstances';
 import { safeInternalPath } from '@/src/utils/safeRedirect';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+
+const COPY = {
+  de: {
+    failed: 'Die Anmeldung ist fehlgeschlagen',
+    completeFailed: 'Die Anmeldung konnte nicht abgeschlossen werden.',
+    retry: 'Erneut versuchen',
+    back: 'Zurück zur Anmeldung',
+    completing: 'Anmeldung wird abgeschlossen …',
+  },
+  en: {
+    failed: 'Sign-in failed',
+    completeFailed: 'Failed to complete sign-in.',
+    retry: 'Try again',
+    back: 'Back to login',
+    completing: 'Completing sign-in…',
+  },
+};
 
 export default function AuthSuccessPage() {
+  const t = COPY[useUiLanguage()];
+  // '' means no server-provided text: the page shows its own fallback for `errorKind`.
   const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<'failed' | 'completeFailed'>('completeFailed');
   const [refused, setRefused] = useState(false);
   // One-shot: auth_redirect is consumed on read, so a second run of this effect
   // (React StrictMode in dev) would find it gone and override the first run's
@@ -34,7 +55,8 @@ export default function AuthSuccessPage() {
         // user record, then full-reload so AuthContext re-initializes.
         const result = await ssoAuthService.handleSSOCallback();
         if (!result.success) {
-          throw new Error(result.error || 'Sign-in failed');
+          setErrorKind('failed');
+          throw new Error(result.error || '');
         }
         const stored = sessionStorage.getItem('auth_redirect');
         sessionStorage.removeItem('auth_redirect');
@@ -52,7 +74,7 @@ export default function AuthSuccessPage() {
         window.location.replace(redirect);
       } catch (err) {
         console.error('SSO success handler failed:', err);
-        setError(err instanceof Error ? err.message : 'Failed to complete sign-in.');
+        setError(err instanceof Error ? err.message : '');
       }
     })();
   }, []);
@@ -60,7 +82,7 @@ export default function AuthSuccessPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-canvas">
       <div className="text-center">
-        {error ? (
+        {error !== null ? (
           <>
             {/* A refusal is a paragraph, not a label: it names the limit, the
                 current number and what to do instead (install VS Code
@@ -73,16 +95,16 @@ export default function AuthSuccessPage() {
                   : 'text-danger-text font-medium mb-3'
               }
             >
-              {error}
+              {error || t[errorKind]}
             </p>
             <a href="/login" className="px-4 py-2 bg-inverse text-on-accent rounded hover:bg-inverse-hover inline-block">
-              {refused ? 'Try again' : 'Back to login'}
+              {refused ? t.retry : t.back}
             </a>
           </>
         ) : (
           <>
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto" />
-            <p className="mt-4 text-muted">Completing sign-in…</p>
+            <p className="mt-4 text-muted">{t.completing}</p>
           </>
         )}
       </div>

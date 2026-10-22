@@ -4,8 +4,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useSyncExternalStore } from 'react';
 import { WAITLIST_URL } from '@/src/utils/registration';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
-const MESSAGES: Record<string, { title: string; body: string }> = {
+const MESSAGES_EN: Record<string, { title: string; body: string }> = {
   full: {
     title: 'The pilot is full',
     body: 'All pilot places are taken, so no new account was created. Your invite link was not used up.',
@@ -28,6 +29,44 @@ const MESSAGES: Record<string, { title: string; body: string }> = {
   },
 };
 
+const MESSAGES_DE: Record<string, { title: string; body: string }> = {
+  full: {
+    title: 'Die Pilotphase ist voll',
+    body: 'Alle Plätze der Pilotphase sind vergeben, deshalb wurde kein neues Konto angelegt. Dein Einladungslink wurde nicht verbraucht.',
+  },
+  closed: {
+    title: 'Die Registrierung ist geschlossen',
+    body: 'Im Moment können keine neuen Konten angelegt werden.',
+  },
+  invite_required: {
+    title: 'Eine Einladung ist nötig',
+    body: 'Computor ist während der Pilotphase nur mit Einladung zugänglich. Öffne den Einladungslink, den dir jemand geschickt hat, und melde dich dort an.',
+  },
+  invite_invalid: {
+    title: 'Einladungslink ungültig',
+    body: 'Dieser Einladungslink ist ungültig, bereits verwendet oder abgelaufen, deshalb wurde kein Konto angelegt. Bitte die Person, die dich eingeladen hat, um einen neuen Link.',
+  },
+  email_unverified: {
+    title: 'Bestätige zuerst deine E-Mail-Adresse',
+    body: 'Klicke auf den Link in der Bestätigungs-E-Mail, die wir dir geschickt haben. Öffne danach deinen Einladungslink erneut, um dein Konto fertig anzulegen.',
+  },
+};
+
+const COPY = {
+  de: {
+    messages: MESSAGES_DE,
+    waitlist: 'Du möchtest zugelassen werden, sobald wieder Plätze frei sind? Setz dich auf die Warteliste, indem du eine Nachricht hinterlässt unter',
+    haveAccount: 'Du hast schon ein Konto?',
+    signIn: 'Anmelden',
+  },
+  en: {
+    messages: MESSAGES_EN,
+    waitlist: 'Want to be let in when places open up? Join the waitlist by leaving a note at',
+    haveAccount: 'Already have an account?',
+    signIn: 'Sign in',
+  },
+};
+
 const noSubscribe = () => () => {};
 
 /**
@@ -37,6 +76,7 @@ const noSubscribe = () => () => {};
  * session has been ended.
  */
 export default function JoinRefusedPage() {
+  const t = COPY[useUiLanguage()];
   // The query string, read on the client only (null while pre-rendering).
   const search = useSyncExternalStore(
     noSubscribe,
@@ -46,7 +86,7 @@ export default function JoinRefusedPage() {
   const params = search == null ? null : new URLSearchParams(search);
   const reason = params ? (params.get('reason') ?? params.get('state') ?? 'invite_invalid') : null;
 
-  const message = (reason && MESSAGES[reason]) || MESSAGES.invite_invalid;
+  const message = (reason && t.messages[reason]) || t.messages.invite_invalid;
   const waitlist = reason !== 'email_unverified';
 
   return (
@@ -62,7 +102,7 @@ export default function JoinRefusedPage() {
             <p className="text-sm text-muted mb-4">{message.body}</p>
             {waitlist && (
               <p className="text-sm text-muted">
-                Want to be let in when places open up? Join the waitlist by leaving a note at{' '}
+                {t.waitlist}{' '}
                 <a href={WAITLIST_URL} className="text-accent-text underline">
                   github.com/computor-org/feedback
                 </a>
@@ -70,9 +110,9 @@ export default function JoinRefusedPage() {
               </p>
             )}
             <p className="text-sm text-muted mt-4">
-              Already have an account?{' '}
+              {t.haveAccount}{' '}
               <Link href="/login" className="text-accent-text underline">
-                Sign in
+                {t.signIn}
               </Link>
               .
             </p>

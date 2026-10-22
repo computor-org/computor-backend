@@ -5,6 +5,40 @@ import type { CoderWorkspace } from '@/src/types/workspaces';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/src/components/ui/Table';
 import Button from '@/src/components/ui/Button';
 import WorkspaceStatusBadge, { categorizeStatus } from './WorkspaceStatusBadge';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+
+const COPY = {
+  de: {
+    open: 'Öffnen',
+    stop: 'Stoppen',
+    stopping: 'Wird gestoppt …',
+    start: 'Starten',
+    starting: 'Wird gestartet …',
+    retry: 'Erneut versuchen',
+    details: 'Details',
+    delete: 'Löschen',
+    name: 'Name',
+    template: 'Vorlage',
+    status: 'Status',
+    created: 'Erstellt',
+    actions: 'Aktionen',
+  },
+  en: {
+    open: 'Open',
+    stop: 'Stop',
+    stopping: 'Stopping…',
+    start: 'Start',
+    starting: 'Starting…',
+    retry: 'Retry',
+    details: 'Details',
+    delete: 'Delete',
+    name: 'Name',
+    template: 'Template',
+    status: 'Status',
+    created: 'Created',
+    actions: 'Actions',
+  },
+};
 
 interface WorkspaceTableProps {
   workspaces: CoderWorkspace[];
@@ -41,6 +75,8 @@ function WorkspaceRow({
   onViewDetails: (owner: string, name: string) => void;
   onLaunch?: (owner: string, name: string) => void;
 }) {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const [actionLoading, setActionLoading] = useState<'start' | 'stop' | null>(null);
   const owner = workspace.owner_name || '';
   const transition = workspace.latest_build_transition;
@@ -73,23 +109,23 @@ function WorkspaceRow({
         <WorkspaceStatusBadge status={workspace.latest_build_status} transition={transition} />
       </Td>
       <Td className="text-sm text-muted whitespace-nowrap">
-        {workspace.created_at ? new Date(workspace.created_at).toLocaleDateString() : '—'}
+        {workspace.created_at ? new Date(workspace.created_at).toLocaleDateString(language === 'de' ? 'de-AT' : undefined) : '—'}
       </Td>
       <Td>
         <div className="flex items-center justify-end gap-1.5">
           {category === 'running' && (
             <>
               <Button size="xs" onClick={() => onViewDetails(owner, workspace.name)}>
-                Open
+                {t.open}
               </Button>
               <Button
                 size="xs"
                 variant="secondary"
                 onClick={() => runAction('stop', onStop)}
                 loading={actionLoading === 'stop'}
-                loadingLabel="Stopping…"
+                loadingLabel={t.stopping}
               >
-                Stop
+                {t.stop}
               </Button>
             </>
           )}
@@ -98,24 +134,24 @@ function WorkspaceRow({
               // Calls straight out of the click: the handler opens a tab, and a
               // window.open() after an await gets eaten by popup blockers.
               <Button size="xs" onClick={() => onLaunch(owner, workspace.name)}>
-                {category === 'failed' ? 'Retry' : 'Start'}
+                {category === 'failed' ? t.retry : t.start}
               </Button>
             ) : (
               <Button
                 size="xs"
                 onClick={() => runAction('start', onStart)}
                 loading={actionLoading === 'start'}
-                loadingLabel="Starting…"
+                loadingLabel={t.starting}
               >
-                {category === 'failed' ? 'Retry' : 'Start'}
+                {category === 'failed' ? t.retry : t.start}
               </Button>
             ))}
           <Button size="xs" variant="ghost" onClick={() => onViewDetails(owner, workspace.name)}>
-            Details
+            {t.details}
           </Button>
           {onDelete && (
             <Button size="xs" variant="dangerGhost" onClick={() => onDelete(owner, workspace.name)}>
-              Delete
+              {t.delete}
             </Button>
           )}
         </div>
@@ -133,15 +169,16 @@ export default function WorkspaceTable({
   onViewDetails,
   onLaunch,
 }: WorkspaceTableProps) {
+  const t = COPY[useUiLanguage()];
   return (
     <Table>
       <Thead>
         <tr>
-          <Th>Name</Th>
-          <Th>Template</Th>
-          <Th>Status</Th>
-          <Th>Created</Th>
-          <Th className="text-right">Actions</Th>
+          <Th>{t.name}</Th>
+          <Th>{t.template}</Th>
+          <Th>{t.status}</Th>
+          <Th>{t.created}</Th>
+          <Th className="text-right">{t.actions}</Th>
         </tr>
       </Thead>
       <Tbody>

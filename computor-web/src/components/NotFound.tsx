@@ -1,4 +1,20 @@
+'use client';
+
 import Link from 'next/link';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+
+const COPY = {
+  de: {
+    title: '404 – Nicht gefunden',
+    message: 'Diese Seite gibt es nicht oder du hast keinen Zugriff darauf.',
+    back: 'Zur Übersicht',
+  },
+  en: {
+    title: '404 - Not Found',
+    message: 'The page you are looking for does not exist or you do not have permission to access it.',
+    back: 'Go to Dashboard',
+  },
+};
 
 interface NotFoundProps {
   title?: string;
@@ -9,12 +25,13 @@ interface NotFoundProps {
 }
 
 export default function NotFound({
-  title = '404 - Not Found',
-  message = 'The page you are looking for does not exist or you do not have permission to access it.',
+  title,
+  message,
   showBackButton = true,
   backLink = '/dashboard',
-  backText = 'Go to Dashboard',
+  backText,
 }: NotFoundProps) {
+  const t = COPY[useUiLanguage()];
   return (
     <div className="min-h-[60vh] flex items-center justify-center p-6">
       <div className="max-w-md w-full text-center space-y-6">
@@ -36,10 +53,10 @@ export default function NotFound({
         </div>
 
         {/* Title */}
-        <h1 className="text-4xl font-bold text-fg">{title}</h1>
+        <h1 className="text-4xl font-bold text-fg">{title ?? t.title}</h1>
 
         {/* Message */}
-        <p className="text-lg text-muted">{message}</p>
+        <p className="text-lg text-muted">{message ?? t.message}</p>
 
         {/* Back Button */}
         {showBackButton && (
@@ -61,7 +78,7 @@ export default function NotFound({
                   d="M10 19l-7-7m0 0l7-7m-7 7h18"
                 />
               </svg>
-              {backText}
+              {backText ?? t.back}
             </Link>
           </div>
         )}

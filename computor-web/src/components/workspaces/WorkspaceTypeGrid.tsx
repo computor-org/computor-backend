@@ -6,6 +6,34 @@ import { derivedWorkspaceName } from '@/src/utils/workspaceLaunch';
 import TemplateCard from './TemplateCard';
 import WorkspaceStatusBadge, { categorizeStatus } from './WorkspaceStatusBadge';
 import { isUsable, type TemplateOption } from './templateOptions';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+
+const COPY = {
+  de: {
+    none: 'Für dich sind noch keine Arten von Arbeitsumgebungen verfügbar.',
+    maintainerPre: 'Es wird nichts automatisch bereitgestellt. Wähle unter ',
+    maintainerLink: 'Administration → Vorlagen',
+    maintainerPost: ' aus, welche Arten diese Installation anbietet.',
+    contact: 'Falls sich das nicht von selbst löst, wende dich an deine Administration.',
+    create: 'Arbeitsumgebung erstellen',
+    open: 'Arbeitsumgebung öffnen',
+    startOpen: 'Starten und öffnen',
+    failed: 'Fehlgeschlagen, zum Ansehen öffnen',
+    openWhenReady: 'Öffnen, sobald bereit',
+  },
+  en: {
+    none: 'No workspace types are available to you yet.',
+    maintainerPre: 'Nothing is deployed automatically — pick which ones this deployment offers under ',
+    maintainerLink: 'Administration → Templates',
+    maintainerPost: '.',
+    contact: 'If this does not resolve itself, contact your administrator.',
+    create: 'Create workspace',
+    open: 'Open workspace',
+    startOpen: 'Start and open',
+    failed: 'Failed — open for details',
+    openWhenReady: 'Open when ready',
+  },
+};
 
 /**
  * The workspace types a user can have, as the place they create one.
@@ -38,23 +66,24 @@ export default function WorkspaceTypeGrid({
   onOpen: (workspace: CoderWorkspace) => void;
   isMaintainer: boolean;
 }) {
+  const t = COPY[useUiLanguage()];
   if (options.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-rule-strong bg-canvas p-4 text-sm text-muted">
-        <p>No workspace types are available to you yet.</p>
+        <p>{t.none}</p>
         {isMaintainer ? (
           <p className="mt-1">
-            Nothing is deployed automatically — pick which ones this deployment offers under{' '}
+            {t.maintainerPre}
             <Link
               href="/workspaces/admin?tab=templates"
               className="text-accent-text hover:underline"
             >
-              Administration → Templates
+              {t.maintainerLink}
             </Link>
-            .
+            {t.maintainerPost}
           </p>
         ) : (
-          <p className="mt-1">If this does not resolve itself, contact your administrator.</p>
+          <p className="mt-1">{t.contact}</p>
         )}
       </div>
     );
@@ -76,7 +105,7 @@ export default function WorkspaceTypeGrid({
             <TemplateCard
               key={option.name}
               option={option}
-              actionLabel="Create workspace"
+              actionLabel={t.create}
               busy={busyTemplate === option.name}
               onClick={() => onCreate(option.name)}
             />
@@ -95,10 +124,10 @@ export default function WorkspaceTypeGrid({
             // TEMPLATE being deployed — a different fact about a different
             // thing, which is why both can be on one card.)
             actionLabel={
-              category === 'running' ? 'Open workspace'
-              : category === 'stopped' ? 'Start and open'
-              : category === 'failed' ? 'Failed — open for details'
-              : 'Open when ready'
+              category === 'running' ? t.open
+              : category === 'stopped' ? t.startOpen
+              : category === 'failed' ? t.failed
+              : t.openWhenReady
             }
             trailing={
               <WorkspaceStatusBadge

@@ -2,6 +2,7 @@
 
 import Badge, { type BadgeColor } from '@/src/components/Badge';
 import type { WorkspaceBuildStatus } from '@/src/types/workspaces';
+import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
 
 type StatusCategory = 'running' | 'stopped' | 'pending' | 'failed' | 'unknown';
 
@@ -54,19 +55,53 @@ const categoryDots: Record<StatusCategory, string> = {
  * shows the lifecycle word a user recognises and keeps the raw value in the
  * tooltip for whoever is debugging.
  */
-const CATEGORY_LABEL: Record<StatusCategory, string> = {
-  running: 'running',
-  stopped: 'stopped',
-  pending: 'working',
-  failed: 'failed',
-  unknown: 'unknown',
+const COPY = {
+  de: {
+    buildStatus: 'Build-Status',
+    categories: {
+      running: 'läuft',
+      stopped: 'gestoppt',
+      pending: 'in Arbeit',
+      failed: 'fehlgeschlagen',
+      unknown: 'unbekannt',
+    } as Record<StatusCategory, string>,
+    inFlight: {
+      starting: 'startet',
+      stopping: 'stoppt',
+      pending: 'ausstehend',
+      canceling: 'wird abgebrochen',
+      deleting: 'wird gelöscht',
+    } as Record<string, string>,
+  },
+  en: {
+    buildStatus: 'Build status',
+    categories: {
+      running: 'running',
+      stopped: 'stopped',
+      pending: 'working',
+      failed: 'failed',
+      unknown: 'unknown',
+    } as Record<StatusCategory, string>,
+    inFlight: {
+      starting: 'starting',
+      stopping: 'stopping',
+      pending: 'pending',
+      canceling: 'canceling',
+      deleting: 'deleting',
+    } as Record<string, string>,
+  },
 };
 
-function statusLabel(status?: string | null, transition?: string | null): string {
+function statusLabel(
+  status: string | null | undefined,
+  transition: string | null | undefined,
+  language: UiLanguage,
+): string {
+  const t = COPY[language];
   const s = (status || '').toLowerCase();
   // In-flight statuses already read well; they are the transition itself.
-  if (['starting', 'stopping', 'pending', 'canceling', 'deleting'].includes(s)) return s;
-  return CATEGORY_LABEL[categorizeStatus(status, transition)];
+  if (s in t.inFlight) return t.inFlight[s];
+  return t.categories[categorizeStatus(status, transition)];
 }
 
 /** Live workspace status as a shared Badge pill with a state dot. */
@@ -78,12 +113,13 @@ export default function WorkspaceStatusBadge({
   /** The build's transition ('start' | 'stop' | 'delete') — pass it when known. */
   transition?: string | null;
 }) {
+  const language = useUiLanguage();
   const category = categorizeStatus(status, transition);
   return (
     <Badge color={categoryColor[category]} pill className="capitalize" >
       <span className={`h-1.5 w-1.5 rounded-full mr-1.5 ${categoryDots[category]}`} />
-      <span title={status ? `Build status: ${status}` : undefined}>
-        {statusLabel(status, transition)}
+      <span title={status ? `${COPY[language].buildStatus}: ${status}` : undefined}>
+        {statusLabel(status, transition, language)}
       </span>
     </Badge>
   );

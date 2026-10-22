@@ -22,6 +22,36 @@ import {
   workspaceLaunchUrl,
 } from '@/src/utils/workspaceLaunch';
 import type { CoderWorkspace } from '@/src/types/workspaces';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+
+const COPY = {
+  de: {
+    ownerUnavailable: 'Der Besitzer der vorhandenen Arbeitsumgebung ist nicht verfügbar. Versuch es noch einmal.',
+    notCreated: 'Die Arbeitsumgebung wurde nicht erstellt.',
+    launchFailed: 'Die Arbeitsumgebung konnte nicht gestartet werden',
+    launching: 'Wird gestartet …',
+    launch: 'Arbeitsumgebung starten',
+    yours: 'Deine Arbeitsumgebungen',
+    open: 'Öffnen',
+    retry: 'Erneut versuchen',
+    start: 'Starten',
+    stop: 'Stoppen',
+    stopping: 'Wird gestoppt …',
+  },
+  en: {
+    ownerUnavailable: 'The existing workspace owner is unavailable. Please retry.',
+    notCreated: 'The workspace was not created.',
+    launchFailed: 'Failed to launch workspace',
+    launching: 'Launching…',
+    launch: 'Launch workspace',
+    yours: 'Your workspaces',
+    open: 'Open',
+    retry: 'Retry',
+    start: 'Start',
+    stop: 'Stop',
+    stopping: 'Stopping…',
+  },
+};
 
 const coderClient = new CoderClient();
 const courseWorkspacesClient = new CourseWorkspacesClient();
@@ -64,6 +94,8 @@ export default function CourseWorkspaceLaunchButtons({
 }) {
   const router = useRouter();
   const notify = useNotify();
+  const language = useUiLanguage();
+  const t = COPY[language];
   const [launching, setLaunching] = useState<string | null>(null);
   const [stopping, setStopping] = useState<string | null>(null);
 
@@ -149,7 +181,7 @@ export default function CourseWorkspaceLaunchButtons({
       let launchUrl: string;
       if (existing) {
         if (!existing.owner_name) {
-          throw new Error('The existing workspace owner is unavailable. Please retry.');
+          throw new Error(t.ownerUnavailable);
         }
         // The launch page handles stopped/failed workspaces and sends the new
         // course context. Do not provision just to select a different course.
@@ -159,7 +191,7 @@ export default function CourseWorkspaceLaunchButtons({
           body: { template: templateName },
         });
         const workspaceName = result.workspace?.name;
-        if (!workspaceName) throw new Error('The workspace was not created.');
+        if (!workspaceName) throw new Error(t.notCreated);
         launchUrl = workspaceLaunchUrl(result.user.username, workspaceName, courseId);
       }
       if (tab) {
@@ -170,7 +202,7 @@ export default function CourseWorkspaceLaunchButtons({
     } catch (err) {
       setLaunchError(true);
       tab?.close();
-      notify(err instanceof Error ? err.message : 'Failed to launch workspace', 'error');
+      notify(err instanceof Error ? err.message : t.launchFailed, 'error');
     } finally {
       setLaunching(null);
     }
@@ -196,7 +228,7 @@ export default function CourseWorkspaceLaunchButtons({
   if (compact) {
     return (
       <div className={`mt-2 flex flex-wrap items-center gap-1.5 ${className ?? ''}`}>
-        {launchError && <LearningOptions capacity />}
+        {launchError && <LearningOptions capacity language={language} />}
         {courseOptions.map((option) => (
           <TemplateIconButton
             key={option.name}
@@ -212,14 +244,14 @@ export default function CourseWorkspaceLaunchButtons({
 
   return (
     <div className={`space-y-4 ${className ?? ''}`}>
-      {launchError && <LearningOptions capacity />}
+      {launchError && <LearningOptions capacity language={language} />}
       {title && <h2 className="text-lg font-semibold text-fg">{title}</h2>}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {courseOptions.map((option) => (
           <TemplateCard
             key={option.name}
             option={option}
-            actionLabel={launching === option.name ? 'Launching…' : 'Launch workspace'}
+            actionLabel={launching === option.name ? t.launching : t.launch}
             busy={launching === option.name}
             onClick={() => provisionAndLaunch(option.name)}
           />
@@ -228,7 +260,7 @@ export default function CourseWorkspaceLaunchButtons({
 
       {workspaces.length > 0 && (
         <div>
-          <h3 className="text-sm font-medium text-body mb-2">Your workspaces</h3>
+          <h3 className="text-sm font-medium text-body mb-2">{t.yours}</h3>
           <ul className="space-y-1.5">
             {workspaces.map((w) => {
               const category = categorizeStatus(w.latest_build_status, w.latest_build_transition);
@@ -254,7 +286,7 @@ export default function CourseWorkspaceLaunchButtons({
                       transition={w.latest_build_transition}
                     />
                     <Button size="xs" onClick={() => openExisting(w)}>
-                      {category === 'running' ? 'Open' : category === 'failed' ? 'Retry' : 'Start'}
+                      {category === 'running' ? t.open : category === 'failed' ? t.retry : t.start}
                     </Button>
                     {category === 'running' && (
                       <Button
@@ -262,9 +294,9 @@ export default function CourseWorkspaceLaunchButtons({
                         variant="secondary"
                         onClick={() => stopExisting(w)}
                         loading={stopping === w.id}
-                        loadingLabel="Stopping…"
+                        loadingLabel={t.stopping}
                       >
-                        Stop
+                        {t.stop}
                       </Button>
                     )}
                   </div>

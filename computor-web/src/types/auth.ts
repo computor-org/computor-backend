@@ -35,6 +35,8 @@ export interface AuthUser {
   role: 'admin' | 'lecturer' | 'student';
   /** Global role ids from the backend (e.g. _admin, _user_manager). */
   systemRoles: string[];
+  /** Profile language the user chose (ISO 639-1); empty means none chosen. */
+  language?: string | null;
 }
 
 /**

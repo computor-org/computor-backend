@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { useCourse } from '@/src/contexts/CourseContext';
 import type { Crumb } from '@/src/components/Breadcrumbs';
+import { useUiLanguage } from './useUiLanguage';
 
 /**
  * The breadcrumb trail for any page inside a course.
@@ -27,20 +28,21 @@ import type { Crumb } from '@/src/components/Breadcrumbs';
  */
 export function useCourseCrumbs(courseId: string, ...tail: (Crumb | string | null | undefined)[]): Crumb[] {
   const { course, courseName } = useCourse();
+  const de = useUiLanguage() === 'de';
   // Named so the dependency is the resolved string, not the object identity —
   // the course object is replaced on every reload even when the name is the same.
-  const name = course?.id === courseId ? courseName : 'Course';
+  const name = course?.id === courseId ? courseName : de ? 'Kurs' : 'Course';
 
   return useMemo(
     () => [
-      { label: 'Courses', href: '/courses' },
+      { label: de ? 'Kurse' : 'Courses', href: '/courses' },
       { label: name, href: `/courses/${courseId}` },
       ...tail
         .filter((c): c is Crumb | string => c != null)
         .map((c) => (typeof c === 'string' ? { label: c } : c)),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [courseId, name, JSON.stringify(tail)],
+    [courseId, name, de, JSON.stringify(tail)],
   );
 }
 

@@ -27,12 +27,64 @@ import {
   workspaceCreatingUrl,
   workspaceLaunchUrl,
 } from '@/src/utils/workspaceLaunch';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type { CoderHealthResponse, CoderWorkspace, WorkspaceDetails } from '@/src/types/workspaces';
 
 const coderClient = new CoderClient();
 
+const COPY = {
+  de: {
+    title: 'Arbeitsumgebungen',
+    subtitle: 'Deine Entwicklungsumgebungen, alle teilen sich dein Home-Verzeichnis',
+    refresh: 'Aktualisieren',
+    newWorkspace: 'Neue Arbeitsumgebung …',
+    checking: 'Coder wird geprüft …',
+    healthy: 'Coder läuft',
+    unreachable: 'Coder nicht erreichbar',
+    runningOfTotal: (running: number, total: number) => `${running} laufen / ${total} gesamt`,
+    stillWorking: (n: number) =>
+      n === 1 ? '1 Arbeitsumgebung ist noch in Arbeit' : `${n} Arbeitsumgebungen sind noch in Arbeit`,
+    createHeading: 'Arbeitsumgebung erstellen',
+    loading: 'Arbeitsumgebungen werden geladen …',
+    emptyTitle: 'Keine Arbeitsumgebungen',
+    emptyCreate: 'Wähle oben eine Art von Arbeitsumgebung aus, um deine erste zu erstellen.',
+    emptyNone: 'Für dich wurde noch keine Arbeitsumgebung bereitgestellt. Wende dich an die Administration.',
+    yours: 'Deine Arbeitsumgebungen',
+    deleteTitle: 'Arbeitsumgebung löschen',
+    delete: 'Löschen',
+    notCreated: 'Die Arbeitsumgebung wurde nicht erstellt.',
+    createdOpening: 'Arbeitsumgebung erstellt, sie öffnet sich in einem neuen Tab',
+    createFailed: 'Die Arbeitsumgebung konnte nicht erstellt werden',
+  },
+  en: {
+    title: 'Workspaces',
+    subtitle: 'Your development workspaces — all of them share your home directory',
+    refresh: 'Refresh',
+    newWorkspace: 'New workspace…',
+    checking: 'Checking Coder…',
+    healthy: 'Coder healthy',
+    unreachable: 'Coder unreachable',
+    runningOfTotal: (running: number, total: number) => `${running} running / ${total} total`,
+    stillWorking: (n: number) =>
+      n === 1 ? '1 workspace is still working' : `${n} workspaces are still working`,
+    createHeading: 'Create a workspace',
+    loading: 'Loading workspaces…',
+    emptyTitle: 'No workspaces',
+    emptyCreate: 'Pick a workspace type above to create your first one.',
+    emptyNone: 'No workspaces have been provisioned for you yet. Please contact your administrator.',
+    yours: 'Your workspaces',
+    deleteTitle: 'Delete Workspace',
+    delete: 'Delete',
+    notCreated: 'The workspace was not created.',
+    createdOpening: 'Workspace created — opening in a new tab',
+    createFailed: 'Failed to create workspace',
+  },
+};
+
 export default function WorkspacesPage() {
   const router = useRouter();
+  const language = useUiLanguage();
+  const t = COPY[language];
   const notify = useNotify();
   const [creationFailed, setCreationFailed] = useState(false);
   const { isWorkspaceMaintainer } = usePermissions();
@@ -91,6 +143,8 @@ export default function WorkspacesPage() {
         workspaces.find(
           (w) => w.name === deleteTarget.name && (w.owner_name || '') === deleteTarget.owner,
         ),
+        'self',
+        language,
       )
     : '';
 
@@ -124,12 +178,12 @@ export default function WorkspacesPage() {
     try {
       const result = await coderClient.provisionWorkspace({ body: { template: templateName } });
       const workspaceName = result.workspace?.name;
-      if (!workspaceName) throw new Error('The workspace was not created.');
+      if (!workspaceName) throw new Error(t.notCreated);
 
       const launchUrl = workspaceLaunchUrl(result.user.username, workspaceName);
       if (tab) {
         tab.location.replace(launchUrl);
-        notify('Workspace created — opening in a new tab', 'success');
+        notify(t.createdOpening, 'success');
       } else {
         router.push(launchUrl);
       }
@@ -137,7 +191,7 @@ export default function WorkspacesPage() {
     } catch (err) {
       setCreationFailed(true);
       tab?.close();
-      notify(err instanceof Error ? err.message : 'Failed to create workspace', 'error');
+      notify(err instanceof Error ? err.message : t.createFailed, 'error');
     } finally {
       setCreating(null);
     }
@@ -149,9 +203,9 @@ export default function WorkspacesPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Workspaces' }]}
-          title="Workspaces"
-          subtitle="Your development workspaces — all of them share your home directory"
+          breadcrumbs={[{ label: t.title }]}
+          title={t.title}
+          subtitle={t.subtitle}
           actions={
             <div className="flex items-center gap-2">
               <Button
@@ -162,13 +216,13 @@ export default function WorkspacesPage() {
                 }}
                 disabled={loading}
               >
-                Refresh
+                {t.refresh}
               </Button>
               {/* Maintainers only: everyone else gets exactly one workspace per
                   type, so a name field would be a field with one legal value. */}
               {isWorkspaceMaintainer && creatable.length > 0 && (
                 <Button variant="secondary" onClick={() => setCustomFormOpen((open) => !open)}>
-                  New workspace…
+                  {t.newWorkspace}
                 </Button>
               )}
             </div>
@@ -176,7 +230,7 @@ export default function WorkspacesPage() {
         />
 
         <ErrorBanner>{error}</ErrorBanner>
-        {creationFailed && <LearningOptions capacity />}
+        {creationFailed && <LearningOptions capacity language={language} />}
 
         {/* Compact status strip */}
         <div className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
@@ -187,18 +241,18 @@ export default function WorkspacesPage() {
               }`}
             />
             {health === null
-              ? 'Checking Coder…'
+              ? t.checking
               : health.healthy
-                ? 'Coder healthy'
-                : 'Coder unreachable'}
+                ? t.healthy
+                : t.unreachable}
           </span>
           <span className="text-faint">·</span>
-          <span>{loading ? '—' : `${runningCount} running / ${workspaces.length} total`}</span>
+          <span>{loading ? '—' : t.runningOfTotal(runningCount, workspaces.length)}</span>
           {busyCount > 0 && (
             <>
               <span className="text-faint">·</span>
               <span className="text-accent-text">
-                {busyCount} {busyCount === 1 ? 'workspace is' : 'workspaces are'} still working
+                {t.stillWorking(busyCount)}
               </span>
             </>
           )}
@@ -206,7 +260,7 @@ export default function WorkspacesPage() {
 
         {!templatesError && (
           <div className="shrink-0 space-y-3">
-            <h2 className="text-sm font-semibold text-fg">Create a workspace</h2>
+            <h2 className="text-sm font-semibold text-fg">{t.createHeading}</h2>
             {customFormOpen && (
               <NewWorkspaceForm
                 options={creatable}
@@ -226,7 +280,7 @@ export default function WorkspacesPage() {
         )}
 
         {loading ? (
-          <ListLoading>Loading workspaces…</ListLoading>
+          <ListLoading>{t.loading}</ListLoading>
         ) : !error && workspaces.length === 0 ? (
           <EmptyState
             icon={
@@ -234,16 +288,16 @@ export default function WorkspacesPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             }
-            title="No workspaces"
+            title={t.emptyTitle}
             description={
               creatable.length > 0
-                ? 'Pick a workspace type above to create your first one.'
-                : 'No workspaces have been provisioned for you yet. Please contact your administrator.'
+                ? t.emptyCreate
+                : t.emptyNone
             }
           />
         ) : !error ? (
           <>
-            <h2 className="shrink-0 text-sm font-semibold text-fg">Your workspaces</h2>
+            <h2 className="shrink-0 text-sm font-semibold text-fg">{t.yours}</h2>
             <ScrollPanel>
               <WorkspaceTable
                 workspaces={workspaces}
@@ -267,9 +321,9 @@ export default function WorkspacesPage() {
         {/* Delete Confirmation */}
         <ConfirmDialog
           open={deleteTarget !== null}
-          title="Delete Workspace"
+          title={t.deleteTitle}
           message={deleteMessage}
-          confirmLabel="Delete"
+          confirmLabel={t.delete}
           variant="danger"
           onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)}

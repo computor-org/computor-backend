@@ -8,7 +8,9 @@ import {
   isUsable,
   templateLabel,
   type TemplateOption,
+  UNAVAILABLE_REASON_DE,
 } from './templateOptions';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 /**
  * One workspace type, as something to click.
@@ -41,9 +43,11 @@ export default function TemplateCard({
   trailing?: ReactNode;
   className?: string;
 }) {
+  const language = useUiLanguage();
   const usable = isUsable(option);
   const label = templateLabel(option);
   const stage = option.stage;
+  const reason = language === 'de' && option.availability === 'unavailable' ? UNAVAILABLE_REASON_DE : option.reason;
 
   return (
     <button
@@ -52,8 +56,8 @@ export default function TemplateCard({
       onClick={onClick}
       // The reason is the hover explanation on a disabled card; on a usable one
       // there is nothing to explain that the card does not already say.
-      title={option.reason ?? undefined}
-      aria-label={usable ? undefined : `${label} — ${availabilityLabel(option)}`}
+      title={reason ?? undefined}
+      aria-label={usable ? undefined : `${label} — ${availabilityLabel(option, language)}`}
       className={`flex w-full items-center gap-3 rounded-lg border p-3 pr-4 text-left transition-colors ${
         usable
           ? 'border-rule bg-surface hover:border-accent-line hover:bg-accent-wash focus-visible:ring-2 focus-visible:ring-accent-line'
@@ -68,7 +72,7 @@ export default function TemplateCard({
             stage?.tone === 'red' ? 'text-danger-text' : 'text-muted'
           }`}
         >
-          {usable ? actionLabel : availabilityLabel(option)}
+          {usable ? actionLabel : availabilityLabel(option, language)}
         </span>
         {/*
           Only while the deployment is still going: a settled stage is a full
@@ -86,7 +90,7 @@ export default function TemplateCard({
         )}
         {usable && stage && (
           <span className="mt-1 block truncate text-xs text-subtle">
-            Updating · {stage.label}
+            {language === 'de' ? 'Wird aktualisiert' : 'Updating'} · {stage.label}
           </span>
         )}
       </span>
@@ -113,16 +117,18 @@ export function TemplateIconButton({
   /** Another type on the same row is launching. */
   dimmed?: boolean;
 }) {
+  const de = useUiLanguage() === 'de';
   const usable = isUsable(option);
   const label = templateLabel(option);
-  const state = availabilityLabel(option);
+  const state = availabilityLabel(option, de ? 'de' : 'en');
+  const launch = de ? `${label} starten` : `Launch ${label}`;
 
   return (
     <button
       type="button"
       disabled={!usable || busy}
-      title={usable ? `Launch ${label}` : `${label} — ${state}`}
-      aria-label={usable ? `Launch ${label} workspace` : `${label} — ${state}`}
+      title={usable ? launch : `${label} — ${state}`}
+      aria-label={usable ? (de ? `Arbeitsumgebung ${label} starten` : `Launch ${label} workspace`) : `${label} — ${state}`}
       onClick={(event) => {
         // The course card wraps this row in a link; keep the click local.
         event.stopPropagation();

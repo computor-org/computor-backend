@@ -4,6 +4,18 @@ import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { safeInternalPath } from '@/src/utils/safeRedirect';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+
+const COPY = {
+  de: {
+    redirecting: 'Weiterleitung zur Anmeldung …',
+    manual: 'Hier klicken, falls du nicht automatisch weitergeleitet wirst',
+  },
+  en: {
+    redirecting: 'Redirecting to sign-in…',
+    manual: 'Click here if you are not redirected automatically',
+  },
+};
 
 /**
  * Optional `?next=/path` target (e.g. the landing page's catalog CTA), reduced
@@ -20,6 +32,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { loginWithSSO, isAuthenticated, isLoading } = useAuth();
   const triggered = useRef(false);
+  const t = COPY[useUiLanguage()];
 
   useEffect(() => {
     if (isLoading) return;
@@ -39,12 +52,12 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-canvas">
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto" />
-        <p className="mt-4 text-muted">Redirecting to sign-in…</p>
+        <p className="mt-4 text-muted">{t.redirecting}</p>
         <button
           onClick={() => loginWithSSO('keycloak', nextPath())}
           className="mt-4 text-sm text-accent-text hover:underline"
         >
-          Click here if you are not redirected automatically
+          {t.manual}
         </button>
       </div>
     </div>

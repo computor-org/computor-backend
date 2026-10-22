@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Badge from '@/src/components/Badge';
 import Panel from '@/src/components/ui/Panel';
 import { GRADING_STATUS } from '@/src/components/student/gradingStatus';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { displayName } from '@/src/utils/displayName';
 import type { CourseContentStudentList } from 'types/generated';
 
@@ -22,6 +23,31 @@ import type { CourseContentStudentList } from 'types/generated';
  * un-started work are not represented here at all — that is the point.
  */
 export type AttentionReason = 'correction_necessary' | 'improvement_possible';
+
+const COPY = {
+  de: {
+    untitled: 'Ohne Titel',
+    course: 'Kurs',
+    unread: 'Ungelesenes Feedback zu dieser Aufgabe',
+    newCount: (n: number) => `${n} neu`,
+    more: (n: number) => `und ${n} weitere`,
+    reasons: {
+      correction_necessary: 'Korrektur nötig',
+      improvement_possible: 'Verbesserung möglich',
+    } satisfies Record<AttentionReason, string>,
+  },
+  en: {
+    untitled: 'Untitled',
+    course: 'Course',
+    unread: 'Unread feedback on this assignment',
+    newCount: (n: number) => `${n} new`,
+    more: (n: number) => `and ${n} more`,
+    reasons: {
+      correction_necessary: GRADING_STATUS.correction_necessary.label,
+      improvement_possible: GRADING_STATUS.improvement_possible.label,
+    } satisfies Record<AttentionReason, string>,
+  },
+};
 
 /** Worst first. Label and tone come from the shared grading-status vocabulary. */
 const RANK: Record<AttentionReason, number> = {
@@ -57,6 +83,7 @@ export function selectNeedsAttention(
   contents: CourseContentStudentList[],
   courseTitles: Map<string, string>,
   reasons: AttentionReason[] = DEFAULT_REASONS,
+  fallbackTitle: string = COPY.en.course,
 ): AttentionItem[] {
   const wanted = new Set<AttentionReason>(reasons);
   const items: AttentionItem[] = [];
@@ -72,7 +99,7 @@ export function selectNeedsAttention(
     items.push({
       content,
       reason: status,
-      courseTitle: courseTitles.get(content.course_id) ?? 'Course',
+      courseTitle: courseTitles.get(content.course_id) ?? fallbackTitle,
     });
   }
 
@@ -85,6 +112,7 @@ export function selectNeedsAttention(
 }
 
 export default function NeedsAttention({ items, limit = 8 }: { items: AttentionItem[]; limit?: number }) {
+  const t = COPY[useUiLanguage()];
   const shown = items.slice(0, limit);
 
   return (
@@ -102,23 +130,23 @@ export default function NeedsAttention({ items, limit = 8 }: { items: AttentionI
               aria-hidden="true"
             />
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-fg truncate">{displayName(content)}</div>
+              <div className="text-sm font-medium text-fg truncate">{displayName(content, t.untitled)}</div>
               <div className="text-xs text-muted truncate">{courseTitle}</div>
             </div>
             {content.unread_message_count ? (
-              <Badge tone="info" className="shrink-0" title="Unread feedback on this assignment">
-                {content.unread_message_count} new
+              <Badge tone="info" className="shrink-0" title={t.unread}>
+                {t.newCount(content.unread_message_count)}
               </Badge>
             ) : null}
             <Badge tone={GRADING_STATUS[reason].tone} className="shrink-0">
-              {GRADING_STATUS[reason].label}
+              {t.reasons[reason]}
             </Badge>
           </Link>
         ))}
       </div>
       {items.length > shown.length && (
         <p className="px-4 py-2.5 text-xs text-muted border-t border-rule-soft">
-          and {items.length - shown.length} more
+          {t.more(items.length - shown.length)}
         </p>
       )}
     </Panel>

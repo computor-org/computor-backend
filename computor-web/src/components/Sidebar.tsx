@@ -9,6 +9,7 @@ import { usePermissions } from '@/src/hooks/usePermissions';
 import { useCourseViews } from '@/src/hooks/useCourseViews';
 import { useSupportCapabilities } from '@/src/hooks/useSupportCapabilities';
 import { icons } from './icons';
+import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
 
 // Baked at build time by computor.sh (docker/web/Dockerfile GIT_COMMIT arg);
 // unset in `next dev`, where the generic fallback is shown instead.
@@ -28,7 +29,76 @@ import {
   pathMatches,
 } from '@/src/config/navigation';
 
+const COPY = {
+  de: {
+    back: 'Zurück zu den Kursen',
+    overview: 'Kursübersicht',
+    collapse: 'Seitenleiste einklappen',
+    expand: 'Seitenleiste ausklappen',
+    sectionCollapse: (label: string) => `Bereich ${label} einklappen`,
+    sectionExpand: (label: string) => `Bereich ${label} ausklappen`,
+    version: 'Laufende Version (Git-Commit)',
+  },
+  en: {
+    back: 'Back to Courses',
+    overview: 'Overview',
+    collapse: 'Collapse sidebar',
+    expand: 'Expand sidebar',
+    sectionCollapse: (label: string) => `Collapse ${label} section`,
+    sectionExpand: (label: string) => `Expand ${label} section`,
+    version: 'Running version (git commit)',
+  },
+};
+
+/** German navigation labels by item id; the config holds the English ones. */
+const NAV_DE: Record<string, string> = {
+  dashboard: 'Übersicht',
+  courses: 'Kurse',
+  'courses-mine': 'Meine Kurse',
+  'courses-catalog': 'Katalog',
+  workspaces: 'Arbeitsumgebungen',
+  'ws-list': 'Arbeitsumgebungen',
+  'ws-admin': 'Verwaltung',
+  management: 'Organisationen',
+  'mgmt-orgs': 'Organisationen',
+  'mgmt-families': 'Kursfamilien',
+  'mgmt-examples': 'Beispiele',
+  'mgmt-example-repos': 'Beispiel-Repositories',
+  'mgmt-gitservers': 'Git-Server',
+  services: 'Dienste',
+  support: 'Support',
+  system: 'System',
+  'sys-status': 'Status',
+  'sys-maintenance': 'Wartung',
+  'sys-limits': 'Instanzlimits',
+  'sys-updates': 'Updates',
+  'sys-consent': 'Datenschutzhinweise',
+  'user-management': 'Benutzer',
+  'um-users': 'Benutzer',
+  'um-invites': 'Einladungslinks',
+  'um-roles': 'Rollen und Claims',
+  'student-view': 'Studierende',
+  'student-assignments': 'Aufgaben',
+  'tutor-view': 'Tutor',
+  'tutor-submissions': 'Abgaben',
+  'tutor-grading': 'Bewertung',
+  'lecturer-view': 'Lehrende',
+  'lecturer-assignments': 'Aufgaben',
+  'lecturer-templates': 'Vorlagen',
+  'lecturer-grading': 'Bewertung',
+  'lecturer-typical-errors': 'Typische Fehler',
+  'lecturer-members': 'Kursmitglieder',
+  'lecturer-groups': 'Kursgruppen',
+  'lecturer-workspaces': 'Arbeitsumgebungen',
+};
+
+function navLabel(item: { id: string; label: string }, language: UiLanguage): string {
+  return language === 'de' ? NAV_DE[item.id] ?? item.label : item.label;
+}
+
 export default function Sidebar() {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const pathname = usePathname();
   const { user } = useAuth();
   const { isAdmin, isOrganizationManager, isUserManager, isWorkspaceUser, isWorkspaceMaintainer, isExampleManager, isServiceManager, showManagement } = usePermissions();
@@ -93,20 +163,20 @@ export default function Sidebar() {
                   ? 'bg-accent-wash/50 text-accent-text'
                   : 'text-body hover:bg-sunken'
               }`}
-              title={collapsed ? navItem.label : undefined}
+              title={collapsed ? navLabel(navItem, language) : undefined}
             >
               <span className={isExactActive || isChildActive ? 'text-accent-text' : 'text-muted'}>
                 {icons[navItem.icon]}
               </span>
               {!collapsed && (
-                <span className="text-sm font-medium">{navItem.label}</span>
+                <span className="text-sm font-medium">{navLabel(navItem, language)}</span>
               )}
             </Link>
 
             {!collapsed && hasSubItems && !sectionActive && (
               <button
                 onClick={() => toggleView(navItem.id)}
-                aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${navItem.label} section`}
+                aria-label={isExpanded ? t.sectionCollapse(navLabel(navItem, language)) : t.sectionExpand(navLabel(navItem, language))}
                 aria-expanded={isExpanded}
                 className="p-2 hover:bg-sunken rounded transition-colors"
               >
@@ -132,7 +202,7 @@ export default function Sidebar() {
                         : 'text-muted hover:bg-sunken'
                     }`}
                   >
-                    {subItem.label}
+                    {navLabel(subItem, language)}
                   </Link>
                 );
               })}
@@ -158,7 +228,7 @@ export default function Sidebar() {
     );
 
     return (
-      <SidebarShell collapsed={collapsed} setCollapsed={setCollapsed} user={user}>
+      <SidebarShell collapsed={collapsed} setCollapsed={setCollapsed} user={user} t={t}>
         {/* Back to Courses Link */}
         <Link
           href="/courses"
@@ -167,7 +237,7 @@ export default function Sidebar() {
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          {!collapsed && <span className="text-sm">Back to Courses</span>}
+          {!collapsed && <span className="text-sm">{t.back}</span>}
         </Link>
 
         {/* Course overview (this course's landing page) — always reachable,
@@ -180,12 +250,12 @@ export default function Sidebar() {
               ? 'bg-accent-wash text-accent-text'
               : 'text-body hover:bg-sunken'
           }`}
-          title={collapsed ? 'Overview' : undefined}
+          title={collapsed ? t.overview : undefined}
         >
           <span className={pathname === `/courses/${currentCourseId}` ? 'text-accent-text' : 'text-muted'}>
             {icons.overview}
           </span>
-          {!collapsed && <span className="text-sm font-medium">Overview</span>}
+          {!collapsed && <span className="text-sm font-medium">{t.overview}</span>}
         </Link>
 
         {renderNavItems(availableViews)}
@@ -195,7 +265,7 @@ export default function Sidebar() {
 
   // Default navigation
   return (
-    <SidebarShell collapsed={collapsed} setCollapsed={setCollapsed} user={user}>
+    <SidebarShell collapsed={collapsed} setCollapsed={setCollapsed} user={user} t={t}>
       {renderNavItems(coursesNavigation)}
       {(showManagement || isExampleManager) &&
         renderNavItems(
@@ -233,11 +303,13 @@ function SidebarShell({
   collapsed,
   setCollapsed,
   user,
+  t,
   children,
 }: {
   collapsed: boolean;
   setCollapsed: (collapsed: boolean) => void;
   user: { givenName?: string; familyName?: string } | null | undefined;
+  t: (typeof COPY)[UiLanguage];
   children: React.ReactNode;
 }) {
   return (
@@ -258,8 +330,8 @@ function SidebarShell({
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="p-1 rounded-lg hover:bg-sunken transition-colors"
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? t.expand : t.collapse}
+          aria-label={collapsed ? t.expand : t.collapse}
         >
           <svg
             className={`h-5 w-5 text-muted transition-transform ${collapsed ? 'rotate-180' : ''}`}
@@ -282,7 +354,7 @@ function SidebarShell({
               <Image src="/computor_logo.png" alt="Computor" width={24} height={24} className="h-6 w-6" />
               <span className="text-sm font-semibold text-body">Computor</span>
             </div>
-            <p className="text-xs text-muted text-center" title="Running version (git commit)">{APP_VERSION}</p>
+            <p className="text-xs text-muted text-center" title={t.version}>{APP_VERSION}</p>
           </div>
         ) : (
           <div className="flex justify-center">

@@ -6,6 +6,7 @@ import ListPageLayout, { ScrollArea } from './ListPageLayout';
 import PageHeader from './PageHeader';
 import ErrorBanner from './ErrorBanner';
 import Button from './ui/Button';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 export function Field({
   label,
@@ -56,7 +57,7 @@ export default function FormPanel({
   onSubmit,
   onCancel,
   submitting,
-  submitLabel = 'Save',
+  submitLabel,
   disabled,
   children,
 }: {
@@ -72,6 +73,7 @@ export default function FormPanel({
   children: ReactNode;
 }) {
   const formId = useId();
+  const de = useUiLanguage() === 'de';
   return (
     // Narrow: the form used to be capped at max-w-2xl on its own, which left
     // the header's Cancel/Save floating far to its right on a wide monitor.
@@ -84,16 +86,16 @@ export default function FormPanel({
         actions={
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={onCancel}>
-              Cancel
+              {de ? 'Abbrechen' : 'Cancel'}
             </Button>
             <Button
               type="submit"
               form={formId}
               disabled={disabled}
               loading={submitting}
-              loadingLabel="Saving…"
+              loadingLabel={de ? 'Wird gespeichert …' : 'Saving…'}
             >
-              {submitLabel}
+              {submitLabel ?? (de ? 'Speichern' : 'Save')}
             </Button>
           </div>
         }

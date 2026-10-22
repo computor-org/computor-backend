@@ -1,16 +1,18 @@
-import { LEGAL_LINKS } from '@/src/config/legal';
+import { LEGAL_LINKS, englishLegalLink } from '@/src/config/legal';
 
 /**
  * The compact "Impressum · Datenschutz · …" line for the current legal profile.
  * Renders nothing when the profile has no links (NEXT_PUBLIC_LEGAL_PROFILE=none).
  * Plain anchors, no hooks: usable from server and client components alike.
  */
-export default function LegalLinks({ className = '' }: { className?: string }) {
+export default function LegalLinks({ className = '', language = 'de' }: { className?: string; language?: 'de' | 'en' }) {
   if (LEGAL_LINKS.length === 0) return null;
   return (
     <nav aria-label="Rechtliches / Legal" className={className}>
       <ul className="flex flex-wrap items-center justify-center gap-x-1 gap-y-1">
-        {LEGAL_LINKS.map((link, i) => (
+        {LEGAL_LINKS.map((german, i) => {
+          const link = language === 'en' ? englishLegalLink(german) : german;
+          return (
           <li key={link.href} className="flex items-center gap-x-1">
             {i > 0 ? <span aria-hidden="true" className="text-faint">·</span> : null}
             <a
@@ -21,7 +23,8 @@ export default function LegalLinks({ className = '' }: { className?: string }) {
               {link.label}
             </a>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </nav>
   );

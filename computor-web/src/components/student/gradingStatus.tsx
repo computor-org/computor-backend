@@ -2,6 +2,7 @@
 
 import Badge from '@/src/components/Badge';
 import type { Tone } from '@/src/components/ui/tones';
+import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
 
 /**
  * The grading-status vocabulary, in one place.
@@ -35,13 +36,32 @@ export const GRADING_STATUS: Record<
   not_reviewed: { label: 'Not reviewed', tone: 'muted', dot: 'bg-faint' },
 };
 
+/** Display labels per language. `GRADING_STATUS[x].label` stays the English wording. */
+const GRADING_LABEL: Record<UiLanguage, Record<GradingStatusSlug, string>> = {
+  de: {
+    corrected: 'Korrigiert',
+    correction_necessary: 'Korrektur nötig',
+    improvement_possible: 'Verbesserung möglich',
+    not_reviewed: 'Nicht geprüft',
+  },
+  en: {
+    corrected: GRADING_STATUS.corrected.label,
+    correction_necessary: GRADING_STATUS.correction_necessary.label,
+    improvement_possible: GRADING_STATUS.improvement_possible.label,
+    not_reviewed: GRADING_STATUS.not_reviewed.label,
+  },
+};
+
 export function isGradingStatus(status: string | null | undefined): status is GradingStatusSlug {
   return status != null && status in GRADING_STATUS;
 }
 
 /** `-` for an unknown or absent status, matching how the tables read today. */
-export function gradingStatusLabel(status: string | null | undefined): string {
-  return isGradingStatus(status) ? GRADING_STATUS[status].label : '-';
+export function gradingStatusLabel(
+  status: string | null | undefined,
+  language: UiLanguage = 'en',
+): string {
+  return isGradingStatus(status) ? GRADING_LABEL[language][status] : '-';
 }
 
 export function gradingStatusTone(status: string | null | undefined): Tone {
@@ -64,14 +84,18 @@ export function isGradingVerdict(status: string | null | undefined): status is G
 export default function GradingStatusBadge({
   status,
   className = '',
+  language,
 }: {
   status: string | null | undefined;
   className?: string;
+  /** Defaults to the signed-in interface language. */
+  language?: UiLanguage;
 }) {
+  const uiLanguage = useUiLanguage();
   if (!isGradingStatus(status)) return null;
   return (
     <Badge tone={GRADING_STATUS[status].tone} className={className}>
-      {GRADING_STATUS[status].label}
+      {gradingStatusLabel(status, language ?? uiLanguage)}
     </Badge>
   );
 }

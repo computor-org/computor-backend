@@ -4,7 +4,13 @@ import { useState } from 'react';
 import type { TicketAttachment } from '@/src/clients/SupportClient';
 import { supportClient } from '@/src/clients/SupportClient';
 import { useNotify } from '@/src/contexts/NotificationContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { formatSize } from '@/src/utils/support';
+
+const COPY = {
+  de: { downloadFailed: 'Download fehlgeschlagen', tooLarge: 'zu groß, im Postfach-Archiv' },
+  en: { downloadFailed: 'Download failed', tooLarge: 'too large, in the mailbox archive' },
+};
 
 /**
  * Attachments are download-only: fetched through the authenticated client as an
@@ -18,6 +24,7 @@ export default function AttachmentList({
   attachments: TicketAttachment[];
 }) {
   const notify = useNotify();
+  const t = COPY[useUiLanguage()];
   const [busy, setBusy] = useState<string | null>(null);
 
   if (attachments.length === 0) return null;
@@ -36,7 +43,7 @@ export default function AttachmentList({
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Download failed', 'error');
+      notify(e instanceof Error ? e.message : t.downloadFailed, 'error');
     } finally {
       setBusy(null);
     }
@@ -59,7 +66,7 @@ export default function AttachmentList({
             <span className="text-body">{a.filename}</span>
           )}
           <span className="text-xs text-muted">({formatSize(a.size)})</span>
-          {!a.stored && <span className="text-xs text-warn-text">too large, in the mailbox archive</span>}
+          {!a.stored && <span className="text-xs text-warn-text">{t.tooLarge}</span>}
         </li>
       ))}
     </ul>

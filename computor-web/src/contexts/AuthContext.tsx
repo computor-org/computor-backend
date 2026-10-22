@@ -29,6 +29,8 @@ interface AuthContextType {
    * public course is the one that exists today.
    */
   refreshPermissions: () => Promise<void>;
+  /** Apply a saved profile language to the interface without a reload. */
+  setProfileLanguage: (language: string | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -203,6 +205,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [user, refreshSession]);
 
+  const setProfileLanguage = useCallback((language: string | null) => {
+    const updated = ssoAuthService.setCachedLanguage(language);
+    if (updated) setUser(updated);
+  }, []);
+
   const value: AuthContextType = {
     user,
     views,
@@ -213,6 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     refreshSession,
     refreshPermissions: loadPermissions,
+    setProfileLanguage,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

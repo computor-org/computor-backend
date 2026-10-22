@@ -50,6 +50,13 @@ export class SSOAuthService implements ISSOAuthProvider {
     return this.currentUser;
   }
 
+  /** Record a profile language change in the cached user. */
+  setCachedLanguage(language: string | null): AuthUser | null {
+    if (!this.currentUser) return null;
+    this.saveSession({ ...this.currentUser, language }, this.currentViews);
+    return this.currentUser;
+  }
+
   /**
    * Get current user's available views
    */
@@ -148,6 +155,7 @@ export class SSOAuthService implements ISSOAuthProvider {
       familyName: userInfo.family_name || undefined,
       role: determineRole(roleIds, views),
       systemRoles: roleIds,
+      language: userInfo.profile?.language_code || null,
     };
   }
 

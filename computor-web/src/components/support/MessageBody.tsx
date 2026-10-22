@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 // Sanitised server-side already; this is the second, independent layer. The
 // iframe has an empty sandbox (no scripts, no same-origin, no popups) and the
@@ -18,11 +19,17 @@ function buildSrcDoc(html: string): string {
   );
 }
 
+const COPY = {
+  de: { plain: 'Nur Text anzeigen', formatted: 'Formatiert anzeigen', frame: 'Formatierte Nachricht' },
+  en: { plain: 'Show plain text', formatted: 'Show formatted', frame: 'Formatted message' },
+};
+
 /**
  * Message body: plain text by default (always a text node), with an opt-in
  * formatted view for mails that carry sanitised HTML.
  */
 export default function MessageBody({ text, html }: { text: string; html?: string | null }) {
+  const t = COPY[useUiLanguage()];
   const [formatted, setFormatted] = useState(false);
 
   return (
@@ -33,12 +40,12 @@ export default function MessageBody({ text, html }: { text: string; html?: strin
           onClick={() => setFormatted((v) => !v)}
           className="mb-2 text-xs text-accent-text hover:underline"
         >
-          {formatted ? 'Show plain text' : 'Show formatted'}
+          {formatted ? t.plain : t.formatted}
         </button>
       )}
       {html != null && formatted ? (
         <iframe
-          title="Formatted message"
+          title={t.frame}
           sandbox=""
           srcDoc={buildSrcDoc(html)}
           referrerPolicy="no-referrer"
