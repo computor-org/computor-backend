@@ -14,6 +14,7 @@ import { PageLoading } from '@/src/components/ListPageLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
 import ConfirmDeployWarningsDialog from '@/src/components/courses/ConfirmDeployWarningsDialog';
+import TutorAgentAutoRouteField from '@/src/components/courses/TutorAgentAutoRouteField';
 import DeploymentCheckReport, { type DeployCheckStatus } from '@/src/components/courses/DeploymentCheckReport';
 import { fileInputCls, inputCls } from '@/src/components/ui/tokens';
 import type { CourseFamilyList, CourseGitBindingUpsert } from '@/src/generated/types/courses';
@@ -56,6 +57,7 @@ function CreateInner() {
   const [path, setPath] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [autoRoute, setAutoRoute] = useState(false);
   const [gitEnabled, setGitEnabled] = useState(true);
   const [serverId, setServerId] = useState('');
   const [delivery, setDelivery] = useState<'git' | 'download'>('git');
@@ -223,6 +225,14 @@ function CreateInner() {
           body: { yaml: fileText, validate_only: false },
         })) as unknown as CourseDeployResult;
         if (!res.course_id) throw new Error(res.errors?.join('; ') || 'Deploy failed');
+        // The deployment file has no field for this course setting; apply the
+        // form's choice to the course the file just created.
+        if (autoRoute) {
+          await coursesClient.updateCoursesCoursesIdPatch({
+            id: res.course_id,
+            body: { tutor_agent_auto_route: true },
+          });
+        }
         // Git comes from the uploaded file's `git:` block (applied server-side by
         // deploy-course). Do NOT also call configureGit here — that would clobber
         // the file's binding with the manual UI selection (and 409 once the file's
@@ -252,6 +262,7 @@ function CreateInner() {
           course_family_id: familyId,
           title: title.trim() || null,
           description: description.trim() || null,
+          tutor_agent_auto_route: autoRoute,
         },
       });
       // One step: configure git immediately so a course is never left without it.
@@ -336,6 +347,10 @@ function CreateInner() {
             </Field>
           </>
         )}
+
+        <Field label="AI tutor">
+          <TutorAgentAutoRouteField value={autoRoute} onChange={setAutoRoute} />
+        </Field>
 
         {hasFile && canConfigureGit && (
           <div className="border-t border-rule pt-4">

@@ -25,6 +25,7 @@ from .permissions import (
     _check_organization_write_permission,
 )
 from .mentions import resolve_message_mentions, validate_message_mentions, _transient_message_for_targets
+from .auto_route import route_to_tutor_agent
 from .read_status import list_messages_with_read_status
 
 
@@ -222,6 +223,11 @@ def create_message_with_author(
     # needs an id first).
     message_like = _transient_message_for_targets(model_dump, permissions.user_id)
     model_dump['content'] = resolve_message_mentions(message_like, model_dump.get('content'), db)
+    # Courses with ``tutor_agent_auto_route`` address unmentioned student
+    # messages to the tutor agent with a visible mention, gated like any other.
+    model_dump['content'] = route_to_tutor_agent(
+        message_like, model_dump, permissions.user_id, parent_message, db,
+    )
     validate_message_mentions(
         message_like,
         model_dump.get('content'),

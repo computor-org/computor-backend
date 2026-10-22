@@ -16,6 +16,7 @@ import { Field } from '@/src/components/FormPanel';
 import { inputCls, readOnlyInputCls } from '@/src/components/ui/tokens';
 import SectionCard, { SectionHint, SectionStatus } from '@/src/components/SectionCard';
 import PublicCourseField from '@/src/components/courses/PublicCourseField';
+import TutorAgentAutoRouteField from '@/src/components/courses/TutorAgentAutoRouteField';
 import DescriptionList from '@/src/components/DescriptionList';
 import Button from '@/src/components/ui/Button';
 import Badge from '@/src/components/Badge';
@@ -66,6 +67,7 @@ export default function CourseEditPage() {
   const [description, setDescription] = useState('');
   const [language, setLanguage] = useState('');
   const [isPublic, setIsPublic] = useState(false);
+  const [autoRoute, setAutoRoute] = useState(false);
   // Self-registration seat cap; empty = unlimited, same convention as budgets.
   const [maxSelfRegistrations, setMaxSelfRegistrations] = useState('');
   const [seatsError, setSeatsError] = useState<string | null>(null);
@@ -101,6 +103,7 @@ export default function CourseEditPage() {
       setDescription(c.description || '');
       setLanguage(c.language_code || '');
       setIsPublic(c.public ?? false);
+      setAutoRoute(c.tutor_agent_auto_route ?? false);
       setMaxSelfRegistrations(
         c.max_self_registrations != null ? String(c.max_self_registrations) : '',
       );
@@ -164,6 +167,7 @@ export default function CourseEditPage() {
           // unchanged — would have their whole save rejected.
           ...(canSetPublic ? { public: isPublic } : {}),
           max_self_registrations: seatCap,
+          tutor_agent_auto_route: autoRoute,
           max_test_runs: parseLimit(maxTestRuns),
           max_submissions: parseLimit(maxSubmissions),
           visible,
@@ -323,6 +327,9 @@ export default function CourseEditPage() {
                     {seatsError} Nothing was saved.
                   </p>
                 )}
+                <Field label="AI tutor">
+                  <TutorAgentAutoRouteField value={autoRoute} onChange={setAutoRoute} />
+                </Field>
                 <div className="flex items-center gap-3">
                   <Button onClick={saveGeneral} loading={savingGeneral} loadingLabel="Saving…">
                     Save

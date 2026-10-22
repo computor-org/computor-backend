@@ -1317,6 +1317,7 @@ export interface CourseCreate {
   visible?: boolean | null;
   public?: boolean | null;
   max_self_registrations?: number | null;
+  tutor_agent_auto_route?: boolean | null;
 }
 
 export interface CourseGet {
@@ -1332,6 +1333,7 @@ export interface CourseGet {
   visible?: boolean | null;
   public?: boolean | null;
   max_self_registrations?: number | null;
+  tutor_agent_auto_route?: boolean | null;
   /** Creation timestamp */
   created_at?: string | null;
   /** Update timestamp */
@@ -1368,6 +1370,7 @@ export interface CourseUpdate {
   visible?: boolean | null;
   public?: boolean | null;
   max_self_registrations?: number | null;
+  tutor_agent_auto_route?: boolean | null;
 }
 
 export interface CourseQuery {

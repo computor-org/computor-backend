@@ -183,6 +183,12 @@ class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     # never blocks a lecturer from enrolling past the cap by hand.
     max_self_registrations = Column(Integer)
 
+    # When true, a student's course message that mentions nobody is addressed
+    # to the configured tutor agent (TUTOR_AGENT_USER_ID, shown as Lena) by
+    # prepending a visible mention. Set per course at creation; NOT NULL with a
+    # false default, like ``public``. See business_logic.messages.auto_route.
+    tutor_agent_auto_route = Column(Boolean, nullable=False, server_default=text("false"))
+
     # Lifecycle: set when an owner archives the course. Archived courses vanish
     # from the student and tutor views and from the public catalog, and every
     # student write (submission, test run) is refused through the same veto as
