@@ -25,6 +25,23 @@ identity, reserved tutor handles stay ordinary text rather than selecting a
 same-named human. The public Ask Lena form uses a separate restricted worker;
 its existing enable flag and credentials remain applicable.
 
+## Routing unaddressed messages to Lena
+
+A course can send every student message that mentions nobody to Lena. The
+setting is `tutor_agent_auto_route` on the course (default off), offered as a
+checkbox when a course is created in the web UI and on its edit page; it is
+also part of `CourseCreate` / `CourseUpdate`.
+
+When it is on, a new message gets a visible `@[Lena](<tutor id>)` prepended if
+all of these hold: `TUTOR_AGENT_USER_ID` is set and that user is active, the
+author is a `_student` of the course, the content (after plain-name resolution)
+mentions nobody, the message is not a reply to Lena (her follow-up handling
+already covers those), and Lena is in the message's audience. From there it is
+an ordinary mention, so the worker needs no change. Edits are never rewritten.
+
+Lena must be a course member for the audience gate to accept her; add the
+tutor account to the course as `_tutor`.
+
 ## Resolution rules
 
 The backend resolves new messages, replies and edited content before

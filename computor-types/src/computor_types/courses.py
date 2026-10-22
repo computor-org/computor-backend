@@ -50,6 +50,9 @@ class CourseCreate(BaseModel):
     # Cap on _student members for self-registration (GET /courses/public).
     # None means unlimited.
     max_self_registrations: Optional[int] = Field(default=None, ge=0)
+    # Address student messages that mention nobody to the tutor agent (Lena)
+    # with a visible @mention. NOT NULL DEFAULT false, like ``public``.
+    tutor_agent_auto_route: Optional[bool] = None
 
 class CourseGet(BaseEntityGet,CourseCreate):
     id: str
@@ -78,6 +81,9 @@ class CourseGet(BaseEntityGet,CourseCreate):
     # Cap on _student members for self-registration (GET /courses/public).
     # None means unlimited.
     max_self_registrations: Optional[int] = Field(default=None, ge=0)
+    # Address student messages that mention nobody to the tutor agent (Lena)
+    # with a visible @mention. NOT NULL DEFAULT false, like ``public``.
+    tutor_agent_auto_route: Optional[bool] = None
     # Set once an owner archives the course: hidden from students and tutors,
     # submissions and test runs closed, reversible. Read-only here; use
     # ``PATCH /courses/{id}/archive`` / ``/unarchive``.
@@ -147,6 +153,9 @@ class CourseUpdate(BaseModel):
     public: Optional[bool] = None
     # Explicit ``null`` removes the cap (unlimited); omit to leave it alone.
     max_self_registrations: Optional[int] = Field(default=None, ge=0)
+    # Omit to leave the flag alone; like ``public`` an explicit ``null`` is
+    # rejected by the NOT NULL column.
+    tutor_agent_auto_route: Optional[bool] = None
 
 
 class CourseQuery(ListQuery):
