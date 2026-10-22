@@ -27,7 +27,7 @@ services:
 
   # Temporal UI (only in development)
   temporal-ui:
-    image: temporalio/ui:2.54.1@sha256:ff0943fe532b8e33c46cd28b29e81e0ce0b6f55b9ee50a38ef1b437cc4de3fa5
+    image: temporalio/ui:2.56.0@sha256:66d55d383bfb334ee0781f21a3b36c865b3f0f2262491a070bb2143394e9fe88
     security_opt:
       - "no-new-privileges:true"
     logging:
