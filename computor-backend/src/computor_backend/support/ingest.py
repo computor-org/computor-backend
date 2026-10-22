@@ -64,7 +64,11 @@ def ingest_mail(
         return IngestResult("duplicate", str(known.ticket_id), str(known.message_id or ""))
 
     team = settings.team_address_list
-    outbound = (mail.from_address in team) or folder == settings.sent_folder
+    # Only the Sent folder holds our side of a conversation. Mail in INBOX is
+    # always incoming, even From a team address (Zulip/Django error reports
+    # sent as contact@, a member writing to the team); our own replies that
+    # loop back into INBOX are already known by Message-ID and skipped above.
+    outbound = folder == settings.sent_folder
     restricted_hit = any(a in settings.restricted_address_list for a in mail.all_recipients)
 
     ticket = None
