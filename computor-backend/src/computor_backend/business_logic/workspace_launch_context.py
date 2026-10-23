@@ -7,6 +7,7 @@ permission to write another user's navigation context.
 """
 
 from datetime import datetime, timedelta, timezone
+from typing import Literal
 from uuid import UUID, uuid4
 
 from computor_types.coder import CoderWorkspace, WorkspaceLaunchContext
@@ -25,6 +26,9 @@ from computor_backend.permissions.course_access import get_course_member_or_403
 from computor_backend.permissions.principal import Principal
 
 LAUNCH_CONTEXT_TTL = 15 * 60
+# How long the dashboard remembers which course a workspace was last opened
+# for. A convenience: once it is gone, the workspace opens without a course.
+LAST_COURSE_TTL = 180 * 24 * 60 * 60
 
 
 def _require_owner(username: str, permissions: Principal) -> str:
@@ -55,6 +59,10 @@ def _key(user_id: str, workspace_id: str) -> str:
     return f"workspace-launch-context:{user_id}:{workspace_id}"
 
 
+def _last_course_key(user_id: str, workspace_id: str) -> str:
+    return f"workspace-last-course:{user_id}:{workspace_id}"
+
+
 def _require_course(
     course_id: UUID, permissions: Principal, db: Session, workspace: CoderWorkspace,
 ) -> None:
@@ -79,6 +87,7 @@ def _require_course(
 async def set_workspace_launch_context(
     username: str, workspace_name: str, course_id: UUID, permissions: Principal,
     db: Session, client: CoderClient, redis: Redis,
+    ui_language: Literal["de", "en"] | None = None,
 ) -> WorkspaceLaunchContext:
     """Replace this owner's navigation request, without starting/rebuilding."""
     try:
@@ -90,13 +99,36 @@ async def set_workspace_launch_context(
     _require_course(course_id, permissions, db, workspace)
     context = WorkspaceLaunchContext(
         course_id=course_id,
+        ui_language=ui_language,
         request_id=uuid4(),
         expires_at=datetime.now(timezone.utc) + timedelta(seconds=LAUNCH_CONTEXT_TTL),
     )
     await redis.set(
         _key(user_id, workspace.id), context.model_dump_json(), ex=LAUNCH_CONTEXT_TTL
     )
+    # Unlike the request above, this survives the launch, so the dashboard can
+    # reopen the workspace in the same course from any browser.
+    await redis.set(
+        _last_course_key(user_id, workspace.id), str(course_id), ex=LAST_COURSE_TTL
+    )
     return context
+
+
+async def populate_last_courses(
+    user_id: str, workspaces: list[CoderWorkspace], redis: Redis,
+) -> None:
+    """Fill ``CoderWorkspace.last_course_id`` on the user's own workspaces.
+
+    Only a hint for choosing the course to open: the launch page posts it as a
+    new launch context, which checks membership and template access again.
+    """
+    for workspace in workspaces:
+        try:
+            raw = await redis.get(_last_course_key(user_id, workspace.id))
+        except Exception:
+            raw = None
+        if raw:
+            workspace.last_course_id = raw.decode() if isinstance(raw, bytes) else str(raw)
 
 
 async def get_workspace_launch_context(

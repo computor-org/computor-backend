@@ -13,6 +13,7 @@ import { useResource } from '@/src/hooks/useResource';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { rememberWorkspaceCourse } from '@/src/utils/workspaceLaunch';
 import { AGENT_LIFECYCLE_GAVE_UP, type WorkspaceDetails, type WorkspaceLaunchContext } from '@/src/types/workspaces';
 
 const coderClient = new CoderClient();
@@ -136,13 +137,14 @@ function LaunchWorkspace() {
   const handOffCourse = useCallback(async () => {
     if (!courseId) return;
     contextRequest.current ??= coderClient.setWorkspaceLaunchContext({
-      username: owner, workspaceName: name, courseId,
+      username: owner, workspaceName: name, courseId, uiLanguage: language,
     });
     const context = await contextRequest.current;
     if (context.course_id !== courseId) {
       throw new Error(tRef.current.courseNotSelected);
     }
-  }, [owner, name, courseId]);
+    rememberWorkspaceCourse(owner, name, courseId);
+  }, [owner, name, courseId, language]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
