@@ -1,17 +1,30 @@
 'use client';
 
 import Link from 'next/link';
-import { ReactNode } from 'react';
+import { ReactNode, type Ref } from 'react';
 import Badge from '@/src/components/Badge';
-import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
+import CourseWorkspaceLaunchButtons, { type CourseWorkspaceLauncher } from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import { displayName } from '@/src/utils/displayName';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { localizedRoleLabel } from '@/src/utils/courseRoles';
+import { usePermissions } from '@/src/hooks/usePermissions';
 
 const COPY = {
-  de: { untitled: 'Kurs ohne Titel', view: 'Kurs ansehen' },
-  en: { untitled: 'Untitled Course', view: 'View Course' },
+  de: { untitled: 'Kurs ohne Titel', view: 'Kurs ansehen', continue: 'Weiterlernen' },
+  en: { untitled: 'Untitled Course', view: 'View Course', continue: 'Continue' },
 };
+
+/** Keep course information as the staff destination; learners resume their work. */
+function useCourseEntry(courseId: string) {
+  const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
+  const isLearner = !isAdmin && !isOrganizationManager &&
+    courseHasAtLeast(courseId, '_student') && !courseHasAtLeast(courseId, '_tutor');
+  const t = COPY[useUiLanguage()];
+  return {
+    href: `/courses/${courseId}${isLearner ? '/student/assignments' : ''}`,
+    label: isLearner ? t.continue : t.view,
+  };
+}
 
 /**
  * One course tile, shared by the course list and the public catalog.
@@ -29,6 +42,7 @@ export default function CourseCard({
   badge,
   footer,
   selected = false,
+  workspaceLauncherRef,
 }: {
   course: { id: string; title?: string | null; path?: string | null; language_code?: string | null; description?: string | null };
   /** Course role, when the viewer has one. Also gates the workspace launchers. */
@@ -40,9 +54,11 @@ export default function CourseCard({
   footer?: ReactNode;
   /** Marks the course the visitor came to join (catalog `?join=`). */
   selected?: boolean;
+  workspaceLauncherRef?: Ref<CourseWorkspaceLauncher>;
 }) {
   const language = useUiLanguage();
   const t = COPY[language];
+  const entry = useCourseEntry(course.id);
   const body = (
     <>
       <div className="flex flex-col items-start mb-4 gap-2 min-w-0">
@@ -79,7 +95,7 @@ export default function CourseCard({
       {href ? (
         // The launch buttons live OUTSIDE the Link: nesting them in the anchor
         // would both be invalid HTML and still navigate the card on an icon click.
-        <Link href={href} className="flex flex-col flex-grow cursor-pointer">
+        <Link href={href === `/courses/${course.id}` ? entry.href : href} className="flex flex-col flex-grow cursor-pointer">
           {body}
         </Link>
       ) : (
@@ -88,7 +104,7 @@ export default function CourseCard({
 
       {/* Template icon launchers; hides itself when the course offers no
           workspaces. Members only — the fetch would 403 without a role. */}
-      {role && <CourseWorkspaceLaunchButtons courseId={course.id} compact className="mb-4" />}
+      {role && <CourseWorkspaceLaunchButtons ref={workspaceLauncherRef} courseId={course.id} compact className="mb-4" />}
 
       {footer && (
         <div className="flex items-center justify-end pt-4 border-t border-rule mt-auto gap-3">
@@ -99,15 +115,15 @@ export default function CourseCard({
   );
 }
 
-/** The "View Course →" footer used by the course list. */
+/** The existing course-entry footer, shared by the dashboard and course list. */
 export function ViewCourseLink({ courseId }: { courseId: string }) {
-  const t = COPY[useUiLanguage()];
+  const entry = useCourseEntry(courseId);
   return (
     <Link
-      href={`/courses/${courseId}`}
+      href={entry.href}
       className="text-sm text-accent-text hover:text-accent-text font-medium flex items-center"
     >
-      {t.view}
+      {entry.label}
       <svg className="ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
       </svg>
