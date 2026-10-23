@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
 import { useRouter } from 'next/navigation';
 import { useResource } from '@/src/hooks/useResource';
 import { useCoderTemplates } from '@/src/hooks/useCoderTemplates';
@@ -12,7 +12,7 @@ import WorkspaceStatusBadge, {
   categorizeStatus,
 } from '@/src/components/workspaces/WorkspaceStatusBadge';
 import TemplateCard, { TemplateIconButton } from '@/src/components/workspaces/TemplateCard';
-import { courseTemplateOption } from '@/src/components/workspaces/templateOptions';
+import { courseTemplateOption, isUsable } from '@/src/components/workspaces/templateOptions';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { CourseWorkspacesClient } from '@/src/clients/CourseWorkspacesClient';
 import {
@@ -26,6 +26,8 @@ import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const COPY = {
   de: {
+    targetLoading: 'VS Code wird noch vorbereitet. Versuch es gleich noch einmal.',
+    targetUnavailable: 'VS Code ist für diesen Kurs gerade nicht verfügbar.',
     ownerUnavailable: 'Der Besitzer der vorhandenen Arbeitsumgebung ist nicht verfügbar. Versuch es noch einmal.',
     notCreated: 'Die Arbeitsumgebung wurde nicht erstellt.',
     launchFailed: 'Die Arbeitsumgebung konnte nicht gestartet werden',
@@ -39,6 +41,8 @@ const COPY = {
     stopping: 'Wird gestoppt …',
   },
   en: {
+    targetLoading: 'VS Code is still loading. Please try again shortly.',
+    targetUnavailable: 'VS Code is not currently available for this course.',
     ownerUnavailable: 'The existing workspace owner is unavailable. Please retry.',
     notCreated: 'The workspace was not created.',
     launchFailed: 'Failed to launch workspace',
@@ -75,13 +79,25 @@ const courseWorkspacesClient = new CourseWorkspacesClient();
  * Self-hiding: renders nothing while loading, on error (non-members), or when
  * the course has no templates.
  */
+export interface CourseWorkspaceLauncher {
+  /** Open one selected assignment through this page's existing personal launcher. */
+  launch: (courseContentId: string, options?: { sameTab?: boolean }) => void;
+}
+
 export default function CourseWorkspaceLaunchButtons({
   courseId,
+  courseContentId,
+  autoLaunch = false,
+  ref,
   compact = false,
   className,
   title,
 }: {
   courseId: string;
+  courseContentId?: string;
+  /** Legacy learner exercise links hand off once, in the current tab. */
+  autoLaunch?: boolean;
+  ref?: Ref<CourseWorkspaceLauncher>;
   compact?: boolean;
   /** Extra classes on the root, e.g. outer spacing — only rendered when the
       component itself renders, so callers don't get stray margins when it
@@ -96,6 +112,8 @@ export default function CourseWorkspaceLaunchButtons({
   const notify = useNotify();
   const language = useUiLanguage();
   const t = COPY[language];
+  const autoAttempt = useRef<string | null>(null);
+  const [launchMessage, setLaunchMessage] = useState<string | null>(null);
   const [launching, setLaunching] = useState<string | null>(null);
   const [stopping, setStopping] = useState<string | null>(null);
 
@@ -160,14 +178,13 @@ export default function CourseWorkspaceLaunchButtons({
     return templates.map((t) => courseTemplateOption(t, byName.get(t.template_name), answered));
   }, [templates, options, templatesAnswered, templatesError, compact]);
 
-  if (templates.length === 0) return null;
-
   // window.open must happen synchronously inside the click — after an await it
   // is no longer tied to the user gesture and popup blockers eat it.
-  async function provisionAndLaunch(templateName: string) {
+  const provisionAndLaunch = useCallback(async (templateName: string, targetId = courseContentId, sameTab = false) => {
     setLaunchError(false);
+    setLaunchMessage(null);
     setLaunching(templateName);
-    const tab = window.open(workspaceCreatingUrl, '_blank');
+    const tab = sameTab ? null : window.open(workspaceCreatingUrl, '_blank');
     try {
       // This listing is scoped to the current user. Read it on every click,
       // including compact cards, rather than trusting a possibly stale poll.
@@ -185,14 +202,14 @@ export default function CourseWorkspaceLaunchButtons({
         }
         // The launch page handles stopped/failed workspaces and sends the new
         // course context. Do not provision just to select a different course.
-        launchUrl = workspaceLaunchUrl(existing.owner_name, existing.name, courseId);
+        launchUrl = workspaceLaunchUrl(existing.owner_name, existing.name, courseId, targetId);
       } else {
         const result = await coderClient.provisionWorkspace({
           body: { template: templateName },
         });
         const workspaceName = result.workspace?.name;
         if (!workspaceName) throw new Error(t.notCreated);
-        launchUrl = workspaceLaunchUrl(result.user.username, workspaceName, courseId);
+        launchUrl = workspaceLaunchUrl(result.user.username, workspaceName, courseId, targetId);
       }
       if (tab) {
         tab.location.replace(launchUrl);
@@ -202,16 +219,18 @@ export default function CourseWorkspaceLaunchButtons({
     } catch (err) {
       setLaunchError(true);
       tab?.close();
-      notify(err instanceof Error ? err.message : t.launchFailed, 'error');
+      const message = err instanceof Error ? err.message : t.launchFailed;
+      setLaunchMessage(sameTab && message !== t.ownerUnavailable && message !== t.notCreated ? t.launchFailed : message);
+      if (!sameTab) notify(message, 'error');
     } finally {
       setLaunching(null);
     }
-  }
+  }, [courseId, courseContentId, notify, router, t]);
 
   function openExisting(workspace: CoderWorkspace) {
     if (!workspace.owner_name) return;
-    if (!openLaunchTab(workspace.owner_name, workspace.name, courseId)) {
-      router.push(workspaceLaunchUrl(workspace.owner_name, workspace.name, courseId));
+    if (!openLaunchTab(workspace.owner_name, workspace.name, courseId, courseContentId)) {
+      router.push(workspaceLaunchUrl(workspace.owner_name, workspace.name, courseId, courseContentId));
     }
   }
 
@@ -224,6 +243,43 @@ export default function CourseWorkspaceLaunchButtons({
       setStopping(null);
     }
   }
+
+  // One mounted course launcher serves every exercise action on the page.
+  // No row needs its own template/workspace fetches or provisioning logic.
+  useImperativeHandle(ref, () => ({
+    launch(targetId, launchOptions) {
+      if (launching || courseTemplates === null || (!compact && !templatesAnswered && !templatesError)) {
+        notify(t.targetLoading, 'info');
+        return;
+      }
+      const vscode = courseOptions.find((option) => option.name === 'vscode-workspace' && isUsable(option));
+      if (!vscode) {
+        notify(t.targetUnavailable, 'error');
+        return;
+      }
+      void provisionAndLaunch(vscode.name, targetId, launchOptions?.sameTab);
+    },
+  }));
+
+  useEffect(() => {
+    if (!autoLaunch || !courseContentId || courseTemplates === null || (!templatesAnswered && !templatesError)) return;
+    const key = `${courseId}:${courseContentId}`;
+    if (autoAttempt.current === key) return;
+    const vscode = courseOptions.find((option) => option.name === 'vscode-workspace' && isUsable(option));
+    if (!vscode) return;
+    autoAttempt.current = key;
+    // Start the external launch after this readiness effect has committed.
+    void Promise.resolve().then(() => provisionAndLaunch(vscode.name, courseContentId, true));
+  }, [autoLaunch, courseId, courseContentId, courseTemplates, templatesAnswered, templatesError, courseOptions, provisionAndLaunch, t]);
+
+  if (autoLaunch) {
+    const ready = courseTemplates !== null && (templatesAnswered || !!templatesError);
+    const unavailable = ready && !courseOptions.some((option) => option.name === 'vscode-workspace' && isUsable(option));
+    const message = launchMessage ?? (unavailable ? t.targetUnavailable : null);
+    return <p role={message ? 'alert' : 'status'}>{message ?? t.launching}</p>;
+  }
+
+  if (templates.length === 0) return null;
 
   if (compact) {
     return (
