@@ -130,3 +130,34 @@ async def test_stopped_workspace_navigation_goes_to_launch_page():
 async def test_stopped_workspace_xhr_gets_503():
     resp = await workspace_unavailable(_FakeRequest(headers={"Accept": "*/*"}), "uowner123", "workspace")
     assert resp.status_code == 503
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("destination", ["iframe", "frame"])
+async def test_direct_reauth_from_child_frame_never_embeds_identity_provider(destination):
+    request = _FakeRequest(headers={**_NAV_HEADERS, "Sec-Fetch-Dest": destination})
+    with patch("computor_backend.business_logic.auth.refresh_sso_token", new=AsyncMock()) as refresh:
+        response = await coder_reauth(request, NEXT, False, None, MagicMock())
+    assert response.status_code == 401
+    assert response.headers["content-type"].startswith("text/html")
+    assert response.headers["cache-control"] == "no-store"
+    assert "location" not in response.headers
+    assert b"reload this workspace" in response.body
+    refresh.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_direct_reauth_static_html_without_metadata_never_reenters_login():
+    path = "/coder/uowner123/workspace/vscode/stable-example/static/out/vs/workbench/contrib/webview/browser/pre/index.html"
+    response = await coder_reauth(_FakeRequest(), path, False, None, MagicMock())
+    assert response.status_code == 401
+    assert "location" not in response.headers
+
+
+@pytest.mark.asyncio
+async def test_direct_reauth_script_does_not_redirect_even_if_html_is_accepted():
+    request = _FakeRequest(headers={**_NAV_HEADERS, "Sec-Fetch-Dest": "script"})
+    response = await coder_reauth(request, NEXT, False, None, MagicMock())
+    assert response.status_code == 401
+    assert response.headers["content-type"].startswith("application/json")
+    assert "location" not in response.headers
