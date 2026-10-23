@@ -42,7 +42,7 @@ function details({
   return {
     workspace: {
       id: 'w1', name, owner_id: 'u-me', owner_name: 'u-me',
-      template_id: 't-vscode', template_name: 'vscode-workspace',
+      template_id: 't-vscode', template_name: 'vscode-workspace', template_display_name: 'VS Code',
       latest_build_status: status === 'running' ? 'succeeded' : status,
       latest_build_id: 'build-existing',
     },
@@ -76,13 +76,15 @@ async function setup(
     systemRoles?: string[];
     profileLanguage?: string | null;
     courseRoles?: string[];
+    /** False: no cached session, as after the login expired in an idle tab. */
+    signedIn?: boolean;
   } = {},
 ) {
   const next = typeof source === 'function' ? source : undefined;
   const sequence = typeof source === 'function' ? [] : source;
   const systemRoles = options.systemRoles ?? ['_workspace_user'];
   const user = { ...USER, profile: { language_code: options.profileLanguage ?? null }, user_roles: systemRoles.map((role_id) => ({ role_id })) };
-  await page.addInitScript(({ user, systemRoles }) => {
+  if (options.signedIn !== false) await page.addInitScript(({ user, systemRoles }) => {
     sessionStorage.setItem('auth_user', JSON.stringify({
       id: user.id, username: user.username, email: user.email,
       givenName: user.given_name, familyName: user.family_name,
@@ -200,6 +202,63 @@ async function setup(
 
   return { starts, stops, contexts, launchRequests, actions, provisions, observedWorkspaces };
 }
+
+test('after the idle auto-stop and an expired login, a reloaded tab signs in and lands back in the workspace', async ({
+  page, baseURL,
+}) => {
+  const { starts } = await setup(page, [
+    details({ status: 'stopped' }),
+    details({ status: 'starting' }),
+    details({ status: 'running', lifecycle: 'ready', ready: true }),
+  ], { signedIn: false });
+  // Keycloak still knows the browser: the SSO hop comes straight back to the callback.
+  const ssoLogins: string[] = [];
+  await page.context().route(`${API_ORIGIN}/auth/keycloak/login**`, (route) => {
+    ssoLogins.push(route.request().url());
+    return route.fulfill({ status: 302, headers: { location: `${baseURL}/auth/success` } });
+  });
+  const visited: string[] = [];
+  page.on('framenavigated', (frame) => {
+    if (frame === page.mainFrame()) visited.push(new URL(frame.url()).pathname);
+  });
+
+  // Where the backend's workspace-unavailable fallback sends the reloaded tab.
+  await page.goto('/workspaces/launch?owner=u-me&name=code');
+  await page.waitForURL(WORKSPACE_URL, { timeout: 30_000 });
+
+  expect(ssoLogins).toHaveLength(1);
+  expect(visited).toContain('/login');
+  expect(visited).not.toContain('/dashboard');
+  expect(starts).toHaveLength(1);
+});
+
+test.describe('in German', () => {
+  test.use({ locale: 'de-AT' });
+
+  test('a workspace found stopped says why it is starting and that the files are kept', async ({ page }) => {
+    await setup(page, [details({ status: 'stopped' })]);
+    await page.goto('/workspaces/launch?owner=u-me&name=code');
+    await expect(page.getByText(
+      'Deine Arbeitsumgebung war angehalten, zum Beispiel weil sie eine Zeit lang nicht benutzt wurde. '
+      + 'Deine Dateien sind noch da.',
+    )).toBeVisible();
+  });
+
+  test('the launch page names the template, not the internal workspace name', async ({ page }) => {
+    await setup(page, [details({ status: 'starting', name: 'vscode' })], { courseWorkspaces: true });
+    await page.goto('/workspaces/launch?owner=u-me&name=vscode');
+    await expect(page.getByText('VS Code', { exact: true })).toBeVisible();
+    await expect(page.getByText('vscode', { exact: true })).toHaveCount(0);
+    await expect(page).toHaveTitle('VS Code wird gestartet …');
+  });
+});
+
+test('a workspace that is already running opens without the stopped notice', async ({ page }) => {
+  await setup(page, [details({ status: 'running', lifecycle: 'starting' })]);
+  await page.goto('/workspaces/launch?owner=u-me&name=code');
+  await expect(page.getByText('This tab opens automatically when it is ready.')).toBeVisible();
+  await expect(page.getByText('had been stopped', { exact: false })).toHaveCount(0);
+});
 
 test('waits while the agent is still starting, then opens when it reports ready', async ({ page }) => {
   await setup(page, [
