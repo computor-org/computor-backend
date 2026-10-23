@@ -4,12 +4,15 @@ on:
   push:
     branches: [main, "release/**"]
   pull_request:
+  merge_group:
 
 permissions:
   contents: read
 
 jobs:
   backend:
+    # Required jobs run in the merge queue, not on pull request events.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -76,6 +79,8 @@ jobs:
         run: python3 ops/coder/pin-extension.py --check
 
   coder-worker-socket-proxy:
+    # Required jobs run in the merge queue, not on pull request events.
+    if: github.event_name != 'pull_request'
     # Behavioural check of the coder worker's Docker allowlist: the pinned
     # proxy image with this repo's template, probed against the runner's
     # daemon (container create/exec, pull, foreign image names -> 403).
@@ -85,6 +90,8 @@ jobs:
       - run: bash ops/tests/test_coder_worker_socket_proxy.sh
 
   public-course-contract:
+    # Required jobs run in the merge queue, not on pull request events.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -125,6 +132,8 @@ jobs:
           computor-backend/src/computor_backend/tests/test_support_tickets_db.py
 
   grading-isolation:
+    # Required jobs run in the merge queue, not on pull request events.
+    if: github.event_name != 'pull_request'
     # Hostile-snippet tests for grading jobs (#237). Sandbox-dependent cases
     # skip themselves when the runner kernel lacks Landlock ABI >= 6; limits,
     # tree kill, output caps and safe file reads run everywhere.
@@ -147,6 +156,8 @@ jobs:
           tests/test_job_isolation.py tests/test_sandbox_launch.py
 
   web:
+    # Required jobs run in the merge queue, not on pull request events.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -167,6 +178,8 @@ jobs:
       - run: yarn test:e2e e2e/public-learning.spec.ts e2e/course-card-layout.spec.ts e2e/workspace-launch.spec.ts e2e/teacher-dashboard.spec.ts e2e/support-tickets.spec.ts e2e/student-description-language.spec.ts --workers=2
 
   keycloak-abuse:
+    # Required jobs run in the merge queue, not on pull request events.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -180,6 +193,8 @@ jobs:
         run: python3 ops/keycloak/test_abuse_live.py --provider /tmp/computor-keycloak-providers/computor-keycloak-abuse.jar
 
   keycloak-admin-mfa:
+    # Required jobs run in the merge queue, not on pull request events.
+    if: github.event_name != 'pull_request'
     # Mandatory admin TOTP (issues#485) against a real Keycloak: flows, OTP,
     # e-mail reset, backend role sync and the backend's amr evidence check.
     runs-on: ubuntu-latest
@@ -192,3 +207,12 @@ jobs:
           CODER_ADMIN_EMAIL: ci@example.invalid
           CODER_ADMIN_PASSWORD: synthetic-test-password
         run: uv run --project computor-backend python ops/keycloak/test_mfa_live.py
+
+  # The single required check. On pull requests the jobs above are skipped and
+  # this passes; in the merge queue it fails unless every job succeeded.
+  ci-gate:
+    if: always()
+    needs: [backend, coder-worker-socket-proxy, public-course-contract, grading-isolation, web, keycloak-abuse, keycloak-admin-mfa]
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = false
