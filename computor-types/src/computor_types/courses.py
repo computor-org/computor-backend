@@ -218,6 +218,18 @@ class CoursePublicList(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CourseSelfEnrollment(BaseModel):
+    """The caller's own enrolment in one course (issues#458).
+
+    ``self_registered`` is true when the caller joined through the public
+    catalog, which is when the course page shows the self-enrolment help.
+    ``can_leave`` is true when the caller may end that enrolment themselves.
+    """
+    course_id: str
+    self_registered: bool = False
+    can_leave: bool = False
+
+
 class CoursePublicCatalogEntry(BaseModel):
     """One row of the anonymous course catalog (GET /public/courses, issue #415).
 
