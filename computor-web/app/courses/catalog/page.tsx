@@ -44,7 +44,7 @@ const COPY = {
     join: 'Kurs beitreten',
     confirmTitle: 'Diesem Kurs beitreten?',
     confirmMessage: (title: string) =>
-      `Du trittst ${title} als Studierende(r) bei. Austreten kannst du nicht selbst. Wende dich dafür an die Lehrenden.`,
+      `Du trittst ${title} als Studierende(r) bei. Auf der Kursseite kannst du den Kurs jederzeit wieder verlassen.`,
     joining: 'Beitritt läuft …',
   },
   en: {
@@ -67,7 +67,7 @@ const COPY = {
     confirmTitle: 'Join this course?',
     confirmMessage: (title: string) =>
       `You will be enrolled in ${title} as a student. ` +
-      'You cannot remove yourself again — ask the course staff if you change your mind.',
+      'You can leave the course again at any time from its course page.',
     joining: 'Joining…',
   },
 };
@@ -86,8 +86,8 @@ function CourseCatalog() {
   );
   const courses = data ?? [];
 
-  // The course awaiting confirmation. Enrolling is a one-way door — there is
-  // no self-unenrol endpoint by design — so it is worth one dialog.
+  // The course awaiting confirmation. Joining is worth one dialog, which also
+  // says how to leave again (POST /user/courses/{id}/leave, issues#458).
   const [pending, setPending] = useState<CoursePublicList | null>(null);
   const [joining, setJoining] = useState(false);
 

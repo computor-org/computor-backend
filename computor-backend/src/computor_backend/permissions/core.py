@@ -38,6 +38,7 @@ from computor_backend.permissions.principal import (
     build_claims,
     course_role_hierarchy
 )
+from computor_backend.permissions.roles import INACTIVE_COURSE_ROLE
 
 # Import models for registration
 from computor_backend.model.auth import User, Account, Profile, StudentProfile, Session as UserSession
@@ -346,6 +347,9 @@ def db_get_course_claims(user_id: str, db: Session) -> List[tuple]: #TODO: PERMI
         .select_from(User)
         .join(CourseMember, CourseMember.user_id == User.id)
         .filter(User.id == user_id)
+        # A learner who left a course holds no claim in it, so every
+        # claim-based gate and /user/scopes treat them as a non-member.
+        .filter(CourseMember.course_role_id != INACTIVE_COURSE_ROLE)
         .all()
     )
     
