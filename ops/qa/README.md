@@ -65,6 +65,10 @@ in an error.
   mit Python – Grundlagen*, results on the first assignments of week 1 (one at
   0 %), the next assignment open, and a stopped workspace.
 - **Lecturer** `qa-lecturer@example.com` and **admin** `qa-admin@example.com`.
+- **Personal tester** (optional): an account for a human tester that no agent
+  uses, defined only in `QA_HOME/personal.env` (mode 0600) with
+  `QA_PERSONAL_USERNAME`, `QA_PERSONAL_EMAIL` and `QA_PERSONAL_PASSWORD`. Every
+  run merges it into the personas, so `reset` recreates it.
 - The three *Data Science mit Python* courses, public in the catalog.
 
 Passwords and API tokens are generated per stack and kept in

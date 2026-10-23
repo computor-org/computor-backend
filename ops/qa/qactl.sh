@@ -42,6 +42,7 @@ QA_REGISTRY_PORT=5000
 ENV_FILE="$QA_HOME/qa.env"
 CRED_FILE="$QA_HOME/credentials.env"
 PERSONAS_FILE="$QA_HOME/personas.json"
+PERSONAL_FILE="$QA_HOME/personal.env"
 DEPLOYED_FILE="$QA_HOME/deployed.env"
 DATA="$QA_HOME/data"
 SRC="$QA_HOME/src/backend"
@@ -223,6 +224,37 @@ with open(path, "w", encoding="utf-8") as fh:
 PY
 )
 
+# A human tester's own account, kept apart from the agents' personas. It is
+# defined only in the private file QA_HOME/personal.env (mode 0600, never in
+# git) with QA_PERSONAL_USERNAME, QA_PERSONAL_EMAIL and QA_PERSONAL_PASSWORD,
+# and it is merged into personas.json on every run, so a reset recreates it.
+# Subshell body: its umask 077 must not leak into later checkouts/builds.
+merge_personal_persona() (
+    [ -f "$PERSONAL_FILE" ] || exit 0
+    [ "$(stat -c %a "$PERSONAL_FILE")" = 600 ] || die "$PERSONAL_FILE must have mode 0600"
+    umask 077
+    python3 - "$PERSONAS_FILE" "$PERSONAL_FILE" <<'PY'
+import json, sys, uuid
+path, personal = sys.argv[1:]
+env = {}
+for line in open(personal, encoding="utf-8"):
+    line = line.strip()
+    if line and not line.startswith("#") and "=" in line:
+        key, value = line.split("=", 1)
+        env[key.strip()] = value.strip().strip('"')
+username = env["QA_PERSONAL_USERNAME"]
+ns = uuid.UUID("0d4c1d1e-5a29-4c6f-9f53-2b5a0c0e0529")
+entry = {"key": "personal", "username": username, "email": env["QA_PERSONAL_EMAIL"],
+         "given_name": env.get("QA_PERSONAL_GIVEN_NAME", "Personal"),
+         "family_name": env.get("QA_PERSONAL_FAMILY_NAME", "Tester"),
+         "password": env["QA_PERSONAL_PASSWORD"], "system_role": None,
+         "keycloak_id": str(uuid.uuid5(ns, username)), "groups": []}
+personas = [p for p in json.load(open(path)) if p["key"] != "personal"] + [entry]
+with open(path, "w", encoding="utf-8") as fh:
+    json.dump(personas, fh, indent=2)
+PY
+)
+
 # Subshell body: its umask 077 must not leak into later checkouts/builds.
 write_credentials() (
     load_env
@@ -255,6 +287,7 @@ ensure_state() {
     chmod 700 "$QA_HOME"
     [ -f "$ENV_FILE" ] || { log "generating $ENV_FILE"; write_env; }
     [ -f "$PERSONAS_FILE" ] || { log "generating personas"; write_personas; }
+    merge_personal_persona
     write_credentials
     for d in postgres temporal-postgres redis redis-data minio/data \
              shared/documents shared/courses shared/course-contents shared/defaults \
