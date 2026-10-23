@@ -16,9 +16,10 @@ function storedLanguage(): UiLanguage | null {
   }
 }
 
-function currentLanguage(): UiLanguage {
+export function getUiLanguage(initialPreference?: UiLanguage): UiLanguage {
   const stored = storedLanguage();
   if (stored) return stored;
+  if (initialPreference) return initialPreference;
   const preferred = (navigator.languages?.[0] ?? navigator.language ?? '').toLowerCase();
   return preferred.startsWith('de') ? 'de' : 'en';
 }
@@ -45,8 +46,9 @@ export function setUiLanguage(language: UiLanguage) {
 /**
  * The visitor's explicit choice, else German for German-language browsers and
  * English otherwise. The server render uses `fallback`; the browser value
- * applies on hydration.
+ * applies on hydration. `preferred` supplies a request-selected language ahead
+ * of browser detection while a remembered explicit choice still wins.
  */
-export function useBrowserLanguage(fallback: UiLanguage = 'de'): UiLanguage {
-  return useSyncExternalStore(subscribe, currentLanguage, () => fallback);
+export function useBrowserLanguage(fallback: UiLanguage = 'de', preferred?: UiLanguage): UiLanguage {
+  return useSyncExternalStore(subscribe, () => getUiLanguage(preferred), () => fallback);
 }
