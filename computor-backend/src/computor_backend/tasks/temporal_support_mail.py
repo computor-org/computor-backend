@@ -40,6 +40,12 @@ def support_deliver_reply(message_id: str) -> Dict[str, str]:
     return deliver_reply(message_id)
 
 
+@activity.defn(name="support_send_welcome")
+def support_send_welcome(user_id: str, language: str = "en") -> Dict[str, str]:
+    from computor_backend.support.welcome import send_welcome
+    return send_welcome(user_id, language=language)
+
+
 @register_task
 @workflow.defn(name="support_mail_import", sandboxed=False)
 class SupportMailImportWorkflow(BaseWorkflow):
@@ -105,6 +111,44 @@ class SupportSendReplyWorkflow(BaseWorkflow):
         return WorkflowResult(status="completed", result=result)
 
 
+@register_task
+@workflow.defn(name="support_welcome_mail", sandboxed=False)
+class SupportWelcomeMailWorkflow(BaseWorkflow):
+    """Welcome mail after a completed registration (issues#185). The workflow
+    ID is per user and duplicates are rejected, and the activity is never
+    retried, so a user gets the mail at most once."""
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "support_welcome_mail"
+
+    @classmethod
+    def get_task_queue(cls) -> str:
+        return SUPPORT_QUEUE
+
+    @classmethod
+    def get_execution_timeout(cls) -> timedelta:
+        return timedelta(hours=2)
+
+    @classmethod
+    def get_retry_policy(cls) -> RetryPolicy:
+        return RetryPolicy(maximum_attempts=1)
+
+    @workflow.run
+    async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
+        missing = self.require_params(parameters, "user_id")
+        if missing:
+            return missing
+        result = await workflow.execute_activity(
+            support_send_welcome,
+            args=[parameters["user_id"], parameters.get("language", "en")],
+            schedule_to_start_timeout=timedelta(hours=1),
+            start_to_close_timeout=timedelta(minutes=5),
+            retry_policy=RetryPolicy(maximum_attempts=1),
+        )
+        return WorkflowResult(status="completed", result=result)
+
+
 async def ensure_import_schedule(client, poll_seconds: int) -> None:
     """Create (or update the interval of) the periodic import schedule."""
     from temporalio.client import (
@@ -146,5 +190,5 @@ async def ensure_import_schedule(client, poll_seconds: int) -> None:
 # worker; any other worker asked to run them fails with an unknown activity.
 ACTIVITIES: list = []
 QUEUE_ACTIVITIES = {
-    SUPPORT_QUEUE: [support_import_mailbox, support_deliver_reply],
+    SUPPORT_QUEUE: [support_import_mailbox, support_deliver_reply, support_send_welcome],
 }
