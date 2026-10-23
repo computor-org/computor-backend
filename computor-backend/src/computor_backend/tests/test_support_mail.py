@@ -160,3 +160,84 @@ class TestReply:
                           references=[], ticket_number=1)
         assert msg["Subject"] == "RE: hi"
         assert str(msg["From"]) == '"via computor.at" <abuse@computor.at>'
+
+
+class TestWelcomeMail:
+    def _settings(self, **kw):
+        return SupportSettings(welcome_mail_enabled=True, mail_enabled=True, **kw)
+
+    @pytest.mark.parametrize("language", ["de", "en", "fr"])
+    def test_localized_text_with_name_and_link(self, language):
+        from computor_backend.support.welcome import build_welcome
+
+        msg = build_welcome(self._settings(site_url="https://example.test/"),
+                            given_name="  Ada  ", to="ada@example.org", language=language)
+        body = msg.get_content()
+        assert msg["To"] == "ada@example.org"
+        assert "contact@computor.at" in msg["From"]
+        assert msg["Auto-Submitted"] == "auto-generated"
+        german = language == "de"
+        assert body.startswith("Hallo Ada," if german else "Hello Ada,")
+        assert ("Hello Ada," not in body) if german else ("Hallo Ada," not in body)
+        assert msg["Subject"] == ("Willkommen bei computor.at" if german else "Welcome to computor.at")
+        assert "https://example.test " in body and "//example.test/" not in body
+        assert ("Kurs beitreten" if german else "Join course") in body
+
+    def test_sender_must_be_a_team_address(self):
+        from computor_backend.support.welcome import build_welcome
+
+        with pytest.raises(ValueError):
+            build_welcome(self._settings(welcome_from="someone@example.org"),
+                          given_name="Ada", to="ada@example.org")
+
+    def test_disabled_deployment_sends_nothing(self, monkeypatch):
+        from computor_backend.support import mailbox, welcome
+
+        sent = []
+        monkeypatch.setattr(mailbox, "smtp_send", lambda *a, **k: sent.append(a))
+        assert welcome.send_welcome("any", SupportSettings())["state"] == "disabled"
+        assert sent == []
+
+    @pytest.mark.parametrize("starttls", [True, False])
+    def test_smtp_login_is_skipped_without_credentials(self, monkeypatch, starttls):
+        from computor_backend.support import mailbox
+
+        calls = []
+
+        class _Smtp:
+            def __init__(self, *a, **k): pass
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def ehlo(self): calls.append("ehlo")
+            def starttls(self, context=None): calls.append("starttls")
+            def login(self, *a): calls.append("login")
+            def send_message(self, *a, **k): calls.append("send")
+
+        monkeypatch.setattr(mailbox.smtplib, "SMTP", _Smtp)
+        mailbox.smtp_send(SupportSettings(smtp_starttls=starttls), object(), "contact@computor.at", ["a@example.org"])
+        assert calls == (["ehlo", "starttls", "ehlo", "send"] if starttls else ["ehlo", "send"])
+        calls.clear()
+        mailbox.smtp_send(SupportSettings(smtp_user="u", smtp_password="p", smtp_starttls=starttls), object(),
+                          "contact@computor.at", ["a@example.org"])
+        assert "login" in calls
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("imports", [True, False])
+async def test_welcome_only_worker_can_disable_mailbox_imports(monkeypatch, imports):
+    from computor_backend.support import config
+    from computor_backend.tasks import temporal_support_mail
+    from computor_backend.tasks.temporal_worker import TemporalWorker
+
+    calls = []
+
+    async def ensure_schedule(client, interval):
+        calls.append((client, interval))
+
+    settings = SupportSettings(mail_enabled=True, welcome_mail_enabled=True, mail_import_enabled=imports)
+    monkeypatch.setattr(config, "get_support_settings", lambda: settings)
+    monkeypatch.setattr(temporal_support_mail, "ensure_import_schedule", ensure_schedule)
+    worker = TemporalWorker(task_queues=["support"])
+    worker.client = object()
+    await worker._ensure_support_schedule()
+    assert calls == ([(worker.client, settings.mail_poll_seconds)] if imports else [])

@@ -26,7 +26,7 @@ from computor_backend.business_logic.instance_limits import (
 )
 from computor_backend.permissions.auth import AuthenticationService
 from computor_backend.permissions.principal import Principal
-from computor_backend.model.auth import User, Account
+from computor_backend.model.auth import User, Account, Profile
 from computor_backend.model.organization import Organization
 from computor_backend.redis_cache import get_redis_client
 from computor_backend.plugins.registry import get_plugin_registry
@@ -421,6 +421,29 @@ def _sso_identity_properties(user_info, auth_result) -> Dict[str, Any]:
     }
 
 
+async def _queue_welcome_mail(user_id: str, language: str = "en") -> None:
+    """Queue the welcome mail (issues#185). Best effort: a mail problem never
+    fails a login. The workflow ID is per user and duplicates are rejected, so
+    the mail goes out at most once."""
+    from computor_backend.support.config import SUPPORT_TASK_QUEUE, get_support_settings
+
+    settings = get_support_settings()
+    if not settings.welcome_mail_enabled:
+        return
+    try:
+        from computor_backend.tasks import get_task_executor
+        from computor_types.tasks import TaskSubmission
+
+        await get_task_executor().submit_task(TaskSubmission(
+            task_name="support_welcome_mail",
+            parameters={"user_id": user_id, "language": language if language in ("de", "en") else "en"},
+            queue=SUPPORT_TASK_QUEUE,
+            workflow_id=f"support-welcome-{user_id}",
+        ))
+    except Exception:
+        logger.warning("welcome mail for user %s: could not be queued", user_id, exc_info=True)
+
+
 async def handle_sso_callback(
     provider: str,
     code: str,
@@ -616,6 +639,16 @@ async def handle_sso_callback(
                 db.add(user)
                 db.flush()
                 created_user = True
+                # The database trigger creates a profile with Automatic language.
+                # Preserve the explicit choice made before registration, without
+                # changing an existing user's preference on a later login.
+                registration_language = (state_data or {}).get("ui_locales")
+                if registration_language in ("de", "en"):
+                    profile = db.query(Profile).filter(Profile.user_id == user.id).first()
+                    if profile is None:
+                        profile = Profile(user_id=user.id)
+                        db.add(profile)
+                    profile.language_code = registration_language
 
             # Create account
             account = Account(
@@ -737,6 +770,10 @@ async def handle_sso_callback(
 
     if enroll_pilot:
         await enroll_in_pilot_courses(db, user_primitives["id"])
+        # Registration is complete here: the address is verified (admission
+        # refused it otherwise) and the first login has created the user.
+        if user_primitives["email"]:
+            await _queue_welcome_mail(user_primitives["id"], (state_data or {}).get("ui_locales", "en"))
 
     # Elevated users must hold Keycloak's computor-mfa-required role (#485).
     from computor_backend.business_logic.admin_mfa import sync_on_login
