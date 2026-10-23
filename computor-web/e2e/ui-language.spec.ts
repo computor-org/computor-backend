@@ -74,3 +74,26 @@ test('a German profile language wins over an English browser', async ({ page }) 
   await page.getByRole('button', { name: 'Benutzermenü' }).click();
   await expect(page.getByRole('button', { name: 'Abmelden' })).toBeVisible();
 });
+
+for (const [locale, language, message] of [
+  ['de-DE', 'en', 'The sign-in page was open too long and has expired.'],
+  ['en-US', 'de', 'Die Anmeldeseite war zu lange geöffnet'],
+] as const) {
+  test.describe(`profile language survives new tabs (${locale}/${language})`, () => {
+    test.use({ locale });
+    test('keeps the saved choice on signed-out pages and sends it to Keycloak', async ({ page, context }) => {
+      await signIn(page, language);
+      await page.goto('/courses');
+      await expect.poll(() => page.evaluate(() => localStorage.getItem('computor.language'))).toBe(language);
+      const freshTab = await context.newPage();
+      await freshTab.goto('/auth/success?error=sign_in_expired');
+      await expect(freshTab.getByText(message)).toBeVisible();
+      const request = freshTab.waitForRequest((request) => request.url().includes('/auth/keycloak/login?'));
+      await freshTab.getByRole('link', { name: language === 'de' ? 'Erneut versuchen' : 'Try again' }).click();
+      const login = new URL((await request).url());
+      expect(login.searchParams.get('ui_locales')).toBe(language);
+      expect(new URL(login.searchParams.get('redirect_uri')!).searchParams.get('ui_locale')).toBe(language);
+      await freshTab.close();
+    });
+  });
+}
