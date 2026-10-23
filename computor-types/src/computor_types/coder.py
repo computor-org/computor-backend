@@ -178,6 +178,11 @@ class CoderWorkspace(BaseModel):
     template_version_name: Optional[str] = Field(
         None, description="Human-readable template version name of the latest build"
     )
+    template_version_created_at: Optional[datetime] = Field(
+        None,
+        description="When the template version of the latest build was created, i.e. how "
+                    "current the workspace's software is; only populated by views that need it",
+    )
     latest_build_transition: Optional[str] = Field(
         None, description="Transition of the latest build: start | stop | delete"
     )

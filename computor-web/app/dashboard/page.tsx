@@ -10,12 +10,12 @@ import Panel from '@/src/components/ui/Panel';
 import Badge from '@/src/components/Badge';
 import { ButtonLink } from '@/src/components/ui/Button';
 import CourseCard, { ViewCourseLink } from '@/src/components/courses/CourseCard';
-import WorkspaceStatusBadge, { categorizeStatus } from '@/src/components/workspaces/WorkspaceStatusBadge';
 import NeedsAttention, {
   DEFAULT_REASONS,
   selectNeedsAttention,
 } from '@/src/components/dashboard/NeedsAttention';
 import InviteFriendCard from '@/src/components/dashboard/InviteFriendCard';
+import DashboardWorkspaces from '@/src/components/dashboard/DashboardWorkspaces';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
@@ -41,7 +41,7 @@ const COPY = {
     sentBack: (n: number) =>
       n === 1 ? '1 Aufgabe wurde von Tutoren zurückgegeben.' : `${n} Aufgaben wurden von Tutoren zurückgegeben.`,
     notEnrolled: 'Du bist noch in keinem Kurs.',
-    nothingWaiting: 'Im Moment wartet nichts auf dich.',
+    nothingSentBack: 'Dir wurde keine Aufgabe zur Korrektur zurückgegeben.',
     announcements: 'Ankündigungen',
     new: 'Neu',
     announcement: 'Ankündigung',
@@ -60,7 +60,7 @@ const COPY = {
     welcome: (name?: string) => `Welcome back, ${name}`,
     sentBack: (n: number) => `${n} ${n === 1 ? 'assignment' : 'assignments'} sent back by a tutor.`,
     notEnrolled: "You're not enrolled in any courses yet.",
-    nothingWaiting: 'Nothing is waiting on you right now.',
+    nothingSentBack: 'No assignment has been sent back to you for correction.',
     announcements: 'Announcements',
     new: 'New',
     announcement: 'Announcement',
@@ -162,9 +162,10 @@ export default function DashboardPage() {
   const attention = selectNeedsAttention(Array.isArray(data?.contents) ? data.contents : [], courseTitles, DEFAULT_REASONS, t.course);
   const workspaces = data?.workspaces ?? [];
   const announcements = data?.announcements ?? [];
-  const runningWorkspaces = workspaces.filter(
-    (ws) => categorizeStatus(ws.latest_build_status, ws.latest_build_transition) === 'running',
-  );
+  // Every state, not just running: a workspace stops after an hour without
+  // use, so the one a returning learner comes back for is usually stopped.
+  // Only a workspace being deleted is left out.
+  const ownWorkspaces = workspaces.filter((ws) => ws.latest_build_transition !== 'delete');
 
   return (
     <AuthenticatedLayout>
@@ -179,7 +180,7 @@ export default function DashboardPage() {
                 ? t.sentBack(attention.length)
                 : courses.length === 0
                   ? t.notEnrolled
-                  : t.nothingWaiting
+                  : t.nothingSentBack
           }
         />
 
@@ -216,6 +217,13 @@ export default function DashboardPage() {
               </section>
             )}
 
+            {ownWorkspaces.length > 0 && (
+              <section>
+                <SectionHeading title={t.workspaces} href="/workspaces" />
+                <DashboardWorkspaces workspaces={ownWorkspaces} courseTitles={courseTitles} />
+              </section>
+            )}
+
             <section>
               <SectionHeading title={t.yourCourses} href="/courses" />
               {courses.length === 0 ? (
@@ -247,28 +255,6 @@ export default function DashboardPage() {
             )}
 
             <InviteFriendCard />
-
-            {runningWorkspaces.length > 0 && (
-              <section>
-                <SectionHeading title={t.workspaces} href="/workspaces" />
-                <Panel padding="none">
-                  <div className="divide-y divide-rule-soft">
-                    {runningWorkspaces.map((ws) => (
-                      <div key={ws.id} className="flex items-center gap-3 px-4 py-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium text-fg truncate">{ws.name}</div>
-                          <div className="text-xs text-muted truncate">{ws.template_name}</div>
-                        </div>
-                        <WorkspaceStatusBadge
-                          status={ws.latest_build_status}
-                          transition={ws.latest_build_transition}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </Panel>
-              </section>
-            )}
           </ScrollArea>
         )}
       </ListPageLayout>

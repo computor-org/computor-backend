@@ -17,6 +17,7 @@ global workspace role (see ``api/coder.py``).
 """
 import asyncio
 import logging
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
@@ -799,6 +800,34 @@ async def populate_home_modes(
     destroys.
     """
     await _populate_build_params(client, workspaces)
+
+
+async def populate_template_version_dates(
+    client: CoderClient, workspaces: list[CoderWorkspace]
+) -> None:
+    """Fill ``CoderWorkspace.template_version_created_at``.
+
+    The workspace's own creation date says little about what runs in it,
+    because starting an outdated workspace rebuilds it on the template's
+    active version. The version's creation time is what tells a user how
+    current their workspace is. One request per distinct version, and those
+    answers are cached by the client.
+    """
+    version_ids = {w.template_version_id for w in workspaces if w.template_version_id}
+    semaphore = asyncio.Semaphore(8)
+
+    async def fetch(version_id: str) -> tuple[str, Optional[datetime]]:
+        async with semaphore:
+            try:
+                created_at = await client.get_template_version_created_at(version_id)
+                return version_id, datetime.fromisoformat(created_at) if created_at else None
+            except Exception:
+                return version_id, None
+
+    created = dict(await asyncio.gather(*(fetch(v) for v in version_ids)))
+    for workspace in workspaces:
+        if workspace.template_version_id:
+            workspace.template_version_created_at = created.get(workspace.template_version_id)
 
 
 async def _populate_build_params(

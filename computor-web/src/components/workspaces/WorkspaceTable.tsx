@@ -5,6 +5,7 @@ import type { CoderWorkspace } from '@/src/types/workspaces';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/src/components/ui/Table';
 import Button from '@/src/components/ui/Button';
 import WorkspaceStatusBadge, { categorizeStatus } from './WorkspaceStatusBadge';
+import { workspaceVersionLabel } from './versionDate';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const COPY = {
@@ -81,6 +82,7 @@ function WorkspaceRow({
   const owner = workspace.owner_name || '';
   const transition = workspace.latest_build_transition;
   const category = categorizeStatus(workspace.latest_build_status, transition);
+  const version = workspaceVersionLabel(workspace.template_version_created_at, language);
 
   const runAction = async (action: 'start' | 'stop', fn: (o: string, n: string) => Promise<void>) => {
     if (!owner) return;
@@ -99,6 +101,7 @@ function WorkspaceRow({
       </Td>
       <Td className="text-sm text-muted">
         {workspace.template_display_name || workspace.template_name || '—'}
+        {version && <div className="text-xs">{version}</div>}
       </Td>
       <Td>
         {/*

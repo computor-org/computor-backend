@@ -13,6 +13,7 @@ import { useResource } from '@/src/hooks/useResource';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { rememberWorkspaceCourse } from '@/src/utils/workspaceLaunch';
 import { AGENT_LIFECYCLE_GAVE_UP, type WorkspaceDetails, type WorkspaceLaunchContext } from '@/src/types/workspaces';
 
 const coderClient = new CoderClient();
@@ -142,6 +143,7 @@ function LaunchWorkspace() {
     if (context.course_id !== courseId) {
       throw new Error(tRef.current.courseNotSelected);
     }
+    rememberWorkspaceCourse(owner, name, courseId);
   }, [owner, name, courseId]);
 
   useEffect(() => {

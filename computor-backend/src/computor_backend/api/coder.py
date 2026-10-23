@@ -693,8 +693,14 @@ async def get_workspaces(
         # A scratch home is destroyed together with its workspace, a shared one
         # is not. The UI cannot warn about that without knowing which is which,
         # so fill it in here (bounded fan-out, one request per workspace).
-        from computor_backend.business_logic.course_workspaces import populate_home_modes
-        await populate_home_modes(client, workspaces)
+        from computor_backend.business_logic.course_workspaces import (
+            populate_home_modes,
+            populate_template_version_dates,
+        )
+        await asyncio.gather(
+            populate_home_modes(client, workspaces),
+            populate_template_version_dates(client, workspaces),
+        )
         return WorkspaceListResponse(
             workspaces=workspaces,
             count=len(workspaces),

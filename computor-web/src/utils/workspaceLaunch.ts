@@ -36,3 +36,36 @@ export function openLaunchTab(owner: string, name: string, courseId?: string): b
 export function derivedWorkspaceName(template: string): string {
   return template.replace(/-workspace$/, '').replace(/[^a-z0-9-]/g, '') || 'workspace';
 }
+
+const LAST_COURSE_KEY = 'computor.workspaceLastCourse';
+
+function readLastCourses(): Record<string, string> {
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(LAST_COURSE_KEY) ?? '{}');
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Remember the course a workspace was last opened for, so the dashboard can
+ * reopen it in the same course. A per-browser convenience only: the server's
+ * launch context expires within minutes, and losing this entry just means the
+ * dashboard opens the workspace without picking a course.
+ */
+export function rememberWorkspaceCourse(owner: string, name: string, courseId: string): void {
+  try {
+    const courses = readLastCourses();
+    courses[`${owner}/${name}`] = courseId;
+    window.localStorage.setItem(LAST_COURSE_KEY, JSON.stringify(courses));
+  } catch {
+    // Storage blocked or full: nothing to remember, nothing breaks.
+  }
+}
+
+/** The course this browser last opened the workspace for, if any. */
+export function lastWorkspaceCourse(owner: string, name: string): string | undefined {
+  const courseId = readLastCourses()[`${owner}/${name}`];
+  return typeof courseId === 'string' ? courseId : undefined;
+}

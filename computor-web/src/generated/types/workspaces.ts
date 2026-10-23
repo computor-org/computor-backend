@@ -239,6 +239,8 @@ export interface CoderWorkspace {
   template_version_id?: string | null;
   /** Human-readable template version name of the latest build */
   template_version_name?: string | null;
+  /** When the template version of the latest build was created, i.e. how current the workspace's software is; only populated by views that need it */
+  template_version_created_at?: string | null;
   /** Transition of the latest build: start | stop | delete */
   latest_build_transition?: string | null;
   /** Latest build status */
