@@ -25,6 +25,7 @@ import Button, { ButtonLink } from '@/src/components/ui/Button';
 import Notice from '@/src/components/ui/Notice';
 import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import SelfEnrollmentHelp from '@/src/components/courses/SelfEnrollmentHelp';
+import CourseProgressCard from '@/src/components/student/CourseProgress';
 import { displayName } from '@/src/utils/displayName';
 import { localizedRoleLabel } from '@/src/utils/courseRoles';
 import type { PersonalCloneCredentialGet } from 'types/generated';
@@ -235,6 +236,8 @@ export default function CoursePage() {
     canDeleteCourse,
   } = usePermissions();
   const canManageMembers = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
+  // Progress is the learner's own: a tutor or lecturer has no submissions here.
+  const isLearner = courseHasAtLeast(courseId, '_student') && !courseHasAtLeast(courseId, '_tutor');
 
   const { data, loading, error, reload } = useResource(
     async () => {
@@ -463,6 +466,11 @@ export default function CoursePage() {
             ])}
           />
         </SectionCard>
+
+        {/* How far the learner is and where to pick up (issues#408, #525). It
+            sits above the workspace launch, so a returning learner sees which
+            assignment comes next before opening the editor. */}
+        {isLearner && <CourseProgressCard courseId={courseId} language={language} />}
 
         {/* Workspaces: launch buttons for the course's allowed templates. The
             component hides itself (card and heading included) when the course
