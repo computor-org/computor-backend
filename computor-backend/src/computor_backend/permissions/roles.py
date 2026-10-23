@@ -30,6 +30,14 @@ class CourseRole(str, Enum):
     STUDENT = "_student"
 
 
+# A self-enrolled learner who left the course (issues#458). The membership row
+# stays, so submissions and results keep their course_member, but the role is
+# outside the hierarchy: it satisfies no role check, ``db_get_course_claims``
+# emits no claim for it, and it is not counted as a student. Joining the course
+# again turns it back into ``_student``.
+INACTIVE_COURSE_ROLE = "_inactive"
+
+
 class ScopeRole(str, Enum):
     """Organization / course-family role identifiers.
 

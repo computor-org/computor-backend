@@ -65,6 +65,16 @@ only that row with `DELETE FROM public_workspace_reservation WHERE
 owner_name='alice' AND workspace_name='vscode';`. Database and Coder failures
 refuse new launches, leaving local VS Code and Codespaces available.
 
+A learner who joins a public course lands in its `Selbsteinschreibung` course
+group, which the backend creates on the first join. The course page then shows
+a "Hilfe & Kontakt" block (Lena instead of tutors, the support form, the
+guides) and lets the learner leave the course. Leaving keeps the membership
+with the role `_inactive`, which grants nothing, so submissions and results
+stay, and joining again restores it. After deploying this, move learners who
+joined earlier into the group once with
+`python -m computor_backend.scripts.backfill_self_enrollment_group --apply`
+(without `--apply` it only reports what it would move).
+
 Verified, signed-in learners can join public courses and submit work. Once
 `PUBLIC_LUNA_ENABLED=true` and the restricted worker are deployed, an assignment
 page also shows a short Ask Lena form. A learner sends a question and selected

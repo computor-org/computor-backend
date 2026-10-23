@@ -21,6 +21,11 @@ import {
 } from '@/src/clients/SupportClient';
 
 const CONTACT = 'contact@computor.at';
+
+// Preset ticket categories (issues#458). The topic travels in the report
+// context and the preset title becomes the ticket subject the team sees.
+type Topic = 'problem' | 'delete-account';
+const TOPICS: Topic[] = ['problem', 'delete-account'];
 const MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
 const SCREENSHOT_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 
@@ -55,6 +60,13 @@ const COPY = {
     signIn: 'Anmelden',
     content: 'Rechtswidrige Inhalte melden',
     loading: 'Wird geladen …',
+    topic: 'Anliegen',
+    topics: { problem: 'Problem mit der Plattform', 'delete-account': 'Konto löschen' },
+    deleteTitle: 'Konto löschen',
+    request: 'Deine Anfrage',
+    deleteDescription: 'Bitte löscht mein Computor-Konto.',
+    deleteHint:
+      'Schick diese Anfrage ab, wenn dein Konto gelöscht werden soll. Das Support-Team antwortet dir unter „Meine Meldungen“, bevor etwas gelöscht wird. Um nur einen selbst gewählten Kurs zu verlassen, nutze „Kurs verlassen“ auf der Kursseite.',
   },
   en: {
     title: 'Report a problem',
@@ -86,6 +98,13 @@ const COPY = {
     signIn: 'Sign in',
     content: 'Report illegal content',
     loading: 'Loading…',
+    topic: 'Topic',
+    topics: { problem: 'Problem with the platform', 'delete-account': 'Delete account' },
+    deleteTitle: 'Delete account',
+    request: 'Your request',
+    deleteDescription: 'Please delete my Computor account.',
+    deleteHint:
+      'Send this request if you want your account deleted. The support team replies under “My reports” before anything is deleted. To leave only a course you joined yourself, use “Leave course” on the course page.',
   },
 };
 
@@ -144,6 +163,8 @@ function ReportForm() {
   const language = useUiLanguage();
   const t = COPY[language];
   const [mode, setMode] = useState<'loading' | 'on' | 'off'>('loading');
+  const [topic, setTopic] = useState<Topic>('problem');
+  const deleting = topic === 'delete-account';
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [expected, setExpected] = useState('');
@@ -153,6 +174,23 @@ function ReportForm() {
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [receipt, setReceipt] = useState<ReportReceipt | null>(null);
+
+  const chooseTopic = (next: Topic) => {
+    setTopic(next);
+    if (next === 'delete-account') {
+      setTitle(t.deleteTitle);
+      setDescription((current) => current.trim() ? current : t.deleteDescription);
+    } else if (title === t.deleteTitle) {
+      setTitle('');
+      if (description === t.deleteDescription) setDescription('');
+    }
+  };
+
+  // A link may preset the topic, e.g. "Konto löschen" on a course page.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('topic') === 'delete-account') chooseTopic('delete-account');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -188,15 +226,16 @@ function ReportForm() {
         await createReport({
           title: title.trim() || undefined,
           description: description.trim(),
-          expected: expected.trim() || undefined,
-          steps: steps.trim() || undefined,
+          expected: (!deleting && expected.trim()) || undefined,
+          steps: (!deleting && steps.trim()) || undefined,
           context: {
             client: 'computor-web',
             client_version: APP_VERSION,
             page: from ?? undefined,
             language: navigator.language,
+            topic: deleting ? 'delete_account' : undefined,
           },
-          screenshot,
+          screenshot: deleting ? null : screenshot,
         }),
       );
     } catch (err) {
@@ -253,31 +292,44 @@ function ReportForm() {
           <p className="text-sm text-muted">{t.privacy}</p>
           <ErrorBanner>{error}</ErrorBanner>
           <label className="block text-sm text-muted">
+            {t.topic}
+            <select className={`${inputCls} mt-1`} value={topic} onChange={(e) => chooseTopic(e.target.value as Topic)}>
+              {TOPICS.map((value) => (
+                <option key={value} value={value}>{t.topics[value]}</option>
+              ))}
+            </select>
+          </label>
+          {deleting && <p className="text-sm text-body">{t.deleteHint}</p>}
+          <label className="block text-sm text-muted">
             {t.titleLabel}
             <input className={`${inputCls} mt-1`} value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} />
           </label>
           <label className="block text-sm text-muted">
-            {t.description}
+            {deleting ? t.request : t.description}
             <textarea className={`${inputCls} mt-1 min-h-32`} required value={description} onChange={(e) => setDescription(e.target.value)} />
           </label>
-          <label className="block text-sm text-muted">
-            {t.expected}
-            <textarea className={`${inputCls} mt-1 min-h-20`} value={expected} onChange={(e) => setExpected(e.target.value)} />
-          </label>
-          <label className="block text-sm text-muted">
-            {t.steps}
-            <textarea className={`${inputCls} mt-1 min-h-20`} value={steps} onChange={(e) => setSteps(e.target.value)} />
-          </label>
-          <label className="block text-sm text-muted">
-            {t.screenshot}
-            <input
-              key={fileKey}
-              type="file"
-              accept={SCREENSHOT_TYPES.join(',')}
-              className={`${fileInputCls} mt-1`}
-              onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
-            />
-          </label>
+          {!deleting && (
+            <>
+              <label className="block text-sm text-muted">
+                {t.expected}
+                <textarea className={`${inputCls} mt-1 min-h-20`} value={expected} onChange={(e) => setExpected(e.target.value)} />
+              </label>
+              <label className="block text-sm text-muted">
+                {t.steps}
+                <textarea className={`${inputCls} mt-1 min-h-20`} value={steps} onChange={(e) => setSteps(e.target.value)} />
+              </label>
+              <label className="block text-sm text-muted">
+                {t.screenshot}
+                <input
+                  key={fileKey}
+                  type="file"
+                  accept={SCREENSHOT_TYPES.join(',')}
+                  className={`${fileInputCls} mt-1`}
+                  onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+            </>
+          )}
           <Button type="submit" disabled={!description.trim()} loading={sending} loadingLabel={t.sending}>
             {t.send}
           </Button>

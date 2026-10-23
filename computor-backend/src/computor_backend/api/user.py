@@ -34,6 +34,7 @@ from starlette.concurrency import run_in_threadpool
 from computor_backend.exceptions import RateLimitException, ServiceUnavailableException
 from computor_backend.redis_cache import get_redis_client
 from computor_types.course_members import CourseMemberGet
+from computor_types.courses import CourseSelfEnrollment
 
 # Import business logic
 from computor_backend.business_logic.users import (
@@ -47,6 +48,8 @@ from computor_backend.business_logic.course_accounts import (
     register_user_course_account,
 )
 from computor_backend.business_logic.course_registration import (
+    get_self_enrollment,
+    leave_self_enrolled_course,
     register_in_public_course,
 )
 from computor_backend.business_logic.course_git import (
@@ -472,11 +475,11 @@ async def enroll_in_public_course(
     would be a trap.
 
     The request has no body. The role is not a parameter: self-registration can
-    only ever produce ``_student``, in the course's first existing group (or a
-    ``default`` group created for the purpose). Idempotent — an existing
+    only ever produce ``_student``, in the course's ``Selbsteinschreibung``
+    group, which is created on the first join. Idempotent — an existing
     membership of any role comes back unchanged with a 200, so a lecturer who
-    clicks Enrol is not demoted. There is no matching DELETE; course staff
-    remove members.
+    clicks Enrol is not demoted. A learner who left the course through
+    ``POST /user/courses/{course_id}/leave`` is enrolled again with a 201.
 
     404 when the course does not exist *or* is not public: a private course
     must not be distinguishable from a missing one. 409 (``CONFLICT_003``) when
@@ -507,6 +510,50 @@ async def enroll_in_public_course(
     await _invalidate_after_enrollment(member, credentials, cache)
 
     return CourseMemberGet.model_validate(member, from_attributes=True)
+
+
+@user_router.get(
+    "/courses/{course_id}/self-enrollment",
+    response_model=CourseSelfEnrollment,
+    summary="Whether you joined this course yourself and may leave it",
+)
+async def get_own_self_enrollment(
+    course_id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db, scope="function"),
+):
+    """The caller's own enrolment in a course (issues#458).
+
+    404 when the caller is not an active member of the course.
+    """
+    return get_self_enrollment(course_id, permissions, db)
+
+
+@user_router.post(
+    "/courses/{course_id}/leave",
+    status_code=204,
+    summary="Leave a course you joined yourself",
+)
+async def leave_course(
+    course_id: UUID | str,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    credentials: Annotated[
+        SSOAuthCredentials | ApiTokenCredentials,
+        Depends(parse_authorization_header),
+    ],
+    db: Session = Depends(get_db, scope="function"),
+    cache=Depends(get_redis_client),
+):
+    """End your own self-enrolment (issues#458).
+
+    The counterpart of ``POST /user/courses/{course_id}/enroll``, and only for
+    memberships created there: 403 for an enrolment by staff, 404 when the
+    caller is not an active member. Submissions and results stay; enrolling
+    again restores the membership.
+    """
+    member = leave_self_enrolled_course(course_id, permissions, db)
+    await _invalidate_after_enrollment(member, credentials, cache)
+    return Response(status_code=204)
 
 
 async def _invalidate_after_enrollment(member, credentials, cache) -> None:

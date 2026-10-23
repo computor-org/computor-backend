@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from computor_backend.database import get_db
 from computor_backend.model.course import CourseMember, SubmissionGroup, SubmissionGroupMember, CourseContent
 from computor_backend.permissions.principal import Principal
+from computor_backend.permissions.roles import INACTIVE_COURSE_ROLE, TUTOR_AND_ABOVE
 from computor_backend.redis_cache import get_redis_client
 from computor_backend.settings import settings
 from computor_backend.websocket.auth import WebSocketCredential
@@ -486,6 +487,7 @@ class ConnectionManager:
             .filter(
                 CourseMember.user_id == principal.user_id,
                 CourseMember.course_group_id == course_group_id,
+                CourseMember.course_role_id != INACTIVE_COURSE_ROLE,
             )
             .exists()
         ).scalar()
@@ -501,7 +503,7 @@ class ConnectionManager:
             .filter(
                 CourseMember.course_id == cg.course_id,
                 CourseMember.user_id == principal.user_id,
-                CourseMember.course_role_id != "_student",
+                CourseMember.course_role_id.in_(TUTOR_AND_ABOVE),
             )
             .exists()
         ).scalar()
@@ -529,6 +531,7 @@ class ConnectionManager:
             .filter(
                 Course.course_family_id == course_family_id,
                 CourseMember.user_id == principal.user_id,
+                CourseMember.course_role_id != INACTIVE_COURSE_ROLE,
             )
             .exists()
         ).scalar()
@@ -555,6 +558,7 @@ class ConnectionManager:
             .filter(
                 Course.organization_id == organization_id,
                 CourseMember.user_id == principal.user_id,
+                CourseMember.course_role_id != INACTIVE_COURSE_ROLE,
             )
             .exists()
         ).scalar()
@@ -591,7 +595,7 @@ class ConnectionManager:
             .filter(
                 CourseMember.course_id == member.course_id,
                 CourseMember.user_id == principal.user_id,
-                CourseMember.course_role_id != "_student",
+                CourseMember.course_role_id.in_(TUTOR_AND_ABOVE),
             )
             .exists()
         ).scalar()
@@ -635,7 +639,7 @@ class ConnectionManager:
             .filter(
                 CourseMember.course_id == submission_group.course_id,
                 CourseMember.user_id == principal.user_id,
-                CourseMember.course_role_id != "_student"
+                CourseMember.course_role_id.in_(TUTOR_AND_ABOVE)
             )
             .exists()
         ).scalar()
@@ -656,7 +660,8 @@ class ConnectionManager:
             db.query(CourseMember.id)
             .filter(
                 CourseMember.course_id == course_id,
-                CourseMember.user_id == principal.user_id
+                CourseMember.user_id == principal.user_id,
+                CourseMember.course_role_id != INACTIVE_COURSE_ROLE,
             )
             .exists()
         ).scalar()
