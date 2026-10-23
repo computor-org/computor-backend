@@ -160,3 +160,59 @@ class TestReply:
                           references=[], ticket_number=1)
         assert msg["Subject"] == "RE: hi"
         assert str(msg["From"]) == '"via computor.at" <abuse@computor.at>'
+
+
+class TestWelcomeMail:
+    def _settings(self, **kw):
+        return SupportSettings(welcome_mail_enabled=True, mail_enabled=True, **kw)
+
+    def test_bilingual_text_with_name_and_link(self):
+        from computor_backend.support.welcome import build_welcome
+
+        msg = build_welcome(self._settings(site_url="https://example.test/"),
+                            given_name="  Ada  ", to="ada@example.org")
+        body = msg.get_content()
+        assert msg["To"] == "ada@example.org"
+        assert "contact@computor.at" in msg["From"]
+        assert msg["Auto-Submitted"] == "auto-generated"
+        assert body.startswith("Hallo Ada,")
+        assert "Hello Ada," in body
+        assert "https://example.test " in body and "//example.test/" not in body
+        assert "Kurs beitreten" in body
+
+    def test_sender_must_be_a_team_address(self):
+        from computor_backend.support.welcome import build_welcome
+
+        with pytest.raises(ValueError):
+            build_welcome(self._settings(welcome_from="someone@example.org"),
+                          given_name="Ada", to="ada@example.org")
+
+    def test_disabled_deployment_sends_nothing(self, monkeypatch):
+        from computor_backend.support import mailbox, welcome
+
+        sent = []
+        monkeypatch.setattr(mailbox, "smtp_send", lambda *a, **k: sent.append(a))
+        assert welcome.send_welcome("any", SupportSettings())["state"] == "disabled"
+        assert sent == []
+
+    def test_smtp_login_is_skipped_without_credentials(self, monkeypatch):
+        from computor_backend.support import mailbox
+
+        calls = []
+
+        class _Smtp:
+            def __init__(self, *a, **k): pass
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def ehlo(self): calls.append("ehlo")
+            def starttls(self, context=None): calls.append("starttls")
+            def login(self, *a): calls.append("login")
+            def send_message(self, *a, **k): calls.append("send")
+
+        monkeypatch.setattr(mailbox.smtplib, "SMTP", _Smtp)
+        mailbox.smtp_send(SupportSettings(), object(), "contact@computor.at", ["a@example.org"])
+        assert "send" in calls and "login" not in calls
+        calls.clear()
+        mailbox.smtp_send(SupportSettings(smtp_user="u", smtp_password="p"), object(),
+                          "contact@computor.at", ["a@example.org"])
+        assert "login" in calls

@@ -192,7 +192,8 @@ def smtp_send(settings: SupportSettings, msg: EmailMessage, envelope_from: str, 
         smtp.ehlo()
         smtp.starttls(context=_tls_context(settings))
         smtp.ehlo()
-        smtp.login(settings.smtp_user, settings.smtp_password)
+        if settings.smtp_user:  # the faepmail relay accepts team mail without authentication
+            smtp.login(settings.smtp_user, settings.smtp_password)
         smtp.send_message(msg, from_addr=envelope_from, to_addrs=rcpts)
 
 
