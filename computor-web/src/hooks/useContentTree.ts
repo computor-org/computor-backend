@@ -59,6 +59,8 @@ export interface UseContentTreeOptions {
    * student tree where the units are the point.
    */
   collapseBelowDepth?: number;
+  /** Open these groups by default; explicit user toggles still win. */
+  defaultExpandedPaths?: readonly string[];
 }
 
 /** A path we invented; it has no row in `items`. */
@@ -66,7 +68,7 @@ type MaybeSynthetic<T> = { path: string; position?: number | null; __item: T | n
 
 export function useContentTree<T extends { path: string; position?: number | null; title?: string | null }>(
   items: T[],
-  { synthesiseContainers = false, collapseBelowDepth }: UseContentTreeOptions = {},
+  { synthesiseContainers = false, collapseBelowDepth, defaultExpandedPaths }: UseContentTreeOptions = {},
 ) {
   // Only paths the user has *explicitly* toggled. Everything else answers to
   // collapseBelowDepth, so a reload that brings new content in does not silently
@@ -94,8 +96,8 @@ export function useContentTree<T extends { path: string; position?: number | nul
 
   const isExpanded = useCallback(
     (path: string) =>
-      overrides[path] ?? (collapseBelowDepth === undefined || depthOf(path) < collapseBelowDepth),
-    [overrides, collapseBelowDepth],
+      overrides[path] ?? (defaultExpandedPaths?.includes(path) || collapseBelowDepth === undefined || depthOf(path) < collapseBelowDepth),
+    [overrides, collapseBelowDepth, defaultExpandedPaths],
   );
 
   const toggle = useCallback(

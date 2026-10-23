@@ -191,7 +191,7 @@ jobs:
       - run: yarn test:public-learning
       - run: yarn build
       - run: npx playwright install --with-deps chromium
-      - run: yarn test:e2e e2e/public-learning.spec.ts e2e/course-card-layout.spec.ts e2e/workspace-launch.spec.ts e2e/teacher-dashboard.spec.ts e2e/support-tickets.spec.ts e2e/student-description-language.spec.ts e2e/self-enrollment-help.spec.ts e2e/public-landing.spec.ts --workers=2
+      - run: yarn test:e2e e2e/public-learning.spec.ts e2e/course-card-layout.spec.ts e2e/workspace-launch.spec.ts e2e/teacher-dashboard.spec.ts e2e/support-tickets.spec.ts e2e/student-description-language.spec.ts e2e/self-enrollment-help.spec.ts e2e/public-landing.spec.ts e2e/student-progress.spec.ts --workers=2
 
   keycloak-abuse:
     # Required jobs run in the merge queue, not on pull request events.
