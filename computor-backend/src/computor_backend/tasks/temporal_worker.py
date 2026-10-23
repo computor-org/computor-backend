@@ -323,6 +323,9 @@ class TemporalWorker:
         if not settings.mail_enabled:
             logger.info("Support mail bridge disabled (SUPPORT_MAIL_ENABLED is not true)")
             return
+        if not settings.mail_import_enabled:
+            logger.info("Support mailbox imports disabled (SUPPORT_MAIL_IMPORT_ENABLED is not true)")
+            return
         from .temporal_support_mail import ensure_import_schedule
         try:
             await ensure_import_schedule(self.client, settings.mail_poll_seconds)
