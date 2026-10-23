@@ -1,0 +1,185 @@
+# QA stack overlay (computor-org/issues#529). Used only by ops/qa/qactl.sh,
+# after base, prod, web, preview, preview-state, forgejo, forgejo-keycloak,
+# keycloak-abuse and coder. It never takes part in a production start.
+#
+# What it adds on top of the preview stack:
+# - Mailpit as the only mailbox: Keycloak's realm SMTP points at it, and its
+#   HTTP API is the way a test reads the verification mail.
+# - Keycloak served through Traefik under /auth with the computor login theme
+#   and the signup protection provider (ALTCHA + honeypot), like computor.at.
+#   docker-compose.keycloak-abuse.yaml cannot be used here because it also
+#   extends keycloak-idp-setup, which the preview stack does not define.
+# - Service images built FROM per-stack base tags (qa-computor-*), mapped onto
+#   the FROM names of the Dockerfiles with additional_contexts, so a QA build
+#   never retags the host's shared computor-base or runtime images.
+# - Container names under CONTAINER_NAME_PREFIX for the Forgejo services,
+#   whose own compose file pins computor-* names.
+# - CPU and memory limits, so a QA run cannot starve the CI containers that
+#   share the host.
+#
+# Every path here is absolute (QA_OPS_DIR, QA_SRC_DIR): the project directory
+# is the deployed backend checkout, not this directory.
+
+services:
+  mailpit:
+    image: axllent/mailpit:v1.31.4@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48
+    container_name: ${CONTAINER_NAME_PREFIX:?}mailpit
+    networks:
+      - computor-network
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    environment:
+      MP_MAX_MESSAGES: "2000"
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    ports:
+      # Web UI and the REST API (/api/v1/...). SMTP (1025) stays internal.
+      - "127.0.0.1:${QA_MAILPIT_PORT:?}:8025"
+    cpus: 0.5
+    mem_limit: 256m
+    labels:
+      - "traefik.enable=false"
+
+  keycloak:
+    # Same start mode and proxy handling as computor.at (keycloak-prod overlay),
+    # reached through Traefik at <origin>/auth like production.
+    command: ["start", "--import-realm"]
+    environment:
+      KC_PROXY_HEADERS: "xforwarded"
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    volumes:
+      - ${QA_SRC_DIR:?}/data/keycloak/themes:/opt/keycloak/themes:ro
+      - ${SYSTEM_DEPLOYMENT_PATH:?}/keycloak/providers:/opt/keycloak/providers:ro
+    cpus: 2
+    mem_limit: 2g
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.keycloak.rule=PathPrefix(`/auth`)"
+      - "traefik.http.routers.keycloak.entrypoints=web"
+      - "traefik.http.routers.keycloak.priority=50"
+      - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
+
+  keycloak-db:
+    cpus: 1
+    mem_limit: 1g
+
+  # The preview fixture seeder is replaced by ops/qa/qa_seed.py.
+  preview-seed:
+    profiles: ["preview-seed-disabled"]
+
+  uvicorn:
+    environment:
+      # Admin provisioning and the Keycloak admin API, as in keycloak-prod.
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
+      KEYCLOAK_ADMIN_MFA: "false"
+    build:
+      additional_contexts:
+        computor-base: docker-image://${QA_BASE_IMAGE:?}
+    cpus: 2
+    mem_limit: 3g
+
+  frontend:
+    cpus: 1
+    mem_limit: 1g
+
+  traefik:
+    cpus: 1
+    mem_limit: 512m
+
+  socket-proxy:
+    cpus: 0.25
+    mem_limit: 128m
+
+  postgres:
+    cpus: 2
+    mem_limit: 2g
+
+  redis:
+    cpus: 0.5
+    mem_limit: 512m
+
+  temporal-postgres:
+    cpus: 1
+    mem_limit: 1g
+
+  temporal:
+    cpus: 1
+    mem_limit: 1g
+
+  minio:
+    cpus: 1
+    mem_limit: 1g
+
+  static-server:
+    cpus: 0.25
+    mem_limit: 128m
+
+  temporal-worker:
+    build:
+      additional_contexts:
+        computor-base: docker-image://${QA_BASE_IMAGE:?}
+    cpus: 2
+    mem_limit: 2g
+
+  # Limits come from TESTING_WORKER_CPUS / _MEM_LIMIT in the generated env.
+  temporal-worker-testing:
+    build:
+      additional_contexts:
+        computor-base: docker-image://${QA_BASE_IMAGE:?}
+        computor-testing-runtimes: docker-image://${QA_TESTING_RUNTIMES_IMAGE:?}
+
+  forgejo-db:
+    container_name: ${CONTAINER_NAME_PREFIX:?}forgejo-db
+    cpus: 1
+    mem_limit: 1g
+
+  forgejo:
+    container_name: ${CONTAINER_NAME_PREFIX:?}forgejo
+    networks:
+      forgejo-internal: {}
+      computor-network:
+        # Default git URL of the backend and of Forgejo's migration allowlist.
+        # Aliases are per network, so this cannot reach another stack.
+        aliases: [computor-forgejo]
+    cpus: 1
+    mem_limit: 1g
+
+  forgejo-bootstrap:
+    container_name: ${CONTAINER_NAME_PREFIX:?}forgejo-bootstrap
+
+  forgejo-keycloak-setup:
+    container_name: ${CONTAINER_NAME_PREFIX:?}forgejo-keycloak-setup
+
+  coder:
+    cpus: 2
+    mem_limit: 2g
+
+  coder-postgres:
+    cpus: 1
+    mem_limit: 1g
+
+  coder-registry:
+    cpus: 0.5
+    mem_limit: 512m
+
+  workspace-ingress:
+    cpus: 0.5
+    mem_limit: 256m
+
+  temporal-worker-coder:
+    build:
+      additional_contexts:
+        computor-base: docker-image://${QA_BASE_IMAGE:?}
+        computor-coder-runtime: docker-image://${QA_CODER_RUNTIME_IMAGE:?}
+    cpus: 2
+    mem_limit: 2g
+
+  coder-socket-proxy:
+    cpus: 0.25
+    mem_limit: 128m
+
+  coder-worker-socket-proxy:
+    cpus: 0.25
+    mem_limit: 128m
