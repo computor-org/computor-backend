@@ -136,3 +136,28 @@ test.describe('/auth/success with a stored auth_redirect', () => {
     expect(offsite).toEqual([]);
   });
 });
+
+test.describe('signed-out guards keep the requested page', () => {
+  // /login hands off to SSO within milliseconds, so record every navigation
+  // instead of asserting on the transient URL.
+  async function loginUrl(page: Page, path: string): Promise<string | undefined> {
+    const visited: string[] = [];
+    page.on('framenavigated', (frame) => { if (frame === page.mainFrame()) visited.push(frame.url()); });
+    await page.route(`${API_ORIGIN}/auth/**`, (route) =>
+      route.fulfill({ status: 200, contentType: 'text/html', body: '<html><body>sso</body></html>' }));
+    await page.route(`${API_ORIGIN}/**`, (route) => json(route, { detail: 'unauthorized' }, 401));
+    await page.goto(path);
+    await page.waitForURL(`${API_ORIGIN}/auth/**`);
+    return visited.find((url) => url.startsWith(`${ORIGIN}/login`));
+  }
+
+  test('a course page returns to itself after sign-in', async ({ page }) => {
+    const path = '/courses/11111111-1111-4111-8111-111111111111/student/assignments?tab=open';
+    expect(await loginUrl(page, path)).toBe(`${ORIGIN}/login?next=${encodeURIComponent(path)}`);
+  });
+
+  test('the workspace launch page returns to itself after sign-in', async ({ page }) => {
+    const path = '/workspaces/launch?owner=me&name=vscode';
+    expect(await loginUrl(page, path)).toBe(`${ORIGIN}/login?next=${encodeURIComponent(path)}`);
+  });
+});
