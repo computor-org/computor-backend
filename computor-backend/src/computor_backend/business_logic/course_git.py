@@ -654,6 +654,13 @@ def _maybe_heal_forgejo_collaborator(
     """Retry granting the Forgejo write-collaborator when it failed at first
     provision (the student's Forgejo account didn't exist yet). No-op once the
     collaborator is recorded as added, or for non-Forgejo repos.
+
+    Creates the Forgejo account first when it is still missing, like the
+    template-reader heal does. Granting against a name Forgejo does not know
+    only fails again, and because this heal runs before the template-reader
+    heal, the retry then handed out a clone token that could read the template
+    but got "repository not found" on the student's own repository
+    (computor-org/issues#433).
     """
     if rec.mode != "managed" or not rec.git_server_id:
         return
@@ -663,7 +670,7 @@ def _maybe_heal_forgejo_collaborator(
     server = db.query(GitServer).filter(GitServer.id == rec.git_server_id).first()
     if server is None or server.type != "forgejo":
         return
-    handle = _resolve_oidc_handle(user_id, db)
+    handle = _ensure_forgejo_account(user_id, server, db)
     if not handle:
         return
     owner, _, repo = (rec.repo_ref or "").partition("/")
