@@ -28,6 +28,16 @@ function nextPath(): string | undefined {
   return safeInternalPath(next, window.location.origin) ?? undefined;
 }
 
+/**
+ * `?action=register` opens Keycloak's registration form instead of the sign-in
+ * form (the landing page's "Konto erstellen"); the backend maps it to the
+ * registrations endpoint.
+ */
+function ssoParams(): Record<string, string> {
+  const action = new URLSearchParams(window.location.search).get('action');
+  return action === 'register' ? { action } : {};
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { loginWithSSO, isAuthenticated, isLoading } = useAuth();
@@ -44,7 +54,7 @@ export default function LoginPage() {
     // showing an intermediate button. Guard against double-trigger in StrictMode.
     if (!triggered.current) {
       triggered.current = true;
-      loginWithSSO('keycloak', nextPath());
+      loginWithSSO('keycloak', nextPath(), ssoParams());
     }
   }, [isAuthenticated, isLoading, loginWithSSO, router]);
 
@@ -54,7 +64,7 @@ export default function LoginPage() {
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto" />
         <p className="mt-4 text-muted">{t.redirecting}</p>
         <button
-          onClick={() => loginWithSSO('keycloak', nextPath())}
+          onClick={() => loginWithSSO('keycloak', nextPath(), ssoParams())}
           className="mt-4 text-sm text-accent-text hover:underline"
         >
           {t.manual}
