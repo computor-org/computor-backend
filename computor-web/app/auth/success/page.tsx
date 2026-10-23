@@ -12,6 +12,8 @@ const COPY = {
     retry: 'Erneut versuchen',
     back: 'Zurück zur Anmeldung',
     completing: 'Anmeldung wird abgeschlossen …',
+    expired: 'Die Anmeldeseite war zu lange geöffnet und ist abgelaufen. Bitte melde dich erneut an.',
+    incomplete: 'Die Anmeldung wurde nicht abgeschlossen. Bitte versuche es erneut.',
   },
   en: {
     failed: 'Sign-in failed',
@@ -19,6 +21,8 @@ const COPY = {
     retry: 'Try again',
     back: 'Back to login',
     completing: 'Completing sign-in…',
+    expired: 'The sign-in page was open too long and has expired. Please sign in again.',
+    incomplete: 'The sign-in was not completed. Please try again.',
   },
 };
 
@@ -28,6 +32,9 @@ export default function AuthSuccessPage() {
   const [error, setError] = useState<string | null>(null);
   const [errorKind, setErrorKind] = useState<'failed' | 'completeFailed'>('completeFailed');
   const [refused, setRefused] = useState(false);
+  // Set for an interrupted sign-in; resolved at render, because the effect below
+  // runs once with the language of the first render, before the browser's is known.
+  const [interrupted, setInterrupted] = useState<'expired' | 'incomplete' | null>(null);
   // One-shot: auth_redirect is consumed on read, so a second run of this effect
   // (React StrictMode in dev) would find it gone and override the first run's
   // redirect with /dashboard.
@@ -44,6 +51,15 @@ export default function AuthSuccessPage() {
       // stop: there are no cookies to complete a session with.
       const params = new URLSearchParams(window.location.search);
       const description = params.get('error_description');
+      // The provider ended the sign-in without a session (e.g. the form
+      // expired while the laptop was closed): say so in the UI language.
+      const kind = params.get('error');
+      if (kind === 'sign_in_expired' || kind === 'sign_in_failed') {
+        setRefused(true);
+        setInterrupted(kind === 'sign_in_expired' ? 'expired' : 'incomplete');
+        setError('');
+        return;
+      }
       if (params.get('error') && description) {
         setRefused(true);
         setError(description);
@@ -80,7 +96,7 @@ export default function AuthSuccessPage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-canvas">
+    <div className="min-h-screen flex items-center justify-center bg-canvas px-4">
       <div className="text-center">
         {error !== null ? (
           <>
@@ -90,12 +106,14 @@ export default function AuthSuccessPage() {
                 stays readable. */}
             <p
               className={
-                refused
+                interrupted
+                  ? 'text-danger-text font-medium mb-3 max-w-md'
+                  : refused
                   ? 'text-danger-text font-medium mb-3 max-w-lg text-left whitespace-pre-line break-words'
                   : 'text-danger-text font-medium mb-3'
               }
             >
-              {error || t[errorKind]}
+              {(interrupted && t[interrupted]) || error || t[errorKind]}
             </p>
             <a href="/login" className="px-4 py-2 bg-inverse text-on-accent rounded hover:bg-inverse-hover inline-block">
               {refused ? t.retry : t.back}

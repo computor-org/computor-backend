@@ -280,10 +280,12 @@ def _post_login_target(state_data: dict) -> tuple:
 @auth_router.get("/{provider}/callback", name="handle_callback")
 async def handle_callback(
     provider: str,
-    code: str = Query(..., description="Authorization code"),
+    code: Optional[str] = Query(None, description="Authorization code (absent when the provider reports an error)"),
     state: str = Query(..., description="State parameter (required, single-use)"),
     request: Request = None,
-    db: Session = Depends(get_db, scope="function")
+    db: Session = Depends(get_db, scope="function"),
+    error: Optional[str] = Query(None, max_length=200, description="Provider error code"),
+    error_description: Optional[str] = Query(None, max_length=500, description="Provider error description"),
 ) -> RedirectResponse:
     """
     Handle OAuth callback from provider.
@@ -323,6 +325,25 @@ async def handle_callback(
     # Validate provider matches
     if state_data.get("provider") != provider:
         raise BadRequestException(detail="Provider mismatch in state parameter")
+
+    if not code:
+        # The provider ended the login without a code, e.g. Keycloak's
+        # "authentication_expired" after a sign-in page was left open (laptop
+        # closed). Answer with a page of ours instead of a raw validation error.
+        # Never to /login: that restarts the sign-in at once and would loop on a
+        # persistent error.
+        logger.info(f"SSO callback without code for {provider}: {error or 'no error given'}")
+        target, _ = _post_login_target(state_data)
+        expired = "expired" in f"{error} {error_description}".lower()
+        params = {
+            "error": "sign_in_expired" if expired else "sign_in_failed",
+            "error_description": (
+                "The sign-in page was open too long and has expired. Please sign in again."
+                if expired else "The sign-in was not completed. Please try again."
+            ),
+        }
+        sep = "&" if "?" in target else "?"
+        return RedirectResponse(url=f"{target}{sep}{urlencode(params)}", status_code=302)
 
     try:
         _api_base = os.environ.get("NEXT_PUBLIC_API_URL", "").rstrip("/")
