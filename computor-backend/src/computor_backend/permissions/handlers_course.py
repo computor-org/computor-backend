@@ -23,7 +23,7 @@ from computor_backend.model.course import (
     SubmissionGroupMember,
 )
 from computor_backend.model.result import Result
-from computor_backend.permissions.roles import CourseRole, ScopeRole
+from computor_backend.permissions.roles import CourseRole, INACTIVE_COURSE_ROLE, ScopeRole
 
 __all__ = [
     "CoursePermissionHandler",
@@ -472,12 +472,18 @@ class MessagePermissionHandler(PermissionHandler):
         )
         filters.append(self.entity.submission_group_id.in_(sgm_subq))
 
+        # Group-, course-, family- and organization-wide messages reach the
+        # course's members; a learner who left (issues#458) keeps only the
+        # messages addressed to them, which the filters above cover.
+        active_member = CourseMember.course_role_id != INACTIVE_COURSE_ROLE
+
         # course_group_id target: members of the group.
         cg_subq = (
             db.query(CourseMember.course_group_id)
             .filter(
                 CourseMember.user_id == principal.user_id,
-                CourseMember.course_group_id.isnot(None)
+                CourseMember.course_group_id.isnot(None),
+                active_member,
             )
         )
         filters.append(self.entity.course_group_id.in_(cg_subq))
@@ -486,14 +492,14 @@ class MessagePermissionHandler(PermissionHandler):
         user_course_contents_subq = (
             db.query(CourseContent.id)
             .join(CourseMember, CourseMember.course_id == CourseContent.course_id)
-            .filter(CourseMember.user_id == principal.user_id)
+            .filter(CourseMember.user_id == principal.user_id, active_member)
         )
         filters.append(self.entity.course_content_id.in_(user_course_contents_subq))
 
         # course_id target: any course_member of that course.
         course_ids_subq = (
             db.query(CourseMember.course_id)
-            .filter(CourseMember.user_id == principal.user_id)
+            .filter(CourseMember.user_id == principal.user_id, active_member)
         )
         filters.append(self.entity.course_id.in_(course_ids_subq))
 
@@ -505,14 +511,14 @@ class MessagePermissionHandler(PermissionHandler):
         family_via_course_subq = (
             db.query(Course.course_family_id)
             .join(CourseMember, CourseMember.course_id == Course.id)
-            .filter(CourseMember.user_id == principal.user_id)
+            .filter(CourseMember.user_id == principal.user_id, active_member)
         )
         filters.append(self.entity.course_family_id.in_(family_via_course_subq))
 
         org_via_course_subq = (
             db.query(Course.organization_id)
             .join(CourseMember, CourseMember.course_id == Course.id)
-            .filter(CourseMember.user_id == principal.user_id)
+            .filter(CourseMember.user_id == principal.user_id, active_member)
         )
         filters.append(self.entity.organization_id.in_(org_via_course_subq))
 
