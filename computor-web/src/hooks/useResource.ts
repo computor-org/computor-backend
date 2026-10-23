@@ -32,11 +32,12 @@ interface UseResourceResult<T> {
 export function useResource<T>(
   fetcher: () => Promise<T>,
   deps: DependencyList = [],
-  opts: { enabled?: boolean; refetchInterval?: number } = {},
+  opts: { enabled?: boolean; refetchInterval?: number; refreshOnFocus?: boolean } = {},
 ): UseResourceResult<T> {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const enabled = opts.enabled ?? true;
   const refetchInterval = opts.refetchInterval;
+  const refreshOnFocus = opts.refreshOnFocus ?? false;
 
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,6 +82,27 @@ export function useResource<T>(
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [authLoading, isAuthenticated, enabled, refetchInterval, run]);
+
+  // Opt in when work can finish in another tab or application. This does not poll.
+  useEffect(() => {
+    if (authLoading || !isAuthenticated || !enabled || !refreshOnFocus) return;
+    let pending = false;
+    const handleReturn = async () => {
+      if (document.hidden || pending) return;
+      pending = true;
+      try {
+        await run(true);
+      } finally {
+        pending = false;
+      }
+    };
+    window.addEventListener('focus', handleReturn);
+    document.addEventListener('visibilitychange', handleReturn);
+    return () => {
+      window.removeEventListener('focus', handleReturn);
+      document.removeEventListener('visibilitychange', handleReturn);
+    };
+  }, [authLoading, isAuthenticated, enabled, refreshOnFocus, run]);
 
   return { data, loading, error, reload, refresh, setData };
 }
