@@ -1,3 +1,4 @@
+import { getUiLanguage, setUiLanguage } from '@/src/hooks/useBrowserLanguage';
 import { AuthResponse, AuthUser } from '@/src/types/auth';
 import { ISSOAuthProvider } from '@/src/interfaces/IAuthProvider';
 import { UserGet } from '@/src/generated/types/users';
@@ -32,6 +33,9 @@ export class SSOAuthService implements ISSOAuthProvider {
 
   private saveSession(user: AuthUser, views: string[]): void {
     saveStoredSession('sso', user, views);
+    if (user.language?.trim()) {
+      setUiLanguage(user.language.trim().toLowerCase() === 'de' ? 'de' : 'en');
+    }
     this.currentUser = user;
     this.currentViews = views;
   }
@@ -74,12 +78,14 @@ export class SSOAuthService implements ISSOAuthProvider {
     sessionStorage.setItem('auth_redirect', returnTo || window.location.pathname);
 
     // Build the frontend callback URL
-    const frontendCallbackUrl = `${window.location.origin}/auth/success`;
+    const language = getUiLanguage();
+    const frontendCallbackUrl = `${window.location.origin}/auth/success?ui_locale=${language}`;
 
     // Redirect to SSO login with redirect_uri parameter
     // extraParams: e.g. an invite code, idp_hint or action=register from /join.
     const params = new URLSearchParams({
       ...extraParams,
+      ui_locales: language,
       redirect_uri: frontendCallbackUrl
     });
 
