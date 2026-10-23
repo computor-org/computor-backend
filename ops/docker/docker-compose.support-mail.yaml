@@ -61,11 +61,15 @@ services:
       - DEBUG_MODE=${DEBUG_MODE}
       - PYTHONPATH=/home/worker/computor-backend/src
       - SUPPORT_MAIL_ENABLED=true
+      - SUPPORT_MAIL_IMPORT_ENABLED=${SUPPORT_MAIL_IMPORT_ENABLED:-true}
       - SUPPORT_MAIL_POLL_SECONDS=${SUPPORT_MAIL_POLL_SECONDS:-120}
       - SUPPORT_IMAP_HOST=${SUPPORT_MAIL_HOST:-mail.computor.at}
       - SUPPORT_IMAP_PORT=993
       - SUPPORT_SMTP_HOST=${SUPPORT_MAIL_HOST:-mail.computor.at}
       - SUPPORT_SMTP_PORT=${SUPPORT_SMTP_PORT:-10588}
+      - SUPPORT_SMTP_STARTTLS=${SUPPORT_SMTP_STARTTLS:-true}
+      - SUPPORT_WELCOME_MAIL_ENABLED=${SUPPORT_WELCOME_MAIL_ENABLED:-false}
+      - SUPPORT_SITE_URL=${SUPPORT_SITE_URL:-https://computor.at}
       - SUPPORT_MAIL_TLS_VERIFY=${SUPPORT_MAIL_TLS_VERIFY:-true}
       - SUPPORT_TEAM_ADDRESSES=${SUPPORT_TEAM_ADDRESSES:-contact@computor.at abuse@computor.at privacy@computor.at security@computor.at postmaster@computor.at}
       - SUPPORT_RESTRICTED_ADDRESSES=${SUPPORT_RESTRICTED_ADDRESSES-security@computor.at}
