@@ -68,7 +68,7 @@ export default function TemplateCard({
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold text-fg">{label}</span>
         <span
-          className={`block truncate text-xs ${
+          className={`block whitespace-normal break-words text-xs ${
             stage?.tone === 'red' ? 'text-danger-text' : 'text-muted'
           }`}
         >
@@ -89,7 +89,7 @@ export default function TemplateCard({
           />
         )}
         {usable && stage && (
-          <span className="mt-1 block truncate text-xs text-subtle">
+          <span className="mt-1 block whitespace-normal break-words text-xs text-subtle">
             {language === 'de' ? 'Wird aktualisiert' : 'Updating'} · {stage.label}
           </span>
         )}
