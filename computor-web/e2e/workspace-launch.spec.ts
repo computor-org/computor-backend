@@ -72,21 +72,27 @@ async function setup(
     workspaces?: Partial<typeof COURSE_WORKSPACE>[];
     workspaceListStatus?: number | (() => number);
     allowProvision?: boolean;
+    /** System roles of the signed-in user; a self-enrolled learner has none. */
+    systemRoles?: string[];
+    profileLanguage?: string | null;
   } = {},
 ) {
   const next = typeof source === 'function' ? source : undefined;
   const sequence = typeof source === 'function' ? [] : source;
-  await page.addInitScript((user) => {
+  const systemRoles = options.systemRoles ?? ['_workspace_user'];
+  const user = { ...USER, profile: { language_code: options.profileLanguage ?? null }, user_roles: systemRoles.map((role_id) => ({ role_id })) };
+  await page.addInitScript(({ user, systemRoles }) => {
     sessionStorage.setItem('auth_user', JSON.stringify({
       id: user.id, username: user.username, email: user.email,
       givenName: user.given_name, familyName: user.family_name,
-      role: 'user', systemRoles: ['_workspace_user'],
+      role: 'user', systemRoles, language: user.profile.language_code,
     }));
     sessionStorage.setItem('auth_provider', 'sso');
-  }, USER);
+  }, { user, systemRoles });
 
   const starts: string[] = [];
   const contexts: { course_id: string }[] = [];
+  const launchRequests: { course_id: string; ui_language?: string }[] = [];
   const actions: string[] = [];
   const provisions: { template: string }[] = [];
   const observedWorkspaces: { id: string; name: string; build: string }[] = [];
@@ -109,7 +115,7 @@ async function setup(
     if (path.endsWith('/user/scopes')) {
       return json(route, { is_admin: false, course: { [COURSE_A]: ['_student'], [COURSE_B]: ['_student'] } });
     }
-    if (path.endsWith('/user')) return json(route, USER);
+    if (path.endsWith('/user')) return json(route, user);
     if (path.startsWith('/messages')) return json(route, []);
 
     if (options.courseWorkspaces) {
@@ -163,7 +169,8 @@ async function setup(
 
     if (path === `${workspacePath}/launch-context` && request.method() === 'POST') {
       const body = request.postDataJSON() as { course_id: string };
-      contexts.push(body);
+      contexts.push({ course_id: body.course_id });
+      launchRequests.push(body);
       if (options.handoff) return options.handoff(route);
       actions.push('context');
       return json(route, { ...body, request_id: `request-${contexts.length}`, expires_at: '2099-01-01T00:00:00Z' });
@@ -185,7 +192,7 @@ async function setup(
     return json(route, {});
   });
 
-  return { starts, contexts, actions, provisions, observedWorkspaces };
+  return { starts, contexts, launchRequests, actions, provisions, observedWorkspaces };
 }
 
 test('waits while the agent is still starting, then opens when it reports ready', async ({ page }) => {
@@ -578,7 +585,7 @@ test('the compact course-card launcher reuses the running workspace without prov
   ], { courseWorkspaces: true });
   await page.goto('/courses');
   const popup = page.waitForEvent('popup');
-  await page.getByRole('button', { name: 'Launch VS Code workspace' }).first().click();
+  await page.getByRole('button', { name: 'Open in VS Code' }).first().click();
   const launchTab = await popup;
   await launchTab.waitForURL(COURSE_WORKSPACE_URL);
   expect(page.url()).toMatch(/\/courses$/);
@@ -613,3 +620,270 @@ test('a popup-blocked existing-workspace Open retains the selected course', asyn
   await page.waitForURL(COURSE_WORKSPACE_URL);
   expect(contexts).toEqual([{ course_id: COURSE_B }]);
 });
+
+test('the dashboard offers a stopped workspace with a labelled start action', async ({ page }) => {
+  let body = details({ status: 'stopped', name: 'vscode' });
+  const { contexts, starts, provisions } = await setup(page, () => body, {
+    courseWorkspaces: true,
+    workspaces: [{
+      ...COURSE_WORKSPACE, latest_build_status: 'succeeded', latest_build_transition: 'stop',
+      template_display_name: 'VS Code', template_version_created_at: '2026-10-20T12:05:00Z',
+    }],
+  });
+  await page.goto('/dashboard');
+  const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Your workspaces' }) });
+  await expect(section.getByText('VS Code', { exact: true })).toBeVisible();
+  await expect(section.getByText('Stopped')).toBeVisible();
+  await expect(section.getByText(/^Version of \d{1,2} Oct 2026, \d{2}:\d{2}$/)).toBeVisible();
+
+  await section.getByRole('combobox', { name: 'Choose a course' }).selectOption(COURSE_A);
+  const popup = page.waitForEvent('popup');
+  await section.getByRole('button', { name: 'Start and open' }).click();
+  const launchTab = await popup;
+  expect(new URL(launchTab.url()).searchParams.get('courseId')).toBe(COURSE_A);
+  await expect.poll(() => starts.length).toBe(1);
+  body = details({ status: 'running', ready: true, name: 'vscode' });
+  await launchTab.waitForURL(COURSE_WORKSPACE_URL);
+  expect(contexts).toEqual([{ course_id: COURSE_A }]);
+  expect(provisions).toHaveLength(0);
+  await launchTab.close();
+});
+
+test('the dashboard reopens a running workspace in the course it was last opened for', async ({ page }) => {
+  const { contexts, starts } = await setup(page, [
+    details({ status: 'running', ready: true, name: 'vscode' }),
+  ], { courseWorkspaces: true });
+
+  await page.goto(`/courses/${COURSE_B}`);
+  const coursePopup = page.waitForEvent('popup');
+  await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
+  const courseTab = await coursePopup;
+  await courseTab.waitForURL(COURSE_WORKSPACE_URL);
+  await courseTab.close();
+
+  await page.goto('/dashboard');
+  const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Your workspaces' }) });
+  await expect(section.getByText('Last opened in Course B')).toBeVisible();
+  const popup = page.waitForEvent('popup');
+  await section.getByRole('button', { name: 'Open', exact: true }).click();
+  const launchTab = await popup;
+  await launchTab.waitForURL(COURSE_WORKSPACE_URL);
+  expect(contexts).toEqual([{ course_id: COURSE_B }, { course_id: COURSE_B }]);
+  expect(starts).toHaveLength(0);
+  await launchTab.close();
+});
+
+test('the dashboard reopens the course the server remembers, also in a fresh browser', async ({ page }) => {
+  const { contexts } = await setup(page, [
+    details({ status: 'running', ready: true, name: 'vscode' }),
+  ], { courseWorkspaces: true, workspaces: [{ ...COURSE_WORKSPACE, last_course_id: COURSE_B }] });
+
+  await page.goto('/dashboard');
+  const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Your workspaces' }) });
+  await expect(section.getByText('Last opened in Course B')).toBeVisible();
+  const popup = page.waitForEvent('popup');
+  await section.getByRole('button', { name: 'Open', exact: true }).click();
+  const launchTab = await popup;
+  expect(new URL(launchTab.url()).searchParams.get('courseId')).toBe(COURSE_B);
+  await launchTab.waitForURL(COURSE_WORKSPACE_URL);
+  expect(contexts).toEqual([{ course_id: COURSE_B }]);
+  await launchTab.close();
+});
+
+test('the dashboard ignores a remembered course the learner is no longer in', async ({ page }) => {
+  await setup(page, [details({ status: 'running', ready: true, name: 'vscode' })], {
+    courseWorkspaces: true,
+    workspaces: [{ ...COURSE_WORKSPACE, last_course_id: '33333333-3333-4333-8333-333333333333' }],
+  });
+  await page.goto('/dashboard');
+  const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Your workspaces' }) });
+  await expect(section.getByRole('button', { name: 'Open', exact: true })).toBeVisible();
+  await expect(section.getByText(/Last opened in/)).toHaveCount(0);
+});
+
+test('a stopping workspace says so and offers to start it again', async ({ page }) => {
+  await setup(page, [details({ status: 'stopped', name: 'vscode' })], {
+    courseWorkspaces: true,
+    workspaces: [{ ...COURSE_WORKSPACE, latest_build_status: 'stopping', latest_build_transition: 'stop' }],
+  });
+  await page.goto('/dashboard');
+  const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Your workspaces' }) });
+  await expect(section.getByText('Stopping', { exact: true })).toBeVisible();
+  await expect(section.getByRole('button', { name: 'Start and open' })).toBeVisible();
+  await expect(section.getByRole('button', { name: 'Open', exact: true })).toHaveCount(0);
+});
+
+test.describe('in German', () => {
+  test.use({ locale: 'de-AT' });
+
+  test('a stopping workspace reads "Wird gestoppt" and offers to start it again', async ({ page }) => {
+    await setup(page, [details({ status: 'stopped', name: 'vscode' })], {
+      courseWorkspaces: true,
+      workspaces: [{ ...COURSE_WORKSPACE, latest_build_status: 'stopping', latest_build_transition: 'stop' }],
+    });
+    await page.goto('/dashboard');
+    const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Deine Arbeitsumgebungen' }) });
+    await expect(section.getByText('Wird gestoppt', { exact: true })).toBeVisible();
+    await expect(section.getByRole('button', { name: 'Starten und öffnen' })).toBeVisible();
+  });
+
+  test('a new learner is welcomed without "zurück" and pointed to the catalog', async ({ page }) => {
+    await setup(page, [details({ status: 'stopped', name: 'vscode' })], { systemRoles: [] });
+    await page.route(`${API_ORIGIN}/courses`, (route) => json(route, []));
+    await page.goto('/dashboard');
+    await expect(page.getByRole('heading', { name: 'Willkommen, Wanda' })).toBeVisible();
+    await expect(page.getByText(/zurück/)).toHaveCount(0);
+    await expect(page.getByText('Im Katalog findest du Kurse, denen du beitreten kannst.')).toBeVisible();
+    await expect(page.getByText(/keinen Zugriff/)).toHaveCount(0);
+  });
+});
+
+test('a learner without a workspace role finds their workspace in the sidebar', async ({ page }) => {
+  await setup(page, [details({ status: 'stopped', name: 'vscode' })], {
+    courseWorkspaces: true,
+    systemRoles: [],
+    workspaces: [{ ...COURSE_WORKSPACE, latest_build_status: 'stopped' }],
+  });
+  await page.goto('/dashboard');
+  await expect(page.getByRole('complementary').getByRole('link', { name: 'Workspaces' })).toBeVisible();
+});
+
+test('a learner without a workspace role or workspace gets no workspace entry', async ({ page }) => {
+  await setup(page, [details({ status: 'stopped', name: 'vscode' })], {
+    courseWorkspaces: true,
+    systemRoles: [],
+    workspaces: [],
+  });
+  await page.goto('/dashboard');
+  await expect(page.getByRole('heading', { name: 'Your courses' })).toBeVisible();
+  await expect(page.getByRole('complementary').getByRole('link', { name: 'Courses', exact: true })).toBeVisible();
+  await expect(page.getByRole('complementary').getByRole('link', { name: 'Workspaces' })).toHaveCount(0);
+});
+
+
+test('the dashboard infers the only course supporting a workspace without launch history', async ({ page }) => {
+  const { contexts } = await setup(page, [details({ status: 'running', ready: true, name: 'vscode' })], { courseWorkspaces: true });
+  await page.route(`${API_ORIGIN}/courses/${COURSE_B}/workspace-settings`, (route) => json(route, { templates: [] }));
+  await page.goto('/dashboard');
+  const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Your workspaces' }) });
+  await expect(section.getByText('Course: Course A', { exact: true })).toBeVisible();
+  const popup = page.waitForEvent('popup');
+  await section.getByRole('button', { name: 'Open', exact: true }).click();
+  const launchTab = await popup;
+  await launchTab.waitForURL(COURSE_WORKSPACE_URL);
+  expect(contexts).toEqual([{ course_id: COURSE_A }]);
+  await launchTab.close();
+});
+
+test('the dashboard asks which course to open when there is no course history', async ({ page }) => {
+  const { contexts } = await setup(page, [details({ status: 'running', ready: true, name: 'vscode' })], { courseWorkspaces: true });
+  await page.goto('/dashboard');
+  const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Your workspaces' }) });
+  await expect(section.getByRole('button', { name: 'Open', exact: true })).toBeDisabled();
+  await section.getByRole('combobox', { name: 'Choose a course' }).selectOption(COURSE_B);
+  const popup = page.waitForEvent('popup');
+  await section.getByRole('button', { name: 'Open', exact: true }).click();
+  const launchTab = await popup;
+  await launchTab.waitForURL(COURSE_WORKSPACE_URL);
+  expect(contexts).toEqual([{ course_id: COURSE_B }]);
+  await launchTab.close();
+});
+
+
+test.describe('launch interface language', () => {
+  test.use({ locale: 'de-DE' });
+  for (const profileLanguage of [null, 'en']) {
+    test(`hands off resolved interface language for profile ${profileLanguage ?? 'Automatic'}`, async ({ page }) => {
+      const { launchRequests } = await setup(page, [details({ status: 'running', ready: true })], { profileLanguage });
+      await page.goto(`/workspaces/launch?owner=u-me&name=code&courseId=${COURSE_A}`);
+      await page.waitForURL(WORKSPACE_URL);
+      expect(launchRequests).toEqual([{ course_id: COURSE_A, ui_language: profileLanguage ?? 'de' }]);
+    });
+  }
+  test('an explicit browser interface choice wins over browser locale for Automatic', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('computor.language', 'en'));
+    const { launchRequests } = await setup(page, [details({ status: 'running', ready: true })]);
+    await page.goto(`/workspaces/launch?owner=u-me&name=code&courseId=${COURSE_A}`);
+    await page.waitForURL(WORKSPACE_URL);
+    expect(launchRequests).toEqual([{ course_id: COURSE_A, ui_language: 'en' }]);
+  });
+});
+
+
+test.describe('launch interface language in an English browser', () => {
+  test.use({ locale: 'en-US' });
+  for (const profileLanguage of [null, 'de']) {
+    test(`hands off resolved interface language for profile ${profileLanguage ?? 'Automatic'}`, async ({ page }) => {
+      const { launchRequests } = await setup(page, [details({ status: 'running', ready: true })], { profileLanguage });
+      await page.goto(`/workspaces/launch?owner=u-me&name=code&courseId=${COURSE_A}`);
+      await page.waitForURL(WORKSPACE_URL);
+      expect(launchRequests).toEqual([{ course_id: COURSE_A, ui_language: profileLanguage ?? 'en' }]);
+    });
+  }
+});
+
+
+for (const locale of ['de-DE', 'en-US']) {
+  test.describe(`returning greeting ${locale}`, () => {
+    test.use({ locale });
+    for (const returningState of ['course', 'workspace']) {
+      test(`welcomes back a learner with an existing ${returningState}`, async ({ page }) => {
+        await setup(page, [details({ status: 'stopped', name: 'vscode' })], {
+          courseWorkspaces: true, workspaces: returningState === 'course' ? [] : [COURSE_WORKSPACE],
+        });
+        if (returningState === 'workspace') await page.route(`${API_ORIGIN}/courses`, (route) => json(route, []));
+        await page.goto('/dashboard');
+        await expect(page.getByRole('heading', { name: locale === 'de-DE' ? 'Willkommen zurück, Wanda' : 'Welcome back, Wanda', exact: true })).toBeVisible();
+      });
+    }
+  });
+}
+
+test('a never-enrolled learner without a workspace gets a first welcome in English', async ({ page }) => {
+  await setup(page, [details({ status: 'stopped', name: 'vscode' })], { courseWorkspaces: true, workspaces: [] });
+  await page.route(`${API_ORIGIN}/courses`, (route) => json(route, []));
+  await page.goto('/dashboard');
+  await expect(page.getByText('The catalog lists the courses you can join.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Welcome, Wanda', exact: true })).toBeVisible();
+});
+
+for (const [locale, event, stopped, running, start, open] of [
+  ['en-US', 'focus', 'Stopped', 'Running', 'Start and open', 'Open'],
+  ['de-DE', 'visibilitychange', 'Gestoppt', 'Läuft', 'Starten und öffnen', 'Öffnen'],
+] as const) {
+  test.describe(`dashboard workspace return refresh ${locale}`, () => {
+    test.use({ locale });
+    test(`refreshes external workspace changes on ${event}`, async ({ page }, testInfo) => {
+      await setup(page, [details({ status: 'running', ready: true, name: 'vscode' })], { courseWorkspaces: true });
+      let isRunning = false;
+      let workspaceReads = 0;
+      const heavyReads: string[] = [];
+      page.on('request', (request) => {
+        const path = new URL(request.url()).pathname;
+        if (path === '/courses' || path === '/students/course-contents' || path === '/messages' || path.endsWith('/workspace-settings')) heavyReads.push(path);
+      });
+      await page.route(`${API_ORIGIN}/coder/workspaces`, (route) => {
+        workspaceReads++;
+        return json(route, {
+          workspaces: [{ ...COURSE_WORKSPACE, last_course_id: COURSE_A, latest_build_status: 'succeeded', latest_build_transition: isRunning ? 'start' : 'stop' }], count: 1,
+        });
+      });
+      await page.goto('/dashboard');
+      await expect(page.getByText(stopped, { exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: start, exact: true })).toBeVisible();
+      const initialHeavyReads = [...heavyReads];
+      expect(initialHeavyReads).toContain('/courses');
+      // The editor/launch tab updates the server while this dashboard stays mounted.
+      isRunning = true;
+      await page.evaluate((event) => {
+        (event === 'focus' ? window : document).dispatchEvent(new Event(event));
+      }, event);
+      await expect(page.getByText(running, { exact: true })).toBeVisible({ timeout: 2000 });
+      await expect(page.getByRole('button', { name: open, exact: true })).toBeEnabled();
+      await expect(page.getByRole('button', { name: start, exact: true })).toHaveCount(0);
+      await expect.poll(() => workspaceReads).toBeGreaterThanOrEqual(3);
+      expect(heavyReads).toEqual(initialHeavyReads);
+      await page.screenshot({ path: testInfo.outputPath(`dashboard-running-${locale}.png`) });
+    });
+  });
+}

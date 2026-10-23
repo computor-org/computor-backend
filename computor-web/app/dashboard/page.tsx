@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -10,12 +11,12 @@ import Panel from '@/src/components/ui/Panel';
 import Badge from '@/src/components/Badge';
 import { ButtonLink } from '@/src/components/ui/Button';
 import CourseCard, { ViewCourseLink } from '@/src/components/courses/CourseCard';
-import WorkspaceStatusBadge, { categorizeStatus } from '@/src/components/workspaces/WorkspaceStatusBadge';
 import NeedsAttention, {
   DEFAULT_REASONS,
   selectNeedsAttention,
 } from '@/src/components/dashboard/NeedsAttention';
 import InviteFriendCard from '@/src/components/dashboard/InviteFriendCard';
+import DashboardWorkspaces from '@/src/components/dashboard/DashboardWorkspaces';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
@@ -24,12 +25,14 @@ import { displayName } from '@/src/utils/displayName';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { StudentsClient } from '@/src/generated/clients/StudentsClient';
 import { MessagesClient } from '@/src/generated/clients/MessagesClient';
+import { CourseWorkspacesClient } from '@/src/clients/CourseWorkspacesClient';
 import { CoderClient } from '@/src/clients/CoderClient';
 
 const coursesClient = new CoursesClient();
 const studentsClient = new StudentsClient();
 const messagesClient = new MessagesClient();
 const coderClient = new CoderClient();
+const courseWorkspacesClient = new CourseWorkspacesClient();
 
 const COPY = {
   de: {
@@ -37,17 +40,18 @@ const COPY = {
     viewAll: 'Alle anzeigen',
     untitledCourse: 'Kurs ohne Titel',
     course: 'Kurs',
-    welcome: (name?: string) => `Willkommen zurück, ${name}`,
+    welcome: (name?: string) => `Willkommen, ${name}`,
+    welcomeBack: (name?: string) => `Willkommen zurück, ${name}`,
     sentBack: (n: number) =>
       n === 1 ? '1 Aufgabe wurde von Tutoren zurückgegeben.' : `${n} Aufgaben wurden von Tutoren zurückgegeben.`,
     notEnrolled: 'Du bist noch in keinem Kurs.',
-    nothingWaiting: 'Im Moment wartet nichts auf dich.',
+    nothingSentBack: 'Dir wurde keine Aufgabe zur Korrektur zurückgegeben.',
     announcements: 'Ankündigungen',
     new: 'Neu',
     announcement: 'Ankündigung',
     yourCourses: 'Deine Kurse',
     noCourses: 'Noch keine Kurse',
-    noAccess: 'Du hast noch keinen Zugriff auf Kurse.',
+    noAccess: 'Im Katalog findest du Kurse, denen du beitreten kannst.',
     browse: 'Katalog durchsuchen',
     sentBackHeading: 'Zur Korrektur zurückgegeben',
     workspaces: 'Deine Arbeitsumgebungen',
@@ -57,16 +61,17 @@ const COPY = {
     viewAll: 'View all',
     untitledCourse: 'Untitled Course',
     course: 'Course',
-    welcome: (name?: string) => `Welcome back, ${name}`,
+    welcome: (name?: string) => `Welcome, ${name}`,
+    welcomeBack: (name?: string) => `Welcome back, ${name}`,
     sentBack: (n: number) => `${n} ${n === 1 ? 'assignment' : 'assignments'} sent back by a tutor.`,
     notEnrolled: "You're not enrolled in any courses yet.",
-    nothingWaiting: 'Nothing is waiting on you right now.',
+    nothingSentBack: 'No assignment has been sent back to you for correction.',
     announcements: 'Announcements',
     new: 'New',
     announcement: 'Announcement',
     yourCourses: 'Your courses',
     noCourses: 'No courses yet',
-    noAccess: 'You do not have access to any courses yet.',
+    noAccess: 'The catalog lists the courses you can join.',
     browse: 'Browse the catalog',
     sentBackHeading: 'Sent back for correction',
     workspaces: 'Your workspaces',
@@ -101,7 +106,7 @@ function SectionHeading({ title, href, linkLabel }: { title: string; href?: stri
  * enrolments and no workspaces sees their courses and nothing misleading.
  */
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { courseRole } = usePermissions();
   const t = COPY[useUiLanguage()];
 
@@ -111,7 +116,7 @@ export default function DashboardPage() {
     // Each of these is optional decoration on the page: a student with no
     // workspace access, or a deployment with messaging disabled, should still
     // get their courses rather than an error banner.
-    const [contents, workspaces, announcements] = await Promise.all([
+    const [contents, announcements] = await Promise.all([
       // No course_id: the backend treats it as "every course this user is in"
       // (student_view.list_course_contents), which is the whole point of this
       // page. Server-side the response is cached per user for 5 minutes and —
@@ -140,38 +145,55 @@ export default function DashboardPage() {
           status: DEFAULT_REASONS.join(','),
         })
         .catch(() => []),
-      coderClient
-        .listWorkspaces()
-        .then((r) => r.workspaces)
-        .catch(() => []),
       messagesClient
         .listMessagesMessagesGet({ scope: 'global', kind: 'announcement', unread: true, limit: 5 })
         .catch(() => []),
     ]);
 
+    const courseWorkspaceTemplates = await Promise.all(courses.map(async (course) => {
+      const settings = await courseWorkspacesClient.getSettings({ courseId: course.id }).catch(() => null);
+      return { courseId: course.id, templates: (settings?.templates ?? []).filter((t) => t.enabled).map((t) => t.template_name) };
+    }));
+
     return {
+      courseWorkspaceTemplates,
       courses,
       contents,
-      workspaces,
       announcements,
     };
   }, []);
 
+  // The launch/editor runs in another tab, so its lifecycle changes must not
+  // leave the mounted dashboard showing the pre-launch snapshot. Only poll
+  // workspace state; courses, progress and announcements remain one-shot.
+  const { data: workspaceData, refresh: refreshWorkspaces } = useResource(
+    async () => (await coderClient.listWorkspaces()).workspaces,
+    [],
+    { refetchInterval: 3000 },
+  );
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const onFocus = () => { void refreshWorkspaces(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [isAuthenticated, refreshWorkspaces]);
+
   const courses = data?.courses ?? [];
   const courseTitles = new Map(courses.map((c) => [c.id, displayName(c, t.untitledCourse)]));
   const attention = selectNeedsAttention(Array.isArray(data?.contents) ? data.contents : [], courseTitles, DEFAULT_REASONS, t.course);
-  const workspaces = data?.workspaces ?? [];
+  const workspaces = workspaceData ?? [];
   const announcements = data?.announcements ?? [];
-  const runningWorkspaces = workspaces.filter(
-    (ws) => categorizeStatus(ws.latest_build_status, ws.latest_build_transition) === 'running',
-  );
+  // Every state, not just running: a workspace stops after an hour without
+  // use, so the one a returning learner comes back for is usually stopped.
+  // Only a workspace being deleted is left out.
+  const ownWorkspaces = workspaces.filter((ws) => ws.latest_build_transition !== 'delete');
 
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
           breadcrumbs={[{ label: t.dashboard }]}
-          title={t.welcome(user?.givenName || user?.username)}
+          title={(courses.length > 0 || ownWorkspaces.length > 0 ? t.welcomeBack : t.welcome)(user?.givenName || user?.username)}
           subtitle={
             loading
               ? undefined
@@ -179,7 +201,7 @@ export default function DashboardPage() {
                 ? t.sentBack(attention.length)
                 : courses.length === 0
                   ? t.notEnrolled
-                  : t.nothingWaiting
+                  : t.nothingSentBack
           }
         />
 
@@ -216,6 +238,13 @@ export default function DashboardPage() {
               </section>
             )}
 
+            {ownWorkspaces.length > 0 && (
+              <section>
+                <SectionHeading title={t.workspaces} href="/workspaces" />
+                <DashboardWorkspaces workspaces={ownWorkspaces} courseTitles={courseTitles} courseTemplates={data?.courseWorkspaceTemplates ?? []} />
+              </section>
+            )}
+
             <section>
               <SectionHeading title={t.yourCourses} href="/courses" />
               {courses.length === 0 ? (
@@ -247,28 +276,6 @@ export default function DashboardPage() {
             )}
 
             <InviteFriendCard />
-
-            {runningWorkspaces.length > 0 && (
-              <section>
-                <SectionHeading title={t.workspaces} href="/workspaces" />
-                <Panel padding="none">
-                  <div className="divide-y divide-rule-soft">
-                    {runningWorkspaces.map((ws) => (
-                      <div key={ws.id} className="flex items-center gap-3 px-4 py-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium text-fg truncate">{ws.name}</div>
-                          <div className="text-xs text-muted truncate">{ws.template_name}</div>
-                        </div>
-                        <WorkspaceStatusBadge
-                          status={ws.latest_build_status}
-                          transition={ws.latest_build_transition}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </Panel>
-              </section>
-            )}
           </ScrollArea>
         )}
       </ListPageLayout>

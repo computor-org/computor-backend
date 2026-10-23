@@ -98,6 +98,7 @@ export type TemplateMetadataUpdateResponse = GenTemplateMetadataUpdateResponse &
 /** One-use course selection delivered to the workspace's Computor extension. */
 export interface WorkspaceLaunchContext {
   course_id: string;
+  ui_language?: 'de' | 'en' | null;
   request_id: string;
   expires_at: string;
 }

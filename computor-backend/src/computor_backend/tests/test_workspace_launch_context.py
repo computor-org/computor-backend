@@ -126,8 +126,10 @@ async def test_reusing_a_workspace_replaces_the_course_and_request(context):
     assert UUID(str(second.course_id)) == COURSE_B
     assert first.request_id != second.request_id
     assert restored == second
-    assert len(context.redis.values) == 1
-    assert list(context.redis.expirations.values()) == [900]
+    context_key = f"workspace-launch-context:{USER_ID}:workspace-1"
+    last_key = f"workspace-last-course:{USER_ID}:workspace-1"
+    assert set(context.redis.values) == {context_key, last_key}
+    assert context.redis.expirations[context_key] == 900
     assert datetime.now(timezone.utc) < second.expires_at <= datetime.now(timezone.utc) + timedelta(seconds=900)
 
 
@@ -302,7 +304,8 @@ async def test_poll_discards_context_when_course_access_is_revoked(context, chan
             SimpleNamespace(template_name="vscode-workspace", enabled=False)
         )
     assert await _get(context) is None
-    assert not context.redis.values
+    # Only the request is discarded; the last-course hint is checked again on use.
+    assert launch._key(USER_ID, "workspace-1") not in context.redis.values
 
 
 @pytest.mark.asyncio
@@ -322,4 +325,77 @@ async def test_poll_discards_invalid_or_expired_context(context, change):
             value["expires_at"] = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
         context.redis.values[key] = json.dumps(value)
     assert await _get(context) is None
-    assert not context.redis.values
+    # Only the request is discarded; the last-course hint is checked again on use.
+    assert launch._key(USER_ID, "workspace-1") not in context.redis.values
+
+
+@pytest.mark.asyncio
+async def test_last_course_outlives_the_launch_and_fills_the_own_listing(context):
+    """The dashboard reopens the workspace in the last course from any browser
+    (computor-org/issues#523), long after the 15-minute request has expired."""
+    await _set(context, COURSE_A)
+    await _set(context, COURSE_B)
+    last_key = f"workspace-last-course:{USER_ID}:workspace-1"
+    assert context.redis.values[last_key] == str(COURSE_B)
+    assert context.redis.expirations[last_key] == launch.LAST_COURSE_TTL > 900
+
+    await context.redis.delete(f"workspace-launch-context:{USER_ID}:workspace-1")
+    listed = [SimpleNamespace(id="workspace-1", last_course_id=None),
+              SimpleNamespace(id="workspace-2", last_course_id=None)]
+    await launch.populate_last_courses(USER_ID, listed, context.redis)
+
+    assert listed[0].last_course_id == str(COURSE_B)
+    assert listed[1].last_course_id is None
+
+
+@pytest.mark.asyncio
+async def test_last_course_of_another_user_is_not_listed(context):
+    await _set(context, COURSE_A)
+    listed = [SimpleNamespace(id="workspace-1", last_course_id=None)]
+    await launch.populate_last_courses(OTHER_ID, listed, context.redis)
+    assert listed[0].last_course_id is None
+
+
+@pytest.mark.parametrize("value", ["fr", "de-DE", "", 12])
+def test_launch_request_rejects_unknown_interface_languages(value):
+    from computor_types.coder import WorkspaceLaunchContextRequest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        WorkspaceLaunchContextRequest(course_id=COURSE_A, ui_language=value)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", ["de", "en", None])
+async def test_launch_interface_language_round_trips_without_changing_course(context, language):
+    result = await launch.set_workspace_launch_context(
+        OWNER, "vscode", COURSE_A, context.permissions, context.db,
+        context.client, context.redis, ui_language=language,
+    )
+    assert result.ui_language == language
+    assert (await _get(context)).ui_language == language
+    assert (await _get(context)).course_id == COURSE_A
+
+
+@pytest.mark.asyncio
+async def test_old_launch_payload_without_interface_language_remains_readable(context):
+    from computor_types.coder import WorkspaceLaunchContextRequest
+
+    assert WorkspaceLaunchContextRequest(course_id=COURSE_A).ui_language is None
+    await _set(context)
+    key = f"workspace-launch-context:{USER_ID}:workspace-1"
+    old = json.loads(context.redis.values[key])
+    old.pop("ui_language")
+    context.redis.values[key] = json.dumps(old)
+    assert (await _get(context)).ui_language is None
+
+
+@pytest.mark.asyncio
+async def test_unknown_language_in_stored_context_is_discarded(context):
+    await _set(context)
+    key = f"workspace-launch-context:{USER_ID}:workspace-1"
+    payload = json.loads(context.redis.values[key])
+    payload["ui_language"] = "fr"
+    context.redis.values[key] = json.dumps(payload)
+    assert await _get(context) is None
+    assert key not in context.redis.values
