@@ -99,7 +99,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
         {LEGAL_LINKS.length > 0 && (
           <footer className="shrink-0 border-t border-rule bg-surface px-4 py-1.5 text-xs text-muted flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
             <LegalLinks language={language} />
-            <NetideeNotice compact />
+            <NetideeNotice compact language={language} />
           </footer>
         )}
       </div>

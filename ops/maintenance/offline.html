@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<!--
+  Shown by the host's nginx when the Computor stack does not answer (502/504),
+  so a visitor knows the address is right and the service is only down for the
+  moment (computor-org/issues#402). Self-contained on purpose: nothing behind
+  nginx is reachable when this page is served. See ops/docs/REVERSE_PROXY.md.
+-->
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <meta http-equiv="refresh" content="60">
+    <title>Computor ist gerade nicht erreichbar</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+            --bg: #f8fafc; --card: #ffffff; --rule: #e5e7eb;
+            --fg: #111827; --muted: #4b5563; --accent: #2563eb; --badge: #fef3c7; --badge-fg: #92400e;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0f172a; --card: #1e293b; --rule: #334155;
+                --fg: #f8fafc; --muted: #cbd5e1; --accent: #93c5fd; --badge: #451a03; --badge-fg: #fcd34d;
+            }
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--fg);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px;
+            line-height: 1.6;
+        }
+        main {
+            width: 100%;
+            max-width: 560px;
+            background: var(--card);
+            border: 1px solid var(--rule);
+            border-radius: 16px;
+            padding: 32px 28px;
+        }
+        .brand { font-weight: 700; font-size: 1.25rem; color: var(--accent); margin-bottom: 20px; }
+        .badge {
+            display: inline-block;
+            background: var(--badge);
+            color: var(--badge-fg);
+            border-radius: 9999px;
+            padding: 2px 12px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        h1 { font-size: 1.5rem; line-height: 1.3; margin-bottom: 12px; }
+        h2 { font-size: 1.125rem; line-height: 1.3; margin-bottom: 8px; }
+        p { color: var(--muted); margin-bottom: 12px; }
+        section + section { border-top: 1px solid var(--rule); margin-top: 24px; padding-top: 20px; }
+        button {
+            margin-top: 4px;
+            font: inherit;
+            font-weight: 600;
+            color: #ffffff;
+            background: #2563eb;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 18px;
+            cursor: pointer;
+        }
+        button:hover { background: #1d4ed8; }
+        button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    </style>
+</head>
+<body>
+    <main>
+        <div class="brand">Computor</div>
+        <section>
+            <span class="badge">Störung</span>
+            <h1>Computor ist gerade nicht erreichbar</h1>
+            <p>Du bist hier richtig: Das ist die Adresse von Computor. Der Server antwortet im Moment nicht.</p>
+            <p>Bitte versuche es in ein paar Minuten noch einmal. Diese Seite lädt sich jede Minute von selbst neu.</p>
+            <button type="button" onclick="location.reload()">Jetzt neu laden</button>
+        </section>
+        <section lang="en">
+            <h2>Computor is temporarily unavailable</h2>
+            <p>You have the right address, but the server is not responding at the moment. Please try again in a few minutes. This page reloads itself every minute.</p>
+        </section>
+    </main>
+</body>
+</html>
