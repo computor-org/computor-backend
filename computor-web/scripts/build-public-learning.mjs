@@ -6,6 +6,9 @@ import yaml from 'js-yaml';
 
 const COURSES = ['python-beginner', 'python-intermediate', 'python-advanced'];
 const SEGMENT = /^[a-zA-Z0-9_-]+$/;
+// The course's ltree path on the server, used after sign-in to find the same
+// course in the self-enrolment catalog.
+const COURSE_PATH = /^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)*$/;
 const MAX_TEXT = 512 * 1024;
 const MAX_MEDIA = 8 * 1024 * 1024;
 
@@ -101,6 +104,7 @@ export function buildPublicLearning(source, destination, revision) {
     visit(manifest.contents);
     const welcome = contents.find(c => ['welcome', 'start_here', 'introduction'].includes(c.id));
     const course = { id: slug, title: manifest.name, description: manifest.description,
+      course_path: COURSE_PATH.test(manifest.path ?? '') ? manifest.path : null,
       language_code: 'de', contents, materials, welcome_content_id: welcome?.id ?? null,
       first_exercise_id: contents.find(c => c.is_submittable)?.id ?? null,
       exercise_count: contents.filter(c => c.is_submittable).length,
