@@ -24,6 +24,8 @@ Examples:
     >>> username_candidates(None, None, "jane.doe@example.com")[0]
     'jane.doe'
 """
+import hashlib
+import re
 from typing import List, Optional
 
 from text_unidecode import unidecode
@@ -69,6 +71,54 @@ def _sanitize(handle: str) -> str:
     # No leading/trailing separators.
     handle = handle.strip("-_.")
     return handle[:_MAX_LEN]
+
+
+# Forgejo's own check (``IsValidUsername``): starts alphanumeric, then ASCII
+# word characters, ``-`` and ``.``; no run of separators and no separator at
+# the end. Its default maximum length is 40.
+_FORGEJO_VALID = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9]|[-_.](?=[A-Za-z0-9]))*$")
+_FORGEJO_MAX_LEN = 40
+
+
+def is_forgejo_valid_username(handle: Optional[str]) -> bool:
+    """Whether Forgejo accepts ``handle`` as an account name unchanged.
+
+    >>> is_forgejo_valid_username("jane.doe")
+    True
+    >>> is_forgejo_valid_username("jane@example.com")
+    False
+    """
+    return bool(
+        handle
+        and len(handle) <= _FORGEJO_MAX_LEN
+        and _FORGEJO_VALID.match(handle)
+        and handle.lower() not in FORGEJO_RESERVED
+    )
+
+
+def forgejo_handle(handle: str, user_id: str) -> str:
+    """The git-server account name for a Keycloak ``preferred_username``.
+
+    A generated handle is already valid and is returned unchanged. A username
+    the person chose at self-registration may not be, above all an e-mail
+    address; Forgejo refuses such a name with 422, so the person would get no
+    account and no repository. It is mapped deterministically to a valid name:
+    invalid characters become ``-`` and a short hash of the computor user id is
+    appended, so the mapped name stays stable across calls and cannot be the
+    unchanged username of somebody else.
+
+    >>> forgejo_handle("jane.doe", "u-1")
+    'jane.doe'
+    >>> forgejo_handle("Jane@Example.com", "u-1").startswith("jane-example.com-")
+    True
+    """
+    if is_forgejo_valid_username(handle):
+        return handle
+    suffix = "-" + hashlib.sha256(str(user_id).encode()).hexdigest()[:8]
+    base = re.sub(r"[^a-z0-9._-]+", "-", unidecode(handle.lower()))
+    base = re.sub(r"[-_.]{2,}", "-", base).strip("-_.")
+    base = base[: _FORGEJO_MAX_LEN - len(suffix)].rstrip("-_.") or "user"
+    return base + suffix
 
 
 def _avoid_reserved(handle: str) -> str:

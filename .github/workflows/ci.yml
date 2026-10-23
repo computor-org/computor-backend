@@ -70,6 +70,8 @@ jobs:
           computor-backend/src/computor_backend/tests/test_forgejo_naming.py
           computor-backend/src/computor_backend/tests/test_forgejo_repo_delete.py
           computor-backend/src/computor_backend/tests/test_forgejo_template_read_heal.py
+          computor-backend/src/computor_backend/tests/test_forgejo_collaborator_heal.py
+          computor-backend/src/computor_backend/tests/test_forgejo_handle.py
           computor-backend/src/computor_backend/tests/test_course_analytics.py
           computor-backend/src/computor_backend/tests/test_support_mail.py
           computor-backend/src/computor_backend/tests/test_issue_reports.py
@@ -88,6 +90,20 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - run: bash ops/tests/test_coder_worker_socket_proxy.sh
+
+  workspace-git-clone:
+    if: github.event_name != 'pull_request'
+    # A managed-Forgejo student repository, provisioned by the backend's own
+    # provider, is cloned, pushed and template-read through the
+    # workspace-facing computor-git route (computor-org/issues#433).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          enable-cache: true
+      - run: uv sync --project computor-backend --python 3.12 --locked
+      - run: bash ops/tests/test_workspace_git_clone.sh
 
   public-course-contract:
     # Required jobs run in the merge queue, not on pull request events.
@@ -212,7 +228,7 @@ jobs:
   # this passes; in the merge queue it fails unless every job succeeded.
   ci-gate:
     if: always()
-    needs: [backend, coder-worker-socket-proxy, public-course-contract, grading-isolation, web, keycloak-abuse, keycloak-admin-mfa]
+    needs: [backend, coder-worker-socket-proxy, workspace-git-clone, public-course-contract, grading-isolation, web, keycloak-abuse, keycloak-admin-mfa]
     runs-on: ubuntu-latest
     steps:
       - run: test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = false
