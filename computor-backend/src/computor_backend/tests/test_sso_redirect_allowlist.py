@@ -112,14 +112,17 @@ async def _initiate(redirect_uri, redis):
         return await auth.initiate_login("keycloak", redirect_uri, _request())
 
 
-async def _callback(redis, state, exchange=None):
+async def _callback(redis, state, exchange=None, code="idp-code", **provider_error):
     exchange = exchange or AsyncMock(return_value={
         "user_id": USER_ID, "account_id": "acc-1", "is_new_user": False,
         "token": ACCESS, "refresh_token": REFRESH,
     })
     with patch("computor_backend.redis_cache.get_redis_client", AsyncMock(return_value=redis)), \
          patch("computor_backend.business_logic.auth.handle_sso_callback", exchange):
-        return await auth.handle_callback("keycloak", "idp-code", state, _request(), Mock())
+        return await auth.handle_callback(
+            "keycloak", code, state, _request(), Mock(),
+            error=provider_error.get("error"), error_description=provider_error.get("error_description"),
+        )
 
 
 def _plant_state(redis, redirect_uri, state="planted-state"):
@@ -219,6 +222,28 @@ async def test_refused_sign_in_is_not_bounced_off_site(redirect_uri):
     resp = await _callback(redis, _plant_state(redis, redirect_uri), exchange=refusal)
     _assert_first_party(resp.headers["location"])
     assert "sign_in_refused" in resp.headers["location"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("provider_error, kind", [
+    ({"error": "temporarily_unavailable", "error_description": "authentication_expired"}, "sign_in_expired"),
+    ({"error": "access_denied"}, "sign_in_failed"),
+    ({}, "sign_in_failed"),
+])
+async def test_callback_without_code_returns_to_the_app_with_a_reason(provider_error, kind):
+    # Keycloak's authentication_expired callback carries no code; it used to end
+    # in a raw VAL_001 JSON page (computor-org/issues#477).
+    redis = _Redis()
+    exchange = AsyncMock()
+    resp = await _callback(redis, _plant_state(redis, "/auth/success"), exchange=exchange,
+                           code=None, **provider_error)
+    assert resp.status_code == 302
+    location = resp.headers["location"]
+    assert urlsplit(location).path == "/auth/success"
+    assert parse_qs(urlsplit(location).query)["error"] == [kind]
+    assert not resp.headers.getlist("set-cookie")
+    exchange.assert_not_awaited()
+    assert not redis.data
 
 
 @pytest.mark.asyncio
@@ -348,3 +373,19 @@ async def test_dev_web_login_and_logout_work_with_shipped_defaults(shipped_defau
 async def test_shipped_defaults_still_reject_foreign_origins(shipped_defaults):
     with pytest.raises(BadRequestException):
         await _initiate("http://localhost:3001/auth/success", _Redis())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", ["de", "en"])
+@pytest.mark.parametrize("action", [None, "register"])
+async def test_login_passes_explicit_language_to_identity_provider(language, action):
+    redis = _Redis()
+    with patch.object(auth, "get_plugin_registry", return_value=_registry()), \
+         patch("computor_backend.redis_cache.get_redis_client", AsyncMock(return_value=redis)):
+        response = await auth.initiate_login(
+            "keycloak", "/auth/success", _request(), action=action, ui_locales=language,
+        )
+    query = parse_qs(urlsplit(response.headers["location"]).query)
+    assert query["ui_locales"] == [language]
+    stored = json.loads(redis.data[f"sso_state:{query['state'][0]}"])
+    assert stored["ui_locales"] == language
