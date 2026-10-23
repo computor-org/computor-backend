@@ -17,8 +17,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Computor - Educational Platform for Programming",
-  description: "Learn programming with interactive courses, automated testing, and collaborative learning",
+  // German first, like the server render of the public pages; the pages set
+  // <html lang> to the visitor's language on hydration.
+  title: "Computor – Lernplattform für Programmierung",
+  description: "Programmieren lernen mit interaktiven Kursen, automatischen Tests und gemeinsamem Arbeiten",
 };
 
 export default function RootLayout({
@@ -27,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="de" suppressHydrationWarning>
       <head>
         {/* Before first paint — see THEME_INIT_SCRIPT for why this is inline. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />

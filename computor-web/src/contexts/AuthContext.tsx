@@ -16,7 +16,7 @@ interface AuthContextType {
   scopes: UserScopes | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  loginWithSSO: (provider?: string, returnTo?: string) => void;
+  loginWithSSO: (provider?: string, returnTo?: string, extraParams?: Record<string, string>) => void;
   logout: () => Promise<void>;
   refreshSession: () => Promise<AuthResponse>;
   /**
@@ -95,8 +95,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth();
   }, [loadPermissions]);
 
-  const loginWithSSO = useCallback((provider: string = 'keycloak', returnTo?: string) => {
-    ssoAuthService.initiateSSO(provider, returnTo);
+  const loginWithSSO = useCallback((provider: string = 'keycloak', returnTo?: string, extraParams?: Record<string, string>) => {
+    ssoAuthService.initiateSSO(provider, returnTo, extraParams);
   }, []);
 
   const logout = useCallback(async () => {

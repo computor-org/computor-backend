@@ -426,3 +426,15 @@ input[aria-invalid="true"]:focus,
 #kc-register-form #kc-form-options {
   margin-bottom: 16px;
 }
+
+/* "Von anderen Geräten abmelden" sat directly on the submit button of the
+   update-password page (issues#478). */
+#kc-passwd-update-form #kc-form-options {
+  margin: 4px 0 16px;
+}
+
+/* Page-level messages (e.g. "Bitte legen Sie ein Passwort … fest") touched
+   the first field label below them. */
+.pf-c-alert.pf-m-inline {
+  margin-bottom: 16px;
+}
