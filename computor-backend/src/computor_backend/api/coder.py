@@ -130,6 +130,7 @@ from computor_backend.permissions.principal import Principal
 from computor_backend.redis_cache import get_cache, get_redis_client
 from computor_backend.business_logic.workspace_launch_context import (
     get_workspace_launch_context as read_workspace_launch_context,
+    populate_last_courses,
     set_workspace_launch_context,
 )
 
@@ -671,6 +672,7 @@ async def get_workspaces(
     client: Annotated[CoderClient, Depends(get_coder_client)],
     db: Annotated[Session, Depends(get_db, scope="function")],
     cache: Annotated[object, Depends(get_cache)],
+    redis=Depends(get_redis_client),
     email: Optional[str] = None,
 ) -> WorkspaceListResponse:
     """
@@ -693,8 +695,16 @@ async def get_workspaces(
         # A scratch home is destroyed together with its workspace, a shared one
         # is not. The UI cannot warn about that without knowing which is which,
         # so fill it in here (bounded fan-out, one request per workspace).
-        from computor_backend.business_logic.course_workspaces import populate_home_modes
-        await populate_home_modes(client, workspaces)
+        from computor_backend.business_logic.course_workspaces import (
+            populate_home_modes,
+            populate_template_version_dates,
+        )
+        await asyncio.gather(
+            populate_home_modes(client, workspaces),
+            populate_template_version_dates(client, workspaces),
+        )
+        if not email:
+            await populate_last_courses(str(permissions.user_id), workspaces, redis)
         return WorkspaceListResponse(
             workspaces=workspaces,
             count=len(workspaces),
@@ -789,7 +799,9 @@ async def post_workspace_launch_context(
 ) -> WorkspaceLaunchContext:
     try:
         return await set_workspace_launch_context(
-            username, workspace_name, request.course_id, permissions, db, client, redis
+            username, workspace_name, request.course_id, permissions, db, client, redis,
+            ui_language=request.ui_language,
+            course_content_id=request.course_content_id,
         )
     except ComputorException:
         raise
