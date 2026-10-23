@@ -111,7 +111,10 @@ export function selectNeedsAttention(
   );
 }
 
-export default function NeedsAttention({ items, limit = 8 }: { items: AttentionItem[]; limit?: number }) {
+export default function NeedsAttention({ items, limit = 8, onOpenAssignment }: {
+  items: AttentionItem[]; limit?: number;
+  onOpenAssignment?: (courseId: string, contentId: string) => boolean;
+}) {
   const t = COPY[useUiLanguage()];
   const shown = items.slice(0, limit);
 
@@ -122,6 +125,9 @@ export default function NeedsAttention({ items, limit = 8 }: { items: AttentionI
           <Link
             key={content.id}
             href={`/courses/${content.course_id}/student/assignments/${content.id}`}
+            onClick={(event) => {
+              if (onOpenAssignment?.(content.course_id, content.id)) event.preventDefault();
+            }}
             className="flex items-center gap-3 px-4 py-3 hover:bg-canvas transition-colors"
           >
             <span
