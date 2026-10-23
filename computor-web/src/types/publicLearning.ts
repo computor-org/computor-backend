@@ -25,6 +25,8 @@ export interface PublicLearningCourseOutline {
   id: string;
   title: string;
   description?: string | null;
+  /** The course's path on the server; the catalog finds the course to join by it. */
+  course_path?: string | null;
   language_code?: string | null;
   contents: PublicLearningContentSummary[];
   welcome_content_id?: string | null;
