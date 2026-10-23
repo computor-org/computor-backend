@@ -292,9 +292,11 @@ maintenance_paths() {
 ensure_maintenance_page() {
     maintenance_paths
     mkdir -p "$MAINTENANCE_PAGE_DIR"
-    if [ ! -f "$MAINTENANCE_PAGE_DIR/index.html" ]; then
+    # Compare, not just test for existence: a page staged by an older checkout
+    # would otherwise be served forever after the source changed.
+    if ! cmp -s "${OPS_DIR}/maintenance/maintenance.html" "$MAINTENANCE_PAGE_DIR/index.html"; then
         cp "${OPS_DIR}/maintenance/maintenance.html" "$MAINTENANCE_PAGE_DIR/index.html" \
-            && log "  ${GREEN}Created maintenance page${NC}" \
+            && log "  ${GREEN}Staged maintenance page${NC}" \
             || warn "  Could not stage maintenance page (missing ${OPS_DIR}/maintenance/maintenance.html)"
     fi
 }
