@@ -111,6 +111,7 @@ async function setup(
     }
     if (path.endsWith('/user')) return json(route, USER);
     if (path.startsWith('/messages')) return json(route, []);
+    if (path === '/students/course-contents') return json(route, []);
 
     if (options.courseWorkspaces) {
       if (path === '/coder/templates') {
@@ -426,7 +427,7 @@ test('primary launches reuse the running workspace across courses without rebuil
     courseWorkspaces: true,
   });
 
-  await page.goto(`/courses/${COURSE_A}`);
+  await page.goto(`/courses/${COURSE_A}/student/assignments`);
   const firstPopup = page.waitForEvent('popup');
   await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
   const first = await firstPopup;
@@ -434,7 +435,7 @@ test('primary launches reuse the running workspace across courses without rebuil
 
   // Reusing the primary button for another course must only replace the
   // course context, preserving the editor's workspace and current build.
-  await page.goto(`/courses/${COURSE_B}`);
+  await page.goto(`/courses/${COURSE_B}/student/assignments`);
   const secondPopup = page.waitForEvent('popup');
   await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
   const second = await secondPopup;
@@ -457,7 +458,7 @@ test('a primary course launch starts its stopped workspace once after the course
     courseWorkspaces: true,
     workspaces: [{ ...COURSE_WORKSPACE, latest_build_status: 'stopped' }],
   });
-  await page.goto(`/courses/${COURSE_A}`);
+  await page.goto(`/courses/${COURSE_A}/student/assignments`);
   const popup = page.waitForEvent('popup');
   await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
   const launchTab = await popup;
@@ -476,7 +477,7 @@ test('a primary course launch provisions an absent workspace once and retains th
   const { contexts, starts, provisions, actions } = await setup(page, [
     details({ status: 'running', ready: true, name: 'vscode' }),
   ], { courseWorkspaces: true, workspaces: [], allowProvision: true });
-  await page.goto(`/courses/${COURSE_B}`);
+  await page.goto(`/courses/${COURSE_B}/student/assignments`);
   const popup = page.waitForEvent('popup');
   await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
   const launchTab = await popup;
@@ -500,7 +501,7 @@ test('a primary course launch does not substitute a scratch workspace or another
     ],
     allowProvision: true,
   });
-  await page.goto(`/courses/${COURSE_A}`);
+  await page.goto(`/courses/${COURSE_A}/student/assignments`);
   const popup = page.waitForEvent('popup');
   await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
   const launchTab = await popup;
@@ -517,7 +518,7 @@ test('a failed workspace lookup shows an error without provisioning and allows a
   const { contexts, starts, provisions } = await setup(page, [
     details({ status: 'running', ready: true, name: 'vscode' }),
   ], { courseWorkspaces: true, workspaceListStatus: () => status });
-  await page.goto(`/courses/${COURSE_A}`);
+  await page.goto(`/courses/${COURSE_A}/student/assignments`);
   // The background poll saw the existing workspace; a failing fresh lookup
   // must not silently use that stale snapshot or fall back to provisioning.
   await expect(page.getByRole('button', { name: 'Open', exact: true })).toBeVisible();
@@ -549,7 +550,7 @@ test('an existing workspace with no owner fails safely and can be retried withou
   const { contexts, starts, provisions } = await setup(page, [
     details({ status: 'running', ready: true, name: 'vscode' }),
   ], { courseWorkspaces: true, workspaces });
-  await page.goto(`/courses/${COURSE_A}`);
+  await page.goto(`/courses/${COURSE_A}/student/assignments`);
   const firstPopup = page.waitForEvent('popup');
   await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
   const failedTab = await firstPopup;
@@ -595,7 +596,7 @@ test('a popup-blocked primary course launch retains the course in its same-tab f
     courseWorkspaces: true,
   });
   await page.addInitScript(() => { window.open = () => null; });
-  await page.goto(`/courses/${COURSE_B}`);
+  await page.goto(`/courses/${COURSE_B}/student/assignments`);
   await page.getByRole('button', { name: /VS Code.*Launch workspace/s }).click();
   await page.waitForURL(COURSE_WORKSPACE_URL);
   expect(contexts).toEqual([{ course_id: COURSE_B }]);
@@ -608,7 +609,7 @@ test('a popup-blocked existing-workspace Open retains the selected course', asyn
     details({ status: 'running', ready: true, name: 'vscode' }),
   ], { courseWorkspaces: true });
   await page.addInitScript(() => { window.open = () => null; });
-  await page.goto(`/courses/${COURSE_B}`);
+  await page.goto(`/courses/${COURSE_B}/student/assignments`);
   await page.getByRole('button', { name: 'Open', exact: true }).click();
   await page.waitForURL(COURSE_WORKSPACE_URL);
   expect(contexts).toEqual([{ course_id: COURSE_B }]);
