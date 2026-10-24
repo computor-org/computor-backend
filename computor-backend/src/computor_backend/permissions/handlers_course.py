@@ -417,8 +417,7 @@ class MessagePermissionHandler(PermissionHandler):
     Write rules are enforced in ``business_logic.messages`` (create) and
     ``business_logic.messages`` (update/delete: author only).
     The build_query restriction below additionally blocks update/delete
-    of targets whose CREATE path is not implemented yet, so the audit
-    trail can't disagree with the create-side guard.
+    of user-DM targets whose CREATE path is not implemented yet.
     """
 
     def can_perform_action(self, principal: Principal, action: str, resource_id: Optional[str] = None, context: Optional[dict] = None) -> bool:
@@ -586,11 +585,6 @@ class MessagePermissionHandler(PermissionHandler):
         # supposed to exist via the public API can't be quietly mutated.
         if action in ["update", "delete"]:
             query = query.filter(self.entity.author_id == principal.user_id)
-            query = query.filter(
-                and_(
-                    self.entity.user_id.is_(None),
-                    self.entity.course_member_id.is_(None),
-                )
-            )
+            query = query.filter(self.entity.user_id.is_(None))
 
         return query
