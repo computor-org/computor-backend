@@ -6,6 +6,7 @@ import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { UserClient } from '@/src/generated/clients/UserClient';
 import { useResource } from '@/src/hooks/useResource';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { usePermissions } from '@/src/hooks/usePermissions';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
@@ -38,6 +39,7 @@ const COPY = {
     backToCourses: 'Zurück zu deinen Kursen',
     enrolledBadge: 'Beigetreten',
     openCourse: 'Kurs öffnen',
+    continue: 'Weiterlernen',
     full: 'Voll',
     seatsLeft: (n: number) => (n === 1 ? '1 Platz frei' : `${n} Plätze frei`),
     join: 'Kurs beitreten',
@@ -59,6 +61,7 @@ const COPY = {
     backToCourses: 'Back to your courses',
     enrolledBadge: 'Enrolled',
     openCourse: 'Open course',
+    continue: 'Continue',
     full: 'Full',
     seatsLeft: (n: number) => (n === 1 ? '1 seat left' : `${n} seats left`),
     join: 'Join course',
@@ -73,7 +76,10 @@ const COPY = {
 function CourseCatalog() {
   const router = useRouter();
   const notify = useNotify();
-  const { refreshPermissions } = useAuth();
+  const { refreshPermissions, isLoading } = useAuth();
+  const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
+  const courseStaff = (id: string) => isAdmin || isOrganizationManager || courseHasAtLeast(id, '_tutor');
+  const courseLearner = (id: string) => !courseStaff(id) && courseHasAtLeast(id, '_student');
   const t = COPY[useUiLanguage()];
   const { data, loading, error, reload } = useResource(
     () => coursesClient.listPublicCoursesCoursesPublicGet({}),
@@ -99,11 +105,12 @@ function CourseCatalog() {
   const dialogCourse = pending
     ?? (joinCourse && !joinCourse.enrolled && !joinCourse.full && !joinDismissed ? joinCourse : null);
 
+  const joinedLearner = joinCourse ? courseLearner(joinCourse.id) : false;
   useEffect(() => {
-    if (!joinCourse) return;
-    if (joinCourse.enrolled) router.replace(`/courses/${joinCourse.id}`);
+    if (!joinCourse || isLoading) return;
+    if (joinCourse.enrolled) router.replace(`/courses/${joinCourse.id}${joinedLearner ? '/student/assignments' : ''}`);
     else document.getElementById(`course-${joinCourse.id}`)?.scrollIntoView({ block: 'nearest' });
-  }, [joinCourse, router]);
+  }, [joinCourse, router, isLoading, joinedLearner]);
 
   function closeDialog() {
     setPending(null);
@@ -120,7 +127,9 @@ function CourseCatalog() {
       await refreshPermissions();
       notify(t.enrolled(displayName(course, t.thisCourse)), 'success');
       closeDialog();
-      router.push(`/courses/${course.id}`);
+      // Enrollment is confirmed, but refreshPermissions returns no new scopes
+      // to this closure. Preserve staff destinations without a stale student gate.
+      router.push(`/courses/${course.id}${courseStaff(course.id) ? '' : '/student/assignments'}`);
     } catch (err) {
       notify(err instanceof Error ? err.message : t.enrollFailed, 'error');
       closeDialog();
@@ -178,8 +187,8 @@ function CourseCatalog() {
                 }
                 footer={
                   course.enrolled ? (
-                    <ButtonLink href={`/courses/${course.id}`} size="sm">
-                      {t.openCourse}
+                    <ButtonLink href={`/courses/${course.id}${courseLearner(course.id) ? '/student/assignments' : ''}`} size="sm">
+                      {courseLearner(course.id) ? t.continue : t.openCourse}
                     </ButtonLink>
                   ) : (
                     <div className="flex items-center gap-3">
