@@ -14,7 +14,7 @@ function json(route: Route, body: unknown) {
   return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 }
 
-async function setup(page: Page, { signedIn = true, courseRoles = { 'c-advanced': ['_student'] } as Record<string, string[]>, isAdmin = false, systemRoles = [] as string[] } = {}) {
+async function setup(page: Page, { signedIn = true, courseRoles = { 'c-advanced': ['_student'] } as Record<string, string[]>, isAdmin = false, systemRoles = [] as string[], publicCourses = COURSES } = {}) {
   const enrolled: string[] = [];
   if (signedIn) {
     await page.addInitScript((roles) => {
@@ -33,7 +33,7 @@ async function setup(page: Page, { signedIn = true, courseRoles = { 'c-advanced'
       enrolled.push(enroll[1]);
       return json(route, {});
     }
-    if (path === '/courses/public') return json(route, COURSES);
+    if (path === '/courses/public') return json(route, publicCourses);
     if (path === '/user/views') return json(route, ['student']);
     if (path === '/user/scopes') return json(route, { is_admin: isAdmin, course: courseRoles });
     if (path === '/user') return json(route, {
@@ -108,8 +108,7 @@ for (const [locale, joinLabel, continueLabel, openLabel] of [
     test.use({ locale });
     test('confirmed enrollment opens assignments before refreshed student scopes arrive', async ({ page }) => {
       const enrolled = await setup(page);
-      await page.goto('/learn/python-beginner');
-      await page.getByRole('link', { name: locale === 'de-DE' ? 'Zum Kurskatalog' : 'Open the course catalog' }).click();
+      await page.goto('/courses/catalog?join=python.beginner');
       await expect(page).toHaveURL(/\/courses\/catalog\?join=python\.beginner$/);
       const dialog = page.getByRole('dialog');
       await expect(dialog.getByText(locale === 'de-DE' ? 'Diesem Kurs beitreten?' : 'Join this course?')).toBeVisible();
@@ -118,6 +117,58 @@ for (const [locale, joinLabel, continueLabel, openLabel] of [
       await dialog.getByRole('button', { name: joinLabel }).click();
       await expect(page).toHaveURL(/\/courses\/c-beginner\/student\/assignments$/);
       expect(enrolled).toEqual(['c-beginner']);
+    });
+    test('an exact exercise survives enrollment consent', async ({ page }) => {
+      const enrolled = await setup(page);
+      await page.goto('/courses/catalog?join=python.beginner&contentPath=week_1.math_constants');
+      await page.getByRole('dialog').getByRole('button', { name: joinLabel }).click();
+      await expect(page).toHaveURL(/\/courses\/c-beginner\/student\/assignments\?contentPath=week_1.math_constants$/);
+      expect(enrolled).toEqual(['c-beginner']);
+    });
+    test('an enrolled exact exercise redirects without enrollment', async ({ page }) => {
+      const enrolled = await setup(page);
+      await page.goto('/courses/catalog?join=python.advanced&contentPath=week_1.math_constants');
+      await expect(page).toHaveURL(/\/courses\/c-advanced\/student\/assignments\?contentPath=week_1.math_constants$/);
+      expect(enrolled).toEqual([]);
+    });
+    test('invalid explicit targets stay in the catalog without consent or fallback', async ({ page }) => {
+      const enrolled = await setup(page);
+      for (const query of [
+        'join=python.beginner&contentPath=',
+        'join=python.beginner&contentPath=Week_1.task',
+        'join=python.beginner&contentPath=week_1.task%0A',
+        'join=python.beginner&contentPath=week_1.task&contentPath=week_2.task',
+        'join=python.beginner&join=python.advanced&contentPath=week_1.task',
+        'join=python.unknown&contentPath=week_1.task',
+        'contentPath=week_1.task',
+        'join=python.advanced&contentPath=../task',
+      ]) {
+        await page.goto(`/courses/catalog?${query}`);
+        await expect(page.getByText(locale === 'de-DE'
+          ? 'Diese Aufgabe kann nicht geöffnet werden. Öffne sie erneut über den ursprünglichen Kurs.'
+          : 'This exercise cannot be opened. Open it again from its original course.')).toBeVisible();
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        await expect(page).toHaveURL(`/courses/catalog?${query}`);
+        expect(enrolled).toEqual([]);
+      }
+    });
+    test('another chosen course never inherits the original exercise', async ({ page }) => {
+      const enrolled = await setup(page);
+      await page.goto('/courses/catalog?join=python.beginner&contentPath=week_1.math_constants');
+      await page.getByRole('dialog').getByRole('button', { name: locale === 'de-DE' ? 'Abbrechen' : 'Cancel' }).click();
+      await page.locator('#course-c-intermediate').getByRole('button', { name: joinLabel }).click();
+      await page.getByRole('dialog').getByRole('button', { name: joinLabel }).click();
+      await expect(page).toHaveURL(/\/courses\/c-intermediate\/student\/assignments$/);
+      expect(enrolled).toEqual(['c-intermediate']);
+    });
+    test('ambiguous course paths cannot choose an exercise destination', async ({ page }) => {
+      const enrolled = await setup(page, { publicCourses: [...COURSES, { ...COURSES[0], id: 'c-duplicate', path: 'python.beginner' }] });
+      await page.goto('/courses/catalog?join=python.beginner&contentPath=week_1.task');
+      await expect(page.getByText(locale === 'de-DE'
+        ? 'Diese Aufgabe kann nicht geöffnet werden. Öffne sie erneut über den ursprünglichen Kurs.'
+        : 'This exercise cannot be opened. Open it again from its original course.')).toBeVisible();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      expect(enrolled).toEqual([]);
     });
     test('an enrolled learner join link opens assignments', async ({ page }) => {
       const enrolled = await setup(page);
@@ -138,12 +189,12 @@ for (const [locale, joinLabel, continueLabel, openLabel] of [
           isAdmin: staff === 'admin',
           systemRoles: staff === 'organization manager' ? ['_organization_manager'] : [],
         });
-        await page.goto('/courses/catalog?join=python.beginner');
+        await page.goto('/courses/catalog?join=python.beginner&contentPath=week_1.math_constants');
         await page.getByRole('dialog').getByRole('button', { name: joinLabel }).click();
         await expect(page).toHaveURL(/\/courses\/c-beginner$/);
         await page.goto('/courses/catalog');
         await expect(page.getByRole('link', { name: openLabel, exact: true })).toHaveAttribute('href', '/courses/c-advanced');
-        await page.goto('/courses/catalog?join=python.advanced');
+        await page.goto('/courses/catalog?join=python.advanced&contentPath=week_1.math_constants');
         await expect(page).toHaveURL(/\/courses\/c-advanced$/);
       });
     }

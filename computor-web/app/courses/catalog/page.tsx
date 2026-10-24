@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { UserClient } from '@/src/generated/clients/UserClient';
 import { useResource } from '@/src/hooks/useResource';
@@ -9,7 +9,6 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
-import { useSearchParam } from '@/src/hooks/useSearchParam';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -28,6 +27,7 @@ const userClient = new UserClient();
 const COPY = {
   de: {
     thisCourse: 'diesen Kurs',
+    invalidTarget: 'Diese Aufgabe kann nicht geöffnet werden. Öffne sie erneut über den ursprünglichen Kurs.',
     enrolled: (title: string) => `Du bist jetzt Mitglied in ${title}.`,
     enrollFailed: 'Der Beitritt zum Kurs war nicht möglich.',
     courses: 'Kurse',
@@ -50,6 +50,7 @@ const COPY = {
   },
   en: {
     thisCourse: 'this course',
+    invalidTarget: 'This exercise cannot be opened. Open it again from its original course.',
     enrolled: (title: string) => `You are now enrolled in ${title}.`,
     enrollFailed: 'Could not enrol you in this course.',
     courses: 'Courses',
@@ -96,21 +97,38 @@ function CourseCatalog() {
   // public course page (issues#521): mark that course and open its
   // confirmation, or open the course itself when the learner is already a
   // member. Once the dialog is closed it stays closed, also after a reload.
-  const joinParam = useSearchParam('join');
+  const searchParams = useSearchParams();
+  const joinValues = searchParams.getAll('join');
+  const joinParam = joinValues.length === 1 ? joinValues[0] : '';
+  const contentValues = searchParams.getAll('contentPath');
+  const hasContentTarget = contentValues.length > 0;
+  const contentPath = contentValues.length === 1 ? contentValues[0] : '';
+  const validContentPath = contentPath.trim() === contentPath
+    && /^[a-z0-9_]+(\.[a-z0-9_]+)*$/.test(contentPath);
   const [joinDismissed, setJoinDismissed] = useState(false);
   const joinMatches = joinParam
     ? courses.filter(course => course.id === joinParam || course.path === joinParam)
     : [];
   const joinCourse = joinMatches.length === 1 ? joinMatches[0] : null;
+  const invalidTarget = hasContentTarget && (!validContentPath || !joinCourse);
+  const blockedTarget = (course: CoursePublicList) => invalidTarget
+    && course.id === joinCourse?.id && !courseStaff(course.id);
+  const destination = (course: CoursePublicList, learner: boolean) => {
+    const base = `/courses/${course.id}${learner ? '/student/assignments' : ''}`;
+    return learner && hasContentTarget && !invalidTarget && course.id === joinCourse?.id
+      ? `${base}?contentPath=${encodeURIComponent(contentPath)}` : base;
+  };
   const dialogCourse = pending
-    ?? (joinCourse && !joinCourse.enrolled && !joinCourse.full && !joinDismissed ? joinCourse : null);
+    ?? (joinCourse && !invalidTarget && !joinCourse.enrolled && !joinCourse.full && !joinDismissed ? joinCourse : null);
 
   const joinedLearner = joinCourse ? courseLearner(joinCourse.id) : false;
+  const joinedStaff = joinCourse ? courseStaff(joinCourse.id) : false;
+  const joinedDestination = joinCourse ? destination(joinCourse, joinedLearner) : '';
   useEffect(() => {
-    if (!joinCourse || isLoading) return;
-    if (joinCourse.enrolled) router.replace(`/courses/${joinCourse.id}${joinedLearner ? '/student/assignments' : ''}`);
+    if (!joinCourse || isLoading || (invalidTarget && !joinedStaff)) return;
+    if (joinCourse.enrolled) router.replace(joinedDestination);
     else document.getElementById(`course-${joinCourse.id}`)?.scrollIntoView({ block: 'nearest' });
-  }, [joinCourse, router, isLoading, joinedLearner]);
+  }, [joinCourse, router, isLoading, joinedStaff, joinedDestination, invalidTarget]);
 
   function closeDialog() {
     setPending(null);
@@ -118,6 +136,7 @@ function CourseCatalog() {
   }
 
   async function join(course: CoursePublicList) {
+    if (blockedTarget(course)) return;
     setJoining(true);
     try {
       await userClient.enrollInPublicCourseUserCoursesCourseIdEnrollPost({ courseId: course.id });
@@ -129,7 +148,7 @@ function CourseCatalog() {
       closeDialog();
       // Enrollment is confirmed, but refreshPermissions returns no new scopes
       // to this closure. Preserve staff destinations without a stale student gate.
-      router.push(`/courses/${course.id}${courseStaff(course.id) ? '' : '/student/assignments'}`);
+      router.push(destination(course, !courseStaff(course.id)));
     } catch (err) {
       notify(err instanceof Error ? err.message : t.enrollFailed, 'error');
       closeDialog();
@@ -148,7 +167,7 @@ function CourseCatalog() {
           subtitle={t.subtitle}
         />
 
-        <ErrorBanner>{error}</ErrorBanner>
+        <ErrorBanner>{error || (!loading && invalidTarget ? t.invalidTarget : null)}</ErrorBanner>
 
         {loading && (
           <ScrollArea spacing="none" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 content-start">
@@ -186,8 +205,10 @@ function CourseCatalog() {
                   ) : undefined
                 }
                 footer={
-                  course.enrolled ? (
-                    <ButtonLink href={`/courses/${course.id}${courseLearner(course.id) ? '/student/assignments' : ''}`} size="sm">
+                  course.enrolled ? blockedTarget(course) ? (
+                    <Button size="sm" disabled>{t.continue}</Button>
+                  ) : (
+                    <ButtonLink href={destination(course, courseLearner(course.id))} size="sm">
                       {courseLearner(course.id) ? t.continue : t.openCourse}
                     </ButtonLink>
                   ) : (
@@ -201,7 +222,7 @@ function CourseCatalog() {
                       ) : null}
                       <Button
                         size="sm"
-                        disabled={course.full === true}
+                        disabled={course.full === true || blockedTarget(course)}
                         onClick={() => setPending(course)}
                       >
                         {t.join}
