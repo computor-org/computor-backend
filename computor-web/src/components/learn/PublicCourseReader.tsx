@@ -131,10 +131,16 @@ function OutlineLinks({
   );
 }
 
-function ReaderActions({ signedIn, t }: { signedIn: boolean; t: Copy }) {
-  const computorHref = signedIn
-    ? '/courses/catalog'
-    : `/login?next=${encodeURIComponent('/courses/catalog')}`;
+// The catalog opens the join confirmation for this course, or the course
+// itself when the learner is already a member (issues#521).
+function catalogPathFor(outline: PublicLearningCourseOutline | null): string {
+  return outline?.course_path
+    ? `/courses/catalog?join=${encodeURIComponent(outline.course_path)}`
+    : '/courses/catalog';
+}
+
+function ReaderActions({ signedIn, target, t }: { signedIn: boolean; target: string; t: Copy }) {
+  const computorHref = signedIn ? target : `/login?next=${encodeURIComponent(target)}`;
   return (
     <div className="rounded-lg border border-rule bg-surface p-4">
       <p className="text-sm font-semibold text-fg">{t.practiseTitle}</p>
@@ -217,7 +223,7 @@ export default function PublicCourseReader({
     : exercises[0];
 
   return (
-    <PublicLearnShell>
+    <PublicLearnShell signInNext={catalogPathFor(outline)}>
       <div className="container mx-auto max-w-7xl px-4 py-8">
         {outlineLoading ? (
           <div className="py-24 text-center text-muted">{t.loadingCourse}</div>
@@ -340,7 +346,7 @@ export default function PublicCourseReader({
                   </nav>
                 )}
 
-                <ReaderActions signedIn={Boolean(user)} t={t} />
+                <ReaderActions signedIn={Boolean(user)} target={catalogPathFor(outline)} t={t} />
 
                 <details className="text-sm text-muted">
                   <summary className="cursor-pointer hover:text-fg">{t.sourceTitle}</summary>
