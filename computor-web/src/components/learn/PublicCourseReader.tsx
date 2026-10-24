@@ -88,6 +88,28 @@ function withoutTitleHeading(markdown: string): string {
   return markdown.replace(/^\s*#\s+.*(?:\r?\n|$)/, '');
 }
 
+function LanguageSwitch({ content, label }: { content: PublicLearningContent; label: string }) {
+  if (content.available_languages.length < 2) return null;
+  return (
+    <div className="flex rounded-lg border border-rule-strong p-1" aria-label={label}>
+      {content.available_languages.map(language => (
+        <button
+          type="button"
+          key={language}
+          onClick={() => setUiLanguage(language as UiLanguage)}
+          className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+            content.selected_language === language
+              ? 'bg-accent text-on-accent'
+              : 'text-muted hover:bg-sunken'
+          }`}
+        >
+          {LANGUAGE_LABEL[language] ?? language.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function OutlineLinks({
   outline,
   activeContentId,
@@ -265,11 +287,20 @@ export default function PublicCourseReader({
                   </div>
                 )}
 
-                {!activeContentId ? (
+                {!contentId ? (
                   <section className="rounded-lg border border-rule bg-surface p-6 md:p-8">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-accent-text">{t.startHere}</p>
-                    <h2 className="mt-2 text-2xl font-bold text-fg">{t.welcome}</h2>
-                    {outline.description ? (
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-accent-text">{t.startHere}</p>
+                        <h2 className="mt-2 text-2xl font-bold text-fg">{t.welcome}</h2>
+                      </div>
+                      {content && <LanguageSwitch content={content} label={t.language} />}
+                    </div>
+                    {content?.markdown ? (
+                      <div className="mt-4">
+                        <PublicMarkdown assetBaseUrl={content.asset_base_url} mediaFiles={content.media_files} markdown={content.markdown} />
+                      </div>
+                    ) : outline.description ? (
                       <div className="mt-4 whitespace-pre-wrap text-body leading-7">{outline.description}</div>
                     ) : (
                       <p className="mt-4 text-muted">{t.noWelcome}</p>
@@ -298,24 +329,7 @@ export default function PublicCourseReader({
                         </p>
                         <h2 className="mt-1 text-2xl font-bold text-fg">{localizedTitle(outline, content.id, content.title, (content.selected_language ?? uiLanguage) as UiLanguage)}</h2>
                       </div>
-                      {content.available_languages.length > 1 && (
-                        <div className="flex rounded-lg border border-rule-strong p-1" aria-label={t.language}>
-                          {content.available_languages.map(language => (
-                            <button
-                              type="button"
-                              key={language}
-                              onClick={() => setUiLanguage(language as UiLanguage)}
-                              className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-                                content.selected_language === language
-                                  ? 'bg-accent text-on-accent'
-                                  : 'text-muted hover:bg-sunken'
-                              }`}
-                            >
-                              {LANGUAGE_LABEL[language] ?? language.toUpperCase()}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      <LanguageSwitch content={content} label={t.language} />
                     </div>
                     {content.markdown ? (
                       <PublicMarkdown assetBaseUrl={content.asset_base_url} mediaFiles={content.media_files} markdown={content.markdown} />
