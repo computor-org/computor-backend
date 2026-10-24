@@ -41,6 +41,7 @@ export default function CourseCard({
   href,
   badge,
   footer,
+  selected = false,
   workspaceLauncherRef,
 }: {
   course: { id: string; title?: string | null; path?: string | null; language_code?: string | null; description?: string | null };
@@ -51,6 +52,8 @@ export default function CourseCard({
   /** Overrides the default role badge. */
   badge?: ReactNode;
   footer?: ReactNode;
+  /** Marks the course the visitor came to join (catalog `?join=`). */
+  selected?: boolean;
   workspaceLauncherRef?: Ref<CourseWorkspaceLauncher>;
 }) {
   const language = useUiLanguage();
@@ -82,7 +85,13 @@ export default function CourseCard({
   );
 
   return (
-    <div className="bg-surface rounded-lg border border-rule p-6 hover:shadow-lg transition-all h-full flex flex-col">
+    <div
+      id={`course-${course.id}`}
+      aria-current={selected ? 'true' : undefined}
+      className={`bg-surface rounded-lg border p-6 hover:shadow-lg transition-all h-full flex flex-col ${
+        selected ? 'border-accent ring-2 ring-accent-line' : 'border-rule'
+      }`}
+    >
       {href ? (
         // The launch buttons live OUTSIDE the Link: nesting them in the anchor
         // would both be invalid HTML and still navigate the card on an icon click.
