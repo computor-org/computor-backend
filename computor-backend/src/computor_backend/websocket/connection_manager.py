@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from computor_backend.database import get_db
 from computor_backend.model.course import CourseMember, SubmissionGroup, SubmissionGroupMember, CourseContent
 from computor_backend.permissions.principal import Principal
+from computor_backend.permissions.roles import TUTOR_AND_ABOVE
 from computor_backend.redis_cache import get_redis_client
 from computor_backend.settings import settings
 from computor_backend.websocket.auth import WebSocketCredential
@@ -591,7 +592,7 @@ class ConnectionManager:
             .filter(
                 CourseMember.course_id == member.course_id,
                 CourseMember.user_id == principal.user_id,
-                CourseMember.course_role_id != "_student",
+                CourseMember.course_role_id.in_(TUTOR_AND_ABOVE),
             )
             .exists()
         ).scalar()

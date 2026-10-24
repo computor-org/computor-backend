@@ -152,6 +152,26 @@ def _check_course_group_write_permission(
         raise ForbiddenException()
 
 
+def _check_course_member_write_permission(
+    permissions: Principal,
+    course_member_id: str,
+    db: Session,
+) -> None:
+    """Private course conversation: its active member or that course's tutors."""
+    member = db.query(CourseMember).filter(CourseMember.id == course_member_id).first()
+    if (
+        member is not None
+        and member.course_role_id in course_role_hierarchy.get_allowed_roles(CourseRole.STUDENT)
+        and (
+            str(member.user_id) == str(permissions.user_id)
+            or _principal_has_course_role(permissions, member.course_id, CourseRole.TUTOR, db)
+        )
+    ):
+        return
+    # Do not distinguish an unknown member from somebody else's membership.
+    raise ForbiddenException()
+
+
 def _check_submission_group_write_permission(
     permissions: Principal,
     submission_group_id: str,
