@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional
 
 from computor_types.base import EntityInterface, ListQuery
@@ -12,6 +12,7 @@ class CourseTutorRepository(BaseModel):
     full_path_student_template: Optional[str] = None
 
 class CourseTutorGet(BaseModel):
+    position: Optional[float] = Field(default=None, allow_inf_nan=False)
     id: str
     title: Optional[str] = None
     description: Optional[str] = None
@@ -29,6 +30,7 @@ class CourseTutorGet(BaseModel):
         return str(value)
 
 class CourseTutorList(BaseModel):
+    position: Optional[float] = Field(default=None, allow_inf_nan=False)
     id: str
     title: Optional[str] = None
     description: Optional[str] = None

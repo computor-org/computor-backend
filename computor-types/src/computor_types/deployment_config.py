@@ -9,7 +9,7 @@ and test-related enums should be in their own module.
 """
 
 from typing import Any, List, Optional, Dict, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .deployment_base import BaseDeployment, DeploymentFactory  # noqa: F401
 
@@ -360,6 +360,7 @@ class CourseGitConfig(BaseDeployment):
 
 class CourseConfig(BaseDeployment):
     """Course configuration."""
+    position: Optional[float] = Field(None, allow_inf_nan=False, description="Course order; unordered courses follow by title")
     name: str = Field(description="Course display name")
     path: str = Field(description="Course path/slug")
     description: Optional[str] = Field(None, description="Course description")
@@ -391,6 +392,14 @@ class CourseConfig(BaseDeployment):
         "Omit to create an unbound course (configure git later in the UI).",
     )
     settings: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Course-specific settings")
+
+    @field_validator('position', mode='before')
+    @classmethod
+    def reject_boolean_position(cls, value):
+        if isinstance(value, bool):
+            raise ValueError('Course position must be a number, not a boolean')
+        return value
+
 
 # Hierarchical configuration classes for nested structure
 
