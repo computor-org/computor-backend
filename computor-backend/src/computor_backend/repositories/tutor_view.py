@@ -196,6 +196,7 @@ class TutorViewRepository(ViewRepository):
             result = CourseTutorGet(
                 id=str(course.id),
                 title=course.title,
+                position=course.position,
                 description=course.description,
                 course_family_id=str(course.course_family_id) if course.course_family_id else None,
                 organization_id=str(course.organization_id) if course.organization_id else None,
@@ -239,6 +240,7 @@ class TutorViewRepository(ViewRepository):
             return CourseTutorList(
                 id=str(course.id),
                 title=course.title,
+                position=course.position,
                 description=course.description,
                 course_family_id=str(course.course_family_id) if course.course_family_id else None,
                 organization_id=str(course.organization_id) if course.organization_id else None,
