@@ -584,10 +584,17 @@ def _oidc_account(user_id: str, db: Session) -> Optional[Account]:
 def _resolve_oidc_handle(user_id: str, db: Session) -> Optional[str]:
     """The student's Keycloak handle (``preferred_username``), stored on the OIDC
     ``Account.properties['username']`` after SSO login. Used as the Forgejo
-    username and as the managed-GitLab student-repo slug."""
+    username and as the managed-GitLab student-repo slug.
+
+    A username chosen at self-registration (e.g. an e-mail address) is not a
+    valid Forgejo name, so it is mapped to one (``utils.git_username``); every
+    caller then uses the same account name."""
+    from computor_backend.utils.git_username import forgejo_handle
+
     account = _oidc_account(user_id, db)
     if account and account.properties:
-        return account.properties.get("username")
+        handle = account.properties.get("username")
+        return forgejo_handle(handle, user_id) if handle else None
     return None
 
 
@@ -654,6 +661,13 @@ def _maybe_heal_forgejo_collaborator(
     """Retry granting the Forgejo write-collaborator when it failed at first
     provision (the student's Forgejo account didn't exist yet). No-op once the
     collaborator is recorded as added, or for non-Forgejo repos.
+
+    Creates the Forgejo account first when it is still missing, like the
+    template-reader heal does. Granting against a name Forgejo does not know
+    only fails again, and because this heal runs before the template-reader
+    heal, the retry then handed out a clone token that could read the template
+    but got "repository not found" on the student's own repository
+    (computor-org/issues#433).
     """
     if rec.mode != "managed" or not rec.git_server_id:
         return
@@ -663,7 +677,7 @@ def _maybe_heal_forgejo_collaborator(
     server = db.query(GitServer).filter(GitServer.id == rec.git_server_id).first()
     if server is None or server.type != "forgejo":
         return
-    handle = _resolve_oidc_handle(user_id, db)
+    handle = _ensure_forgejo_account(user_id, server, db)
     if not handle:
         return
     owner, _, repo = (rec.repo_ref or "").partition("/")

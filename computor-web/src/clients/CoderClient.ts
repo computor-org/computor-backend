@@ -81,14 +81,15 @@ export class CoderClient extends BaseEndpointClient {
   }
 
   /** Preserve the course for a new or already-running editor session. */
-  async setWorkspaceLaunchContext({ username, workspaceName, courseId }: {
+  async setWorkspaceLaunchContext({ username, workspaceName, courseId, uiLanguage }: {
     username: string;
     workspaceName: string;
     courseId: string;
+    uiLanguage?: 'de' | 'en';
   }): Promise<WorkspaceLaunchContext> {
     return this.client.post<WorkspaceLaunchContext>(
       this.buildPath('workspaces', username, workspaceName, 'launch-context'),
-      { course_id: courseId },
+      { course_id: courseId, ui_language: uiLanguage },
     );
   }
 
