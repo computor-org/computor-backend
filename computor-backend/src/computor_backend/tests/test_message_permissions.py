@@ -8,7 +8,7 @@ scope rules end-to-end at the business-logic boundary:
 | None (global)         | admin only on write (read is public; verified in |
 |                       | the handler-side tests, not here)                |
 | user_id               | NotImplementedException (path wired but disabled)|
-| course_member_id      | NotImplementedException (not implemented yet)    |
+| course_member_id      | member owner OR course role >= _tutor             |
 | submission_group_id   | submission_group_member OR course role >= _tutor |
 | course_content_id     | course role >= _lecturer                         |
 | course_group_id       | course role >= _lecturer                         |
@@ -121,6 +121,7 @@ def _stub_helpers(monkeypatch):
             "_check_global_write_permission",
             "_check_user_message_write_permission",
             "_check_submission_group_write_permission",
+            "_check_course_member_write_permission",
             "_check_course_content_write_permission",
             "_check_course_group_write_permission",
             "_check_course_write_permission",
@@ -297,13 +298,12 @@ class TestPrimaryTargetDispatch:
                 _payload(user_id="u-2"), p, db=MagicMock()
             )
 
-    def test_course_member_id_target_raises_not_implemented(self, monkeypatch):
-        _stub_helpers(monkeypatch)
-        p = _principal(is_admin=True)
-        with pytest.raises(NotImplementedException):
-            create_message_with_author(
-                _payload(course_member_id="cm-1"), p, db=MagicMock()
-            )
+    def test_course_member_id_dispatches_to_its_permission_check(self, monkeypatch):
+        mocks = _stub_helpers(monkeypatch)
+        p = _principal()
+        result = create_message_with_author(_payload(course_member_id="cm-1"), p, db=MagicMock())
+        mocks["_check_course_member_write_permission"].assert_called_once()
+        assert result["course_member_id"] == "cm-1"
 
 
 class TestPrimaryTargetSelection:
@@ -487,9 +487,8 @@ class TestNonConversationalReplyGuard:
     ):
         # The three conversational scopes accept replies. The reply
         # guard must not raise BadRequestException for them — what
-        # happens downstream (NotImplementedException for user_id /
-        # course_member_id, dispatch to the real helper for
-        # submission_group) is a separate concern.
+        # happens downstream (NotImplementedException for user_id or
+        # dispatch to the per-scope helper) is a separate concern.
         _stub_helpers(monkeypatch)
         db = self._mock_db_with_parent(parent_target)
         admin = _principal(is_admin=True)
@@ -501,7 +500,7 @@ class TestNonConversationalReplyGuard:
             assert "announcement-only" not in str(exc.detail).lower()
             assert "not allowed" not in str(exc.detail).lower()
         except NotImplementedException:
-            # Expected for the user_id / course_member_id branches.
+            # Expected for the user_id branch.
             pass
 
 
