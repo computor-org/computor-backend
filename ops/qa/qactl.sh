@@ -464,6 +464,15 @@ seed_tool() {
         -e QA_PUBLIC_ORIGIN -e TESTING_WORKER_TOKEN -e QA_DEPLOYED_VSIX uvicorn python /qa/qa_seed.py "$@"
 }
 
+# Re-uploaded examples keep their version ids, and the testing worker caches
+# each version set by id for good (tasks/temporal_student_testing.py), so a
+# re-run would keep grading against the files it fetched before.
+seed_content() {
+    seed_tool content
+    qa_compose exec -T temporal-worker-testing \
+        sh -c 'rm -rf "${EXAMPLE_CACHE_DIR:-/tmp/examples}/by-version"' || true
+}
+
 # Workspace image and template. A deployed VSIX must be in the template
 # directory for the image build and out of it for the push (Coder caps the
 # template archive at 1 MiB), so that case builds and pushes separately.
@@ -502,7 +511,7 @@ cmd_seed() {
     printf '%s\n' "$out" | grep -v '^QA_[A-Z_]*_API_TOKEN=' || true
     # New API tokens go to the private credentials file only.
     printf '%s\n' "$out" | grep '^QA_[A-Z_]*_API_TOKEN=' >> "$CRED_FILE" || true
-    seed_tool content
+    seed_content
     seed_templates
     seed_tool returning
     touch "$QA_HOME/.seeded"
@@ -682,6 +691,7 @@ main() {
         seed)
             ensure_state; load_env
             if [ "${1:-}" = templates ]; then seed_templates
+            elif [ "${1:-}" = content ]; then ensure_content; seed_content
             elif [ $# -gt 0 ]; then ensure_content; seed_tool "$1"
             else cmd_seed; fi ;;
         deploy) cmd_deploy "$@" ;;
