@@ -11,6 +11,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
 import { CoderClient } from '@/src/clients/CoderClient';
+import { loginPathFor } from '@/src/utils/safeRedirect';
 import { AGENT_LIFECYCLE_GAVE_UP, type WorkspaceDetails, type WorkspaceLaunchContext } from '@/src/types/workspaces';
 
 const coderClient = new CoderClient();
@@ -96,7 +97,7 @@ function LaunchWorkspace() {
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.push('/login');
+      router.push(loginPathFor(window.location));
     }
   }, [isAuthenticated, authLoading, router]);
 
