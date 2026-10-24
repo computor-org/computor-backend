@@ -26,6 +26,7 @@ grants nothing, and joining again restores ``_student``.
 
 import logging
 from datetime import datetime, timezone
+from computor_backend.business_logic.course_order import course_ordering
 from typing import Optional, Tuple
 from uuid import UUID
 
@@ -94,7 +95,7 @@ def list_public_courses(
 
     total = query.count()
     rows = (
-        query.order_by(Course.title.asc(), Course.id.asc())
+        query.order_by(*course_ordering())
         .offset(skip)
         .limit(limit)
         .all()
@@ -147,6 +148,7 @@ def list_public_courses(
             CoursePublicList(
                 id=str(course.id),
                 title=course.title,
+                position=course.position,
                 description=course.description,
                 path=str(course.path),
                 language_code=course.language_code,
@@ -175,8 +177,8 @@ def list_anonymous_catalog(db: Session) -> list[CoursePublicCatalogEntry]:
     rows = (
         _catalog_query(db)
         .filter(Course.visible.isnot(False))
-        .with_entities(Course.id, Course.title, Course.description, Course.language_code)
-        .order_by(Course.title.asc(), Course.id.asc())
+        .with_entities(Course.id, Course.title, Course.description, Course.language_code, Course.position)
+        .order_by(*course_ordering())
         .limit(ANONYMOUS_CATALOG_LIMIT)
         .all()
     )
@@ -186,10 +188,11 @@ def list_anonymous_catalog(db: Session) -> list[CoursePublicCatalogEntry]:
         CoursePublicCatalogEntry(
             id=str(course_id),
             title=title,
+            position=position,
             description=description,
             language_code=language_code,
         )
-        for course_id, title, description, language_code in rows
+        for course_id, title, description, language_code, position in rows
     ]
 
 

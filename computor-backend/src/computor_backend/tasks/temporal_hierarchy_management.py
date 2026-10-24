@@ -35,6 +35,7 @@ def create_course_activity(
     try:
         config = CourseConfig(
             name=course_config.get("name"),
+            position=course_config.get("position"),
             path=course_config.get("path"),
             description=course_config.get("description", ""),
         )
@@ -62,6 +63,7 @@ def create_course_activity(
             if course is None:
                 course = Course(
                     title=config.name,
+                    position=config.position,
                     description=config.description or "",
                     path=Ltree(config.path),
                     course_family_id=family.id,

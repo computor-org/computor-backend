@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { GitServersClient } from '@/src/generated/clients/GitServersClient';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
@@ -63,6 +64,9 @@ export default function CourseEditPage() {
   const [error, setError] = useState<string | null>(null);
 
   // General form
+  const uiLanguage = useUiLanguage();
+  const [position, setPosition] = useState('');
+  const [positionError, setPositionError] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [language, setLanguage] = useState('');
@@ -100,6 +104,7 @@ export default function CourseEditPage() {
       const c = await coursesClient.getCoursesCoursesIdGet({ id: courseId });
       setCourse(c);
       setTitle(c.title || '');
+      setPosition(c.position != null ? String(c.position) : '');
       setDescription(c.description || '');
       setLanguage(c.language_code || '');
       setIsPublic(c.public ?? false);
@@ -143,6 +148,15 @@ export default function CourseEditPage() {
   }, [authLoading, isAuthenticated, canEdit, load]);
 
   async function saveGeneral() {
+    const orderText = position.trim();
+    const order = orderText ? Number(orderText) : null;
+    if (order !== null && !Number.isFinite(order)) {
+      setPositionError(uiLanguage === 'de'
+        ? 'Gib eine endliche Zahl ein oder lass das Feld leer.'
+        : 'Enter a finite number or leave the field empty.');
+      return;
+    }
+    setPositionError(null);
     // Unlike the budget fields, parseLimit's "unparseable = unlimited" is not
     // acceptable here: a typo would silently open the course to everyone.
     // Only an explicitly blank field means unlimited.
@@ -160,6 +174,7 @@ export default function CourseEditPage() {
         id: courseId,
         body: {
           title: title.trim() || null,
+          position: order,
           description: description.trim() || null,
           language_code: language.trim() || null,
           // Only sent when the caller may change it: the backend guard keys on
@@ -245,6 +260,22 @@ export default function CourseEditPage() {
                 <Field label="Title">
                   <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
                 </Field>
+                <Field
+                  label={uiLanguage === 'de' ? 'Kursreihenfolge' : 'Course order'}
+                  hint={uiLanguage === 'de'
+                    ? 'Kleinere Zahlen stehen zuerst. Ohne Zahl folgt der Kurs nach den geordneten Kursen, alphabetisch nach Titel.'
+                    : 'Lower numbers come first. Leave empty to list the course after ordered courses, alphabetically by title.'}
+                >
+                  <input
+                    value={position}
+                    onChange={(e) => setPosition(e.target.value)}
+                    inputMode="decimal"
+                    aria-invalid={!!positionError}
+                    aria-describedby={positionError ? 'course-position-error' : undefined}
+                    className={inputCls}
+                  />
+                </Field>
+                {positionError && <p id="course-position-error" role="alert" className="text-sm text-danger-text">{positionError}</p>}
                 <Field label="Description">
                   <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className={inputCls} />
                 </Field>

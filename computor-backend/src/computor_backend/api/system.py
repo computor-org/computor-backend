@@ -102,6 +102,7 @@ async def create_course_async(
         "name": request.course.get("title", ""),
         "path": request.course.get("path", ""),
         "description": request.course.get("description", ""),
+        "position": request.course.get("position"),
         "course_family_id": request.course_family_id,
         "has_gitlab": has_gitlab,
         "git": request.git.model_dump() if (request.git and request.git.git_server_id) else None,
