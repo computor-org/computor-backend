@@ -279,13 +279,17 @@ function LaunchWorkspace() {
     ? workspaceStage(details.status, undefined, details.agent_lifecycle, language)
     : { label: hasTarget ? t.starting : t.creatingYours };
 
+  // The template's display name ("VS Code"), not the workspace's internal
+  // name ("vscode"), which means nothing to a learner.
+  const displayName = details?.workspace?.template_display_name || undefined;
+
   useEffect(() => {
     document.title = errorMessage
       ? t.couldNotOpen
-      : name
-        ? t.startingTitle(name)
+      : displayName
+        ? t.startingTitle(displayName)
         : t.startingWorkspaceTitle;
-  }, [errorMessage, name, t]);
+  }, [errorMessage, displayName, t]);
 
   return errorMessage ? (
     <div className="max-w-md w-full text-center space-y-4">
@@ -305,7 +309,7 @@ function LaunchWorkspace() {
         <h1 className="text-lg font-semibold text-fg">
           {hasTarget ? t.startingYours : t.creatingYours}
         </h1>
-        {name && <p className="text-sm text-muted">{name}</p>}
+        {displayName && <p className="text-sm text-muted">{displayName}</p>}
       </div>
 
       {/*
@@ -315,7 +319,7 @@ function LaunchWorkspace() {
         on one for two minutes.
       */}
       <div className="flex flex-col items-center gap-3">
-        <Spinner size="md" label={`${stage.label}${name ? ` ${name}` : ''}`} />
+        <Spinner size="md" label={`${stage.label}${displayName ? ` ${displayName}` : ''}`} />
         <p className="text-sm text-muted text-center">{stage.label}…</p>
       </div>
 

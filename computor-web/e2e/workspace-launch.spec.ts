@@ -42,7 +42,7 @@ function details({
   return {
     workspace: {
       id: 'w1', name, owner_id: 'u-me', owner_name: 'u-me',
-      template_id: 't-vscode', template_name: 'vscode-workspace',
+      template_id: 't-vscode', template_name: 'vscode-workspace', template_display_name: 'VS Code',
       latest_build_status: status === 'running' ? 'succeeded' : status,
       latest_build_id: 'build-existing',
     },
@@ -238,6 +238,14 @@ test.describe('in German', () => {
       'Deine Arbeitsumgebung war angehalten, zum Beispiel weil sie eine Zeit lang nicht benutzt wurde. '
       + 'Deine Dateien sind noch da.',
     )).toBeVisible();
+  });
+
+  test('the launch page names the template, not the internal workspace name', async ({ page }) => {
+    await setup(page, [details({ status: 'starting', name: 'vscode' })], { courseWorkspaces: true });
+    await page.goto('/workspaces/launch?owner=u-me&name=vscode');
+    await expect(page.getByText('VS Code', { exact: true })).toBeVisible();
+    await expect(page.getByText('vscode', { exact: true })).toHaveCount(0);
+    await expect(page).toHaveTitle('VS Code wird gestartet …');
   });
 });
 
