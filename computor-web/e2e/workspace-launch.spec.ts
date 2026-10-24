@@ -996,7 +996,8 @@ test.describe('German mobile workspace action', () => {
     await page.goto(`/courses/${COURSE_A}`);
     const button = page.getByRole('button', { name: /VS Code.*Arbeitsumgebung einrichten/s });
     await expect(button).toBeVisible();
-    await page.getByRole('button', { name: 'Seitenleiste einklappen', exact: true }).click();
+    const collapseSidebar = page.getByRole('button', { name: 'Seitenleiste einklappen', exact: true });
+    if (await collapseSidebar.isVisible()) await collapseSidebar.click();
     await expect(page.getByRole('complementary')).toHaveCSS('width', '64px');
     const action = button.getByText('Arbeitsumgebung einrichten', { exact: true });
     await expect(action).toBeVisible();
