@@ -584,10 +584,17 @@ def _oidc_account(user_id: str, db: Session) -> Optional[Account]:
 def _resolve_oidc_handle(user_id: str, db: Session) -> Optional[str]:
     """The student's Keycloak handle (``preferred_username``), stored on the OIDC
     ``Account.properties['username']`` after SSO login. Used as the Forgejo
-    username and as the managed-GitLab student-repo slug."""
+    username and as the managed-GitLab student-repo slug.
+
+    A username chosen at self-registration (e.g. an e-mail address) is not a
+    valid Forgejo name, so it is mapped to one (``utils.git_username``); every
+    caller then uses the same account name."""
+    from computor_backend.utils.git_username import forgejo_handle
+
     account = _oidc_account(user_id, db)
     if account and account.properties:
-        return account.properties.get("username")
+        handle = account.properties.get("username")
+        return forgejo_handle(handle, user_id) if handle else None
     return None
 
 
