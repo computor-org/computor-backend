@@ -10,6 +10,7 @@ from computor_types.student_courses import (
 from computor_types.custom_types import Ltree
 from computor_backend.interfaces.base import BackendEntityInterface
 from computor_backend.model.course import Course
+from computor_backend.business_logic.course_order import course_ordering
 
 
 class CourseStudentInterface(CourseStudentInterfaceBase, BackendEntityInterface):
@@ -23,7 +24,7 @@ class CourseStudentInterface(CourseStudentInterfaceBase, BackendEntityInterface)
     def search(db: Session, query, params: Optional[CourseStudentQuery]):
         """Apply search filters to student course query."""
         if params is None:
-            return query
+            return query.order_by(*course_ordering())
 
         if params.id is not None:
             query = query.filter(Course.id == params.id)
@@ -38,7 +39,4 @@ class CourseStudentInterface(CourseStudentInterfaceBase, BackendEntityInterface)
         if params.organization_id is not None:
             query = query.filter(Course.organization_id == params.organization_id)
 
-        # Sort by path, then by title as secondary sort
-        query = query.order_by(Course.path, Course.title)
-
-        return query
+        return query.order_by(*course_ordering())

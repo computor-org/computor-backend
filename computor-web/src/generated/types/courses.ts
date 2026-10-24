@@ -505,6 +505,7 @@ export interface CourseTutorRepository {
 }
 
 export interface CourseTutorGet {
+  position?: number | null;
   id: string;
   title?: string | null;
   description?: string | null;
@@ -515,6 +516,7 @@ export interface CourseTutorGet {
 }
 
 export interface CourseTutorList {
+  position?: number | null;
   id: string;
   title?: string | null;
   description?: string | null;
@@ -1020,6 +1022,7 @@ export interface CourseFamilyQuery {
 }
 
 export interface CourseStudentGet {
+  position?: number | null;
   id: string;
   title?: string | null;
   description?: string | null;
@@ -1030,6 +1033,7 @@ export interface CourseStudentGet {
 }
 
 export interface CourseStudentList {
+  position?: number | null;
   id: string;
   title?: string | null;
   description?: string | null;
@@ -1305,6 +1309,7 @@ export interface CoursePropertiesGet {
 }
 
 export interface CourseCreate {
+  position?: number | null;
   id?: string | null;
   title?: string | null;
   description?: string | null;
@@ -1321,6 +1326,7 @@ export interface CourseCreate {
 }
 
 export interface CourseGet {
+  position?: number | null;
   id: string;
   title?: string | null;
   description?: string | null;
@@ -1346,6 +1352,7 @@ export interface CourseGet {
 }
 
 export interface CourseList {
+  position?: number | null;
   id: string;
   title?: string | null;
   description?: string | null;
@@ -1362,6 +1369,7 @@ export interface CourseList {
 }
 
 export interface CourseUpdate {
+  position?: number | null;
   title?: string | null;
   description?: string | null;
   language_code?: string | null;
@@ -1404,6 +1412,7 @@ export interface CourseQuery {
  * whether to register.
  */
 export interface CoursePublicList {
+  position?: number | null;
   id: string;
   title?: string | null;
   description?: string | null;
@@ -1436,6 +1445,7 @@ export interface CourseSelfEnrollment {
  * ``id`` stays because it is what the register call takes after sign-in.
  */
 export interface CoursePublicCatalogEntry {
+  position?: number | null;
   id: string;
   title?: string | null;
   description?: string | null;
