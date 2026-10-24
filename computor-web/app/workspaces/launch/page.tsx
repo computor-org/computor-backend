@@ -37,6 +37,7 @@ const COPY = {
     retry: 'Erneut versuchen',
     back: 'Zurück zu den Arbeitsumgebungen',
     opensAutomatically: 'Dieser Tab öffnet sich automatisch, sobald die Arbeitsumgebung bereit ist.',
+    wasStopped: 'Deine Arbeitsumgebung war angehalten, zum Beispiel weil sie eine Zeit lang nicht benutzt wurde. Deine Dateien sind noch da.',
   },
   en: {
     selectionNotOpened: 'Your selection could not be opened in your workspace. Please retry.',
@@ -56,6 +57,7 @@ const COPY = {
     retry: 'Retry',
     back: 'Back to workspaces',
     opensAutomatically: 'This tab opens automatically when it is ready.',
+    wasStopped: 'Your workspace had been stopped, for example after a while without use. Your files are still there.',
   },
 };
 
@@ -106,6 +108,8 @@ function LaunchWorkspace() {
 
   /** The states worth giving up on; everything else is derived at render. */
   const [terminalError, setTerminalError] = useState<string | null>(null);
+  /** We found the workspace stopped (typically the idle auto-stop) and restarted it. */
+  const [resumingStopped, setResumingStopped] = useState(false);
 
   // One-shot guards. Refs, not state: StrictMode double-invokes effects in dev,
   // and re-renders must not fire a second build or a second redirect.
@@ -165,15 +169,23 @@ function LaunchWorkspace() {
     rememberWorkspaceCourse(owner, name, courseId);
   }, [owner, name, courseId, courseContentId, language]);
 
+  // An expired session must come back here after login, not on the dashboard:
+  // reloading a workspace tab after the idle auto-stop lands on this page with
+  // the login usually expired as well (computor-org/issues#379).
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.push('/login');
+      const back = `${window.location.pathname}${window.location.search}`;
+      router.replace(`/login?next=${encodeURIComponent(back)}`);
     }
   }, [isAuthenticated, authLoading, router]);
 
   const { data: details, error } = useResource<WorkspaceDetails>(
     async () => {
       const polled = await coderClient.getWorkspaceDetails({ username: owner, workspaceName: name });
+      // Found stopped before we asked for a start: this tab is restarting it.
+      if (!startRequested.current && categorizeStatus(polled.status) === 'stopped' && mounted.current) {
+        setResumingStopped(true);
+      }
       // Judge each poll here, in the fetcher, rather than from a separate timer:
       // this runs exactly once per poll and in order, so the `failed` that lags
       // our start request can be told apart from a build that actually failed.
@@ -289,13 +301,17 @@ function LaunchWorkspace() {
     ? workspaceStage(details.status, undefined, details.agent_lifecycle, language)
     : { label: hasTarget ? t.starting : t.creatingYours };
 
+  // The template's display name ("VS Code"), not the workspace's internal
+  // name ("vscode"), which means nothing to a learner.
+  const displayName = details?.workspace?.template_display_name || undefined;
+
   useEffect(() => {
     document.title = errorMessage
       ? t.couldNotOpen
-      : name
-        ? t.startingTitle(name)
+      : displayName
+        ? t.startingTitle(displayName)
         : t.startingWorkspaceTitle;
-  }, [errorMessage, name, t]);
+  }, [errorMessage, displayName, t]);
 
   return errorMessage ? (
     <div className="max-w-md w-full text-center space-y-4">
@@ -315,7 +331,7 @@ function LaunchWorkspace() {
         <h1 className="text-lg font-semibold text-fg">
           {hasTarget ? t.startingYours : t.creatingYours}
         </h1>
-        {name && <p className="text-sm text-muted">{name}</p>}
+        {displayName && <p className="text-sm text-muted">{displayName}</p>}
       </div>
 
       {/*
@@ -325,9 +341,13 @@ function LaunchWorkspace() {
         on one for two minutes.
       */}
       <div className="flex flex-col items-center gap-3">
-        <Spinner size="md" label={`${stage.label}${name ? ` ${name}` : ''}`} />
+        <Spinner size="md" label={`${stage.label}${displayName ? ` ${displayName}` : ''}`} />
         <p className="text-sm text-muted text-center">{stage.label}…</p>
       </div>
+
+      {resumingStopped && (
+        <p className="text-sm text-muted text-center">{t.wasStopped}</p>
+      )}
 
       <p className="text-xs text-subtle text-center">
         {t.opensAutomatically}
