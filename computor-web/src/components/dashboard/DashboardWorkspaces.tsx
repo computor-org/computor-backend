@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '@/src/contexts/AuthContext';
+import { useNotify } from '@/src/contexts/NotificationContext';
 import { useRouter } from 'next/navigation';
 import Panel from '@/src/components/ui/Panel';
 import Button from '@/src/components/ui/Button';
@@ -8,12 +10,13 @@ import TemplateIcon from '@/src/components/workspaces/TemplateIcon';
 import WorkspaceStatusBadge, { categorizeStatus } from '@/src/components/workspaces/WorkspaceStatusBadge';
 import { workspaceVersionLabel } from '@/src/components/workspaces/versionDate';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
-import { lastWorkspaceCourse, openLaunchTab, workspaceLaunchUrl } from '@/src/utils/workspaceLaunch';
+import { lastWorkspaceCourse, reserveWorkspaceLaunch, focusRunningWorkspace, workspaceLaunchUrl } from '@/src/utils/workspaceLaunch';
 import type { CoderWorkspace } from '@/src/types/workspaces';
 
 const COPY = {
   de: {
     open: 'Öffnen',
+    failed: 'Die Arbeitsumgebung konnte nicht geöffnet werden. Versuch es noch einmal.',
     startAndOpen: 'Starten und öffnen',
     retry: 'Erneut starten',
     chooseCourse: 'Kurs auswählen',
@@ -22,6 +25,7 @@ const COPY = {
   },
   en: {
     open: 'Open',
+    failed: 'The workspace could not be opened. Please retry.',
     startAndOpen: 'Start and open',
     retry: 'Start again',
     chooseCourse: 'Choose a course',
@@ -50,6 +54,10 @@ export default function DashboardWorkspaces({
   courseTemplates: { courseId: string; templates: string[] }[];
 }) {
   const router = useRouter();
+  const { user } = useAuth();
+  const notify = useNotify();
+  const reservationRef = useRef<ReturnType<typeof reserveWorkspaceLaunch> | null>(null);
+  useEffect(() => () => { reservationRef.current?.cancel(); }, [user?.id]);
   const [selectedCourses, setSelectedCourses] = useState<Record<string, string>>({});
   const language = useUiLanguage();
   const t = COPY[language];
@@ -76,9 +84,20 @@ export default function DashboardWorkspaces({
 
           // Synchronous on purpose: the tab has to open inside the click, or
           // popup blockers eat it.
-          const launch = () => {
-            if (!openLaunchTab(owner, ws.name, courseId)) {
-              router.push(workspaceLaunchUrl(owner, ws.name, courseId));
+          const launch = async () => {
+            if (!user?.id) return;
+            const reservation = reserveWorkspaceLaunch(user.id, ws.template_name ?? ws.name, ws.name, owner);
+            reservationRef.current = reservation;
+            try {
+              const outcome = await focusRunningWorkspace(reservation, ws, courseId, undefined, language);
+              if (outcome === 'handled') return;
+              if (!reservation.current()) return;
+              const url = workspaceLaunchUrl(owner, ws.name, courseId);
+              if (outcome === 'lifecycle' && reservation.tab) reservation.tab.location.replace(url);
+              else { if (!reservation.tab) window.name = reservation.key; router.push(url); }
+            } catch {
+              reservation.closeFresh();
+              if (reservation.current()) notify(t.failed, 'error');
             }
           };
 

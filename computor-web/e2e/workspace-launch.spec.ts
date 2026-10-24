@@ -75,6 +75,7 @@ async function setup(
     allowProvision?: boolean;
     /** System roles of the signed-in user; a self-enrolled learner has none. */
     systemRoles?: string[];
+    userId?: string;
     profileLanguage?: string | null;
     courseRoles?: string[];
     /** False: no cached session, as after the login expired in an idle tab. */
@@ -84,7 +85,7 @@ async function setup(
   const next = typeof source === 'function' ? source : undefined;
   const sequence = typeof source === 'function' ? [] : source;
   const systemRoles = options.systemRoles ?? ['_workspace_user'];
-  const user = { ...USER, profile: { language_code: options.profileLanguage ?? null }, user_roles: systemRoles.map((role_id) => ({ role_id })) };
+  const user = { ...USER, id: options.userId ?? USER.id, profile: { language_code: options.profileLanguage ?? null }, user_roles: systemRoles.map((role_id) => ({ role_id })) };
   if (options.signedIn !== false) await page.addInitScript(({ user, systemRoles }) => {
     sessionStorage.setItem('auth_user', JSON.stringify({
       id: user.id, username: user.username, email: user.email,
@@ -509,10 +510,12 @@ test('primary launches reuse the running workspace across courses without rebuil
   // Reusing the primary button for another course must only replace the
   // course context, preserving the editor's workspace and current build.
   await page.goto(`/courses/${COURSE_B}/student/assignments`);
-  const secondPopup = page.waitForEvent('popup');
   await page.getByRole('button', { name: 'Open in VS Code' }).click();
-  const second = await secondPopup;
-  await second.waitForURL(COURSE_WORKSPACE_URL);
+  // This fixture's editor is cross-origin, so its unverified document stays
+  // untouched and the ordinary lifecycle fallback uses the portal tab.
+  await page.waitForURL(COURSE_WORKSPACE_URL);
+  expect(first.isClosed()).toBe(false);
+  expect(page.context().pages()).toHaveLength(2);
 
   expect(contexts).toEqual([{ course_id: COURSE_A }, { course_id: COURSE_B }]);
   expect(starts).toHaveLength(0);
@@ -522,7 +525,6 @@ test('primary launches reuse the running workspace across courses without rebuil
     id: 'w1', name: 'vscode', build: 'build-existing',
   })));
   await first.close();
-  await second.close();
 });
 
 test('a primary course launch starts its stopped workspace once after the course handoff', async ({ page }) => {
@@ -598,13 +600,13 @@ test('the course page offers one state-aware control for the personal workspace'
 
   // None yet: only the tile that sets the workspace up, with what to expect.
   await expect(card.getByRole('button', { name: /VS Code.*Set up workspace/s })).toBeVisible();
-  await expect(card.getByText('Edit, test and submit here. Opens this course in a new tab.', { exact: true })).toBeVisible();
+  await expect(card.getByText('Edit, test and submit here. Opens this course in your workspace.', { exact: true })).toBeVisible();
   await expect(card.getByRole('button', { name: 'Open in VS Code' })).toHaveCount(0);
 
   // Stopped: one row, no tile, and no second list for the same workspace.
   workspaces.push({ ...COURSE_WORKSPACE, latest_build_status: 'stopped' });
   await expect(card.getByRole('button', { name: 'Start and open' })).toBeVisible();
-  await expect(card.getByText('Edit, test and submit in VS Code. Opens this course in a new tab. Your files are kept.')).toBeVisible();
+  await expect(card.getByText('Edit, test and submit in VS Code. Opens this course in your workspace or reuses the open editor. Your files are kept.')).toBeVisible();
   await expect(card.getByRole('button', { name: /Set up workspace|Launch workspace/ })).toHaveCount(0);
   await expect(card.getByRole('button', { name: 'Stop', exact: true })).toHaveCount(0);
   await expect(card.getByText('Other workspaces')).toHaveCount(0);
@@ -1198,3 +1200,262 @@ for (const failure of ['unavailable', 'wrong-target', 'missing-course'] as const
     expect(provisions).toHaveLength(0);
   });
 }
+
+
+for (const language of ['de', 'en'] as const) {
+  test(`named workspace reuse preserves the dirty editor and renews the exact target in ${language}`, async ({ page, baseURL }) => {
+    const nativeUrl = new URL('/coder/u-me/vscode/', baseURL).href;
+    const state = { ...details({ status: 'running', ready: true, name: 'vscode' }), access_url: nativeUrl, code_server_url: nativeUrl };
+    let rejectSelection = false;
+    const { launchRequests, starts, provisions } = await setup(page, [state], {
+      courseWorkspaces: true, profileLanguage: language,
+      handoff: (route) => rejectSelection
+        ? json(route, { detail: 'PRIVATE_INTERNAL_ERROR_PATH' }, 503)
+        : json(route, { ...route.request().postDataJSON(), request_id: 'fresh-request', expires_at: '2099-01-01T00:00:00Z' }),
+    });
+    let loads = 0;
+    await page.context().route(`${nativeUrl}**`, (route) => {
+      loads++;
+      return route.fulfill({ contentType: 'text/html', body: '<h1>Pinned Welcome</h1><textarea aria-label="Dirty Python">unsaved code</textarea>' });
+    });
+    await page.route(`${API_ORIGIN}/students/course-contents**`, (route) => json(route, [
+      { id: ASSIGNMENT_A, course_id: COURSE_A, course_content_kind_id: 'assignment', title: 'Exercise A', path: 'a', status: 'correction_necessary' },
+      { id: 'bbbbbbbb-1111-4111-8111-111111111111', course_id: COURSE_B, course_content_kind_id: 'assignment', title: 'Exercise B', path: 'b', status: 'correction_necessary' },
+    ]));
+    await page.goto('/dashboard');
+    const popup = page.waitForEvent('popup');
+    await page.getByRole('link', { name: /Exercise A/ }).click();
+    const editor = await popup;
+    await editor.waitForURL(nativeUrl);
+    await editor.getByRole('textbox', { name: 'Dirty Python' }).fill('unsaved change before another exercise');
+    const originalDocument = await editor.evaluate(() => performance.timeOrigin);
+    const originalName = await editor.evaluate(() => window.name);
+    await page.getByRole('link', { name: /Exercise B/ }).click();
+    await expect.poll(() => launchRequests.length).toBe(2);
+    expect(launchRequests.map((request) => request.course_content_id)).toEqual([ASSIGNMENT_A, 'bbbbbbbb-1111-4111-8111-111111111111']);
+    expect(await editor.evaluate(() => performance.timeOrigin)).toBe(originalDocument);
+    expect(await editor.evaluate(() => window.name)).toBe(originalName);
+    await expect(editor.getByRole('heading', { name: 'Pinned Welcome' })).toBeVisible();
+    await expect(editor.getByRole('textbox', { name: 'Dirty Python' })).toHaveValue('unsaved change before another exercise');
+    expect(page.context().pages()).toHaveLength(2);
+    expect(loads).toBe(1);
+    expect(starts).toHaveLength(0);
+    expect(provisions).toHaveLength(0);
+    rejectSelection = true;
+    await page.getByRole('link', { name: /Exercise A/ }).click();
+    await expect(page.getByText(language === 'de'
+      ? 'Deine Auswahl konnte in deiner Arbeitsumgebung nicht geöffnet werden. Versuch es noch einmal.'
+      : 'Your selection could not be opened in your workspace. Please retry.', { exact: true })).toBeVisible();
+    await expect(page.getByText(/PRIVATE_INTERNAL_ERROR_PATH/)).toHaveCount(0);
+    await page.getByRole('button', { name: language === 'de' ? 'In VS Code öffnen' : 'Open in VS Code', exact: true }).first().click();
+    await expect.poll(() => launchRequests.length).toBe(4);
+    expect(launchRequests[3].course_content_id).toBeUndefined();
+    await expect(page.getByText(/PRIVATE_INTERNAL_ERROR_PATH/)).toHaveCount(0);
+    expect(editor.isClosed()).toBe(false);
+    expect(await editor.evaluate(() => performance.timeOrigin)).toBe(originalDocument);
+    await expect(editor.getByRole('textbox', { name: 'Dirty Python' })).toHaveValue('unsaved change before another exercise');
+    expect(loads).toBe(1);
+    expect(page.context().pages()).toHaveLength(2);
+  });
+}
+
+
+async function namedDashboard(page: Page, baseURL: string | undefined, options: Parameters<typeof setup>[2] = {}, path = '/coder/u-me/vscode/') {
+  const url = new URL(path, baseURL).href;
+  let state = { ...details({ status: 'running', ready: true, name: 'vscode' }), access_url: url, code_server_url: url };
+  const harness = await setup(page, () => state, { courseWorkspaces: true, ...options });
+  let loads = 0;
+  await page.context().route(`${url}**`, (route) => {
+    loads++;
+    return route.fulfill({ contentType: 'text/html', body: '<h1>Pinned Welcome</h1><textarea aria-label="Dirty Python">unsaved code</textarea>' });
+  });
+  await page.route(`${API_ORIGIN}/students/course-contents**`, (route) => json(route, [
+    { id: ASSIGNMENT_A, course_id: COURSE_A, course_content_kind_id: 'assignment', title: 'Exercise A', path: 'a', status: 'correction_necessary' },
+    { id: 'bbbbbbbb-1111-4111-8111-111111111111', course_id: COURSE_B, course_content_kind_id: 'assignment', title: 'Exercise B', path: 'b', status: 'correction_necessary' },
+  ]));
+  await page.goto('/dashboard');
+  return { ...harness, url, loads: () => loads, stop: () => { state = { ...state, status: 'stopped', ready: false }; },
+    async open() {
+      const popup = page.waitForEvent('popup');
+      await page.getByRole('link', { name: /Exercise A/ }).click();
+      const editor = await popup;
+      await editor.waitForURL(url);
+      await editor.getByRole('textbox', { name: 'Dirty Python' }).fill('preserve this unsaved buffer');
+      return editor;
+    },
+  };
+}
+
+test('named workspace context writes serialize so a delayed older target cannot win', async ({ page, baseURL }) => {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  const committed: string[] = [];
+  let requests = 0;
+  const fixture = await namedDashboard(page, baseURL, { handoff: async (route) => {
+    requests++;
+    if (requests === 2) await held;
+    const body = route.request().postDataJSON();
+    committed.push(body.course_content_id);
+    return json(route, { ...body, request_id: `r${requests}`, expires_at: '2099-01-01T00:00:00Z' });
+  } });
+  const editor = await fixture.open();
+  await editor.evaluate(() => {
+    const focus = window.focus.bind(window);
+    window.focus = () => { document.body.dataset.focuses = String(Number(document.body.dataset.focuses ?? 0) + 1); focus(); };
+  });
+  await page.getByRole('link', { name: /Exercise B/ }).click();
+  await expect.poll(() => requests).toBe(2);
+  const detailsResponse = page.waitForResponse((response) => response.url().endsWith('/coder/workspaces/u-me/vscode'));
+  await page.getByRole('link', { name: /Exercise A/ }).click();
+  await detailsResponse;
+  expect(requests).toBe(2);
+  release();
+  await expect.poll(() => committed.length).toBe(3);
+  expect(committed).toEqual([ASSIGNMENT_A, 'bbbbbbbb-1111-4111-8111-111111111111', ASSIGNMENT_A]);
+  await expect(editor.locator('body')).toHaveAttribute('data-focuses', '1');
+  await expect(editor.getByRole('textbox', { name: 'Dirty Python' })).toHaveValue('preserve this unsaved buffer');
+  expect(fixture.loads()).toBe(1);
+  expect(page.context().pages()).toHaveLength(2);
+});
+
+test('concurrent first named launches share one provision before the workspace name is known', async ({ page, baseURL }) => {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  const fixture = await namedDashboard(page, baseURL, { workspaces: [], allowProvision: true });
+  let provisions = 0;
+  await page.route(`${API_ORIGIN}/coder/workspaces/provision`, async (route) => {
+    provisions++;
+    await held;
+    return json(route, { user: { username: 'u-me' }, workspace: COURSE_WORKSPACE });
+  });
+  const popup = page.waitForEvent('popup');
+  await page.getByRole('link', { name: /Exercise A/ }).click();
+  const editor = await popup;
+  await expect.poll(() => provisions).toBe(1);
+  await page.getByRole('link', { name: /Exercise B/ }).click();
+  release();
+  await editor.waitForURL(fixture.url);
+  expect(provisions).toBe(1);
+  expect(fixture.launchRequests.map((request) => request.course_content_id)).toEqual(['bbbbbbbb-1111-4111-8111-111111111111']);
+  expect(page.context().pages()).toHaveLength(2);
+  await page.route(`${API_ORIGIN}/coder/workspaces`, (route) => json(route, { workspaces: [COURSE_WORKSPACE], count: 1 }));
+  await page.getByRole('link', { name: /Exercise A/ }).click();
+  await expect.poll(() => fixture.launchRequests.length).toBe(2);
+  expect(fixture.loads()).toBe(1);
+  expect(page.context().pages()).toHaveLength(2);
+});
+
+test('a verified named stopped workspace uses its existing lifecycle tab', async ({ page, baseURL }) => {
+  const fixture = await namedDashboard(page, baseURL);
+  const editor = await fixture.open();
+  fixture.stop();
+  await page.getByRole('link', { name: /Exercise B/ }).click();
+  await expect.poll(() => fixture.starts.length).toBe(1);
+  expect(page.url()).toContain('/dashboard');
+  expect(page.context().pages()).toHaveLength(2);
+  expect(editor.url()).toContain('/workspaces/launch');
+  expect(fixture.provisions).toHaveLength(0);
+});
+
+for (const retained of ['custom-base', 'unverified'] as const) {
+  test(`named workspace handles a ${retained} document without unsafe replacement`, async ({ page, baseURL }) => {
+    const fixture = await namedDashboard(page, baseURL, {}, '/custom/authorized-editor/u-me/vscode/');
+    const editor = await fixture.open();
+    const original = await editor.evaluate(() => performance.timeOrigin);
+    if (retained === 'unverified') {
+      const elsewhere = new URL('/unrelated-document', baseURL).href;
+      await page.context().route(elsewhere, (route) => route.fulfill({ contentType: 'text/html', body: '<textarea aria-label="Dirty Python">preserve this unsaved buffer</textarea>' }));
+      await editor.goto(elsewhere);
+    }
+    const retainedDocument = await editor.evaluate(() => performance.timeOrigin);
+    await page.getByRole('link', { name: /Exercise B/ }).click();
+    await expect.poll(() => fixture.launchRequests.length).toBe(2);
+    if (retained === 'custom-base') expect(await editor.evaluate(() => performance.timeOrigin)).toBe(original);
+    else await page.waitForURL(fixture.url);
+    expect(await editor.evaluate(() => performance.timeOrigin)).toBe(retainedDocument);
+    await expect(editor.getByRole('textbox', { name: 'Dirty Python' })).toHaveValue('preserve this unsaved buffer');
+    expect(editor.isClosed()).toBe(false);
+    expect(page.context().pages()).toHaveLength(2);
+  });
+}
+
+
+for (const isolation of ['user', 'template', 'workspace'] as const) {
+  test(`named editor contexts isolate a different ${isolation}`, async ({ page, baseURL }) => {
+    const fixture = await namedDashboard(page, baseURL);
+    const original = await fixture.open();
+    const document = await original.evaluate(() => performance.timeOrigin);
+    const name = await original.evaluate(() => window.name);
+    const otherUser = isolation === 'user' ? 'u-other' : 'u-me';
+    const template = isolation === 'template' ? 'python-workspace' : 'vscode-workspace';
+    const workspaceName = isolation === 'workspace' ? 'extra-lab' : isolation === 'template' ? 'python' : 'vscode';
+    const otherUrl = new URL(`/coder/${otherUser}/${workspaceName}/`, baseURL).href;
+    const workspace = { ...COURSE_WORKSPACE, id: 'w-other', owner_id: otherUser, owner_name: otherUser,
+      name: workspaceName, template_name: template, template_display_name: isolation === 'template' ? 'Python' : 'VS Code' };
+    const portal = await page.context().newPage();
+    await setup(portal, [details({ status: 'running', ready: true })], { courseWorkspaces: true, userId: otherUser, workspaces: [workspace] });
+    await portal.route(`${API_ORIGIN}/courses/*/workspace-settings`, (route) => json(route, {
+      templates: [{ template_name: template, display_name: workspace.template_display_name, enabled: true, exists_in_coder: true }],
+    }));
+    await portal.context().route(otherUrl, (route) => route.fulfill({ contentType: 'text/html', body: '<h1>Other owned editor</h1>' }));
+    await portal.context().route(`${API_ORIGIN}/coder/workspaces/${otherUser}/${workspaceName}**`, (route) => {
+      if (route.request().method() === 'POST') return json(route, { ...route.request().postDataJSON(), request_id: 'other', expires_at: '2099-01-01T00:00:00Z' });
+      return json(route, { ...details({ status: 'running', ready: true }), workspace, access_url: otherUrl, code_server_url: otherUrl });
+    });
+    await portal.goto('/dashboard');
+    const popup = portal.waitForEvent('popup');
+    if (isolation === 'workspace') {
+      await portal.getByRole('combobox', { name: 'Choose a course' }).selectOption(COURSE_A);
+      await portal.getByRole('button', { name: 'Open', exact: true }).click();
+    } else {
+      await portal.getByRole('button', { name: `Open in ${workspace.template_display_name}`, exact: true }).first().click();
+    }
+    const other = await popup;
+    await other.waitForURL(otherUrl);
+    expect(await other.evaluate(() => window.name)).not.toBe(name);
+    expect(await other.evaluate(() => window.name)).not.toBe('');
+    expect(await original.evaluate(() => performance.timeOrigin)).toBe(document);
+    await expect(original.getByRole('textbox', { name: 'Dirty Python' })).toHaveValue('preserve this unsaved buffer');
+    expect(original.isClosed()).toBe(false);
+    expect(page.context().pages()).toHaveLength(4);
+  });
+}
+
+
+test('a blocked named editor popup keeps the exact target in the ordinary same-tab fallback', async ({ page, baseURL }) => {
+  const fixture = await namedDashboard(page, baseURL);
+  await page.evaluate(() => { window.open = () => null; });
+  await page.getByRole('link', { name: /Exercise A/ }).click();
+  await page.waitForURL(fixture.url);
+  expect(fixture.launchRequests.map((request) => request.course_content_id)).toEqual([ASSIGNMENT_A]);
+  expect(fixture.starts).toHaveLength(0);
+  expect(fixture.provisions).toHaveLength(0);
+  expect(page.context().pages()).toHaveLength(1);
+});
+
+
+test('an unmounted named launch cannot provision after its delayed workspace lookup returns', async ({ page, baseURL }) => {
+  const fixture = await namedDashboard(page, baseURL, { workspaces: [], allowProvision: true });
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  let lookups = 0;
+  await page.route(`${API_ORIGIN}/coder/workspaces`, async (route) => {
+    lookups++;
+    await held;
+    return json(route, { workspaces: [], count: 0 });
+  });
+  const popup = page.waitForEvent('popup');
+  await page.getByRole('link', { name: /Exercise A/ }).click();
+  const waiter = await popup;
+  await expect.poll(() => lookups).toBeGreaterThan(0);
+  await page.getByRole('link', { name: 'Continue', exact: true }).first().click();
+  await page.waitForURL(`**/courses/${COURSE_A}/student/assignments`);
+  release();
+  // Let the held response and any request it causes settle after the real
+  // client-side route change, which retains the original async JavaScript.
+  await page.waitForLoadState('networkidle');
+  expect(fixture.provisions).toHaveLength(0);
+  expect(fixture.launchRequests).toHaveLength(0);
+  await expect(waiter.getByText('Creating your workspace…')).toBeVisible();
+  await waiter.close();
+});

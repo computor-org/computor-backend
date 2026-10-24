@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { useCoderTemplates } from '@/src/hooks/useCoderTemplates';
 import { useWorkspaceActions } from '@/src/hooks/useWorkspaceActions';
@@ -18,8 +19,8 @@ import { CoderClient } from '@/src/clients/CoderClient';
 import { CourseWorkspacesClient } from '@/src/clients/CourseWorkspacesClient';
 import {
   derivedWorkspaceName,
-  openLaunchTab,
-  workspaceCreatingUrl,
+  reserveWorkspaceLaunch,
+  focusRunningWorkspace,
   workspaceLaunchUrl,
 } from '@/src/utils/workspaceLaunch';
 import type { CoderWorkspace } from '@/src/types/workspaces';
@@ -32,16 +33,17 @@ const COPY = {
     ownerUnavailable: 'Der Besitzer der vorhandenen Arbeitsumgebung ist nicht verfügbar. Versuch es noch einmal.',
     notCreated: 'Die Arbeitsumgebung wurde nicht erstellt.',
     launchFailed: 'Die Arbeitsumgebung konnte nicht gestartet werden',
+    selectionFailed: 'Deine Auswahl konnte in deiner Arbeitsumgebung nicht geöffnet werden. Versuch es noch einmal.',
     launching: 'Wird gestartet …',
     launch: 'Arbeitsumgebung starten',
     setUp: 'Arbeitsumgebung einrichten',
     setUpHint:
-      'Hier programmierst, testest und gibst du ab. Öffnet diesen Kurs in einem neuen Tab.',
+      'Hier programmierst, testest und gibst du ab. Öffnet diesen Kurs in deiner Arbeitsumgebung.',
     openIn: (label: string) => `In ${label} öffnen`,
     startAndOpen: 'Starten und öffnen',
     startAgain: 'Erneut starten',
     openHint: (label: string) =>
-      `In ${label} programmieren, testen und abgeben. Dieser Kurs öffnet sich in einem neuen Tab. Deine Dateien bleiben erhalten.`,
+      `In ${label} programmieren, testen und abgeben. Öffnet diesen Kurs in deiner Arbeitsumgebung oder verwendet den offenen Editor weiter. Deine Dateien bleiben erhalten.`,
     stopHint: (label: string) =>
       `Wenn du fertig bist, beende ${label} mit „Stoppen“. Schließt du nur den Tab, stoppt die Arbeitsumgebung nach einer Weile ohne Nutzung von selbst. Beim nächsten Start wird sie bei Bedarf aktualisiert.`,
     yours: 'Weitere Arbeitsumgebungen',
@@ -57,15 +59,16 @@ const COPY = {
     ownerUnavailable: 'The existing workspace owner is unavailable. Please retry.',
     notCreated: 'The workspace was not created.',
     launchFailed: 'Failed to launch workspace',
+    selectionFailed: 'Your selection could not be opened in your workspace. Please retry.',
     launching: 'Launching…',
     launch: 'Launch workspace',
     setUp: 'Set up workspace',
     setUpHint:
-      'Edit, test and submit here. Opens this course in a new tab.',
+      'Edit, test and submit here. Opens this course in your workspace.',
     openIn: (label: string) => `Open in ${label}`,
     startAndOpen: 'Start and open',
     startAgain: 'Start again',
-    openHint: (label: string) => `Edit, test and submit in ${label}. Opens this course in a new tab. Your files are kept.`,
+    openHint: (label: string) => `Edit, test and submit in ${label}. Opens this course in your workspace or reuses the open editor. Your files are kept.`,
     stopHint: (label: string) =>
       `When you are done, shut down ${label} with Stop. If you only close the tab, the workspace stops by itself after a while without use. The next start updates the workspace if needed.`,
     yours: 'Other workspaces',
@@ -136,6 +139,9 @@ export default function CourseWorkspaceLaunchButtons({
   title?: string;
 }) {
   const router = useRouter();
+  const { user } = useAuth();
+  const reservationRef = useRef<ReturnType<typeof reserveWorkspaceLaunch> | null>(null);
+  useEffect(() => () => { reservationRef.current?.cancel(); }, [user?.id]);
   const notify = useNotify();
   const language = useUiLanguage();
   const t = COPY[language];
@@ -216,56 +222,66 @@ export default function CourseWorkspaceLaunchButtons({
   // window.open must happen synchronously inside the click — after an await it
   // is no longer tied to the user gesture and popup blockers eat it.
   const provisionAndLaunch = useCallback(async (templateName: string, targetId = courseContentId, sameTab = false) => {
+    if (!user?.id) return;
     setLaunchError(false);
     setLaunchMessage(null);
     setLaunching(templateName);
-    const tab = sameTab ? null : window.open(workspaceCreatingUrl, '_blank');
+    const reservation = reserveWorkspaceLaunch(user.id, templateName, undefined, undefined, sameTab);
+    reservationRef.current = reservation;
     try {
-      // This listing is scoped to the current user. Read it on every click,
-      // including compact cards, rather than trusting a possibly stale poll.
-      // A failed lookup must surface as an error: provisioning an existing
-      // workspace rotates its token and rebuilds the editor.
-      const { workspaces: ownWorkspaces } = await coderClient.listWorkspaces();
-      const existing = ownWorkspaces.find((workspace) =>
-        workspace.template_name === templateName
-        && workspace.name === derivedWorkspaceName(templateName),
-      );
-      let launchUrl: string;
-      if (existing) {
-        if (!existing.owner_name) {
-          throw new Error(t.ownerUnavailable);
+      const workspace = await reservation.resolveWorkspace(async () => {
+        const { workspaces: ownWorkspaces } = await coderClient.listWorkspaces();
+        const existing = ownWorkspaces.find((candidate) =>
+          candidate.template_name === templateName && candidate.name === derivedWorkspaceName(templateName));
+        if (existing) {
+          if (!existing.owner_name) throw new Error(t.ownerUnavailable);
+          return existing;
         }
-        // The launch page handles stopped/failed workspaces and sends the new
-        // course context. Do not provision just to select a different course.
-        launchUrl = workspaceLaunchUrl(existing.owner_name, existing.name, courseId, targetId);
-      } else {
-        const result = await coderClient.provisionWorkspace({
-          body: { template: templateName },
-        });
-        const workspaceName = result.workspace?.name;
-        if (!workspaceName) throw new Error(t.notCreated);
-        launchUrl = workspaceLaunchUrl(result.user.username, workspaceName, courseId, targetId);
-      }
+        // A newer same-key waiter may still need this shared resolution,
+        // but a fully cancelled launch must not create a workspace.
+        if (!reservation.wanted()) throw new Error(t.notCreated);
+        const result = await coderClient.provisionWorkspace({ body: { template: templateName } });
+        if (!result.workspace?.name) throw new Error(t.notCreated);
+        return { ...result.workspace, owner_name: result.user.username, template_name: templateName };
+      });
+      if (!reservation.current()) return;
+      const outcome = await focusRunningWorkspace(reservation, workspace, courseId, targetId, language);
+      if (outcome === 'handled') return;
+      if (!reservation.current()) return;
+      const launchUrl = workspaceLaunchUrl(workspace.owner_name!, workspace.name, courseId, targetId);
+      const tab = outcome === 'lifecycle' ? reservation.tab : null;
       if (tab) {
         tab.location.replace(launchUrl);
       } else {
+        if (!reservation.tab) window.name = reservation.key;
         router.push(launchUrl);
       }
     } catch (err) {
+      reservation.closeFresh();
+      if (!reservation.current()) return;
       setLaunchError(true);
-      tab?.close();
-      const message = err instanceof Error ? err.message : t.launchFailed;
+      const message = targetId || (reservation.tab && !reservation.fresh) ? t.selectionFailed : err instanceof Error ? err.message : t.launchFailed;
       setLaunchMessage(sameTab && message !== t.ownerUnavailable && message !== t.notCreated ? t.launchFailed : message);
       if (!sameTab) notify(message, 'error');
     } finally {
-      setLaunching(null);
+      if (reservation.active() && reservationRef.current === reservation) setLaunching(null);
     }
-  }, [courseId, courseContentId, notify, router, t]);
+  }, [courseId, courseContentId, language, notify, router, t, user?.id]);
 
-  function openExisting(workspace: CoderWorkspace) {
-    if (!workspace.owner_name) return;
-    if (!openLaunchTab(workspace.owner_name, workspace.name, courseId, courseContentId)) {
-      router.push(workspaceLaunchUrl(workspace.owner_name, workspace.name, courseId, courseContentId));
+  async function openExisting(workspace: CoderWorkspace) {
+    if (!workspace.owner_name || !user?.id) return;
+    const reservation = reserveWorkspaceLaunch(user.id, workspace.template_name ?? workspace.name, workspace.name, workspace.owner_name);
+    reservationRef.current = reservation;
+    try {
+      const outcome = await focusRunningWorkspace(reservation, workspace, courseId, courseContentId, language);
+      if (outcome === 'handled') return;
+      if (!reservation.current()) return;
+      const url = workspaceLaunchUrl(workspace.owner_name, workspace.name, courseId, courseContentId);
+      if (outcome === 'lifecycle' && reservation.tab) reservation.tab.location.replace(url);
+      else { if (!reservation.tab) window.name = reservation.key; router.push(url); }
+    } catch {
+      reservation.closeFresh();
+      if (reservation.current()) notify(courseContentId ? t.selectionFailed : t.launchFailed, 'error');
     }
   }
 
