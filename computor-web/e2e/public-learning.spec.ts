@@ -47,6 +47,21 @@ test('anonymous reading uses only static files even when the API is unavailable'
   expect(mutations).toEqual([]);
 });
 
+test('the course welcome item renders as Markdown in the reader language and is not a week', async ({ page }) => {
+  await page.goto(`/learn/${COURSE}`);
+  await expect(page.getByText('3 weeks · ', { exact: false })).toBeVisible();
+  const welcome = page.locator('article section').first();
+  await expect(welcome.getByRole('heading', { name: 'Welcome', exact: true })).toBeVisible();
+  await expect(welcome.getByText(/How to reach your first submission/)).toBeVisible();
+  await expect(welcome.getByRole('link', { name: 'public course page' })).toHaveAttribute('href', /\/learn\/python-beginner$/);
+  await expect(welcome.getByText(/lang:|\[public course page\]/)).toHaveCount(0);
+  await welcome.getByRole('button', { name: 'Deutsch', exact: true }).click();
+  await expect(welcome.getByText(/So kommst du zur ersten Abgabe/)).toBeVisible();
+  await expect(welcome.getByRole('link', { name: /Mathematische Konstanten/ })).toBeVisible();
+  await welcome.getByRole('button', { name: 'English', exact: true }).click();
+  await expect(welcome.getByRole('link', { name: /Start with Mathematical Constants/ })).toBeVisible();
+});
+
 test('all three courses have native reading content', async ({ page }) => {
   for (const slug of ['python-beginner', 'python-intermediate', 'python-advanced']) {
     await page.goto(`/learn/${slug}`);
@@ -155,4 +170,46 @@ test('static publication is read-only and restricts content sniffing', async ({ 
     expect(rejected.headers()['allow']?.split(/,\s*/).sort()).toEqual(['GET', 'HEAD']);
     expect(await (await request.get(file)).body()).toEqual(original);
   }
+});
+
+test('reference definitions survive title removal and math titles render throughout the reader', async ({ page }) => {
+  await page.goto('/learn/python-advanced/content/week_2.pi_int');
+  await expect(page.locator('article h2').first()).toContainText('Approximation of');
+  await expect(page.locator('article h2 .katex')).toHaveCount(1);
+  await expect(page.locator('article .markdown h1')).toHaveCount(0);
+  await expect(page.locator('article a[href*="operators/lambda"]')).toHaveCount(1);
+  await expect(page.getByRole('navigation', { name: 'Course outline' }).locator('.katex').first()).toBeVisible();
+  await expect(page.locator('article')).not.toContainText('$\\pi$');
+  await page.getByRole('button', { name: 'Deutsch', exact: true }).click();
+  await expect(page.locator('article h2').first()).toContainText('Approximation von');
+  await page.goto('/learn/python-advanced/content/week_3.pi_series');
+  await expect(page.getByRole('navigation', { name: 'Aufgabennavigation' }).locator('.katex').first()).toBeVisible();
+  await expect(page.locator('article .markdown h1')).toHaveCount(0);
+});
+
+test('long inline equations stay inside the mobile reader without clipping their scrollable content', async ({ page }) => {
+  const outline = JSON.parse(fs.readFileSync('public/learning/courses/python-beginner.json', 'utf8'));
+  const terms = Array.from({ length: 30 }, (_, i) => `a_{${i}}`).join(' + ');
+  const markdown = `# Narrow reader\n\nA long formula $\\frac{${terms}}{100}$ ends here.`;
+  outline.materials[MATH].markdown_variants = { de: markdown, en: markdown };
+  await page.route('**/learning/courses/python-beginner.json', route => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify(outline),
+  }));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(URL);
+  const math = page.locator('article p .katex');
+  await expect(math).toBeVisible();
+  const bounds = await math.evaluate(element => ({
+    width: element.getBoundingClientRect().width,
+    parentWidth: element.parentElement!.getBoundingClientRect().width,
+    scrollWidth: element.scrollWidth,
+    height: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    overflow: getComputedStyle(element).overflowX,
+  }));
+  expect(bounds.width).toBeLessThanOrEqual(bounds.parentWidth);
+  expect(bounds.scrollWidth).toBeGreaterThan(bounds.width);
+  expect(bounds.overflow).toBe('auto');
+  expect(bounds.scrollHeight).toBeLessThanOrEqual(bounds.height);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
