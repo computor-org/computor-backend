@@ -130,6 +130,7 @@ from computor_backend.permissions.principal import Principal
 from computor_backend.redis_cache import get_cache, get_redis_client
 from computor_backend.business_logic.workspace_launch_context import (
     get_workspace_launch_context as read_workspace_launch_context,
+    populate_last_courses,
     set_workspace_launch_context,
 )
 
@@ -671,6 +672,7 @@ async def get_workspaces(
     client: Annotated[CoderClient, Depends(get_coder_client)],
     db: Annotated[Session, Depends(get_db, scope="function")],
     cache: Annotated[object, Depends(get_cache)],
+    redis=Depends(get_redis_client),
     email: Optional[str] = None,
 ) -> WorkspaceListResponse:
     """
@@ -701,6 +703,8 @@ async def get_workspaces(
             populate_home_modes(client, workspaces),
             populate_template_version_dates(client, workspaces),
         )
+        if not email:
+            await populate_last_courses(str(permissions.user_id), workspaces, redis)
         return WorkspaceListResponse(
             workspaces=workspaces,
             count=len(workspaces),

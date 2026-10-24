@@ -249,6 +249,8 @@ export interface CoderWorkspace {
   latest_build_id?: string | null;
   /** Home volume mode ('shared' | 'scratch') read from the latest build's rich parameters; only populated by views that need it */
   home_mode?: string | null;
+  /** Course the owner last opened this workspace for; only populated in the owner's own listing, and the course may no longer be theirs */
+  last_course_id?: string | null;
   /** Coder automatic update policy: always | never */
   automatic_updates?: string | null;
   /** Creation timestamp */

@@ -670,6 +670,71 @@ test('the dashboard reopens a running workspace in the course it was last opened
   await launchTab.close();
 });
 
+test('the dashboard reopens the course the server remembers, also in a fresh browser', async ({ page }) => {
+  const { contexts } = await setup(page, [
+    details({ status: 'running', ready: true, name: 'vscode' }),
+  ], { courseWorkspaces: true, workspaces: [{ ...COURSE_WORKSPACE, last_course_id: COURSE_B }] });
+
+  await page.goto('/dashboard');
+  const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Your workspaces' }) });
+  await expect(section.getByText('Last opened in Course B')).toBeVisible();
+  const popup = page.waitForEvent('popup');
+  await section.getByRole('button', { name: 'Open', exact: true }).click();
+  const launchTab = await popup;
+  expect(new URL(launchTab.url()).searchParams.get('courseId')).toBe(COURSE_B);
+  await launchTab.waitForURL(COURSE_WORKSPACE_URL);
+  expect(contexts).toEqual([{ course_id: COURSE_B }]);
+  await launchTab.close();
+});
+
+test('the dashboard ignores a remembered course the learner is no longer in', async ({ page }) => {
+  await setup(page, [details({ status: 'running', ready: true, name: 'vscode' })], {
+    courseWorkspaces: true,
+    workspaces: [{ ...COURSE_WORKSPACE, last_course_id: '33333333-3333-4333-8333-333333333333' }],
+  });
+  await page.goto('/dashboard');
+  const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Your workspaces' }) });
+  await expect(section.getByRole('button', { name: 'Open', exact: true })).toBeVisible();
+  await expect(section.getByText(/Last opened in/)).toHaveCount(0);
+});
+
+test('a stopping workspace says so and offers to start it again', async ({ page }) => {
+  await setup(page, [details({ status: 'stopped', name: 'vscode' })], {
+    courseWorkspaces: true,
+    workspaces: [{ ...COURSE_WORKSPACE, latest_build_status: 'stopping', latest_build_transition: 'stop' }],
+  });
+  await page.goto('/dashboard');
+  const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Your workspaces' }) });
+  await expect(section.getByText('Stopping', { exact: true })).toBeVisible();
+  await expect(section.getByRole('button', { name: 'Start and open' })).toBeVisible();
+  await expect(section.getByRole('button', { name: 'Open', exact: true })).toHaveCount(0);
+});
+
+test.describe('in German', () => {
+  test.use({ locale: 'de-AT' });
+
+  test('a stopping workspace reads "Wird gestoppt" and offers to start it again', async ({ page }) => {
+    await setup(page, [details({ status: 'stopped', name: 'vscode' })], {
+      courseWorkspaces: true,
+      workspaces: [{ ...COURSE_WORKSPACE, latest_build_status: 'stopping', latest_build_transition: 'stop' }],
+    });
+    await page.goto('/dashboard');
+    const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Deine Arbeitsumgebungen' }) });
+    await expect(section.getByText('Wird gestoppt', { exact: true })).toBeVisible();
+    await expect(section.getByRole('button', { name: 'Starten und öffnen' })).toBeVisible();
+  });
+
+  test('a new learner is welcomed without "zurück" and pointed to the catalog', async ({ page }) => {
+    await setup(page, [details({ status: 'stopped', name: 'vscode' })], { systemRoles: [] });
+    await page.route(`${API_ORIGIN}/courses`, (route) => json(route, []));
+    await page.goto('/dashboard');
+    await expect(page.getByRole('heading', { name: 'Willkommen, Wanda' })).toBeVisible();
+    await expect(page.getByText(/zurück/)).toHaveCount(0);
+    await expect(page.getByText('Im Katalog findest du Kurse, denen du beitreten kannst.')).toBeVisible();
+    await expect(page.getByText(/keinen Zugriff/)).toHaveCount(0);
+  });
+});
+
 test('a learner without a workspace role finds their workspace in the sidebar', async ({ page }) => {
   await setup(page, [details({ status: 'stopped', name: 'vscode' })], {
     courseWorkspaces: true,

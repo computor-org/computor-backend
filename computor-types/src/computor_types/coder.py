@@ -198,6 +198,11 @@ class CoderWorkspace(BaseModel):
         description="Home volume mode ('shared' | 'scratch') read from the latest build's "
                     "rich parameters; only populated by views that need it",
     )
+    last_course_id: Optional[str] = Field(
+        None,
+        description="Course the owner last opened this workspace for; only populated in "
+                    "the owner's own listing, and the course may no longer be theirs",
+    )
     automatic_updates: Optional[str] = Field(
         None,
         description="Coder automatic update policy: always | never",

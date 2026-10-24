@@ -32,8 +32,8 @@ const COPY = {
  * after an hour without use, so listing only running ones hid exactly the
  * workspace they came back for. Each row has one labelled action that goes
  * through the launch page, which starts a stopped workspace and waits for it.
- * It reopens the course this browser last opened the workspace for, when that
- * course is still one of the user's.
+ * It reopens the course the workspace was last opened for (remembered by the
+ * server, else by this browser), when that course is still one of the user's.
  */
 export default function DashboardWorkspaces({
   workspaces,
@@ -52,15 +52,17 @@ export default function DashboardWorkspaces({
         {workspaces.map((ws) => {
           const category = categorizeStatus(ws.latest_build_status, ws.latest_build_transition);
           const owner = ws.owner_name ?? '';
-          const remembered = owner ? lastWorkspaceCourse(owner, ws.name) : undefined;
-          const courseId = remembered && courseTitles.has(remembered) ? remembered : undefined;
+          const courseId = [ws.last_course_id, owner ? lastWorkspaceCourse(owner, ws.name) : undefined]
+            .find((id): id is string => !!id && courseTitles.has(id));
           const version = workspaceVersionLabel(ws.template_version_created_at, language);
+          // A workspace that is stopping is not opened but started again once
+          // it has stopped, which is what the launch page does.
           const label =
-            category === 'running' || category === 'pending'
-              ? t.open
-              : category === 'failed'
-                ? t.retry
-                : t.startAndOpen;
+            category === 'failed'
+              ? t.retry
+              : ws.latest_build_transition === 'stop' || category === 'stopped'
+                ? t.startAndOpen
+                : t.open;
 
           // Synchronous on purpose: the tab has to open inside the click, or
           // popup blockers eat it.
