@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect } from 'react';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -105,7 +106,7 @@ function SectionHeading({ title, href, linkLabel }: { title: string; href?: stri
  * enrolments and no workspaces sees their courses and nothing misleading.
  */
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { courseRole } = usePermissions();
   const t = COPY[useUiLanguage()];
 
@@ -115,7 +116,7 @@ export default function DashboardPage() {
     // Each of these is optional decoration on the page: a student with no
     // workspace access, or a deployment with messaging disabled, should still
     // get their courses rather than an error banner.
-    const [contents, workspaces, announcements] = await Promise.all([
+    const [contents, announcements] = await Promise.all([
       // No course_id: the backend treats it as "every course this user is in"
       // (student_view.list_course_contents), which is the whole point of this
       // page. Server-side the response is cached per user for 5 minutes and —
@@ -144,10 +145,6 @@ export default function DashboardPage() {
           status: DEFAULT_REASONS.join(','),
         })
         .catch(() => []),
-      coderClient
-        .listWorkspaces()
-        .then((r) => r.workspaces)
-        .catch(() => []),
       messagesClient
         .listMessagesMessagesGet({ scope: 'global', kind: 'announcement', unread: true, limit: 5 })
         .catch(() => []),
@@ -162,15 +159,29 @@ export default function DashboardPage() {
       courseWorkspaceTemplates,
       courses,
       contents,
-      workspaces,
       announcements,
     };
   }, []);
 
+  // The launch/editor runs in another tab, so its lifecycle changes must not
+  // leave the mounted dashboard showing the pre-launch snapshot. Only poll
+  // workspace state; courses, progress and announcements remain one-shot.
+  const { data: workspaceData, refresh: refreshWorkspaces } = useResource(
+    async () => (await coderClient.listWorkspaces()).workspaces,
+    [],
+    { refetchInterval: 3000 },
+  );
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const onFocus = () => { void refreshWorkspaces(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [isAuthenticated, refreshWorkspaces]);
+
   const courses = data?.courses ?? [];
   const courseTitles = new Map(courses.map((c) => [c.id, displayName(c, t.untitledCourse)]));
   const attention = selectNeedsAttention(Array.isArray(data?.contents) ? data.contents : [], courseTitles, DEFAULT_REASONS, t.course);
-  const workspaces = data?.workspaces ?? [];
+  const workspaces = workspaceData ?? [];
   const announcements = data?.announcements ?? [];
   // Every state, not just running: a workspace stops after an hour without
   // use, so the one a returning learner comes back for is usually stopped.

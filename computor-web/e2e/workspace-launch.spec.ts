@@ -985,6 +985,46 @@ test('a never-enrolled learner without a workspace gets a first welcome in Engli
   await expect(page.getByRole('heading', { name: 'Welcome, Wanda', exact: true })).toBeVisible();
 });
 
+for (const [locale, event, stopped, running, start, open] of [
+  ['en-US', 'focus', 'Stopped', 'Running', 'Start and open', 'Open'],
+  ['de-DE', 'visibilitychange', 'Gestoppt', 'Läuft', 'Starten und öffnen', 'Öffnen'],
+] as const) {
+  test.describe(`dashboard workspace return refresh ${locale}`, () => {
+    test.use({ locale });
+    test(`refreshes external workspace changes on ${event}`, async ({ page }, testInfo) => {
+      await setup(page, [details({ status: 'running', ready: true, name: 'vscode' })], { courseWorkspaces: true });
+      let isRunning = false;
+      let workspaceReads = 0;
+      const heavyReads: string[] = [];
+      page.on('request', (request) => {
+        const path = new URL(request.url()).pathname;
+        if (path === '/courses' || path === '/students/course-contents' || path === '/messages' || path.endsWith('/workspace-settings')) heavyReads.push(path);
+      });
+      await page.route(`${API_ORIGIN}/coder/workspaces`, (route) => {
+        workspaceReads++;
+        return json(route, {
+          workspaces: [{ ...COURSE_WORKSPACE, last_course_id: COURSE_A, latest_build_status: 'succeeded', latest_build_transition: isRunning ? 'start' : 'stop' }], count: 1,
+        });
+      });
+      await page.goto('/dashboard');
+      await expect(page.getByText(stopped, { exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: start, exact: true })).toBeVisible();
+      const initialHeavyReads = [...heavyReads];
+      expect(initialHeavyReads).toContain('/courses');
+      // The editor/launch tab updates the server while this dashboard stays mounted.
+      isRunning = true;
+      await page.evaluate((event) => {
+        (event === 'focus' ? window : document).dispatchEvent(new Event(event));
+      }, event);
+      await expect(page.getByText(running, { exact: true })).toBeVisible({ timeout: 2000 });
+      await expect(page.getByRole('button', { name: open, exact: true })).toBeEnabled();
+      await expect(page.getByRole('button', { name: start, exact: true })).toHaveCount(0);
+      await expect.poll(() => workspaceReads).toBeGreaterThanOrEqual(3);
+      expect(heavyReads).toEqual(initialHeavyReads);
+      await page.screenshot({ path: testInfo.outputPath(`dashboard-running-${locale}.png`) });
+    });
+  });
+}
 
 test.describe('German mobile workspace action', () => {
   test.use({ locale: 'de-DE', viewport: { width: 390, height: 844 } });
