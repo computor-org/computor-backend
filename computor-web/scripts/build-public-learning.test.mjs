@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { buildPublicLearning } from './build-public-learning.mjs';
+import { buildPublicLearning, descriptionVariants } from './build-public-learning.mjs';
 
 const revision = 'a'.repeat(40);
 function fixture(t) {
@@ -85,4 +85,26 @@ test('hidden course, traversal identifier and excessive text fail closed', t => 
   fs.writeFileSync(path.join(f.example, 'content/index_en.md'), 'a'.repeat(512 * 1024 + 1));
   assert.throws(() => buildPublicLearning(f.source, f.output, revision), /size/);
   assert.throws(() => buildPublicLearning(f.source, f.output, 'main'), /exact source commit/);
+});
+
+test('a welcome item renders its description in the reader language and is not counted as a unit', t => {
+  const f = fixture(t);
+  f.manifest.content_types.push({ slug: 'welcome', kind: 'unit', title: 'Start' });
+  f.manifest.contents.unshift({ path: 'welcome', position: 0, content_type: 'welcome', title: 'Willkommen',
+    description: '<!-- lang: de -->\nHallo **du**.\n\n<!-- lang: en -->\nHello **you**.\n' });
+  f.manifests(f.manifest);
+  buildPublicLearning(f.source, f.output, revision);
+  const course = JSON.parse(fs.readFileSync(path.join(f.output, 'courses/python-beginner.json')));
+  assert.equal(course.welcome_content_id, 'welcome');
+  assert.deepEqual(course.materials.welcome.markdown_variants, { de: 'Hallo **du**.', en: 'Hello **you**.' });
+  assert(!JSON.stringify(course).includes('lang:'));
+  assert.equal(course.unit_count, 1);
+  const catalog = JSON.parse(fs.readFileSync(path.join(f.output, 'catalog.json')));
+  assert.equal(catalog[0].unit_count, 1);
+});
+
+test('an unmarked item description is Markdown in the course language', () => {
+  assert.deepEqual(descriptionVariants('  Nur **deutsch**.\n', 'de'), { de: 'Nur **deutsch**.' });
+  assert.deepEqual(descriptionVariants('Common\n<!-- lang: en -->\nEnglish\n<!-- lang: xx -->\nskip', 'de'),
+    { en: 'Common\n\nEnglish' });
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth } from '@/src/contexts/AuthContext';
 import {
   CODESPACES_URL,
@@ -10,7 +10,7 @@ import {
 } from '@/src/components/courses/LearningOptions';
 import EmptyState from '@/src/components/EmptyState';
 import PublicLearnShell from '@/src/components/learn/PublicLearnShell';
-import PublicMarkdown from '@/src/components/learn/PublicMarkdown';
+import PublicMarkdown, { PublicMarkdownTitle } from '@/src/components/learn/PublicMarkdown';
 import { localizedTitle } from '@/src/components/learn/localize';
 import { setUiLanguage, useBrowserLanguage, type UiLanguage } from '@/src/hooks/useBrowserLanguage';
 import type {
@@ -40,7 +40,7 @@ const COPY = {
     startHere: 'Hier beginnen',
     welcome: 'Willkommen',
     noWelcome: 'Wähle links eine Aufgabe oder beginne mit der ersten.',
-    startWith: (title: string) => `Mit „${title}“ beginnen`,
+    startWith: (title: ReactNode) => <>Mit „{title}“ beginnen</>,
     loadingContent: 'Inhalt wird geladen…',
     contentUnavailable: 'Inhalt nicht verfügbar',
     itemFailed: 'Dieser Inhalt konnte nicht geladen werden.',
@@ -67,7 +67,7 @@ const COPY = {
     startHere: 'Start here',
     welcome: 'Welcome',
     noWelcome: 'Pick an exercise on the left or start with the first one.',
-    startWith: (title: string) => `Start with ${title}`,
+    startWith: (title: ReactNode) => <>Start with {title}</>,
     loadingContent: 'Loading content…',
     contentUnavailable: 'Course content unavailable',
     itemFailed: 'This item could not be loaded.',
@@ -85,7 +85,29 @@ type Copy = (typeof COPY)[UiLanguage];
 
 /** Drop the leading Markdown heading; the page shows it as the item title. */
 function withoutTitleHeading(markdown: string): string {
-  return markdown.replace(/^\s*#\s+.*(?:\r?\n|$)/, '');
+  return markdown.replace(/^(\s*(?:\[[^\]\r\n]+\]:[^\r\n]*(?:\r?\n|$)\s*)*)#\s+[^\r\n]*(?:\r?\n|$)/, '$1');
+}
+
+function LanguageSwitch({ content, label }: { content: PublicLearningContent; label: string }) {
+  if (content.available_languages.length < 2) return null;
+  return (
+    <div className="flex rounded-lg border border-rule-strong p-1" aria-label={label}>
+      {content.available_languages.map(language => (
+        <button
+          type="button"
+          key={language}
+          onClick={() => setUiLanguage(language as UiLanguage)}
+          className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+            content.selected_language === language
+              ? 'bg-accent text-on-accent'
+              : 'text-muted hover:bg-sunken'
+          }`}
+        >
+          {LANGUAGE_LABEL[language] ?? language.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function OutlineLinks({
@@ -124,7 +146,7 @@ function OutlineLinks({
           }`}
           style={{ paddingLeft: `${0.75 + item.depth * 1.1}rem` }}
         >
-          <span className="block truncate">{localizedTitle(outline, item.id, item.title, language)}</span>
+          <span className="block truncate"><PublicMarkdownTitle markdown={localizedTitle(outline, item.id, item.title, language)} /></span>
         </Link>
       ))}
     </nav>
@@ -259,11 +281,20 @@ export default function PublicCourseReader({
                   </div>
                 )}
 
-                {!activeContentId ? (
+                {!contentId ? (
                   <section className="rounded-lg border border-rule bg-surface p-6 md:p-8">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-accent-text">{t.startHere}</p>
-                    <h2 className="mt-2 text-2xl font-bold text-fg">{t.welcome}</h2>
-                    {outline.description ? (
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-accent-text">{t.startHere}</p>
+                        <h2 className="mt-2 text-2xl font-bold text-fg">{t.welcome}</h2>
+                      </div>
+                      {content && <LanguageSwitch content={content} label={t.language} />}
+                    </div>
+                    {content?.markdown ? (
+                      <div className="mt-4">
+                        <PublicMarkdown assetBaseUrl={content.asset_base_url} mediaFiles={content.media_files} markdown={content.markdown} />
+                      </div>
+                    ) : outline.description ? (
                       <div className="mt-4 whitespace-pre-wrap text-body leading-7">{outline.description}</div>
                     ) : (
                       <p className="mt-4 text-muted">{t.noWelcome}</p>
@@ -273,7 +304,7 @@ export default function PublicCourseReader({
                         href={`/learn/${outline.id}/content/${firstExercise.id}`}
                         className="mt-6 inline-block rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent-hover"
                       >
-                        {t.startWith(localizedTitle(outline, firstExercise.id, firstExercise.title, uiLanguage))}
+                        {t.startWith(<PublicMarkdownTitle markdown={localizedTitle(outline, firstExercise.id, firstExercise.title, uiLanguage)} />)}
                       </Link>
                     )}
                   </section>
@@ -290,26 +321,9 @@ export default function PublicCourseReader({
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted">
                           {content.is_submittable ? t.exercise : t.material}
                         </p>
-                        <h2 className="mt-1 text-2xl font-bold text-fg">{localizedTitle(outline, content.id, content.title, (content.selected_language ?? uiLanguage) as UiLanguage)}</h2>
+                        <h2 className="mt-1 text-2xl font-bold text-fg"><PublicMarkdownTitle markdown={localizedTitle(outline, content.id, content.title, (content.selected_language ?? uiLanguage) as UiLanguage)} /></h2>
                       </div>
-                      {content.available_languages.length > 1 && (
-                        <div className="flex rounded-lg border border-rule-strong p-1" aria-label={t.language}>
-                          {content.available_languages.map(language => (
-                            <button
-                              type="button"
-                              key={language}
-                              onClick={() => setUiLanguage(language as UiLanguage)}
-                              className={`rounded-md px-3 py-1.5 text-xs font-medium ${
-                                content.selected_language === language
-                                  ? 'bg-accent text-on-accent'
-                                  : 'text-muted hover:bg-sunken'
-                              }`}
-                            >
-                              {LANGUAGE_LABEL[language] ?? language.toUpperCase()}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      <LanguageSwitch content={content} label={t.language} />
                     </div>
                     {content.markdown ? (
                       <PublicMarkdown assetBaseUrl={content.asset_base_url} mediaFiles={content.media_files} markdown={content.markdown} />
@@ -326,14 +340,14 @@ export default function PublicCourseReader({
                     <div>
                       {previous && (
                         <Link href={`/learn/${outline.id}/content/${previous.id}`} className="text-sm text-accent-text hover:underline">
-                          ← {localizedTitle(outline, previous.id, previous.title, uiLanguage)}
+                          ← <PublicMarkdownTitle markdown={localizedTitle(outline, previous.id, previous.title, uiLanguage)} />
                         </Link>
                       )}
                     </div>
                     <div className="text-right">
                       {next && (
                         <Link href={`/learn/${outline.id}/content/${next.id}`} className="text-sm text-accent-text hover:underline">
-                          {localizedTitle(outline, next.id, next.title, uiLanguage)} →
+                          <PublicMarkdownTitle markdown={localizedTitle(outline, next.id, next.title, uiLanguage)} /> →
                         </Link>
                       )}
                     </div>
