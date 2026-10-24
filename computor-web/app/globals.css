@@ -291,6 +291,17 @@ body {
   content: none;
 }
 
+/* Long inline equations scroll within the text column on narrow screens. */
+.public-markdown .katex:not(.katex-display .katex) {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  vertical-align: middle;
+  padding-block: 0.5em;
+  margin-block: -0.5em;
+}
+
 .markdown .katex-display {
   overflow-x: auto;
   overflow-y: hidden;
