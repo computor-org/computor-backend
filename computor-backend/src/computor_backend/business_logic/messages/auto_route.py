@@ -28,6 +28,7 @@ def _course_id_for_targets(model_dump: dict, db: Session) -> Optional[str]:
     if model_dump.get('course_id'):
         return str(model_dump['course_id'])
     for key, model in (
+        ('course_member_id', CourseMember),
         ('submission_group_id', SubmissionGroup),
         ('course_content_id', CourseContent),
         ('course_group_id', CourseGroup),
