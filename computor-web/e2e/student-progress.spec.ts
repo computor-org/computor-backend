@@ -209,3 +209,56 @@ test('a tutor sees no learner progress and the page does not ask for it', async 
   await expect(page.getByTestId('course-progress')).toHaveCount(0);
   expect(requested).not.toContain('/students/course-contents');
 });
+
+for (const language of ['de', 'en'] as const) {
+  test.describe(`Returning to mounted progress (${language})`, () => {
+    test.use({ locale: language === 'de' ? 'de-DE' : 'en-US' });
+
+    for (const returnEvent of ['focus', 'visibilitychange'] as const) {
+      test(`${returnEvent} refreshes counts and the next assignment without navigation`, async ({ page }) => {
+        const initial = CONTENTS.map((c) => ({ ...c, submitted: false, result: null }));
+        const requested = await signIn(page, { contents: initial });
+        await page.goto(`/courses/${COURSE_ID}`);
+        const card = page.getByTestId('course-progress');
+        const count = language === 'de' ? '0 von 6 Aufgaben eingereicht' : '0 of 6 assignments submitted';
+        await expect(card).toContainText(count);
+        await page.waitForLoadState('networkidle');
+        const mountedCard = await card.elementHandle();
+        const requestsBefore = requested.length;
+
+        // The workspace submitted the first assignment while this page stayed open.
+        const updated = initial.map((c) => c.id === 'a-week1.constants' ? { ...c, submitted: true } : c);
+        let refreshRequests = 0;
+        let finishRefresh!: () => void;
+        const responseReady = new Promise<void>((resolve) => { finishRefresh = resolve; });
+        await page.route(`${API_ORIGIN}/students/course-contents?**`, async (route) => {
+          refreshRequests += 1;
+          await responseReady;
+          await json(route, updated);
+        });
+        await page.evaluate((event) => {
+          const target = event === 'focus' ? window : document;
+          target.dispatchEvent(new Event(event));
+          target.dispatchEvent(new Event(event));
+        }, returnEvent);
+        await expect.poll(() => refreshRequests).toBe(1);
+        finishRefresh();
+
+        await expect(card).toContainText(language === 'de' ? '1 von 6 Aufgaben eingereicht' : '1 of 6 assignments submitted');
+        await expect(card.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '17');
+        await expect(card).toContainText(language === 'de' ? 'Weiter mit: Woche 1 › Listen' : 'Continue with: Woche 1 › Listen');
+        await expect(card.getByRole('link', { name: language === 'de' ? 'Aufgabe öffnen' : 'Open assignment', exact: true })).toHaveAttribute(
+          'href', `/courses/${COURSE_ID}/student/assignments/a-week1.lists`,
+        );
+        expect(await mountedCard?.evaluate((node) => node === document.querySelector('[data-testid="course-progress"]'))).toBe(true);
+        expect(new URL(page.url()).pathname).toBe(`/courses/${COURSE_ID}`);
+        // Templates already refresh on visibility through their existing polling hook.
+        // The progress change must add no other course, message or template requests.
+        const otherRequests = requested.slice(requestsBefore);
+        if (returnEvent === 'focus') expect(otherRequests).toEqual([]);
+        else expect(otherRequests).toEqual(['/coder/templates', '/coder/templates']);
+        expect(refreshRequests).toBe(1); // Duplicate return events share the pending refresh.
+      });
+    }
+  });
+}

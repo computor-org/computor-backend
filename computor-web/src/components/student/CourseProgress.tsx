@@ -112,7 +112,7 @@ export default function CourseProgressCard({ courseId, language }: { courseId: s
     const response = await apiFetch(`${API_BASE_URL}/students/course-contents?course_id=${courseId}`);
     if (!response.ok) return null;
     return (await response.json()) as ProgressContent[];
-  }, [courseId]);
+  }, [courseId], { refreshOnFocus: true });
   // Quietly absent while loading or on failure: the card is a shortcut, and the
   // assignment list stays the authority.
   if (!Array.isArray(data)) return null;
