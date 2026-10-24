@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth } from '@/src/contexts/AuthContext';
 import {
@@ -153,16 +154,10 @@ function OutlineLinks({
   );
 }
 
-// The catalog opens the join confirmation for this course, or the course
-// itself when the learner is already a member (issues#521).
-function catalogPathFor(outline: PublicLearningCourseOutline | null): string {
-  return outline?.course_path
-    ? `/courses/catalog?join=${encodeURIComponent(outline.course_path)}`
-    : '/courses/catalog';
-}
-
-function ReaderActions({ signedIn, target, t }: { signedIn: boolean; target: string; t: Copy }) {
-  const computorHref = signedIn ? target : `/login?next=${encodeURIComponent(target)}`;
+function ReaderActions({ signedIn, t }: { signedIn: boolean; t: Copy }) {
+  const computorHref = signedIn
+    ? '/courses/catalog'
+    : `/login?next=${encodeURIComponent('/courses/catalog')}`;
   return (
     <div className="rounded-lg border border-rule bg-surface p-4">
       <p className="text-sm font-semibold text-fg">{t.practiseTitle}</p>
@@ -188,7 +183,8 @@ export default function PublicCourseReader({
   courseId: string;
   contentId?: string;
 }) {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
+  const router = useRouter();
   const [loaded, setLoaded] = useState<{
     courseId: string; outline: PublicLearningCourseOutline | null; error: string | null;
   } | null>(null);
@@ -220,6 +216,26 @@ export default function PublicCourseReader({
 
   const material = activeContentId && outline && Object.hasOwn(outline.materials, activeContentId)
     ? outline.materials[activeContentId] : undefined;
+  const activeItem = outline?.contents.find(item => item.id === activeContentId);
+  const authenticatedReader = Boolean(user);
+  const nativeCoursePath = outline?.course_path;
+  const validCoursePath = typeof nativeCoursePath === 'string'
+    && /^[a-z0-9_]+(?:\.[a-z0-9_]+)*$/.test(nativeCoursePath);
+  const validItemPath = activeItem && material
+    && /^[a-z0-9_]+(?:\.[a-z0-9_]+)*$/.test(activeItem.path)
+    && material.path === activeItem.path;
+  const hasAuthoredContent = activeItem?.is_submittable || Boolean(material?.description?.trim())
+    || Object.values(material?.markdown_variants ?? {}).some(text => Boolean(text.trim()));
+  const handoffTarget = authenticatedReader && outline && validCoursePath
+    && (!contentId || validItemPath)
+    ? `/courses/catalog?${new URLSearchParams({ join: nativeCoursePath,
+      ...(validItemPath && hasAuthoredContent ? { contentPath: activeItem.path } : {}) })}`
+    : null;
+
+  useEffect(() => {
+    if (!authLoading && handoffTarget) router.replace(handoffTarget);
+  }, [authLoading, handoffTarget, router]);
+
   const languages = Object.keys(material?.markdown_variants ?? {});
   const language = [uiLanguage, outline?.language_code, 'en', 'de']
     .find(value => value && languages.includes(value)) ?? languages[0];
@@ -245,10 +261,12 @@ export default function PublicCourseReader({
     : exercises[0];
 
   return (
-    <PublicLearnShell signInNext={catalogPathFor(outline)}>
+    <PublicLearnShell>
       <div className="container mx-auto max-w-7xl px-4 py-8">
-        {outlineLoading ? (
+        {outlineLoading || authLoading || (!authLoading && Boolean(handoffTarget)) ? (
           <div className="py-24 text-center text-muted">{t.loadingCourse}</div>
+        ) : authenticatedReader && outline ? (
+          <EmptyState title={t.contentUnavailable} description={t.itemFailed} />
         ) : !outline ? (
           <EmptyState title={t.unavailable} description={error ?? t.loadFailed} />
         ) : (
@@ -360,7 +378,7 @@ export default function PublicCourseReader({
                   </nav>
                 )}
 
-                <ReaderActions signedIn={Boolean(user)} target={catalogPathFor(outline)} t={t} />
+                <ReaderActions signedIn={Boolean(user)} t={t} />
 
                 <details className="text-sm text-muted">
                   <summary className="cursor-pointer hover:text-fg">{t.sourceTitle}</summary>
