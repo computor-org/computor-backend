@@ -13,6 +13,7 @@ from computor_types.custom_types import Ltree
 from computor_backend.exceptions import ForbiddenException
 from computor_backend.interfaces.base import BackendEntityInterface, CacheTag
 from computor_backend.model.course import Course
+from computor_backend.business_logic.course_order import course_ordering
 from computor_backend.permissions.core import check_permissions
 from computor_backend.permissions.principal import Principal, course_role_hierarchy
 from computor_backend.websocket import publish_course_updated
@@ -178,7 +179,7 @@ class CourseInterface(CourseInterfaceBase, BackendEntityInterface):
     def search(db: Session, query, params: Optional[CourseQuery]):
         """Apply search filters to course query."""
         if params is None:
-            return query
+            return query.order_by(*course_ordering())
 
         if params.id is not None:
             query = query.filter(Course.id == params.id)
@@ -208,4 +209,4 @@ class CourseInterface(CourseInterfaceBase, BackendEntityInterface):
         elif params.archived is False:
             query = query.filter(Course.archived_at.is_(None))
 
-        return query
+        return query.order_by(*course_ordering())
