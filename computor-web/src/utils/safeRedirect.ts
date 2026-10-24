@@ -44,3 +44,11 @@ export function safeInternalPath(raw: string | null | undefined, origin: string)
   if (!canonical.startsWith('/') || canonical.startsWith('//')) return null;
   return canonical;
 }
+
+/**
+ * The sign-in URL that returns to the page the user is on now, for the guards
+ * that send unauthenticated users to /login. /login validates `next` again.
+ */
+export function loginPathFor(location: { pathname: string; search: string }): string {
+  return `/login?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`;
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { UserClient } from '@/src/generated/clients/UserClient';
@@ -8,6 +8,7 @@ import { useResource } from '@/src/hooks/useResource';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { useSearchParam } from '@/src/hooks/useSearchParam';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -35,7 +36,7 @@ const COPY = {
     emptyTitle: 'Keine Kurse offen für die Selbstanmeldung',
     emptyDescription: 'Ein Kurs erscheint hier, sobald seine Lehrenden ihn freigeben. Frage dort nach oder schau später wieder vorbei.',
     backToCourses: 'Zurück zu deinen Kursen',
-    enrolledBadge: 'Angemeldet',
+    enrolledBadge: 'Beigetreten',
     openCourse: 'Kurs öffnen',
     full: 'Voll',
     seatsLeft: (n: number) => (n === 1 ? '1 Platz frei' : `${n} Plätze frei`),
@@ -69,7 +70,7 @@ const COPY = {
   },
 };
 
-export default function CourseCatalogPage() {
+function CourseCatalog() {
   const router = useRouter();
   const notify = useNotify();
   const { refreshPermissions } = useAuth();
@@ -85,6 +86,30 @@ export default function CourseCatalogPage() {
   const [pending, setPending] = useState<CoursePublicList | null>(null);
   const [joining, setJoining] = useState(false);
 
+  // `?join=<course id or path>` comes from "Anmelden und beitreten" on a
+  // public course page (issues#521): mark that course and open its
+  // confirmation, or open the course itself when the learner is already a
+  // member. Once the dialog is closed it stays closed, also after a reload.
+  const joinParam = useSearchParam('join');
+  const [joinDismissed, setJoinDismissed] = useState(false);
+  const joinMatches = joinParam
+    ? courses.filter(course => course.id === joinParam || course.path === joinParam)
+    : [];
+  const joinCourse = joinMatches.length === 1 ? joinMatches[0] : null;
+  const dialogCourse = pending
+    ?? (joinCourse && !joinCourse.enrolled && !joinCourse.full && !joinDismissed ? joinCourse : null);
+
+  useEffect(() => {
+    if (!joinCourse) return;
+    if (joinCourse.enrolled) router.replace(`/courses/${joinCourse.id}`);
+    else document.getElementById(`course-${joinCourse.id}`)?.scrollIntoView({ block: 'nearest' });
+  }, [joinCourse, router]);
+
+  function closeDialog() {
+    setPending(null);
+    setJoinDismissed(true);
+  }
+
   async function join(course: CoursePublicList) {
     setJoining(true);
     try {
@@ -94,11 +119,11 @@ export default function CourseCatalogPage() {
       // sidebar and role badges would lag the redirect.
       await refreshPermissions();
       notify(t.enrolled(displayName(course, t.thisCourse)), 'success');
-      setPending(null);
+      closeDialog();
       router.push(`/courses/${course.id}`);
     } catch (err) {
       notify(err instanceof Error ? err.message : t.enrollFailed, 'error');
-      setPending(null);
+      closeDialog();
       reload();
     } finally {
       setJoining(false);
@@ -143,6 +168,7 @@ export default function CourseCatalogPage() {
               <CourseCard
                 key={course.id}
                 course={course}
+                selected={course.id === joinCourse?.id}
                 badge={
                   course.enrolled ? (
                     <Badge color="green" className="shrink-0">{t.enrolledBadge}</Badge>
@@ -180,14 +206,23 @@ export default function CourseCatalogPage() {
         )}
 
         <ConfirmDialog
-          open={pending !== null}
+          open={dialogCourse !== null}
           title={t.confirmTitle}
-          message={t.confirmMessage(displayName(pending, t.thisCourse))}
+          message={t.confirmMessage(displayName(dialogCourse, t.thisCourse))}
           confirmLabel={joining ? t.joining : t.join}
-          onCancel={() => setPending(null)}
-          onConfirm={() => pending && join(pending)}
+          onCancel={closeDialog}
+          onConfirm={() => dialogCourse && join(dialogCourse)}
         />
       </ListPageLayout>
     </AuthenticatedLayout>
+  );
+}
+
+export default function CourseCatalogPage() {
+  // useSearchParams (for ?join=) needs a Suspense boundary.
+  return (
+    <Suspense>
+      <CourseCatalog />
+    </Suspense>
   );
 }
