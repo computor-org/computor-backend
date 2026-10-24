@@ -51,7 +51,8 @@ export const coursesNavigation: NavItem[] = [
   },
 ];
 
-// Workspaces — gated by workspace access (_workspace_user / admin). Choosing a
+// Workspaces — shown with workspace access (_workspace_user / admin), and to a
+// course member who already owns a workspace (see Sidebar). Choosing a
 // type and creating a workspace happens on /workspaces itself, so the
 // Administration sub-item (deploying templates, fleet, volumes) only appears
 // for maintainers; plain workspace users get a single flat entry.

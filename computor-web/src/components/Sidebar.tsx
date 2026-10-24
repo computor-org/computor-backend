@@ -8,6 +8,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useCourseViews } from '@/src/hooks/useCourseViews';
 import { useSupportCapabilities } from '@/src/hooks/useSupportCapabilities';
+import { useHasOwnWorkspace } from '@/src/hooks/useHasOwnWorkspace';
 import { icons } from './icons';
 import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
 
@@ -101,7 +102,12 @@ export default function Sidebar() {
   const t = COPY[language];
   const pathname = usePathname();
   const { user } = useAuth();
-  const { isAdmin, isOrganizationManager, isUserManager, isWorkspaceUser, isWorkspaceMaintainer, isExampleManager, isServiceManager, showManagement } = usePermissions();
+  const { isAdmin, isOrganizationManager, isUserManager, isWorkspaceUser, isWorkspaceMaintainer, isExampleManager, isServiceManager, showManagement, courseRoles } = usePermissions();
+  // Learners who joined a course themselves hold no workspace role but get a
+  // workspace through the course; once they have one, list the entry for them
+  // too, so /workspaces is not reachable only from the dashboard.
+  const hasOwnWorkspace = useHasOwnWorkspace(!isWorkspaceUser && Object.keys(courseRoles).length > 0);
+  const showWorkspaces = isWorkspaceUser || hasOwnWorkspace;
   const { capabilities: supportCaps } = useSupportCapabilities();
   // Phones start with the icon rail: the full 16rem sidebar would leave a 390 px
   // screen about 130 px for the page. The layout renders the sidebar only on
@@ -291,7 +297,7 @@ export default function Sidebar() {
               })),
         )}
       {isUserManager && renderNavItems(userMgmtNavigation)}
-      {isWorkspaceUser && renderNavItems(getWorkspacesNavigation(isWorkspaceMaintainer))}
+      {showWorkspaces && renderNavItems(getWorkspacesNavigation(isWorkspaceMaintainer))}
       {isServiceManager && renderNavItems(servicesNavigation)}
       {supportCaps?.can_view && renderNavItems(supportNavigation)}
       {isAdmin && renderNavItems(adminNavigation)}

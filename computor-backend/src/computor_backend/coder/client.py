@@ -81,6 +81,8 @@ class CoderClient:
         self._session_token: Optional[str] = None
         self._org_id: Optional[str] = None
         self._client: Optional[httpx.AsyncClient] = None
+        # Template versions are immutable, so their creation time never changes.
+        self._template_version_created: dict[str, str] = {}
 
     async def __aenter__(self) -> "CoderClient":
         """Async context manager entry."""
@@ -1523,6 +1525,28 @@ class CoderClient:
             for p in resp.json()
             if p.get("name") and p.get("value") is not None
         }
+
+    async def get_template_version_created_at(self, version_id: str) -> Optional[str]:
+        """Creation time of a template version, or None when unreadable.
+
+        A version never changes once pushed, so a successful answer is cached
+        for the life of the client.
+        """
+        cached = self._template_version_created.get(version_id)
+        if cached is not None:
+            return cached
+        resp = await self._request(
+            "GET",
+            f"/api/v2/templateversions/{version_id}",
+            admin_headers=True,
+            ok=None,
+        )
+        if resp.status_code != 200:
+            return None
+        created_at = resp.json().get("created_at")
+        if created_at:
+            self._template_version_created[version_id] = created_at
+        return created_at
 
     async def _get_build_param(
         self, build_id: str, name: str
