@@ -141,6 +141,7 @@ class CourseFamilyMember(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
 class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     __tablename__ = 'course'
     __table_args__ = (
+        CheckConstraint("position > '-Infinity'::double precision AND position < 'Infinity'::double precision", name='ck_course_position_finite'),
         Index('course_path_key', 'course_family_id', 'path', unique=True),
         # Serves GET /courses/public: the predicate is the most selective one
         # on the table and `title` is that endpoint's ORDER BY. Partial, so
@@ -148,6 +149,7 @@ class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
         Index('ix_course_public_title', 'title', postgresql_where=text('public')),
     )
 
+    position = Column(Float(53), nullable=True)
     properties = Column(JSONB)
     title = Column(String(255))
     description = Column(String(4096))
