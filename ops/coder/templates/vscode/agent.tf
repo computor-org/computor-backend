@@ -28,6 +28,7 @@ resource "coder_agent" "main" {
     GIT_AUTHOR_EMAIL         = data.coder_workspace_owner.me.email
     GIT_COMMITTER_NAME       = coalesce(data.coder_workspace_owner.me.full_name, data.coder_workspace_owner.me.name)
     GIT_COMMITTER_EMAIL      = data.coder_workspace_owner.me.email
+    COMPUTOR_MANAGED_CODE_SERVER = "true"
     COMPUTOR_AUTH_TOKEN      = data.coder_parameter.computor_auth_token.value
     COMPUTOR_WORKSPACE_OWNER = data.coder_workspace_owner.me.name
     COMPUTOR_WORKSPACE_NAME  = data.coder_workspace.me.name

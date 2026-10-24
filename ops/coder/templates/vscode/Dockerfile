@@ -138,14 +138,25 @@ LABEL computor.extension.revision="${EXTENSION_REPO_SHA}"
 # Brings the extension up to the instance's approved version in place, at
 # start and periodically (startup.sh.tftpl; README.md "Extension updates").
 COPY extension-sync.mjs /opt/computor/extension-sync.mjs
+COPY seed-language-packs.py /opt/computor/seed-language-packs.py
+RUN mkdir -p /opt/computor/code-server-language-data \
+    && chown coder:coder /opt/computor/code-server-language-data
 
 # Copy VSIX from builder stage
 COPY --from=vsix-builder --chown=coder:coder /tmp/extension.vsix /opt/code-server/extension.vsix
 
 USER coder
 
-# Install extensions and clean up VSIX
+# Install extensions and clean up VSIX. The Open VSX build of ms-python.python
+# is "universal" and ships no python-env-tools/bin/pet, so the
+# ms-python.vscode-python-envs extension it pulls in fails to spawn pet in a
+# loop and leaves the interpreter badge on "Initializing virtual environments"
+# (computor-org/issues#484). ms-python.python does not need it, because
+# python.useEnvironmentsExtension defaults to false.
 RUN code-server --extensions-dir /opt/code-server/extensions --install-extension /opt/code-server/extension.vsix --force \
     && code-server --extensions-dir /opt/code-server/extensions --install-extension ms-python.python --force \
     && code-server --extensions-dir /opt/code-server/extensions --install-extension ms-toolsai.jupyter --force \
+    && code-server --extensions-dir /opt/code-server/extensions --user-data-dir /opt/computor/code-server-language-data --install-extension MS-CEINTL.vscode-language-pack-de --force \
+    && python3 /opt/computor/seed-language-packs.py --build /opt/code-server/extensions /opt/computor/code-server-language-data \
+    && code-server --extensions-dir /opt/code-server/extensions --uninstall-extension ms-python.vscode-python-envs \
     && rm /opt/code-server/extension.vsix
