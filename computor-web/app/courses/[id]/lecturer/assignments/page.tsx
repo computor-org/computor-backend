@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useLecturerCopy } from '@/src/hooks/useLecturerCopy';
+import { LecturersClient } from '@/src/generated/clients/LecturersClient';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useResource } from '@/src/hooks/useResource';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
@@ -22,8 +24,9 @@ import TreeRow, { TreeRows } from '@/src/components/ui/TreeRow';
 import type { CourseContentLecturerList, CourseContentTypeList } from 'types/generated';
 
 export default function LecturerContentPage() {
+  const t = useLecturerCopy();
   const courseId = useParams().id as string;
-  const crumbs = useCourseCrumbs(courseId, 'Assignments');
+  const crumbs = useCourseCrumbs(courseId, t("Assignments"));
 
   // reload re-fetches everything (badges move pending → deploying → deployed as
   // the release workflow runs).
@@ -34,6 +37,7 @@ export default function LecturerContentPage() {
       apiFetch(`${API_BASE_URL}/lecturers/course-contents?course_id=${courseId}&limit=500`),
       apiFetch(`${API_BASE_URL}/course-content-types?course_id=${courseId}&limit=200`),
     ]);
+    if (!ccRes.ok || !ctRes.ok) throw new Error(t('Could not load assignments.'));
     let contents: CourseContentLecturerList[] = [];
     if (ccRes.ok) {
       // Order is useContentTree's job now — it nests by path and sorts siblings
@@ -51,6 +55,7 @@ export default function LecturerContentPage() {
   const contents = useMemo(() => data?.contents ?? [], [data]);
   const typeMap = data?.typeMap ?? {};
 
+  const [upgrading, setUpgrading] = useState(false);
   const [releasing, setReleasing] = useState<string | null>(null);
   const [releaseMsg, setReleaseMsg] = useState<string | null>(null);
 
@@ -71,15 +76,33 @@ export default function LecturerContentPage() {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.detail || err?.message || `Release failed (${res.status})`);
+        setReleaseMsg(`${t('Release failed')} (HTTP ${res.status}). ${t('Try again.')}`);
+        return;
       }
-      setReleaseMsg('Release started — badges move to “deploying”, then “deployed”.');
+      setReleaseMsg(t("Release started — badges move to “deploying”, then “deployed”."));
+      reload();
       setTimeout(() => reload(), 3000);
-    } catch (e) {
-      setReleaseMsg(e instanceof Error ? e.message : 'Release failed');
+    } catch {
+      setReleaseMsg(`${t("Release failed")}. ${t("Try again.")}`);
     } finally {
       setReleasing(null);
+    }
+  }
+
+  async function upgrade() {
+    setUpgrading(true);
+    setReleaseMsg(null);
+    try {
+      const result = await new LecturersClient().batchUpgradeVersionsEndpointLecturersCoursesCourseIdUpgradeVersionsPost({
+        courseId,
+        body: { course_content_ids: contents.filter(c => !c.archived_at && c.deployment?.has_newer_version).map(c => c.id) },
+      });
+      setReleaseMsg(`${t("Versions selected")}: ${result.total_upgraded}. ${t("Already current")}: ${result.total_skipped}. ${t("Failed")}: ${result.total_failed}. ${t("Release pending assignments to publish the selected versions.")}`);
+      reload();
+    } catch {
+      setReleaseMsg(t("Could not select newer versions. Try again."));
+    } finally {
+      setUpgrading(false);
     }
   }
 
@@ -102,12 +125,12 @@ export default function LecturerContentPage() {
         body: JSON.stringify({ visible: c.visible === false ? null : false }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.detail || err?.message || `Failed (${res.status})`);
+        setReleaseMsg(`${t('Could not change visibility')} (HTTP ${res.status}) ${t('Try again.')}`);
+        return;
       }
       reload();
-    } catch (e) {
-      setReleaseMsg(e instanceof Error ? e.message : 'Could not change visibility');
+    } catch {
+      setReleaseMsg(`${t("Could not change visibility")} ${t("Try again.")}`);
     } finally {
       setTogglingVisibility(null);
     }
@@ -121,7 +144,7 @@ export default function LecturerContentPage() {
     deployed: active.filter((c) => c.deployment_status === 'deployed').length,
     pending: active.filter((c) => c.deployment_status === 'pending').length,
     failed: active.filter((c) => c.deployment_status === 'failed').length,
-    none: active.filter((c) => !c.deployment_status && !c.has_deployment).length,
+    none: active.filter((c) => c.is_submittable && !c.deployment_status && !c.has_deployment).length,
   };
 
   // One tree, one indent, one expand model — shared with the student view.
@@ -137,7 +160,7 @@ export default function LecturerContentPage() {
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
-        <PageHeader breadcrumbs={crumbs} title="Assignments" />
+        <PageHeader breadcrumbs={crumbs} title={t("Assignments")} />
 
         <ErrorBanner>{error}</ErrorBanner>
 
@@ -147,57 +170,59 @@ export default function LecturerContentPage() {
           <ScrollArea>
             {/* Summary — the at-a-glance deployment signal */}
             <StatGrid columns={5}>
-              <StatCard label="Contents" value={active.length} />
-              <StatCard label="Assignments" value={submittable} tone="info" />
-              <StatCard label="Deployed" value={counts.deployed} tone="success" />
-              <StatCard label="Pending" value={counts.pending} tone="warning" />
-              <StatCard label="Failed / none" value={counts.failed + counts.none} tone="error" />
+              <StatCard label={t("Contents")} value={active.length} />
+              <StatCard label={t("Assignments")} value={submittable} tone="info" />
+              <StatCard label={t("Deployed")} value={counts.deployed} tone="success" />
+              <StatCard label={t("Pending")} value={counts.pending} tone="warning" />
+              <StatCard label={t("Failed / none")} value={counts.failed + counts.none} tone="error" />
             </StatGrid>
+
+            <Notice tone="info">
+              {t('Existing workspaces: ask learners to open the course in the Student view, expand it and click “Refresh” to receive the released files. Their local changes are kept.')}
+            </Notice>
 
             {outdated > 0 && (
               <Notice tone="warning">
-                {outdated} deployed content(s) have a newer example version available.
+                {t("Newer example versions available")}: {outdated}. <p>{t("Select the latest versions, then release the pending assignments. Existing learner work is kept.")}</p>
+                <Button size="sm" onClick={upgrade} disabled={upgrading || releasing !== null} loading={upgrading} loadingLabel={t("Selecting versions…")}>{t("Select latest versions")} ({outdated})</Button>
               </Notice>
             )}
 
-            <Toolbar end={releaseMsg && <span className="text-sm text-muted">{releaseMsg}</span>}>
+            <Toolbar end={releaseMsg && <span role="status" className="text-sm text-muted">{releaseMsg}</span>}>
+              <Button variant="secondary" size="sm" onClick={reload} disabled={upgrading || releasing !== null}>
+                {t('Refresh status')}
+              </Button>
               <Button
                 onClick={() => release('all')}
                 size="sm"
-                disabled={releasing !== null || counts.pending + counts.failed === 0}
+                disabled={upgrading || releasing !== null || counts.pending + counts.failed === 0}
                 loading={releasing === 'all'}
-                loadingLabel="Releasing…"
-                title="Deploy every pending/failed assignment into the template repo"
+                loadingLabel={t("Releasing…")}
+                title={t("Deploy every pending/failed assignment into the template repo")}
               >
-                Release all pending ({counts.pending + counts.failed})
+                {t('Release all pending')} ({counts.pending + counts.failed})
               </Button>
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={() => release('all-force', undefined, true)}
-                disabled={releasing !== null || counts.deployed + counts.pending + counts.failed === 0}
+                disabled={upgrading || releasing !== null || counts.deployed + counts.pending + counts.failed === 0}
                 loading={releasing === 'all-force'}
-                loadingLabel="Re-releasing…"
-                title="Re-deploy ALL assignments (including already-deployed) — fills both the template and reference repos"
-              >
-                Re-release all (force)
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setAllExpanded(false)}>
-                Collapse all
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setAllExpanded(true)}>
-                Expand all
-              </Button>
+                loadingLabel={t("Re-releasing…")}
+                title={t("Re-deploy ALL assignments (including already-deployed) — fills both the template and reference repos")}
+              >{t("Re-release all (force)")}</Button>
+              <Button variant="ghost" size="sm" onClick={() => setAllExpanded(false)}>{t("Collapse all")}</Button>
+              <Button variant="ghost" size="sm" onClick={() => setAllExpanded(true)}>{t("Expand all")}</Button>
             </Toolbar>
 
             {/* Content tree with deployment badges */}
             {active.length === 0 ? (
               <EmptyState
-                title="No course contents yet"
-                description="Units and assignments arrive by uploading a course deployment file."
+                title={t("No course contents yet")}
+                description={t("Units and assignments arrive by uploading a course deployment file.")}
               />
             ) : (
-              <TreeRows>
+              <div className="[&>div>div]:flex-wrap [&>div>div>div:nth-child(4)]:min-w-40"><TreeRows>
                 {rows.map(({ key, item, depth, label, expanded, hasChildren, toggle }) => {
                   // Nothing is synthesised for the lecturer list — the endpoint
                   // returns the units themselves — so every row has an item.
@@ -229,16 +254,14 @@ export default function LecturerContentPage() {
                           className="shrink-0"
                           title={
                             hiddenHere
-                              ? 'Students do not see this or anything under it.'
-                              : 'Hidden because a unit above this one, or the course, is hidden.'
+                              ? t("Students do not see this or anything under it.")
+                              : t("Hidden because a unit above this one, or the course, is hidden.")
                           }
-                        >
-                          Invisible
-                        </Badge>
+                        >{t("Invisible")}</Badge>
                       )}
                       {type && (
                         <Badge tone="muted" className="shrink-0">
-                          {type.slug}
+                          {type.title || type.slug}
                         </Badge>
                       )}
                       {c.is_submittable && (c.max_test_runs != null || c.max_submissions != null) && (
@@ -246,17 +269,15 @@ export default function LecturerContentPage() {
                           tone="info"
                           className="shrink-0"
                           title={
-                            `Test runs: ${formatLimit(c.max_test_runs)} · ` +
-                            `Submissions: ${formatLimit(c.max_submissions)}`
+                            `${t('Test runs')}: ${formatLimit(c.max_test_runs)} · ` +
+                            `${t('Submissions')}: ${formatLimit(c.max_submissions)}`
                           }
                         >
                           {formatLimit(c.max_test_runs)}T / {formatLimit(c.max_submissions)}S
                         </Badge>
                       )}
                       {c.deployment?.has_newer_version && (
-                        <Badge tone="warning" className="shrink-0" title="A newer example version is available">
-                          update available
-                        </Badge>
+                        <Badge tone="warning" className="shrink-0" title={t("A newer example version is available")}>{t("update available")}</Badge>
                       )}
                       {/* Only offered where the lecturer can actually change
                           the outcome. A row hidden by an ancestor stays hidden
@@ -272,11 +293,11 @@ export default function LecturerContentPage() {
                           onClick={() => toggleVisibility(c)}
                           title={
                             hiddenHere
-                              ? 'Show this to students again'
-                              : 'Hide this from students, along with everything under it'
+                              ? t("Show this to students again")
+                              : t("Hide this from students, along with everything under it")
                           }
                         >
-                          {hiddenHere ? 'Show' : 'Hide'}
+                          {hiddenHere ? t("Show") : t("Hide")}
                         </Button>
                       )}
                       {canReleaseOne && (
@@ -285,12 +306,10 @@ export default function LecturerContentPage() {
                           size="xs"
                           className="shrink-0"
                           onClick={() => release(c.id, [c.id])}
-                          disabled={releasing !== null}
+                          disabled={upgrading || releasing !== null}
                           loading={releasing === c.id}
                           loadingLabel="…"
-                        >
-                          Release
-                        </Button>
+                        >{t("Release")}</Button>
                       )}
                       {!canReleaseOne && unitKids.length > 0 && (
                         <Button
@@ -298,33 +317,31 @@ export default function LecturerContentPage() {
                           size="xs"
                           className="shrink-0"
                           onClick={() => release(c.id, unitKids.map((k) => k.id))}
-                          disabled={releasing !== null}
+                          disabled={upgrading || releasing !== null}
                           loading={releasing === c.id}
                           loadingLabel="…"
-                          title={`Release ${unitKids.length} assignment(s) in this unit`}
+                          title={`${t('Release unit')} (${unitKids.length})`}
                         >
-                          Release unit ({unitKids.length})
+                          {t('Release unit')} ({unitKids.length})
                         </Button>
                       )}
                       <Badge tone={badge.tone} className="shrink-0">
-                        {badge.label}
+                        {t(badge.label)}
                       </Badge>
                       <ButtonLink
                         href={`/courses/${courseId}/lecturer/assignments/${c.id}`}
                         variant="ghost"
                         size="xs"
                         className="shrink-0"
-                      >
-                        Open
-                      </ButtonLink>
+                      >{t("Open")}</ButtonLink>
                     </TreeRow>
                   );
                 })}
-              </TreeRows>
+              </TreeRows></div>
             )}
 
             {archivedCount > 0 && (
-              <p className="text-xs text-subtle">{archivedCount} archived content(s) hidden.</p>
+              <p className="text-xs text-subtle">{archivedCount} {t('archived contents hidden.')}</p>
             )}
           </ScrollArea>
         )}
