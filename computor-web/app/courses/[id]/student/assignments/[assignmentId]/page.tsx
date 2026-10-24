@@ -1,6 +1,8 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
+import { usePermissions } from '@/src/hooks/usePermissions';
+import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import ReactMarkdown from 'react-markdown';
 import { mathMarkdownPlugins } from '@/src/components/markdownMath';
 import { formatUsage } from '@/src/utils/limits';
@@ -129,6 +131,10 @@ export default function AssignmentDetailPage() {
   const params = useParams();
   const courseId = params.id as string;
   const assignmentId = params.assignmentId as string;
+  const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
+  const isOrdinaryLearner = !isAdmin && !isOrganizationManager &&
+    courseHasAtLeast(courseId, '_student') && !courseHasAtLeast(courseId, '_tutor');
+  const resultsOnly = useSearchParams().get('view') === 'results';
 
   const { data, loading, error } = useResource(async () => {
     const assignment = await studentsClient.studentGetCourseContentEndpointStudentsCourseContentsCourseContentIdGet(
@@ -137,7 +143,7 @@ export default function AssignmentDetailPage() {
     // The released README in the reading language; the stored title and the
     // example's meta description are only the fallback.
     const language = await contentLanguage(courseId);
-    const readme = await fetchStudentDescription(assignmentId, language).catch(() => null);
+    const readme = isOrdinaryLearner ? null : await fetchStudentDescription(assignmentId, language).catch(() => null);
     const submissionGroupId = assignment.submission_group?.id;
     // Nothing has been attempted yet — there is no group to hang runs off.
     if (!submissionGroupId) return { assignment, language, readme, results: [], artifacts: [] };
@@ -153,7 +159,7 @@ export default function AssignmentDetailPage() {
       submissionsClient.listSubmissionArtifactsSubmissionsArtifactsGet({ submissionGroupId }),
     ]);
     return { assignment, language, readme, results, artifacts };
-  }, [assignmentId, courseId]);
+  }, [assignmentId, courseId, isOrdinaryLearner]);
 
   const assignment = data?.assignment ?? null;
   const group = assignment?.submission_group ?? null;
@@ -176,6 +182,22 @@ export default function AssignmentDetailPage() {
   const description = readme
     ? (readmeHeading ? withoutLeadingHeading(readme.markdown) : readme.markdown)
     : assignment?.description || assignment?.deployment?.example_version?.description;
+  const validTarget = assignment?.id === assignmentId && assignment.course_id === courseId &&
+    ['unit', 'assignment'].includes(assignment.course_content_kind_id) &&
+    (assignment.course_content_kind_id === 'unit'
+      ? Boolean(assignment.description?.trim() || assignment.has_deployment || assignment.deployment)
+      : Boolean(assignment.has_deployment || assignment.deployment)) && assignment.visible_effective !== false;
+  if (isOrdinaryLearner && !resultsOnly) {
+    return (
+      <AuthenticatedLayout>
+        <DetailPanel breadcrumbs={crumbs} title={name} loading={loading}
+          error={error || (!loading && !validTarget ? t.notFound : null)}>
+          {validTarget && <CourseWorkspaceLaunchButtons courseId={courseId} courseContentId={assignmentId} autoLaunch />}
+        </DetailPanel>
+      </AuthenticatedLayout>
+    );
+  }
+
   const repository = group?.repository ?? null;
   const members = group?.members ?? [];
 
@@ -234,7 +256,7 @@ export default function AssignmentDetailPage() {
               <GradingPanel group={group} submitted={assignment.submitted} />
             </SectionCard>
 
-            <SectionCard title={t.description}>
+            {!isOrdinaryLearner && <SectionCard title={t.description}>
               {description ? (
                 <div className="prose markdown max-w-none">
                   <ReactMarkdown
@@ -256,9 +278,9 @@ export default function AssignmentDetailPage() {
               ) : (
                 <EmptyState compact title={t.noDescription} />
               )}
-            </SectionCard>
+            </SectionCard>}
 
-            <PublicLunaPanel key={assignmentId} assignmentId={assignmentId} language={language} />
+            {!isOrdinaryLearner && <PublicLunaPanel key={assignmentId} assignmentId={assignmentId} language={language} />}
 
             <SectionCard
               title={t.latestTestResult}
