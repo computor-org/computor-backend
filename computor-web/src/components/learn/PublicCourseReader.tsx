@@ -154,10 +154,10 @@ function OutlineLinks({
   );
 }
 
-function ReaderActions({ signedIn, t }: { signedIn: boolean; t: Copy }) {
+function ReaderActions({ signedIn, destination, t }: { signedIn: boolean; destination: string; t: Copy }) {
   const computorHref = signedIn
-    ? '/courses/catalog'
-    : `/login?next=${encodeURIComponent('/courses/catalog')}`;
+    ? destination
+    : `/login?next=${encodeURIComponent(destination)}`;
   return (
     <div className="rounded-lg border border-rule bg-surface p-4">
       <p className="text-sm font-semibold text-fg">{t.practiseTitle}</p>
@@ -226,11 +226,12 @@ export default function PublicCourseReader({
     && material.path === activeItem.path;
   const hasAuthoredContent = activeItem?.is_submittable || Boolean(material?.description?.trim())
     || Object.values(material?.markdown_variants ?? {}).some(text => Boolean(text.trim()));
-  const handoffTarget = authenticatedReader && outline && validCoursePath
+  const courseDestination = outline && validCoursePath
     && (!contentId || validItemPath)
     ? `/courses/catalog?${new URLSearchParams({ join: nativeCoursePath,
-      ...(validItemPath && hasAuthoredContent ? { contentPath: activeItem.path } : {}) })}`
+      ...(validItemPath && hasAuthoredContent && (authenticatedReader || contentId) ? { contentPath: activeItem.path } : {}) })}`
     : null;
+  const handoffTarget = authenticatedReader ? courseDestination : null;
 
   useEffect(() => {
     if (!authLoading && handoffTarget) router.replace(handoffTarget);
@@ -261,7 +262,7 @@ export default function PublicCourseReader({
     : exercises[0];
 
   return (
-    <PublicLearnShell>
+    <PublicLearnShell signInNext={courseDestination ?? undefined}>
       <div className="container mx-auto max-w-7xl px-4 py-8">
         {outlineLoading || authLoading || (!authLoading && Boolean(handoffTarget)) ? (
           <div className="py-24 text-center text-muted">{t.loadingCourse}</div>
@@ -378,7 +379,7 @@ export default function PublicCourseReader({
                   </nav>
                 )}
 
-                <ReaderActions signedIn={Boolean(user)} t={t} />
+                <ReaderActions signedIn={Boolean(user)} destination={courseDestination ?? '/courses/catalog'} t={t} />
 
                 <details className="text-sm text-muted">
                   <summary className="cursor-pointer hover:text-fg">{t.sourceTitle}</summary>

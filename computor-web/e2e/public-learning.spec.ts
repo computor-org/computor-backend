@@ -310,3 +310,25 @@ test('guest exercise reading retains Markdown and an invalid authenticated hando
     expect(new globalThis.URL(page.url()).pathname).toBe(URL);
   }
 });
+
+
+for (const contentId of [undefined, MATH]) {
+  test(`guest ${contentId ? 'exercise' : 'course root'} sign-in links preserve the authoritative course target`, async ({ page }) => {
+    const outline = JSON.parse(fs.readFileSync('public/learning/courses/python-beginner.json', 'utf8'));
+    outline.course_path = 'authoritative.unrelated_course';
+    outline.contents.find((item: { id: string }) => item.id === MATH).path = 'unit_exact.item_7';
+    outline.materials[MATH].path = 'unit_exact.item_7';
+    await page.route('**/learning/courses/python-beginner.json', route => route.fulfill({
+      contentType: 'application/json', body: JSON.stringify(outline),
+    }));
+    const readerUrl = contentId ? `/learn/${COURSE}/content/${contentId}` : `/learn/${COURSE}`;
+    await page.goto(readerUrl);
+    const destination = '/courses/catalog?join=authoritative.unrelated_course'
+      + (contentId ? '&contentPath=unit_exact.item_7' : '');
+    const login = `/login?next=${encodeURIComponent(destination)}`;
+    await expect(page.getByRole('link', { name: 'Sign in to join', exact: true })).toHaveAttribute('href', login);
+    await expect(page.getByRole('banner').getByRole('link', { name: 'Sign in', exact: true })).toHaveAttribute('href', login);
+    await expect(page.locator('article .prose')).not.toBeEmpty();
+    expect(new globalThis.URL(page.url()).pathname).toBe(readerUrl);
+  });
+}
