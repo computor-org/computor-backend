@@ -412,9 +412,10 @@ def cmd_returning() -> None:
                                                    "submit": True})},
             files={"file": ("submission.zip", archive.getvalue(), "application/zip")})
         artifact_id = upload["artifacts"][0]
-        # A real test run through the testing worker. The public mirror has no
-        # tests, so the run ends in an error; once it has, the result is set to
-        # the seeded grade through the same endpoint the worker reports with.
+        # A real test run through the testing worker, which grades (or, without
+        # private tests, errors on) the synthetic file; once it has finished,
+        # the result is set to the seeded grade through the same endpoint the
+        # worker reports with.
         run = learner.post("/tests", json={"artifact_id": artifact_id})
         result_id = run["id"]
         deadline = time.monotonic() + 300
