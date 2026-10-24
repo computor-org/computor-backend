@@ -49,10 +49,17 @@ running workspaces get it at their next start; `--vsix none` returns to the
 git build. A content ref is downloaded as
 a GitHub archive and imported into a fresh baseline (`reset`): examples through
 the examples API, courses through `deploy-course`, then released like the
-lecturer tools do. The public mirror has no instructor block in most
-`meta.yaml` files, so the import adds `studentSubmissionFiles` from the file
-names the exercise text asks for; there are no tests, so a real test run ends
-in an error.
+lecturer tools do. The public mirror has no tests, reference solutions or
+instructor block in `meta.yaml`. Like computor.at, the stack takes them from a
+private repository with one directory per example slug, such as a course's
+assignments repository: put `QA_TESTS_REPO=<git URL>` into
+`$QA_HOME/tests.env` (mode 0600, never in git) on the QA host. Every public
+example then gets `test.yaml`, the reference files and the `meta.yaml`
+properties of its newest private version that has a `test.yaml`, while the
+public exercise text stays. `rm -rf $QA_HOME/src/tests` followed by
+`qactl.sh seed content` picks up newer tests. Without `QA_TESTS_REPO` the
+import adds `studentSubmissionFiles` from the file names the exercise text asks
+for, and every test run ends in an error.
 
 ## What a fresh stack contains
 

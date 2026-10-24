@@ -23,6 +23,8 @@
 #   data/             SYSTEM_DEPLOYMENT_PATH of the stack
 #   src/backend       detached worktree of the deployed backend ref
 #   src/content       data-science-python at the deployed content ref
+#   src/tests         private tests and reference solutions per example slug
+#   tests.env         QA_TESTS_REPO, the private repository they come from (0600)
 #   vsix/             the VSIX baked into the workspace image, if any
 #   deployed.env      the refs and VSIX that are currently deployed
 set -euo pipefail
@@ -47,6 +49,8 @@ DEPLOYED_FILE="$QA_HOME/deployed.env"
 DATA="$QA_HOME/data"
 SRC="$QA_HOME/src/backend"
 CONTENT="$QA_HOME/src/content"
+TESTS="$QA_HOME/src/tests"
+TESTS_ENV="$QA_HOME/tests.env"
 
 log() { printf '[qactl] %s\n' "$*"; }
 die() { printf '[qactl] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -454,6 +458,7 @@ seed_tool() {
     local mounts=(-v "$QA_OPS_DIR/qa_seed.py:/qa/qa_seed.py:ro" -v "$PERSONAS_FILE:/qa/personas.json:ro"
                   -v "$CRED_FILE:/qa/credentials.env:ro")
     [ -d "$CONTENT" ] && mounts+=(-v "$CONTENT:/qa/content:ro")
+    [ -d "$TESTS" ] && mounts+=(-v "$TESTS:/qa/tests:ro")
     qa_compose run --rm --no-deps -T "${mounts[@]}" \
         -e PYTHONPATH=/home/worker/computor-backend/src -e QA_API_URL=http://uvicorn:8000 \
         -e QA_PUBLIC_ORIGIN -e TESTING_WORKER_TOKEN -e QA_DEPLOYED_VSIX uvicorn python /qa/qa_seed.py "$@"
@@ -506,6 +511,7 @@ cmd_seed() {
 ensure_content() {
     load_env
     [ -d "$CONTENT" ] || fetch_content "${QA_DEPLOYED_CONTENT_REF:-main}"
+    [ -d "$TESTS" ] || fetch_tests
 }
 
 fetch_content() {
@@ -517,6 +523,40 @@ fetch_content() {
     mkdir -p "$(dirname "$CONTENT")"
     mv "$tmp" "$CONTENT"
     record_deployed QA_DEPLOYED_CONTENT_REF "$ref"
+    fetch_tests
+}
+
+# The public mirror has no tests or reference solutions. QA_TESTS_REPO (from
+# the environment or the private file tests.env) is a git repository with one
+# directory per example slug, such as a course's assignments repository on
+# computor.at; every public example gets its newest version with a test.yaml.
+fetch_tests() {
+    local repo="${QA_TESTS_REPO:-}" mirror="$QA_HOME/src/tests.git" tmp dir slug rev
+    if [ -z "$repo" ] && [ -f "$TESTS_ENV" ]; then
+        repo=$(sed -n 's/^QA_TESTS_REPO=//p' "$TESTS_ENV" | tail -n 1)
+    fi
+    if [ -z "$repo" ]; then
+        log "no QA_TESTS_REPO in $TESTS_ENV: test runs of the examples will error"
+        return 0
+    fi
+    if [ -d "$mirror" ]; then
+        git -C "$mirror" fetch -q origin '+refs/heads/*:refs/heads/*'
+    else
+        git clone -q --bare "$repo" "$mirror"
+    fi
+    tmp=$(mktemp -d "$QA_HOME/.tests.XXXXXX")
+    for dir in "$CONTENT"/examples/*/*/; do
+        slug=$(basename "$dir")
+        rev=$(git -C "$mirror" rev-list -1 HEAD -- "$slug/test.yaml")
+        [ -n "$rev" ] || continue
+        # The newest commit touching it may be the one that removed it.
+        git -C "$mirror" cat-file -e "$rev:$slug/test.yaml" 2>/dev/null || rev="$rev^"
+        git -C "$mirror" archive "$rev" "$slug" | tar -x -C "$tmp"
+    done
+    rm -rf "$TESTS"
+    mv "$tmp" "$TESTS"
+    record_deployed QA_DEPLOYED_TESTS_REF "$(git -C "$mirror" rev-parse --short HEAD)"
+    log "private tests for $(find "$TESTS" -mindepth 1 -maxdepth 1 -type d | wc -l) examples"
 }
 
 cmd_down() {
@@ -617,6 +657,7 @@ cmd_status() {
 
 Backend ref:  ${QA_DEPLOYED_BACKEND_REF:-?} ($(git -C "$SRC" rev-parse --short HEAD 2>/dev/null || echo none))
 Content ref:  ${QA_DEPLOYED_CONTENT_REF:-?}
+Tests ref:    ${QA_DEPLOYED_TESTS_REF:-none (test runs error)}
 VSIX:         ${QA_DEPLOYED_VSIX:-built from computor-vscode main by the template}
 Web:          $QA_PUBLIC_ORIGIN/
 Keycloak:     $QA_PUBLIC_ORIGIN/auth/  (admin console realm master: $KEYCLOAK_ADMIN)

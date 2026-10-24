@@ -117,3 +117,41 @@ def test_realm_has_email_first_signup_and_mailpit():
     assert "http://localhost:18480/api/auth/keycloak/callback" in backend["redirectUris"]
     (user,) = realm["users"]
     assert user["emailVerified"] is True and user["requiredActions"] == []
+
+
+def _qa_seed(tmp_path, monkeypatch):
+    personas = tmp_path / "personas.json"
+    personas.write_text("[]")
+    monkeypatch.setenv("QA_PERSONAS_FILE", str(personas))
+    spec = importlib.util.spec_from_file_location("qa_seed", QA / "qa_seed.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _write(root, files):
+    for rel, text in files.items():
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(text)
+
+
+def test_private_tests_complete_a_public_example(tmp_path, monkeypatch):
+    """A public example without test.yaml must be uploaded with the private
+    tests, or every learner's Test run errors (integration round 1, N18)."""
+    seed = _qa_seed(tmp_path, monkeypatch)
+    public, private = tmp_path / "public", tmp_path / "private"
+    _write(public, {"meta.yaml": "slug: x.mathc\n", "content/index_de.md": "Neu\n"})
+    _write(private, {
+        "meta.yaml": "slug: x.mathc\nproperties:\n  studentSubmissionFiles: [mathc.py]\n",
+        "content/index_de.md": "Alt\n", "test.yaml": "type: python\n",
+        "mathc.py": "p = 3.14\n", "localTests/t.py": "pass\n",
+    })
+    files = seed.example_files(public)
+    meta = yaml.safe_load(files["meta.yaml"])
+
+    assert seed.with_private_tests(files, meta, private)
+    assert files["test.yaml"] == "type: python\n"
+    assert files["mathc.py"] == "p = 3.14\n" and "localTests/t.py" in files
+    assert files["content/index_de.md"] == "Neu\n"
+    assert meta["properties"]["studentSubmissionFiles"] == ["mathc.py"]
+    assert not seed.with_private_tests(files, meta, tmp_path / "missing")

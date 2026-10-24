@@ -8,7 +8,8 @@ HTTP API for everything a person or the testing worker would do:
   baseline   persona users linked to their Keycloak ids, the admin role and an
              admin API token (printed as QA_ADMIN_API_TOKEN=... for qactl)
   content    data-science-python from /qa/content: every example uploaded to
-             the example repository, the three course YAMLs deployed under one
+             the example repository, with its tests and reference solution
+             from the private copy in /qa/tests where there is one, the three course YAMLs deployed under one
              course family, published in the catalog, assignments and student
              template released through the same endpoints the lecturer tools use
   templates  the vscode workspace image built and its Coder template pushed,
@@ -38,9 +39,10 @@ import httpx
 import yaml
 
 API = os.environ.get("QA_API_URL", "http://uvicorn:8000").rstrip("/")
-PERSONAS = json.loads(Path("/qa/personas.json").read_text())
+PERSONAS = json.loads(Path(os.environ.get("QA_PERSONAS_FILE", "/qa/personas.json")).read_text())
 CREDENTIALS = Path("/qa/credentials.env")
 CONTENT = Path("/qa/content")
+TESTS = Path("/qa/tests")
 
 ORG_PATH = "itpcp"
 ORG_TITLE = "ITPcp, TU Graz"
@@ -203,8 +205,8 @@ def submission_properties(directory: Path, meta: dict) -> dict | None:
     The public data-science-python mirror drops the instructor block of most
     meta.yaml files (submission file names, tests), and the student template
     refuses an example without it. The file names are the ``*.py`` names the
-    German exercise text asks for, else ``<slug tail>.py``. Grading needs the
-    private tests, so a QA test run of such an example reports an error.
+    German exercise text asks for, else ``<slug tail>.py``. Without the private
+    tests (``with_private_tests``) a QA test run of such an example errors.
     """
     props = dict(meta.get("properties") or {})
     if props.get("studentSubmissionFiles"):
@@ -231,6 +233,26 @@ def example_files(directory: Path) -> dict[str, str]:
     return files
 
 
+def with_private_tests(files: dict[str, str], meta: dict, private: Path) -> bool:
+    """Add an example's tests from its private copy, as computor.at has them.
+
+    The public mirror is the instructor example without ``test.yaml``, the
+    reference solution and the ``meta.yaml`` properties that name them. The
+    private copy (the course's assignments repository, which computor's own
+    assignments-repository task writes from the example library) has all of
+    them. The public exercise text stays, so content fixes still show.
+    """
+    if not (private / "test.yaml").is_file():
+        return False
+    for rel, data in example_files(private).items():
+        if rel != "meta.yaml" and not rel.startswith("content/"):
+            files[rel] = data
+    private_meta = yaml.safe_load((private / "meta.yaml").read_text(encoding="utf-8")) or {}
+    if private_meta.get("properties"):
+        meta["properties"] = private_meta["properties"]
+    return True
+
+
 def cmd_content() -> None:
     if not (CONTENT / "courses").is_dir():
         raise SystemExit("no data-science-python checkout at /qa/content")
@@ -241,14 +263,17 @@ def cmd_content() -> None:
     if repo is None:
         raise SystemExit("no example repository; is data/deployments/example-repository.yaml staged?")
 
-    uploaded = synthesized = 0
+    if not TESTS.is_dir():
+        log("no private tests in /qa/tests: test runs of the examples will error")
+    uploaded = tested = synthesized = 0
     for directory in sorted((CONTENT / "examples").glob("*/*")):
         if not (directory / "meta.yaml").is_file():
             continue
         files = example_files(directory)
         meta = yaml.safe_load(files["meta.yaml"])
-        props = submission_properties(directory, meta)
-        if props is not None:
+        if with_private_tests(files, meta, TESTS / directory.name):
+            tested += 1
+        elif (props := submission_properties(directory, meta)) is not None:
             meta["properties"] = props
             synthesized += 1
         # Re-running the step replaces the stored version instead of failing.
@@ -259,7 +284,7 @@ def cmd_content() -> None:
                                            "files": files})
         uploaded += 1
     log(f"uploaded {uploaded} examples to repository {repo['name']} "
-        f"({synthesized} with synthesized submission properties)")
+        f"({tested} with private tests, {synthesized} with synthesized submission properties)")
 
     org = find_one(api.get("/organizations", params={"path": ORG_PATH}), path=ORG_PATH)
     if org is None:
