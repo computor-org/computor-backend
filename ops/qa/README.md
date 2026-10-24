@@ -58,8 +58,9 @@ not acknowledged that digest, only QA Keycloak restarts to clear its theme
 metadata cache. Newly created containers already load the current theme and
 need no extra restart. The digest is recorded atomically only after Keycloak
 is healthy. An existing stack without a digest refreshes once rather than
-marking potentially stale cached metadata as current. This retains Keycloak's
-database, users and sessions along with the rest of the QA state.
+marking potentially stale cached metadata as current. This preserves Keycloak's
+database, users and persistent QA state. Ordinary session expiry still applies;
+uninterrupted active sessions are not guaranteed.
 
 The content and examples refs shown by `status` identify the baseline imports.
 They do not track later lecturer edits or uploads. Record the actual course
