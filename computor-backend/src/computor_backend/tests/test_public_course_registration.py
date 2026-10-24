@@ -23,6 +23,9 @@ from sqlalchemy_utils import Ltree
 from computor_backend.business_logic import course_registration
 from computor_backend.business_logic.course_registration import (
     SELF_REGISTRATION_GROUP_TITLE,
+    assign_self_enrolled_to_group,
+    get_self_enrollment,
+    leave_self_enrolled_course,
     list_public_courses,
     register_in_public_course,
     resolve_registration_group,
@@ -33,7 +36,13 @@ from computor_backend.exceptions import (
     NotFoundException,
 )
 from computor_backend.model.auth import User
-from computor_backend.model.course import Course, CourseFamily, CourseGroup, CourseMember
+from computor_backend.model.course import (
+    Course,
+    CourseFamily,
+    CourseGroup,
+    CourseMember,
+    CourseRole,
+)
 from computor_backend.model.organization import Organization
 from computor_backend.permissions.principal import Principal
 from computor_types.courses import CoursePublicList, CoursePublicQuery
@@ -93,6 +102,12 @@ def _no_post_create(monkeypatch):
 def world(db):
     """An organization + family, and a factory for courses and users in it."""
     suffix = uuid.uuid4().hex[:10]
+
+    # A schema made by create_all (the CI contract job) has no seeded roles.
+    for role in ("_student", "_tutor", "_lecturer", "_inactive"):
+        if db.get(CourseRole, role) is None:
+            db.add(CourseRole(id=role, title=role.strip("_").title(), builtin=True))
+    db.flush()
 
     org = Organization(
         title="Public Registration Org",
@@ -250,64 +265,40 @@ def test_catalog_filters_and_paginates(world, db):
 # Group resolution
 # ---------------------------------------------------------------------------
 
-def test_registration_uses_the_oldest_group_not_the_alphabetical_first(world, db):
-    """The bug in PR #210.
-
-    Ordering groups by title drops self-registered strangers into whatever
-    real teaching group happens to sort first.
-
-    created_at is set explicitly rather than relying on insertion order:
-    Postgres now() is fixed for the whole transaction, so two groups added in
-    one transaction share a server-default timestamp to the microsecond and
-    the ordering falls through to the random uuid tie-break.
-    """
-    from datetime import datetime, timedelta, timezone
-
+def test_registration_uses_the_self_enrolment_group_not_a_teaching_group(world, db):
+    """Self-enrolled strangers never land in one of the course's real groups,
+    neither the oldest one nor the alphabetically first (PR #210)."""
     course = world["course"](public=True)
     caller = world["user"]("joiner")
-
-    base = datetime.now(timezone.utc)
-    older = CourseGroup(
-        title="Zeta cohort", course_id=course.id, created_at=base - timedelta(days=2)
-    )
-    db.add(older)
-    newer = CourseGroup(
-        title="Alpha cohort", course_id=course.id, created_at=base - timedelta(days=1)
-    )
-    db.add(newer)
-    db.flush()
-
-    group = resolve_registration_group(course, _principal(caller), db)
-
-    assert group.id == older.id, "must be the oldest group, not the alphabetical first"
-
-
-def test_group_choice_is_stable_when_timestamps_tie(world, db):
-    """Groups created in one batch share a created_at (transaction-scoped
-    now()), so the winner is arbitrary — but it must be the SAME one every
-    time, or self-registered students would scatter across the batch."""
-    course = world["course"](public=True)
-    caller = world["user"]("joiner")
-
-    for title in ("Group A", "Group B", "Group C"):
+    for title in ("Zeta cohort", "Alpha cohort"):
         db.add(CourseGroup(title=title, course_id=course.id))
     db.flush()
 
-    picks = {
-        str(resolve_registration_group(course, _principal(caller), db).id)
-        for _ in range(5)
-    }
-    assert len(picks) == 1
+    group = resolve_registration_group(course, _principal(caller), db)
+
+    assert group.title == SELF_REGISTRATION_GROUP_TITLE == "Selbsteinschreibung"
+    assert str(group.course_id) == str(course.id)
 
 
-def test_registration_creates_a_default_group_when_the_course_has_none(world, db):
+def test_self_enrolment_group_is_created_once(world, db):
     course = world["course"](public=True)
     caller = world["user"]("joiner")
 
-    group = resolve_registration_group(course, _principal(caller), db)
+    picks = {
+        str(resolve_registration_group(course, _principal(caller), db).id)
+        for _ in range(3)
+    }
 
-    assert group.title == SELF_REGISTRATION_GROUP_TITLE
-    assert str(group.course_id) == str(course.id)
+    assert len(picks) == 1
+    assert (
+        db.query(CourseGroup)
+        .filter(
+            CourseGroup.course_id == course.id,
+            CourseGroup.title == SELF_REGISTRATION_GROUP_TITLE,
+        )
+        .count()
+        == 1
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -527,6 +518,196 @@ async def test_catalog_reports_seats_left_and_full(world, db):
     assert rows[str(full.id)].full is True
 
 
+# ---------------------------------------------------------------------------
+# Leaving and rejoining (issues#458)
+# ---------------------------------------------------------------------------
+
+def _member(db, course: Course, user: User) -> CourseMember:
+    return (
+        db.query(CourseMember)
+        .filter(CourseMember.course_id == course.id, CourseMember.user_id == user.id)
+        .one()
+    )
+
+
+@pytest.mark.asyncio
+async def test_leaving_keeps_the_membership_but_ends_access(world, db):
+    from computor_backend.permissions.core import db_get_course_claims
+
+    course = world["course"](public=True)
+    learner = world["user"]("leaver")
+    member, _ = await register_in_public_course(course.id, _principal(learner), db)
+    member_id = str(member.id)
+    assert any(str(course.id) in value for _, value in db_get_course_claims(str(learner.id), db))
+
+    leave_self_enrolled_course(course.id, _principal(learner), db)
+
+    left = _member(db, course, learner)
+    assert str(left.id) == member_id, "the row submissions and results hang on stays"
+    assert left.course_role_id == "_inactive"
+    assert left.properties["self_registered"] is True
+    assert "left_at" in left.properties
+    assert not any(str(course.id) in value for _, value in db_get_course_claims(str(learner.id), db))
+    items, _ = list_public_courses(CoursePublicQuery(), _principal(learner), db)
+    assert {i.id: i for i in items}[str(course.id)].enrolled is False
+    with pytest.raises(NotFoundException):
+        get_self_enrollment(course.id, _principal(learner), db)
+
+
+@pytest.mark.asyncio
+async def test_rejoining_restores_the_same_membership(world, db, _no_post_create):
+    course = world["course"](public=True)
+    learner = world["user"]("returner")
+    first, _ = await register_in_public_course(course.id, _principal(learner), db)
+    leave_self_enrolled_course(course.id, _principal(learner), db)
+
+    again, created = await register_in_public_course(course.id, _principal(learner), db)
+
+    assert created is True
+    assert str(again.id) == str(first.id)
+    assert again.course_role_id == "_student"
+    assert again.properties == {"self_registered": True}
+    assert db.get(CourseGroup, again.course_group_id).title == SELF_REGISTRATION_GROUP_TITLE
+    assert len(_no_post_create) == 2, "content released meanwhile gets its submission groups"
+
+
+@pytest.mark.asyncio
+async def test_only_a_self_enrolled_student_can_leave(world, db):
+    course = world["course"](public=True)
+    staff_enrolled = _add_student(world, db, course, "imported")
+    importee = db.get(User, staff_enrolled.user_id)
+    lecturer = world["user"]("lecturer")
+    db.add(CourseMember(user_id=lecturer.id, course_id=course.id, course_role_id="_lecturer",
+                        properties={"self_registered": True}))
+    db.flush()
+    stranger = world["user"]("stranger")
+
+    with pytest.raises(ForbiddenException):
+        leave_self_enrolled_course(course.id, _principal(importee), db)
+    with pytest.raises(ForbiddenException):
+        leave_self_enrolled_course(course.id, _principal(lecturer), db)
+    with pytest.raises(NotFoundException):
+        leave_self_enrolled_course(course.id, _principal(stranger), db)
+    assert _member(db, course, importee).course_role_id == "_student"
+    assert _member(db, course, lecturer).course_role_id == "_lecturer"
+
+
+@pytest.mark.asyncio
+async def test_self_enrollment_status(world, db):
+    course = world["course"](public=True)
+    learner = world["user"]("learner")
+    await register_in_public_course(course.id, _principal(learner), db)
+    imported = db.get(User, _add_student(world, db, course, "imported").user_id)
+
+    own = get_self_enrollment(course.id, _principal(learner), db)
+    other = get_self_enrollment(course.id, _principal(imported), db)
+
+    assert (own.self_registered, own.can_leave) == (True, True)
+    assert (other.self_registered, other.can_leave) == (False, False)
+
+
+@pytest.mark.asyncio
+async def test_a_learner_who_left_frees_the_seat_and_rejoins_only_if_one_is_free(world, db):
+    course = world["course"](public=True, max_self_registrations=1)
+    first = world["user"]("first")
+    second = world["user"]("second")
+    await register_in_public_course(course.id, _principal(first), db)
+    leave_self_enrolled_course(course.id, _principal(first), db)
+
+    await register_in_public_course(course.id, _principal(second), db)
+
+    with pytest.raises(ConflictException):
+        await register_in_public_course(course.id, _principal(first), db)
+    assert _member(db, course, first).course_role_id == "_inactive"
+
+
+@pytest.mark.asyncio
+async def test_websocket_does_not_treat_a_left_learner_as_staff(world, db):
+    from computor_backend.websocket.connection_manager import ConnectionManager
+
+    course = world["course"](public=True)
+    learner = world["user"]("leaver")
+    peer = _add_student(world, db, course, "peer")
+    await register_in_public_course(course.id, _principal(learner), db)
+    leave_self_enrolled_course(course.id, _principal(learner), db)
+    group = db.get(CourseGroup, peer.course_group_id)
+
+    manager = ConnectionManager()
+    checks = [
+        manager._can_access_course(_principal(learner), str(course.id), db),
+        manager._can_access_course_group(_principal(learner), str(group.id), db),
+        manager._can_access_course_member(_principal(learner), str(peer.id), db),
+    ]
+    for check in checks:
+        allowed, _ = await check
+        assert allowed is False
+
+
+@pytest.mark.asyncio
+async def test_a_left_learner_keeps_own_messages_but_not_course_wide_ones(world, db):
+    from computor_backend.model.message import Message
+    from computor_backend.permissions.handlers_course import MessagePermissionHandler
+
+    course = world["course"](public=True)
+    learner = world["user"]("leaver")
+    lecturer = world["user"]("lecturer")
+    member, _ = await register_in_public_course(course.id, _principal(learner), db)
+    to_course = Message(author_id=lecturer.id, level=0, content="Hallo alle", course_id=course.id)
+    to_group = Message(author_id=lecturer.id, level=0, content="Hallo Gruppe", course_group_id=member.course_group_id)
+    to_learner = Message(author_id=lecturer.id, level=0, content="Hallo du", course_member_id=member.id)
+    db.add_all([to_course, to_group, to_learner])
+    db.flush()
+
+    def visible() -> set[str]:
+        query = MessagePermissionHandler(Message).build_query(_principal(learner), "list", db)
+        ids = {str(m.id) for m in query.filter(Message.id.in_([to_course.id, to_group.id, to_learner.id]))}
+        return {m.content for m in (to_course, to_group, to_learner) if str(m.id) in ids}
+
+    assert visible() == {"Hallo alle", "Hallo Gruppe", "Hallo du"}
+    leave_self_enrolled_course(course.id, _principal(learner), db)
+    assert visible() == {"Hallo du"}
+
+
+# ---------------------------------------------------------------------------
+# Backfill of the Selbsteinschreibung group (issues#458)
+# ---------------------------------------------------------------------------
+
+def test_backfill_moves_earlier_self_enrolled_learners_once(world, db):
+    course = world["course"](public=True)
+    old_group = CourseGroup(title="default", course_id=course.id)
+    db.add(old_group)
+    db.flush()
+
+    def member(name, role, properties):
+        user = world["user"](name)
+        row = CourseMember(user_id=user.id, course_id=course.id, course_group_id=old_group.id,
+                           course_role_id=role, properties=properties)
+        db.add(row)
+        db.flush()
+        return row
+
+    joined = member("joined", "_student", {"self_registered": True})
+    left = member("left", "_inactive", {"self_registered": True, "left_at": "2026-10-01T00:00:00+00:00"})
+    imported = member("imported", "_student", None)
+
+    planned = assign_self_enrolled_to_group(db, apply=False)
+    mine = {m["course_member_id"] for m in planned if m["course_id"] == str(course.id)}
+    assert mine == {str(joined.id), str(left.id)}
+    assert db.query(CourseGroup).filter(
+        CourseGroup.course_id == course.id, CourseGroup.title == SELF_REGISTRATION_GROUP_TITLE
+    ).count() == 0, "a dry run writes nothing"
+
+    assign_self_enrolled_to_group(db, apply=True)
+
+    for row in (joined, left):
+        db.refresh(row)
+        assert db.get(CourseGroup, row.course_group_id).title == SELF_REGISTRATION_GROUP_TITLE
+    db.refresh(imported)
+    assert str(imported.course_group_id) == str(old_group.id)
+    again = assign_self_enrolled_to_group(db, apply=False)
+    assert not [m for m in again if m["course_id"] == str(course.id)]
+
+
 @pytest.fixture
 def race(monkeypatch):
     """Committed rows and real connections for lock tests (not the rollback fixture).
@@ -551,6 +732,9 @@ def race(monkeypatch):
     suffix = uuid.uuid4().hex[:10]
 
     setup = Session()
+    if setup.get(CourseRole, "_student") is None:  # create_all schema, no seed
+        setup.add(CourseRole(id="_student", title="Student", builtin=True))
+        setup.flush()
     org = Organization(
         title="Race Org",
         organization_type="organization",

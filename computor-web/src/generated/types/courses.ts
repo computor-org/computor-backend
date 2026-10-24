@@ -1416,6 +1416,19 @@ export interface CoursePublicList {
 }
 
 /**
+ * The caller's own enrolment in one course (issues#458).
+ *
+ * ``self_registered`` is true when the caller joined through the public
+ * catalog, which is when the course page shows the self-enrolment help.
+ * ``can_leave`` is true when the caller may end that enrolment themselves.
+ */
+export interface CourseSelfEnrollment {
+  course_id: string;
+  self_registered?: boolean;
+  can_leave?: boolean;
+}
+
+/**
  * One row of the anonymous course catalog (GET /public/courses, issue #415).
  * 
  * Narrower than ``CoursePublicList``: this is read by visitors who are not

@@ -3,7 +3,7 @@
  * Endpoint: /user
  */
 
-import type { CourseGitDescriptor, CourseMemberGet, CourseMemberProviderAccountUpdate, CourseMemberReadinessStatus, CourseMemberRepositoryGet, CourseMemberRepositoryRegister, CourseMemberValidationRequest, PersonalCloneCredentialGet, ReferralInviteList, StudentRepositoryProvisioned, TemplateAccessGet, UserGet, UserScopes } from 'types/generated';
+import type { CourseGitDescriptor, CourseMemberGet, CourseMemberProviderAccountUpdate, CourseMemberReadinessStatus, CourseMemberRepositoryGet, CourseMemberRepositoryRegister, CourseMemberValidationRequest, CourseSelfEnrollment, PersonalCloneCredentialGet, ReferralInviteList, StudentRepositoryProvisioned, TemplateAccessGet, UserGet, UserScopes } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -83,6 +83,21 @@ export class UserClient extends BaseEndpointClient {
   }
 
   /**
+   * Leave a course you joined yourself
+   * End your own self-enrolment (issues#458).
+   * The counterpart of ``POST /user/courses/{course_id}/enroll``, and only for
+   * memberships created there: 403 for an enrolment by staff, 404 when the
+   * caller is not an active member. Submissions and results stay; enrolling
+   * again restores the membership.
+   */
+  async leaveCourseUserCoursesCourseIdLeavePost({ courseId, userId }: { courseId: string | string; userId?: string | null }): Promise<void> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.post<void>(this.buildPath('courses', courseId, 'leave'), { params: queryParams });
+  }
+
+  /**
    * Provision Student Repository Endpoint
    * Babysat Forgejo provisioning for the current student.
    * Forks the course's student-template into the student's own repository and
@@ -159,6 +174,18 @@ export class UserClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.get<CourseMemberRepositoryGet | null>(this.buildPath('courses', courseId, 'repository'), { params: queryParams });
+  }
+
+  /**
+   * Whether you joined this course yourself and may leave it
+   * The caller's own enrolment in a course (issues#458).
+   * 404 when the caller is not an active member of the course.
+   */
+  async getOwnSelfEnrollmentUserCoursesCourseIdSelfEnrollmentGet({ courseId, userId }: { courseId: string | string; userId?: string | null }): Promise<CourseSelfEnrollment> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.get<CourseSelfEnrollment>(this.buildPath('courses', courseId, 'self-enrollment'), { params: queryParams });
   }
 
   /**

@@ -58,6 +58,14 @@ class SupportSettings(BaseSettings):
     smtp_password: str = ""
     # Verify the mail host's certificate (off only in throwaway test stacks).
     mail_tls_verify: bool = True
+    # Welcome mail after a completed registration (issues#185). Needs the mail
+    # bridge (``mail_enabled``) on the support worker. The API only queues the
+    # mail when this flag is on as well, so a deployment without the support
+    # worker never accumulates queued workflows.
+    welcome_mail_enabled: bool = False
+    welcome_from: str = "contact@computor.at"
+    # Public address of the web UI, linked in the welcome mail.
+    site_url: str = "https://computor.at"
     # Largest attachment stored in the database; bigger ones stay in Dovecot.
     max_attachment_bytes: int = 15 * 1024 * 1024
     # Largest message fetched at all (bigger: headers only + note).

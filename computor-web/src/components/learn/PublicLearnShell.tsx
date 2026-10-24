@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
+import LanguageSwitch from '@/src/components/LanguageSwitch';
 import LegalLinks from '@/src/components/LegalLinks';
 import NetideeNotice from '@/src/components/NetideeNotice';
 import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
@@ -41,9 +42,14 @@ export default function PublicLearnShell({
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-3 min-w-0">
             <Image src="/computor_logo.png" alt="" width={36} height={36} className="h-9 w-9 shrink-0" />
-            <span className="font-bold text-xl truncate">Computor Learn</span>
+            {/* Phones get "Computor" only, and only the logo once the signed-in
+                links need the room. */}
+            <span className={`font-bold text-xl truncate ${user ? 'sr-only sm:not-sr-only' : ''}`}>
+              Computor<span className="hidden sm:inline"> Learn</span>
+            </span>
           </Link>
           <div className="flex items-center gap-3 text-sm">
+            <LanguageSwitch />
             <Link href="/learn" className="text-accent-text hover:underline">{t.courses}</Link>
             {user ? (
               <>
@@ -66,13 +72,13 @@ export default function PublicLearnShell({
       <footer className="border-t border-rule bg-surface">
         <div className="container mx-auto px-4 py-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted">
           <span>&copy; 2026 Computor</span>
-          <LegalLinks className="text-sm" />
+          <LegalLinks className="text-sm" language={language} />
           {user && (
             <Link href="/problem" className="hover:text-accent-text hover:underline underline-offset-2">
               {t.report}
             </Link>
           )}
-          <NetideeNotice />
+          <NetideeNotice language={language} />
         </div>
       </footer>
     </div>

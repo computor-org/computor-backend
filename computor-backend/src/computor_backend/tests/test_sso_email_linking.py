@@ -379,3 +379,69 @@ async def test_a_pre_fix_reservation_stays_flagged_after_a_verified_login_elsewh
     after = audit(db)
     assert after["unverified_total"] - before["unverified_total"] == 1
     assert after["unverified_verified_other_email"] - before["unverified_verified_other_email"] == 1
+
+
+@pytest.fixture
+def welcome_queue(monkeypatch):
+    """Record the tasks the login queues, with the welcome mail switched on."""
+    from computor_backend import tasks as tasks_pkg
+    from computor_backend.support import config as support_config
+
+    submitted = []
+
+    class _Executor:
+        async def submit_task(self, submission):
+            submitted.append(submission)
+
+    monkeypatch.setattr(tasks_pkg, "get_task_executor", lambda: _Executor())
+    monkeypatch.setattr(
+        support_config, "get_support_settings",
+        lambda: support_config.SupportSettings(welcome_mail_enabled=True),
+    )
+    return submitted
+
+
+@pytest.mark.asyncio
+async def test_completed_registration_queues_one_welcome_mail(db, login_as, welcome_queue):
+    sub = f"kc-{uuid.uuid4().hex}"
+    first = await login_as(db, email=_email(), email_verified=True, sub=sub)
+
+    assert [(t.task_name, t.queue, t.workflow_id, t.parameters) for t in welcome_queue] == [
+        ("support_welcome_mail", "support", f"support-welcome-{first['user_id']}",
+         {"user_id": first["user_id"]}),
+    ]
+
+    await login_as(db, email=_email(), email_verified=True, sub=sub)
+    assert len(welcome_queue) == 1
+
+
+@pytest.mark.asyncio
+async def test_refused_unverified_registration_sends_no_welcome_mail(db, login_as, welcome_queue):
+    with pytest.raises(ForbiddenException):
+        await login_as(db, email=_email(), email_verified=False)
+
+    assert welcome_queue == []
+
+
+@pytest.mark.asyncio
+async def test_welcome_mail_is_off_unless_enabled(db, login_as, welcome_queue, monkeypatch):
+    from computor_backend.support import config as support_config
+
+    monkeypatch.setattr(support_config, "get_support_settings", lambda: support_config.SupportSettings())
+    await login_as(db, email=_email(), email_verified=True)
+
+    assert welcome_queue == []
+
+
+@pytest.mark.asyncio
+async def test_an_unreachable_queue_does_not_fail_the_login(db, login_as, welcome_queue, monkeypatch):
+    from computor_backend import tasks as tasks_pkg
+
+    class _Down:
+        async def submit_task(self, submission):
+            raise ConnectionError("temporal is down")
+
+    monkeypatch.setattr(tasks_pkg, "get_task_executor", lambda: _Down())
+    result = await login_as(db, email=_email(), email_verified=True)
+
+    assert result["is_new_user"] is True

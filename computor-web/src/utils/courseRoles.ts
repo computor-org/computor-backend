@@ -30,6 +30,8 @@ export const COURSE_ROLE_LABEL: Record<string, string> = {
   _lecturer: 'Lecturer',
   _maintainer: 'Maintainer',
   _owner: 'Owner',
+  // A self-enrolled learner who left the course; grants nothing (issues#458).
+  _inactive: 'Inactive',
 };
 
 const GERMAN_ROLE_LABEL: Record<string, string> = {
@@ -38,6 +40,7 @@ const GERMAN_ROLE_LABEL: Record<string, string> = {
   Lecturer: 'Lehrende',
   Maintainer: 'Maintainer',
   Owner: 'Eigentümer',
+  Inactive: 'Ausgetreten',
 };
 
 /** An English role label ('Student', 'Lecturer', …) in the interface language. */

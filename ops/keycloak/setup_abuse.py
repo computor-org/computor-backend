@@ -12,6 +12,11 @@ from setup_identity_providers import _request, get_admin_token
 REGISTRATION = 'computor-registration-protected'
 RESET = 'computor-reset-protected'
 PROTECTED_ATTRIBUTES = ('computor.selfRegistered', 'computor.selfRegisteredAt', 'computor.lastLogin')
+# Lifetime of the address-verification link in seconds. Keycloak's default for
+# user-generated action tokens is 5 minutes, which a new learner who opens the
+# mail later cannot meet (issues#478); a day leaves room for a delayed mail.
+VERIFY_EMAIL_LIFESPAN = 86400
+VERIFY_EMAIL_LIFESPAN_ATTRIBUTE = 'actionTokenGeneratedByUserLifespan.verify-email'
 
 
 def canonical_gmail(address):
@@ -140,10 +145,13 @@ def configure(base, realm, token, secret, apply=True, backup=None, cost=10000, t
     if 'computor-registration-activity' not in listeners:
         listeners.append('computor-registration-activity')
     kc.request('PUT', '', {'registrationFlow': REGISTRATION, 'resetCredentialsFlow': RESET,
-                          'eventsListeners': listeners})
+                          'eventsListeners': listeners,
+                          'attributes': {VERIFY_EMAIL_LIFESPAN_ATTRIBUTE: str(VERIFY_EMAIL_LIFESPAN)}})
     stored = kc.request('GET', '')
     if stored.get('registrationFlow') != REGISTRATION or stored.get('resetCredentialsFlow') != RESET:
         raise RuntimeError('Protected flow bindings did not persist')
+    if (stored.get('attributes') or {}).get(VERIFY_EMAIL_LIFESPAN_ATTRIBUTE) != str(VERIFY_EMAIL_LIFESPAN):
+        raise RuntimeError('Verification link lifespan did not persist')
     return result
 
 
