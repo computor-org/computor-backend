@@ -428,6 +428,7 @@ class GitLabBuilder:
             # Create course in database
             course_data = CourseCreate(
                 title=course_config.name,
+                position=course_config.position,
                 description=course_config.description or "",
                 path=course_config.path,
                 course_family_id=str(course_family.id),
@@ -436,6 +437,7 @@ class GitLabBuilder:
             
             new_course = Course(
                 title=course_data.title,
+                position=course_data.position,
                 description=course_data.description,
                 path=Ltree(course_data.path),  # Convert to Ltree
                 course_family_id=course_family.id,

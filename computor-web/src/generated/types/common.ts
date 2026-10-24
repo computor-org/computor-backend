@@ -3801,6 +3801,8 @@ export interface CourseGitConfig {
  * Course configuration.
  */
 export interface CourseConfig {
+  /** Course order; unordered courses follow by title */
+  position?: number | null;
   /** Course display name */
   name: string;
   /** Course path/slug */
@@ -3827,6 +3829,8 @@ export interface CourseConfig {
  * Course configuration for hierarchical deployment.
  */
 export interface HierarchicalCourseConfig {
+  /** Course order; unordered courses follow by title */
+  position?: number | null;
   /** Course display name */
   name: string;
   /** Course path/slug */

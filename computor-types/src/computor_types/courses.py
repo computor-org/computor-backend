@@ -25,6 +25,7 @@ class CoursePropertiesGet(BaseModel):
     )
     
 class CourseCreate(BaseModel):
+    position: Optional[float] = Field(default=None, allow_inf_nan=False)
     id: Optional[str] = None
     title: Optional[str] = None
     description: Optional[str] = None
@@ -53,6 +54,14 @@ class CourseCreate(BaseModel):
     # Address student messages that mention nobody to the tutor agent (Lena)
     # with a visible @mention. NOT NULL DEFAULT false, like ``public``.
     tutor_agent_auto_route: Optional[bool] = None
+
+    @field_validator('position', mode='before')
+    @classmethod
+    def reject_boolean_position(cls, value):
+        if isinstance(value, bool):
+            raise ValueError('Course position must be a number, not a boolean')
+        return value
+
 
 class CourseGet(BaseEntityGet,CourseCreate):
     id: str
@@ -99,6 +108,7 @@ class CourseGet(BaseEntityGet,CourseCreate):
     model_config = ConfigDict(from_attributes=True)
 
 class CourseList(BaseModel):
+    position: Optional[float] = Field(default=None, allow_inf_nan=False)
     id: str
     title: Optional[str] = None
     description: Optional[str] = None
@@ -135,6 +145,7 @@ class CourseList(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class CourseUpdate(BaseModel):
+    position: Optional[float] = Field(default=None, allow_inf_nan=False)
     title: Optional[str] = None
     description: Optional[str] = None
     language_code: Optional[str] = None
@@ -156,6 +167,14 @@ class CourseUpdate(BaseModel):
     # Omit to leave the flag alone; like ``public`` an explicit ``null`` is
     # rejected by the NOT NULL column.
     tutor_agent_auto_route: Optional[bool] = None
+
+
+    @field_validator('position', mode='before')
+    @classmethod
+    def reject_boolean_position(cls, value):
+        if isinstance(value, bool):
+            raise ValueError('Course position must be a number, not a boolean')
+        return value
 
 
 class CourseQuery(ListQuery):
@@ -192,6 +211,8 @@ class CoursePublicList(BaseModel):
     the course, so it carries only what someone needs in order to decide
     whether to register.
     """
+
+    position: Optional[float] = Field(default=None, allow_inf_nan=False)
     id: str
     title: Optional[str] = None
     description: Optional[str] = None
@@ -237,6 +258,8 @@ class CoursePublicCatalogEntry(BaseModel):
     signed in, so it carries no path, organization, or caller-relative data.
     ``id`` stays because it is what the register call takes after sign-in.
     """
+
+    position: Optional[float] = Field(default=None, allow_inf_nan=False)
     id: str
     title: Optional[str] = None
     description: Optional[str] = None
