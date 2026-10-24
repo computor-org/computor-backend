@@ -1,6 +1,8 @@
 export interface PublicCourseCatalogEntry {
   id: string;
   title?: string | null;
+  position: number | null;
+  course_path: string;
   description?: string | null;
   language_code?: string | null;
   exercise_count: number;
@@ -23,10 +25,10 @@ export interface PublicLearningContentSummary {
 
 export interface PublicLearningCourseOutline {
   id: string;
+  position: number | null;
+  course_path: string;
   title: string;
   description?: string | null;
-  /** The course's path on the server; the catalog finds the course to join by it. */
-  course_path?: string | null;
   language_code?: string | null;
   contents: PublicLearningContentSummary[];
   welcome_content_id?: string | null;

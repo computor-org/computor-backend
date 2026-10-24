@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { buildPublicLearning } from './build-public-learning.mjs';
+import { buildPublicLearning, descriptionVariants } from './build-public-learning.mjs';
 
 const revision = 'a'.repeat(40);
 function fixture(t) {
@@ -15,7 +15,7 @@ function fixture(t) {
   fs.mkdirSync(path.join(source, 'courses'), { recursive: true });
   fs.mkdirSync(path.join(example, 'content/mediaFiles'), { recursive: true });
   fs.writeFileSync(path.join(source, 'LICENSE'), 'MIT License\nCopyright Example Contributors\nPermission notice');
-  const manifest = { name: 'Public course', description: 'Course description', path: 'python.example',
+  const manifest = { path: 'unrelated.native_course', name: 'Public course', description: 'Course description',
     content_types: [{ slug: 'week', kind: 'unit', title: 'Week' }, { slug: 'task', kind: 'assignment', title: 'Exercise' }],
     contents: [{ path: 'week_1', position: 1, content_type: 'week', contents: [
       { path: 'first', position: 1, content_type: 'task', example_identifier: 'example.first' },
@@ -47,7 +47,8 @@ test('publication selects real course structure, bilingual text and referenced r
   assert.deepEqual(course.contents.map(row => row.id), ['week_1', 'week_1.first']);
   assert.equal(course.materials['week_1.first'].markdown_variants.en, '# First exercise');
   assert.equal(course.source_commit, revision);
-  assert.equal(course.course_path, 'python.example');
+  assert.equal(course.course_path, f.manifest.path);
+  assert(catalog.every(entry => entry.course_path === f.manifest.path));
   assert.equal(fs.readFileSync(path.join(f.output, 'LICENSE.txt'), 'utf8'),
     'MIT License\nCopyright Example Contributors\nPermission notice');
   const files = fs.readdirSync(f.output, { recursive: true }).filter(name => fs.statSync(path.join(f.output, name)).isFile());
@@ -86,4 +87,71 @@ test('hidden course, traversal identifier and excessive text fail closed', t => 
   fs.writeFileSync(path.join(f.example, 'content/index_en.md'), 'a'.repeat(512 * 1024 + 1));
   assert.throws(() => buildPublicLearning(f.source, f.output, revision), /size/);
   assert.throws(() => buildPublicLearning(f.source, f.output, 'main'), /exact source commit/);
+});
+
+test('a welcome item renders its description in the reader language and is not counted as a unit', t => {
+  const f = fixture(t);
+  f.manifest.content_types.push({ slug: 'welcome', kind: 'unit', title: 'Start' });
+  f.manifest.contents.unshift({ path: 'welcome', position: 0, content_type: 'welcome', title: 'Willkommen',
+    description: '<!-- lang: de -->\nHallo **du**.\n\n<!-- lang: en -->\nHello **you**.\n' });
+  f.manifests(f.manifest);
+  buildPublicLearning(f.source, f.output, revision);
+  const course = JSON.parse(fs.readFileSync(path.join(f.output, 'courses/python-beginner.json')));
+  assert.equal(course.welcome_content_id, 'welcome');
+  assert.deepEqual(course.materials.welcome.markdown_variants, { de: 'Hallo **du**.', en: 'Hello **you**.' });
+  assert(!JSON.stringify(course).includes('lang:'));
+  assert.equal(course.unit_count, 1);
+  const catalog = JSON.parse(fs.readFileSync(path.join(f.output, 'catalog.json')));
+  assert.equal(catalog[0].unit_count, 1);
+});
+
+test('an unmarked item description is Markdown in the course language', () => {
+  assert.deepEqual(descriptionVariants('  Nur **deutsch**.\n', 'de'), { de: 'Nur **deutsch**.' });
+  assert.deepEqual(descriptionVariants('Common\n<!-- lang: en -->\nEnglish\n<!-- lang: xx -->\nskip', 'de'),
+    { en: 'Common\n\nEnglish' });
+});
+
+
+test('course positions order the catalog numerically with nulls last and stable title/id ties', t => {
+  const f = fixture(t);
+  const slugs = ['python-beginner', 'python-intermediate', 'python-advanced'];
+  const cases = [
+    { titles: ['Alpha', 'Middle', 'Zulu'], positions: [20, 0.5, -10], order: [2, 1, 0] },
+    { titles: ['Alpha', 'Zulu', 'Middle'], positions: [null, -0.5, undefined], order: [1, 0, 2] },
+    { titles: ['Zulu', 'Alpha', 'Alpha'], positions: [1, 1, 1], order: [2, 1, 0] },
+  ];
+  for (const { titles, positions, order } of cases) {
+    slugs.forEach((slug, index) => fs.writeFileSync(path.join(f.source, `courses/${slug}.yaml`),
+      JSON.stringify({ ...f.manifest, name: titles[index], position: positions[index] })));
+    const catalog = buildPublicLearning(f.source, f.output, revision);
+    assert.deepEqual(catalog.map(course => course.id), order.map(index => slugs[index]));
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.output, 'catalog.json'))), catalog);
+    slugs.forEach((slug, index) => {
+      assert.equal(catalog.find(course => course.id === slug).position, positions[index] ?? null);
+      const outline = JSON.parse(fs.readFileSync(path.join(f.output, `courses/${slug}.json`)));
+      assert.equal(outline.position, positions[index] ?? null);
+    });
+  }
+});
+
+test('course positions reject non-numeric and non-finite values', t => {
+  const f = fixture(t);
+  for (const position of ['1', true, {}, []]) {
+    f.manifests({ ...f.manifest, position });
+    assert.throws(() => buildPublicLearning(f.source, f.output, revision), /finite number or null/);
+  }
+  for (const position of ['1e999', '-1e999']) {
+    fs.writeFileSync(path.join(f.source, 'courses/python-beginner.yaml'),
+      JSON.stringify({ ...f.manifest, position: 0 }).replace('"position":0', `"position":${position}`));
+    assert.throws(() => buildPublicLearning(f.source, f.output, revision), /finite number or null/);
+  }
+});
+
+
+test('course paths require the native deployment ltree contract', t => {
+  const f = fixture(t);
+  for (const coursePath of [undefined, null, '', 'python-beginner', 'Python.beginner', 'python..beginner', '../private']) {
+    f.manifests({ ...f.manifest, path: coursePath });
+    assert.throws(() => buildPublicLearning(f.source, f.output, revision), /native ltree path/);
+  }
 });
