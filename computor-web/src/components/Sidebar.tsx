@@ -103,7 +103,12 @@ export default function Sidebar() {
   const { user } = useAuth();
   const { isAdmin, isOrganizationManager, isUserManager, isWorkspaceUser, isWorkspaceMaintainer, isExampleManager, isServiceManager, showManagement } = usePermissions();
   const { capabilities: supportCaps } = useSupportCapabilities();
-  const [collapsed, setCollapsed] = useState(false);
+  // Phones start with the icon rail: the full 16rem sidebar would leave a 390 px
+  // screen about 130 px for the page. The layout renders the sidebar only on
+  // the client (after the auth check), so reading the viewport here is safe.
+  const [collapsed, setCollapsed] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches,
+  );
   // Team members reach their own reports through the Support entry's tab.
   const showMyReports = !supportCaps?.can_view;
 

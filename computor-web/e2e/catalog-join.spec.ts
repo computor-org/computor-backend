@@ -91,3 +91,30 @@ test('an unknown course leaves the plain catalog', async ({ page }) => {
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.locator('[aria-current="true"]')).toHaveCount(0);
 });
+
+test.describe('German catalog', () => {
+  test.use({ locale: 'de-DE' });
+  // "Angemeldet" also means "signed in", which every learner here is.
+  test('a joined course is marked "Beigetreten"', async ({ page }) => {
+    await setup(page);
+    await page.goto('/courses/catalog');
+    await expect(page.getByText('Beigetreten', { exact: true })).toHaveCount(1);
+    await expect(page.getByText('Angemeldet', { exact: true })).toHaveCount(0);
+  });
+});
+
+test('on a phone the sidebar starts as an icon rail and leaves the page its width', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await setup(page);
+  await page.goto('/courses/catalog');
+  await expect(page.getByRole('button', { name: 'Expand sidebar' })).toBeVisible();
+  const box = await page.getByRole('heading', { name: 'Data Science mit Python – Grundlagen' }).boundingBox();
+  expect(box!.width).toBeGreaterThan(200);
+});
+
+test('on a desktop the sidebar starts expanded', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await setup(page);
+  await page.goto('/courses/catalog');
+  await expect(page.getByRole('button', { name: 'Collapse sidebar' })).toBeVisible();
+});

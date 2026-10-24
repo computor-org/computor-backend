@@ -36,7 +36,7 @@ const COPY = {
     emptyTitle: 'Keine Kurse offen für die Selbstanmeldung',
     emptyDescription: 'Ein Kurs erscheint hier, sobald seine Lehrenden ihn freigeben. Frage dort nach oder schau später wieder vorbei.',
     backToCourses: 'Zurück zu deinen Kursen',
-    enrolledBadge: 'Angemeldet',
+    enrolledBadge: 'Beigetreten',
     openCourse: 'Kurs öffnen',
     full: 'Voll',
     seatsLeft: (n: number) => (n === 1 ? '1 Platz frei' : `${n} Plätze frei`),
