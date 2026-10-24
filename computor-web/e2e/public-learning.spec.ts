@@ -47,6 +47,21 @@ test('anonymous reading uses only static files even when the API is unavailable'
   expect(mutations).toEqual([]);
 });
 
+test('the course welcome item renders as Markdown in the reader language and is not a week', async ({ page }) => {
+  await page.goto(`/learn/${COURSE}`);
+  await expect(page.getByText('3 weeks · ', { exact: false })).toBeVisible();
+  const welcome = page.locator('article section').first();
+  await expect(welcome.getByRole('heading', { name: 'Welcome', exact: true })).toBeVisible();
+  await expect(welcome.getByText(/How to reach your first submission/)).toBeVisible();
+  await expect(welcome.getByRole('link', { name: 'public course page' })).toHaveAttribute('href', /\/learn\/python-beginner$/);
+  await expect(welcome.getByText(/lang:|\[public course page\]/)).toHaveCount(0);
+  await welcome.getByRole('button', { name: 'Deutsch', exact: true }).click();
+  await expect(welcome.getByText(/So kommst du zur ersten Abgabe/)).toBeVisible();
+  await expect(welcome.getByRole('link', { name: /Mathematische Konstanten/ })).toBeVisible();
+  await welcome.getByRole('button', { name: 'English', exact: true }).click();
+  await expect(welcome.getByRole('link', { name: /Start with Mathematical Constants/ })).toBeVisible();
+});
+
 test('all three courses have native reading content', async ({ page }) => {
   for (const slug of ['python-beginner', 'python-intermediate', 'python-advanced']) {
     await page.goto(`/learn/${slug}`);

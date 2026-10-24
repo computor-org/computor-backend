@@ -7,6 +7,22 @@ import yaml from 'js-yaml';
 const COURSES = ['python-beginner', 'python-intermediate', 'python-advanced'];
 const SEGMENT = /^[a-zA-Z0-9_-]+$/;
 const MAX_TEXT = 512 * 1024;
+// A course item's description may hold one section per language, each behind
+// a "<!-- lang: xx -->" line (data-science-python welcome item).
+const LANGUAGE_MARKER = /^<!--\s*lang:\s*([a-z]{2})\s*-->[ \t]*$/m;
+
+/** Language variants of a description; unmarked text is in the course language. */
+export function descriptionVariants(text, language) {
+  const parts = text.split(new RegExp(LANGUAGE_MARKER.source, 'gm'));
+  if (parts.length === 1) return { [language]: text.trim() };
+  const variants = {};
+  for (let index = 1; index < parts.length; index += 2) {
+    if (['de', 'en'].includes(parts[index]) && !variants[parts[index]]) {
+      variants[parts[index]] = `${parts[0].trim()}\n\n${parts[index + 1].trim()}`.trim();
+    }
+  }
+  return variants;
+}
 const MAX_MEDIA = 8 * 1024 * 1024;
 
 function readInside(root, relative, limit) {
@@ -56,6 +72,11 @@ export function buildPublicLearning(source, destination, revision) {
         let description = node.description ?? null;
         const variants = {};
         const media = new Set();
+        if (!node.example_identifier && description?.trim()) {
+          // Rendered as Markdown in the reader's language, like an exercise.
+          Object.assign(variants, descriptionVariants(description, 'de'));
+          description = Object.values(variants)[0] ?? null;
+        }
         if (node.example_identifier) {
           if (!/^[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)*$/.test(node.example_identifier)) throw Error('Invalid example identifier');
           const example = `examples/python/${node.example_identifier}`;
@@ -104,7 +125,7 @@ export function buildPublicLearning(source, destination, revision) {
       language_code: 'de', contents, materials, welcome_content_id: welcome?.id ?? null,
       first_exercise_id: contents.find(c => c.is_submittable)?.id ?? null,
       exercise_count: contents.filter(c => c.is_submittable).length,
-      unit_count: contents.filter(c => !c.is_submittable).length,
+      unit_count: contents.filter(c => !c.is_submittable && c.id !== welcome?.id).length,
       source_commit: revision };
     fs.mkdirSync(path.join(destination, 'courses'), { recursive: true });
     fs.writeFileSync(path.join(destination, 'courses', `${slug}.json`), JSON.stringify(course));
