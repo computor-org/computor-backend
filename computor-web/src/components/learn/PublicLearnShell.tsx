@@ -14,7 +14,13 @@ const COPY = {
   en: { courses: 'Courses', signIn: 'Sign in', signOut: 'Sign out', report: 'Report a problem' },
 };
 
-export default function PublicLearnShell({ children }: { children: ReactNode }) {
+export default function PublicLearnShell({
+  children,
+  signInNext = '/courses/catalog',
+}: {
+  children: ReactNode;
+  signInNext?: string;
+}) {
   const router = useRouter();
   const { user, logout } = useAuth();
   const language = useBrowserLanguage();
@@ -46,7 +52,7 @@ export default function PublicLearnShell({ children }: { children: ReactNode }) 
                 </button>
               </>
             ) : (
-              <Link href="/login?next=%2Fcourses%2Fcatalog" className="text-accent-text hover:underline">
+              <Link href={`/login?next=${encodeURIComponent(signInNext)}`} className="text-accent-text hover:underline">
                 {t.signIn}
               </Link>
             )}

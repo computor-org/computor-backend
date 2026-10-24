@@ -40,7 +40,7 @@ export default function PublicMarkdown({
   const source = normalizeLegacyHtml(markdown);
 
   return (
-    <div className="prose markdown max-w-none">
+    <div className="prose markdown public-markdown max-w-none">
       <ReactMarkdown
         {...mathMarkdownPlugins}
         skipHtml
@@ -67,5 +67,22 @@ export default function PublicMarkdown({
         {source}
       </ReactMarkdown>
     </div>
+  );
+}
+
+/** Titles share the reader's math parser while remaining inline inside links. */
+export function PublicMarkdownTitle({ markdown }: { markdown: string }) {
+  return (
+    <ReactMarkdown
+      {...mathMarkdownPlugins}
+      skipHtml
+      components={{
+        p: ({ children }) => <>{children}</>,
+        a: ({ children }) => <>{children}</>,
+        img: () => null,
+      }}
+    >
+      {markdown}
+    </ReactMarkdown>
   );
 }
