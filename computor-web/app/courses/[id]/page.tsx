@@ -238,6 +238,7 @@ export default function CoursePage() {
   const canManageMembers = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
   // Progress is the learner's own: a tutor or lecturer has no submissions here.
   const isLearner = courseHasAtLeast(courseId, '_student') && !courseHasAtLeast(courseId, '_tutor');
+  const isOrdinaryLearner = !isAdmin && !isOrganizationManager && isLearner;
 
   const { data, loading, error, reload } = useResource(
     async () => {
@@ -477,7 +478,7 @@ export default function CoursePage() {
             offers none; the role gate only avoids a guaranteed-403 fetch for
             non-members. The card chrome is the caller's because the compact
             variant on the courses list renders without one. */}
-        {(isAdmin || myRole != null) && (
+        {!isOrdinaryLearner && (isAdmin || myRole != null) && (
           <CourseWorkspaceLaunchButtons
             courseId={courseId}
             title={t.workspaces}

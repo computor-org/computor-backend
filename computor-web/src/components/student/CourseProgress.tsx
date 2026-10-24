@@ -19,7 +19,7 @@ const COPY = {
     continueWith: 'Weiter mit',
     startWith: 'Beginne mit',
     lastTested: (score: string) => `zuletzt getestet: ${score}`,
-    open: 'Aufgabe öffnen',
+    open: 'Aufgabe lesen',
     all: 'Alle Aufgaben',
     done: 'Du hast alle Aufgaben eingereicht. Deine Ergebnisse und Bewertungen findest du bei den Aufgaben.',
   },
@@ -30,7 +30,7 @@ const COPY = {
     continueWith: 'Continue with',
     startWith: 'Start with',
     lastTested: (score: string) => `last tested: ${score}`,
-    open: 'Open assignment',
+    open: 'Read task',
     all: 'All assignments',
     done: 'You have submitted every assignment. Your results and grades are listed with the assignments.',
   },
@@ -80,7 +80,7 @@ export function CourseProgressSummary<T extends ProgressContent>({
             {score != null && <span className="text-muted"> ({t.lastTested(formatScore(score))})</span>}
           </p>
           <div className="flex shrink-0 flex-wrap gap-2">
-            <ButtonLink href={`${assignmentsHref}/${next.item.id}`} size="sm">
+            <ButtonLink href={`${assignmentsHref}/${next.item.id}`} variant="secondary" size="sm">
               {t.open}
             </ButtonLink>
             {!compact && (

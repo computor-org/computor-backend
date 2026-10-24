@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useResource } from '@/src/hooks/useResource';
+import { usePermissions } from '@/src/hooks/usePermissions';
+import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import { useContentTree } from '@/src/hooks/useContentTree';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
@@ -26,6 +28,7 @@ import type { CourseContentStudentList } from 'types/generated';
 const COPY = {
   de: {
     title: 'Aufgaben',
+    workspaces: 'Arbeitsumgebungen',
     fetchFailed: 'Kursinhalte konnten nicht geladen werden',
     subtitle: (units: number, assignments: number) =>
       `${units} ${units === 1 ? 'Einheit' : 'Einheiten'} · ${assignments} ${assignments === 1 ? 'Aufgabe' : 'Aufgaben'}`,
@@ -48,6 +51,7 @@ const COPY = {
   },
   en: {
     title: 'Assignments',
+    workspaces: 'Workspaces',
     fetchFailed: 'Failed to fetch course contents',
     subtitle: (units: number, assignments: number) => `${units} units · ${assignments} assignments`,
     emptyTitle: 'No assignments yet',
@@ -86,12 +90,15 @@ export default function StudentCourseContentsPage() {
   const language = useUiLanguage();
   const t = COPY[language];
   const crumbs = useCourseCrumbs(courseId, t.title);
+  const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
+  const isOrdinaryLearner = !isAdmin && !isOrganizationManager &&
+    courseHasAtLeast(courseId, '_student') && !courseHasAtLeast(courseId, '_tutor');
 
   const { data, loading, error } = useResource(async () => {
     const response = await apiFetch(`${API_BASE_URL}/students/course-contents?course_id=${courseId}`);
     if (!response.ok) throw new Error(t.fetchFailed);
     return (await response.json()) as CourseContentStudentList[];
-  }, [courseId]);
+  }, [courseId], { refreshOnFocus: true });
   const courseContents = useMemo(() => data ?? [], [data]);
 
   // synthesiseContainers: a student is served the assignments they can see, so a
@@ -120,6 +127,13 @@ export default function StudentCourseContentsPage() {
           <ListLoading />
         ) : (
           <ScrollArea>
+            {isOrdinaryLearner && (
+              <CourseWorkspaceLaunchButtons
+                courseId={courseId}
+                title={t.workspaces}
+                className="bg-surface rounded-lg border border-rule p-6"
+              />
+            )}
             {rows.length === 0 ? (
               <EmptyState
                 icon={
