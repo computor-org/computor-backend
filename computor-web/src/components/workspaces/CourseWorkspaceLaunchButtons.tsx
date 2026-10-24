@@ -41,7 +41,7 @@ const COPY = {
     openHint: (label: string) =>
       `Öffnet ${label} in einem neuen Tab mit diesem Kurs. Deine Dateien bleiben erhalten.`,
     stopHint: (label: string) =>
-      `Wenn du fertig bist, beendet „Stoppen“ ${label}, und deine Dateien bleiben erhalten. Schließt du nur den Tab, stoppt die Arbeitsumgebung nach einiger Zeit ohne Nutzung von selbst.`,
+      `Wenn du fertig bist, beende ${label} mit „Stoppen“. Schließt du nur den Tab, stoppt die Arbeitsumgebung nach einer Weile ohne Nutzung von selbst.`,
     yours: 'Weitere Arbeitsumgebungen',
     open: 'Öffnen',
     retry: 'Erneut versuchen',
@@ -63,7 +63,7 @@ const COPY = {
     startAgain: 'Start again',
     openHint: (label: string) => `Opens ${label} in a new tab with this course. Your files are kept.`,
     stopHint: (label: string) =>
-      `When you are done, Stop shuts down ${label} and keeps your files. If you only close the tab, the workspace stops by itself after a while without use.`,
+      `When you are done, shut down ${label} with Stop. If you only close the tab, the workspace stops by itself after a while without use.`,
     yours: 'Other workspaces',
     open: 'Open',
     retry: 'Retry',
@@ -290,8 +290,14 @@ export default function CourseWorkspaceLaunchButtons({
             const w = personal.get(option.name)!;
             const category = categorizeStatus(w.latest_build_status, w.latest_build_transition);
             const label = templateLabel(option);
+            // A workspace that is stopping is started again once it has
+            // stopped, which is what the launch page does.
             const primary =
-              category === 'stopped' ? t.startAndOpen : category === 'failed' ? t.startAgain : t.openIn(label);
+              category === 'failed'
+                ? t.startAgain
+                : category === 'stopped' || w.latest_build_transition === 'stop'
+                  ? t.startAndOpen
+                  : t.openIn(label);
             return (
               <li
                 key={option.name}

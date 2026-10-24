@@ -550,6 +550,12 @@ test('the course page offers one state-aware control for the personal workspace'
   await expect(card.getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
   await expect(card.getByText(/If you only close the tab, the workspace stops by itself/)).toBeVisible();
   await expect(card.getByRole('button', { name: 'Start and open' })).toHaveCount(0);
+
+  // Stopping: said so, and the launch page would start it again once stopped.
+  workspaces[0] = { ...COURSE_WORKSPACE, latest_build_status: 'stopping', latest_build_transition: 'stop' };
+  await expect(card.getByText('Stopping', { exact: true })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Start and open' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Open in VS Code' })).toHaveCount(0);
 });
 
 test('Stop on the course page stops the personal workspace without opening it', async ({ page }) => {
@@ -787,6 +793,14 @@ test.describe('in German', () => {
     const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Deine Arbeitsumgebungen' }) });
     await expect(section.getByText('Wird gestoppt', { exact: true })).toBeVisible();
     await expect(section.getByRole('button', { name: 'Starten und öffnen' })).toBeVisible();
+  });
+
+  test('the course page says plainly how to finish', async ({ page }) => {
+    await setup(page, [details({ status: 'running', ready: true, name: 'vscode' })], { courseWorkspaces: true });
+    await page.goto(`/courses/${COURSE_A}`);
+    await expect(page.getByText(
+      'Wenn du fertig bist, beende VS Code mit „Stoppen“. Schließt du nur den Tab, stoppt die Arbeitsumgebung nach einer Weile ohne Nutzung von selbst.',
+    )).toBeVisible();
   });
 
   test('a new learner is welcomed without "zurück" and pointed to the catalog', async ({ page }) => {
