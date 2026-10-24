@@ -252,8 +252,11 @@ function LaunchWorkspace() {
 
       // `ready` is the real signal; `gaveUp` means it is never coming.
       if (details.ready || gaveUp) {
-        void openWorkspace(url);
-        return;
+        let active = true;
+        void Promise.resolve().then(() => {
+          if (active && mounted.current) return openWorkspace(url);
+        });
+        return () => { active = false; };
       }
 
       // Running but not ready: give the service a bounded chance to come up,
