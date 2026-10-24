@@ -12,6 +12,6 @@
             </#if>
             <noscript><p>${msg("computorJavascriptRequired")}</p></noscript>
         </div>
-        <script type="module" src="${url.resourcesPath}/js/computor-altcha-20261016.js"></script>
+        <script type="module" src="${url.resourcesPath}/js/computor-altcha-20261024.js"></script>
     </#if>
 </#macro>

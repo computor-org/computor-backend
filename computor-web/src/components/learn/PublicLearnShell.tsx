@@ -65,13 +65,13 @@ export default function PublicLearnShell({ children }: { children: ReactNode }) 
       <footer className="border-t border-rule bg-surface">
         <div className="container mx-auto px-4 py-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted">
           <span>&copy; 2026 Computor</span>
-          <LegalLinks className="text-sm" />
+          <LegalLinks className="text-sm" language={language} />
           {user && (
             <Link href="/problem" className="hover:text-accent-text hover:underline underline-offset-2">
               {t.report}
             </Link>
           )}
-          <NetideeNotice />
+          <NetideeNotice language={language} />
         </div>
       </footer>
     </div>

@@ -186,13 +186,13 @@ export default function Home() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-center text-muted">
             <p>&copy; 2026 Computor. {t.footer}</p>
-            <LegalLinks className="text-sm" />
+            <LegalLinks className="text-sm" language={language} />
             {user && (
               <Link href="/problem" className="text-sm hover:text-accent-text hover:underline underline-offset-2">
                 {t.report}
               </Link>
             )}
-            <NetideeNotice />
+            <NetideeNotice language={language} />
           </div>
         </div>
       </footer>

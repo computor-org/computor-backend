@@ -51,6 +51,23 @@ test.describe('German browser', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'de');
   });
 
+  test('the footer follows the chosen language on the landing page and in /learn', async ({ page }) => {
+    await blockApi(page, []);
+    await page.goto('/');
+    const footer = page.locator('footer');
+    await expect(footer.getByText('Mit den Mitteln der Förderaktion netidee')).toBeVisible();
+
+    await page.getByRole('group', { name: 'Sprache' }).getByRole('button', { name: 'EN' }).click();
+    await expect(footer.getByText('Financially supported and made possible by the netidee funding programme.')).toBeVisible();
+    await expect(footer).not.toContainText('Förderaktion');
+    await expect(footer).not.toContainText('Impressum');
+
+    await page.goto('/learn');
+    await expect(footer.getByText('Financially supported and made possible by the netidee funding programme.')).toBeVisible();
+    await expect(footer).not.toContainText('Förderaktion');
+    await expect(footer).not.toContainText('Impressum');
+  });
+
   test('"Konto erstellen" opens the registration form and returns to the catalog', async ({ page }) => {
     const calls: string[] = [];
     await blockApi(page, calls);
