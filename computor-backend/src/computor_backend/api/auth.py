@@ -11,11 +11,12 @@ import logging
 import os
 import re
 import secrets
+from html import escape
 from typing import Annotated, List, Optional
 from urllib.parse import urlencode, urlparse, urlsplit
 
 from fastapi import APIRouter, Depends, Query, Request, Response
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -844,6 +845,47 @@ def _default_sso_provider() -> str:
     return enabled[0]
 
 
+def _coder_static_request(uri: str) -> bool:
+    # Native code-server webviews bootstrap from versioned static HTML. Keep
+    # this fallback for clients/proxies that omit Fetch Metadata headers.
+    return bool(re.match(
+        r"^/coder/[A-Za-z0-9._~-]+/[A-Za-z0-9._~-]+/vscode/[^/?]+/static/",
+        uri.split("?", 1)[0],
+    ))
+
+
+def _workspace_auth_hint(request: Request, uri: str) -> Response:
+    """An expired child document must never navigate its frame into the IdP."""
+    segments = _coder_workspace_segments(uri)
+    if segments is None:
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"}, headers={"Cache-Control": "no-store"})
+    # No authenticated profile remains here. Use only the browser's available
+    # language, never unvalidated query text; normal SSO restores profile choice.
+    language = request.headers.get("Accept-Language", "").split(",", 1)[0].split(";", 1)[0].strip().lower()
+    german = language.split("-", 1)[0] == "de"
+    title = "Deine Sitzung ist abgelaufen." if german else "Your session has expired."
+    message = (
+        "Öffne Computor in einem neuen Browser-Tab, melde dich erneut an und lade anschließend diese Arbeitsumgebung neu."
+        if german else "Open Computor in another browser tab, sign in again, then reload this workspace to open your results."
+    )
+    return HTMLResponse(
+        status_code=401,
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'",
+            "Referrer-Policy": "no-referrer",
+        },
+        content=f"""<!doctype html><html lang="{'de' if german else 'en'}"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{escape(title)}</title><style>
+:root {{ color-scheme: light dark; }}
+body {{ font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 20px; color: CanvasText; background: Canvas; }}
+main {{ max-width: 36rem; }} h1 {{ font-size: 18px; }}
+</style></head><body><main><h1>{escape(title)}</h1><p>{escape(message)}</p>
+</main></body></html>""",
+    )
+
+
 def _is_browser_navigation(request: Request) -> bool:
     """A top-level browser navigation (tab load/reload), as opposed to the
     XHR/websocket traffic code-server itself generates. On the ForwardAuth path
@@ -851,6 +893,9 @@ def _is_browser_navigation(request: Request) -> bool:
     always GET)."""
     method = request.headers.get("X-Forwarded-Method") or request.method
     if method.upper() != "GET":
+        return False
+    destination = request.headers.get("Sec-Fetch-Dest")
+    if destination and destination != "document":
         return False
     return "text/html" in request.headers.get("Accept", "")
 
@@ -899,6 +944,11 @@ async def verify_coder_access(
     original_uri = request.headers.get("X-Forwarded-Uri", request.url.path)
 
     if principal is None:
+        destination = request.headers.get("Sec-Fetch-Dest")
+        if destination in ("iframe", "frame", "object", "embed") or _coder_static_request(original_uri):
+            if "text/html" in request.headers.get("Accept", "") or original_uri.split("?", 1)[0].endswith(".html"):
+                return _workspace_auth_hint(request, original_uri)
+            return JSONResponse(status_code=401, content={"detail": "Not authenticated"}, headers={"Cache-Control": "no-store"})
         # No live session — the 1h ct_access_token cookie and the sliding Redis
         # session both die during exactly the idle period that also auto-stops
         # the workspace. Traefik forwards a non-2xx ForwardAuth response to the
@@ -1026,7 +1076,7 @@ async def coder_reauth(
     retried: bool = Query(False, description="Set after a full SSO round-trip, to stop redirect loops"),
     principal: Optional[Principal] = Depends(_coder_request_principal),
     db: Session = Depends(get_db, scope="function"),
-) -> RedirectResponse:
+) -> Response:
     """
     Renew the browser session for a workspace tab whose credential expired (#379).
 
@@ -1047,6 +1097,12 @@ async def coder_reauth(
     """
     if not _WORKSPACE_PATH.match(next_path):
         raise BadRequestException(detail="next must be a /coder/{owner}/{workspace} path")
+
+    destination = request.headers.get("Sec-Fetch-Dest")
+    if principal is None and ((destination and destination != "document") or _coder_static_request(next_path)):
+        if destination in ("iframe", "frame", "object", "embed") or next_path.split("?", 1)[0].endswith(".html"):
+            return _workspace_auth_hint(request, next_path)
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"}, headers={"Cache-Control": "no-store"})
 
     target = f"{_workspace_public_origin()}{next_path}"
 

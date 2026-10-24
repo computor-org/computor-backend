@@ -300,3 +300,68 @@ async def test_foreign_workspace_with_query_credentials_never_logged(caplog):
     resp = await verify_coder_access(_FakeRequest(f"/coder/{other}/ws/{_QUERY}"), _user())
     assert resp.status_code == 403
     _assert_no_secret_logged(caplog)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("destination", ["iframe", "frame"])
+@pytest.mark.parametrize("language,expected", [("de-DE", "melde dich erneut an"), ("en-US", "sign in again"), ("deception", "sign in again")])
+async def test_expired_webview_bootstrap_shows_recovery_without_embedding_login(destination, language, expected):
+    request = _FakeRequest(
+        f"/coder/{USER_OWNER}/workspace/vscode/stable-example/static/out/vs/workbench/contrib/webview/browser/pre/index.html?secret=never-echo",
+        headers={**_NAV_HEADERS, "Sec-Fetch-Dest": destination, "Sec-Fetch-Mode": "navigate", "Accept-Language": language},
+    )
+    response = await verify_coder_access(request, None)
+    assert response.status_code == 401
+    assert response.headers["content-type"].startswith("text/html")
+    text = response.body.decode()
+    assert expected in text
+    assert "<form" not in text and "never-echo" not in text
+    assert "location" not in response.headers
+    assert "<a " not in text  # Native webview sandbox cannot navigate the top frame.
+    assert response.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.asyncio
+async def test_expired_native_webview_path_without_fetch_metadata_never_redirects_to_sso():
+    response = await verify_coder_access(_FakeRequest(
+        f"/coder/{USER_OWNER}/workspace/vscode/stable-example/static/out/vs/workbench/contrib/webview/browser/pre/index.html",
+        headers=_NAV_HEADERS,
+    ), None)
+    assert response.status_code == 401
+    assert response.headers["content-type"].startswith("text/html")
+    assert "location" not in response.headers
+
+
+@pytest.mark.asyncio
+async def test_expired_script_with_html_accept_does_not_start_sign_in():
+    response = await verify_coder_access(_FakeRequest(
+        f"/coder/{USER_OWNER}/workspace/vscode/stable-example/static/main.js",
+        headers={**_NAV_HEADERS, "Sec-Fetch-Dest": "script"},
+    ), None)
+    assert response.status_code == 401
+    assert "location" not in response.headers
+
+
+@pytest.mark.asyncio
+async def test_top_level_editor_deep_link_still_recovers_session():
+    response = await verify_coder_access(_FakeRequest(
+        f"/coder/{USER_OWNER}/workspace/?folder=%2Fhome%2Flearner",
+        headers={**_NAV_HEADERS, "Sec-Fetch-Dest": "document", "Sec-Fetch-Mode": "navigate"},
+    ), None)
+    assert response.status_code == 302
+    assert "/auth/coder-reauth?" in response.headers["location"]
+
+
+@pytest.mark.asyncio
+async def test_signed_in_native_webview_and_html_report_are_still_forwarded(monkeypatch):
+    monkeypatch.setattr("computor_backend.api.auth.bump_workspace_activity", lambda *_a: None)
+    for tail in [
+        "vscode/stable-example/static/out/vs/workbench/contrib/webview/browser/pre/index.html",
+        "proxy/8080/report.html",
+    ]:
+        response = await verify_coder_access(_FakeRequest(
+            f"/coder/{USER_OWNER}/workspace/{tail}",
+            headers={**_NAV_HEADERS, "Sec-Fetch-Dest": "iframe"},
+        ), _user())
+        assert response.status_code == 200
+        assert _body(response)["status"] == "authorized"
