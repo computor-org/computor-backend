@@ -77,6 +77,11 @@ fi
 # extension, decides where it takes over: a lecturer running the extension on
 # their own machine keeps the built-in editor, which works fine there.
 USER_DATA_DIR="/home/coder/.local/share/code-server-${workspace_name_lower}"
+# Native translations require a registry in the active user-data-dir.
+# The image's home is hidden by the persistent volume, and each workspace has
+# its own editor state, so seed the image registry before serving requests.
+python3 /opt/computor/seed-language-packs.py \
+  /opt/computor/code-server-language-data/languagepacks.json "$USER_DATA_DIR"
 SETTINGS_FILE="$USER_DATA_DIR/User/settings.json"
 mkdir -p "$USER_DATA_DIR/User"
 if [ ! -f "$SETTINGS_FILE" ]; then
