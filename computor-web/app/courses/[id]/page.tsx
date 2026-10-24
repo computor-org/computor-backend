@@ -24,6 +24,8 @@ import SectionCard from '@/src/components/SectionCard';
 import Button, { ButtonLink } from '@/src/components/ui/Button';
 import Notice from '@/src/components/ui/Notice';
 import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
+import SelfEnrollmentHelp from '@/src/components/courses/SelfEnrollmentHelp';
+import CourseProgressCard from '@/src/components/student/CourseProgress';
 import { displayName } from '@/src/utils/displayName';
 import { localizedRoleLabel } from '@/src/utils/courseRoles';
 import type { PersonalCloneCredentialGet } from 'types/generated';
@@ -53,6 +55,8 @@ const COPY = {
     gitChecked: 'Git-Zugriff geprüft. Dein Repository ist erreichbar.',
     gitCheckFailed: 'Git-Zugriff konnte nicht geprüft werden',
     notFound: 'Kurs nicht gefunden',
+    left: (title: string) => `Du hast ${title} verlassen.`,
+    leaveFailed: 'Der Kurs konnte nicht verlassen werden.',
     courses: 'Kurse',
     untitled: 'Kurs ohne Titel',
     untitledShort: 'Ohne Titel',
@@ -126,6 +130,8 @@ const COPY = {
     gitChecked: 'Git access checked — your repository is reachable.',
     gitCheckFailed: 'Could not check git access',
     notFound: 'Course not found',
+    left: (title: string) => `You left ${title}.`,
+    leaveFailed: 'Could not leave the course.',
     courses: 'Courses',
     untitled: 'Untitled Course',
     untitledShort: 'Untitled',
@@ -230,11 +236,13 @@ export default function CoursePage() {
     canDeleteCourse,
   } = usePermissions();
   const canManageMembers = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
+  // Progress is the learner's own: a tutor or lecturer has no submissions here.
+  const isLearner = courseHasAtLeast(courseId, '_student') && !courseHasAtLeast(courseId, '_tutor');
 
   const { data, loading, error, reload } = useResource(
     async () => {
       const course = await coursesClient.getCoursesCoursesIdGet({ id: courseId });
-      const [organization, courseFamily, gitBinding, myRepo, gitDescriptor] = await Promise.all([
+      const [organization, courseFamily, gitBinding, myRepo, gitDescriptor, selfEnrollment] = await Promise.all([
         organizationsClient.getOrganizationsOrganizationsIdGet({ id: course.organization_id }).catch(() => null),
         courseFamiliesClient.getCourseFamiliesCourseFamiliesIdGet({ id: course.course_family_id }).catch(() => null),
         // Git binding is lecturer-cohort only; fetch it only for managers.
@@ -246,8 +254,11 @@ export default function CoursePage() {
         // Whether this course provisions git at all — drives the repo section
         // (everyone), so a non-git course never shows the provision button.
         userClient.getCourseGitDescriptorEndpointUserCoursesCourseIdGitGet({ courseId }).catch(() => null),
+        // Whether the caller joined through the catalog (help block, leave).
+        // 404s (→ null) when they aren't a member.
+        userClient.getOwnSelfEnrollmentUserCoursesCourseIdSelfEnrollmentGet({ courseId }).catch(() => null),
       ]);
-      return { course, organization, courseFamily, gitBinding, myRepo, gitDescriptor };
+      return { course, organization, courseFamily, gitBinding, myRepo, gitDescriptor, selfEnrollment };
     },
     [courseId, canManageMembers],
   );
@@ -257,6 +268,7 @@ export default function CoursePage() {
   const gitBinding = data?.gitBinding ?? null;
   const myRepo = data?.myRepo ?? null;
   const gitDescriptor = data?.gitDescriptor ?? null;
+  const selfEnrollment = data?.selfEnrollment ?? null;
   // The course actually provisions git repos — the exact condition under which
   // provision-repository succeeds (binding present + git delivery). Gate the
   // repo section on this so a non-git course never offers the provision button.
@@ -304,6 +316,21 @@ export default function CoursePage() {
   // any unrelated re-render would otherwise snap the disclosure shut under the
   // reader while they are copying out of it.
   const [cloneOpen, setCloneOpen] = useState(false);
+
+  // Ends the caller's own self-enrolment. The backend keeps the membership
+  // (submissions and results hang on it) but withdraws every course claim, so
+  // re-pull the scopes before leaving a page the caller can no longer read.
+  async function leaveCourse() {
+    if (!course) return;
+    try {
+      await userClient.leaveCourseUserCoursesCourseIdLeavePost({ courseId });
+      await refreshPermissions();
+      notify(t.left(displayName(course, t.untitled)), 'success');
+      router.push('/courses');
+    } catch (err) {
+      notify(err instanceof Error && err.message ? err.message : t.leaveFailed, 'error');
+    }
+  }
 
   async function ensureGitAccess() {
     setEnsuring(true);
@@ -440,6 +467,11 @@ export default function CoursePage() {
           />
         </SectionCard>
 
+        {/* How far the learner is and where to pick up (issues#408, #525). It
+            sits above the workspace launch, so a returning learner sees which
+            assignment comes next before opening the editor. */}
+        {isLearner && <CourseProgressCard courseId={courseId} language={language} />}
+
         {/* Workspaces: launch buttons for the course's allowed templates. The
             component hides itself (card and heading included) when the course
             offers none; the role gate only avoids a guaranteed-403 fetch for
@@ -450,6 +482,18 @@ export default function CoursePage() {
             courseId={courseId}
             title={t.workspaces}
             className="bg-surface rounded-lg border border-rule p-6"
+          />
+        )}
+
+        {/* Help & contact for a course joined through the catalog: a
+            self-enrolled learner has no lecturer or tutor to ask (issues#458). */}
+        {selfEnrollment?.self_registered && (
+          <SelfEnrollmentHelp
+            courseId={courseId}
+            courseTitle={displayName(course, t.untitled)}
+            canLeave={selfEnrollment.can_leave === true}
+            language={language}
+            onLeave={leaveCourse}
           />
         )}
 

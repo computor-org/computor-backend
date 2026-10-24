@@ -22,7 +22,8 @@ from sqlalchemy.orm import sessionmaker
 
 from computor_backend.business_logic import auth as auth_bl
 from computor_backend.exceptions import ForbiddenException
-from computor_backend.model.auth import Account, User
+from computor_backend.model.auth import Account, Profile, User
+from computor_backend.model.language import Language
 from computor_backend.plugins import AuthResult, AuthStatus, UserInfo
 
 
@@ -74,7 +75,7 @@ def login_as(monkeypatch):
     monkeypatch.setattr(auth_bl, "login_idle_seconds", lambda db: 60)
     monkeypatch.setattr(auth_bl, "_provision_git_server_account", _noop)
 
-    async def _run(db, *, email: str, email_verified, sub: str | None = None):
+    async def _run(db, *, email: str, email_verified, sub: str | None = None, language: str | None = None):
         attributes = {} if email_verified is None else {"email_verified": email_verified}
         result = AuthResult(
             status=AuthStatus.SUCCESS,
@@ -106,7 +107,7 @@ def login_as(monkeypatch):
             provider="keycloak",
             code="code",
             state="state",
-            state_data={},
+            state_data={"ui_locales": language} if language else {},
             callback_url="http://test/callback",
             db=db,
         )
@@ -379,3 +380,115 @@ async def test_a_pre_fix_reservation_stays_flagged_after_a_verified_login_elsewh
     after = audit(db)
     assert after["unverified_total"] - before["unverified_total"] == 1
     assert after["unverified_verified_other_email"] - before["unverified_verified_other_email"] == 1
+
+
+@pytest.fixture
+def welcome_queue(monkeypatch):
+    """Record the tasks the login queues, with the welcome mail switched on."""
+    from computor_backend import tasks as tasks_pkg
+    from computor_backend.support import config as support_config
+
+    submitted = []
+
+    class _Executor:
+        async def submit_task(self, submission):
+            submitted.append(submission)
+
+    monkeypatch.setattr(tasks_pkg, "get_task_executor", lambda: _Executor())
+    monkeypatch.setattr(
+        support_config, "get_support_settings",
+        lambda: support_config.SupportSettings(welcome_mail_enabled=True),
+    )
+    return submitted
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", ["de", "en", None])
+async def test_completed_registration_queues_one_welcome_mail(db, login_as, welcome_queue, registration_languages, language):
+    sub = f"kc-{uuid.uuid4().hex}"
+    first = await login_as(db, email=_email(), email_verified=True, sub=sub, language=language)
+
+    assert [(t.task_name, t.queue, t.workflow_id, t.parameters) for t in welcome_queue] == [
+        ("support_welcome_mail", "support", f"support-welcome-{first['user_id']}",
+         {"user_id": first["user_id"], "language": language or "en"}),
+    ]
+
+    await login_as(db, email=_email(), email_verified=True, sub=sub)
+    assert len(welcome_queue) == 1
+
+
+@pytest.mark.asyncio
+async def test_refused_unverified_registration_sends_no_welcome_mail(db, login_as, welcome_queue):
+    with pytest.raises(ForbiddenException):
+        await login_as(db, email=_email(), email_verified=False)
+
+    assert welcome_queue == []
+
+
+@pytest.mark.asyncio
+async def test_welcome_mail_is_off_unless_enabled(db, login_as, welcome_queue, monkeypatch):
+    from computor_backend.support import config as support_config
+
+    monkeypatch.setattr(support_config, "get_support_settings", lambda: support_config.SupportSettings())
+    await login_as(db, email=_email(), email_verified=True)
+
+    assert welcome_queue == []
+
+
+@pytest.mark.asyncio
+async def test_an_unreachable_queue_does_not_fail_the_login(db, login_as, welcome_queue, monkeypatch):
+    from computor_backend import tasks as tasks_pkg
+
+    class _Down:
+        async def submit_task(self, submission):
+            raise ConnectionError("temporal is down")
+
+    monkeypatch.setattr(tasks_pkg, "get_task_executor", lambda: _Down())
+    result = await login_as(db, email=_email(), email_verified=True)
+
+    assert result["is_new_user"] is True
+
+
+@pytest.fixture
+def registration_languages(db):
+    # Production migrations seed these reference rows; create_all does not.
+    for code, name in (("de", "German"), ("en", "English")):
+        if db.get(Language, code) is None:
+            db.add(Language(code=code, name=name))
+    db.flush()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", ["de", "en"])
+async def test_registration_persists_explicit_profile_language(db, login_as, registration_languages, language):
+    result = await login_as(db, email=_email(), email_verified=True, language=language)
+
+    profile = db.query(Profile).filter(Profile.user_id == result["user_id"]).one()
+    assert profile.language_code == language
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", [None, "fr", "invalid"])
+async def test_registration_does_not_persist_an_unsupported_profile_language(db, login_as, language):
+    result = await login_as(db, email=_email(), email_verified=True, language=language)
+
+    profile = db.query(Profile).filter(Profile.user_id == result["user_id"]).first()
+    assert profile is None or profile.language_code is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stored_language", ["de", None])
+async def test_returning_login_preserves_profile_language(db, login_as, registration_languages, stored_language):
+    sub = f"kc-{uuid.uuid4().hex}"
+    first = await login_as(db, email=_email(), email_verified=True, sub=sub)
+    profile = db.query(Profile).filter(Profile.user_id == first["user_id"]).first()
+    if profile is None:
+        profile = Profile(user_id=first["user_id"])
+        db.add(profile)
+    profile.language_code = stored_language
+    db.flush()
+
+    await login_as(db, email=_email(), email_verified=True, sub=sub, language="en")
+
+    db.refresh(profile)
+    assert profile.language_code == stored_language

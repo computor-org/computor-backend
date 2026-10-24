@@ -65,6 +65,17 @@ server {
     # with its stock HTML 413 page and never reaches the stack.
     client_max_body_size 512M;
 
+    # When the stack does not answer (Traefik down, host-side restart), nginx
+    # itself produces the 502/504. Show the offline page instead of nginx's
+    # stock error, so visitors know the address is right. Without
+    # proxy_intercept_errors this never replaces an answer from the stack, such
+    # as the API's own 503 JSON.
+    error_page 502 504 /computor-offline.html;
+    location = /computor-offline.html {
+        root /var/www/computor;
+        internal;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:8080;
 
@@ -108,6 +119,12 @@ server {
 }
 ```
 
+Install the offline page once, and again whenever `ops/maintenance/offline.html` changes:
+
+```bash
+install -D -m 644 ops/maintenance/offline.html /var/www/computor/computor-offline.html
+```
+
 Apply with:
 
 ```bash
@@ -126,6 +143,7 @@ nginx -t && systemctl reload nginx
 | `X-Forwarded-Host` / `-Port` | Keycloak/Traefik reconstruct public URLs from these. |
 | `proxy_buffer_size 128k` (+ buffers) | Keycloak login responses carry large `Set-Cookie` headers; small buffers → 502. |
 | `client_max_body_size 512M` | Every upload crosses this vhost: `git push` to Forgejo **and** API uploads (examples, submissions). The 1 MB default rejects them all with nginx's HTML 413 page. |
+| `error_page 502 504` + `internal` location | nginx answers 502/504 itself only when the stack is unreachable; the static page tells visitors the address is right and reloads every minute. It is self-contained, because nothing behind nginx is reachable at that moment. |
 | single `location /`, no path rewrite | Traefik owns `/api`, `/auth`, `/forgejo`, `/docs`; stripping paths breaks routing. |
 
 ## Telling the two 413s apart
@@ -164,6 +182,7 @@ curl -s -X POST https://<domain>/api/examples/upload \
       stack (also the ones for alternate hostnames). NOT Forgejo-only: example and
       submission uploads need it too — without it they 413 at nginx.
 - [ ] Port 8080 not reachable from outside the host (loopback bind, or firewalled).
+- [ ] Offline page installed at `/var/www/computor/computor-offline.html`; with the stack stopped, the domain shows it.
 - [ ] `nginx -t` passes; reload done.
 
 > The stack itself needs no nginx-specific config beyond `PUBLIC_DOMAIN`. Keycloak

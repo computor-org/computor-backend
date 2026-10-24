@@ -16,9 +16,16 @@ self-registered student is indistinguishable from an imported one apart from
 Denials are 404, not 403: a course you may not join must not be
 distinguishable from a course that does not exist. See exceptions/__init__.py
 on ``PermissionDeniedAsNotFound``.
+
+Self-enrolled learners all land in one course group, ``Selbsteinschreibung``,
+created on the first join (issues#458), and may leave the course again on
+their own. Leaving does not delete the membership: submissions and results
+reference it. The role becomes ``_inactive`` (see permissions/roles.py), which
+grants nothing, and joining again restores ``_student``.
 """
 
 import logging
+from datetime import datetime, timezone
 from typing import Optional, Tuple
 from uuid import UUID
 
@@ -33,18 +40,21 @@ from computor_backend.exceptions import (
 from computor_backend.model.course import Course, CourseGroup, CourseMember
 from computor_backend.model.organization import Organization
 from computor_backend.permissions.principal import Principal
+from computor_backend.permissions.roles import INACTIVE_COURSE_ROLE
 from computor_types.courses import (
     CoursePublicCatalogEntry,
     CoursePublicList,
     CoursePublicQuery,
+    CourseSelfEnrollment,
 )
 
 logger = logging.getLogger(__name__)
 
-# Title of the group created when a public course has none at all. A student
+# The course group every self-enrolled learner joins (issues#458). A student
 # CourseMember must carry a course_group_id (CHECK constraint on
-# course_member), so self-registration cannot proceed without one.
-SELF_REGISTRATION_GROUP_TITLE = "default"
+# course_member), and a group of its own keeps self-enrolled strangers out of
+# the course's real teaching groups and lets staff see them at a glance.
+SELF_REGISTRATION_GROUP_TITLE = "Selbsteinschreibung"
 
 
 def _catalog_query(db: Session):
@@ -101,6 +111,8 @@ def list_public_courses(
             for (course_id,) in db.query(CourseMember.course_id).filter(
                 CourseMember.user_id == permissions.get_user_id_or_throw(),
                 CourseMember.course_id.in_(page_ids),
+                # A learner who left can join again, so the course is offered.
+                CourseMember.course_role_id != INACTIVE_COURSE_ROLE,
             )
         }
 
@@ -196,42 +208,36 @@ def get_public_course_or_404(course_id: UUID | str, db: Session) -> Course:
 def resolve_registration_group(
     course: Course, permissions: Principal, db: Session
 ) -> CourseGroup:
-    """The group a self-registered student joins.
+    """The ``Selbsteinschreibung`` group of the course, created if missing.
 
-    The course's first group by creation order, not the alphabetically first —
-    ordering by title would drop strangers into whatever real teaching group
-    happens to sort earliest ("Group A"). A course with no groups at all gets
-    one named ``default``.
-
-    ``id`` breaks ties because Postgres ``now()`` is fixed for a transaction,
-    so groups created in one batch share a ``created_at`` to the microsecond.
-    The tie-break is then arbitrary but *stable*, which is the property that
-    actually matters: every self-registering student in a given course lands
-    in the same group rather than being scattered across the batch.
-
-    Mirrors ``course_member_import._get_or_create_course_group``; not reused,
-    because that helper looks a group up *by title* and this one takes
-    whichever exists.
+    Checked at every join rather than when the course is made public, so a
+    course that was opened before this group existed, or whose group was
+    deleted, gets it back on the next join. Looked up by title, which
+    ``course_group_title_key`` makes unique per course.
     """
-    group = (
-        db.query(CourseGroup)
-        .filter(CourseGroup.course_id == course.id)
-        .order_by(CourseGroup.created_at.asc(), CourseGroup.id.asc())
-        .first()
-    )
+    def _existing() -> Optional[CourseGroup]:
+        return (
+            db.query(CourseGroup)
+            .filter(
+                CourseGroup.course_id == course.id,
+                CourseGroup.title == SELF_REGISTRATION_GROUP_TITLE,
+            )
+            .first()
+        )
+
+    group = _existing()
     if group is not None:
         return group
 
-    # Two first-registrations racing would both see zero groups and both try
-    # to insert "default", which course_group_title_key forbids. Take the
-    # savepoint so losing the race costs the insert, not the caller's whole
-    # transaction.
+    # Two first joins racing would both miss the group and both insert it,
+    # which course_group_title_key forbids. Take the savepoint so losing the
+    # race costs the insert, not the caller's whole transaction.
     try:
         with db.begin_nested():
             group = CourseGroup(
                 course_id=course.id,
                 title=SELF_REGISTRATION_GROUP_TITLE,
-                description="Created automatically for self-registered students.",
+                description="Created automatically for self-enrolled learners.",
                 created_by=permissions.user_id,
                 updated_by=permissions.user_id,
             )
@@ -244,14 +250,7 @@ def resolve_registration_group(
         )
         return group
     except exc.IntegrityError:
-        group = (
-            db.query(CourseGroup)
-            .filter(
-                CourseGroup.course_id == course.id,
-                CourseGroup.title == SELF_REGISTRATION_GROUP_TITLE,
-            )
-            .first()
-        )
+        group = _existing()
         if group is None:  # pragma: no cover - only if the constraint changed
             raise
         return group
@@ -286,7 +285,7 @@ def _ensure_seat_available(
         .filter(CourseMember.course_id == course.id, CourseMember.user_id == user_id)
         .first()
     )
-    if existing is not None:
+    if existing is not None and existing.course_role_id != INACTIVE_COURSE_ROLE:
         return existing
     students = (
         db.query(func.count(CourseMember.id))
@@ -314,7 +313,9 @@ async def register_in_public_course(
 
     Returns ``(member, created)``. Idempotent: an existing membership is
     returned untouched with ``created=False``, whatever its role — a lecturer
-    who clicks Register is not demoted.
+    who clicks Register is not demoted. The one exception is a learner who left
+    the course: their ``_inactive`` membership becomes ``_student`` again, with
+    its submissions and results, and counts as created.
     """
     if permissions.is_service:
         raise ForbiddenException(
@@ -332,14 +333,17 @@ async def register_in_public_course(
         )
         .first()
     )
-    if existing is not None:
+    if existing is not None and existing.course_role_id != INACTIVE_COURSE_ROLE:
         return existing, False
 
-    existing = _ensure_seat_available(course, user_id, db)
-    if existing is not None:
-        return existing, False
+    held = _ensure_seat_available(course, user_id, db)
+    if held is not None:
+        return held, False
 
     group = resolve_registration_group(course, permissions, db)
+
+    if existing is not None:
+        return await _rejoin(existing, group, permissions, db), True
 
     try:
         with db.begin_nested():
@@ -391,3 +395,159 @@ async def register_in_public_course(
         group.id,
     )
     return member, True
+
+
+async def _rejoin(
+    member: CourseMember, group: CourseGroup, permissions: Principal, db: Session
+) -> CourseMember:
+    """Turn a left learner's membership back into ``_student``.
+
+    The post-create hook runs again because content released while the
+    learner was away still needs its submission groups; it only creates the
+    ones that are missing.
+    """
+    from computor_backend.business_logic.course_member_post_create import (
+        course_member_post_create,
+    )
+
+    properties = dict(member.properties or {})
+    properties.pop("left_at", None)
+    properties["self_registered"] = True
+    member.course_role_id = "_student"
+    member.course_group_id = group.id
+    member.properties = properties
+    member.updated_by = permissions.user_id
+    db.flush()
+
+    await course_member_post_create(member, db, permissions=permissions)
+    db.commit()
+    db.refresh(member)
+    logger.info(
+        "User %s rejoined public course %s (group %s)",
+        member.user_id,
+        member.course_id,
+        group.id,
+    )
+    return member
+
+
+def get_self_enrollment(
+    course_id: UUID | str, permissions: Principal, db: Session
+) -> CourseSelfEnrollment:
+    """Whether the caller joined this course themselves and may leave it.
+
+    404 when the caller holds no active membership: a course they left or
+    never joined looks the same as one that does not exist.
+    """
+    member = _active_membership_or_404(course_id, permissions, db)
+    self_registered = bool((member.properties or {}).get("self_registered"))
+    return CourseSelfEnrollment(
+        course_id=str(member.course_id),
+        self_registered=self_registered,
+        can_leave=self_registered and member.course_role_id == "_student",
+    )
+
+
+def leave_self_enrolled_course(
+    course_id: UUID | str, permissions: Principal, db: Session
+) -> CourseMember:
+    """End the caller's own self-enrolment in a course.
+
+    Only a ``_student`` membership created by self-registration can be left
+    this way; an enrolment by staff is ended by staff, and a tutor or lecturer
+    who once joined as a learner does not lose their role by accident. The
+    membership is kept as ``_inactive`` so that submissions and results stay
+    attached to it, and joining again restores it.
+    """
+    member = _active_membership_or_404(course_id, permissions, db)
+    if not (member.properties or {}).get("self_registered") or (
+        member.course_role_id != "_student"
+    ):
+        raise ForbiddenException(
+            detail=(
+                "Only a course you joined yourself can be left here. "
+                "Please contact the course staff or support."
+            )
+        )
+
+    properties = dict(member.properties or {})
+    properties["left_at"] = datetime.now(timezone.utc).isoformat()
+    member.course_role_id = INACTIVE_COURSE_ROLE
+    member.properties = properties
+    member.updated_by = permissions.user_id
+    db.commit()
+    db.refresh(member)
+    logger.info("User %s left self-enrolled course %s", member.user_id, member.course_id)
+    return member
+
+
+def _active_membership_or_404(
+    course_id: UUID | str, permissions: Principal, db: Session
+) -> CourseMember:
+    member = (
+        db.query(CourseMember)
+        .filter(
+            CourseMember.course_id == str(course_id),
+            CourseMember.user_id == permissions.get_user_id_or_throw(),
+            CourseMember.course_role_id != INACTIVE_COURSE_ROLE,
+        )
+        .first()
+    )
+    if member is None:
+        raise PermissionDeniedAsNotFound(detail="You are not a member of this course.")
+    return member
+
+
+def assign_self_enrolled_to_group(db: Session, *, apply: bool) -> list[dict]:
+    """Move every self-enrolled learner into their course's group (issues#458).
+
+    One-off backfill for learners who joined before self-enrolment had a group
+    of its own and therefore sit in the course's oldest group or in
+    ``default``. Covers learners who left as well, so that joining again finds
+    them in place. Learners already in ``Selbsteinschreibung`` are skipped, so
+    a second run changes nothing.
+
+    Returns one row per learner that is (or with ``apply`` was) moved. Without
+    ``apply`` nothing is written, not even the groups.
+    """
+    members = (
+        db.query(CourseMember)
+        .filter(
+            CourseMember.properties["self_registered"].astext == "true",
+            CourseMember.course_role_id.in_(["_student", INACTIVE_COURSE_ROLE]),
+        )
+        .order_by(CourseMember.course_id, CourseMember.id)
+        .all()
+    )
+    groups: dict[str, Optional[CourseGroup]] = {}
+    moves: list[dict] = []
+    for member in members:
+        course_id = str(member.course_id)
+        if course_id not in groups:
+            groups[course_id] = (
+                db.query(CourseGroup)
+                .filter(
+                    CourseGroup.course_id == member.course_id,
+                    CourseGroup.title == SELF_REGISTRATION_GROUP_TITLE,
+                )
+                .first()
+            )
+        group = groups[course_id]
+        if group is not None and str(member.course_group_id) == str(group.id):
+            continue
+        moves.append(
+            {
+                "course_id": course_id,
+                "course_member_id": str(member.id),
+                "from_group_id": str(member.course_group_id) if member.course_group_id else None,
+            }
+        )
+        if not apply:
+            continue
+        if group is None:
+            group = resolve_registration_group(member.course, Principal(), db)
+            groups[course_id] = group
+        member.course_group_id = group.id
+    if apply:
+        db.commit()
+    return moves

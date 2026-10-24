@@ -19,6 +19,8 @@ import GradingStatusBadge, { isGradingVerdict } from '@/src/components/student/g
 import Toolbar from '@/src/components/ui/Toolbar';
 import TreeRow, { TreeRows } from '@/src/components/ui/TreeRow';
 import { formatUsageCompact } from '@/src/utils/limits';
+import { courseProgress } from '@/src/utils/studentProgress';
+import { CourseProgressSummary } from '@/src/components/student/CourseProgress';
 import type { CourseContentStudentList } from 'types/generated';
 
 const COPY = {
@@ -32,6 +34,9 @@ const COPY = {
     collapseAll: 'Alle einklappen',
     expandAll: 'Alle ausklappen',
     items: (n: number) => (n === 1 ? '1 Element' : `${n} Elemente`),
+    unitProgress: (s: number, n: number) => `${s}/${n} eingereicht`,
+    unitProgressTitle: (s: number, n: number) => `${s} von ${n} Aufgaben dieser Einheit eingereicht`,
+    nextUp: 'Weiter hier',
     submitted: 'Eingereicht',
     notSubmitted: 'Nicht eingereicht',
     usageTitle: 'Testläufe und Abgaben im Verhältnis zu deinem Kontingent',
@@ -50,6 +55,9 @@ const COPY = {
     collapseAll: 'Collapse all',
     expandAll: 'Expand all',
     items: (n: number) => `${n} ${n === 1 ? 'item' : 'items'}`,
+    unitProgress: (s: number, n: number) => `${s}/${n} submitted`,
+    unitProgressTitle: (s: number, n: number) => `${s} of ${n} assignments in this unit submitted`,
+    nextUp: 'Next up',
     submitted: 'Submitted',
     notSubmitted: 'Not submitted',
     usageTitle: 'Test runs and submissions used, against your budget',
@@ -91,6 +99,9 @@ export default function StudentCourseContentsPage() {
   // the container keeps the structure legible instead of flattening the tree.
   const { rows, setAllExpanded } = useContentTree(courseContents, { synthesiseContainers: true });
 
+  const progress = useMemo(() => courseProgress(courseContents), [courseContents]);
+  const nextId = progress.next?.item.id;
+
   const units = courseContents.filter((c) => c.course_content_kind_id === 'unit').length;
   const assignments = courseContents.filter((c) => c.course_content_kind_id === 'assignment').length;
 
@@ -121,6 +132,8 @@ export default function StudentCourseContentsPage() {
               />
             ) : (
               <>
+                <CourseProgressSummary courseId={courseId} progress={progress} language={language} compact />
+
                 <Toolbar>
                   <Button variant="ghost" size="sm" onClick={() => setAllExpanded(false)}>
                     {t.collapseAll}
@@ -133,6 +146,7 @@ export default function StudentCourseContentsPage() {
                 <TreeRows>
                   {rows.map(({ key, item, depth, label, expanded, hasChildren, toggle, childCount }) => {
                     const isAssignment = item?.course_content_kind_id === 'assignment';
+                    const unit = hasChildren ? progress.units.get(key) : undefined;
 
                     return (
                       <TreeRow
@@ -146,13 +160,29 @@ export default function StudentCourseContentsPage() {
                         label={label}
                       >
                         {!isAssignment && hasChildren && (
-                          <Badge tone="muted" className="shrink-0">
-                            {t.items(childCount)}
-                          </Badge>
+                          unit ? (
+                            <Badge
+                              tone={unit.submitted === unit.total ? 'success' : 'muted'}
+                              className="shrink-0 tabular-nums"
+                              title={t.unitProgressTitle(unit.submitted, unit.total)}
+                            >
+                              {t.unitProgress(unit.submitted, unit.total)}
+                            </Badge>
+                          ) : (
+                            <Badge tone="muted" className="shrink-0">
+                              {t.items(childCount)}
+                            </Badge>
+                          )
                         )}
 
                         {item && isAssignment && (
                           <>
+                            {item.id === nextId && (
+                              <Badge tone="info" className="shrink-0">
+                                {t.nextUp}
+                              </Badge>
+                            )}
+
                             {/* Only a verdict a human reached. `not_reviewed` is
                                 the default state of most of a semester, and a
                                 grey chip on every row of 72 would say nothing. */}
