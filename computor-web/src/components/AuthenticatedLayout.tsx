@@ -12,6 +12,7 @@ import NetideeNotice from './NetideeNotice';
 import { LEGAL_LINKS } from '@/src/config/legal';
 import { API_BASE_URL, apiGet, redirectToConsent } from '@/src/utils/apiClient';
 import type { ConsentStatusGet as ConsentStatus } from 'types/generated';
+import { loginPathFor } from '@/src/utils/safeRedirect';
 
 // Consent bootstrap check runs once per authenticated session per page load;
 // mid-session changes (withdrawal, policy version bump) are caught by the 403
@@ -26,7 +27,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       consentChecked = false;
-      router.push('/login');
+      router.push(loginPathFor(window.location));
     }
   }, [isAuthenticated, isLoading, router]);
 
