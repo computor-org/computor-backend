@@ -12,6 +12,8 @@ import os
 import re
 import secrets
 from html import escape
+from base64 import b64encode
+from hashlib import sha256
 from typing import Annotated, List, Optional
 from urllib.parse import urlencode, urlparse, urlsplit
 
@@ -868,21 +870,45 @@ def _workspace_auth_hint(request: Request, uri: str) -> Response:
         "Öffne Computor in einem neuen Browser-Tab, melde dich erneut an und lade anschließend diese Arbeitsumgebung neu."
         if german else "Open Computor in another browser tab, sign in again, then reload this workspace to open your results."
     )
+    # The native iframe may extend beyond the visible editor pane. Measure
+    # only this document's intersection, keeping its intrinsic width independent
+    # of the body so the same document can grow again after a mobile resize.
+    fit_script = """(() => {
+const sentinel = document.createElement('div');
+sentinel.setAttribute('aria-hidden', 'true');
+sentinel.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:1px;pointer-events:none';
+document.body.appendChild(sentinel);
+const intersection = new IntersectionObserver(entries => {
+    const width = entries[0]?.intersectionRect.width;
+    if (width > 0) document.body.style.maxWidth = Math.floor(width) + 'px';
+}, { threshold: Array.from({ length: 1001 }, (_, index) => index / 1000) });
+intersection.observe(sentinel);
+const resize = new ResizeObserver(() => {
+    intersection.unobserve(sentinel);
+    intersection.observe(sentinel);
+});
+resize.observe(sentinel);
+window.addEventListener('pagehide', () => {
+    resize.disconnect();
+    intersection.disconnect();
+}, { once: true });
+})();"""
+    fit_hash = b64encode(sha256(fit_script.encode()).digest()).decode()
     return HTMLResponse(
         status_code=401,
         headers={
             "Cache-Control": "no-store",
-            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'",
+            "Content-Security-Policy": f"default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-{fit_hash}'; base-uri 'none'; form-action 'none'",
             "Referrer-Policy": "no-referrer",
         },
         content=f"""<!doctype html><html lang="{'de' if german else 'en'}"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{escape(title)}</title><style>
 :root {{ color-scheme: light dark; }}
-body {{ font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 20px; color: CanvasText; background: Canvas; }}
+body {{ box-sizing: border-box; overflow-wrap: anywhere; font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 20px; color: CanvasText; background: Canvas; }}
 main {{ max-width: 36rem; }} h1 {{ font-size: 18px; }}
 </style></head><body><main><h1>{escape(title)}</h1><p>{escape(message)}</p>
-</main></body></html>""",
+</main><script>{fit_script}</script></body></html>""",
     )
 
 

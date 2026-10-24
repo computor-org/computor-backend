@@ -365,3 +365,41 @@ async def test_signed_in_native_webview_and_html_report_are_still_forwarded(monk
         ), _user())
         assert response.status_code == 200
         assert _body(response)["status"] == "authorized"
+
+
+@pytest.mark.asyncio
+async def test_expired_hint_csp_authorizes_only_its_local_sizing_script():
+    from base64 import b64encode
+    from hashlib import sha256
+    from html.parser import HTMLParser
+
+    class Scripts(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.active = False
+            self.source = ""
+
+        def handle_starttag(self, tag, attrs):
+            if tag == "script":
+                assert not dict(attrs).get("src")
+                self.active = True
+
+        def handle_endtag(self, tag):
+            if tag == "script":
+                self.active = False
+
+        def handle_data(self, data):
+            if self.active:
+                self.source += data
+
+    response = await verify_coder_access(_FakeRequest(
+        f"/coder/{USER_OWNER}/workspace/vscode/stable-example/static/pre/index.html",
+        headers={**_NAV_HEADERS, "Sec-Fetch-Dest": "iframe"},
+    ), None)
+    scripts = Scripts()
+    scripts.feed(response.body.decode())
+    digest = b64encode(sha256(scripts.source.encode()).digest()).decode()
+    directives = response.headers["content-security-policy"].split("; ")
+    assert f"script-src 'sha256-{digest}'" in directives
+    assert "default-src 'none'" in directives
+    assert response.headers["cache-control"] == "no-store"
