@@ -34,12 +34,12 @@ const COPY = {
     launch: 'Arbeitsumgebung starten',
     setUp: 'Arbeitsumgebung einrichten',
     setUpHint:
-      'Beim ersten Klick wird deine persönliche Arbeitsumgebung eingerichtet. Sie öffnet sich in einem neuen Tab mit diesem Kurs.',
+      'Hier programmierst, testest und gibst du ab. Öffnet diesen Kurs in einem neuen Tab.',
     openIn: (label: string) => `In ${label} öffnen`,
     startAndOpen: 'Starten und öffnen',
     startAgain: 'Erneut starten',
     openHint: (label: string) =>
-      `Öffnet ${label} in einem neuen Tab mit diesem Kurs. Deine Dateien bleiben erhalten.`,
+      `In ${label} programmieren, testen und abgeben. Dieser Kurs öffnet sich in einem neuen Tab. Deine Dateien bleiben erhalten.`,
     stopHint: (label: string) =>
       `Wenn du fertig bist, beende ${label} mit „Stoppen“. Schließt du nur den Tab, stoppt die Arbeitsumgebung nach einer Weile ohne Nutzung von selbst. Beim nächsten Start wird sie bei Bedarf aktualisiert.`,
     yours: 'Weitere Arbeitsumgebungen',
@@ -57,11 +57,11 @@ const COPY = {
     launch: 'Launch workspace',
     setUp: 'Set up workspace',
     setUpHint:
-      'The first click sets up your personal workspace. It opens in a new tab with this course.',
+      'Edit, test and submit here. Opens this course in a new tab.',
     openIn: (label: string) => `Open in ${label}`,
     startAndOpen: 'Start and open',
     startAgain: 'Start again',
-    openHint: (label: string) => `Opens ${label} in a new tab with this course. Your files are kept.`,
+    openHint: (label: string) => `Edit, test and submit in ${label}. Opens this course in a new tab. Your files are kept.`,
     stopHint: (label: string) =>
       `When you are done, shut down ${label} with Stop. If you only close the tab, the workspace stops by itself after a while without use. The next start updates the workspace if needed.`,
     yours: 'Other workspaces',
