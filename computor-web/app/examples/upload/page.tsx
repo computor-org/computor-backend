@@ -1,8 +1,10 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { useLecturerCopy } from '@/src/hooks/useLecturerCopy';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { ApiError } from '@/src/api/client';
 import { ExamplesClient } from '@/src/generated/clients/ExamplesClient';
 import { ExampleRepositoriesClient } from '@/src/generated/clients/ExampleRepositoriesClient';
 import { useAuth } from '@/src/contexts/AuthContext';
@@ -22,11 +24,12 @@ const exampleRepositoriesClient = new ExampleRepositoriesClient();
 const DIR_OK = /^[a-zA-Z0-9._-]+$/;
 
 interface UploadRow extends DiscoveredExample {
-  status: 'pending' | 'uploading' | 'ok' | 'error';
+  status: 'pending' | 'uploading' | 'ok' | 'existing' | 'error';
   message?: string;
 }
 
 function UploadInner() {
+  const t = useLecturerCopy();
   const router = useRouter();
   const initialRepo = useSearchParam('repository');
   const forcedDirectory = useSearchParam('directory');
@@ -37,29 +40,29 @@ function UploadInner() {
   const [repos, setRepos] = useState<ExampleRepositoryList[]>([]);
   const [repoId, setRepoId] = useState(initialRepo);
   const [rows, setRows] = useState<UploadRow[]>([]);
+  const [fileName, setFileName] = useState('');
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      const all = await exampleRepositoriesClient.listExampleRepositoriesExampleRepositoriesGet({ limit: 200 });
-      const uploadable = all.filter((r) => r.source_type === 'minio' || r.source_type === 's3');
-      setRepos(uploadable);
-      if (!initialRepo && uploadable.length === 1) setRepoId(uploadable[0].id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load repositories');
-    }
-  }, [initialRepo]);
-
   useEffect(() => {
     if (authLoading || !isAuthenticated || !canManage) return;
-    load();
-  }, [authLoading, isAuthenticated, canManage, load]);
+    let cancelled = false;
+    exampleRepositoriesClient.listExampleRepositoriesExampleRepositoriesGet({ limit: 200 })
+      .then(all => {
+        if (cancelled) return;
+        const uploadable = all.filter(r => r.source_type === 'minio' || r.source_type === 's3');
+        setRepos(uploadable);
+        if (!initialRepo && uploadable.length === 1) setRepoId(uploadable[0].id);
+      })
+      .catch(() => { if (!cancelled) setError(t('Failed to load repositories')); });
+    return () => { cancelled = true; };
+  }, [authLoading, isAuthenticated, canManage, initialRepo, t]);
 
   async function onPickZip(file: File | undefined) {
     if (!file) return;
+    setFileName(file.name);
     setParsing(true);
     setParseError(null);
     setRows([]);
@@ -70,8 +73,8 @@ function UploadInner() {
       const adjusted =
         forcedDirectory && discovered.length === 1 ? [{ ...discovered[0], directory: forcedDirectory }] : discovered;
       setRows(adjusted.map((d) => ({ ...d, status: 'pending' })));
-    } catch (e) {
-      setParseError(e instanceof Error ? e.message : 'Could not read the zip');
+    } catch {
+      setParseError(t('Could not read the zip'));
     } finally {
       setParsing(false);
     }
@@ -82,6 +85,7 @@ function UploadInner() {
     setUploading(true);
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
+      if (row.status === 'ok' || row.status === 'existing') continue;
       setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, status: 'uploading', message: undefined } : r)));
       try {
         const v = await examplesClient.uploadExampleExamplesUploadPost({
@@ -93,65 +97,72 @@ function UploadInner() {
         });
         setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, status: 'ok', message: `v${v.version_tag ?? ''}` } : r)));
       } catch (e) {
-        setRows((rs) =>
-          rs.map((r, idx) => (idx === i ? { ...r, status: 'error', message: e instanceof Error ? e.message : 'Upload failed' } : r)),
-        );
+        const exists = e instanceof ApiError && e.errorCode === 'VERSION_001';
+        setRows((rs) => rs.map((r, idx) => idx === i ? {
+          ...r,
+          status: exists ? 'existing' : 'error',
+          message: t(exists
+            ? 'This version already exists and was kept. Use a new version tag for changed files.'
+            : 'Upload failed. Check the example and try again.'),
+        } : r));
       }
     }
     setUploading(false);
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return <Forbidden message="You do not have access to examples." backLink="/examples" backText="Back" />;
+    return <Forbidden message={t("You do not have access to examples.")} backLink="/examples" backText={t("Back")} />;
   }
 
   const dirsValid = rows.length > 0 && rows.every((r) => DIR_OK.test(r.directory));
-  const allDone = rows.length > 0 && rows.every((r) => r.status === 'ok' || r.status === 'error');
+  const allDone = rows.length > 0 && rows.every((r) => r.status === 'ok' || r.status === 'existing' || r.status === 'error');
 
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
-        <PageHeader
-          breadcrumbs={[{ label: 'Examples', href: '/examples' }, { label: 'Upload' }]}
-          title="Upload examples"
-          subtitle={
-            <>
-              Choose a repository and a .zip of one example (a root <code className="font-mono">meta.yaml</code>) or several
-              (each in its own folder with a <code className="font-mono">meta.yaml</code>).
-            </>
-          }
-          actions={
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => router.push('/examples')}
-                className="px-4 py-2 text-sm text-muted hover:bg-sunken rounded-lg"
-              >
-                {allDone ? 'Done' : 'Cancel'}
-              </button>
-              <button
-                type="button"
-                onClick={runUpload}
-                disabled={uploading || rows.length === 0 || !dirsValid || !repoId || allDone}
-                className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
-              >
-                {uploading ? 'Uploading…' : `Upload ${rows.length || ''}`}
-              </button>
-            </div>
-          }
-        />
+        <div className="[&>div>div]:flex-wrap [&>div>div>div]:flex-wrap">
+          <PageHeader
+            breadcrumbs={[{ label: t("Examples"), href: '/examples' }, { label: t("Upload") }]}
+            title={t("Upload examples")}
+            subtitle={
+              <>
+                {t('Choose a ZIP file containing one or more examples. Each example needs a meta.yaml file in its folder.')}
+              </>
+            }
+            actions={
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => router.push('/examples')}
+                  className="px-4 py-2 text-sm text-muted hover:bg-sunken rounded-lg"
+                >
+                  {allDone ? t("Done") : t("Cancel")}
+                </button>
+                <button
+                  type="button"
+                  onClick={runUpload}
+                  disabled={uploading || rows.length === 0 || !dirsValid || !repoId || !rows.some(r => r.status === 'pending' || r.status === 'error')}
+                  className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
+                >
+                  {uploading ? t("Uploading…") : `${t('Upload')} ${rows.length || ''}`}
+                </button>
+              </div>
+            }
+          />
+        </div>
 
         <ErrorBanner>{error}</ErrorBanner>
 
         <ScrollArea>
           <div className="max-w-2xl">
+            {allDone && <p role="status" className="mb-4 text-sm text-muted">{t('Uploaded')}: {rows.filter(r => r.status === 'ok').length}. {t('Already exists')}: {rows.filter(r => r.status === 'existing').length}. {t('Failed')}: {rows.filter(r => r.status === 'error').length}.</p>}
             <div className="bg-surface border border-rule rounded-lg p-6 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-body mb-1">Repository</label>
+                <label className="block text-xs font-medium text-body mb-1">{t("Repository")}</label>
                 {repos.length === 0 ? (
                   <p className="text-sm text-muted">
-                    No uploadable (MinIO/S3) repository.{' '}
-                    <Link href="/example-repositories/create" className="text-accent-text hover:underline">Create one first</Link>.
+                    {t('No uploadable repository.')} {' '}
+                    <Link href="/example-repositories/create" className="text-accent-text hover:underline">{t('Create one first')}</Link>.
                   </p>
                 ) : (
                   <select
@@ -159,51 +170,50 @@ function UploadInner() {
                     onChange={(e) => setRepoId(e.target.value)}
                     className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line"
                   >
-                    <option value="">— select a repository —</option>
+                    <option value="">{t('Select a repository')}</option>
                     {repos.map((r) => (
-                      <option key={r.id} value={r.id}>{r.name} ({r.source_type})</option>
+                      <option key={r.id} value={r.id}>{r.name === 'Default Examples' ? t('Default Examples') : r.name} ({r.source_type})</option>
                     ))}
                   </select>
                 )}
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-body mb-1">Zip file</label>
-                <input
-                  type="file"
-                  accept=".zip,application/zip"
-                  onChange={(e) => onPickZip(e.target.files?.[0])}
-                  className="block w-full text-sm text-muted file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-accent-wash file:text-accent-text file:text-sm file:font-medium hover:file:bg-accent-wash"
-                />
+                <label className="block text-xs font-medium text-body mb-1">{t("Zip file")}</label>
+                <label className="inline-flex cursor-pointer rounded-lg bg-accent-wash px-4 py-2 text-sm font-medium text-accent-text focus-within:ring-2 focus-within:ring-accent-line">
+                  {t('Choose ZIP file')}
+                  <input type="file" accept=".zip,application/zip" onChange={(e) => onPickZip(e.target.files?.[0])} className="sr-only" />
+                </label>
+                <p className="mt-2 break-words text-sm text-muted">{fileName || t('No file selected')}</p>
               </div>
 
-              {parsing && <div className="text-sm text-muted">Reading zip…</div>}
+              {parsing && <div className="text-sm text-muted">{t("Reading zip…")}</div>}
               <ErrorBanner>{parseError}</ErrorBanner>
 
               {rows.length > 0 && (
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-muted">Discovered {rows.length} example{rows.length > 1 ? 's' : ''}</div>
+                  <div className="text-xs font-medium text-muted">{t('Examples found')}: {rows.length}</div>
                   {rows.map((r, i) => (
-                    <div key={i} className="flex items-center gap-3 border border-rule rounded-lg px-3 py-2">
+                    <div key={i} className="flex flex-wrap items-center gap-3 border border-rule rounded-lg px-3 py-2">
                       <input
                         value={r.directory}
-                        disabled={uploading || r.status === 'ok'}
+                        disabled={uploading || r.status === 'ok' || r.status === 'existing'}
                         onChange={(e) => setRows((rs) => rs.map((x, idx) => (idx === i ? { ...x, directory: e.target.value } : x)))}
-                        className={`flex-1 px-2 py-1 border rounded text-sm font-mono ${DIR_OK.test(r.directory) ? 'border-rule-strong' : 'border-danger-line'}`}
+                        className={`min-w-0 basis-full sm:basis-auto flex-1 px-2 py-1 border rounded text-sm font-mono ${DIR_OK.test(r.directory) ? 'border-rule-strong' : 'border-danger-line'}`}
                       />
-                      <span className="text-xs text-subtle shrink-0">{r.fileCount} files</span>
+                      <span className="text-xs text-subtle shrink-0">{t('Files')}: {r.fileCount}</span>
                       <span
-                        className={`text-xs shrink-0 w-40 truncate text-right ${
-                          r.status === 'ok' ? 'text-success-text' : r.status === 'error' ? 'text-danger-text' : r.status === 'uploading' ? 'text-warn-text' : 'text-subtle'
+                        className={`text-xs break-words text-right ${
+                          r.status === 'ok' || r.status === 'existing' ? 'text-success-text' : r.status === 'error' ? 'text-danger-text' : r.status === 'uploading' ? 'text-warn-text' : 'text-subtle'
                         }`}
                         title={r.message}
                       >
-                        {r.status === 'pending' ? 'ready' : r.status === 'uploading' ? 'uploading…' : r.status === 'ok' ? `uploaded ${r.message ?? ''}` : r.message}
+                        {r.status === 'pending' ? t("ready") : r.status === 'uploading' ? t("uploading…") : r.status === 'ok' ? `${t('uploaded')} ${r.message ?? ''}` : r.message}
                       </span>
                     </div>
                   ))}
                   {!dirsValid && (
-                    <p className="text-xs text-danger-text">Directory names may only contain letters, numbers, dots, dashes and underscores.</p>
+                    <p className="text-xs text-danger-text">{t("Directory names may only contain letters, numbers, dots, dashes and underscores.")}</p>
                   )}
                 </div>
               )}
