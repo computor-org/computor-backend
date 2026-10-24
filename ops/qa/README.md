@@ -52,6 +52,15 @@ yanked, so workspaces keep that VSIX instead of updating to the approved one;
 running workspaces get it at their next start; `--vsix none` returns to the
 git build.
 
+On `up` and state-preserving `deploy`, the controller hashes theme paths and
+bytes from the mounted backend checkout. If an existing Keycloak process has
+not acknowledged that digest, only QA Keycloak restarts to clear its theme
+metadata cache. Newly created containers already load the current theme and
+need no extra restart. The digest is recorded atomically only after Keycloak
+is healthy. An existing stack without a digest refreshes once rather than
+marking potentially stale cached metadata as current. This retains Keycloak's
+database, users and sessions along with the rest of the QA state.
+
 The content and examples refs shown by `status` identify the baseline imports.
 They do not track later lecturer edits or uploads. Record the actual course
 manifest, example versions and their source revisions separately when rehearsing

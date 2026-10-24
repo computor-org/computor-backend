@@ -434,6 +434,47 @@ images_present() {
 
 # ------------------------------------------------------------ lifecycle ----
 
+keycloak_theme_digest() {
+    python3 - "$SRC/data/keycloak/themes" <<'PY'
+import hashlib
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+files = sorted(path for path in root.rglob('*') if path.is_file())
+if not files:
+    raise SystemExit('Keycloak themes are missing')
+digest = hashlib.sha256()
+for path in files:
+    data = path.read_bytes()
+    digest.update(path.relative_to(root).as_posix().encode() + b'\0')
+    digest.update(len(data).to_bytes(8, 'big'))
+    digest.update(data)
+print(digest.hexdigest())
+PY
+}
+
+start_services() {
+    local before after digest applied="" marker="$QA_HOME/keycloak-theme.sha256"
+    digest=$(keycloak_theme_digest)
+    before=$(qa_compose ps -q keycloak)
+    [ ! -f "$marker" ] || applied=$(cat "$marker")
+    qa_compose up -d --remove-orphans
+    after=$(qa_compose ps -q keycloak)
+    [ -n "$after" ] || die "Keycloak container missing after startup"
+    # A fresh process loads the mounted theme itself. Existing processes cache
+    # theme metadata even when the bind-mounted files change. An absent marker
+    # on an existing container is unknown, not proof that it loaded this theme.
+    if [ -n "$before" ] && [ "$before" = "$after" ] && [ "$applied" != "$digest" ]; then
+        log "refreshing QA Keycloak after theme changes"
+        qa_compose restart --no-deps keycloak
+    fi
+    wait_healthy keycloak 600
+    # Never acknowledge a theme before the process serving it is healthy.
+    (umask 077; printf '%s\n' "$digest" > "$marker.tmp")
+    mv "$marker.tmp" "$marker"
+}
+
 wait_healthy() {
     local service=$1 timeout=${2:-600} waited=0 cid state
     while :; do
@@ -499,8 +540,7 @@ cmd_up() {
     stage_runtime_files
     images_present || build_images
     log "starting the stack"
-    qa_compose up -d --remove-orphans
-    wait_healthy keycloak 600
+    start_services
     wait_healthy uvicorn 600
     keycloak_setup
     if [ ! -f "$QA_HOME/.seeded" ]; then
@@ -650,8 +690,7 @@ cmd_deploy() {
         cmd_reset
         return
     fi
-    qa_compose up -d --remove-orphans
-    wait_healthy keycloak 600
+    start_services
     wait_healthy uvicorn 600
     keycloak_setup
     if [ -n "$vsix" ] || [ -n "$backend_ref" ]; then
