@@ -51,6 +51,7 @@ class WorkspaceLaunchContextRequest(BaseModel):
     """Course navigation requested when opening an existing workspace."""
 
     course_id: UUID
+    course_content_id: Optional[UUID] = None
     ui_language: Optional[Literal["de", "en"]] = None
 
 
@@ -58,6 +59,7 @@ class WorkspaceLaunchContext(BaseModel):
     """Short-lived navigation context; does not change workspace provisioning."""
 
     course_id: UUID
+    course_content_id: Optional[UUID] = None
     ui_language: Optional[Literal["de", "en"]] = None
     request_id: UUID
     expires_at: datetime

@@ -801,6 +801,7 @@ async def post_workspace_launch_context(
         return await set_workspace_launch_context(
             username, workspace_name, request.course_id, permissions, db, client, redis,
             ui_language=request.ui_language,
+            course_content_id=request.course_content_id,
         )
     except ComputorException:
         raise

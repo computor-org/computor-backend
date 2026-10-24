@@ -13,7 +13,6 @@ import { useResource } from '@/src/hooks/useResource';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
-import { loginPathFor } from '@/src/utils/safeRedirect';
 import { rememberWorkspaceCourse } from '@/src/utils/workspaceLaunch';
 import { AGENT_LIFECYCLE_GAVE_UP, type WorkspaceDetails, type WorkspaceLaunchContext } from '@/src/types/workspaces';
 
@@ -21,6 +20,7 @@ const coderClient = new CoderClient();
 
 const COPY = {
   de: {
+    selectionNotOpened: 'Deine Auswahl konnte in deiner Arbeitsumgebung nicht geöffnet werden. Versuch es noch einmal.',
     courseNotSelected: 'Der Kurs konnte in deiner Arbeitsumgebung nicht ausgewählt werden. Versuch es noch einmal.',
     courseNotSelectedShort: 'Der Kurs konnte in deiner Arbeitsumgebung nicht ausgewählt werden.',
     startFailed: 'Die Arbeitsumgebung konnte nicht gestartet werden.',
@@ -40,6 +40,7 @@ const COPY = {
     wasStopped: 'Deine Arbeitsumgebung war angehalten, zum Beispiel weil sie eine Zeit lang nicht benutzt wurde. Deine Dateien sind noch da.',
   },
   en: {
+    selectionNotOpened: 'Your selection could not be opened in your workspace. Please retry.',
     courseNotSelected: 'The course could not be selected in your workspace. Please retry.',
     courseNotSelectedShort: 'The course could not be selected in your workspace.',
     startFailed: 'The workspace failed to start.',
@@ -87,6 +88,7 @@ function LaunchWorkspace() {
   const owner = useSearchParam('owner');
   const name = useSearchParam('name');
   const courseId = useSearchParam('courseId');
+  const courseContentId = useSearchParam('courseContentId');
   // Creation parks the tab here before the workspace's name is known — the
   // opener replaces the URL (or closes the tab) once provisioning returns.
   const creating = Boolean(useSearchParam('creating'));
@@ -116,7 +118,7 @@ function LaunchWorkspace() {
   const redirected = useRef(false);
   const launchFailed = useRef(false);
   const mounted = useRef(false);
-  const contextRequest = useRef<Promise<WorkspaceLaunchContext> | null>(null);
+  const contextRequest = useRef<{ key: string; promise: Promise<WorkspaceLaunchContext> } | null>(null);
   const graceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /**
    * Whether the workspace has reported anything other than `failed` since we
@@ -140,23 +142,40 @@ function LaunchWorkspace() {
   // grace timer must not race past a context handoff still in flight. Keeping
   // the promise also prevents StrictMode/repeated polls creating new requests.
   const handOffCourse = useCallback(async () => {
-    if (!courseId) return;
-    contextRequest.current ??= coderClient.setWorkspaceLaunchContext({
-      username: owner, workspaceName: name, courseId, uiLanguage: language,
+    if (!courseId) {
+      if (courseContentId) throw new Error(tRef.current.selectionNotOpened);
+      return;
+    }
+    const key = JSON.stringify([owner, name, courseId, courseContentId, language]);
+    if (contextRequest.current?.key !== key) {
+      contextRequest.current = {
+        key,
+        promise: coderClient.setWorkspaceLaunchContext({
+          username: owner, workspaceName: name, courseId, uiLanguage: language,
+          courseContentId: courseContentId || undefined,
+        }),
+      };
+    }
+    const context = await contextRequest.current.promise.catch((error: unknown) => {
+      if (courseContentId) throw new Error(tRef.current.selectionNotOpened);
+      throw error;
     });
-    const context = await contextRequest.current;
     if (context.course_id !== courseId) {
       throw new Error(tRef.current.courseNotSelected);
     }
+    if (courseContentId && context.course_content_id !== courseContentId) {
+      throw new Error(tRef.current.selectionNotOpened);
+    }
     rememberWorkspaceCourse(owner, name, courseId);
-  }, [owner, name, courseId, language]);
+  }, [owner, name, courseId, courseContentId, language]);
 
   // An expired session must come back here after login, not on the dashboard:
   // reloading a workspace tab after the idle auto-stop lands on this page with
   // the login usually expired as well (computor-org/issues#379).
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.replace(loginPathFor(window.location));
+      const back = `${window.location.pathname}${window.location.search}`;
+      router.replace(`/login?next=${encodeURIComponent(back)}`);
     }
   }, [isAuthenticated, authLoading, router]);
 

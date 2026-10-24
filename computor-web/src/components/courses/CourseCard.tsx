@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { ReactNode } from 'react';
+import { ReactNode, type Ref } from 'react';
 import Badge from '@/src/components/Badge';
-import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
+import CourseWorkspaceLaunchButtons, { type CourseWorkspaceLauncher } from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import { displayName } from '@/src/utils/displayName';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { localizedRoleLabel } from '@/src/utils/courseRoles';
@@ -41,7 +41,7 @@ export default function CourseCard({
   href,
   badge,
   footer,
-  selected = false,
+  workspaceLauncherRef,
 }: {
   course: { id: string; title?: string | null; path?: string | null; language_code?: string | null; description?: string | null };
   /** Course role, when the viewer has one. Also gates the workspace launchers. */
@@ -51,8 +51,7 @@ export default function CourseCard({
   /** Overrides the default role badge. */
   badge?: ReactNode;
   footer?: ReactNode;
-  /** Marks the course the visitor came to join (catalog `?join=`). */
-  selected?: boolean;
+  workspaceLauncherRef?: Ref<CourseWorkspaceLauncher>;
 }) {
   const language = useUiLanguage();
   const t = COPY[language];
@@ -83,13 +82,7 @@ export default function CourseCard({
   );
 
   return (
-    <div
-      id={`course-${course.id}`}
-      aria-current={selected ? 'true' : undefined}
-      className={`bg-surface rounded-lg border p-6 hover:shadow-lg transition-all h-full flex flex-col ${
-        selected ? 'border-accent ring-2 ring-accent-line' : 'border-rule'
-      }`}
-    >
+    <div className="bg-surface rounded-lg border border-rule p-6 hover:shadow-lg transition-all h-full flex flex-col">
       {href ? (
         // The launch buttons live OUTSIDE the Link: nesting them in the anchor
         // would both be invalid HTML and still navigate the card on an icon click.
@@ -102,7 +95,7 @@ export default function CourseCard({
 
       {/* Template icon launchers; hides itself when the course offers no
           workspaces. Members only — the fetch would 403 without a role. */}
-      {role && <CourseWorkspaceLaunchButtons courseId={course.id} compact className="mb-4" />}
+      {role && <CourseWorkspaceLaunchButtons ref={workspaceLauncherRef} courseId={course.id} compact className="mb-4" />}
 
       {footer && (
         <div className="flex items-center justify-end pt-4 border-t border-rule mt-auto gap-3">

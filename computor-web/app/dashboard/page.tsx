@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import type { CourseWorkspaceLauncher } from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
@@ -107,7 +108,15 @@ function SectionHeading({ title, href, linkLabel }: { title: string; href?: stri
  */
 export default function DashboardPage() {
   const { user, isAuthenticated } = useAuth();
-  const { courseRole } = usePermissions();
+  const { courseRole, isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
+  const courseLaunchers = useRef(new Map<string, CourseWorkspaceLauncher>());
+  const openAssignment = (courseId: string, contentId: string) => {
+    if (isAdmin || isOrganizationManager || !courseHasAtLeast(courseId, '_student') || courseHasAtLeast(courseId, '_tutor')) return false;
+    const launcher = courseLaunchers.current.get(courseId);
+    if (launcher) launcher.launch(contentId);
+    else window.location.assign(`/courses/${courseId}/student/assignments/${contentId}`);
+    return true;
+  };
   const t = COPY[useUiLanguage()];
 
   const { data, loading, error } = useResource(async () => {
@@ -259,6 +268,10 @@ export default function DashboardPage() {
                     <CourseCard
                       key={course.id}
                       course={course}
+                      workspaceLauncherRef={(launcher) => {
+                        if (launcher) courseLaunchers.current.set(course.id, launcher);
+                        else courseLaunchers.current.delete(course.id);
+                      }}
                       role={courseRole(course.id)}
                       href={`/courses/${course.id}`}
                       footer={<ViewCourseLink courseId={course.id} />}
@@ -271,7 +284,7 @@ export default function DashboardPage() {
             {attention.length > 0 && (
               <section>
                 <SectionHeading title={t.sentBackHeading} />
-                <NeedsAttention items={attention} />
+                <NeedsAttention items={attention} onOpenAssignment={openAssignment} />
               </section>
             )}
 

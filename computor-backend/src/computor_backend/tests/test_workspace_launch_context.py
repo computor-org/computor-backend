@@ -20,7 +20,8 @@ import computor_backend.business_logic.workspace_launch_context as launch
 from computor_backend.coder.exceptions import CoderWorkspaceNotFoundError
 from computor_backend.coder.naming import encode_coder_username
 from computor_backend.exceptions import ForbiddenException, NotFoundException
-from computor_backend.model.course import Course, CourseMember
+from computor_backend.model.course import Course, CourseMember, CourseContent
+from computor_backend.model.deployment import CourseContentDeployment
 from computor_backend.model.workspace import (
     CourseWorkspaceTemplate,
     WorkspaceTemplateSettings,
@@ -44,6 +45,8 @@ def _matches(row, expression):
     expected = getattr(expression.right, "value", None)
     if isinstance(expression.right, (False_, True_)):
         expected = isinstance(expression.right, True_)
+    if expression.operator is operators.in_op:
+        return str(actual) in {str(value) for value in expected}
     if expression.operator in (operators.is_, operators.eq):
         return actual is expected if actual is None or expected is None else str(actual) == str(expected)
     if expression.operator in (operators.is_not, operators.ne):
@@ -55,6 +58,7 @@ def _db(rows):
     db = MagicMock()
 
     def query(model):
+        model = getattr(model, "class_", model)
         filters = []
         q = MagicMock()
 
@@ -399,3 +403,97 @@ async def test_unknown_language_in_stored_context_is_discarded(context):
     context.redis.values[key] = json.dumps(payload)
     assert await _get(context) is None
     assert key not in context.redis.values
+
+
+TARGET = UUID("a1111111-1111-4111-8111-111111111111")
+
+
+def _assignment(ctx):
+    target = SimpleNamespace(id=str(TARGET), course_id=str(COURSE_A), path="unit.exercise",
+                             course_content_kind_id="assignment", is_submittable=True,
+                             visible=None, archived_at=None)
+    ctx.rows[CourseContent] = [target]
+    deployment = SimpleNamespace(course_content_id=str(TARGET), deployed_at=datetime.now(timezone.utc),
+                                 deployment_status="deployed")
+    ctx.rows[CourseContentDeployment] = [deployment]
+    return target, deployment
+
+
+async def _set_target(ctx, target=TARGET):
+    return await launch.set_workspace_launch_context(
+        OWNER, "vscode", COURSE_A, ctx.permissions, ctx.db, ctx.client, ctx.redis,
+        course_content_id=target,
+    )
+
+
+@pytest.mark.asyncio
+async def test_exact_assignment_roundtrip_and_repeated_clicks_get_fresh_requests(context):
+    _assignment(context)
+    first = await _set_target(context)
+    assert first.course_content_id == TARGET
+    assert await _get(context) == first
+    second = await _set_target(context)
+    assert second.course_content_id == TARGET
+    assert second.request_id != first.request_id
+    assert await _get(context) == second
+    # A generic course launch replaces the explicit target instead of reusing it.
+    legacy = await _set(context)
+    assert legacy.course_content_id is None
+    assert await _get(context) == legacy
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("invalid", ["missing", "other-course", "unsupported-kind", "archived", "hidden", "hidden-parent", "unreleased", "unassigned"])
+async def test_unavailable_assignment_is_rejected_on_write_and_revoked_on_read(context, invalid):
+    target, deployment = _assignment(context)
+    await _set_target(context)
+    if invalid == "missing": context.rows[CourseContent] = []
+    elif invalid == "other-course": target.course_id = str(COURSE_B)
+    elif invalid == "unsupported-kind": target.course_content_kind_id = "unsupported"
+    elif invalid == "archived": target.archived_at = datetime.now(timezone.utc)
+    elif invalid == "hidden": target.visible = False
+    elif invalid == "hidden-parent":
+        context.rows[CourseContent].append(SimpleNamespace(id="parent", course_id=str(COURSE_A), path="unit", visible=False))
+    elif invalid == "unreleased": deployment.deployed_at = None
+    elif invalid == "unassigned": deployment.deployment_status = "unassigned"
+    assert await _get(context) is None
+    assert launch._key(USER_ID, context.workspace.id) not in context.redis.values
+    with pytest.raises(NotFoundException): await _set_target(context)
+
+
+@pytest.mark.asyncio
+async def test_previously_released_assignment_remains_available_during_version_update(context):
+    _, deployment = _assignment(context)
+    deployment.deployment_status = "pending"
+    assert (await _set_target(context)).course_content_id == TARGET
+
+
+def test_assignment_target_request_rejects_invalid_uuid_and_preserves_null_legacy():
+    from pydantic import ValidationError
+    from computor_types.coder import WorkspaceLaunchContextRequest
+    assert WorkspaceLaunchContextRequest(course_id=COURSE_A).course_content_id is None
+    assert WorkspaceLaunchContextRequest(course_id=COURSE_A, course_content_id=None).course_content_id is None
+    with pytest.raises(ValidationError):
+        WorkspaceLaunchContextRequest(course_id=COURSE_A, course_content_id="not-an-id")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("invalid", [None, "other-course", "hidden", "hidden-parent"])
+async def test_unit_target_uses_native_student_visibility_without_assignment_release(context, invalid):
+    target, _ = _assignment(context)
+    target.course_content_kind_id = "unit"
+    target.is_submittable = False
+    context.rows[CourseContentDeployment] = []
+    assert (await _set_target(context)).course_content_id == TARGET
+    assert (await _get(context)).course_content_id == TARGET
+    if invalid is None:
+        return
+    if invalid == "other-course":
+        target.course_id = str(COURSE_B)
+    elif invalid == "hidden":
+        target.visible = False
+    else:
+        context.rows[CourseContent].append(SimpleNamespace(id="parent", course_id=str(COURSE_A), path="unit", visible=False))
+    assert await _get(context) is None
+    with pytest.raises(NotFoundException):
+        await _set_target(context)

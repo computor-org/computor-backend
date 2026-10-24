@@ -16,11 +16,12 @@ from redis.asyncio import Redis
 from sqlalchemy.orm import Session
 
 from computor_backend.business_logic.course_workspaces import is_template_enabled
+from computor_backend.business_logic.content_visibility import is_student_visible
 from computor_backend.coder.client import CoderClient
 from computor_backend.coder.exceptions import CoderNotFoundError
 from computor_backend.coder.naming import coder_username_matches_user
 from computor_backend.exceptions import ForbiddenException, NotFoundException
-from computor_backend.model.course import Course
+from computor_backend.model.course import Course, CourseContent
 from computor_backend.model.workspace import CourseWorkspaceTemplate
 from computor_backend.permissions.course_access import get_course_member_or_403
 from computor_backend.permissions.principal import Principal
@@ -65,7 +66,7 @@ def _last_course_key(user_id: str, workspace_id: str) -> str:
 
 def _require_course(
     course_id: UUID, permissions: Principal, db: Session, workspace: CoderWorkspace,
-) -> None:
+) -> Course:
     # This helper checks an actual membership row, even for administrators,
     # rather than accepting a possibly stale token's cached course claims.
     # PostgreSQL UUID columns use as_uuid=False: keep API DTOs typed as UUID,
@@ -82,12 +83,30 @@ def _require_course(
     ).first()
     if not template_name or allowed is None or not is_template_enabled(db, template_name):
         raise ForbiddenException(detail="This workspace template is not enabled for the course.")
+    return course
+
+
+def _require_target(
+    course_id: UUID, course_content_id: UUID | None, db: Session, course: Course,
+) -> None:
+    if course_content_id is None:
+        return
+    target = db.query(CourseContent).filter(
+        CourseContent.id == str(course_content_id),
+        CourseContent.course_id == str(course_id),
+    ).first()
+    # This is learner navigation, even when the caller also has staff claims.
+    # Use the student visibility/release authority, including ancestor vetoes.
+    if (target is None or target.course_content_kind_id not in {"assignment", "unit"}
+            or target.archived_at is not None or not is_student_visible(db, target, course=course)):
+        raise NotFoundException(detail="Course content is not available.")
 
 
 async def set_workspace_launch_context(
     username: str, workspace_name: str, course_id: UUID, permissions: Principal,
     db: Session, client: CoderClient, redis: Redis,
     ui_language: Literal["de", "en"] | None = None,
+    course_content_id: UUID | None = None,
 ) -> WorkspaceLaunchContext:
     """Replace this owner's navigation request, without starting/rebuilding."""
     try:
@@ -96,9 +115,11 @@ async def set_workspace_launch_context(
         )
     except CoderNotFoundError as exc:
         raise NotFoundException(detail="Workspace was not found.") from exc
-    _require_course(course_id, permissions, db, workspace)
+    course = _require_course(course_id, permissions, db, workspace)
+    _require_target(course_id, course_content_id, db, course)
     context = WorkspaceLaunchContext(
         course_id=course_id,
+        course_content_id=course_content_id,
         ui_language=ui_language,
         request_id=uuid4(),
         expires_at=datetime.now(timezone.utc) + timedelta(seconds=LAUNCH_CONTEXT_TTL),
@@ -153,7 +174,8 @@ async def get_workspace_launch_context(
             now < context.expires_at <= now + timedelta(seconds=LAUNCH_CONTEXT_TTL)
         ):
             raise ValueError("Expired or invalid launch context")
-        _require_course(context.course_id, permissions, db, workspace)
+        course = _require_course(context.course_id, permissions, db, workspace)
+        _require_target(context.course_id, context.course_content_id, db, course)
     except (ValidationError, ValueError, ForbiddenException, NotFoundException):
         await redis.delete(key)
         return None
