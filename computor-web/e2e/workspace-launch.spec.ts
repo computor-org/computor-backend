@@ -588,15 +588,16 @@ test('a primary course launch does not substitute a scratch workspace or another
   await launchTab.close();
 });
 
-test('the course page offers one state-aware control for the personal workspace', async ({ page }) => {
+test('staff Overview offers one state-aware control for the personal workspace', async ({ page }) => {
   // Read on every listing request, so the polled section follows each change.
   const workspaces: Partial<typeof COURSE_WORKSPACE>[] = [];
   await setup(page, [details({ status: 'running', ready: true, name: 'vscode' })], {
     courseWorkspaces: true,
+    courseRoles: ['_lecturer'],
     workspaces,
   });
   const card = page.locator('div', { has: page.getByRole('heading', { name: 'Workspaces', exact: true }) }).last();
-  await page.goto(`/courses/${COURSE_A}/student/assignments`);
+  await page.goto(`/courses/${COURSE_A}`);
 
   // None yet: only the tile that sets the workspace up, with what to expect.
   await expect(card.getByRole('button', { name: /VS Code.*Set up workspace/s })).toBeVisible();
@@ -625,11 +626,11 @@ test('the course page offers one state-aware control for the personal workspace'
   await expect(card.getByRole('button', { name: 'Open in VS Code' })).toHaveCount(0);
 });
 
-test('Stop on the course page stops the personal workspace without opening it', async ({ page }) => {
+test('Stop on staff Overview stops the personal workspace without opening it', async ({ page }) => {
   const { stops, contexts, starts, provisions } = await setup(page, [
     details({ status: 'running', ready: true, name: 'vscode' }),
-  ], { courseWorkspaces: true });
-  await page.goto(`/courses/${COURSE_A}/student/assignments`);
+  ], { courseWorkspaces: true, courseRoles: ['_lecturer'] });
+  await page.goto(`/courses/${COURSE_A}`);
   await page.getByRole('button', { name: 'Stop', exact: true }).click();
   await expect.poll(() => stops).toEqual(['/coder/workspaces/u-me/vscode/stop']);
   expect(contexts).toHaveLength(0);
