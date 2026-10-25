@@ -7,7 +7,11 @@ the main daemon that runs grading workers, the registry, Postgres and Coder.
   (root only, directory kept across restarts so bind mounts of it stay valid),
   data-root `/var/lib/docker-ws`, exec-root `/run/docker-ws`, containerd
   namespace `computor-ws`, `userns-remap: computor-ws` (container uid 1000 =
-  host uid 2001000), `no-new-privileges`, `live-restore`, `iptables: false`.
+  host uid 2001000), `no-new-privileges`, `live-restore`, `iptables: false`,
+  default bridge on its own link `computor-ws0` (created by the unit; with
+  `bridge: none` dockerd would delete the host's `docker0` on a start without
+  running containers, which broke the main daemon's default network on
+  2026-10-25).
 - **Coder** reaches only this daemon, through `coder-provisioner-socket-proxy`
   (`CODER_WORKSPACE_DOCKER_MOUNT=/run/computor-ws-docker`,
   `CODER_WORKSPACE_DOCKER_SOCKET=/var/run/workspace-docker/docker.sock`).

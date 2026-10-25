@@ -15,6 +15,11 @@ Type=notify
 # Direct I/O on the data-root's loop device: without it the backing file's
 # page cache is charged to whichever container writes, and a large write
 # OOM-kills it (seen in rehearsal). The mount unit cannot set it.
+# Own default bridge. With "bridge": "none" dockerd deletes the host's docker0
+# at start (moby daemon_unix.go initNetworkController ->
+# removeDefaultBridgeInterface), i.e. the main daemon's default network. The
+# workspace policy for this bridge comes from workspace-egress.sh.
+ExecStartPre=/bin/sh -c 'ip link show computor-ws0 >/dev/null 2>&1 || ip link add computor-ws0 type bridge'
 ExecStartPre=/bin/sh -c 'losetup --direct-io=on "$$(findmnt -n -o SOURCE --mountpoint /var/lib/docker-ws)"'
 ExecStart=/usr/bin/dockerd --config-file /etc/docker/daemon-ws.json --containerd=/run/containerd/containerd.sock
 # Socket directory survives daemon restarts, so bind mounts of it stay valid.
