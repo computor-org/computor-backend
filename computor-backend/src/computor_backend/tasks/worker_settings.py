@@ -95,6 +95,18 @@ class WorkerSettings(BaseSettings):
         default=None, validation_alias="TEMPORAL_API_KEY"
     )
 
+    # Execution namespaces. Comma-separated ``<queue pattern>=<namespace>``
+    # pairs (fnmatch patterns), e.g.
+    # ``coder-tasks=computor-coder,testing*=computor-grading``. Workflows on a
+    # matching queue are started, polled and looked up in that namespace, all
+    # other queues stay in TEMPORAL_NAMESPACE. With a JWT authorizer on the
+    # frontend, each execution worker then holds a token for its own namespace
+    # only and cannot reach the control workflows. Unset or empty means a single
+    # namespace, exactly as before.
+    temporal_queue_namespaces: Optional[str] = Field(
+        default=None, validation_alias="TEMPORAL_QUEUE_NAMESPACES"
+    )
+
     # --- Temporal worker activity thread pool (tasks/temporal_worker.py) ---
     # Blocking activities (GitPython clone/push, sync SQLAlchemy, sync
     # python-gitlab, docker image build, subprocess test execution) are plain

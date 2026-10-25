@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 from .temporal_client import (
     get_temporal_client,
+    namespace_for_queue,
     DEFAULT_TASK_QUEUE
 )
 
@@ -145,8 +146,10 @@ class TemporalWorker:
                 thread_name_prefix=f"activity-{task_queue}",
             )
             self._activity_executors.append(activity_executor)
+            # Each queue is polled in its own namespace (TEMPORAL_QUEUE_NAMESPACES).
+            namespace = namespace_for_queue(task_queue)
             worker = Worker(
-                self.client,
+                await get_temporal_client(namespace),
                 task_queue=task_queue,
                 workflows=workflows,
                 activities=activities,
@@ -156,7 +159,7 @@ class TemporalWorker:
             )
             self.workers.append(worker)
             logger.info(
-                f"Worker created for queue: {task_queue} "
+                f"Worker created for queue: {task_queue} in namespace {namespace} "
                 f"({len(activities)} activities, "
                 f"activity thread pool max_workers={max_workers}, "
                 f"max_concurrent_activities={max_concurrent_activities or 'SDK default'})"

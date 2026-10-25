@@ -1004,6 +1004,9 @@ CODER_ADMIN_TASKS = {
     "build_workspace_images",
     "push_coder_templates",
     "rollout_workspaces",
+    # The control-plane rollout used when Coder has its own namespace; its
+    # execution half (id suffix EXEC_WORKFLOW_ID_SUFFIX) is not listed itself.
+    "rollout_workspaces_control",
 }
 
 
@@ -1011,9 +1014,14 @@ async def _recent_coder_tasks(limit: int = 20) -> list[TaskInfo]:
     """Return recent Coder administration workflows with queryable progress."""
     executor = get_task_executor()
     listed = await executor.list_tasks(limit=max(limit * 5, 100))
+    from computor_backend.tasks.temporal_coder_setup import EXEC_WORKFLOW_ID_SUFFIX
+
     candidates = [
         row for row in listed.get("tasks", [])
         if row.get("task_name") in CODER_ADMIN_TASKS
+        and not str(row.get("workflow_id") or row.get("task_id") or "").endswith(
+            EXEC_WORKFLOW_ID_SUFFIX
+        )
     ][:limit]
     tasks: list[TaskInfo] = []
     for row in candidates:
@@ -1514,15 +1522,31 @@ async def rollout_workspaces_endpoint(
     await _require_verified_workspace_limits()
     await _reject_conflicting_coder_task()
 
-    executor = get_task_executor()
-    submission = TaskSubmission(
-        task_name="rollout_workspaces",
-        parameters={
-            "templates": request.templates,
-            "templates_dir": settings.templates_dir,
-        },
-        queue="coder-tasks",
+    from computor_backend.tasks.temporal_client import namespace_for_queue
+    from computor_backend.tasks.temporal_coder_setup import (
+        CODER_TASK_QUEUE,
+        CONTROL_PLANE_TASK_QUEUE,
     )
+
+    executor = get_task_executor()
+    parameters = {
+        "templates": request.templates,
+        "templates_dir": settings.templates_dir,
+    }
+    if namespace_for_queue(CODER_TASK_QUEUE) != namespace_for_queue(CONTROL_PLANE_TASK_QUEUE):
+        # The Coder worker has its own namespace: the control plane drives the
+        # rollout there and applies the credential updates itself.
+        submission = TaskSubmission(
+            task_name="rollout_workspaces_control",
+            parameters=parameters,
+            queue=CONTROL_PLANE_TASK_QUEUE,
+        )
+    else:
+        submission = TaskSubmission(
+            task_name="rollout_workspaces",
+            parameters=parameters,
+            queue=CODER_TASK_QUEUE,
+        )
     workflow_id = await executor.submit_task(submission)
 
     return CoderAdminTaskResponse(

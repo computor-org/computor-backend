@@ -30,9 +30,12 @@ async def queue_poller_count(task_queue: str) -> Optional[int]:
         import temporalio.api.workflowservice.v1 as workflowservice
         from temporalio.api.enums.v1 import TaskQueueType
 
-        from computor_backend.tasks.temporal_client import get_temporal_client
+        from computor_backend.tasks.temporal_client import (
+            get_temporal_client,
+            namespace_for_queue,
+        )
 
-        client = await get_temporal_client()
+        client = await get_temporal_client(namespace_for_queue(task_queue))
         response = await client.workflow_service.describe_task_queue(
             workflowservice.DescribeTaskQueueRequest(
                 namespace=client.namespace,

@@ -1557,7 +1557,10 @@ class RolloutWorkspacesWorkflow(BaseWorkflow):
                     maximum_attempts=2,
                 ),
             )
-            if deferred:
+            # Under rollout_workspaces_control the control plane applies the
+            # pending updates itself, because this workflow then runs in the
+            # Coder worker's own namespace where no control worker polls.
+            if deferred and not parameters.get("control_plane_applies_updates"):
                 result = await _apply_pending_updates(result)
             results.append(result)
             ok = bool(result.get("success"))
@@ -1573,6 +1576,159 @@ class RolloutWorkspacesWorkflow(BaseWorkflow):
 
         failed = [r for r in results if not r.get("success")]
         _finish_progress(self._progress, len(failed))
+        return WorkflowResult(
+            status="completed_with_errors" if failed else "completed",
+            result={"rollouts": results},
+            error=(f"{len(failed)} rollout(s) had errors" if failed else None),
+            metadata={"workflow_type": "rollout_workspaces"},
+        )
+
+
+# ---------------------------------------------------------------------------
+# Rollout across namespaces
+#
+# With TEMPORAL_QUEUE_NAMESPACES the Coder worker polls coder-tasks in its own
+# namespace and holds no credential for the main one, so a workflow there cannot
+# schedule apply_workspace_credential_updates on the control queue (Temporal has
+# no cross-namespace activities or child workflows). The control plane instead
+# runs rollout_workspaces_control in the main namespace: one activity starts
+# rollout_workspaces in the Coder namespace under a deterministic id and waits
+# for its result, then the control plane applies the deferred updates.
+# ---------------------------------------------------------------------------
+
+CODER_TASK_QUEUE = "coder-tasks"
+EXEC_WORKFLOW_ID_SUFFIX = "--exec"
+_EXEC_HEARTBEAT_SECONDS = 20
+
+
+@activity.defn(name="run_exec_workflow")
+async def run_exec_workflow(
+    workflow_name: str,
+    workflow_id: str,
+    parameters: Dict[str, Any],
+    task_queue: str,
+) -> Any:
+    """Start ``workflow_name`` on ``task_queue`` in that queue's namespace and
+    return its result.
+
+    Control plane only (``QUEUE_ACTIVITIES``): it needs a client for the
+    execution namespace. A retried attempt finds the execution already started
+    under ``workflow_id`` and waits for that one instead of starting another.
+    Cancelling this activity cancels the execution workflow.
+    """
+    from temporalio.client import WorkflowFailureError
+    from temporalio.common import WorkflowIDReusePolicy
+    from temporalio.exceptions import WorkflowAlreadyStartedError
+
+    from .registry import task_registry
+    from .temporal_client import get_temporal_client, namespace_for_queue
+
+    workflow_class = task_registry.get_task(workflow_name)
+    client = await get_temporal_client(namespace_for_queue(task_queue))
+    try:
+        handle = await client.start_workflow(
+            workflow_name,
+            parameters,
+            id=workflow_id,
+            task_queue=task_queue,
+            execution_timeout=workflow_class.get_execution_timeout(),
+            retry_policy=workflow_class.get_retry_policy(),
+            id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
+        )
+    except WorkflowAlreadyStartedError:
+        handle = client.get_workflow_handle(workflow_id)
+
+    waiter = asyncio.ensure_future(handle.result())
+    try:
+        while True:
+            done, _ = await asyncio.wait({waiter}, timeout=_EXEC_HEARTBEAT_SECONDS)
+            if done:
+                break
+            activity.heartbeat()
+    except asyncio.CancelledError:
+        waiter.cancel()
+        try:
+            await handle.cancel()
+        except Exception:  # noqa: BLE001 - best effort, already cancelling
+            logger.warning("Could not cancel execution workflow %s", workflow_id)
+        raise
+    try:
+        return waiter.result()
+    except WorkflowFailureError as e:
+        raise ApplicationError(
+            f"execution workflow {workflow_id} failed: {e.cause or e}",
+            non_retryable=True,
+        ) from None
+
+
+@register_task
+@workflow.defn(name="rollout_workspaces_control", sandboxed=False)
+class RolloutWorkspacesControlWorkflow(BaseWorkflow):
+    """rollout_workspaces for a Coder worker in its own namespace (see above)."""
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "rollout_workspaces_control"
+
+    @classmethod
+    def get_task_queue(cls) -> str:
+        return CONTROL_PLANE_TASK_QUEUE
+
+    @classmethod
+    def get_execution_timeout(cls) -> timedelta:
+        # The execution rollout (40 min) plus the credential updates.
+        return timedelta(minutes=70)
+
+    def __init__(self) -> None:
+        self._progress: Dict[str, Any] = {
+            "phase": "queued",
+            "operation_status": "running",
+            "exec_workflow_id": None,
+        }
+
+    @workflow.query
+    def get_progress(self) -> Dict[str, Any]:
+        return self._progress
+
+    @workflow.run
+    async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
+        exec_id = workflow.info().workflow_id + EXEC_WORKFLOW_ID_SUFFIX
+        self._progress.update({"phase": "rolling_out", "exec_workflow_id": exec_id})
+        outcome = await workflow.execute_activity(
+            run_exec_workflow,
+            args=[
+                RolloutWorkspacesWorkflow.get_name(),
+                exec_id,
+                {**parameters, "control_plane_applies_updates": True},
+                CODER_TASK_QUEUE,
+            ],
+            start_to_close_timeout=RolloutWorkspacesWorkflow.get_execution_timeout()
+            + timedelta(minutes=5),
+            heartbeat_timeout=timedelta(seconds=_EXEC_HEARTBEAT_SECONDS * 6),
+            retry_policy=RetryPolicy(
+                initial_interval=timedelta(seconds=5),
+                backoff_coefficient=2.0,
+                maximum_attempts=5,
+            ),
+        )
+        outcome = outcome if isinstance(outcome, dict) else {}
+        rollouts = (outcome.get("result") or {}).get("rollouts")
+        if outcome.get("status") == "failed" or rollouts is None:
+            self._progress.update({"phase": "complete", "operation_status": "failed"})
+            return WorkflowResult(
+                status="failed",
+                result=outcome.get("result"),
+                error=outcome.get("error") or "rollout returned no result",
+                metadata={"workflow_type": "rollout_workspaces"},
+            )
+
+        self._progress["phase"] = "applying_credentials"
+        results = [await _apply_pending_updates(dict(r)) for r in rollouts]
+        failed = [r for r in results if not r.get("success")]
+        self._progress.update({
+            "phase": "complete",
+            "operation_status": "completed_with_errors" if failed else "completed",
+        })
         return WorkflowResult(
             status="completed_with_errors" if failed else "completed",
             result={"rollouts": results},
@@ -1966,5 +2122,5 @@ ACTIVITIES = [
 # control plane holds; on any other worker a misrouted call must fail as an
 # unknown activity instead of running there.
 QUEUE_ACTIVITIES = {
-    CONTROL_PLANE_TASK_QUEUE: [apply_workspace_credential_updates],
+    CONTROL_PLANE_TASK_QUEUE: [apply_workspace_credential_updates, run_exec_workflow],
 }
