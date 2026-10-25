@@ -701,6 +701,7 @@ async def create_tutor_test(
                 "course_content_id": str(course_content_id),
                 "user_id": str(user_id),
                 "store_graphics_artifacts": test_config.store_graphics_artifacts,
+                "language": course.language_code or None,
             },
         },
         queue=task_queue,

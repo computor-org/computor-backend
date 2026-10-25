@@ -255,7 +255,10 @@ async def create_test_run(
     # Resolve the testing service: cached FK, else by the example's executionBackend
     # slug (self-healing). Lets a content/example exist before the service is
     # registered — testing works the moment the matching service appears.
-    from computor_backend.business_logic.testing_service import resolve_testing_service
+    from computor_backend.business_logic.testing_service import (
+        resolve_course_language,
+        resolve_testing_service,
+    )
 
     service = resolve_testing_service(course_content, db)
 
@@ -310,6 +313,7 @@ async def create_test_run(
         "example_version_id": str(deployment.example_version_id),
         "artifact_id": str(artifact.id),
         "version_identifier": version_identifier,
+        "language": resolve_course_language(course_content, db),
     }
 
     # Generate workflow ID

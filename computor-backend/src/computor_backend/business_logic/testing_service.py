@@ -21,7 +21,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from computor_backend.model.course import CourseContent
+from computor_backend.model.course import Course, CourseContent
 from computor_backend.model.deployment import CourseContentDeployment
 from computor_backend.model.example import ExampleVersion
 from computor_backend.model.service import Service
@@ -182,3 +182,17 @@ def resolve_testing_service(course_content: CourseContent, db: Session) -> Optio
         service.slug, course_content.id, binding,
     )
     return service
+
+
+def resolve_course_language(course_content: CourseContent, db: Session) -> Optional[str]:
+    """Language code of the course that owns ``course_content`` (``None`` if unset).
+
+    The testing worker hands it to the runner so learner-facing messages are
+    written in the course language. It never influences the grading outcome.
+    """
+    code = (
+        db.query(Course.language_code)
+        .filter(Course.id == course_content.course_id)
+        .scalar()
+    )
+    return code or None

@@ -24,6 +24,7 @@ from ctcore.models import (
 )
 from .conftest import report_key, Solution
 from ctcore.helpers import get_property_as_list, get_abbr, token_exchange
+from ctcore.i18n import tr
 from testers.executors.octave import (
     OctaveExecutor, run_structural_analysis,
 )
@@ -272,7 +273,7 @@ class TestComputorOctave:
 
             file_path = os.path.join(dir_student, actual_file)
             if not os.path.exists(file_path):
-                pytest.fail(f"File `{main.file}` not found in student directory")
+                pytest.fail(tr("file_not_found_plain", file=main.file))
 
             counts = run_structural_analysis(file_path, [sub.name], root=dir_student)
             c = counts.get(sub.name, 0)
@@ -290,7 +291,7 @@ class TestComputorOctave:
             exists_r, files_r = check_file_exists(dir_reference, file_pattern)
 
             if not exists_s:
-                pytest.fail(f"File '{file_pattern}' not found in student directory")
+                pytest.fail(tr("file_not_found", file=file_pattern))
             if not exists_r:
                 pytest.fail(f"File '{file_pattern}' not found in reference directory")
 
@@ -299,7 +300,7 @@ class TestComputorOctave:
                 for f in files_s:
                     filepath = os.path.join(dir_student, f)
                     if os.path.isfile(filepath) and os.path.getsize(filepath) == 0:
-                        pytest.fail(f"File '{f}' is empty (0 bytes)")
+                        pytest.fail(tr("file_empty", file=f))
 
             if files_s:
                 _report["student_file_list"].extend(files_s)
