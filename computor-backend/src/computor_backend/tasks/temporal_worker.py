@@ -4,6 +4,7 @@ Temporal worker implementation for running workflows and activities.
 
 import asyncio
 import logging
+import os
 import signal
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 from .temporal_client import (
     get_temporal_client,
+    namespace_for_queue,
     DEFAULT_TASK_QUEUE
 )
 
@@ -33,6 +35,48 @@ from .temporal_client import (
 # import_task_modules(). Adding a new module only requires editing that list.
 from .registry import task_registry, import_task_modules
 from .worker_settings import get_worker_settings
+
+# Exit codes. Docker restarts the container on any non-zero exit
+# (restart: unless-stopped), and a restart loop is what the container health
+# check and the sentinel see, instead of a process that is up but polls nothing.
+EXIT_FATAL = 1
+EXIT_UNAUTHORIZED = 3
+# After an authorization failure nothing in flight can report its result, so
+# there is no reason to wait out the graceful drain before exiting.
+UNAUTHORIZED_EXIT_GRACE_SECONDS = 15.0
+
+_AUTH_MARKERS = (
+    "PermissionDenied",
+    "PERMISSION_DENIED",
+    "Unauthenticated",
+    "UNAUTHENTICATED",
+    "Request unauthorized",
+)
+
+
+def is_authorization_error(error: Optional[BaseException]) -> bool:
+    """True when ``error`` or anything in its cause chain is an auth refusal.
+
+    temporalio 1.5.1 reports a refused poll as ``RuntimeError("Activity worker
+    failed")`` caused by ``RuntimeError("Poll failure: ... code:
+    PermissionDenied ...")`` from the Rust core, so the status only survives in
+    the message text; client calls raise ``RPCError`` with a status instead.
+    """
+    from temporalio.service import RPCError, RPCStatusCode
+
+    seen = 0
+    while error is not None and seen < 10:
+        if isinstance(error, RPCError) and error.status in (
+            RPCStatusCode.PERMISSION_DENIED,
+            RPCStatusCode.UNAUTHENTICATED,
+        ):
+            return True
+        text = str(error)
+        if any(marker in text for marker in _AUTH_MARKERS):
+            return True
+        error = error.__cause__ or error.__context__
+        seen += 1
+    return False
 
 
 class TemporalWorker:
@@ -58,6 +102,9 @@ class TemporalWorker:
         # Set on shutdown so the heartbeat loop wakes immediately instead of
         # sitting out the rest of its sleep.
         self._shutdown_event: Optional[asyncio.Event] = None
+        # First fatal worker error; decides the exit code of run_worker().
+        self._fatal: Optional[BaseException] = None
+        self._exit_watchdog: Optional[asyncio.TimerHandle] = None
 
     async def _heartbeat_loop(self):
         """Log periodic heartbeat to show worker is alive.
@@ -84,8 +131,13 @@ class TemporalWorker:
                     f"uptime: {uptime}"
                 )
 
-    async def start(self):
-        """Start the worker and begin processing workflows."""
+    async def start(self) -> int:
+        """Start the worker, process workflows, and return the exit code.
+
+        0 after a requested shutdown, EXIT_UNAUTHORIZED when Temporal refused
+        a poll (e.g. an expired or wrong token), EXIT_FATAL after any other
+        fatal worker error.
+        """
         # Aware UTC. The worker container runs on UTC by design, but a naive
         # stamp logged its isoformat() with no offset ("2026-08-10T11:03:52"),
         # which reads as local time to anyone correlating it against a wall
@@ -145,18 +197,21 @@ class TemporalWorker:
                 thread_name_prefix=f"activity-{task_queue}",
             )
             self._activity_executors.append(activity_executor)
+            # Each queue is polled in its own namespace (TEMPORAL_QUEUE_NAMESPACES).
+            namespace = namespace_for_queue(task_queue)
             worker = Worker(
-                self.client,
+                await get_temporal_client(namespace),
                 task_queue=task_queue,
                 workflows=workflows,
                 activities=activities,
                 activity_executor=activity_executor,
                 graceful_shutdown_timeout=graceful_shutdown,
+                on_fatal_error=self._on_fatal_error,
                 **worker_limits,
             )
             self.workers.append(worker)
             logger.info(
-                f"Worker created for queue: {task_queue} "
+                f"Worker created for queue: {task_queue} in namespace {namespace} "
                 f"({len(activities)} activities, "
                 f"activity thread pool max_workers={max_workers}, "
                 f"max_concurrent_activities={max_concurrent_activities or 'SDK default'})"
@@ -193,8 +248,70 @@ class TemporalWorker:
             logger.info("Workers cancelled")
         except Exception as e:
             logger.error(f"Worker error: {e}", exc_info=True)
+            self._begin_fatal_exit(e)
         finally:
             await self.shutdown()
+        return self.exit_code()
+
+    def exit_code(self) -> int:
+        if self._fatal is None:
+            return 0
+        return EXIT_UNAUTHORIZED if is_authorization_error(self._fatal) else EXIT_FATAL
+
+    async def _on_fatal_error(self, error: BaseException) -> None:
+        """SDK hook: one queue's worker failed and is shutting itself down."""
+        self._begin_fatal_exit(error)
+
+    def _begin_fatal_exit(self, error: BaseException) -> None:
+        """Stop every queue's worker and make sure the process really exits.
+
+        Without this a worker whose polls were refused stayed up and idle:
+        temporalio 1.5.1 logs "Worker failed, shutting down" and then never
+        returns from Worker.run() while the core keeps retrying the poll, so
+        the container looked healthy and nothing polled the queue. A watchdog
+        on the event loop ends the process with the exit code if the orderly
+        shutdown does not finish in time.
+        """
+        if self._fatal is not None:
+            return
+        self._fatal = error
+        code = self.exit_code()
+        cause = error
+        for _ in range(10):  # the innermost error names the gRPC status
+            if cause.__cause__ is None:
+                break
+            cause = cause.__cause__
+        error = str(cause)[:300] or repr(cause)
+        if code == EXIT_UNAUTHORIZED:
+            grace = UNAUTHORIZED_EXIT_GRACE_SECONDS
+            logger.critical(
+                "Temporal refused this worker (authorization failure: %s). The "
+                "token in TEMPORAL_API_KEY is expired, revoked or lacks write "
+                "access to the queue's namespace (TEMPORAL_QUEUE_NAMESPACES). "
+                "Exiting with code %d within %.0fs so the container restarts "
+                "and the failure is visible.",
+                error, code, grace,
+            )
+        else:
+            grace = get_worker_settings().graceful_shutdown_seconds + 15.0
+            logger.critical(
+                "Temporal worker failed fatally (%s); exiting with code %d "
+                "within %.0fs.", error, code, grace,
+            )
+        self._shutdown = True
+        if self._shutdown_event is not None:
+            self._shutdown_event.set()
+        for worker in self.workers:
+            asyncio.ensure_future(worker.shutdown())
+        self._exit_watchdog = asyncio.get_running_loop().call_later(
+            grace, self._hard_exit, code
+        )
+
+    @staticmethod
+    def _hard_exit(code: int) -> None:  # pragma: no cover - ends the process
+        logger.critical("Worker shutdown did not finish in time; exiting with code %d", code)
+        logging.shutdown()
+        os._exit(code)
 
     async def _ensure_support_schedule(self) -> None:
         """The support worker owns the periodic team-mailbox import (#520)."""
@@ -262,7 +379,7 @@ class TemporalWorker:
         logger.info(f"Workers shut down - uptime: {uptime}")
 
 
-async def run_worker(queues: Optional[List[str]] = None):
+async def run_worker(queues: Optional[List[str]] = None) -> int:
     """
     Run a Temporal worker.
 
@@ -270,7 +387,7 @@ async def run_worker(queues: Optional[List[str]] = None):
         queues: Optional list of queue names to process
     """
     worker = TemporalWorker(task_queues=queues)
-    await worker.start()
+    return await worker.start()
 
 
 def main():
@@ -290,8 +407,8 @@ def main():
     # Use specified queues or default
     queues = args.queues
 
-    # Run worker
-    asyncio.run(run_worker(queues))
+    # Run worker; a non-zero code makes Docker restart the container.
+    sys.exit(asyncio.run(run_worker(queues)))
 
 
 if __name__ == "__main__":

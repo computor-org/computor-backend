@@ -11,6 +11,8 @@ source "$repo/ops/lib/common.sh"
 load_env
 [[ "${PUBLIC_DOMAIN:-}" == https://computor.at ]] || die 'This rollout is for computor.at only'
 [[ "${UPDATE_ENABLED:-false}" != true ]] || die 'Disable concurrent self-updates first'
+retention_tool=/opt/computor-backup/public-backup.py
+[[ -f "$retention_tool" ]] || die 'Install the public backup retention tool before this rollout'
 data="${SYSTEM_DEPLOYMENT_PATH:?}"
 mkdir -p "$data/rotation" "$data/keycloak-abuse-releases"
 mkdir "$data/rotation/.lock" || die 'Another deployment holds the rotation lock'
@@ -50,7 +52,15 @@ cp -p "$repo/.env" "$release/env"
 cp -a "$data/keycloak/themes" "$release/themes"
 mkdir -p "$data/keycloak/providers"
 cp -a "$data/keycloak/providers" "$release/providers"
-docker exec computor-keycloak-db pg_dump -U keycloak keycloak | gzip > "$release/keycloak.sql.gz"
+copy_created=$(date -u +%FT%TZ)
+if ! docker exec computor-keycloak-db pg_dump -U keycloak keycloak | gzip > "$release/keycloak.sql.gz"; then
+    rm -f -- "$release/keycloak.sql.gz"
+    die 'Keycloak database snapshot failed'
+fi
+if ! python3 "$retention_tool" --register-intermediate "$release/keycloak.sql.gz" --created "$copy_created"; then
+    rm -f -- "$release/keycloak.sql.gz"
+    die 'Keycloak snapshot retention registration failed'
+fi
 docker ps --filter label=com.docker.compose.project=computor --format '{{.ID}} {{.Names}}' | sort > "$release/containers-before"
 sha256sum "$jar" > "$release/provider.sha256"
 git -C "$repo" rev-parse HEAD > "$release/source-commit"

@@ -1,0 +1,101 @@
+# Namespace-scoped authorization on the Temporal frontend
+# (TEMPORAL_AUTH_ENABLED=true in .env, on top of TEMPORAL_TLS_ENABLED=true).
+#
+# mTLS alone admits every certificate holder to every namespace, including
+# execution workers that run student code. With this overlay the frontend runs
+# Temporal's built-in JWT claim mapper and authorizer: every call needs a
+# bearer token (TEMPORAL_API_KEY on the client) whose "permissions" claim names
+# the namespace, e.g. "computor-grading:write". The built-in "worker" role
+# grants nothing (polling needs "write"), so the isolation is by namespace:
+# TEMPORAL_QUEUE_NAMESPACES puts the execution queues into their own
+# namespaces, the control plane's token is writer on all of them, and each
+# execution worker's token is writer on its own namespace only.
+#
+# TEMPORAL_AUTH_DIR holds jwks.json, the public signing key made by
+# ops/temporal-auth/temporal-auth.py (the private key stays off the hosts).
+# Temporal fetches key sets only over http(s), hence the small static server.
+#
+# The internal frontend (7236, internode TLS, no authorizer) serves the
+# server's own system worker and the in-container CLI: auto-setup, the
+# namespace bootstrap below and operator commands. It is not published.
+services:
+  temporal-jwks:
+    image: halverneus/static-file-server:v1.8.12@sha256:48c3f4139614c377ad9f29273c465c04671a338a296d40e0ebee626178800072
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}temporal-jwks
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - computor-network
+    volumes:
+      - ${TEMPORAL_AUTH_DIR:?set TEMPORAL_AUTH_DIR when TEMPORAL_AUTH_ENABLED=true}/jwks.json:/web/jwks.json:ro
+    environment:
+      - FOLDER=/web
+      - PORT=8080
+      - SHOW_LISTING=false
+    labels:
+      - "traefik.enable=false"
+
+  temporal:
+    depends_on:
+      temporal-jwks:
+        condition: service_started
+    environment:
+      - TEMPORAL_AUTH_AUTHORIZER=default
+      - TEMPORAL_AUTH_CLAIM_MAPPER=default
+      - TEMPORAL_JWT_KEY_SOURCE1=http://temporal-jwks:8080/jwks.json
+      - USE_INTERNAL_FRONTEND=true
+      - SERVICES=frontend:internal-frontend:history:matching:worker
+      # auto-setup's namespace and search-attribute calls; on 7233 they would
+      # be refused and the setup would loop forever.
+      - TEMPORAL_ADDRESS=temporal:7236
+    healthcheck:
+      test: ["CMD", "temporal", "--address", "temporal:7236", "operator", "cluster", "health"]
+
+  # One-shot: create every execution namespace named in TEMPORAL_QUEUE_NAMESPACES
+  # (idempotent), with the default namespace's retention.
+  temporal-namespaces:
+    image: temporalio/auto-setup:1.29.7@sha256:f14912b699cf73015ad5c4fc18d522d4b014db90e794039214dfb7c022c2644f
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}temporal-namespaces
+    restart: "no"
+    security_opt:
+      - "no-new-privileges:true"
+    networks:
+      - computor-network
+    depends_on:
+      temporal:
+        condition: service_healthy
+    volumes:
+      - ${TEMPORAL_TLS_DIR}/ca.pem:/etc/temporal/tls/ca.pem:ro
+      - ${TEMPORAL_TLS_DIR}/server.pem:/etc/temporal/tls/server.pem:ro
+      - ${TEMPORAL_TLS_DIR}/server-key.pem:/etc/temporal/tls/server-key.pem:ro
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7236
+      - TEMPORAL_TLS_CLIENT_CERT_PATH=/etc/temporal/tls/server.pem
+      - TEMPORAL_TLS_CLIENT_KEY_PATH=/etc/temporal/tls/server-key.pem
+      - TEMPORAL_TLS_SERVER_CA_CERT_PATH=/etc/temporal/tls/ca.pem
+      - TEMPORAL_TLS_SERVER_NAME=temporal
+      - TEMPORAL_QUEUE_NAMESPACES=${TEMPORAL_QUEUE_NAMESPACES:-}
+      - NAMESPACE_RETENTION=${TEMPORAL_EXEC_NAMESPACE_RETENTION:-24h}
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -eu
+        for ns in $$(printf '%s' "$$TEMPORAL_QUEUE_NAMESPACES" | tr ',' '\n' | sed -n 's/^[^=]*=[[:space:]]*//p' | sort -u); do
+          if temporal operator namespace describe --namespace "$$ns" >/dev/null 2>&1; then
+            echo "temporal-namespaces: $$ns exists"
+          else
+            temporal operator namespace create --namespace "$$ns" --retention "$$NAMESPACE_RETENTION"
+            echo "temporal-namespaces: created $$ns"
+          fi
+        done
+    labels:
+      - "traefik.enable=false"

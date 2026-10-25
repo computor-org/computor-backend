@@ -3,8 +3,11 @@ Temporal client configuration and initialization.
 """
 
 from temporalio.client import Client, TLSConfig
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 import asyncio
+import base64
+import binascii
+import fnmatch
 
 from .worker_settings import get_worker_settings
 
@@ -12,47 +15,159 @@ from .worker_settings import get_worker_settings
 # Default task queue
 DEFAULT_TASK_QUEUE = "computor-tasks"
 
+# Queues whose workflows are control workflows (enrollment, repositories,
+# support mail). They always stay in the main namespace; mapping one of them to
+# an execution namespace would hand control work to execution workers.
+CONTROL_TASK_QUEUES = frozenset({DEFAULT_TASK_QUEUE, "support"})
+
 # NOTE: there is deliberately no module-level default RetryPolicy here. The one
 # that used to live at this spot had bare ints where temporalio wants
 # timedeltas, so it would have raised on conversion had anything ever used it —
 # nothing did. Per-workflow policy belongs in BaseWorkflow.get_retry_policy().
 
 _client: Optional[Client] = None
+# Clients for the execution namespaces, sharing the main client's connection.
+_namespace_clients: Dict[str, Client] = {}
 _client_lock = asyncio.Lock()
 
 
-async def get_temporal_client() -> Client:
+def parse_queue_namespaces(value: Optional[str]) -> List[Tuple[str, str]]:
+    """``(queue pattern, namespace)`` pairs from TEMPORAL_QUEUE_NAMESPACES.
+
+    The order is kept: the first matching pattern wins, and lookups by
+    workflow id try the namespaces in this order after the main one.
+    """
+    pairs: List[Tuple[str, str]] = []
+    for item in (value or "").split(","):
+        item = item.strip()
+        if not item:
+            continue
+        pattern, sep, namespace = item.partition("=")
+        pattern, namespace = pattern.strip(), namespace.strip()
+        if not sep or not pattern or not namespace:
+            raise ValueError(
+                f"TEMPORAL_QUEUE_NAMESPACES entry {item!r} is not '<queue pattern>=<namespace>'"
+            )
+        for control_queue in CONTROL_TASK_QUEUES:
+            if fnmatch.fnmatchcase(control_queue, pattern):
+                raise ValueError(
+                    f"TEMPORAL_QUEUE_NAMESPACES pattern {pattern!r} matches the control "
+                    f"queue {control_queue!r}, which must stay in the main namespace"
+                )
+        pairs.append((pattern, namespace))
+    return pairs
+
+
+def namespace_for_queue(task_queue: str, settings=None) -> str:
+    """The namespace whose workers poll ``task_queue``."""
+    settings = settings or get_worker_settings()
+    for pattern, namespace in parse_queue_namespaces(settings.temporal_queue_namespaces):
+        if fnmatch.fnmatchcase(task_queue, pattern):
+            return namespace
+    return settings.temporal_namespace
+
+
+def configured_namespaces(settings=None) -> List[str]:
+    """The main namespace followed by every distinct execution namespace.
+
+    Workflow ids are looked up in this order, so a workflow created in an
+    execution namespace can never shadow a control workflow of the same id.
+    """
+    settings = settings or get_worker_settings()
+    namespaces = [settings.temporal_namespace]
+    for _pattern, namespace in parse_queue_namespaces(settings.temporal_queue_namespaces):
+        if namespace not in namespaces:
+            namespaces.append(namespace)
+    return namespaces
+
+
+def _pem(value: str) -> bytes:
+    """PEM bytes from either PEM text or single-line base64 of it.
+
+    Single-line base64 lets a certificate live in a compose ``.env`` file,
+    which cannot hold the multi-line PEM form reliably.
+    """
+    if value.lstrip().startswith("-----BEGIN"):
+        return value.encode()
+    try:
+        decoded = base64.b64decode(value.strip(), validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("Temporal TLS value is neither PEM nor base64 PEM") from exc
+    if not decoded.lstrip().startswith(b"-----BEGIN"):
+        raise ValueError("Temporal TLS value is neither PEM nor base64 PEM")
+    return decoded
+
+
+def build_tls_config(settings) -> Optional[TLSConfig]:
+    """mTLS settings for the frontend, or None when no client cert is set.
+
+    A half-configured client (cert without key or the reverse) is an error
+    rather than a silent fallback to plaintext.
+    """
+    cert, key = settings.temporal_tls_cert, settings.temporal_tls_key
+    if not cert and not key:
+        return None
+    if not (cert and key):
+        raise ValueError("TEMPORAL_TLS_CERT and TEMPORAL_TLS_KEY must be set together")
+    return TLSConfig(
+        client_cert=_pem(cert),
+        client_private_key=_pem(key),
+        server_root_ca_cert=_pem(settings.temporal_tls_ca) if settings.temporal_tls_ca else None,
+        domain=settings.temporal_tls_server_name or None,
+    )
+
+
+def build_rpc_metadata(settings, tls_config: Optional[TLSConfig]) -> dict:
+    """gRPC headers carrying TEMPORAL_API_KEY, or none when it is unset.
+
+    The token is a bearer credential, so it is only sent over TLS.
+    """
+    token = (settings.temporal_api_key or "").strip()
+    if not token:
+        return {}
+    if tls_config is None:
+        raise ValueError("TEMPORAL_API_KEY requires TLS (set TEMPORAL_TLS_CERT and TEMPORAL_TLS_KEY)")
+    return {"authorization": f"Bearer {token}"}
+
+
+async def get_temporal_client(namespace: Optional[str] = None) -> Client:
     """
     Get or create a Temporal client instance.
-    
+
+    Args:
+        namespace: an execution namespace (see ``namespace_for_queue``). None or
+            the main namespace returns the main client; any other namespace gets
+            a client on the same connection and credentials.
+
     Returns:
         Configured Temporal client
     """
     global _client
-    
+
     async with _client_lock:
         if _client is None:
             # Read config lazily (not at import) so the environment / test
             # overrides in effect when the client first connects are honored.
             settings = get_worker_settings()
-            tls_config = None
-
-            # Configure TLS if certificates are provided
-            if settings.temporal_tls_cert and settings.temporal_tls_key:
-                tls_config = TLSConfig(
-                    client_cert=settings.temporal_tls_cert.encode(),
-                    client_private_key=settings.temporal_tls_key.encode(),
-                    server_root_ca_cert=settings.temporal_tls_ca.encode() if settings.temporal_tls_ca else None,
-                )
+            tls_config = build_tls_config(settings)
+            rpc_metadata = build_rpc_metadata(settings, tls_config)
 
             # Create client
+            connect_kwargs = {"rpc_metadata": rpc_metadata} if rpc_metadata else {}
             _client = await Client.connect(
                 target_host=f"{settings.temporal_host}:{settings.temporal_port}",
                 namespace=settings.temporal_namespace,
                 tls=tls_config,
+                **connect_kwargs,
             )
 
-        return _client
+        if namespace is None or namespace == _client.namespace:
+            return _client
+        client = _namespace_clients.get(namespace)
+        if client is None:
+            client = Client(_client.service_client, namespace=namespace)
+            _namespace_clients[namespace] = client
+        return client
 
 
 def get_task_queue_name(queue_name: Optional[str] = None) -> str:
@@ -72,6 +187,7 @@ async def close_temporal_client():
     """Close the Temporal client connection."""
     global _client
     async with _client_lock:
+        _namespace_clients.clear()
         if _client:
             await _client.close()
             _client = None

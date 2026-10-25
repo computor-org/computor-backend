@@ -134,6 +134,16 @@ assemble_compose_files() {
         COMPOSE_FILES="$COMPOSE_FILES -f ${d}/docker-compose.support-mail.yaml"
     fi
 
+    # Mutual TLS on the Temporal frontend: server certificates from
+    # TEMPORAL_TLS_DIR; clients read TEMPORAL_TLS_CERT/KEY/CA from .env.
+    if [ "${TEMPORAL_TLS_ENABLED:-}" = "true" ]; then
+        COMPOSE_FILES="$COMPOSE_FILES -f ${d}/docker-compose.temporal-tls.yaml"
+        # Namespace-scoped JWT authorization on top of mTLS.
+        if [ "${TEMPORAL_AUTH_ENABLED:-}" = "true" ]; then
+            COMPOSE_FILES="$COMPOSE_FILES -f ${d}/docker-compose.temporal-auth.yaml"
+        fi
+    fi
+
     # Self-update sidecar: prod-only, opt-in. The file-exists guard keeps a
     # UPDATE_ENABLED=true .env working on a checkout that predates the overlay.
     if [ "$environment" = "prod" ] && [ "${UPDATE_ENABLED:-}" = "true" ] \
@@ -186,7 +196,7 @@ compose() {
 # the hash onto the image as a label, and compare it on the next run.
 #
 # The digest covers OUR inputs only — it cannot see upstream drift in
-# mathworks/matlab:<release>, ghcr.io/coder/code-server:latest or python:3.10-slim.
+# mathworks/matlab:<release>, ghcr.io/coder/code-server:latest or python:3.12-slim.
 # Refreshing those is what `--build-base` is for, and it wants `--pull` with it.
 
 # sha256 over the Dockerfile, its context files and the build args.

@@ -9,7 +9,13 @@ from typing import Any, Dict, Optional, List
 from temporalio.client import WorkflowHandle, WorkflowExecutionStatus
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.service import RPCError, RPCStatusCode
-from .temporal_client import get_temporal_client, get_task_queue_name, DEFAULT_TASK_QUEUE
+from .temporal_client import (
+    DEFAULT_TASK_QUEUE,
+    configured_namespaces,
+    get_task_queue_name,
+    get_temporal_client,
+    namespace_for_queue,
+)
 from .temporal_base import WorkflowResult
 from .registry import task_registry
 from computor_types.tasks import TaskStatus, TaskResult, TaskInfo, TaskSubmission
@@ -52,6 +58,13 @@ CODER_ADMIN_WORKFLOWS = {
     "build_workspace_images",
     "push_coder_templates",
     "rollout_workspaces",
+    "rollout_workspaces_control",
+}
+
+# Control workflows that stand in for an execution workflow in another
+# namespace are reported under the name the clients know.
+DISPLAY_TASK_NAMES = {
+    "rollout_workspaces_control": "rollout_workspaces",
 }
 
 
@@ -102,6 +115,31 @@ class TemporalTaskExecutor:
             minutes = (total_seconds % 3600) // 60
             return f"{hours}h {minutes}m"
     
+    async def _locate(self, task_id: str):
+        """``(client, handle, description)`` of ``task_id`` in its namespace.
+
+        The main namespace is asked first, then each execution namespace (see
+        ``configured_namespaces``). Raises ``TaskNotFoundError`` only when every
+        namespace answers NOT_FOUND; any other RPC failure propagates.
+        """
+        for namespace in configured_namespaces():
+            client = await get_temporal_client(namespace)
+            handle = client.get_workflow_handle(task_id)
+            try:
+                return client, handle, await handle.describe()
+            except RPCError as e:
+                if e.status != RPCStatusCode.NOT_FOUND:
+                    raise
+        raise TaskNotFoundError(f"Task {task_id} not found")
+
+    async def _handle(self, task_id: str) -> WorkflowHandle:
+        """Workflow handle of ``task_id``, without a lookup in single-namespace mode."""
+        if len(configured_namespaces()) == 1:
+            client = await get_temporal_client()
+            return client.get_workflow_handle(task_id)
+        _client, handle, _description = await self._locate(task_id)
+        return handle
+
     async def submit_task(self, submission: TaskSubmission) -> str:
         """
         Submit a task for execution.
@@ -122,16 +160,16 @@ class TemporalTaskExecutor:
         except KeyError:
             raise TaskRegistrationError(f"Workflow '{submission.task_name}' not found in task registry")
         
-        # Get Temporal client
-        client = await get_temporal_client()
-        
         # Use provided workflow ID or generate a new one
         workflow_id = submission.workflow_id if submission.workflow_id else f"{submission.task_name}-{uuid.uuid4()}"
         
         # Get task queue name - use workflow's default queue or submission's queue
         workflow_queue = workflow_class.get_task_queue()
         task_queue = get_task_queue_name(submission.queue if submission.queue != DEFAULT_TASK_QUEUE else workflow_queue)
-        
+
+        # The queue's namespace: execution queues may live in their own.
+        client = await get_temporal_client(namespace_for_queue(task_queue))
+
         # Start workflow
         handle = await client.start_workflow(
             workflow=workflow_class,
@@ -158,15 +196,10 @@ class TemporalTaskExecutor:
         Raises:
             Exception: If task not found or status query fails
         """
-        client = await get_temporal_client()
-        
         try:
-            # Get workflow handle
-            handle = client.get_workflow_handle(task_id)
-            
-            # Describe workflow to get status
-            description = await handle.describe()
-            
+            # Find the workflow (in its namespace) and describe it
+            client, handle, description = await self._locate(task_id)
+
             # Map Temporal status to our TaskStatus
             status = self._status_mapping.get(
                 description.status,
@@ -186,6 +219,7 @@ class TemporalTaskExecutor:
                     # Workflows created before progress queries were introduced
                     # deliberately retain their coarse Temporal status.
                     logger.debug("No progress query for workflow %s", task_id)
+                progress = await self._execution_progress(progress)
 
                 if description.status == WorkflowExecutionStatus.COMPLETED:
                     try:
@@ -204,6 +238,8 @@ class TemporalTaskExecutor:
                     except Exception:
                         logger.debug("Could not read completed workflow result %s", task_id)
             
+            task_name = DISPLAY_TASK_NAMES.get(task_name, task_name)
+
             # Create shortened task ID for better display
             short_task_id = task_id.split('-')[-1] if '-' in task_id else task_id
             
@@ -264,6 +300,24 @@ class TemporalTaskExecutor:
             logger.warning("Temporal unavailable while describing %s: %s", task_id, e)
             raise
     
+    async def _execution_progress(self, progress: Any) -> Any:
+        """While a control workflow waits for its execution workflow, show the
+        latter's (per-template) progress."""
+        if not isinstance(progress, dict) or progress.get("phase") != "rolling_out":
+            return progress
+        exec_id = progress.get("exec_workflow_id")
+        if not exec_id:
+            return progress
+        try:
+            _client, handle, _description = await self._locate(exec_id)
+            inner = await handle.query("get_progress")
+        except Exception:
+            logger.debug("No progress yet for execution workflow %s", exec_id)
+            return progress
+        if not isinstance(inner, dict):
+            return progress
+        return {**inner, "operation_status": "running", "exec_workflow_id": exec_id}
+
     async def get_task_result(self, task_id: str) -> TaskResult:
         """
         Get task execution result.
@@ -277,12 +331,10 @@ class TemporalTaskExecutor:
         Raises:
             Exception: If task not found or result unavailable
         """
-        client = await get_temporal_client()
-        
         try:
             # Get workflow handle
-            handle = client.get_workflow_handle(task_id)
-            
+            handle = await self._handle(task_id)
+
             # Get workflow result
             try:
                 result = await handle.result()
@@ -332,12 +384,10 @@ class TemporalTaskExecutor:
         Raises:
             Exception: If task not found or cancellation fails
         """
-        client = await get_temporal_client()
-        
         try:
             # Get workflow handle
-            handle = client.get_workflow_handle(task_id)
-            
+            handle = await self._handle(task_id)
+
             # Cancel the workflow
             await handle.cancel()
             
@@ -373,8 +423,6 @@ class TemporalTaskExecutor:
         Returns:
             Dictionary with task list and pagination info
         """
-        client = await get_temporal_client()
-        
         try:
             # Use Temporal's list_workflows API to get workflows
             from temporalio.client import WorkflowExecutionStatus
@@ -401,13 +449,28 @@ class TemporalTaskExecutor:
 
             query = " AND ".join(query_parts) if query_parts else ""
 
-            # List workflows using Temporal's visibility API
+            # List workflows using Temporal's visibility API, in every
+            # namespace; each is asked for a full page, merged newest first.
+            namespaces = configured_namespaces()
+            listed = []
+            for namespace in namespaces:
+                client = await get_temporal_client(namespace)
+                count = 0
+                async for workflow in client.list_workflows(
+                    query=query or None,
+                    page_size=min(limit + offset, 1000)
+                ):
+                    listed.append(workflow)
+                    count += 1
+                    if count >= limit + offset:
+                        break
+            if len(namespaces) > 1:
+                _epoch = datetime.min.replace(tzinfo=timezone.utc)
+                listed.sort(key=lambda w: w.start_time or _epoch, reverse=True)
+
             workflows = []
-            async for workflow in client.list_workflows(
-                query=query or None,
-                page_size=min(limit + offset, 1000)
-            ):
-                
+            for workflow in listed:
+
                 # Convert to our TaskInfo format
                 status_value = self._status_mapping.get(workflow.status, TaskStatus.QUEUED).value
                 

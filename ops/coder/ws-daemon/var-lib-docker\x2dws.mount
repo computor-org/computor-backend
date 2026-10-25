@@ -1,0 +1,19 @@
+# The workspace daemon's data-root (images, container layers) on its own
+# fixed-size XFS image with project quotas: the whole daemon cannot fill the
+# host disk, and pquota is what lets overlay2 enforce a per-container rootfs
+# size (template variable storage_size). Containers run in a user namespace,
+# where the kernel refuses project-id changes, so the chattr -P route of the
+# withdrawn XFS home design does not apply here. No nodev: overlay2's quota
+# probe opens a block device node it creates in the data-root.
+[Unit]
+Description=Workspace Docker data-root
+Before=dockerd-ws.service
+
+[Mount]
+What=/var/lib/computor-ws/dataroot.img
+Where=/var/lib/docker-ws
+Type=xfs
+Options=loop,prjquota
+
+[Install]
+WantedBy=local-fs.target

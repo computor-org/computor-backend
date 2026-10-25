@@ -84,6 +84,28 @@ class WorkerSettings(BaseSettings):
     temporal_tls_ca: Optional[str] = Field(
         default=None, validation_alias="TEMPORAL_TLS_CA"
     )
+    # TLS name to verify the frontend certificate against when it differs from
+    # TEMPORAL_HOST (for example when connecting by IP over WireGuard).
+    temporal_tls_server_name: Optional[str] = Field(
+        default=None, validation_alias="TEMPORAL_TLS_SERVER_NAME"
+    )
+    # Bearer token (a JWT) for a frontend that runs Temporal's JWT claim mapper
+    # and authorizer. Sent as the ``authorization`` gRPC header on every call.
+    temporal_api_key: Optional[str] = Field(
+        default=None, validation_alias="TEMPORAL_API_KEY"
+    )
+
+    # Execution namespaces. Comma-separated ``<queue pattern>=<namespace>``
+    # pairs (fnmatch patterns), e.g.
+    # ``coder-tasks=computor-coder,testing*=computor-grading``. Workflows on a
+    # matching queue are started, polled and looked up in that namespace, all
+    # other queues stay in TEMPORAL_NAMESPACE. With a JWT authorizer on the
+    # frontend, each execution worker then holds a token for its own namespace
+    # only and cannot reach the control workflows. Unset or empty means a single
+    # namespace, exactly as before.
+    temporal_queue_namespaces: Optional[str] = Field(
+        default=None, validation_alias="TEMPORAL_QUEUE_NAMESPACES"
+    )
 
     # --- Temporal worker activity thread pool (tasks/temporal_worker.py) ---
     # Blocking activities (GitPython clone/push, sync SQLAlchemy, sync
@@ -147,6 +169,12 @@ class WorkerSettings(BaseSettings):
     # GC, volume-ownership repair): the operations that need a container or
     # exec, which the worker's Docker proxy refuses. See ops/coder/hostops.
     hostops_dir: str = Field(default="/hostops", validation_alias="COMPUTOR_HOSTOPS_DIR")
+    # True where workspaces run on the separate workspace daemon with
+    # image-backed homes (ops/coder/ws-daemon): listing and deleting workspace
+    # volumes then go through the host operations, which see those images.
+    workspace_volumes_hostops: bool = Field(
+        default=False, validation_alias="CODER_WORKSPACE_VOLUMES_HOSTOPS"
+    )
     # The host's cgroup2 tree, bind-mounted read-only, from which the workspace
     # slice limits are read.
     host_cgroup_root: str = Field(

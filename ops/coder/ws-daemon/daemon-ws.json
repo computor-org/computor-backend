@@ -1,0 +1,22 @@
+{
+  "hosts": ["unix:///run/computor-ws-docker/docker.sock"],
+  "group": "root",
+  "data-root": "/var/lib/docker-ws",
+  "exec-root": "/run/docker-ws",
+  "pidfile": "/run/docker-ws.pid",
+  "containerd-namespace": "computor-ws",
+  "containerd-plugins-namespace": "computor-ws-plugins",
+  "bridge": "computor-ws0",
+  "iptables": false,
+  "ip6tables": false,
+  "ip-masq": false,
+  "default-address-pools": [{"base": "172.31.0.0/16", "size": 24}],
+  "userns-remap": "computor-ws",
+  "features": {"containerd-snapshotter": false},
+  "storage-driver": "overlay2",
+  "exec-opts": ["native.cgroupdriver=systemd"],
+  "no-new-privileges": true,
+  "live-restore": true,
+  "log-driver": "json-file",
+  "log-opts": {"max-size": "10m", "max-file": "3"}
+}

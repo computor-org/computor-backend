@@ -123,6 +123,14 @@ class CoderSettings(BaseSettings):
                     "idle workspace is reclaimed this long after its last request. "
                     "Keep >= workspace_ttl_ms so a bump never shortens the deadline."
     )
+    workspace_max_lifetime_ms: int = Field(
+        default=43_200_000,  # 12 hours
+        description="Upper bound on one workspace start: the ForwardAuth keepalive "
+                    "never pushes the auto-stop deadline past the start build's "
+                    "creation plus this. Any authorized proxied request counts as "
+                    "activity, so an editor tab left open could otherwise keep a "
+                    "workspace running indefinitely (a 28 h run was seen). 0 = no cap."
+    )
     workspace_activity_bump_throttle_s: int = Field(
         default=300,  # 5 minutes
         description="Minimum interval between Coder deadline-extend calls per "

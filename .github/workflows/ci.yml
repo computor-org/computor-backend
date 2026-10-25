@@ -29,6 +29,7 @@ jobs:
         run: >-
           uv run --project computor-backend --python 3.12 pytest -q
           computor-backend/src/computor_backend/tests/test_canonical_zip_hash.py
+          computor-backend/src/computor_backend/tests/test_temporal_client.py
           computor-backend/src/computor_backend/tests/test_plain_mentions.py
           computor-backend/src/computor_backend/tests/test_coder_forwardauth.py
           computor-backend/src/computor_backend/tests/test_coder_provision_errors.py
@@ -37,6 +38,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_coder_worker_docker_compose.py
           computor-backend/src/computor_backend/tests/test_worker_privileges.py
           computor-backend/src/computor_backend/tests/test_rollout_history_secrets.py
+          computor-backend/src/computor_backend/tests/test_temporal_exec_namespaces.py
           computor-backend/src/computor_backend/tests/test_workspace_volumes.py
           computor-backend/src/computor_backend/tests/test_workspace_slice_verification.py
           computor-backend/src/computor_backend/tests/test_coder_source_repo_pinning.py
@@ -106,6 +108,17 @@ jobs:
       - run: uv sync --project computor-backend --python 3.12 --locked
       - run: bash ops/tests/test_workspace_git_clone.sh
 
+  coder-provisioner-socket-proxy:
+    # Required jobs run in the merge queue, not on pull request events.
+    if: github.event_name != 'pull_request'
+    # Behavioural check of the Coder server's Docker allowlist: a workspace
+    # lifecycle end to end, privileged/host-bind/host-namespace creates, exec,
+    # foreign images -> 403.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - run: bash ops/tests/test_coder_provisioner_socket_proxy.sh
+
   public-course-contract:
     # Required jobs run in the merge queue, not on pull request events.
     if: github.event_name != 'pull_request'
@@ -172,6 +185,7 @@ jobs:
         run: >-
           ../.venv-grading/bin/python -m pytest -q -rs
           tests/test_job_isolation.py tests/test_sandbox_launch.py
+          tests/test_env_filter.py
 
   web:
     # Required jobs run in the merge queue, not on pull request events.
@@ -184,7 +198,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: 20
+          node-version: 24
           cache: yarn
           cache-dependency-path: computor-web/yarn.lock
       - run: corepack enable
@@ -230,7 +244,7 @@ jobs:
   # this passes; in the merge queue it fails unless every job succeeded.
   ci-gate:
     if: always()
-    needs: [backend, coder-worker-socket-proxy, workspace-git-clone, public-course-contract, grading-isolation, web, keycloak-abuse, keycloak-admin-mfa]
+    needs: [backend, coder-worker-socket-proxy, coder-provisioner-socket-proxy, workspace-git-clone, public-course-contract, grading-isolation, web, keycloak-abuse, keycloak-admin-mfa]
     runs-on: ubuntu-latest
     steps:
       - run: test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = false

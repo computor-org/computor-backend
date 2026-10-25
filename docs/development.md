@@ -12,7 +12,7 @@ generation, and tests.
 
 ```bash
 # 1. Virtualenv + editable installs (order matters: types → client → backend)
-python3.10 -m venv .venv && source .venv/bin/activate
+python3.12 -m venv .venv && source .venv/bin/activate
 pip install -e computor-types/ -e computor-client/ -e computor-backend/
 
 # 2. Environment — generate .env with fresh secrets (never overwrites an existing .env)

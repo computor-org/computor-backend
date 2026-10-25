@@ -6,6 +6,7 @@ import asyncio
 import logging
 import secrets
 import string
+import uuid
 from typing import Any, Optional
 
 import httpx
@@ -805,6 +806,25 @@ class CoderClient:
             updated_at=ws.get("updated_at"),
         )
 
+    async def get_workspace_by_id(self, workspace_id: str) -> CoderWorkspace:
+        """Look up one workspace by its Coder id (admin view).
+
+        The id is checked to be a UUID before it goes into the path, because
+        callers may pass ids reported by another service.
+
+        Raises:
+            CoderWorkspaceNotFoundError: If the id is malformed or unknown.
+            CoderAPIError: On any other non-200 answer.
+        """
+        try:
+            ws_id = str(uuid.UUID(str(workspace_id)))
+        except ValueError:
+            raise CoderWorkspaceNotFoundError("malformed workspace id") from None
+        resp = await self._request("GET", f"/api/v2/workspaces/{ws_id}", ok=(200, 404))
+        if resp.status_code == 404:
+            raise CoderWorkspaceNotFoundError(ws_id)
+        return self._parse_workspace_summary(resp.json())
+
     async def list_all_workspaces(self, limit: int = 1000) -> list[CoderWorkspace]:
         """List every workspace on the server (admin-only fleet view).
 
@@ -1027,6 +1047,7 @@ class CoderClient:
             template_display_name=data.get("template_display_name"),
             latest_build_status=data.get("latest_build", {}).get("status"),
             latest_build_id=data.get("latest_build", {}).get("id"),
+            latest_build_created_at=data.get("latest_build", {}).get("created_at"),
             created_at=data.get("created_at"),
         )
 
@@ -1279,6 +1300,7 @@ class CoderClient:
             template_display_name=data.get("template_display_name"),
             latest_build_status=data.get("latest_build", {}).get("status"),
             latest_build_id=data.get("latest_build", {}).get("id"),
+            latest_build_created_at=data.get("latest_build", {}).get("created_at"),
             created_at=data.get("created_at"),
             updated_at=data.get("updated_at"),
         )

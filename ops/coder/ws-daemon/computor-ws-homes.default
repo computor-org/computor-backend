@@ -1,0 +1,12 @@
+# /etc/default/computor-ws-homes - read by computor-ws-homes.service.
+# Size of a NEW home or scratch image (truncate/mkfs size: 5G, 512M ...).
+# Existing images keep their size; grow one with
+#   computor-ws-home-grow <volume> <size>
+WS_HOMES_HOME_SIZE=5G
+WS_HOMES_SCRATCH_SIZE=5G
+# Per-volume sizes for new images, one "coder-home-<id>=10G" per line.
+WS_HOMES_SIZES_FILE=/etc/computor/ws-home-sizes
+WS_HOMES_IMAGE_DIR=/var/lib/computor-ws/homes
+WS_HOMES_MOUNT_DIR=/var/lib/computor-ws/mnt
+WS_HOMES_REMAP_USER=computor-ws
+WS_HOMES_CONTAINER_UID=1000

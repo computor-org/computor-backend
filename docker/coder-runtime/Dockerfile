@@ -9,14 +9,14 @@
 # download) on EVERY build. Now temporal-worker-coder layers the computor env
 # (copied from computor-base) on top of this image, and the runtime is built once.
 #
-# python:3.10-slim base (same as computor-base) so the copied CPython-3.10
+# python:3.12-slim base (same as computor-base) so the copied CPython-3.12
 # computor env is ABI-compatible.
-FROM python:3.10-slim@sha256:31dd4d9529d02d7436659061cb7564cd4733fc90e5e152709a942d53382ec8d0
+FROM python:3.12.15-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704
 
 # git: the task registry imports EVERY task module on every worker, and
 # git_ops imports GitPython, which refuses to import without a git binary —
 # without it the coder worker crash-loops at startup (computor-base has git,
-# but this runtime is python:3.10-slim, not computor-base).
+# but this runtime is python:3.12-slim, not computor-base).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         docker.io \

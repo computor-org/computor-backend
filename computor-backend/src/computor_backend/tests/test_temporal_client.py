@@ -3,6 +3,7 @@ Tests for Temporal client configuration and initialization.
 """
 
 import pytest
+import base64
 import os
 from unittest.mock import patch, MagicMock, AsyncMock
 from temporalio.client import Client
@@ -74,9 +75,10 @@ class TestTemporalClient:
         
         # Mock TLS environment variables
         with patch.dict(os.environ, {
-            'TEMPORAL_TLS_CERT': 'test_cert',
-            'TEMPORAL_TLS_KEY': 'test_key',
-            'TEMPORAL_TLS_CA': 'test_ca'
+            'TEMPORAL_TLS_CERT': _CERT,
+            'TEMPORAL_TLS_KEY': base64.b64encode(_KEY.encode()).decode(),
+            'TEMPORAL_TLS_CA': _CA,
+            'TEMPORAL_TLS_SERVER_NAME': 'temporal',
         }):
             # Settings are read lazily and cached, so drop the cache rather than
             # reloading the module (the config no longer lives at import time).
@@ -88,9 +90,12 @@ class TestTemporalClient:
 
                 await temporal_client.get_temporal_client()
 
-                # Verify TLS config was created
-                call_args = mock_connect.call_args
-                assert call_args[1]['tls'] is not None
+                # PEM and base64 PEM both arrive as PEM bytes.
+                tls = mock_connect.call_args[1]['tls']
+                assert tls.client_cert == _CERT.encode()
+                assert tls.client_private_key == _KEY.encode()
+                assert tls.server_root_ca_cert == _CA.encode()
+                assert tls.domain == 'temporal'
 
         # Cleanup: drop the client and the TLS-flavoured settings cache.
         temporal_client._client = None
@@ -197,3 +202,78 @@ class TestTemporalClient:
             
         # Cleanup
         temporal_client._client = None
+
+_CERT = "-----BEGIN CERTIFICATE-----\nY2VydA==\n-----END CERTIFICATE-----\n"
+_KEY = "-----BEGIN PRIVATE KEY-----\na2V5\n-----END PRIVATE KEY-----\n"
+_CA = "-----BEGIN CERTIFICATE-----\nY2E=\n-----END CERTIFICATE-----\n"
+
+
+class TestBuildTlsConfig:
+    """mTLS is opt-in, and a half or garbled configuration fails closed."""
+
+    @staticmethod
+    def _settings(**env):
+        with patch.dict(os.environ, env, clear=True):
+            get_worker_settings.cache_clear()
+            try:
+                return get_worker_settings()
+            finally:
+                get_worker_settings.cache_clear()
+
+    def test_no_cert_means_plaintext(self):
+        from computor_backend.tasks.temporal_client import build_tls_config
+        assert build_tls_config(self._settings()) is None
+        assert build_tls_config(self._settings(TEMPORAL_TLS_CERT="", TEMPORAL_TLS_KEY="")) is None
+
+    @pytest.mark.parametrize("env", [
+        {"TEMPORAL_TLS_CERT": _CERT},
+        {"TEMPORAL_TLS_KEY": _KEY},
+    ])
+    def test_half_configured_client_is_an_error(self, env):
+        from computor_backend.tasks.temporal_client import build_tls_config
+        with pytest.raises(ValueError, match="set together"):
+            build_tls_config(self._settings(**env))
+
+    @pytest.mark.parametrize("bad", ["not base64!", base64.b64encode(b"no pem here").decode()])
+    def test_garbled_value_is_an_error(self, bad):
+        from computor_backend.tasks.temporal_client import build_tls_config
+        with pytest.raises(ValueError, match="neither PEM nor base64 PEM"):
+            build_tls_config(self._settings(TEMPORAL_TLS_CERT=bad, TEMPORAL_TLS_KEY=_KEY))
+
+
+_JWT = "probe"  # stands in for a signed JWT; the client passes it through
+
+
+class TestBuildRpcMetadata:
+    """The bearer token is opt-in and never sent without TLS."""
+
+    _settings = staticmethod(TestBuildTlsConfig._settings)
+
+    def test_no_token_means_no_header(self):
+        from computor_backend.tasks.temporal_client import build_rpc_metadata
+        assert build_rpc_metadata(self._settings(), None) == {}
+        assert build_rpc_metadata(self._settings(TEMPORAL_API_KEY=" "), None) == {}
+
+    def test_token_becomes_bearer_header(self):
+        from computor_backend.tasks.temporal_client import build_rpc_metadata, build_tls_config
+        settings = self._settings(TEMPORAL_TLS_CERT=_CERT, TEMPORAL_TLS_KEY=_KEY, TEMPORAL_API_KEY=_JWT)
+        assert build_rpc_metadata(settings, build_tls_config(settings)) == {"authorization": f"Bearer {_JWT}"}
+
+    def test_token_without_tls_is_an_error(self):
+        from computor_backend.tasks.temporal_client import build_rpc_metadata
+        with pytest.raises(ValueError, match="requires TLS"):
+            build_rpc_metadata(self._settings(TEMPORAL_API_KEY=_JWT), None)
+
+    @pytest.mark.asyncio
+    async def test_client_sends_token(self):
+        from computor_backend.tasks import temporal_client
+        temporal_client._client = None
+        with patch.dict(os.environ, {"TEMPORAL_TLS_CERT": _CERT, "TEMPORAL_TLS_KEY": _KEY,
+                                     "TEMPORAL_API_KEY": _JWT}):
+            get_worker_settings.cache_clear()
+            with patch('computor_backend.tasks.temporal_client.Client.connect') as mock_connect:
+                mock_connect.return_value = MagicMock()
+                await temporal_client.get_temporal_client()
+                assert mock_connect.call_args[1]['rpc_metadata'] == {"authorization": f"Bearer {_JWT}"}
+        temporal_client._client = None
+        get_worker_settings.cache_clear()

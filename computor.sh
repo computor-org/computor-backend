@@ -119,7 +119,7 @@ ensure_deployment_base() {
 }
 
 # Verify a non-root container can reach the Docker socket and export DOCKER_GID.
-# Needed by Coder's provisioner (workspace builds) and the updater sidecar.
+# Needed by the updater sidecar.
 # The socket's group must be probed INSIDE a container — host-side stat is wrong
 # on Docker Desktop / OrbStack, where the in-container socket is root:root.
 verify_docker_socket_access() {
@@ -294,10 +294,10 @@ cmd_up() {
         fi
     fi
 
-    # Docker socket access is needed by Coder (workspace provisioning) and by
-    # the updater sidecar (self-update builds).
-    if [ "${CODER_ENABLED:-}" = "true" ] \
-        || { [ "${UPDATE_ENABLED:-}" = "true" ] && [ "$ENVIRONMENT" = "prod" ]; }; then
+    # Raw Docker socket access (DOCKER_GID) is needed only by the updater
+    # sidecar (self-update builds). Coder and its worker reach Docker through
+    # their socket proxies, which run as the socket's owner.
+    if [ "${UPDATE_ENABLED:-}" = "true" ] && [ "$ENVIRONMENT" = "prod" ]; then
         verify_docker_socket_access
     fi
 

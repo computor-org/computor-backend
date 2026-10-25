@@ -21,7 +21,7 @@ for the course, workspace, and Lena paths.
 - Debian-based Linux recommended
 - Docker >= 29.x and Docker Compose >= 5.x
 - Git
-- Python 3.10 (development only)
+- Python 3.12 (development only)
 
 ## Quick Start
 
@@ -33,7 +33,7 @@ git clone <repository-url> <dir-name>
 cd <dir-name>
 
 # Create virtual environment
-python3.10 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 
 # Install packages (editable mode for development)

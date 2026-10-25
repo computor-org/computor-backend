@@ -211,6 +211,9 @@ class CoderWorkspace(BaseModel):
         None,
         description="Coder automatic update policy: always | never",
     )
+    latest_build_created_at: Optional[datetime] = Field(
+        None, description="When the latest build (e.g. the current start) was created"
+    )
     created_at: Optional[datetime] = Field(None, description="Creation timestamp")
     updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
 

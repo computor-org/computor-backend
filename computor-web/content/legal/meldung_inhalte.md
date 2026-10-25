@@ -1,12 +1,12 @@
 # Inhalte melden / Report content
 
-Version 1.0, gültig ab 30.09.2026
+Version 1.1, gültig ab 25.10.2026
 
 ## Deutsch
 
 ### Rechtswidrige Inhalte melden
 
-Wenn Sie auf computor.at oder chat.computor.at Inhalte finden, die Sie für
+Wenn Sie auf computor.at Inhalte finden, die Sie für
 rechtswidrig oder für einen Verstoß gegen unsere
 [Nutzungsbedingungen](/terms) halten, melden Sie diese bitte per E-Mail an
 **abuse@computor.at**. Meldungen kann jede Person und jede Stelle einreichen;
@@ -14,7 +14,7 @@ ein Konto auf computor.at ist nicht nötig.
 
 Bitte geben Sie an:
 
-1. wo sich der Inhalt befindet, möglichst genau (Link, Kurs, Chat-Kanal,
+1. wo sich der Inhalt befindet, möglichst genau (Link, Kurs,
    Benutzername, Datum der Nachricht);
 2. warum Sie den Inhalt für rechtswidrig oder unzulässig halten; bei
    Urheberrechtsverletzungen: welches Werk betroffen ist und, soweit
@@ -68,15 +68,15 @@ Sicherheitslücken melden Sie bitte vertraulich an security@computor.at.
 
 ### Report illegal content
 
-If you find content on computor.at or chat.computor.at that you believe is
+If you find content on computor.at that you believe is
 illegal or violates our [Terms of Use](/terms), please report it by email to
 **abuse@computor.at**. Any individual or entity can submit a report; you do
 not need an account on computor.at.
 
 Please include:
 
-1. where the content is, as precisely as possible (link, course, chat
-   channel, username, date of the message);
+1. where the content is, as precisely as possible (link, course,
+   username, date of the message);
 2. why you believe the content is illegal or not permitted; for copyright
    claims: which work is concerned and, where applicable, your relationship
    to the rights holder;

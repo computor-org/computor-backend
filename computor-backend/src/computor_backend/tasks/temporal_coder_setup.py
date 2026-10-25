@@ -59,6 +59,8 @@ _VERSION_TAG_RE = re.compile(r"^v\d{8}-\d{6}(-[0-9a-f]{6})?$")
 # stall instead of being cancelled.
 HOSTOPS_GC_TIMEOUT_SECONDS = 8 * 60
 HOSTOPS_REPAIR_TIMEOUT_SECONDS = 4 * 60
+# list-volumes / delete-volume on image-backed homes: quick host operations.
+HOSTOPS_VOLUME_TIMEOUT_SECONDS = 45
 
 
 def _heartbeat_if_in_activity() -> None:
@@ -1404,6 +1406,12 @@ async def apply_workspace_credential_updates(
 
     An owner without a Computor user (Coder's own ``admin``) keeps the
     credential of its previous build.
+
+    The list comes from the Coder-side workflow, which runs with execution
+    credentials, so it is not trusted: each workspace is looked up in the
+    Coder API first, and one whose real owner or active template version
+    differs from the report is skipped (logged, counted as an error) before
+    any credential is derived for it.
     """
     from computor_backend.coder.client import CoderClient
 
@@ -1411,10 +1419,11 @@ async def apply_workspace_credential_updates(
     errors: List[str] = []
     failure = None
     try:
-        owners = sorted({w["owner_name"] for w in workspaces if w.get("owner_name")})
-        credentials = await asyncio.to_thread(_current_owner_credentials, owners)
         async with CoderClient() as client:
-            updated_now = await _update_workspaces(client, version_id, workspaces, credentials, errors)
+            verified = await _verified_workspaces(client, version_id, workspaces, errors)
+            owners = sorted({w["owner_name"] for w in verified if w.get("owner_name")})
+            credentials = await asyncio.to_thread(_current_owner_credentials, owners)
+            updated_now = await _update_workspaces(client, version_id, verified, credentials, errors)
     except Exception as e:  # noqa: BLE001 - setup errors can embed secrets
         logger.exception("Control-plane credential update failed")
         failure = type(e).__name__
@@ -1423,6 +1432,46 @@ async def apply_workspace_credential_updates(
         # the original (e.g. a settings error quoting a password) enters history.
         raise ApplicationError(f"credential update failed ({failure})")
     return {"updated_now": updated_now, "errors": errors}
+
+
+async def _verified_workspaces(client, version_id, workspaces, errors) -> List[Dict[str, str]]:
+    """The reported workspaces whose owner and template version Coder confirms.
+
+    Returned entries carry Coder's own id, name and owner, never the reported
+    values. Refusals go to the log in full and into ``errors`` (Temporal
+    history) with the reported id only.
+    """
+    active_versions: Dict[str, str] = {}
+    verified: List[Dict[str, str]] = []
+    for w in workspaces:
+        reported_id = str(w.get("id", ""))[:64]
+        reported_owner = w.get("owner_name") or ""
+        try:
+            actual = await client.get_workspace_by_id(reported_id)
+            template = actual.template_name or ""
+            if template not in active_versions:
+                active_versions[template] = await client.get_template_active_version(template)
+        except Exception as e:  # noqa: BLE001 - collect per-workspace failures
+            logger.warning(f"Credential update of workspace {reported_id!r} refused: lookup failed ({e})")
+            errors.append(f"{reported_id}: not verified ({type(e).__name__})")
+            continue
+        actual_owner = actual.owner_name or ""
+        if actual_owner != reported_owner:
+            logger.warning(
+                f"Credential update of workspace {reported_id!r} refused: reported owner "
+                f"{reported_owner!r}, Coder owner {actual_owner!r}"
+            )
+            errors.append(f"{reported_id}: owner mismatch, skipped")
+            continue
+        if active_versions[template] != version_id:
+            logger.warning(
+                f"Credential update of workspace {reported_id!r} refused: version {version_id!r} "
+                f"is not the active version of template {template!r}"
+            )
+            errors.append(f"{reported_id}: template version mismatch, skipped")
+            continue
+        verified.append({"id": str(actual.id), "name": actual.name, "owner_name": actual_owner})
+    return verified
 
 
 async def _update_workspaces(client, version_id, workspaces, credentials, errors) -> int:
@@ -1557,7 +1606,10 @@ class RolloutWorkspacesWorkflow(BaseWorkflow):
                     maximum_attempts=2,
                 ),
             )
-            if deferred:
+            # Under rollout_workspaces_control the control plane applies the
+            # pending updates itself, because this workflow then runs in the
+            # Coder worker's own namespace where no control worker polls.
+            if deferred and not parameters.get("control_plane_applies_updates"):
                 result = await _apply_pending_updates(result)
             results.append(result)
             ok = bool(result.get("success"))
@@ -1573,6 +1625,159 @@ class RolloutWorkspacesWorkflow(BaseWorkflow):
 
         failed = [r for r in results if not r.get("success")]
         _finish_progress(self._progress, len(failed))
+        return WorkflowResult(
+            status="completed_with_errors" if failed else "completed",
+            result={"rollouts": results},
+            error=(f"{len(failed)} rollout(s) had errors" if failed else None),
+            metadata={"workflow_type": "rollout_workspaces"},
+        )
+
+
+# ---------------------------------------------------------------------------
+# Rollout across namespaces
+#
+# With TEMPORAL_QUEUE_NAMESPACES the Coder worker polls coder-tasks in its own
+# namespace and holds no credential for the main one, so a workflow there cannot
+# schedule apply_workspace_credential_updates on the control queue (Temporal has
+# no cross-namespace activities or child workflows). The control plane instead
+# runs rollout_workspaces_control in the main namespace: one activity starts
+# rollout_workspaces in the Coder namespace under a deterministic id and waits
+# for its result, then the control plane applies the deferred updates.
+# ---------------------------------------------------------------------------
+
+CODER_TASK_QUEUE = "coder-tasks"
+EXEC_WORKFLOW_ID_SUFFIX = "--exec"
+_EXEC_HEARTBEAT_SECONDS = 20
+
+
+@activity.defn(name="run_exec_workflow")
+async def run_exec_workflow(
+    workflow_name: str,
+    workflow_id: str,
+    parameters: Dict[str, Any],
+    task_queue: str,
+) -> Any:
+    """Start ``workflow_name`` on ``task_queue`` in that queue's namespace and
+    return its result.
+
+    Control plane only (``QUEUE_ACTIVITIES``): it needs a client for the
+    execution namespace. A retried attempt finds the execution already started
+    under ``workflow_id`` and waits for that one instead of starting another.
+    Cancelling this activity cancels the execution workflow.
+    """
+    from temporalio.client import WorkflowFailureError
+    from temporalio.common import WorkflowIDReusePolicy
+    from temporalio.exceptions import WorkflowAlreadyStartedError
+
+    from .registry import task_registry
+    from .temporal_client import get_temporal_client, namespace_for_queue
+
+    workflow_class = task_registry.get_task(workflow_name)
+    client = await get_temporal_client(namespace_for_queue(task_queue))
+    try:
+        handle = await client.start_workflow(
+            workflow_name,
+            parameters,
+            id=workflow_id,
+            task_queue=task_queue,
+            execution_timeout=workflow_class.get_execution_timeout(),
+            retry_policy=workflow_class.get_retry_policy(),
+            id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
+        )
+    except WorkflowAlreadyStartedError:
+        handle = client.get_workflow_handle(workflow_id)
+
+    waiter = asyncio.ensure_future(handle.result())
+    try:
+        while True:
+            done, _ = await asyncio.wait({waiter}, timeout=_EXEC_HEARTBEAT_SECONDS)
+            if done:
+                break
+            activity.heartbeat()
+    except asyncio.CancelledError:
+        waiter.cancel()
+        try:
+            await handle.cancel()
+        except Exception:  # noqa: BLE001 - best effort, already cancelling
+            logger.warning("Could not cancel execution workflow %s", workflow_id)
+        raise
+    try:
+        return waiter.result()
+    except WorkflowFailureError as e:
+        raise ApplicationError(
+            f"execution workflow {workflow_id} failed: {e.cause or e}",
+            non_retryable=True,
+        ) from None
+
+
+@register_task
+@workflow.defn(name="rollout_workspaces_control", sandboxed=False)
+class RolloutWorkspacesControlWorkflow(BaseWorkflow):
+    """rollout_workspaces for a Coder worker in its own namespace (see above)."""
+
+    @classmethod
+    def get_name(cls) -> str:
+        return "rollout_workspaces_control"
+
+    @classmethod
+    def get_task_queue(cls) -> str:
+        return CONTROL_PLANE_TASK_QUEUE
+
+    @classmethod
+    def get_execution_timeout(cls) -> timedelta:
+        # The execution rollout (40 min) plus the credential updates.
+        return timedelta(minutes=70)
+
+    def __init__(self) -> None:
+        self._progress: Dict[str, Any] = {
+            "phase": "queued",
+            "operation_status": "running",
+            "exec_workflow_id": None,
+        }
+
+    @workflow.query
+    def get_progress(self) -> Dict[str, Any]:
+        return self._progress
+
+    @workflow.run
+    async def run(self, parameters: Dict[str, Any]) -> WorkflowResult:
+        exec_id = workflow.info().workflow_id + EXEC_WORKFLOW_ID_SUFFIX
+        self._progress.update({"phase": "rolling_out", "exec_workflow_id": exec_id})
+        outcome = await workflow.execute_activity(
+            run_exec_workflow,
+            args=[
+                RolloutWorkspacesWorkflow.get_name(),
+                exec_id,
+                {**parameters, "control_plane_applies_updates": True},
+                CODER_TASK_QUEUE,
+            ],
+            start_to_close_timeout=RolloutWorkspacesWorkflow.get_execution_timeout()
+            + timedelta(minutes=5),
+            heartbeat_timeout=timedelta(seconds=_EXEC_HEARTBEAT_SECONDS * 6),
+            retry_policy=RetryPolicy(
+                initial_interval=timedelta(seconds=5),
+                backoff_coefficient=2.0,
+                maximum_attempts=5,
+            ),
+        )
+        outcome = outcome if isinstance(outcome, dict) else {}
+        rollouts = (outcome.get("result") or {}).get("rollouts")
+        if outcome.get("status") == "failed" or rollouts is None:
+            self._progress.update({"phase": "complete", "operation_status": "failed"})
+            return WorkflowResult(
+                status="failed",
+                result=outcome.get("result"),
+                error=outcome.get("error") or "rollout returned no result",
+                metadata={"workflow_type": "rollout_workspaces"},
+            )
+
+        self._progress["phase"] = "applying_credentials"
+        results = [await _apply_pending_updates(dict(r)) for r in rollouts]
+        failed = [r for r in results if not r.get("success")]
+        self._progress.update({
+            "phase": "complete",
+            "operation_status": "completed_with_errors" if failed else "completed",
+        })
         return WorkflowResult(
             status="completed_with_errors" if failed else "completed",
             result={"rollouts": results},
@@ -1646,6 +1851,8 @@ def list_workspace_volumes() -> Dict[str, Any]:
     import docker as docker_sdk
 
     settings = get_worker_settings()
+    if settings.workspace_volumes_hostops:
+        return _list_image_volumes()
     try:
         client = _docker_client()
     except Exception as e:
@@ -1691,6 +1898,36 @@ def list_workspace_volumes() -> Dict[str, Any]:
     return {"success": True, "volumes": volumes}
 
 
+def _list_image_volumes() -> Dict[str, Any]:
+    """The workspace daemon's image-backed homes, as listed by the host.
+
+    Each ``volume=`` line is ``name,used,capacity,mounted,created``; used is
+    the filesystem's used bytes (empty if unreadable), capacity the image size.
+    """
+    answer = coder_hostops.submit(
+        "list-volumes", [], timeout=HOSTOPS_VOLUME_TIMEOUT_SECONDS,
+        heartbeat=_heartbeat_if_in_activity,
+    )
+    if answer.get("status") != "ok":
+        return {"success": False, "error": str(answer.get("message") or "list failed"), "volumes": []}
+    volumes = []
+    for line in answer.get("volume") or []:
+        parts = str(line).split(",")
+        if len(parts) != 5 or not _is_workspace_volume(parts[0]):
+            continue
+        name, used, _capacity, mounted, created = parts
+        volumes.append({
+            "name": name,
+            "kind": "home" if name.startswith(HOME_VOLUME_PREFIX) else "scratch",
+            "owner_ref": name.split("-", 2)[2],
+            "size_bytes": int(used) if used.isdigit() else None,
+            "in_use": mounted == "1",
+            "created_at": created or None,
+        })
+    volumes.sort(key=lambda v: v["name"])
+    return {"success": True, "volumes": volumes}
+
+
 @activity.defn(name="delete_workspace_volume")
 def delete_workspace_volume(name: str) -> Dict[str, Any]:
     """Remove one workspace volume; never forced.
@@ -1705,6 +1942,16 @@ def delete_workspace_volume(name: str) -> Dict[str, Any]:
         return {"success": False, "error": f"'{name}' is not a workspace volume"}
 
     settings = get_worker_settings()
+    if settings.workspace_volumes_hostops:
+        answer = coder_hostops.submit(
+            "delete-volume",
+            [("volume", name)],
+            timeout=HOSTOPS_VOLUME_TIMEOUT_SECONDS,
+            heartbeat=_heartbeat_if_in_activity,
+        )
+        if answer.get("status") != "ok":
+            return {"success": False, "error": str(answer.get("message") or "delete failed")}
+        return {"success": True, "message": f"Volume '{name}' deleted"}
     try:
         client = _docker_client()
         client.volumes.get(name).remove()
@@ -1966,5 +2213,5 @@ ACTIVITIES = [
 # control plane holds; on any other worker a misrouted call must fail as an
 # unknown activity instead of running there.
 QUEUE_ACTIVITIES = {
-    CONTROL_PLANE_TASK_QUEUE: [apply_workspace_credential_updates],
+    CONTROL_PLANE_TASK_QUEUE: [apply_workspace_credential_updates, run_exec_workflow],
 }

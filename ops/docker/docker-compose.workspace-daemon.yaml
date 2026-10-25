@@ -1,0 +1,79 @@
+# Workspace-side services on the workspace Docker daemon (dockerd-ws, see
+# ops/coder/ws-daemon/README.md). Run against that daemon only:
+#   DOCKER_HOST=unix:///run/computor-ws-docker/docker.sock docker compose -p computor-ws \
+#     --env-file .env -f ops/docker/docker-compose.workspace-daemon.yaml up -d
+# Coder workspaces live on this daemon, so the ingress that routes to them
+# and the agents' route to the Coder server have to live here too: the two
+# daemons' bridges cannot share a Docker network. The ingress therefore
+# also relays the agents' Coder connection (alias `coder`, TCP :7080) to the
+# Coder server's published address on the main daemon.
+services:
+  ws-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0@sha256:9e4b9e7517a6b660f2cc903a19b257b1852d5b3344794e3ea334ff00ae677ac2
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}ws-socket-proxy
+    # Needs the real root to open the daemon socket. Under userns_mode host
+    # the image files still belong to the remapped range, so root needs
+    # DAC_OVERRIDE to render its haproxy.cfg.
+    userns_mode: host
+    networks: [ws-control]
+    restart: unless-stopped
+    cap_drop: [ALL]
+    cap_add: [DAC_OVERRIDE]
+    security_opt: ["no-new-privileges:true"]
+    logging: {driver: json-file, options: {max-size: "10m", max-file: "5"}}
+    environment:
+      CONTAINERS: "1"
+      NETWORKS: "1"
+      SOCKET_PATH: /var/run/workspace-docker/docker.sock
+    volumes:
+      # The directory, not the socket file (see docker-compose.coder.yaml).
+      - /run/computor-ws-docker:/var/run/workspace-docker:ro
+
+  workspace-ingress:
+    image: traefik:v3.7.13@sha256:24841fe2de7304c149343d877d2923b4c8800a38ba015dea9174c23b20e344a0
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}workspace-ingress
+    restart: unless-stopped
+    user: "65534:65534"
+    cap_drop: [ALL]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    logging: {driver: json-file, options: {max-size: "10m", max-file: "5"}}
+    command:
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.endpoint=tcp://ws-socket-proxy:2375"
+      - "--providers.docker.exposedbydefault=false"
+      - '--providers.docker.constraints=Label(`computor.ingress`,`workspace`)'
+      - "--providers.docker.network=${CODER_WORKSPACE_NETWORK:-computor-coder-workspaces}"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.forwardedHeaders.trustedIPs=127.0.0.1/32,172.16.0.0/12,192.168.0.0/16"
+      - "--entrypoints.coder.address=:7080"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+    networks:
+      ws-control: {}
+      computor-coder-workspaces:
+        aliases: [computor-api, computor-git, coder]
+      computor-coder-workspaces-offline:
+        aliases: [computor-api, computor-git, coder]
+    ports:
+      - "${WORKERHOST_BIND_ADDRESS:?wg address of this host}:${WORKERHOST_INGRESS_PORT:-8081}:80"
+    volumes:
+      - ${SYSTEM_DEPLOYMENT_PATH}/workspace-ingress/dynamic:/etc/traefik/dynamic:ro
+      # dynamic/ holds routes.yml and coder-relay.yml, both rendered from
+      # ops/coder/workspace-ingress/*.template (see ops/coder/ws-daemon/README.md).
+    depends_on: [ws-socket-proxy]
+
+networks:
+  ws-control:
+    name: computor-ws-control
+    internal: true
+  computor-coder-workspaces:
+    name: ${CODER_WORKSPACE_NETWORK:-computor-coder-workspaces}
+    driver: bridge
+    ipam: {config: [{subnet: 172.30.0.0/20}]}
+  computor-coder-workspaces-offline:
+    name: ${CODER_WORKSPACE_NETWORK_OFFLINE:-computor-coder-workspaces-offline}
+    driver: bridge
+    internal: true
+    ipam: {config: [{subnet: 172.30.16.0/20}]}

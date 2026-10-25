@@ -30,9 +30,12 @@ async def queue_poller_count(task_queue: str) -> Optional[int]:
         import temporalio.api.workflowservice.v1 as workflowservice
         from temporalio.api.enums.v1 import TaskQueueType
 
-        from computor_backend.tasks.temporal_client import get_temporal_client
+        from computor_backend.tasks.temporal_client import (
+            get_temporal_client,
+            namespace_for_queue,
+        )
 
-        client = await get_temporal_client()
+        client = await get_temporal_client(namespace_for_queue(task_queue))
         response = await client.workflow_service.describe_task_queue(
             workflowservice.DescribeTaskQueueRequest(
                 namespace=client.namespace,
@@ -73,3 +76,39 @@ async def assert_queue_has_worker(task_queue: str, service_name: str = "") -> No
         ),
         context={"task_queue": task_queue, "service": service_name},
     )
+
+
+async def poller_report(task_queues: list[str]) -> dict:
+    """``{queue: {"namespace": ns, "pollers": n or None}}`` for monitoring."""
+    from computor_backend.tasks.temporal_client import namespace_for_queue
+
+    report = {}
+    for queue in task_queues:
+        report[queue] = {
+            "namespace": namespace_for_queue(queue),
+            "pollers": await queue_poller_count(queue),
+        }
+    return report
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    """Print the poller report as one JSON line (used by the host sentinel).
+
+    ``python -m computor_backend.tasks.queue_health computor-tasks testing``
+    runs inside the API container, which holds the control-plane token and
+    TEMPORAL_QUEUE_NAMESPACES, so each queue is asked in its own namespace.
+    """
+    import argparse
+    import asyncio
+    import json
+
+    parser = argparse.ArgumentParser(description="Report Temporal pollers per task queue")
+    parser.add_argument("queues", nargs="+")
+    args = parser.parse_args(argv)
+    logging.basicConfig(level=logging.ERROR)
+    print(json.dumps(asyncio.run(poller_report(args.queues)), sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

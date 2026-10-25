@@ -272,8 +272,10 @@ If Coder fails to start:
    in production (dev mounts the socket directly). `temporal-worker-coder` uses
    its own allowlist proxy (`coder-worker-socket-proxy`: builds, image push and
    volume inspect/delete, no container create or exec; see
-   `ops/docs/CODER_INTEGRATION.md`). Coder still needs RW socket access for
-   container provisioning and runs with `no-new-privileges`.
+   `ops/docs/CODER_INTEGRATION.md`). The Coder server has no socket either:
+   its provisioner uses `coder-provisioner-socket-proxy`, which admits only
+   the workspace lifecycle and refuses privileged containers, host binds and
+   host namespaces.
 6. **Coder registry isolation:** `coder-registry` is deliberately left off the
    `computor-network`, so workspace containers (which DO live on that network)
    can't reach it over TCP. The host docker daemon talks to it via the
