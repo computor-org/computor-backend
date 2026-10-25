@@ -241,12 +241,12 @@ export default function AssignmentDetailPage() {
             <StatGrid columns={4}>
               <StatCard
                 label={t.grade}
-                value={formatScore(group?.grading, 1)}
+                value={formatScore(group?.grading, 1, language)}
                 tone={scoreTone(group?.grading)}
               />
               <StatCard
                 label={t.latestTestResult}
-                value={formatScore(testScore, 1)}
+                value={formatScore(testScore, 1, language)}
                 tone={scoreTone(testScore)}
               />
               <StatCard

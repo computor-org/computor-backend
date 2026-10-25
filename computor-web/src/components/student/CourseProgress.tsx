@@ -74,7 +74,7 @@ export function CourseProgressSummary<T extends ProgressContent>({
       <div className="space-y-1.5">
         <div className="flex items-baseline justify-between gap-3 text-sm">
           <span className="text-fg">{t.count(progress.submitted, progress.total)}</span>
-          <span className="text-muted tabular-nums">{pct}%</span>
+          <span className="text-muted tabular-nums">{formatScore(pct / 100, 0, language)}</span>
         </div>
         <ProgressTrack value={pct} tone="green" size="md" label={t.barLabel} />
       </div>
@@ -89,7 +89,7 @@ export function CourseProgressSummary<T extends ProgressContent>({
                 {displayName(next.item)}
               </button>
             ) : <span className="font-medium text-fg">{displayName(next.item)}</span>}
-            {score != null && <span className="text-muted"> ({t.lastTested(formatScore(score))})</span>}
+            {score != null && <span className="text-muted"> ({t.lastTested(formatScore(score, 0, language))})</span>}
           </p>
           <div className="flex shrink-0 flex-wrap gap-2">
             {!onOpenAssignment && (

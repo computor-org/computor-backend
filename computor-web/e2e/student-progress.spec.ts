@@ -175,7 +175,8 @@ test.describe('German learner', () => {
     await expect(page.getByRole('heading', { name: 'Dein Fortschritt' })).toBeVisible({ timeout: 15_000 });
     await expect(card.getByText('4 von 6 Aufgaben eingereicht')).toBeVisible();
     await expect(card.getByRole('progressbar', { name: 'Eingereichte Aufgaben' })).toHaveAttribute('aria-valuenow', '67');
-    await expect(card).toContainText('Weiter mit: Woche 3 › Beta-Absorption (zuletzt getestet: 0%)');
+    // German number format: a space before the percent sign.
+    await expect(card).toContainText(/Weiter mit: Woche 3 › Beta-Absorption \(zuletzt getestet: 0\s%\)/);
     await expect(card.getByRole('button', { name: 'Beta-Absorption', exact: true })).toBeVisible();
     await expect(card.getByRole('link', { name: 'Aufgabe lesen' })).toHaveCount(0);
     await expect(card.getByRole('link', { name: 'Alle Aufgaben' })).toHaveAttribute(
@@ -401,7 +402,7 @@ for (const language of ['de', 'en'] as const) {
       await expect(page.getByRole('button', { name: 'Topic B', exact: true })).toHaveAttribute('aria-expanded', 'false');
       await expect(page.getByRole('button', { name: 'Second exercise', exact: true })).toHaveCount(0);
       await expect(page.getByRole('link', { name: language === 'de' ? 'Ergebnisse' : 'Results', exact: true })).toHaveAttribute('href', `/courses/${COURSE_ID}/student/assignments/${FIRST}?view=results`);
-      await expect(page.locator(`[title="${language === 'de' ? 'Letztes Testergebnis' : 'Latest test result'}"]`)).toContainText('0%');
+      await expect(page.locator(`[title="${language === 'de' ? 'Letztes Testergebnis' : 'Latest test result'}"]`)).toContainText(language === 'de' ? /^0\s%$/ : '0%');
       const settingsBefore = requested.filter((path) => path.endsWith('/workspace-settings')).length;
       for (const [target, click] of [
         [FIRST, () => primary.click()],
