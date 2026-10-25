@@ -33,3 +33,10 @@ def test_safe_env_drops_blocked_extra_vars():
     env = get_safe_env("python", extra_vars={"API_TOKEN": "x", "MY_FLAG": "1"})
     assert "API_TOKEN" not in env
     assert env["MY_FLAG"] == "1"
+
+
+def test_temporal_client_credentials_are_blocked():
+    env = {"TEMPORAL_TLS_KEY": "key", "TEMPORAL_TLS_CERT": "cert", "TEMPORAL_HOST": "10.88.0.1",
+           "PATH": "/usr/bin"}
+    assert filter_env(env) == {"PATH": "/usr/bin"}
+    assert "TEMPORAL_TLS_KEY" not in get_safe_env("python", extra_vars={"TEMPORAL_TLS_KEY": "k"})

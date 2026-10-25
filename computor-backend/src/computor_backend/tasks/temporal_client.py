@@ -5,6 +5,8 @@ Temporal client configuration and initialization.
 from temporalio.client import Client, TLSConfig
 from typing import Optional
 import asyncio
+import base64
+import binascii
 
 from .worker_settings import get_worker_settings
 
@@ -21,6 +23,42 @@ _client: Optional[Client] = None
 _client_lock = asyncio.Lock()
 
 
+def _pem(value: str) -> bytes:
+    """PEM bytes from either PEM text or single-line base64 of it.
+
+    Single-line base64 lets a certificate live in a compose ``.env`` file,
+    which cannot hold the multi-line PEM form reliably.
+    """
+    if value.lstrip().startswith("-----BEGIN"):
+        return value.encode()
+    try:
+        decoded = base64.b64decode(value.strip(), validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("Temporal TLS value is neither PEM nor base64 PEM") from exc
+    if not decoded.lstrip().startswith(b"-----BEGIN"):
+        raise ValueError("Temporal TLS value is neither PEM nor base64 PEM")
+    return decoded
+
+
+def build_tls_config(settings) -> Optional[TLSConfig]:
+    """mTLS settings for the frontend, or None when no client cert is set.
+
+    A half-configured client (cert without key or the reverse) is an error
+    rather than a silent fallback to plaintext.
+    """
+    cert, key = settings.temporal_tls_cert, settings.temporal_tls_key
+    if not cert and not key:
+        return None
+    if not (cert and key):
+        raise ValueError("TEMPORAL_TLS_CERT and TEMPORAL_TLS_KEY must be set together")
+    return TLSConfig(
+        client_cert=_pem(cert),
+        client_private_key=_pem(key),
+        server_root_ca_cert=_pem(settings.temporal_tls_ca) if settings.temporal_tls_ca else None,
+        domain=settings.temporal_tls_server_name or None,
+    )
+
+
 async def get_temporal_client() -> Client:
     """
     Get or create a Temporal client instance.
@@ -35,15 +73,7 @@ async def get_temporal_client() -> Client:
             # Read config lazily (not at import) so the environment / test
             # overrides in effect when the client first connects are honored.
             settings = get_worker_settings()
-            tls_config = None
-
-            # Configure TLS if certificates are provided
-            if settings.temporal_tls_cert and settings.temporal_tls_key:
-                tls_config = TLSConfig(
-                    client_cert=settings.temporal_tls_cert.encode(),
-                    client_private_key=settings.temporal_tls_key.encode(),
-                    server_root_ca_cert=settings.temporal_tls_ca.encode() if settings.temporal_tls_ca else None,
-                )
+            tls_config = build_tls_config(settings)
 
             # Create client
             _client = await Client.connect(

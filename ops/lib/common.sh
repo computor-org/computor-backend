@@ -134,6 +134,12 @@ assemble_compose_files() {
         COMPOSE_FILES="$COMPOSE_FILES -f ${d}/docker-compose.support-mail.yaml"
     fi
 
+    # Mutual TLS on the Temporal frontend: server certificates from
+    # TEMPORAL_TLS_DIR; clients read TEMPORAL_TLS_CERT/KEY/CA from .env.
+    if [ "${TEMPORAL_TLS_ENABLED:-}" = "true" ]; then
+        COMPOSE_FILES="$COMPOSE_FILES -f ${d}/docker-compose.temporal-tls.yaml"
+    fi
+
     # Self-update sidecar: prod-only, opt-in. The file-exists guard keeps a
     # UPDATE_ENABLED=true .env working on a checkout that predates the overlay.
     if [ "$environment" = "prod" ] && [ "${UPDATE_ENABLED:-}" = "true" ] \

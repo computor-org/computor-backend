@@ -327,22 +327,13 @@ async def get_deployment_status_with_workflow(
     workflow_info = None
     if deployment.workflow_id:
         try:
-            # Import Temporal client
-            from temporalio.client import Client
+            # Shared client: same address, namespace and mTLS settings as
+            # every other Temporal caller.
+            from computor_backend.tasks.temporal_client import get_temporal_client
             from datetime import datetime, timezone
-            import os
-            
-            # Get Temporal configuration
-            temporal_host = os.environ.get('TEMPORAL_HOST', 'localhost')
-            temporal_port = os.environ.get('TEMPORAL_PORT', '7233')
-            temporal_namespace = os.environ.get('TEMPORAL_NAMESPACE', 'default')
-            
-            # Create Temporal client
+
             async def get_workflow_status():
-                client = await Client.connect(
-                    f"{temporal_host}:{temporal_port}",
-                    namespace=temporal_namespace
-                )
+                client = await get_temporal_client()
                 
                 try:
                     # Get workflow handle

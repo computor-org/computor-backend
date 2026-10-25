@@ -1,0 +1,42 @@
+# Mutual TLS on the Temporal frontend (TEMPORAL_TLS_ENABLED=true in .env).
+#
+# Without this overlay any process that reaches tcp/7233 (every container on
+# the control-plane network, every container on a split worker host that can
+# route to the WireGuard address) can list, start, signal and terminate
+# workflows, and can poll the control-plane task queue. With it the frontend
+# completes a handshake only for clients holding a certificate from the
+# deployment's Temporal CA. Internode traffic (history, matching, the internal
+# system worker) uses the same server certificate, which also serves as the
+# client certificate of the auto-setup CLI and the health check.
+#
+# TEMPORAL_TLS_DIR holds ca.pem, server.pem and server-key.pem, made by
+# ops/temporal-tls/generate-certs.sh. The key must be readable by uid 1000
+# (the image's temporal user). Client keys and the CA key do not belong there.
+#
+# Clients (API, workers) read TEMPORAL_TLS_CERT / TEMPORAL_TLS_KEY /
+# TEMPORAL_TLS_CA (PEM or single-line base64) and TEMPORAL_TLS_SERVER_NAME
+# from .env; the compose files pass them through, empty by default.
+services:
+  temporal:
+    volumes:
+      - ${TEMPORAL_TLS_DIR:?set TEMPORAL_TLS_DIR when TEMPORAL_TLS_ENABLED=true}/ca.pem:/etc/temporal/tls/ca.pem:ro
+      - ${TEMPORAL_TLS_DIR}/server.pem:/etc/temporal/tls/server.pem:ro
+      - ${TEMPORAL_TLS_DIR}/server-key.pem:/etc/temporal/tls/server-key.pem:ro
+    environment:
+      # Server (rendered by the image's config_template.yaml).
+      - TEMPORAL_TLS_REQUIRE_CLIENT_AUTH=true
+      - TEMPORAL_TLS_SERVER_CA_CERT=/etc/temporal/tls/ca.pem
+      - TEMPORAL_TLS_SERVER_CERT=/etc/temporal/tls/server.pem
+      - TEMPORAL_TLS_SERVER_KEY=/etc/temporal/tls/server-key.pem
+      - TEMPORAL_TLS_INTERNODE_SERVER_NAME=temporal
+      - TEMPORAL_TLS_FRONTEND_CERT=/etc/temporal/tls/server.pem
+      - TEMPORAL_TLS_FRONTEND_KEY=/etc/temporal/tls/server-key.pem
+      - TEMPORAL_TLS_CLIENT1_CA_CERT=/etc/temporal/tls/ca.pem
+      - TEMPORAL_TLS_CLIENT2_CA_CERT=/etc/temporal/tls/ca.pem
+      - TEMPORAL_TLS_FRONTEND_SERVER_NAME=temporal
+      # Temporal CLI environment config, used by auto-setup.sh (namespace and
+      # search attributes) and by the health check below.
+      - TEMPORAL_TLS_CLIENT_CERT_PATH=/etc/temporal/tls/server.pem
+      - TEMPORAL_TLS_CLIENT_KEY_PATH=/etc/temporal/tls/server-key.pem
+      - TEMPORAL_TLS_SERVER_CA_CERT_PATH=/etc/temporal/tls/ca.pem
+      - TEMPORAL_TLS_SERVER_NAME=temporal

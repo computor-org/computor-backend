@@ -75,8 +75,9 @@ BLOCKED_ENV_VARS: Set[str] = {
 # Variables blocked by prefix rather than exact name. Every COMPUTOR_* value
 # is internal worker config and must not reach student code — with the one
 # exception of the flag that turns the sandbox on, which is harmless to leak
-# and is filtered here only for tidiness.
-BLOCKED_ENV_PREFIXES = ("COMPUTOR_",)
+# and is filtered here only for tidiness. TEMPORAL_* carries the worker's
+# Temporal address and its mTLS client certificate and key.
+BLOCKED_ENV_PREFIXES = ("COMPUTOR_", "TEMPORAL_")
 
 
 # Minimal safe environment for subprocess execution

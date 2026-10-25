@@ -29,6 +29,7 @@ jobs:
         run: >-
           uv run --project computor-backend --python 3.12 pytest -q
           computor-backend/src/computor_backend/tests/test_canonical_zip_hash.py
+          computor-backend/src/computor_backend/tests/test_temporal_client.py
           computor-backend/src/computor_backend/tests/test_plain_mentions.py
           computor-backend/src/computor_backend/tests/test_coder_forwardauth.py
           computor-backend/src/computor_backend/tests/test_coder_provision_errors.py
@@ -154,6 +155,7 @@ jobs:
         run: >-
           ../.venv-grading/bin/python -m pytest -q -rs
           tests/test_job_isolation.py tests/test_sandbox_launch.py
+          tests/test_env_filter.py
 
   web:
     # Required jobs run in the merge queue, not on pull request events.

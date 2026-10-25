@@ -297,6 +297,10 @@ services:
       DOCKER_HOST: tcp://coder-worker-socket-proxy:2375
       TEMPORAL_HOST: temporal
       TEMPORAL_PORT: 7233
+      TEMPORAL_TLS_CERT: ${TEMPORAL_TLS_CERT:-}
+      TEMPORAL_TLS_KEY: ${TEMPORAL_TLS_KEY:-}
+      TEMPORAL_TLS_CA: ${TEMPORAL_TLS_CA:-}
+      TEMPORAL_TLS_SERVER_NAME: ${TEMPORAL_TLS_SERVER_NAME:-}
       CODER_URL: http://coder:7080
       CODER_ENABLED: "true"
       CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}

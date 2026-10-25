@@ -10,7 +10,8 @@ from typing import List, Dict, Any, Optional
 from abc import ABC, abstractmethod
 
 from .config import RunnerSettings, RunnerBackend
-from .executor import DEFAULT_SAFE_ENV, BLOCKED_ENV_VARS
+from .executor import DEFAULT_SAFE_ENV
+from ctexec.environment import is_blocked_var
 
 
 class Runner(ABC):
@@ -35,8 +36,7 @@ class Runner(ABC):
     def _get_safe_env(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
         """Build safe environment."""
         if not self.settings.clean_environment:
-            env = {k: v for k, v in os.environ.items()
-                   if k.upper() not in BLOCKED_ENV_VARS}
+            env = {k: v for k, v in os.environ.items() if not is_blocked_var(k)}
         else:
             env = DEFAULT_SAFE_ENV.copy()
 
@@ -48,7 +48,7 @@ class Runner(ABC):
         # Add extra vars
         if extra:
             for key, value in extra.items():
-                if key.upper() not in BLOCKED_ENV_VARS:
+                if not is_blocked_var(key):
                     env[key] = value
 
         return env
