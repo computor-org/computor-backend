@@ -239,3 +239,41 @@ class TestBuildTlsConfig:
         from computor_backend.tasks.temporal_client import build_tls_config
         with pytest.raises(ValueError, match="neither PEM nor base64 PEM"):
             build_tls_config(self._settings(TEMPORAL_TLS_CERT=bad, TEMPORAL_TLS_KEY=_KEY))
+
+
+_JWT = "probe"  # stands in for a signed JWT; the client passes it through
+
+
+class TestBuildRpcMetadata:
+    """The bearer token is opt-in and never sent without TLS."""
+
+    _settings = staticmethod(TestBuildTlsConfig._settings)
+
+    def test_no_token_means_no_header(self):
+        from computor_backend.tasks.temporal_client import build_rpc_metadata
+        assert build_rpc_metadata(self._settings(), None) == {}
+        assert build_rpc_metadata(self._settings(TEMPORAL_API_KEY=" "), None) == {}
+
+    def test_token_becomes_bearer_header(self):
+        from computor_backend.tasks.temporal_client import build_rpc_metadata, build_tls_config
+        settings = self._settings(TEMPORAL_TLS_CERT=_CERT, TEMPORAL_TLS_KEY=_KEY, TEMPORAL_API_KEY=_JWT)
+        assert build_rpc_metadata(settings, build_tls_config(settings)) == {"authorization": f"Bearer {_JWT}"}
+
+    def test_token_without_tls_is_an_error(self):
+        from computor_backend.tasks.temporal_client import build_rpc_metadata
+        with pytest.raises(ValueError, match="requires TLS"):
+            build_rpc_metadata(self._settings(TEMPORAL_API_KEY=_JWT), None)
+
+    @pytest.mark.asyncio
+    async def test_client_sends_token(self):
+        from computor_backend.tasks import temporal_client
+        temporal_client._client = None
+        with patch.dict(os.environ, {"TEMPORAL_TLS_CERT": _CERT, "TEMPORAL_TLS_KEY": _KEY,
+                                     "TEMPORAL_API_KEY": _JWT}):
+            get_worker_settings.cache_clear()
+            with patch('computor_backend.tasks.temporal_client.Client.connect') as mock_connect:
+                mock_connect.return_value = MagicMock()
+                await temporal_client.get_temporal_client()
+                assert mock_connect.call_args[1]['rpc_metadata'] == {"authorization": f"Bearer {_JWT}"}
+        temporal_client._client = None
+        get_worker_settings.cache_clear()

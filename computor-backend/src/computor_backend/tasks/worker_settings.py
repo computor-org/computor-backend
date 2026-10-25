@@ -89,6 +89,11 @@ class WorkerSettings(BaseSettings):
     temporal_tls_server_name: Optional[str] = Field(
         default=None, validation_alias="TEMPORAL_TLS_SERVER_NAME"
     )
+    # Bearer token (a JWT) for a frontend that runs Temporal's JWT claim mapper
+    # and authorizer. Sent as the ``authorization`` gRPC header on every call.
+    temporal_api_key: Optional[str] = Field(
+        default=None, validation_alias="TEMPORAL_API_KEY"
+    )
 
     # --- Temporal worker activity thread pool (tasks/temporal_worker.py) ---
     # Blocking activities (GitPython clone/push, sync SQLAlchemy, sync
