@@ -1,6 +1,6 @@
 # Terms of Use computor.at
 
-Version 1.2, effective 22 October 2026
+Version 1.3, effective 25 October 2026
 
 This is a translation. The German version (Nutzungsbedingungen) is
 authoritative.
@@ -78,13 +78,18 @@ certificate or a confirmation of competence. If a university course uses
 results for an assessment, the responsible teacher decides under the
 applicable regulations.
 
-3.6 Lena provides AI-generated learning help when you ask Lena. With the
-"Ask Lena" button, Lena uses your question, the text you send and your visible
-assignment. When you mention Lena in a message about an assignment, Lena also
-uses the message thread, your latest submission and its test results, and
-answers in the thread. Lena cannot execute code or grade your work. Check its
-answers, because they can be incorrect. Requests and answers are handled as
-described in the Privacy notice, including bounded inference caches. Their contents are not logged or used to train models. Availability and
+3.6 Lena provides AI-generated learning help through the "Ask Lena" button and
+in course messages. With the button, Lena uses your question, the text you send
+and your visible assignment. You can address Lena with @lena and reply in the
+thread. In courses with automatic Lena routing, learner messages that mention
+nobody else are also addressed to Lena when Lena is available and included in
+the message's audience. A visible Lena mention is added. Lena uses the thread
+and, for assignments, your latest submission and its test results, and answers
+in the thread. Lena cannot execute code or grade your work. Check its answers,
+because they can be incorrect. Requests and answers are handled as described
+in the Privacy notice, including bounded inference caches. Messages and answers
+in the thread remain stored there. The inference services keep no additional
+content logs and do not use your content for model training. Availability and
 request limits depend on capacity. Public examples also work with desktop
 VS Code or optional GitHub Codespaces under GitHub's own terms.
 
