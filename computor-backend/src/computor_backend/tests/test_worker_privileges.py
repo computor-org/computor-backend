@@ -147,6 +147,9 @@ class _FakeCoder:
     def __init__(self, workspaces):
         self.workspaces = workspaces
         self.updates = []
+        # Coder's own view by id: the rollout's targets plus workspaces of
+        # other templates or owners that a report could name.
+        self.by_id = {w.id: w for w in workspaces}
 
     async def __aenter__(self):
         return self
@@ -155,7 +158,14 @@ class _FakeCoder:
         return False
 
     async def get_template_active_version(self, name):
-        return "v2"
+        return "v3" if name == "other" else "v2"
+
+    async def get_workspace_by_id(self, workspace_id):
+        from computor_backend.coder.exceptions import CoderWorkspaceNotFoundError
+
+        if workspace_id not in self.by_id:
+            raise CoderWorkspaceNotFoundError(workspace_id)
+        return self.by_id[workspace_id]
 
     async def list_all_workspaces(self):
         return self.workspaces
@@ -225,6 +235,7 @@ def test_control_plane_applies_current_credentials(monkeypatch, coder):
     from computor_backend.coder import service
 
     db = object()
+    coder.by_id["w9"] = _running("w9", "admin")
     monkeypatch.setattr(database, "get_db_session", lambda: contextlib.nullcontext(db))
     monkeypatch.setattr(
         service, "workspace_app_credentials_for_owner",
@@ -236,6 +247,41 @@ def test_control_plane_applies_current_credentials(monkeypatch, coder):
     ]))
     assert result == {"updated_now": 2, "errors": []}
     assert coder.updates == [("w1", "v2", ("s-ualice", "h-ualice")), ("w9", "v2", None)]
+
+
+def test_control_plane_refuses_unconfirmed_workspace_owner_pairs(monkeypatch, coder):
+    """The Coder-side report is checked against Coder before credentials are derived."""
+    import contextlib
+
+    from computor_backend import database
+    from computor_backend.coder import service
+
+    derived = []
+    monkeypatch.setattr(database, "get_db_session", lambda: contextlib.nullcontext(object()))
+
+    def credentials(session, owner):
+        derived.append(owner)
+        return ("s-" + owner, "h-" + owner)
+
+    monkeypatch.setattr(service, "workspace_app_credentials_for_owner", credentials)
+    result = asyncio.run(setup.apply_workspace_credential_updates("v2", [
+        # bob's workspace reported as alice's: alice's credential must not reach it
+        {"id": "w2", "name": "w2", "owner_name": "ualice"},
+        # a workspace Coder does not know
+        {"id": "w404", "name": "w404", "owner_name": "ualice"},
+        # right owner, but v2 is not the active version of its template
+        {"id": "w3", "name": "w3", "owner_name": "ucarol"},
+        # the only genuine pair; the reported name is replaced by Coder's
+        {"id": "w1", "name": "forged", "owner_name": "ualice"},
+    ]))
+    assert result["updated_now"] == 1
+    assert result["errors"] == [
+        "w2: owner mismatch, skipped",
+        "w404: not verified (CoderWorkspaceNotFoundError)",
+        "w3: template version mismatch, skipped",
+    ]
+    assert coder.updates == [("w1", "v2", ("s-ualice", "h-ualice"))]
+    assert derived == ["ualice"]
 
 
 def test_control_plane_setup_errors_carry_no_secret(monkeypatch, coder):
