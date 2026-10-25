@@ -143,8 +143,10 @@ try {
   await shot(page, 'course-page');
 
   if (!skipWorkspace) {
-    // 9. Launch the managed VS Code workspace (opens a new tab).
-    const launch = page.getByRole('button', { name: /Arbeitsumgebung starten|Starten/ }).first();
+    // 9. Launch the managed VS Code workspace (opens a new tab). A new learner
+    // gets the template card ("Arbeitsumgebung einrichten"), a learner with a
+    // stopped workspace "Starten und öffnen".
+    const launch = page.getByRole('button', { name: /Arbeitsumgebung einrichten|Starten und öffnen|Arbeitsumgebung starten/ }).first();
     const [tab] = await Promise.all([context.waitForEvent('page'), launch.click()]);
     await tab.setViewportSize({ width: 1440, height: 900 });
     await tab.waitForLoadState();

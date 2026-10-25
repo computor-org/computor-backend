@@ -37,7 +37,7 @@ const screens = process.env.QA_SCREENS || './qa-screens';
 const phase = process.env.QA_PHASE || 'learners';
 const label = process.env.QA_LABEL || phase;
 const locale = process.env.QA_LOCALE || 'de-DE';
-const course = 'Data Science mit Python – Grundlagen';
+const course = /^Data Science mit Python( I)? – Grundlagen$/;
 mkdirSync(screens, { recursive: true });
 
 const shellQuote = value => `'${value.replaceAll("'", "'\\''")}'`;
@@ -83,7 +83,7 @@ async function signIn(email, password) {
 async function openCourse(page, title = course) {
   await page.goto(`${origin}/courses`);
   await settle(page);
-  await page.getByText(title, { exact: true }).first().click();
+  await (typeof title === 'string' ? page.getByText(title, { exact: true }) : page.getByText(title)).first().click();
   await page.waitForURL(/\/courses\/[0-9a-f-]{36}/);
   await settle(page);
   return page.url().match(/\/courses\/([0-9a-f-]{36})/)[1];
