@@ -1,6 +1,6 @@
 # Datenschutzerklärung computor.at
 
-Version 1.4, Stand 25.10.2026
+Version 1.5, Stand 25.10.2026
 
 Computor ist ein kostenloses Lernangebot der TU Graz. Öffentliche Materialien
 können Sie ohne Konto lesen. Für Konto, Kurse, Abgaben, Arbeitsumgebung,
@@ -104,7 +104,7 @@ ist keine pauschale Einwilligung dafür.
 | Lena-Schaltflächen-Anfrage | Höchstens 15 Minuten, nach Fertigstellung entfernt. |
 | Lena-Schaltflächen-Antwort | 24 Stunden, nur für die anfragende Person abrufbar. |
 | Lena-Antworten im Verlauf und Inferenz-Caches | Verlauf wie Kursnachrichten; Caches nach der in Abschnitt 2 beschriebenen Kapazitätsregel. |
-| Web- und Scanner-Zugriffslogs | Tägliche Rotation nichtleerer Dateien mit 14 aufbewahrten Archivrotationen; keine feste Grenze von 14 Kalendertagen. |
+| Web- und Scanner-Zugriffslogs | Tägliche Rotation mit 14 Archivdateien, auch für leere Logs; keine feste Grenze von 14 Kalendertagen. |
 | Diagnose- und technische Sicherheitsaufzeichnungen | Je nach Dienst größenabhängige Rotation (häufig fünf Dateien zu je 10 MB) oder keine automatische Alterslöschung; keine einheitliche Frist. |
 | Anmelde- und Verwaltungsereignisse im Anmeldedienst | Anmeldeereignisse 30 Tage, detaillierte Verwaltungsereignisse 90 Tage; unabhängig von Diagnoseprotokollen. |
 | Technische Angriffssperren | Scanner-Sperrhistorie 35 Tage; zugehörige Logdateien mit vier wöchentlichen Archivrotationen nichtleerer Dateien. |

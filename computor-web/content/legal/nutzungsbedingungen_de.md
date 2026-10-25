@@ -1,10 +1,10 @@
 # Nutzungsbedingungen computor.at
 
-Version 1.4, Stand 25.10.2026
+Version 1.5, Stand 25.10.2026
 
 Diese Fassung gilt für neue Nutzungsverträge. Bestehende Verträge behalten ihre
 Bedingungen, bis diese wirksam geändert werden;
-[Version 1.3](https://github.com/computor-org/computor-backend/blob/9d9d8467c149cd8ee04ba7bfcae3ffa85e2eda5e/computor-web/content/legal/nutzungsbedingungen_de.md) bleibt zugänglich.
+[Version 1.4](https://github.com/computor-org/computor-backend/blob/3b91ebda6ceb22783aa3350a95e4a34d9662462e/computor-web/content/legal/nutzungsbedingungen_de.md) bleibt zugänglich und verweist auf Version 1.3.
 
 ## 1. Anbieter, Konto und kostenloses Angebot
 
@@ -114,8 +114,13 @@ die zuständigen Behörden (Art. 18 DSA).
 ## 5. Änderungen und Ende des Angebots oder Vertrags
 
 Wir können Funktionen und technische Umsetzung aus technischen,
-sicherheitsbezogenen, rechtlichen oder betrieblichen Gründen ändern, soweit
-Ihnen dies unter Berücksichtigung Ihrer berechtigten Interessen zumutbar ist.
+sicherheitsbezogenen, rechtlichen oder betrieblichen Gründen einseitig nur
+ändern, wenn die Änderung geringfügig, sachlich gerechtfertigt und Ihnen unter
+Berücksichtigung Ihrer berechtigten Interessen zumutbar ist. Neue Funktionen
+können wir ergänzen, soweit dadurch die vereinbarten Leistungen nicht
+nachteilig verändert werden. Wesentliche nachteilige Änderungen setzen eine
+wirksame Vereinbarung mit Ihnen oder ein hierfür anwendbares gesetzliches
+Änderungsverfahren voraus.
 Wesentliche Einschränkungen und eine geplante Einstellung kündigen wir mit
 angemessener Frist an und geben Ihnen Gelegenheit, eigene Inhalte zu sichern.
 Bei akuten Sicherheitsproblemen oder zwingenden rechtlichen Vorgaben können
