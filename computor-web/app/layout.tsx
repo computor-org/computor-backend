@@ -4,6 +4,7 @@ import "katex/dist/katex.min.css";
 import "./globals.css";
 import { AuthProvider } from "@/src/contexts/AuthContext";
 import { NotificationProvider } from "@/src/contexts/NotificationContext";
+import { CourseProvider } from "@/src/contexts/CourseContext";
 import { THEME_INIT_SCRIPT } from "@/src/utils/theme";
 
 const geistSans = Geist({
@@ -39,7 +40,13 @@ export default function RootLayout({
       >
         <AuthProvider>
           <NotificationProvider>
-            {children}
+            {/*
+              Above every page, not inside AuthenticatedLayout: pages call
+              useCourseCrumbs before they render that layout, and below it
+              they only ever saw the context's default, so the breadcrumb read
+              "Kurs" where the course's name belonged.
+            */}
+            <CourseProvider>{children}</CourseProvider>
           </NotificationProvider>
         </AuthProvider>
       </body>

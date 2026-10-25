@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
-import { CourseProvider } from '@/src/contexts/CourseContext';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import MaintenanceBanner from './MaintenanceBanner';
@@ -70,9 +69,6 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
   }
 
   return (
-    // CourseProvider wraps the chrome, not just the page: the top bar shows the
-    // course name too, and it used to fetch the course a second time to get it.
-    <CourseProvider>
     <div className="h-dvh overflow-hidden bg-canvas flex">
       {/* Sidebar (fixed; scrolls internally via its own nav) */}
       <Sidebar />
@@ -105,6 +101,5 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
         )}
       </div>
     </div>
-    </CourseProvider>
   );
 }
