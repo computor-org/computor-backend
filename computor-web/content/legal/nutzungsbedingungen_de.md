@@ -1,281 +1,168 @@
 # Nutzungsbedingungen computor.at
 
-Version 1.3, gültig ab 25.10.2026
+Version 1.4, Stand 25.10.2026
 
-## Das Wichtigste in Kürze
+Diese Fassung gilt für neue Nutzungsverträge. Bestehende Verträge behalten ihre
+Bedingungen, bis diese wirksam geändert werden;
+[Version 1.3](https://github.com/computor-org/computor-backend/blob/9d9d8467c149cd8ee04ba7bfcae3ffa85e2eda5e/computor-web/content/legal/nutzungsbedingungen_de.md) bleibt zugänglich.
 
-Diese Kurzfassung erleichtert das Lesen. Verbindlich ist der Volltext darunter.
+## 1. Anbieter, Konto und kostenloses Angebot
 
-- computor.at ist ein kostenloses Lernangebot der TU Graz, gefördert von netidee.
-- Ihr Code bleibt Ihrer. Wir nutzen ihn nur, um den Dienst zu erbringen.
-- Die Arbeitsumgebung ist zum Lernen da: kein Mining, keine Angriffe, keine
-  Scans, kein Spam, nichts Rechtswidriges.
-- Ressourcen und Kursplätze sind begrenzt. Sichern Sie wichtige Arbeit über Git
-  oder durch Herunterladen.
-- Wesentliche Änderungen kündigen wir mindestens 30 Tage vorher an; Änderungen
-  zu Ihrem Nachteil gelten erst, wenn Sie ihnen zustimmen.
-- Österreichisches Recht; Ihre zwingenden Verbraucherrechte bleiben erhalten.
+Die Technische Universität Graz, Rechbauerstraße 12, 8010 Graz („TU Graz“,
+„wir“), betreibt computor.at durch das Institut für
+Theoretische Physik – Computational Physics, Petersgasse 16, 8010 Graz.
+Kontaktangaben stehen im [Impressum](/impressum). Das von netidee geförderte
+Lernangebot ist kostenlos.
 
-## 1. Anbieterin und Geltungsbereich
+Diese Bedingungen gelten für registrierte Nutzer*innen. Mit der Annahme bei
+der ersten Anmeldung schließen Sie einen kostenlosen Nutzungsvertrag auf
+unbestimmte Zeit. Öffentliche Lernmaterialien können Sie ohne Konto lesen. Bei
+TU-Lehrveranstaltungen gehen die Studienvorschriften und Kursanforderungen im
+Konfliktfall vor. Die [Datenschutzerklärung](/privacy) erläutert die
+Datenverarbeitung; ihre Kenntnisnahme ist keine datenschutzrechtliche
+Einwilligung.
 
-1.1 Die Lernplattform computor.at und den Chat chat.computor.at (gemeinsam
-„Plattform“) betreibt die Technische Universität Graz, Rechbauerstraße 12,
-8010 Graz („TU Graz“ oder „wir“), durch ihr Institut für Theoretische Physik –
-Computational Physics (ITPcp), Petersgasse 16, 8010 Graz. Näheres steht im
-[Impressum](/impressum).
+Sie müssen mindestens 14 Jahre alt sein. Wir löschen Konten jüngerer Personen,
+sobald wir davon erfahren. Jede Person darf nur ein nicht übertragbares Konto
+haben. Schützen Sie Passwort und E-Mail-Konto und melden Sie einen vermuteten
+Fremdzugriff sofort an security@computor.at.
 
-1.2 Diese Nutzungsbedingungen regeln die Nutzung der Plattform durch
-registrierte Nutzer*innen („Sie“). Wie wir Ihre Daten verarbeiten, erklärt die
-[Datenschutzerklärung](/privacy).
+## 2. Lernen, Arbeitsumgebungen und zusätzliche Werkzeuge
 
-1.3 Nutzen Sie die Plattform im Rahmen einer Lehrveranstaltung der TU Graz,
-gelten zusätzlich die studienrechtlichen Vorschriften der TU Graz und die
-Vorgaben der Lehrveranstaltung. Bei einem Widerspruch gehen diese vor.
+Computor bietet Kurse und Programmierübungen, automatische Tests,
+Abgabe-Repositories, Kommunikation und Lernhilfe. Welche Funktionen und
+Arbeitswege verfügbar sind, steht im Angebot. Derzeit laufen die über den
+Browser bereitgestellten Workspaces auf unseren Servern; alternativ können
+Sie mit geeigneten Werkzeugen auf Ihrem Gerät arbeiten. Eine Browseroberfläche
+bedeutet nicht, dass die Berechnung auf Ihrem Gerät stattfindet.
 
-## 2. Konto und Vertragsabschluss
+Rechenzeit, Speicher, Netzwerkzugang, Kursplätze und gleichzeitig laufende
+Workspaces sind begrenzt. Inaktive Workspaces können gestoppt werden;
+ihre Dateien bleiben erhalten. Bei ausgeschöpfter Kapazität kann der Zugang
+vorübergehend ausfallen; ein Anspruch auf einen bestimmten Kursplatz besteht
+nicht. Wir betreiben den Dienst mit der für ein universitäres Lernangebot
+üblichen Sorgfalt, können aber keine unterbrechungsfreie Verfügbarkeit oder
+Wiederherstellung einzelner Dateien versprechen. Sichern Sie wichtige Arbeit über Git oder durch Herunterladen.
 
-2.1 Sie erstellen ein Konto mit bestätigter E-Mail-Adresse und Passwort. Beim ersten Login bestätigen
-Sie, diese Nutzungsbedingungen zu akzeptieren. Damit kommt ein unentgeltlicher
-Nutzungsvertrag auf unbestimmte Zeit zustande. Den Chat chat.computor.at können
-Sie auch mit einem eigenen Chat-Konto nutzen; auch dafür gelten diese
-Nutzungsbedingungen.
+Tests und Punkte dienen dem Lernen und sind kein Prüfungszeugnis oder
+Kompetenznachweis. Nutzt eine Lehrveranstaltung Ergebnisse zur Beurteilung,
+entscheidet die Lehrperson nach den geltenden Vorschriften. Lena gibt derzeit
+KI-Lernhilfe über eine Schaltfläche und in Kursnachrichten, in entsprechend
+eingerichteten Kursen auch durch automatische Zuordnung. Sie führt keinen Code
+aus und entscheidet keine Noten. Umfang, Empfängerkreis und Speicherung stehen
+in der Datenschutzerklärung. Prüfen Sie KI-Antworten, weil sie falsch sein
+können; Verfügbarkeit und Anfragegrenzen hängen von der Kapazität ab.
 
-2.2 Sie müssen mindestens 14 Jahre alt sein. Die Nutzung ist kostenlos und
-begründet für Sie keine Zahlungspflichten; Jugendliche ab 14 Jahren können sie
-daher selbst vereinbaren (§ 170 Abs. 3 ABGB). Konten von Personen unter 14
-Jahren löschen wir, sobald wir davon erfahren.
+Je nach verfügbarer Funktion arbeiten Sie auf Ihrem Gerät oder in einer
+bereitgestellten Umgebung. Selbst gewählte externe Dienste haben eigene
+Bedingungen und können Kosten verursachen; sie ersetzen nicht das vereinbarte
+kostenlose Angebot. Die Datenschutzerklärung erläutert die Datenflüsse.
 
-2.3 Jede Person darf nur ein Konto haben. Konten sind nicht übertragbar.
-Schützen Sie Ihr Passwort und Ihr E-Mail-Konto. Wenn Sie vermuten, dass jemand
-anderer Ihr Konto nutzt, melden Sie das bitte umgehend an security@computor.at.
+## 3. Zulässige Nutzung und eigene Inhalte
 
-## 3. Leistungen
+Nutzen Sie die Plattform zum Lernen und Lehren. Untersagt sind missbräuchliche
+Ressourcennutzung (etwa unbefugtes Mining), Spam sowie unbefugte Angriffe und Port- oder
+Schwachstellenscans. Netzwerkdienste, Proxys, VPN-/Tor-Knoten und
+Sicherheitsübungen sind erlaubt, soweit Kurs oder Plattform sie vorsehen oder
+ausdrücklich gestatten. Vorgesehene oder ausdrücklich erlaubte Kurs- und
+Plattformfunktionen bleiben zulässig, auch wenn sie Agenten einsetzen.
+Umgehen Sie keine Ressourcen-, Zugangs- oder Teilnahmegrenzen.
+Greifen Sie nicht auf fremde Konten oder Daten zu und versuchen Sie nicht,
+aus der Arbeitsumgebung auszubrechen. Rechtswidrige Inhalte, die Verbreitung
+von Schadsoftware, Urheberrechtsverletzungen, sexuelle Missbrauchsdarstellungen
+von Kindern, Hetze, Drohungen, Belästigung, Beleidigung und Bloßstellung sind
+untersagt. Veröffentlichen Sie weder fremde Abgaben ohne Zustimmung noch
+Lösungen bewerteter Aufgaben, wenn der Kurs dies verbietet.
 
-3.1 Wir stellen unentgeltlich bereit: Kurse und Übungsaufgaben, eine
-Programmierumgebung im Browser („Workspace“), die automatische Prüfung Ihrer
-Abgaben, Git-Repositories für Ihre Abgaben, einen Chat und optionale Lena-Lernhilfe.
+Sicherheitsforschung bedarf vorheriger Absprache über security@computor.at.
+Melden Sie Schwachstellen vertraulich, ohne fremde Daten abzurufen oder den
+Betrieb zu stören. Wir protokollieren nutzungsbezogene technische Zugriffs- und
+Sicherheitsereignisse, soweit dies für den sicheren Betrieb erforderlich ist.
+Daten, Zwecke, Zugriffsberechtigte und Aufbewahrungsfristen erläutert die
+Datenschutzerklärung.
 
-3.2 Wir betreiben die Plattform mit der Sorgfalt, die für ein universitäres
-Lernangebot üblich ist. Wartungsarbeiten kündigen wir, soweit möglich, vorher
-auf der Plattform an. Eine ununterbrochene Verfügbarkeit können wir nicht
-zusagen.
+Ihr Code, Ihre Texte und Dateien bleiben Ihre. Sie räumen der TU Graz nur die
+kostenlosen, nicht ausschließlichen Rechte ein, Ihre Inhalte im für den Betrieb
+erforderlichen Umfang zu verarbeiten, insbesondere zu speichern, auszuführen,
+automatisch zu testen, den Lehrenden und Tutor*innen Ihres Kurses anzuzeigen
+und Kursnachrichten im jeweiligen Empfängerkreis anzuzeigen.
+Diese Rechte enden mit der Löschung; für Sicherungskopien gelten die in der
+Datenschutzerklärung erläuterten Löschregeln. Laden Sie nur Inhalte hoch, für
+die Sie die nötigen Rechte haben.
 
-3.3 Rechenzeit, Arbeitsspeicher, Speicherplatz, Netzwerkzugang sowie Anzahl
-und Laufzeit der Workspaces sind begrenzt. Workspaces werden nach einer Stunde
-ohne Aktivität automatisch gestoppt; Ihre Dateien bleiben dabei erhalten.
-Kursplätze und die Anzahl gleichzeitig nutzbarer Workspaces können begrenzt
-sein. Ist die Kapazität erschöpft, kann eine Kursanmeldung oder der Start eines
-Workspaces vorübergehend nicht möglich sein. Einen Anspruch auf einen
-bestimmten Kursplatz gibt es nicht.
+Für Kursmaterial und [Software](https://github.com/computor-org) gelten die
+jeweils ausgewiesenen Lizenzen; Rechte an Fremdmaterial bleiben unberührt.
 
-3.4 Wir erstellen regelmäßig Sicherungskopien der Server, können aber die
-Wiederherstellung einzelner Dateien nicht zusagen. Sichern Sie bitte wichtige
-Arbeit selbst, indem Sie sie über Git abgeben oder herunterladen.
+## 4. Moderation und Beschwerde
 
-3.5 Automatische Tests und Punkte sind Lernhilfen. Sie sind keine Prüfung,
-kein Zeugnis und keine Bestätigung von Kenntnissen. Zieht eine
-Lehrveranstaltung Ergebnisse für eine Beurteilung heran, entscheidet die
-jeweilige Lehrperson nach den dafür geltenden Vorschriften.
+Bei konkreten Hinweisen auf Rechts- oder Nutzungsverstöße werden wir tätig; rechtswidrige Inhalte können Sie über
+[Inhalte melden](/report) melden. Maßnahmen richten sich nach der Schwere:
+Hinweis, Entfernen oder Sperren von Inhalten, Stoppen eines Workspaces,
+vorübergehende Kontosperre oder Kündigung. Automatische Werkzeuge melden
+Auffälligkeiten; ein Mensch entscheidet über Maßnahmen gegen Sie. Bei akuter
+Gefahr kann ein Workspace automatisch gestoppt werden.
 
-3.6 Lena erzeugt KI-Lernhilfe über die Schaltfläche „Lena fragen“ und in
-Kursnachrichten. Über die Schaltfläche nutzt Lena Ihre Frage, Ihren ausgewählten
-Text und die sichtbare Aufgabe. Sie können Lena mit @lena ansprechen und im
-Verlauf antworten. In Kursen mit automatischer Lena-Zuordnung werden auch
-Nachrichten von Lernenden ohne andere erwähnte Person Lena zugeordnet, sofern
-Lena zum Empfängerkreis gehört und verfügbar ist. Dabei wird eine sichtbare
-Lena-Erwähnung ergänzt. Lena nutzt den Nachrichtenverlauf und bei Aufgaben
-zusätzlich Ihre letzte Abgabe und deren Testergebnisse und antwortet im Verlauf.
-Lena führt keinen Code aus und bewertet keine Abgaben.
-Prüfen Sie Antworten, denn sie können falsch sein. Anfragen und Antworten werden
-wie in der Datenschutzerklärung beschrieben verarbeitet, einschließlich
-begrenzter Inferenz-Caches. Nachrichten und Antworten im Verlauf bleiben dort
-gespeichert. Die Inferenzdienste erstellen keine zusätzlichen Inhaltsprotokolle
-und verwenden Ihre Inhalte nicht zum Modelltraining. Verfügbarkeit und
-Anfragegrenzen hängen von der Kapazität ab. Öffentliche Beispiele können Sie
-auch mit Desktop-VS-Code oder
-optional GitHub Codespaces nach den dortigen Bedingungen bearbeiten.
+Wir erklären Ihnen per E-Mail die Maßnahme, Tatsachen, betroffenen Regeln, den
+Einsatz einer Meldung oder automatischen Erkennung und die Rechtsbehelfe, außer
+Gesetz oder Behörde verbieten dies (Art. 17 DSA). Sie können binnen sechs
+Monaten an contact@computor.at widersprechen. Die Beschwerde wird unter
+menschlicher Aufsicht geprüft; Sie erhalten eine begründete Entscheidung.
+Der Rechtsweg bleibt jederzeit offen. Bei Verdacht auf eine Straftat, die das
+Leben oder die Sicherheit von Menschen bedroht, informieren wir unverzüglich
+die zuständigen Behörden (Art. 18 DSA).
 
-## 4. Änderung und Einstellung von Leistungen
+## 5. Änderungen und Ende des Angebots oder Vertrags
 
-4.1 Wir dürfen die Plattform ändern, soweit das für Sie zumutbar ist,
-insbesondere weil es geringfügig und sachlich gerechtfertigt ist. Sachliche
-Gründe sind etwa die technische Weiterentwicklung, die Sicherheit der
-Plattform, rechtliche Vorgaben oder geänderte Mittel für den Betrieb.
+Wir können Funktionen und technische Umsetzung aus technischen,
+sicherheitsbezogenen, rechtlichen oder betrieblichen Gründen ändern, soweit
+Ihnen dies unter Berücksichtigung Ihrer berechtigten Interessen zumutbar ist.
+Wesentliche Einschränkungen und eine geplante Einstellung kündigen wir mit
+angemessener Frist an und geben Ihnen Gelegenheit, eigene Inhalte zu sichern.
+Bei akuten Sicherheitsproblemen oder zwingenden rechtlichen Vorgaben können
+notwendige Maßnahmen sofort erfolgen; wir informieren Sie unverzüglich.
 
-4.2 Wesentliche Einschränkungen (z. B. der Wegfall eines Kurses, in dem Sie
-eingeschrieben sind, oder des Workspace-Angebots) und die Einstellung der
-Plattform kündigen wir mindestens 30 Tage vorher per E-Mail und auf der
-Plattform an, mit Begründung. In dieser Zeit können Sie Ihre Daten
-herunterladen oder bei uns anfordern.
+Sie können den Nutzungsvertrag jederzeit beenden und die Kontolöschung unter
+privacy@computor.at verlangen. Wir können unter Wahrung Ihrer berechtigten
+Interessen mit angemessener Frist kündigen. Bei schweren Rechts- oder
+Nutzungsverstößen oder Wiederholung trotz Hinweis können wir vorübergehend
+sperren oder fristlos kündigen; Begründung und Beschwerde nach Abschnitt 4
+bleiben erhalten. Gesetzliche Rechte bleiben unberührt.
 
-4.3 Bei akuter Gefahr für die Sicherheit der Plattform, ihrer Nutzer*innen
-oder Dritter dürfen wir Funktionen sofort einschränken. Wir informieren Sie
-dann so bald wie möglich über Grund und voraussichtliche Dauer.
+Für seit 24 Monaten ungenutzte Konten gilt die Löschregel: Wir kündigen die
+Löschung mit angemessener Frist per E-Mail an; eine Anmeldung in dieser
+Frist erhält das Konto. Die Löschung wird über die beteiligten Dienste hinweg
+bearbeitet und ist nicht mit dem bloßen Archivieren eines Kontos erledigt.
+Gesetzlich erforderliche Aufbewahrung und Sicherungskopien erläutert die
+Datenschutzerklärung.
 
-## 5. Erlaubte Nutzung
+## 6. Haftung
 
-5.1 Die Plattform dient dem Lernen und Lehren von Programmierung. Nicht erlaubt
-ist insbesondere:
+Für vorsätzlich oder grob fahrlässig verursachte Schäden haften wir nach den
+gesetzlichen Regeln. Für leichte Fahrlässigkeit haften wir nicht, außer bei
+Personenschäden, Schäden an zur Bearbeitung übernommenen Sachen oder zwingender
+Haftung, insbesondere nach Produkthaftungsgesetz oder Art. 82 DSGVO.
+Gesetzliche Gewährleistungsrechte bleiben erhalten, soweit sie auf diesen
+kostenlosen Vertrag anwendbar sind.
 
-a) Kryptowährungs-Mining und sonstige rechenintensive Nutzung ohne Bezug zu
-   einem Kurs;
-b) Angriffe auf Systeme, gegen die Plattform ebenso wie gegen Dritte: Port- und
-   Schwachstellen-Scans, Denial-of-Service, Brute-Force-Angriffe, Ausbruchs-
-   versuche aus dem Workspace, Zugriff auf fremde Konten oder Daten;
-c) Umgehen von Ressourcengrenzen, Zugangsbeschränkungen oder
-   Teilnahmegrenzen, etwa durch mehrere Konten oder automatisierte Anmeldungen;
-d) Versand von Spam, Betrieb von Proxies, VPN- oder Tor-Knoten oder von Bots
-   aus dem Workspace sowie das Anbieten öffentlich erreichbarer Dienste aus dem
-   Workspace;
-e) Speichern, Verbreiten oder Verlinken rechtswidriger Inhalte, z. B.
-   Schadsoftware zur Verbreitung, urheberrechtsverletzendes Material,
-   Darstellungen sexuellen Kindesmissbrauchs, Verhetzung oder Drohungen;
-f) Belästigung, Beleidigung oder Bloßstellung anderer Personen;
-g) Veröffentlichung von Lösungen zu beurteilten Aufgaben, wenn der Kurs das
-   untersagt, oder von Abgaben anderer ohne deren Zustimmung.
+Fehlen trotz der Empfehlung in Abschnitt 2 eigene Sicherungskopien, kann dies
+bei Datenverlust als Mitverschulden berücksichtigt werden (§ 1304 ABGB).
+Für schuldhafte Verstöße gegen diese Bedingungen haften Sie nach dem Gesetz.
+Die gesetzlichen Pflichten der TU Graz werden damit nicht auf Sie übertragen.
 
-5.2 Sicherheitsforschung an der Plattform ist nur nach vorheriger Absprache
-mit security@computor.at erlaubt. Gefundene Sicherheitslücken melden Sie bitte
-vertraulich an security@computor.at. Gegen
-Personen, die eine Lücke in gutem Glauben und vertraulich melden, ohne Daten
-anderer abzurufen oder den Betrieb zu stören, werden wir wegen dieser Meldung
-keine rechtlichen Schritte einleiten.
+## 7. Recht und Gerichtsstand
 
-5.3 Zum Schutz der Plattform überwachen wir den Ressourcenverbrauch der
-Workspaces automatisiert (siehe [Datenschutzerklärung](/privacy)). Eine
-allgemeine Überwachung der Inhalte findet nicht statt.
+Es gilt österreichisches Recht ohne Verweisungsnormen. Diese Rechtswahl
+entzieht Verbraucher*innen nicht den zwingenden Schutz des Rechts ihres
+gewöhnlichen Aufenthalts, soweit Art. 6 der Rom-I-Verordnung anwendbar ist.
+Die gesetzlichen Gerichtsstandsregeln bleiben unberührt. Für Unternehmen ist
+das sachlich zuständige Gericht in Graz zuständig.
 
-## 6. Ihre Inhalte
+## 8. Änderungen dieser Bedingungen und Kontakt
 
-6.1 Code, Texte und Dateien, die Sie erstellen, bleiben Ihre. Sie räumen der
-TU Graz nur die Rechte ein, die für den Betrieb der Plattform nötig sind:
-Ihre Inhalte zu speichern, auszuführen und automatisch zu testen, sie den
-Lehrenden und Tutor*innen Ihres Kurses anzuzeigen und Chat-Nachrichten den
-Mitgliedern des jeweiligen Kanals anzuzeigen. Dieses Recht ist unentgeltlich,
-nicht ausschließlich und endet, sobald die Inhalte gelöscht sind; Kopien in
-Sicherungen werden nach der in der Datenschutzerklärung genannten Frist
-gelöscht.
+Über wesentliche Änderungen dieser Bedingungen informieren wir Sie.
+Änderungen, die Ihre Zustimmung erfordern, vereinbaren wir mit Ihnen gesondert.
 
-6.2 Laden Sie nur Inhalte hoch, an denen Sie die nötigen Rechte haben.
-
-## 7. Kursmaterial und Software
-
-7.1 Soweit nicht anders angegeben, stehen Texte und Übungsaufgaben der Kurse
-unter der Lizenz Creative Commons Namensnennung 4.0 International (CC BY 4.0)
-und Programmcode der Kurse (Code-Beispiele, Tests, Vorlagen) unter der
-MIT-Lizenz. Material Dritter ist gekennzeichnet und kann anderen Lizenzen
-unterliegen.
-
-7.2 Die Software der Plattform ist Open Source unter der MIT-Lizenz
-(https://github.com/computor-org).
-
-## 8. Moderation von Inhalten
-
-8.1 Wir prüfen Inhalte nicht allgemein. Wir werden tätig, wenn uns Hinweise
-auf rechtswidrige Inhalte oder Verstöße gegen Punkt 5 vorliegen, etwa durch
-eine Meldung (siehe [Inhalte melden](/report)) oder durch die automatische
-Ressourcenüberwachung.
-
-8.2 Mögliche Maßnahmen sind, abgestuft nach Schwere: ein Hinweis an Sie, das
-Entfernen oder Sperren einzelner Inhalte, das Stoppen eines Workspaces, die
-vorübergehende Sperre des Kontos, die Kündigung nach Punkt 9. Automatische
-Werkzeuge melden Auffälligkeiten; über Maßnahmen gegen Sie entscheidet ein
-Mensch. Zum Schutz vor akuten Gefahren kann ein Workspace auch automatisch
-angehalten werden.
-
-8.3 Wenn wir eine Maßnahme setzen, teilen wir Ihnen per E-Mail mit, welche
-Maßnahme wir getroffen haben, auf welche Tatsachen wir sie stützen, ob sie auf
-einer Meldung oder auf automatischer Erkennung beruht, gegen welche Vorschrift
-oder Bestimmung dieser Bedingungen der Inhalt verstößt und wie Sie sich dagegen
-wehren können (Art. 17 DSA). Das unterbleibt nur, wenn Behörden oder Gesetze
-es verbieten.
-
-8.4 Gegen jede Maßnahme können Sie innerhalb von sechs Monaten bei
-contact@computor.at Einspruch erheben. Den Einspruch prüft nach Möglichkeit
-eine Person, die an der ursprünglichen Entscheidung nicht beteiligt war. Wir
-teilen Ihnen das Ergebnis mit Begründung mit. Der Rechtsweg steht Ihnen
-jederzeit offen.
-
-8.5 Erfahren wir von Informationen, die den Verdacht einer Straftat
-begründen, die eine Gefahr für das Leben oder die Sicherheit von Personen
-darstellt, informieren wir unverzüglich die Polizei bzw. die zuständigen
-Behörden (Art. 18 DSA).
-
-## 9. Kündigung und Sperre
-
-9.1 Sie können den Nutzungsvertrag jederzeit ohne Angabe von Gründen beenden,
-indem Sie die Löschung Ihres Kontos per E-Mail an privacy@computor.at von der
-mit Ihrem Konto verknüpften Adresse verlangen.
-
-9.2 Wir können den Nutzungsvertrag aus sachlichen Gründen, etwa bei Einstellung
-der Plattform, mit einer Frist von 30 Tagen per E-Mail kündigen. Konten, mit
-denen sich 24 Monate lang niemand angemeldet hat, löschen wir nach vorheriger
-Ankündigung per E-Mail mit mindestens 30 Tagen Frist; eine Anmeldung in dieser
-Zeit genügt, um das Konto zu behalten.
-
-9.3 Bei schweren oder trotz Hinweis wiederholten Verstößen gegen Punkt 5 oder
-gegen Gesetze können wir das Konto vorübergehend sperren oder den Vertrag ohne
-Frist kündigen. Punkt 8.3 und 8.4 gelten entsprechend.
-
-## 10. Haftung
-
-10.1 Für Schäden, die wir vorsätzlich oder grob fahrlässig verursachen, haften
-wir nach den gesetzlichen Bestimmungen.
-
-10.2 Für Schäden, die wir leicht fahrlässig verursachen, haften wir nicht. Das
-gilt nicht für Schäden an der Person, nicht für Schäden an Sachen, die wir zur
-Bearbeitung übernommen haben, und nicht, soweit eine Haftung gesetzlich
-zwingend vorgesehen ist, etwa nach dem Produkthaftungsgesetz oder nach Art. 82
-DSGVO.
-
-10.3 Haben Sie wichtige Arbeit nicht wie in Punkt 3.4 empfohlen gesichert, kann
-das bei einem Datenverlust als Mitverschulden berücksichtigt werden
-(§ 1304 ABGB).
-
-10.4 Gesetzliche Gewährleistungsrechte bleiben unberührt, soweit sie auf diesen
-unentgeltlichen Vertrag anwendbar sind.
-
-10.5 Sie haften nach den gesetzlichen Bestimmungen für Schäden, die Sie durch
-schuldhafte Verstöße gegen diese Bedingungen verursachen, etwa durch Angriffe
-von der Plattform aus auf Dritte.
-
-## 11. Änderungen dieser Nutzungsbedingungen
-
-11.1 Wir können diese Nutzungsbedingungen ändern, wenn sich die Plattform, die
-Rechtslage oder die Bedingungen für ihren Betrieb ändern. Wir informieren Sie
-mindestens 30 Tage vor dem Inkrafttreten per E-Mail und mit einem Hinweis beim
-Login, stellen die neue Fassung bereit und heben die Änderungen hervor.
-
-11.2 Änderungen, die Sie nicht schlechter stellen (etwa Klarstellungen,
-zusätzliche Leistungen oder gesetzlich zwingend vorgegebene Anpassungen),
-gelten ab dem angekündigten Zeitpunkt.
-
-11.3 Änderungen, die Sie wesentlich schlechter stellen, gelten nur, wenn Sie
-ihnen ausdrücklich zustimmen. Wir bitten Sie dazu beim nächsten Login um Ihre
-Zustimmung. Die bloße Weiternutzung gilt nicht als Zustimmung. Solange Sie
-nicht zugestimmt haben, gilt für Sie die bisherige Fassung weiter; wir können
-den Vertrag dann nach Punkt 9.2 kündigen.
-
-## 12. Anwendbares Recht und Gerichtsstand
-
-12.1 Es gilt österreichisches Recht unter Ausschluss der Verweisungsnormen des
-internationalen Privatrechts. Sind Sie Verbraucher*in, behalten Sie zusätzlich
-den Schutz der zwingenden Bestimmungen des Rechts des Staates, in dem Sie Ihren
-gewöhnlichen Aufenthalt haben (Art. 6 Abs. 2 Rom-I-Verordnung).
-
-12.2 Sind Sie Verbraucher*in, können Sie uns in Österreich oder an Ihrem
-Wohnsitz klagen, und wir können Sie nur an Ihrem Wohnsitz klagen (§ 14 KSchG,
-Art. 18 Verordnung (EU) Nr. 1215/2012). Für Unternehmer*innen ist das
-sachlich zuständige Gericht in Graz zuständig.
-
-12.3 Es gibt keine Schiedsvereinbarung und keinen Verzicht auf
-Sammel- oder Verbandsklagen.
-
-## 13. Kontakt
-
-- Allgemein: contact@computor.at
-- Missbrauch und rechtswidrige Inhalte: abuse@computor.at, siehe [Inhalte melden](/report)
-- Datenschutz: privacy@computor.at oder datenschutz@tugraz.at
-- Sicherheit: security@computor.at
-- Fehler und Vorschläge: „Problem melden“ in der Web-App und in der
-  VS-Code-Erweiterung oder contact@computor.at
+Allgemeines und Beschwerden: contact@computor.at; rechtswidrige Inhalte:
+abuse@computor.at; Datenschutz: privacy@computor.at oder datenschutz@tugraz.at;
+Sicherheit: security@computor.at. Fehler melden Sie über „Problem melden“ in
+Web-App oder VS-Code-Erweiterung oder an contact@computor.at.

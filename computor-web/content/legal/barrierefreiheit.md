@@ -1,6 +1,6 @@
 # Barrierefreiheitserklärung computor.at / Accessibility statement
 
-Version 1.0, gültig ab 30.09.2026
+Version 1.1, gültig ab 25.10.2026
 
 Stand/Prüfmethode: Selbstbewertung, 30.09.2026
 
@@ -12,8 +12,7 @@ mobilen Anwendungen des Bundes (Web-Zugänglichkeits-Gesetz – WZG) BGBl. I
 Nr. 59/2019 idgF barrierefrei zugänglich zu machen.
 
 Diese Erklärung zur Barrierefreiheit gilt für https://computor.at
-einschließlich der Anmeldeseiten und der Arbeitsumgebungen sowie für
-https://chat.computor.at.
+einschließlich der Anmeldeseiten und der Arbeitsumgebungen.
 
 ### Stand der Vereinbarkeit mit den Anforderungen
 
@@ -26,14 +25,10 @@ Die nachstehend aufgeführten Inhalte sind aus den folgenden Gründen nur
 teilweise oder nicht barrierefrei:
 
 - **Programmierumgebung im Browser:** Die Workspaces beruhen auf der
-  Browser-Version von Visual Studio Code (code-server, Coder). Sie ist mit
+  Browser-Version von Visual Studio Code. Sie ist mit
   Tastatur und Screenreader weitgehend bedienbar, wurde von uns aber nicht
   vollständig nach WCAG 2.1 geprüft. Einzelne Bedienelemente fremder
   Erweiterungen können unzugänglich sein.
-- **Chat:** chat.computor.at verwendet die Open-Source-Software Zulip. Deren
-  Barrierefreiheit können wir nur eingeschränkt beeinflussen.
-- **Anmeldeseiten:** Die Anmeldung erfolgt über Keycloak und GitHub. Die Seiten
-  von GitHub liegen außerhalb unseres Einflusses.
 - **Kursmaterial:** Einzelne Grafiken, Diagramme und Ausgaben von
   Programmbeispielen haben noch keine Textalternativen. Formeln sind nicht
   überall für Screenreader aufbereitet.
@@ -86,7 +81,7 @@ websites and mobile applications (Web-Zugänglichkeits-Gesetz – WZG [Web
 Accessibility Act]) BGBl. I No. 59/2019 as amended.
 
 This accessibility statement applies to https://computor.at, including the
-sign-in pages and workspaces, and to https://chat.computor.at.
+sign-in pages and workspaces.
 
 ### Compliance status
 
@@ -99,14 +94,10 @@ The content listed below is only partially accessible or non-accessible for
 the following reasons:
 
 - **Browser programming environment:** workspaces are based on the browser
-  version of Visual Studio Code (code-server, Coder). It is largely usable
+  version of Visual Studio Code. It is largely usable
   with keyboard and screen reader, but we have not fully tested it against
   WCAG 2.1. Individual controls of third-party extensions may be
   inaccessible.
-- **Chat:** chat.computor.at uses the open-source software Zulip. We can
-  influence its accessibility only to a limited extent.
-- **Sign-in pages:** sign-in uses Keycloak and GitHub. GitHub's pages are
-  outside our control.
 - **Course material:** some graphics, diagrams and outputs of code examples do
   not yet have text alternatives. Formulas are not everywhere prepared for
   screen readers.
