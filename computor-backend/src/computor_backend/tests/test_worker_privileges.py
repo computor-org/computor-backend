@@ -56,7 +56,9 @@ def test_ingress_is_unprivileged_and_immutable(services):
     assert all(v.get("read_only") for v in ingress["volumes"])
 
 
-@pytest.mark.parametrize("name", ["coder-socket-proxy", "coder-worker-socket-proxy"])
+@pytest.mark.parametrize(
+    "name", ["coder-socket-proxy", "coder-worker-socket-proxy", "coder-provisioner-socket-proxy"]
+)
 def test_socket_proxies_have_no_capabilities(services, name):
     proxy = services[name]
     assert proxy["cap_drop"] == ["ALL"]
