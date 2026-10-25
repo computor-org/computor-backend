@@ -113,14 +113,14 @@ die zuständigen Behörden (Art. 18 DSA).
 
 ## 5. Änderungen und Ende des Angebots oder Vertrags
 
-Wir können Funktionen und technische Umsetzung aus technischen,
+Die technische Umsetzung können wir weiterentwickeln und neue Funktionen
+ergänzen, soweit dadurch die vereinbarten Leistungen nicht nachteilig verändert
+werden. Vereinbarte Leistungen können wir aus technischen,
 sicherheitsbezogenen, rechtlichen oder betrieblichen Gründen einseitig nur
 ändern, wenn die Änderung geringfügig, sachlich gerechtfertigt und Ihnen unter
-Berücksichtigung Ihrer berechtigten Interessen zumutbar ist. Neue Funktionen
-können wir ergänzen, soweit dadurch die vereinbarten Leistungen nicht
-nachteilig verändert werden. Wesentliche nachteilige Änderungen setzen eine
-wirksame Vereinbarung mit Ihnen oder ein hierfür anwendbares gesetzliches
-Änderungsverfahren voraus.
+Berücksichtigung Ihrer berechtigten Interessen zumutbar ist. Wesentliche
+nachteilige Änderungen setzen eine wirksame Vereinbarung mit Ihnen oder ein
+hierfür anwendbares gesetzliches Änderungsverfahren voraus.
 Wesentliche Einschränkungen und eine geplante Einstellung kündigen wir mit
 angemessener Frist an und geben Ihnen Gelegenheit, eigene Inhalte zu sichern.
 Bei akuten Sicherheitsproblemen oder zwingenden rechtlichen Vorgaben können
