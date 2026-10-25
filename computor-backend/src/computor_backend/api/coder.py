@@ -1267,12 +1267,19 @@ def _deployment_template_variables() -> dict:
 
     cgroup_parent: parent cgroup (e.g. computor-workspaces.slice) that puts
     every workspace container under one aggregate systemd slice limit.
+
+    storage_size: writable rootfs cap per workspace container (needs overlay2
+    on xfs with pquota, as on the workspace daemon's data-root).
+
+    tmp_size: size of the tmpfs mounted at /tmp in each workspace.
     """
     import os
 
     return {
         "matlab_license_file": os.environ.get("MATLAB_MLM_LICENSE_FILE", ""),
         "cgroup_parent": os.environ.get("CODER_WORKSPACE_CGROUP_PARENT", ""),
+        "storage_size": os.environ.get("CODER_WORKSPACE_ROOTFS_SIZE", ""),
+        "tmp_size": os.environ.get("CODER_WORKSPACE_TMP_SIZE", ""),
     }
 
 

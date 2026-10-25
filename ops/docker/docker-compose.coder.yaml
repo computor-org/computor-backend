@@ -255,12 +255,21 @@ services:
         max-size: "10m"
         max-file: "5"
     volumes:
-      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
+      # The daemon that runs the workspaces. Default: this host's daemon (the
+      # socket file). On the computor.at worker: the separate workspace daemon
+      # (ops/coder/ws-daemon/), so Coder cannot see or control any platform
+      # container. There the socket's DIRECTORY is mounted
+      # (CODER_WORKSPACE_DOCKER_MOUNT=/run/computor-ws-docker,
+      # CODER_WORKSPACE_DOCKER_SOCKET=/var/run/workspace-docker/docker.sock):
+      # that daemon restarts with live-restore while this proxy keeps running,
+      # and a bind of the socket file would keep the old, dead inode.
+      - ${CODER_WORKSPACE_DOCKER_MOUNT:-${DOCKER_SOCKET_PATH:-/var/run/docker.sock}}:/var/run/workspace-docker:ro
       - ./coder-provisioner-socket-proxy/haproxy.cfg.template:/usr/local/etc/haproxy/haproxy.cfg.template:ro
     environment:
       # Workspace images are pulled from this registry only; it must equal
       # the registry the templates' workspace_image points at.
       CODER_REGISTRY_HOST: localhost:5000
+      SOCKET_PATH: ${CODER_WORKSPACE_DOCKER_SOCKET:-/var/run/workspace-docker}
       # The only networks a workspace container may be connected to.
       CODER_WORKSPACE_NETWORK: ${CODER_WORKSPACE_NETWORK:-computor-coder-workspaces}
       CODER_WORKSPACE_NETWORK_OFFLINE: ${CODER_WORKSPACE_NETWORK_OFFLINE:-computor-coder-workspaces-offline}
@@ -351,6 +360,10 @@ services:
       CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
       CODER_TEMPLATES_DIR: /templates
+      # true on the computor.at worker (workspace daemon, ops/coder/ws-daemon):
+      # list/delete workspace volumes through the host operations, which see
+      # the image-backed homes; set COMPUTOR_WORKSPACE_DOCKER for hostops too.
+      CODER_WORKSPACE_VOLUMES_HOSTOPS: ${CODER_WORKSPACE_VOLUMES_HOSTOPS:-false}
       # localhost:5000 (not coder-registry:5000): the worker calls the host
       # docker daemon via the proxy, so this name is resolved from the daemon's
       # perspective. localhost:5000 reaches the registry's port binding and is

@@ -1045,6 +1045,7 @@ class CoderClient:
             template_display_name=data.get("template_display_name"),
             latest_build_status=data.get("latest_build", {}).get("status"),
             latest_build_id=data.get("latest_build", {}).get("id"),
+            latest_build_created_at=data.get("latest_build", {}).get("created_at"),
             created_at=data.get("created_at"),
         )
 
@@ -1297,6 +1298,7 @@ class CoderClient:
             template_display_name=data.get("template_display_name"),
             latest_build_status=data.get("latest_build", {}).get("status"),
             latest_build_id=data.get("latest_build", {}).get("id"),
+            latest_build_created_at=data.get("latest_build", {}).get("created_at"),
             created_at=data.get("created_at"),
             updated_at=data.get("updated_at"),
         )

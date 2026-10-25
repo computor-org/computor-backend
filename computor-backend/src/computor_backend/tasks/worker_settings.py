@@ -169,6 +169,12 @@ class WorkerSettings(BaseSettings):
     # GC, volume-ownership repair): the operations that need a container or
     # exec, which the worker's Docker proxy refuses. See ops/coder/hostops.
     hostops_dir: str = Field(default="/hostops", validation_alias="COMPUTOR_HOSTOPS_DIR")
+    # True where workspaces run on the separate workspace daemon with
+    # image-backed homes (ops/coder/ws-daemon): listing and deleting workspace
+    # volumes then go through the host operations, which see those images.
+    workspace_volumes_hostops: bool = Field(
+        default=False, validation_alias="CODER_WORKSPACE_VOLUMES_HOSTOPS"
+    )
     # The host's cgroup2 tree, bind-mounted read-only, from which the workspace
     # slice limits are read.
     host_cgroup_root: str = Field(

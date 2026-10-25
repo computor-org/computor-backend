@@ -59,6 +59,8 @@ _VERSION_TAG_RE = re.compile(r"^v\d{8}-\d{6}(-[0-9a-f]{6})?$")
 # stall instead of being cancelled.
 HOSTOPS_GC_TIMEOUT_SECONDS = 8 * 60
 HOSTOPS_REPAIR_TIMEOUT_SECONDS = 4 * 60
+# list-volumes / delete-volume on image-backed homes: quick host operations.
+HOSTOPS_VOLUME_TIMEOUT_SECONDS = 45
 
 
 def _heartbeat_if_in_activity() -> None:
@@ -1849,6 +1851,8 @@ def list_workspace_volumes() -> Dict[str, Any]:
     import docker as docker_sdk
 
     settings = get_worker_settings()
+    if settings.workspace_volumes_hostops:
+        return _list_image_volumes()
     try:
         client = _docker_client()
     except Exception as e:
@@ -1894,6 +1898,36 @@ def list_workspace_volumes() -> Dict[str, Any]:
     return {"success": True, "volumes": volumes}
 
 
+def _list_image_volumes() -> Dict[str, Any]:
+    """The workspace daemon's image-backed homes, as listed by the host.
+
+    Each ``volume=`` line is ``name,used,capacity,mounted,created``; used is
+    the filesystem's used bytes (empty if unreadable), capacity the image size.
+    """
+    answer = coder_hostops.submit(
+        "list-volumes", [], timeout=HOSTOPS_VOLUME_TIMEOUT_SECONDS,
+        heartbeat=_heartbeat_if_in_activity,
+    )
+    if answer.get("status") != "ok":
+        return {"success": False, "error": str(answer.get("message") or "list failed"), "volumes": []}
+    volumes = []
+    for line in answer.get("volume") or []:
+        parts = str(line).split(",")
+        if len(parts) != 5 or not _is_workspace_volume(parts[0]):
+            continue
+        name, used, _capacity, mounted, created = parts
+        volumes.append({
+            "name": name,
+            "kind": "home" if name.startswith(HOME_VOLUME_PREFIX) else "scratch",
+            "owner_ref": name.split("-", 2)[2],
+            "size_bytes": int(used) if used.isdigit() else None,
+            "in_use": mounted == "1",
+            "created_at": created or None,
+        })
+    volumes.sort(key=lambda v: v["name"])
+    return {"success": True, "volumes": volumes}
+
+
 @activity.defn(name="delete_workspace_volume")
 def delete_workspace_volume(name: str) -> Dict[str, Any]:
     """Remove one workspace volume; never forced.
@@ -1908,6 +1942,16 @@ def delete_workspace_volume(name: str) -> Dict[str, Any]:
         return {"success": False, "error": f"'{name}' is not a workspace volume"}
 
     settings = get_worker_settings()
+    if settings.workspace_volumes_hostops:
+        answer = coder_hostops.submit(
+            "delete-volume",
+            [("volume", name)],
+            timeout=HOSTOPS_VOLUME_TIMEOUT_SECONDS,
+            heartbeat=_heartbeat_if_in_activity,
+        )
+        if answer.get("status") != "ok":
+            return {"success": False, "error": str(answer.get("message") or "delete failed")}
+        return {"success": True, "message": f"Volume '{name}' deleted"}
     try:
         client = _docker_client()
         client.volumes.get(name).remove()

@@ -14,6 +14,7 @@ fast and we touch the Coder API at most once per window per workspace.
 import asyncio
 import logging
 import time
+from datetime import datetime, timezone
 
 from .client import get_coder_client
 from .config import get_coder_settings
@@ -57,12 +58,13 @@ def bump_workspace_activity(owner: str, workspace_name: str) -> None:
     except RuntimeError:
         # No running loop (not expected on the async request path) — skip.
         return
-    task = loop.create_task(_extend(owner, workspace_name, settings.workspace_activity_bump_ms))
+    task = loop.create_task(_extend(owner, workspace_name, settings.workspace_activity_bump_ms,
+                                    settings.workspace_max_lifetime_ms))
     _pending.add(task)
     task.add_done_callback(_pending.discard)
 
 
-async def _extend(owner: str, workspace_name: str, extend_ms: int) -> None:
+async def _extend(owner: str, workspace_name: str, extend_ms: int, max_lifetime_ms: int = 0) -> None:
     key = (owner, workspace_name)
     try:
         client = get_coder_client()
@@ -72,10 +74,21 @@ async def _extend(owner: str, workspace_name: str, extend_ms: int) -> None:
         # signal. Suspended accounts remain suspended.
         await client.ensure_user_active(owner)
         workspace_id = _workspace_ids.get(key)
-        if workspace_id is None:
+        started = None
+        if workspace_id is None or max_lifetime_ms > 0:
+            # With a lifetime cap the start time is needed on every (throttled)
+            # bump: a restart is a new build with a new start.
             details = await client.get_workspace(owner, workspace_name)
             workspace_id = details.workspace.id
+            started = details.workspace.latest_build_created_at
             _workspace_ids[key] = workspace_id
+        if max_lifetime_ms > 0 and started is not None:
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            left_ms = int((started - datetime.now(timezone.utc)).total_seconds() * 1000) + max_lifetime_ms
+            if left_ms <= 0:
+                return  # at the cap: the current deadline stops it
+            extend_ms = min(extend_ms, left_ms)
 
         extended = await client.extend_workspace_deadline(workspace_id, extend_ms=extend_ms)
         if not extended:

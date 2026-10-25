@@ -181,3 +181,49 @@ async def test_workspace_lookup_by_id_rejects_malformed_ids_and_maps_404():
         await client.close()
     assert paths == [f"/api/v2/workspaces/{ws_id}",
                      "/api/v2/workspaces/00000000-0000-0000-0000-000000000000"]
+
+
+def _keepalive_client(started):
+    client = MagicMock()
+    client.ensure_user_active = AsyncMock()
+    client.get_workspace = AsyncMock(return_value=MagicMock(
+        workspace=MagicMock(id="workspace-id", latest_build_created_at=started)))
+    client.extend_workspace_deadline = AsyncMock(return_value=True)
+    return client
+
+
+@pytest.mark.asyncio
+async def test_keepalive_never_extends_past_the_lifetime_cap(monkeypatch):
+    """An editor tab that keeps sending requests must not keep a workspace
+    running forever: the deadline stays below start + max lifetime."""
+    from datetime import datetime, timedelta, timezone
+
+    started = datetime.now(timezone.utc) - timedelta(hours=11, minutes=30)
+    client = _keepalive_client(started)
+    monkeypatch.setattr(keepalive, "get_coder_client", lambda: client)
+    keepalive._workspace_ids.clear()
+    await keepalive._extend("uowner", "vscode", 3_600_000, 12 * 3_600_000)
+    extend_ms = client.extend_workspace_deadline.await_args.kwargs["extend_ms"]
+    assert 29 * 60_000 < extend_ms <= 30 * 60_000
+
+
+@pytest.mark.asyncio
+async def test_keepalive_stops_extending_at_the_cap(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    client = _keepalive_client(datetime.now(timezone.utc) - timedelta(hours=13))
+    monkeypatch.setattr(keepalive, "get_coder_client", lambda: client)
+    keepalive._workspace_ids.clear()
+    await keepalive._extend("uowner", "vscode", 3_600_000, 12 * 3_600_000)
+    client.extend_workspace_deadline.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_keepalive_extends_fully_early_in_a_start(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    client = _keepalive_client(datetime.now(timezone.utc) - timedelta(minutes=5))
+    monkeypatch.setattr(keepalive, "get_coder_client", lambda: client)
+    keepalive._workspace_ids.clear()
+    await keepalive._extend("uowner", "vscode", 3_600_000, 12 * 3_600_000)
+    assert client.extend_workspace_deadline.await_args.kwargs["extend_ms"] == 3_600_000

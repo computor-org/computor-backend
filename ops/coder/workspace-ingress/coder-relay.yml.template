@@ -1,0 +1,16 @@
+# Coder agent -> Coder server relay on the workspace-daemon ingress
+# (docker-compose.workspace-daemon.yaml). Workspaces resolve `coder` to the
+# ingress; this forwards the raw TCP stream (HTTP, websockets, DERP) to the
+# Coder server's address on the main daemon. Rendered with
+#   CODER_RELAY_UPSTREAM=<wg address of this host>:7080 envsubst
+tcp:
+  routers:
+    coder-relay:
+      rule: "HostSNI(`*`)"
+      entryPoints: [coder]
+      service: coder-relay
+  services:
+    coder-relay:
+      loadBalancer:
+        servers:
+          - address: "${CODER_RELAY_UPSTREAM}"

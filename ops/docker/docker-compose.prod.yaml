@@ -176,6 +176,10 @@ services:
       MATLAB_MLM_LICENSE_FILE: ${MATLAB_MLM_LICENSE_FILE:-}
       # Aggregate parent slice for workspace containers (Terraform cgroup_parent).
       CODER_WORKSPACE_CGROUP_PARENT: ${CODER_WORKSPACE_CGROUP_PARENT:-}
+      # Per-workspace rootfs cap and /tmp tmpfs size (template variables
+      # storage_size / tmp_size); empty = template default (no cap / no tmpfs).
+      CODER_WORKSPACE_ROOTFS_SIZE: ${CODER_WORKSPACE_ROOTFS_SIZE:-}
+      CODER_WORKSPACE_TMP_SIZE: ${CODER_WORKSPACE_TMP_SIZE:-}
       # true = public deployment: template workflows refuse to run without
       # CODER_WORKSPACE_CGROUP_PARENT (aggregate slice incl. TasksMax).
       COMPUTOR_PUBLIC_DEPLOYMENT: ${COMPUTOR_PUBLIC_DEPLOYMENT:-false}

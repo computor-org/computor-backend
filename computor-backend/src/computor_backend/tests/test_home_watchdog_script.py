@@ -19,7 +19,8 @@ case "$1 $2" in
   "volume ls") [ -f "$S/volume_ls_fail" ] && exit 1; cat "$S/volumes" ;;
   "volume inspect")
     name="${@: -1}"; [ -f "$S/inspect_fail_$name" ] && { echo "boom" >&2; exit 1; }
-    echo "$S/mnt/$name" ;;
+    if [ -f "$S/plugin_$name" ]; then echo "computor-home $(cat "$S/plugin_$name")"
+    else echo "local $S/mnt/$name"; fi ;;
   "ps -q")
     f="${4#volume=}"; f="${f#label=}"
     [ -f "$S/ps_fail_$f" ] && exit 1; cat "$S/ps_$f" 2>/dev/null ;;
@@ -116,3 +117,18 @@ def test_dry_run_never_stops(env):
     assert proc.returncode == 0
     assert stopped == []
     assert "not stopped" in proc.stderr
+
+
+def test_unmounted_image_home_is_skipped_mounted_one_measured(env):
+    """Workspace daemon homes (driver computor-home) have a mountpoint only
+    while mounted; an unmounted one is not an error and cannot grow."""
+    state = env["state"]
+    env["volume"]("coder-home-idle", 0)
+    (state / "plugin_coder-home-idle").write_text("")
+    env["volume"]("coder-home-live", 2 * GIB, "c-live\n")
+    (state / "plugin_coder-home-live").write_text(str(state / "mnt" / "coder-home-live"))
+    proc, stopped = env["run"]()
+    assert proc.returncode == 0, proc.stderr
+    assert stopped == ["c-live"]
+    assert "0 error(s)" in proc.stdout
+

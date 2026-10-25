@@ -1,0 +1,17 @@
+# Volume plugin giving each workspace home its own fixed-size ext4 image
+# (computor-ws-homes.py). Runs in the host mount namespace on purpose: the
+# loop mounts it makes must be visible to dockerd-ws.
+[Unit]
+Description=Computor workspace home volumes (Docker volume plugin)
+Before=dockerd-ws.service
+After=local-fs.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/computor-ws-homes
+ExecStart=/usr/bin/python3 -I /usr/local/libexec/computor-ws-homes.py
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target

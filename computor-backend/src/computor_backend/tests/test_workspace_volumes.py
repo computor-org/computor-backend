@@ -136,3 +136,56 @@ def test_repair_reports_a_host_failure():
     ):
         result = repair_volume_ownership("coder-home-abc")
     assert result == {"success": False, "error": "host did not answer"}
+
+
+# --- image-backed homes on the workspace daemon (hostops) -----------------------
+
+
+def _hostops_settings(monkeypatch):
+    from computor_backend.tasks.worker_settings import get_worker_settings
+
+    monkeypatch.setenv("CODER_WORKSPACE_VOLUMES_HOSTOPS", "true")
+    get_worker_settings.cache_clear()
+    return get_worker_settings
+
+
+def test_image_homes_are_listed_by_the_host(monkeypatch):
+    settings = _hostops_settings(monkeypatch)
+    home = "coder-home-0b1c2d3e-0000-4000-8000-00000000abcd"
+    answer = {"status": "ok", "volume": [
+        f"{home},1048576,5368709120,1,2026-10-25T20:00:00Z",
+        "coder-scratch-x,,5368709120,0,",
+        "garbage",
+    ]}
+    try:
+        with patch("computor_backend.tasks.temporal_coder_setup.coder_hostops.submit",
+                   lambda action, fields, timeout, heartbeat=None: answer if action == "list-volumes" else None):
+            result = list_workspace_volumes()
+    finally:
+        settings.cache_clear()
+    assert result["success"] is True
+    assert result["volumes"][0] == {
+        "name": "coder-home-0b1c2d3e-0000-4000-8000-00000000abcd", "kind": "home",
+        "owner_ref": "0b1c2d3e-0000-4000-8000-00000000abcd", "size_bytes": 1048576,
+        "in_use": True, "created_at": "2026-10-25T20:00:00Z",
+    }
+    assert result["volumes"][1]["size_bytes"] is None and result["volumes"][1]["in_use"] is False
+    assert len(result["volumes"]) == 2
+
+
+def test_image_home_delete_goes_to_the_host(monkeypatch):
+    settings = _hostops_settings(monkeypatch)
+    sent = {}
+
+    def submit(action, fields, timeout, heartbeat=None):
+        sent["action"], sent["fields"] = action, fields
+        return {"status": "error", "message": "'x' is in use by a container"}
+
+    try:
+        with patch("computor_backend.tasks.temporal_coder_setup.coder_hostops.submit", submit):
+            result = delete_workspace_volume("coder-home-abc")
+    finally:
+        settings.cache_clear()
+    assert sent == {"action": "delete-volume", "fields": [("volume", "coder-home-abc")]}
+    assert result == {"success": False, "error": "'x' is in use by a container"}
+

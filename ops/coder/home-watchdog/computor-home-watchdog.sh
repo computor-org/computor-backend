@@ -19,6 +19,11 @@
 # reported and the scan continues. Exit status 2 = enforcement incomplete.
 #
 # Env (from /etc/default/computor-home-watchdog via the systemd unit):
+#   DOCKER_HOST                the daemon that runs the workspaces; on the
+#                              computor.at worker the workspace daemon
+#                              (unix:///run/computor-ws-docker/docker.sock),
+#                              whose homes and rootfs have hard sizes, so
+#                              there this is a second line of defence only
 #   COMPUTOR_HOME_LIMIT_GIB    limit per volume in GiB (default 10)
 #   COMPUTOR_HOME_WARN_GIB     log a notice above this (default 80% of limit)
 #   COMPUTOR_LAYER_LIMIT_GIB   limit per container writable layer (default 5)
@@ -79,8 +84,18 @@ fi
 
 for volume in $volumes; do
     case "$volume" in coder-home-*|coder-scratch-*) ;; *) continue ;; esac
-    if ! mountpoint=$(docker volume inspect --format '{{.Mountpoint}}' "$volume" 2>&1) \
-        || [ ! -d "$mountpoint" ]; then
+    if ! info=$(docker volume inspect --format '{{.Driver}} {{.Mountpoint}}' "$volume" 2>&1); then
+        fail "volume ${volume}: cannot inspect (${info})"
+        continue
+    fi
+    driver=${info%% *}; mountpoint=${info#* }
+    # Image-backed homes of the workspace daemon (driver computor-home) have
+    # a mountpoint only while a workspace uses them, and their filesystem
+    # size is already the hard limit; an unmounted one cannot grow.
+    if [ "$driver" = computor-home ] && [ -z "$mountpoint" ]; then
+        continue
+    fi
+    if [ ! -d "$mountpoint" ]; then
         fail "volume ${volume}: cannot resolve mountpoint (${mountpoint})"
         continue
     fi
