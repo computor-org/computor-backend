@@ -1,10 +1,10 @@
 # Terms of Use computor.at
 
-Version 1.4, dated 25 October 2026
+Version 1.5, dated 25 October 2026
 
 This version applies to new usage contracts. Existing contracts keep their terms
 until validly changed;
-[version 1.3](https://github.com/computor-org/computor-backend/blob/9d9d8467c149cd8ee04ba7bfcae3ffa85e2eda5e/computor-web/content/legal/terms_en.md) remains available. The German version is authoritative.
+[version 1.4](https://github.com/computor-org/computor-backend/blob/3b91ebda6ceb22783aa3350a95e4a34d9662462e/computor-web/content/legal/terms_en.md) remains available and links to version 1.3. The German version is authoritative.
 
 ## 1. Provider, account and free service
 
@@ -104,9 +104,12 @@ authorities (Art. 18 DSA).
 
 ## 5. Changing or ending the service or contract
 
-We may change features and their technical implementation for technical,
-security, legal or operational reasons where reasonable in light of your
-legitimate interests. We give reasonable advance notice of substantial
+We may unilaterally change features and their technical implementation for
+technical, security, legal or operational reasons only if the change is minor,
+objectively justified and reasonable in light of your legitimate interests.
+We may add features without adversely changing the agreed services. Material
+adverse changes require a valid agreement with you or an applicable statutory
+change procedure. We give reasonable advance notice of substantial
 restrictions or planned closure and an opportunity to save your content.
 Necessary measures for urgent security issues or binding legal requirements may
 take effect immediately; we inform you without undue delay.

@@ -1,6 +1,6 @@
 # Privacy Notice computor.at
 
-Version 1.4, dated 25 October 2026. The German version is authoritative.
+Version 1.5, dated 25 October 2026. The German version is authoritative.
 
 Computor is a free TU Graz learning service. Public material needs no account.
 For accounts, courses, submissions, workspaces, communication and learning help,
@@ -91,7 +91,7 @@ introduction as required by law; this notice is not blanket consent for them.
 | Lena button request | At most 15 minutes, removed on completion. |
 | Lena button answer | 24 hours, retrievable only by the requester. |
 | Lena thread answers and inference caches | Threads follow course-message retention; caches follow the capacity rule in section 2. |
-| Web and scanner access logs | Nonempty files rotate daily with 14 archived rotations; this is not a fixed 14-calendar-day limit. |
+| Web and scanner access logs | Daily rotation with 14 archived files, including empty log files; this is not a fixed 14-calendar-day limit. |
 | Diagnostics and technical security records | Depending on the service, size-based rotation (often five files of 10 MB each) or no automatic age deletion; no uniform period. |
 | Sign-in service login and administrator events | Login events 30 days, detailed administrator events 90 days, separately from diagnostic logs. |
 | Technical attack blocking | Scanner ban history 35 days; related log files keep four weekly archived rotations of nonempty files. |
