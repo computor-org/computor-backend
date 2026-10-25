@@ -196,7 +196,7 @@ export default function SupportPage() {
             ))}
           </select>
           <form
-            className="flex items-center gap-2"
+            className="flex w-full min-w-0 items-center gap-2 sm:w-auto"
             onSubmit={(e) => {
               e.preventDefault();
               setSearch(searchInput.trim());
@@ -210,7 +210,7 @@ export default function SupportPage() {
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder={t.searchPlaceholder}
               maxLength={200}
-              className={`${inputCls} !w-64`}
+              className={`${inputCls} min-w-0 flex-1 sm:!w-64 sm:flex-none`}
             />
             <Button type="submit" variant="secondary">
               {t.search}
