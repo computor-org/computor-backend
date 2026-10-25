@@ -55,7 +55,7 @@ try {
   await shot('workspaces');
   await page.goto(`${origin}/courses`);
   await settle();
-  await page.getByText('Data Science mit Python – Grundlagen').first().click();
+  await page.getByText(/Data Science mit Python.* – Grundlagen/).first().click();
   await page.waitForURL(/\/courses\/[0-9a-f-]{36}/);
   await settle();
   await shot('course-page');
