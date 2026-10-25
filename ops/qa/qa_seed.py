@@ -337,6 +337,7 @@ def cmd_content() -> None:
             # Releases are not re-applied onto a course with learners in it;
             # qactl.sh deploy --content-ref imports into a fresh baseline.
             log(f"{path}: already deployed, left as it is")
+            ensure_lecturer(api, existing["id"], path)
             continue
         result = api.post(f"/course-families/{family['id']}/deploy-course",
                           json={"yaml": text, "validate_only": False})
@@ -346,6 +347,23 @@ def cmd_content() -> None:
             log(f"  deploy messages: {result.get('errors')}")
         api.patch(f"/courses/{course_id}", json={"public": True, "language_code": "de"})
         release_course(api, course_id, path)
+        ensure_lecturer(api, course_id, path)
+
+
+def ensure_lecturer(api: Api, course_id: str, path: str) -> None:
+    """The lecturer persona teaches every QA course, so lecturer pages have data."""
+    if not any(p["key"] == "lecturer" for p in PERSONAS):
+        return
+    email = persona("lecturer")["email"]
+    user = find_one(api.get("/users", params={"email": email}), email=email)
+    if user is None:
+        raise SystemExit(f"no user {email}; run the baseline first")
+    members = api.get("/course-members", params={"course_id": course_id, "user_id": user["id"]})
+    if find_one(members, user_id=user["id"]) is not None:
+        return
+    api.post("/course-members", json={"user_id": user["id"], "course_id": course_id,
+                                      "course_role_id": "_lecturer"})
+    log(f"{path}: lecturer {email} added")
 
 
 def release_course(api: Api, course_id: str, path: str) -> None:
