@@ -47,8 +47,17 @@ def test_control_plane_worker_can_reach_coder(services):
     assert {"CODER_URL", "CODER_ADMIN_EMAIL", "CODER_ADMIN_PASSWORD", "TOKEN_SECRET"} <= set(env)
 
 
+def _legacy(services, name):
+    # On the split worker host the workspace ingress and its proxy run on the
+    # workspace daemon (test_workspace_daemon_services_are_contained); the
+    # main-daemon copies exist only in the legacy-ingress profile.
+    if name not in services:
+        pytest.skip(f"{name}: legacy-ingress profile only")
+    return services[name]
+
+
 def test_ingress_is_unprivileged_and_immutable(services):
-    ingress = services["workspace-ingress"]
+    ingress = _legacy(services, "workspace-ingress")
     assert ingress["user"] == "65534:65534"
     assert ingress["cap_drop"] == ["ALL"]
     assert ingress["read_only"] is True
@@ -60,7 +69,7 @@ def test_ingress_is_unprivileged_and_immutable(services):
     "name", ["coder-socket-proxy", "coder-worker-socket-proxy", "coder-provisioner-socket-proxy"]
 )
 def test_socket_proxies_have_no_capabilities(services, name):
-    proxy = services[name]
+    proxy = _legacy(services, name)
     assert proxy["cap_drop"] == ["ALL"]
     assert "no-new-privileges:true" in proxy["security_opt"]
     assert all(v.get("read_only") for v in proxy["volumes"])
@@ -373,3 +382,19 @@ def test_workflow_replays_old_histories_without_the_deferral(monkeypatch):
     _, calls = _run_workflow(monkeypatch, patched=False)
     assert [c[0] for c in calls] == ["discover_template_operations", "rollout_template_workspaces"]
     assert calls[-1][2] == ["vscode", "/t"]
+
+
+def test_workspace_daemon_services_are_contained(tmp_path):
+    services = _render(tmp_path, ("workspace-daemon",))["services"]
+    ingress = services["workspace-ingress"]
+    assert ingress["user"] == "65534:65534" and ingress["cap_drop"] == ["ALL"]
+    assert ingress["read_only"] is True and "no-new-privileges:true" in ingress["security_opt"]
+    assert all(v.get("read_only") for v in ingress["volumes"])
+    proxy = services["ws-socket-proxy"]
+    # Real root (userns_mode host) to open the socket; DAC_OVERRIDE only.
+    assert proxy["cap_drop"] == ["ALL"] and proxy["cap_add"] == ["DAC_OVERRIDE"]
+    assert "no-new-privileges:true" in proxy["security_opt"]
+    assert [v["source"] for v in proxy["volumes"]] == ["/run/computor-ws-docker"]
+    assert all(v.get("read_only") for v in proxy["volumes"])
+    assert set(proxy["environment"]) >= {"CONTAINERS", "NETWORKS"} and "POST" not in proxy["environment"]
+
