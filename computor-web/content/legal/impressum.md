@@ -1,6 +1,6 @@
 # Impressum computor.at
 
-Version 1.0, gültig ab 30.09.2026
+Version 1.1, gültig ab 25.10.2026
 
 Informationen gemäß § 5 E-Commerce-Gesetz (ECG) und Offenlegung gemäß § 25 Mediengesetz (MedienG).
 
@@ -36,7 +36,7 @@ Projektleitung: Assoc.Prof. Dr. Christopher Albert
   der VS-Code-Erweiterung (nach Anmeldung, siehe [Problem melden](/problem))
   oder contact@computor.at
 
-Die Angebote computor.at und chat.computor.at werden vom ITPcp im Rahmen der
+Das Angebot computor.at wird vom ITPcp im Rahmen der
 Lehre, Weiterbildung und Wissenschaftskommunikation der TU Graz betrieben.
 
 ### Grundlegende Richtung (§ 25 Abs. 4 MedienG)
@@ -129,7 +129,7 @@ Project lead: Assoc.Prof. Dr. Christopher Albert
   extension (after signing in, see [Report a problem](/problem)) or
   contact@computor.at
 
-computor.at and chat.computor.at are operated by ITPcp as part of TU Graz's
+computor.at is operated by ITPcp as part of TU Graz's
 teaching, continuing education and science communication.
 
 ### Purpose (§ 25(4) Austrian Media Act)

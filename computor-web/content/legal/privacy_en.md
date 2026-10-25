@@ -1,332 +1,149 @@
 # Privacy Notice computor.at
 
-Version 1.3, effective 25 October 2026
-
-In this privacy notice, we inform you about how personal data are processed on
-the learning platform computor.at and in the chat chat.computor.at. This
-allows you to see at a glance which personal data we process, for what
-purpose, and on which legal basis. We process your data exclusively on the
-basis of the legal provisions for data protection and data security and, in
-particular, the Austrian Data Protection Act (Datenschutzgesetz, “DSG”), the EU
-General Data Protection Regulation (“GDPR”, in German “DSGVO”) and the Austrian
-Telecommunications Act (“TKG 2021”). The German version is authoritative.
-
-## Summary
-
-- We process only what we need to provide your account, courses, workspace,
-  automatic tests, chat and Lena learning assistance. In courses configured for
-  automatic routing, messages can also be addressed to Lena automatically (section 4.8).
-- No advertising, no external tracking or analytics services, no third-party services embedded
-  in our web pages, no sale of data, no use of your data to train AI models.
-- Only technically necessary cookies, so there is no cookie banner.
-- Platform servers are in Germany (Hetzner); Lena inference runs at TU Graz in Austria.
-- You sign up with a verified email address and a password. Public examples need no account.
-- You can ask us to delete your account at any time: privacy@computor.at.
-
-## 1. Scope
-
-This notice applies to all processing on computor.at (including sign-in, the
-browser workspaces and the Git server) and in the chat chat.computor.at. Both
-services are run by the same controller.
-
-## 2. Contact
-
-The data controller for processing your personal data is Graz University of
-Technology, Rechbauerstraße 12, 8010 Graz, Austria (hereinafter “TU Graz” or
-“we”). The platform is run by the Institute of Theoretical Physics –
-Computational Physics (ITPcp), Petersgasse 16, 8010 Graz.
-
-The TU Graz data protection officer is x-tention Informationstechnologie GmbH,
-Friedhofstraße 57, 4600 Wels, datenschutzbeauftragter@tugraz.at.
-
-If you have any data protection concerns, please contact datenschutz@tugraz.at
-or privacy@computor.at.
-
-## 3. Legal basis
-
-TU Graz runs computor.at to fulfil its statutory tasks in teaching, continuing
-education and science communication (§§ 2 and 3 Universities Act 2002, “UG”).
-Unless stated otherwise below, we therefore process your data on the basis of
-the public interest under Art. 6(1)(e) GDPR in conjunction with §§ 2 and 3 UG.
-Processing is not based on your consent. Accepting the Terms of Use governs
-your use of the platform; it is not consent under data protection law.
-
-## 4. What we process and why
-
-### 4.1 Sign-in and account
-
-You create an account with your email address and password. Our sign-in
-service (Keycloak) verifies your email and stores the password as a cryptographic
-hash, never as readable text.
-
-Categories of data: verified email address, username, name you provide, password
-hash, internal user ID, time you accepted the Terms of Use, time of last sign-in.
-
-Purpose: account creation, sign-in and account-related contact.
-
-Legal basis: Art. 6(1)(e) GDPR in conjunction with §§ 2 and 3 UG.
-
-Your email address is required to create an account. Reading public examples
-does not require an account.
-
-### 4.2 Courses, submissions and tests
-
-Categories of data: course enrolments, group membership, your code and other
-submissions, Git repositories with their history (on our own Forgejo Git
-server), automatic test results, points, feedback from teaching staff,
-messages about assignments, timestamps.
-
-Purpose: running the courses, automatically testing your code, feedback and
-support by teaching staff and tutors, and overviews of learning progress and
-test errors.
-
-Legal basis: Art. 6(1)(e) GDPR in conjunction with §§ 2 and 3 UG.
-
-Test results and points are calculated automatically. They serve only your
-learning; they produce no legal effects concerning you and do not similarly
-significantly affect you. There is therefore no automated decision within the
-meaning of Art. 22 GDPR. If a university course uses results from computor.at
-for an assessment, the responsible teacher decides, not the platform.
-
-### 4.3 Browser workspaces
-
-Categories of data: files in your workspace (browser version of Visual Studio
-Code, based on Coder), processes running in it, start and stop times.
-
-Purpose: providing a programming environment that needs no local installation.
-
-Legal basis: Art. 6(1)(e) GDPR in conjunction with §§ 2 and 3 UG.
-
-Workspaces are stopped automatically after one hour without activity. Files in
-your home directory are kept as long as your account exists. The operations
-team accesses the content of your workspace only to fix a problem at your
-request or where there is a specific suspicion of abuse.
-
-### 4.4 Chat (chat.computor.at)
-
-The chat is a separate service (Zulip) with its own account. You can sign in
-with GitHub or with email address and password; we store passwords only as a
-cryptographic hash.
-
-Categories of data: name, email address, profile details, messages,
-reactions, uploaded files, timestamps, notification settings.
-
-Purpose: communication between participants, teaching staff and tutors; email
-notifications if you have enabled them.
-
-Legal basis: Art. 6(1)(e) GDPR in conjunction with §§ 2 and 3 UG.
-
-### 4.5 Creation of log data (access data)
-
-In order to be able to provide our online services, log data that are
-technically necessary are stored each time our online offer is accessed. The
-log data enable us to detect, limit and eliminate system malfunctions, system
-errors, malfunctions that can restrict the availability of the online services
-as well as unauthorised access to our systems. The log data are not linked to
-other personal data unless this is necessary to investigate a specific
-security incident.
-
-Categories of data: date and time of the request, name and URL of the
-retrieved resource, amount of data, response of the server (e.g. HTTP status
-code), identification data for the browser and operating system used, website
-from which the access was made, IP address.
-
-Legal basis: we store the log data for a limited period of time to fulfil our
-legitimate interest in secure and reliable operation according to
-Art. 6(1)(f) GDPR.
-
-Storage period: 14 days.
-
-### 4.6 Security and abuse monitoring
-
-Anyone can run programs in the workspaces. To detect abuse (e.g.
-cryptocurrency mining or attacks on third parties), we automatically record
-aggregate figures per workspace: CPU usage and number of network connections.
-These values are evaluated in memory and not stored permanently. We do not see
-the content you transmit.
-
-If a workspace exceeds set thresholds, an alert attributed to your account
-(username, workspace, measured values, time) is created in an internal
-channel that only the operations team can access. A human decides on any
-measures; to protect against acute danger, a workspace may also be stopped
-automatically.
-
-Legal basis: Art. 6(1)(f) GDPR (legitimate interest in protecting the
-platform, its users and third parties; see also Art. 32 GDPR).
-
-Storage period of alerts: 90 days; in the case of a specific incident, until
-it is resolved.
-
-### 4.7 Enquiries and reports
-
-If you email us or report content, we process your message and contact details
-to handle it.
-
-The same applies when you use "Report a problem" in the web app or in the VS
-Code extension: your description, any files you choose to attach (such as a
-screenshot or a log) and technical details of the program (application,
-version, page or command) are stored with your account as a request to our
-support team. You see replies in the web app. Your request and attachments are
-not published automatically. After review, the support team may publish a
-summary without personal data in the project's public GitHub issue tracker.
-
-Legal basis: Art. 6(1)(e) GDPR in conjunction with §§ 2 and 3 UG; for reports
-of illegal content, Art. 6(1)(c) GDPR in conjunction with Articles 16 and 17 of
-Regulation (EU) 2022/2065 (Digital Services Act, “DSA”), where applicable.
-
-Storage period: until the matter is closed, then at most three years for
-traceability and the defence of legal claims.
-
-### 4.8 Lena learning assistance
-
-Lena is available through the "Ask Lena" button on an assignment and in course
-messages. In courses with automatic Lena routing, messages can also be forwarded
-to Lena without an explicit mention. Lena gives learning help; it does not run
-your code or decide grades.
-
-**"Ask Lena" button:** we process your question, the text you choose to submit,
-the assignment description visible to you and the generated answer.
-
-**Course messages:** you can address Lena with @lena and reply in the thread.
-If automatic Lena routing is enabled for the course, learner messages that
-mention nobody else are also addressed to Lena when Lena is available and
-included in the message's audience. A visible Lena mention is added. We process
-the message and earlier messages in the same thread. For messages about an
-assignment, we also use the assignment description, your latest submission for
-that assignment and its test results. Lena's answer is stored as a message in
-the thread, subject to the same visibility as other messages in that thread.
-
-In both cases inference takes place on TU Graz machines in Austria, without an
-external AI provider or model training.
-
-Legal basis: Art. 6(1)(e) GDPR in conjunction with §§ 2 and 3 UG.
-
-A request made with the button is held temporarily on computor.at for at most 15 minutes; after
-completion it is removed, and only you can retrieve the answer for 24 hours.
-The inference services keep no additional prompt or answer files or content logs.
-Messages in the thread remain stored as described above. The model
-uses bounded memory and local disk caches to reuse computations. Cache entries
-are replaced when capacity is needed or the cache is cleared; they have no fixed
-time-based expiry. These caches are private to the inference service and are
-not made available to learners. We retain numeric size, status and timing
-telemetry without question, submitted-text or answer contents.
-
-## 5. Who sees your data
-
-- **Teaching staff and tutors of your course** see your name, username,
-  submissions, test results, points and progress.
-- **Other participants** see your name and your messages in the chat channels
-  where you post. Your submissions are not visible to other participants
-  unless a course provides for group work.
-- **The operations team** (a few administrators at ITPcp) has technical access
-  to the servers and uses it only for operation, troubleshooting and abuse
-  prevention.
-- Your submissions and workspaces are **not public**.
-
-## 6. Recipients and processors
-
-We run all services of the platform ourselves (sign-in with Keycloak, Forgejo
-Git server, database, file storage, test system, workspaces with Coder, chat
-with Zulip). Fonts are served from our own servers. We do not embed external
-content delivery, tracking, analytics, advertising or AI services. Lena is
-operated by TU Graz.
-
-| Recipient | Role | Location | Basis |
-|---|---|---|---|
-| Hetzner Online GmbH, Industriestraße 25, 91710 Gunzenhausen, Germany | processor: servers, storage, backups | data centres in Nuremberg and Falkenstein, Germany | data processing agreement under Art. 28 GDPR |
-| Authorities and courts | only where required by law or to report serious criminal offences (Art. 18 DSA) | Austria or EU | Art. 6(1)(c) GDPR |
-
-**Optional GitHub Codespaces:** If you choose this way of working, GitHub
-provides the development environment under its own terms and privacy notice.
-It is separate from computor.at; you decide which files to put there. Desktop
-VS Code and the anonymous read-only examples remain available as alternatives.
-
-Emails from the platform (e.g. chat notifications) are sent via the TU Graz
-mail server. Beyond this, your data are not transferred to third countries. We
-do not sell your data and do not use them for advertising or to train AI
-models.
-
-## 7. Cookies and similar technologies
-
-Here, “cookie(s)” also covers technologies that are similar to cookies in
-terms of functionality, such as the browser's local storage.
-
-We use only technically necessary cookies (functional cookies) according to
-the exemption clause in § 165(3) TKG 2021. The user's consent is not required;
-therefore there is no cookie banner. We do not use analytics or advertising
-cookies. The cookies relate only to computor.at or chat.computor.at; no data
-are transmitted to third parties.
-
-| Name | Purpose | Duration | Provider |
-|---|---|---|---|
-| `KEYCLOAK_SESSION`, `KEYCLOAK_IDENTITY`, `AUTH_SESSION_ID`, `KC_RESTART` and similar | sign-in session at the sign-in service | session or until sign-in expires | TU Graz (Keycloak) |
-| `ct_access_token` | platform access token | 1 hour | TU Graz |
-| `ct_refresh_token` | renewing the sign-in | 7 days | TU Graz |
-| `coder_session_token` and similar | workspace session | until the session expires | TU Graz (Coder) |
-| `sessionid`, `csrftoken` (also with prefix `__Host-`) | chat session and protection against cross-site request forgery | until sign-out or expiry | TU Graz (Zulip) |
-| `computor-theme` (local storage) | your light/dark theme preference | until you delete it | TU Graz |
-
-You can control cookies and their storage period in your browser settings.
-Without these cookies, however, signing in is not possible.
-
-## 8. Storage periods
-
-| Data | Period |
+Version 1.4, dated 25 October 2026. The German version is authoritative.
+
+Computor is a free TU Graz learning service. Public material needs no account.
+For accounts, courses, submissions, workspaces, communication and learning help,
+we process the data below. There is no advertising, sale of data or external
+behavioural tracking. Configured courses also route messages automatically to
+Lena AI learning assistance. You may request account deletion at any time at
+privacy@computor.at.
+
+## 1. Controller and legal bases
+
+Graz University of Technology, Rechbauerstraße 12, 8010 Graz, Austria (“TU Graz”,
+“we”), is controller for computor.at, including sign-in, Git and workspaces.
+The Institute of Theoretical Physics – Computational Physics,
+Petersgasse 16, 8010 Graz, operates the service. Contact privacy@computor.at or
+datenschutz@tugraz.at. The data protection officer is x-tention
+Informationstechnologie GmbH, Friedhofstraße 57, 4600 Wels,
+datenschutzbeauftragter@tugraz.at.
+
+The service fulfils TU Graz's statutory teaching, continuing education and
+science communication tasks. Necessary processing, including secure operation,
+relies on Art. 6(1)(e) GDPR with §§ 2 and 3 Universities Act 2002; Art. 32 GDPR
+requires appropriate security. Legally required disclosures rely on Art. 6(1)(c)
+GDPR, including reports under Articles 16–18 DSA where applicable. Accepting the
+Terms of Use is not data protection consent or permission for arbitrary future
+processing.
+
+An account requires a verified email address and password; without these you
+cannot sign in. The minimum account age is 14. We delete a younger person's
+account when we learn of it.
+
+## 2. Data, purposes and visibility
+
+| Area | Data and purpose | Who sees the data |
+|---|---|---|
+| Account | Email, username, provided name, password hash, internal ID, terms acceptance and last sign-in; for access and account messages. Passwords are not stored as readable text. | Operations staff; teachers and tutors see their course participants' names and usernames. |
+| Courses and submissions | Enrolments, groups, code and other submissions, Git history, test results, points, feedback and timestamps; for exercises, support and learning-progress/test-error overviews. | Course teachers and tutors; other learners only for designated group work. Submissions are not public. |
+| Hosted workspaces | Files, running processes, start/stop times; for the programming environment on our servers. Home files remain when it is stopped. | Technical operations access; content access where necessary for operation, recovery, support or security. |
+| Course messages | Messages with revision history and timestamps; for communication and support. | The relevant audience, not every course participant by default. |
+| Lena | Questions, selected text, assignment/thread context and answers; for learning assistance described below. | Only you for button requests; the thread's audience for messages. |
+| Support and reports | Email, contact details, descriptions, chosen attachments and technical details such as application, version, page or command; for handling and replying. | Support staff; requests and attachments are not published automatically. A reviewed summary without personal data may appear in the public GitHub issue tracker. |
+| Access and security | IP, time, requested resource, size, status, browser/OS and referring page, account or workspace identifiers where applicable, login events, administrative actions and diagnostics; for fault/attack detection, availability and secure operation. | Technical operations and security roles, limited to their role and the stated operational and security purposes. |
+
+Technical server access serves operation, troubleshooting and abuse prevention
+through the designated operations and security roles. Tests and points are
+computed automatically but do not decide grades. The responsible teacher
+assesses work; there is no solely automated decision with legal or similarly significant effects under Art. 22
+GDPR.
+
+**Lena:** “Ask Lena” sends your question, selected text and visible assignment.
+In course messages you may mention @lena and reply in the thread. With automatic
+routing enabled, learner messages mentioning nobody else are also addressed to
+Lena when it is available and within the audience; a visible mention is added.
+Processing includes the message and earlier thread, plus the assignment, your
+latest submission and its tests for assignment messages. The reply is stored
+in that thread with the same audience. Lena neither executes code nor decides
+grades.
+
+Current Lena inference runs on TU Graz machines in Austria without an external
+AI provider, additional content logs or model training on your data. Bounded
+memory and disk caches reuse computations; learners cannot access them. Entries
+are replaced for capacity or cleared, without a fixed time expiry. Numeric size,
+status and timing measurements contain no questions, submitted text or answers.
+
+## 3. Locations and additional ways of working
+
+Platform data are processed in Germany and Austria. We operate the platform
+services ourselves. Hetzner Online GmbH,
+Industriestraße 25, 91710 Gunzenhausen, Germany, provides servers, storage and
+backups in Nuremberg and Falkenstein as a processor under Art. 28 GDPR. TU Graz
+operates learning assistance and service administration in Austria. Section 4
+explains deletion of recovery copies. Email notifications use the TU Graz mail server.
+Authorities and courts receive data only when legally required or for legally
+specified serious-offence reports. Fonts come from our servers; no external
+advertising, tracking, analytics, content-delivery or AI services are embedded
+in the current web pages.
+
+We do not sell your data or use it for advertising or model training.
+
+Device-local computation and storage differ from upload, sync, submission and
+hosted processing. New purposes, recipients or transfers are explained before
+introduction as required by law; this notice is not blanket consent for them.
+
+## 4. Retention and deletion
+
+| Data | Period or deletion rule |
 |---|---|
-| Account, course enrolments, submissions, Git repositories, test results | until your account is deleted |
-| Workspace files (home directory) | until your account is deleted |
-| Course and assignment messages, including Lena's answers | until your account is deleted |
-| Lena requests made with the button | at most 15 minutes; removed on completion |
-| Lena answers to the button | 24 hours, visible only to the author |
-| Lena inference caches | bounded capacity; replacement on capacity pressure or clearing |
-| Chat account and messages | until you delete messages or your chat account, or ask us to delete it |
-| Web server access logs (log data) | 14 days |
-| Security alerts attributed to an account | 90 days |
-| Enquiries and reports | until closed, then at most three years |
-| Backups (server snapshots) | daily backups are kept for 7 days; backups made before maintenance for at most 30 days |
+| Account, course data, submissions, repositories, results, home files and course messages | Until account deletion, handled across the services involved. Leaving a course or archiving an account is not deletion. |
+| Lena button request | At most 15 minutes, removed on completion. |
+| Lena button answer | 24 hours, retrievable only by the requester. |
+| Lena thread answers and inference caches | Threads follow course-message retention; caches follow the capacity rule in section 2. |
+| Web and scanner access logs | Nonempty files rotate daily with 14 archived rotations; this is not a fixed 14-calendar-day limit. |
+| Diagnostics and technical security records | Depending on the service, size-based rotation (often five files of 10 MB each) or no automatic age deletion; no uniform period. |
+| Sign-in service login and administrator events | Login events 30 days, detailed administrator events 90 days, separately from diagnostic logs. |
+| Technical attack blocking | Scanner ban history 35 days; related log files keep four weekly archived rotations of nonempty files. |
+| Support and reports | Until closure, then at most three years for traceability and defence of claims. |
 
-**Inactive accounts:** we delete accounts, together with their data, that have
-not been signed in to for 24 months. We announce the deletion by email at
-least 30 days in advance; signing in during this period keeps the account.
+Evidence needed for a specific security incident or legal obligation is
+separately restricted to that purpose and the period it requires.
 
-**Deletion and backups:** deleted data disappear from all backups at the
-latest 30 days after deletion. In the case of a specific security incident, we
-keep the data needed until it has been resolved.
+For accounts unused for 24 months, we give reasonable advance warning of
+deletion by email; signing in then keeps the account. Longer contractually
+agreed warning periods remain unaffected. Deletion requests also cover
+sign-in, Git, workspaces and file storage. If specific data must remain
+for a concrete legal reason, we explain the reason and period and restrict them
+to that purpose.
 
-## 9. Rights of data subjects
+**Backups:** We retain backup copies of personal platform data for no longer
+than 30 days.
 
-You have the rights to access, rectification and erasure of your data, as well
-as the right to restriction and the right to data portability of the data you
-have provided. If the processing is based on the legal basis of legitimate or
-public interest, you can lodge a justified objection to the processing
-(Art. 21 GDPR).
+## 5. Cookies and security
 
-In order to process your request and to ensure that personal data are not
-disclosed to unauthorised third parties, we must identify you clearly. Please
-therefore write to privacy@computor.at or datenschutz@tugraz.at from the email
-address linked to your account. We usually reply within one month
-(Art. 12(3) GDPR).
+We use functional cookies and local browser storage for sign-in, session
+protection and your chosen appearance, without advertising or analytics cookies.
+Technically necessary storage falls under § 165(3) TKG 2021 and does not require
+a cookie banner.
 
-There is also a right to lodge a complaint with the Austrian Data Protection
-Authority (Österreichische Datenschutzbehörde), Barichgasse 40–42, 1030 Vienna,
-Austria, dsb@dsb.gv.at, https://www.dsb.gv.at.
+| Function | Duration |
+|---|---|
+| Sign-in and protection for account and workspace sessions | Session, or until sign-out/expiry. |
+| Platform access token / renewal token | One hour / seven days. |
+| Chosen light/dark appearance | Until you clear local browser storage. |
 
-## 10. Minimum age
+Browser settings control storage; session cookies are necessary for sign-in.
+Web access uses TLS and user programs run in separate containers with resource
+limits. Report vulnerabilities confidentially to security@computor.at.
 
-You may use computor.at and chat.computor.at from the age of 14. Processing of
-your data is not based on consent (see section 3), so you do not need your
-parents' consent for it. Persons under 14 may not create an account. If we
-learn that an account belongs to a person under 14, we delete it.
+## 6. Rights and changes
 
-## 11. Security
+Subject to the applicable legal conditions, you have rights of access,
+rectification, erasure, restriction and portability. You may object to
+public-interest processing on grounds relating to your particular situation
+(Art. 21 GDPR). You may request an export separately from the narrower statutory
+portability right; the terms also promise export when services are restricted
+or discontinued.
 
-All connections are encrypted (TLS). User code runs in separate containers
-with resource limits. Server access is restricted to the operations team.
-Please report security vulnerabilities confidentially to security@computor.at.
+Write to privacy@computor.at or datenschutz@tugraz.at, preferably from your
+registered address so we can identify you securely. We normally respond within
+one month and explain any legally permitted extension within that time
+(Art. 12(3) GDPR). You may complain to the Austrian Data Protection Authority,
+Barichgasse 40–42, 1030 Vienna, dsb@dsb.gv.at,
+[dsb.gv.at](https://www.dsb.gv.at).
 
-## 12. Changes to this notice
-
-If our processing changes, we update this notice. We inform registered users
-of material changes by email or at their next sign-in. The current version is
-available at https://computor.at/privacy; previous versions are also
-available there.
+The current notice is at https://computor.at/privacy/en. We keep it current and
+inform you of material changes to processing. Before using data for a new
+purpose, we provide the required information. Contractual changes remain
+governed by the Terms of Use.
