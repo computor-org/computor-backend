@@ -96,7 +96,10 @@ def test_coder_server_has_no_docker_socket(config):
 def test_provisioner_proxy_uses_the_allowlist_and_is_private(config):
     proxy = config["services"]["coder-provisioner-socket-proxy"]
     targets = {v["target"]: v for v in proxy["volumes"]}
-    assert targets["/var/run/docker.sock"]["read_only"] is True
+    # The daemon socket is mounted read-only at a fixed target: by default the
+    # main socket, on the worker the workspace daemon's socket directory.
+    assert targets["/var/run/workspace-docker"]["read_only"] is True
+    assert proxy["environment"]["SOCKET_PATH"] == "/var/run/workspace-docker"
     template = targets["/usr/local/etc/haproxy/haproxy.cfg.template"]
     assert template["source"].endswith(
         "ops/docker/coder-provisioner-socket-proxy/haproxy.cfg.template")
