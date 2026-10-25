@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { ExampleRepositoriesClient } from '@/src/generated/clients/ExampleRepositoriesClient';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -14,7 +15,28 @@ import Badge from '@/src/components/Badge';
 
 const exampleRepositoriesClient = new ExampleRepositoriesClient();
 
+const COPY = {
+  de: {
+    forbidden: 'Du hast keinen Zugriff auf Beispiel-Repositories.',
+    title: 'Beispiel-Repositories',
+    subtitle: 'Speicher-Backends, die Beispiele enthalten. Lade Beispiele in ein MinIO-Repository hoch.',
+    newRepo: 'Neues Repository',
+    loading: 'Wird geladen …',
+    empty: 'Noch keine Beispiel-Repositories. Erstelle ein MinIO-Repository, um Beispiele hochzuladen.',
+  },
+  en: {
+    forbidden: 'You do not have access to example repositories.',
+    title: 'Example repositories',
+    subtitle: 'Storage backends that hold examples. Upload examples into a MinIO repository.',
+    newRepo: 'New repository',
+    loading: 'Loading…',
+    empty: 'No example repositories yet. Create a MinIO repository to upload examples into.',
+  },
+};
+
 export default function ExampleRepositoriesPage() {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { canViewExamples, canManageExamples } = usePermissions();
 
@@ -22,20 +44,20 @@ export default function ExampleRepositoriesPage() {
   const repos = data ?? [];
 
   if (!authLoading && isAuthenticated && !canViewExamples) {
-    return <Forbidden message="You do not have access to example repositories." />;
+    return <Forbidden message={t.forbidden} />;
   }
 
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Example repositories' }]}
-          title="Example repositories"
-          subtitle="Storage backends that hold examples. Upload examples into a MinIO repository."
+          breadcrumbs={[{ label: t.title }]}
+          title={t.title}
+          subtitle={t.subtitle}
           actions={
             canManageExamples ? (
               <Link href="/example-repositories/create" className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover">
-                New repository
+                {t.newRepo}
               </Link>
             ) : undefined
           }
@@ -44,10 +66,10 @@ export default function ExampleRepositoriesPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <ListLoading>Loading…</ListLoading>
+          <ListLoading>{t.loading}</ListLoading>
         ) : repos.length === 0 ? (
           <div className="text-muted border border-dashed border-rule-strong rounded-lg p-8 text-center">
-            No example repositories yet. Create a MinIO repository to upload examples into.
+            {t.empty}
           </div>
         ) : (
           <ScrollArea spacing="none" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 content-start">

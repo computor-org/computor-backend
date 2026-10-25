@@ -2,7 +2,8 @@ import type {
   CoderTemplate,
   TemplatePreparation,
 } from '@/src/types/workspaces';
-import { templateTaskStage, type TemplateTaskStage } from './templateTaskStage';
+import type { UiLanguage } from '@/src/hooks/useUiLanguage';
+import { stageLabel, templateTaskStage, type TemplateTaskStage } from './templateTaskStage';
 
 /**
  * One workspace type as a user meets it, and whether they can have it.
@@ -180,7 +181,22 @@ export function courseTemplateOption(
 /** Short state word for a card's second line. */
 export function availabilityLabel(option: TemplateOption, language: 'de' | 'en' = 'en'): string {
   if (option.availability === 'available') return '';
-  if (option.stage) return option.stage.label;
+  if (option.stage) return stageLabel(option.stage.key, language);
   if (language === 'de') return option.availability === 'failed' ? 'Nicht verfügbar' : 'Noch nicht eingerichtet';
   return option.availability === 'failed' ? 'Not available' : 'Not set up yet';
+}
+
+/** The hover text of a type that cannot be picked, in the interface language. */
+export function optionReason(option: TemplateOption, language: UiLanguage = 'en'): string | undefined {
+  if (language !== 'de' || !option.stage) {
+    return language === 'de' && option.availability === 'unavailable' ? UNAVAILABLE_REASON_DE : option.reason;
+  }
+  const label = stageLabel(option.stage.key, 'de');
+  if (option.availability === 'failed') {
+    return `${label} — diese Art von Arbeitsumgebung ist nicht verfügbar. Wende dich an die Administration.`;
+  }
+  if (option.availability === 'preparing') {
+    return `${templateLabel(option)} wird vorbereitet (${label}) und kann noch nicht verwendet werden.`;
+  }
+  return option.reason;
 }

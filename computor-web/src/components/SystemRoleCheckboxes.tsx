@@ -2,7 +2,8 @@
 
 import { useSystemRoles } from '@/src/hooks/useSystemRoles';
 import { usePermissions } from '@/src/hooks/usePermissions';
-import { ADMIN_ROLE_LOCKED_HINT, grantsAdmin } from '@/src/utils/systemRoles';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { adminRoleLockedHint, grantsAdmin } from '@/src/utils/systemRoles';
 
 /**
  * Checkbox list of the builtin system roles, labelled with each role's
@@ -23,11 +24,14 @@ export default function SystemRoleCheckboxes({
   onToggle: (roleId: string) => void;
   disabled?: boolean;
 }) {
+  const language = useUiLanguage();
+  const de = language === 'de';
+  const lockedHint = adminRoleLockedHint(language);
   const { roles, loading } = useSystemRoles();
   const { isAdmin } = usePermissions();
 
-  if (loading) return <p className="text-xs text-subtle">Loading roles…</p>;
-  if (roles.length === 0) return <p className="text-xs text-subtle">No system roles available.</p>;
+  if (loading) return <p className="text-xs text-subtle">{de ? 'Rollen werden geladen…' : 'Loading roles…'}</p>;
+  if (roles.length === 0) return <p className="text-xs text-subtle">{de ? 'Keine Systemrollen verfügbar.' : 'No system roles available.'}</p>;
 
   return (
     <div className="space-y-2">
@@ -37,7 +41,7 @@ export default function SystemRoleCheckboxes({
           <label
             key={r.id}
             className={`flex items-start gap-2 ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
-            title={locked ? ADMIN_ROLE_LOCKED_HINT : undefined}
+            title={locked ? lockedHint : undefined}
           >
             <input
               type="checkbox"
@@ -49,7 +53,7 @@ export default function SystemRoleCheckboxes({
             <span>
               <span className="text-sm font-medium text-fg">{r.title ?? r.id}</span>
               {r.description && <span className="block text-xs text-subtle">{r.description}</span>}
-              {locked && <span className="block text-xs text-subtle italic">{ADMIN_ROLE_LOCKED_HINT}</span>}
+              {locked && <span className="block text-xs text-subtle italic">{lockedHint}</span>}
             </span>
           </label>
         );

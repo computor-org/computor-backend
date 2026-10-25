@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useCascadeDelete } from '@/src/hooks/useCascadeDelete';
@@ -21,7 +22,42 @@ import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 const courseFamiliesClient = new CourseFamiliesClient();
 const coursesClient = new CoursesClient();
 
+const COPY = {
+  de: {
+    crumb: 'Kursfamilien',
+    family: 'Kursfamilie',
+    newCourse: 'Neuer Kurs',
+    edit: 'Bearbeiten',
+    delete: 'Löschen',
+    loading: 'Wird geladen …',
+    courses: 'Kurse',
+    noCourses: 'Noch keine Kurse in dieser Kursfamilie.',
+    untitledCourse: 'Kurs ohne Titel',
+    archived: 'Archiviert',
+    deleteTitle: (name: string) => `Kursfamilie „${name}“ löschen?`,
+    deleteMessage:
+      'Die Kursfamilie wird dauerhaft gelöscht, das lässt sich nicht rückgängig machen. Sie darf vorher keine Kurse mehr enthalten.',
+  },
+  en: {
+    crumb: 'Course families',
+    family: 'Course Family',
+    newCourse: 'New course',
+    edit: 'Edit',
+    delete: 'Delete',
+    loading: 'Loading…',
+    courses: 'Courses',
+    noCourses: 'No courses in this family yet.',
+    untitledCourse: 'Untitled Course',
+    archived: 'Archived',
+    deleteTitle: (name: string) => `Delete course family “${name}”?`,
+    deleteMessage:
+      'This permanently deletes the course family and is irreversible. It must have no courses first.',
+  },
+};
+
 export default function CourseFamilyDetailPage() {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const familyId = useParams().id as string;
   const router = useRouter();
   const { refreshPermissions } = useAuth();
@@ -36,7 +72,7 @@ export default function CourseFamilyDetailPage() {
   );
   const family = data?.family ?? null;
   const courses = data?.courses ?? [];
-  const familyName = displayName(family, 'Course Family');
+  const familyName = displayName(family, t.family);
   const mayCreateCourse = family ? canCreateCourse(family.organization_id, familyId) : false;
 
   // Preview (dry run) first, then the real delete behind the typed-path dialog.
@@ -55,19 +91,19 @@ export default function CourseFamilyDetailPage() {
     <AuthenticatedLayout>
       <ListPageLayout width="narrow">
         <PageHeader
-          breadcrumbs={[{ label: 'Course families', href: '/course-families' }, { label: familyName }]}
+          breadcrumbs={[{ label: t.crumb, href: '/course-families' }, { label: familyName }]}
           title={familyName}
           actions={
             <>
               {mayCreateCourse && (
-                <ButtonLink href={`/courses/create?familyId=${familyId}`}>New course</ButtonLink>
+                <ButtonLink href={`/courses/create?familyId=${familyId}`}>{t.newCourse}</ButtonLink>
               )}
               {family && canManage && (
-                <ButtonLink href={`/course-families/${familyId}/edit`} variant="secondary">Edit</ButtonLink>
+                <ButtonLink href={`/course-families/${familyId}/edit`} variant="secondary">{t.edit}</ButtonLink>
               )}
               {family && canDeleteCourseFamily(familyId) && (
-                <Button variant="dangerGhost" onClick={del.begin} loading={del.opening} loadingLabel="Delete">
-                  Delete
+                <Button variant="dangerGhost" onClick={del.begin} loading={del.opening} loadingLabel={t.delete}>
+                  {t.delete}
                 </Button>
               )}
             </>
@@ -77,7 +113,7 @@ export default function CourseFamilyDetailPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <ListLoading>Loading…</ListLoading>
+          <ListLoading>{t.loading}</ListLoading>
         ) : (
           <ScrollArea>
             {family?.description && (
@@ -87,17 +123,17 @@ export default function CourseFamilyDetailPage() {
             )}
 
             <h2 className="text-xl font-semibold text-fg">
-              Courses <span className="text-subtle font-normal">({courses.length})</span>
+              {t.courses} <span className="text-subtle font-normal">({courses.length})</span>
             </h2>
             {courses.length === 0 ? (
-              <div className="text-muted border border-dashed border-rule-strong rounded-lg p-8 text-center">No courses in this family yet.</div>
+              <div className="text-muted border border-dashed border-rule-strong rounded-lg p-8 text-center">{t.noCourses}</div>
             ) : (
               <div className="bg-surface border border-rule rounded-lg divide-y">
                 {courses.map((c) => (
                   <Link key={c.id} href={`/courses/${c.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-canvas">
                     <div className="min-w-0 flex items-center gap-2">
-                      <div className="text-sm font-medium text-fg truncate">{displayName(c, 'Untitled Course')}</div>
-                      {c.archived_at && <Badge tone="muted">Archived</Badge>}
+                      <div className="text-sm font-medium text-fg truncate">{displayName(c, t.untitledCourse)}</div>
+                      {c.archived_at && <Badge tone="muted">{t.archived}</Badge>}
                     </div>
                     <span className="text-faint">›</span>
                   </Link>
@@ -110,8 +146,8 @@ export default function CourseFamilyDetailPage() {
 
       {del.preview && family && (
         <ConfirmDeleteDialog
-          title={`Delete course family “${familyName}”?`}
-          message="This permanently deletes the course family and is irreversible. It must have no courses first."
+          title={t.deleteTitle(familyName)}
+          message={t.deleteMessage}
           confirmWord={family.path}
           preview={<CascadeDeletePreview result={del.preview} />}
           blockedReason={del.preview.blocked_reason}

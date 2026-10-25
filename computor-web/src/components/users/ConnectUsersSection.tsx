@@ -8,6 +8,7 @@ import Button from '@/src/components/ui/Button';
 import UserSearchPicker, { userDisplayName } from '@/src/components/users/UserSearchPicker';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
+import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
 import type {
   UserConnectCourseMove,
   UserConnectProfileMove,
@@ -26,33 +27,107 @@ type UserRef = {
   email?: string | null;
 };
 
-function courseMoveText(m: UserConnectCourseMove): string {
-  if (m.action === 'duplicate_removed') {
-    return 'duplicate membership on the imported user will be removed';
-  }
-  return m.group_carried_over ? 'membership moves (course group carried over)' : 'membership moves';
+const COPY = {
+  de: {
+    duplicateRemoved: 'doppelte Mitgliedschaft beim importierten Benutzer wird entfernt',
+    moveGroup: 'Mitgliedschaft wird verschoben (Kursgruppe wird übernommen)',
+    move: 'Mitgliedschaft wird verschoben',
+    studentEmail: (email: string) => `Studierenden-E-Mail ${email} geht an den zu behaltenden Benutzer`,
+    merged: 'wird mit dem bestehenden Profil des zu behaltenden Benutzers zusammengeführt',
+    profileMoves: 'Profil wird zum zu behaltenden Benutzer verschoben',
+    memberships: (n: number) => `${n} ${n === 1 ? 'Kursmitgliedschaft' : 'Kursmitgliedschaften'} verschoben`,
+    duplicates: (n: number) => `${n} ${n === 1 ? 'doppelte Mitgliedschaft' : 'doppelte Mitgliedschaften'} entfernt`,
+    profiles: (n: number) => `${n} ${n === 1 ? 'Studierendenprofil' : 'Studierendenprofile'} übernommen`,
+    roles: (n: number) => `${n} ${n === 1 ? 'Rolle' : 'Rollen'} zusammengeführt`,
+    noData: ' Es gab keine Kursdaten zu verschieben.',
+    checkFailed: 'Prüfung der Zusammenführung fehlgeschlagen',
+    userFallback: 'Benutzer',
+    connected: (source: string, keeper: string, summary: string) => `${source} wurde mit ${keeper} zusammengeführt.${summary}`,
+    connectFailed: 'Benutzer konnten nicht zusammengeführt werden',
+    absorbHeading: 'Vorab angelegten Benutzer übernehmen',
+    connectHeading: 'Mit bestehendem Konto zusammenführen',
+    absorbIntro: 'Wähle einen vorab angelegten Benutzer (aus einer Kursliste importiert, noch nie angemeldet), der in dieses Konto übernommen werden soll. Seine Kursmitgliedschaften, Studierendenprofile und Rollen wechseln hierher, danach wird der importierte Benutzer gelöscht.',
+    connectIntro: 'Dieser Benutzer hat kein Anmeldekonto, er wurde vermutlich aus einer Kursliste importiert. Wähle das echte, bereits angemeldete Konto, das seine Kursmitgliedschaften, Studierendenprofile und Rollen übernehmen soll. Dieser importierte Benutzer wird anschließend gelöscht.',
+    absorb: 'Übernehmen',
+    connect: 'Zusammenführen',
+    checking: 'Es wird geprüft, was verschoben würde…',
+    dialogTitle: 'Benutzer zusammenführen',
+    willBeAbsorbed: 'wird übernommen in',
+    courseMemberships: 'Kursmitgliedschaften',
+    studentProfiles: 'Studierendenprofile',
+    rolesGained: 'Rollen, die der zu behaltende Benutzer erhält',
+    accountsMove: (n: number) => `${n} verknüpfte${n === 1 ? 's Konto wird' : ' Konten werden'} zum zu behaltenden Benutzer verschoben.`,
+    messagesRepointed: (n: number) => `${n} ${n === 1 ? 'Nachrichtenverweis wird' : 'Nachrichtenverweise werden'} umgehängt.`,
+    nothingToMove: 'Nichts zu verschieben, der importierte Benutzer hat keine Kursdaten. Beim Zusammenführen wird er einfach gelöscht.',
+    deleteWarning: (name: string, email: string) => `Der Benutzer ${name}${email} wird endgültig gelöscht.`,
+    irreversible: 'Das kann nicht rückgängig gemacht werden.',
+    cancel: 'Abbrechen',
+    connecting: 'Wird zusammengeführt…',
+    connectAndDelete: 'Zusammenführen und Benutzer löschen',
+  },
+  en: {
+    duplicateRemoved: 'duplicate membership on the imported user will be removed',
+    moveGroup: 'membership moves (course group carried over)',
+    move: 'membership moves',
+    studentEmail: (email: string) => `student email ${email} lands on the keeper`,
+    merged: 'merged into the keeper’s existing profile',
+    profileMoves: 'profile moves to the keeper',
+    memberships: (n: number) => `${n} course membership${n === 1 ? '' : 's'} moved`,
+    duplicates: (n: number) => `${n} duplicate membership${n === 1 ? '' : 's'} removed`,
+    profiles: (n: number) => `${n} student profile${n === 1 ? '' : 's'} carried over`,
+    roles: (n: number) => `${n} role${n === 1 ? '' : 's'} merged`,
+    noData: ' There was no course data to move.',
+    checkFailed: 'Connection check failed',
+    userFallback: 'user',
+    connected: (source: string, keeper: string, summary: string) => `Connected ${source} into ${keeper}.${summary}`,
+    connectFailed: 'Failed to connect users',
+    absorbHeading: 'Absorb a pre-provisioned user',
+    connectHeading: 'Connect into an existing account',
+    absorbIntro: 'Pick a pre-provisioned user (imported from a course roster, never logged in) to absorb into this account. Their course memberships, student profiles and roles move here, then the imported user is deleted.',
+    connectIntro: 'This user has no login account — it was likely imported from a course roster. Pick the real, logged-in account that should take over its course memberships, student profiles and roles. This imported user is deleted afterwards.',
+    absorb: 'Absorb',
+    connect: 'Connect',
+    checking: 'Checking what would move…',
+    dialogTitle: 'Connect users',
+    willBeAbsorbed: 'will be absorbed into',
+    courseMemberships: 'Course memberships',
+    studentProfiles: 'Student profiles',
+    rolesGained: 'Roles gained by the keeper',
+    accountsMove: (n: number) => `${n} linked account${n === 1 ? '' : 's'} move to the keeper.`,
+    messagesRepointed: (n: number) => `${n} message reference${n === 1 ? '' : 's'} will be re-pointed.`,
+    nothingToMove: 'Nothing to move — the imported user carries no course data. Connecting simply deletes it.',
+    deleteWarning: (name: string, email: string) => `The user ${name}${email} will be permanently deleted.`,
+    irreversible: 'This cannot be undone.',
+    cancel: 'Cancel',
+    connecting: 'Connecting…',
+    connectAndDelete: 'Connect and delete user',
+  },
+};
+
+function courseMoveText(m: UserConnectCourseMove, t: (typeof COPY)[UiLanguage]): string {
+  if (m.action === 'duplicate_removed') return t.duplicateRemoved;
+  return m.group_carried_over ? t.moveGroup : t.move;
 }
 
-function profileMoveText(p: UserConnectProfileMove): string {
-  const email = p.student_email ? `student email ${p.student_email} lands on the keeper` : null;
-  const how =
-    p.action === 'merged' ? 'merged into the keeper’s existing profile' : 'profile moves to the keeper';
+function profileMoveText(p: UserConnectProfileMove, t: (typeof COPY)[UiLanguage]): string {
+  const email = p.student_email ? t.studentEmail(p.student_email) : null;
+  const how = p.action === 'merged' ? t.merged : t.profileMoves;
   return email ? `${how}; ${email}` : how;
 }
 
 /** Short "what moved" summary for the success toast. */
-function summarize(res: UserConnectResponse): string {
+function summarize(res: UserConnectResponse, t: (typeof COPY)[UiLanguage]): string {
   const moves = res.course_memberships ?? [];
   const moved = moves.filter((m) => m.action === 'moved').length;
   const removed = moves.length - moved;
   const profiles = (res.student_profiles ?? []).length;
   const roles = (res.roles_merged ?? []).length;
   const parts: string[] = [];
-  if (moved) parts.push(`${moved} course membership${moved === 1 ? '' : 's'} moved`);
-  if (removed) parts.push(`${removed} duplicate membership${removed === 1 ? '' : 's'} removed`);
-  if (profiles) parts.push(`${profiles} student profile${profiles === 1 ? '' : 's'} carried over`);
-  if (roles) parts.push(`${roles} role${roles === 1 ? '' : 's'} merged`);
-  return parts.length ? ` ${parts.join(', ')}.` : ' There was no course data to move.';
+  if (moved) parts.push(t.memberships(moved));
+  if (removed) parts.push(t.duplicates(removed));
+  if (profiles) parts.push(t.profiles(profiles));
+  if (roles) parts.push(t.roles(roles));
+  return parts.length ? ` ${parts.join(', ')}.` : t.noData;
 }
 
 /**
@@ -81,6 +156,8 @@ export default function ConnectUsersSection({
   onConnected: () => void | Promise<void>;
 }) {
   const router = useRouter();
+  const language = useUiLanguage();
+  const t = COPY[language];
   const notify = useNotify();
 
   const [picked, setPicked] = useState<UserList | null>(null);
@@ -111,7 +188,7 @@ export default function ConnectUsersSection({
       setPicked(candidate);
       setPlan(res);
     } catch (e) {
-      setInlineError(e instanceof Error ? e.message : 'Connection check failed');
+      setInlineError(e instanceof Error ? e.message : t.checkFailed);
     } finally {
       setChecking(false);
     }
@@ -130,7 +207,11 @@ export default function ConnectUsersSection({
       const res = await connect(picked, false);
       const keeperId = res.target_user_id;
       notify(
-        `Connected ${source ? userDisplayName(source) : 'user'} into ${keeper ? userDisplayName(keeper) : 'user'}.${summarize(res)}`,
+        t.connected(
+          source ? userDisplayName(source) : t.userFallback,
+          keeper ? userDisplayName(keeper) : t.userFallback,
+          summarize(res, t),
+        ),
         'success',
       );
       setPlan(null);
@@ -142,7 +223,7 @@ export default function ConnectUsersSection({
         router.push(`/admin/users/${keeperId}`);
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Failed to connect users';
+      const msg = e instanceof Error ? e.message : t.connectFailed;
       setInlineError(msg);
       notify(msg, 'error');
       // Close the dialog; the plan may no longer be valid.
@@ -166,16 +247,10 @@ export default function ConnectUsersSection({
   return (
     <section className="bg-surface border border-rule rounded-md p-6 space-y-3">
       <h2 className="text-lg font-semibold text-fg">
-        {hasBuiltinAccount ? 'Absorb a pre-provisioned user' : 'Connect into an existing account'}
+        {hasBuiltinAccount ? t.absorbHeading : t.connectHeading}
       </h2>
       <p className="text-sm text-muted">
-        {hasBuiltinAccount
-          ? 'Pick a pre-provisioned user (imported from a course roster, never logged in) to absorb into ' +
-            'this account. Their course memberships, student profiles and roles move here, then the ' +
-            'imported user is deleted.'
-          : 'This user has no login account — it was likely imported from a course roster. Pick the real, ' +
-            'logged-in account that should take over its course memberships, student profiles and roles. ' +
-            'This imported user is deleted afterwards.'}
+        {hasBuiltinAccount ? t.absorbIntro : t.connectIntro}
       </p>
 
       <ErrorBanner>{inlineError}</ErrorBanner>
@@ -184,17 +259,17 @@ export default function ConnectUsersSection({
         excludeId={user.id}
         onPick={pick}
         busy={checking || executing}
-        pickLabel={hasBuiltinAccount ? 'Absorb' : 'Connect'}
+        pickLabel={hasBuiltinAccount ? t.absorb : t.connect}
       />
-      {checking && <p className="text-sm text-muted">Checking what would move…</p>}
+      {checking && <p className="text-sm text-muted">{t.checking}</p>}
 
       {plan && picked && keeper && source && (
-        <Modal title="Connect users" onClose={closeDialog} maxWidth="max-w-lg">
+        <Modal title={t.dialogTitle} onClose={closeDialog} maxWidth="max-w-lg">
           <div className="px-6 pt-2 pb-6 space-y-4">
             <p className="text-sm text-muted">
               <span className="font-medium text-fg">{userDisplayName(source)}</span>
-              {source.email ? <span className="text-muted"> ({source.email})</span> : null} will be
-              absorbed into <span className="font-medium text-fg">{userDisplayName(keeper)}</span>
+              {source.email ? <span className="text-muted"> ({source.email})</span> : null} {t.willBeAbsorbed}{' '}
+              <span className="font-medium text-fg">{userDisplayName(keeper)}</span>
               {keeper.email ? <span className="text-muted"> ({keeper.email})</span> : null}.
             </p>
 
@@ -202,13 +277,13 @@ export default function ConnectUsersSection({
               {courseMoves.length > 0 && (
                 <div>
                   <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-1">
-                    Course memberships
+                    {t.courseMemberships}
                   </h3>
                   <ul className="space-y-1">
                     {courseMoves.map((m) => (
                       <li key={m.course_id}>
                         <span className="font-medium text-fg">{m.course_title ?? m.course_id}</span>
-                        <span className="text-muted"> — {courseMoveText(m)}</span>
+                        <span className="text-muted"> — {courseMoveText(m, t)}</span>
                       </li>
                     ))}
                   </ul>
@@ -218,7 +293,7 @@ export default function ConnectUsersSection({
               {profileMoves.length > 0 && (
                 <div>
                   <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-1">
-                    Student profiles
+                    {t.studentProfiles}
                   </h3>
                   <ul className="space-y-1">
                     {profileMoves.map((p) => (
@@ -226,7 +301,7 @@ export default function ConnectUsersSection({
                         <span className="font-medium text-fg">
                           {p.organization_title ?? p.organization_id}
                         </span>
-                        <span className="text-muted"> — {profileMoveText(p)}</span>
+                        <span className="text-muted"> — {profileMoveText(p, t)}</span>
                       </li>
                     ))}
                   </ul>
@@ -236,7 +311,7 @@ export default function ConnectUsersSection({
               {rolesMerged.length > 0 && (
                 <div>
                   <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-1">
-                    Roles gained by the keeper
+                    {t.rolesGained}
                   </h3>
                   <p className="text-muted">{rolesMerged.join(', ')}</p>
                 </div>
@@ -244,44 +319,40 @@ export default function ConnectUsersSection({
 
               {(plan.accounts_moved ?? 0) > 0 && (
                 <p className="text-muted">
-                  {plan.accounts_moved} linked account{plan.accounts_moved === 1 ? '' : 's'} move to the
-                  keeper.
+                  {t.accountsMove(plan.accounts_moved ?? 0)}
                 </p>
               )}
               {(plan.messages_repointed ?? 0) > 0 && (
                 <p className="text-muted">
-                  {plan.messages_repointed} message reference
-                  {plan.messages_repointed === 1 ? '' : 's'} will be re-pointed.
+                  {t.messagesRepointed(plan.messages_repointed ?? 0)}
                 </p>
               )}
 
               {planEmpty && (
                 <p className="text-muted">
-                  Nothing to move — the imported user carries no course data. Connecting simply deletes
-                  it.
+                  {t.nothingToMove}
                 </p>
               )}
             </div>
 
             <div className="p-3 bg-danger-wash border border-danger-line rounded-md text-sm text-danger-text">
               <span className="font-semibold">
-                The user {userDisplayName(source)}
-                {source.email ? ` (${source.email})` : ''} will be permanently deleted.
+                {t.deleteWarning(userDisplayName(source), source.email ? ` (${source.email})` : '')}
               </span>{' '}
-              This cannot be undone.
+              {t.irreversible}
             </div>
 
             <div className="flex justify-end gap-3">
               <Button variant="ghost" onClick={closeDialog} disabled={executing}>
-                Cancel
+                {t.cancel}
               </Button>
               <Button
                 variant="danger"
                 onClick={execute}
                 loading={executing}
-                loadingLabel="Connecting…"
+                loadingLabel={t.connecting}
               >
-                Connect and delete user
+                {t.connectAndDelete}
               </Button>
             </div>
           </div>

@@ -9,8 +9,130 @@ import Button from '@/src/components/ui/Button';
 import { inputCls } from '@/src/components/ui/tokens';
 import { CoderClient } from '@/src/clients/CoderClient';
 import type { TemplateVariable } from '@/src/types/workspaces';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const coderClient = new CoderClient();
+
+const COPY = {
+  de: {
+    notWhole: (label: string) => `${label} muss eine nicht negative ganze Zahl sein.`,
+    duplicate: (name: string) => `Doppelter Variablenname „${name}“.`,
+    memoryCap: 'Speicherlimit',
+    cpuShares: 'CPU-Anteile',
+    maxRunning: 'Max. laufende Arbeitsumgebungen',
+    saved:
+      'Einstellungen gespeichert. Limits und Überschreibungen gelten ab dem nächsten Push der Vorlage, das Platzkontingent gilt sofort.',
+    saveFailed: 'Einstellungen konnten nicht gespeichert werden',
+    loading: 'Einstellungen werden geladen …',
+    limitsTitle: 'Ressourcenlimits & Plätze',
+    limitsHint1: 'Container-Limits werden mit dem nächsten ',
+    buildPush: 'Build & Push',
+    limitsHint2:
+      ' als Terraform-Variablen übertragen und wirken, sobald Arbeitsumgebungen auf der neuen Version neu starten. Das Platzkontingent wird beim Bereitstellen und Starten sofort durchgesetzt – für alle, auch für Administrierende.',
+    enabled: 'Aktiviert',
+    enabledHint:
+      'Deaktivierte Vorlagen sind für Nutzende und Kurse ausgeblendet und lassen sich nicht bereitstellen; bestehende Arbeitsumgebungen laufen und starten weiter.',
+    memoryLabel: 'Speicherlimit (MiB)',
+    unlimited: 'unbegrenzt',
+    memoryHint: 'Leer oder 0 = unbegrenzt.',
+    cpuPlaceholder: 'Docker-Standard',
+    cpuHint: 'Relatives Gewicht (Standard 1024); leer oder 0 behält den Docker-Standard.',
+    seatsHint: 'Über alle Nutzenden hinweg (z. B. Lizenzplätze); 0 friert die Vorlage ein.',
+    policyTitle: 'Root- & Internetrichtlinie',
+    policyHint1:
+      'Die Obergrenze für jede Arbeitsumgebung dieser Vorlage. Ein Kurs kann diese Rechte weiter einschränken, aber nie gewähren, was hier ausgeschaltet ist. Gilt mit dem nächsten ',
+    policyHint2: ' und für jede Arbeitsumgebung beim nächsten Neustart.',
+    rootTitle: 'Root-Zugriff (sudo)',
+    rootOff1: 'Aus startet den Container mit ',
+    rootOff2: ', sodass ',
+    rootOff3: ' und ',
+    rootOff4:
+      ' vom Kernel abgelehnt werden, obwohl das Image sie enthält. Nutzende können dann keine Systempakete mehr installieren – auch nicht über ein ',
+    rootOff5: '-Skript.',
+    internetTitle: 'Internetzugang',
+    internetHint:
+      'Aus verlegt die Arbeitsumgebung in ein isoliertes Netzwerk ohne Route nach außen: Die Computor-API und Git bleiben erreichbar, alles Externe schlägt sofort fehl. Paketinstallationen über PyPI, npm oder apt funktionieren dann nicht mehr.',
+    varsTitle: 'Überschreibungen von Terraform-Variablen',
+    varsHint1: 'Werden als ',
+    varsHint2:
+      ' übertragen – sie überschreiben die Standardwerte der Vorlage, ohne ihre Dateien anzupassen. Leere Werte werden beim Push ignoriert.',
+    varNamePlaceholder: 'Variablenname (z. B. shm_size)',
+    varName: (n: number) => `Name der Variable ${n}`,
+    valuePlaceholder: 'Wert',
+    varValue: (n: number) => `Wert der Variable ${n}`,
+    remove: 'Entfernen',
+    noVars: 'Diese Vorlage deklariert keine überschreibbaren Variablen.',
+    pick: 'Von der Vorlage deklariert – wähle eine aus, um ihren Standardwert zu überschreiben:',
+    untyped: 'ohne Typ',
+    defaultVal: (v: string) => ` · Standard: ${v}`,
+    loadingVars: 'Deklarierte Variablen werden geladen …',
+    varsLoadFailed:
+      'Die deklarierten Variablen der Vorlage konnten nicht geladen werden – gib die Namen manuell ein.',
+    addVar: '+ Variable hinzufügen',
+    saving: 'Wird gespeichert …',
+    save: 'Einstellungen speichern',
+    discard: 'Änderungen verwerfen',
+  },
+  en: {
+    notWhole: (label: string) => `${label} must be a non-negative whole number.`,
+    duplicate: (name: string) => `Duplicate variable name '${name}'.`,
+    memoryCap: 'Memory cap',
+    cpuShares: 'CPU shares',
+    maxRunning: 'Max running workspaces',
+    saved:
+      'Settings saved. Limits and overrides apply at the next template push; the seat quota applies immediately.',
+    saveFailed: 'Failed to save settings',
+    loading: 'Loading settings…',
+    limitsTitle: 'Resource limits & seats',
+    limitsHint1: 'Container limits are pushed as Terraform variables with the next ',
+    buildPush: 'Build & push',
+    limitsHint2:
+      ' and take effect as workspaces restart onto the new version. The seat quota is enforced immediately on provision/start — for everyone, admins included.',
+    enabled: 'Enabled',
+    enabledHint:
+      'Disabled templates are hidden from users and courses and cannot be provisioned; existing workspaces keep running and starting.',
+    memoryLabel: 'Memory cap (MiB)',
+    unlimited: 'unlimited',
+    memoryHint: 'Empty or 0 = unlimited.',
+    cpuPlaceholder: 'Docker default',
+    cpuHint: 'Relative weight (default 1024); empty or 0 keeps the Docker default.',
+    seatsHint: 'Across all users (e.g. license seats); 0 freezes the template.',
+    policyTitle: 'Root & internet policy',
+    policyHint1:
+      'The ceiling for every workspace of this template. A course can restrict these further but can never grant what is switched off here. Applied with the next ',
+    policyHint2: ', and to each workspace when it next restarts.',
+    rootTitle: 'Root access (sudo)',
+    rootOff1: 'Off runs the container with ',
+    rootOff2: ', so ',
+    rootOff3: ' and ',
+    rootOff4:
+      ' are refused by the kernel even though the image ships them. Users can no longer install system packages — including from a ',
+    rootOff5: ' script.',
+    internetTitle: 'Internet access',
+    internetHint:
+      'Off moves the workspace to an isolated network with no route out: the Computor API and git stay reachable, everything external fails immediately. Package installs from PyPI, npm or apt stop working.',
+    varsTitle: 'Terraform variable overrides',
+    varsHint1: 'Pushed as ',
+    varsHint2:
+      " — they override the template's defaults without customizing its files. Empty values are ignored at push.",
+    varNamePlaceholder: 'variable name (e.g. shm_size)',
+    varName: (n: number) => `Variable ${n} name`,
+    valuePlaceholder: 'value',
+    varValue: (n: number) => `Variable ${n} value`,
+    remove: 'Remove',
+    noVars: 'This template declares no overridable variables.',
+    pick: 'Declared by the template — pick one to override its default:',
+    untyped: 'untyped',
+    defaultVal: (v: string) => ` · default: ${v}`,
+    loadingVars: 'Loading declared variables…',
+    varsLoadFailed:
+      "Could not load the template's declared variables — enter names manually.",
+    addVar: '+ Add variable',
+    saving: 'Saving…',
+    save: 'Save settings',
+    discard: 'Discard changes',
+  },
+};
 
 interface VariableRow {
   name: string;
@@ -35,12 +157,12 @@ function defaultToString(variable: TemplateVariable): string {
 }
 
 /** '' → null, otherwise a non-negative integer (throws a user message). */
-function parseLimit(label: string, raw: string): number | null {
+function parseLimit(label: string, raw: string, message: (label: string) => string): number | null {
   const text = raw.trim();
   if (!text) return null;
   const value = Number(text);
   if (!Number.isInteger(value) || value < 0) {
-    throw new Error(`${label} must be a non-negative whole number.`);
+    throw new Error(message(label));
   }
   return value;
 }
@@ -48,6 +170,8 @@ function parseLimit(label: string, raw: string): number | null {
 /** DB-backed per-template limits, seat quota, and Terraform variable overrides. */
 export default function TemplateSettingsPanel({ templateName }: { templateName: string }) {
   const notify = useNotify();
+  const language = useUiLanguage();
+  const t = COPY[language];
   const [draft, setDraft] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -100,32 +224,32 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
       for (const row of form.variables) {
         const name = row.name.trim();
         if (!name) continue;
-        if (name in variables) throw new Error(`Duplicate variable name '${name}'.`);
+        if (name in variables) throw new Error(t.duplicate(name));
         variables[name] = row.value;
       }
       await coderClient.updateTemplateSettings({
         templateName,
         body: {
           enabled: form.enabled,
-          memory_mb: parseLimit('Memory cap', form.memoryMb),
-          cpu_shares: parseLimit('CPU shares', form.cpuShares),
-          max_running_workspaces: parseLimit('Max running workspaces', form.maxRunning),
+          memory_mb: parseLimit(t.memoryCap, form.memoryMb, t.notWhole),
+          cpu_shares: parseLimit(t.cpuShares, form.cpuShares, t.notWhole),
+          max_running_workspaces: parseLimit(t.maxRunning, form.maxRunning, t.notWhole),
           allow_root: form.allowRoot,
           allow_internet: form.allowInternet,
           template_variables: variables,
         },
       });
-      notify('Settings saved. Limits and overrides apply at the next template push; the seat quota applies immediately.', 'success');
+      notify(t.saved, 'success');
       setDraft(null);
       await reload();
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Failed to save settings', 'error');
+      notify(e instanceof Error ? e.message : t.saveFailed, 'error');
     } finally {
       setSaving(false);
     }
   }
 
-  if (loading) return <ListLoading>Loading settings…</ListLoading>;
+  if (loading) return <ListLoading>{t.loading}</ListLoading>;
 
   return (
     // Fills the page: the settings cards scroll, "Save settings" does not. It
@@ -138,12 +262,11 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
       <div className="flex-1 min-h-0 overflow-y-auto scroll-slim scroll-gutter space-y-4">
       <div className="bg-surface rounded-lg border border-rule p-5 space-y-4">
         <div>
-          <h2 className="text-lg font-semibold text-fg">Resource limits &amp; seats</h2>
+          <h2 className="text-lg font-semibold text-fg">{t.limitsTitle}</h2>
           <p className="text-sm text-muted mt-1">
-            Container limits are pushed as Terraform variables with the next{' '}
-            <span className="font-medium">Build &amp; push</span> and take effect as workspaces
-            restart onto the new version. The seat quota is enforced immediately on
-            provision/start — for everyone, admins included.
+            {t.limitsHint1}
+            <span className="font-medium">{t.buildPush}</span>
+            {t.limitsHint2}
           </p>
         </div>
 
@@ -155,10 +278,9 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
             className="mt-0.5"
           />
           <span>
-            <span className="block text-sm font-medium text-fg">Enabled</span>
+            <span className="block text-sm font-medium text-fg">{t.enabled}</span>
             <span className="block text-xs text-muted">
-              Disabled templates are hidden from users and courses and cannot be provisioned;
-              existing workspaces keep running and starting.
+              {t.enabledHint}
             </span>
           </span>
         </label>
@@ -166,61 +288,56 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
             <label htmlFor="tpl-memory" className="block text-xs font-medium text-body mb-1">
-              Memory cap (MiB)
+              {t.memoryLabel}
             </label>
             <input
               id="tpl-memory"
               value={form.memoryMb}
               onChange={(event) => update({ memoryMb: event.target.value })}
-              placeholder="unlimited"
+              placeholder={t.unlimited}
               inputMode="numeric"
               className={inputCls}
             />
-            <p className="text-xs text-muted mt-1">Empty or 0 = unlimited.</p>
+            <p className="text-xs text-muted mt-1">{t.memoryHint}</p>
           </div>
           <div>
             <label htmlFor="tpl-cpu" className="block text-xs font-medium text-body mb-1">
-              CPU shares
+              {t.cpuShares}
             </label>
             <input
               id="tpl-cpu"
               value={form.cpuShares}
               onChange={(event) => update({ cpuShares: event.target.value })}
-              placeholder="Docker default"
+              placeholder={t.cpuPlaceholder}
               inputMode="numeric"
               className={inputCls}
             />
-            <p className="text-xs text-muted mt-1">
-              Relative weight (default 1024); empty or 0 keeps the Docker default.
-            </p>
+            <p className="text-xs text-muted mt-1">{t.cpuHint}</p>
           </div>
           <div>
             <label htmlFor="tpl-seats" className="block text-xs font-medium text-body mb-1">
-              Max running workspaces
+              {t.maxRunning}
             </label>
             <input
               id="tpl-seats"
               value={form.maxRunning}
               onChange={(event) => update({ maxRunning: event.target.value })}
-              placeholder="unlimited"
+              placeholder={t.unlimited}
               inputMode="numeric"
               className={inputCls}
             />
-            <p className="text-xs text-muted mt-1">
-              Across all users (e.g. license seats); 0 freezes the template.
-            </p>
+            <p className="text-xs text-muted mt-1">{t.seatsHint}</p>
           </div>
         </div>
       </div>
 
       <div className="bg-surface rounded-lg border border-rule p-5 space-y-4">
         <div>
-          <h2 className="text-lg font-semibold text-fg">Root &amp; internet policy</h2>
+          <h2 className="text-lg font-semibold text-fg">{t.policyTitle}</h2>
           <p className="text-sm text-muted mt-1">
-            The ceiling for every workspace of this template. A course can restrict these
-            further but can never grant what is switched off here. Applied with the next{' '}
-            <span className="font-medium">Build &amp; push</span>, and to each workspace when
-            it next restarts.
+            {t.policyHint1}
+            <span className="font-medium">{t.buildPush}</span>
+            {t.policyHint2}
           </p>
         </div>
 
@@ -232,12 +349,11 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
             className="mt-0.5"
           />
           <span>
-            <span className="block text-sm font-medium text-fg">Root access (sudo)</span>
+            <span className="block text-sm font-medium text-fg">{t.rootTitle}</span>
             <span className="block text-xs text-muted">
-              Off runs the container with <code className="font-mono">no-new-privileges</code>,
-              so <code className="font-mono">sudo</code> and <code className="font-mono">su</code>{' '}
-              are refused by the kernel even though the image ships them. Users can no longer
-              install system packages — including from a <code className="font-mono">~/personalize</code> script.
+              {t.rootOff1}<code className="font-mono">no-new-privileges</code>
+              {t.rootOff2}<code className="font-mono">sudo</code>{t.rootOff3}<code className="font-mono">su</code>
+              {t.rootOff4}<code className="font-mono">~/personalize</code>{t.rootOff5}
             </span>
           </span>
         </label>
@@ -250,11 +366,9 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
             className="mt-0.5"
           />
           <span>
-            <span className="block text-sm font-medium text-fg">Internet access</span>
+            <span className="block text-sm font-medium text-fg">{t.internetTitle}</span>
             <span className="block text-xs text-muted">
-              Off moves the workspace to an isolated network with no route out: the Computor
-              API and git stay reachable, everything external fails immediately. Package
-              installs from PyPI, npm or apt stop working.
+              {t.internetHint}
             </span>
           </span>
         </label>
@@ -262,11 +376,10 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
 
       <div className="bg-surface rounded-lg border border-rule p-5 space-y-3">
         <div>
-          <h2 className="text-lg font-semibold text-fg">Terraform variable overrides</h2>
+          <h2 className="text-lg font-semibold text-fg">{t.varsTitle}</h2>
           <p className="text-sm text-muted mt-1">
-            Pushed as <code className="font-mono text-xs">--variable name=value</code> — they
-            override the template&apos;s defaults without customizing its files. Empty values
-            are ignored at push.
+            {t.varsHint1}<code className="font-mono text-xs">--variable name=value</code>
+            {t.varsHint2}
           </p>
         </div>
 
@@ -282,9 +395,9 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
                   variables[index] = { ...row, name: event.target.value };
                   update({ variables });
                 }}
-                placeholder="variable name (e.g. shm_size)"
+                placeholder={t.varNamePlaceholder}
                 className={`${inputCls} font-mono`}
-                aria-label={`Variable ${index + 1} name`}
+                aria-label={t.varName(index + 1)}
               />
             </div>
             <div className="flex-1 min-w-0">
@@ -295,9 +408,9 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
                   variables[index] = { ...row, value: event.target.value };
                   update({ variables });
                 }}
-                placeholder="value"
+                placeholder={t.valuePlaceholder}
                 className={`${inputCls} font-mono`}
-                aria-label={`Variable ${index + 1} value`}
+                aria-label={t.varValue(index + 1)}
               />
             </div>
             <Button
@@ -305,21 +418,19 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
               variant="dangerGhost"
               onClick={() => update({ variables: form.variables.filter((_, i) => i !== index) })}
             >
-              Remove
+              {t.remove}
             </Button>
           </div>
         ))}
 
         {form.variables.length === 0 && addable.length === 0 && !declaredLoading && !declaredError && (
-          <p className="text-sm text-muted">
-            This template declares no overridable variables.
-          </p>
+          <p className="text-sm text-muted">{t.noVars}</p>
         )}
 
         {addable.length > 0 && (
           <div className="space-y-2">
             <p className="text-xs font-medium text-body">
-              Declared by the template — pick one to override its default:
+              {t.pick}
             </p>
             {addable.map((variable) => (
               <button
@@ -337,8 +448,8 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
               >
                 <span className="text-sm font-mono text-fg">+ {variable.name}</span>
                 <span className="text-xs text-muted ml-2">
-                  {variable.type || 'untyped'}
-                  {variable.has_default && ` · default: ${defaultToString(variable) || '""'}`}
+                  {variable.type || t.untyped}
+                  {variable.has_default && t.defaultVal(defaultToString(variable) || '""')}
                 </span>
                 {variable.description && (
                   <span className="block text-xs text-muted mt-0.5">{variable.description}</span>
@@ -349,22 +460,20 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
         )}
 
         {declaredLoading && (
-          <p className="text-xs text-muted">Loading declared variables…</p>
+          <p className="text-xs text-muted">{t.loadingVars}</p>
         )}
 
         {declaredError && (
           // Pick-list unavailable (e.g. templates dir not mounted) — fall back
           // to free-form entry so overrides stay manageable.
           <div className="space-y-2">
-            <p className="text-xs text-muted">
-              Could not load the template&apos;s declared variables — enter names manually.
-            </p>
+            <p className="text-xs text-muted">{t.varsLoadFailed}</p>
             <Button
               size="xs"
               variant="ghost"
               onClick={() => update({ variables: [...form.variables, { name: '', value: '' }] })}
             >
-              + Add variable
+              {t.addVar}
             </Button>
           </div>
         )}
@@ -373,12 +482,12 @@ export default function TemplateSettingsPanel({ templateName }: { templateName: 
       </div>
 
       <div className="shrink-0 flex flex-wrap items-center gap-3 border-t border-rule pt-4">
-        <Button onClick={save} loading={saving} loadingLabel="Saving…">
-          Save settings
+        <Button onClick={save} loading={saving} loadingLabel={t.saving}>
+          {t.save}
         </Button>
         {draft && (
           <Button variant="ghost" onClick={() => setDraft(null)} disabled={saving}>
-            Discard changes
+            {t.discard}
           </Button>
         )}
       </div>

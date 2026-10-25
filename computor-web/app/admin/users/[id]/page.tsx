@@ -19,14 +19,155 @@ import { UsersClient } from '@/src/generated/clients/UsersClient';
 import { UserRolesClient } from '@/src/generated/clients/UserRolesClient';
 import { AccountsClient } from '@/src/generated/clients/AccountsClient';
 import type { UserGet, AccountList, AccountProvider } from 'types/generated';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { formatDateTime } from '@/src/utils/locale';
 
 const usersClient = new UsersClient();
 const userClient = new UserRolesClient();
 const accountsClient = new AccountsClient();
 
+const COPY = {
+  de: {
+    loadFailed: 'Benutzer konnte nicht geladen werden',
+    rolesUpdated: 'Rollen aktualisiert.',
+    rolesFailed: 'Rollen konnten nicht aktualisiert werden',
+    archived: 'Benutzer archiviert.',
+    unarchived: 'Benutzer wiederhergestellt.',
+    operationFailed: 'Vorgang fehlgeschlagen',
+    banned: 'Benutzer gesperrt. Eine Anmeldung ist nicht mehr möglich.',
+    banFailed: 'Benutzer konnte nicht gesperrt werden',
+    unbanned: 'Sperre aufgehoben. Der Benutzer kann sich wieder anmelden.',
+    unbanFailed: 'Sperre konnte nicht aufgehoben werden',
+    accountLinked: 'Konto verknüpft.',
+    accountAddFailed: 'Konto konnte nicht hinzugefügt werden',
+    deleted: 'Benutzer gelöscht.',
+    accountRemoved: 'Verknüpftes Konto entfernt.',
+    accountRemoveFailed: 'Konto konnte nicht entfernt werden',
+    forbidden: 'Erfordert die Rolle admin oder _user_manager.',
+    back: 'Zurück',
+    users: 'Benutzer',
+    user: 'Benutzer',
+    edit: 'Bearbeiten',
+    unarchive: 'Wiederherstellen',
+    archive: 'Archivieren',
+    loading: 'Wird geladen…',
+    status: 'Status',
+    bannedLabel: 'Gesperrt',
+    archivedLabel: 'Archiviert',
+    active: 'Aktiv',
+    created: 'Erstellt',
+    accessControl: 'Zugriffskontrolle',
+    bannedOn: (when: string) => `Gesperrt am ${when}. Dieser Benutzer kann sich nicht anmelden.`,
+    reason: (reason: string) => `Grund: ${reason}`,
+    unbanUser: 'Sperre aufheben',
+    banExplain: 'Eine Sperre verhindert sofort die Anmeldung dieses Benutzers und beendet seine aktiven Sitzungen.',
+    reasonPlaceholder: 'Grund (optional)',
+    banUser: 'Benutzer sperren',
+    systemRoles: 'Systemrollen',
+    saving: 'Wird gespeichert…',
+    saveRoles: 'Rollen speichern',
+    linkedAccounts: 'Verknüpfte Konten',
+    noAccounts: 'Keine verknüpften Konten.',
+    remove: 'Entfernen',
+    providerUrl: 'Provider-URL',
+    cancel: 'Abbrechen',
+    linking: 'Wird verknüpft…',
+    linkAccount: 'Konto verknüpfen',
+    deleteUser: 'Benutzer löschen',
+    deleteExplainSignedIn: 'Dieser Benutzer hat sich bereits angemeldet. Das Löschen erfolgt bewusst in zwei Schritten: Zuerst wird der Benutzer archiviert, danach kann ein Administrator ihn endgültig löschen.',
+    deleteExplainNever: 'Dieser Benutzer hat sich noch nie angemeldet (vorab durch Import, manuelles Anlegen oder eine nicht eingelöste Einladung angelegt). Beim Löschen werden der Datensatz und seine Kursmitgliedschaften entfernt.',
+    deleteButton: 'Benutzer löschen…',
+    unarchiveTitle: 'Benutzer wiederherstellen',
+    archiveTitle: 'Benutzer archivieren',
+    unarchiveMessage: (email: string | null | undefined) => `${email} wiederherstellen? Der Benutzer kann sich dann wieder anmelden.`,
+    archiveMessage: (email: string | null | undefined) => `${email} archivieren? Der Benutzer kann sich dann nicht mehr anmelden.`,
+    banTitle: 'Benutzer sperren',
+    banMessage: (email: string | null | undefined) => `${email} sperren? Der Benutzer wird abgemeldet und kann sich bis zur Aufhebung der Sperre nicht anmelden.`,
+    banConfirm: 'Sperren',
+    unbanTitle: 'Sperre aufheben',
+    unbanMessage: (email: string | null | undefined) => `Sperre für ${email} aufheben? Der Benutzer kann sich wieder anmelden.`,
+    unbanConfirm: 'Aufheben',
+    deleteMessage: (email: string | null | undefined) => `${email} endgültig löschen? Das kann nicht rückgängig gemacht werden.`,
+    blockedAdmin: 'Benutzer mit einer Admin-Rolle können nicht gelöscht werden. Entziehe zuerst die Admin-Rolle.',
+    blockedArchiveFirst: 'Dieser Benutzer hat sich bereits angemeldet. Archiviere ihn zuerst, danach kann ein Administrator das Konto löschen.',
+    blockedAdminOnly: 'Nur Administratoren können einen Benutzer löschen, der sich bereits angemeldet hat.',
+    removeTitle: 'Verknüpftes Konto entfernen',
+    removeMessage: 'Dieses verknüpfte Konto entfernen? Der Benutzer kann sich darüber nicht mehr anmelden und wird darüber nicht mehr zugeordnet.',
+  },
+  en: {
+    loadFailed: 'Failed to load user',
+    rolesUpdated: 'Roles updated.',
+    rolesFailed: 'Failed to update roles',
+    archived: 'User archived.',
+    unarchived: 'User unarchived.',
+    operationFailed: 'Operation failed',
+    banned: 'User banned. They can no longer sign in.',
+    banFailed: 'Failed to ban user',
+    unbanned: 'User unbanned. They can sign in again.',
+    unbanFailed: 'Failed to unban user',
+    accountLinked: 'Account linked.',
+    accountAddFailed: 'Failed to add account',
+    deleted: 'User deleted.',
+    accountRemoved: 'Linked account removed.',
+    accountRemoveFailed: 'Failed to remove account',
+    forbidden: 'Requires admin or _user_manager role.',
+    back: 'Back',
+    users: 'Users',
+    user: 'User',
+    edit: 'Edit',
+    unarchive: 'Unarchive',
+    archive: 'Archive',
+    loading: 'Loading…',
+    status: 'Status',
+    bannedLabel: 'Banned',
+    archivedLabel: 'Archived',
+    active: 'Active',
+    created: 'Created',
+    accessControl: 'Access control',
+    bannedOn: (when: string) => `Banned on ${when}. This user cannot authenticate.`,
+    reason: (reason: string) => `Reason: ${reason}`,
+    unbanUser: 'Unban user',
+    banExplain: 'Banning immediately blocks this user from signing in and revokes their active sessions.',
+    reasonPlaceholder: 'Reason (optional)',
+    banUser: 'Ban user',
+    systemRoles: 'System roles',
+    saving: 'Saving…',
+    saveRoles: 'Save roles',
+    linkedAccounts: 'Linked accounts',
+    noAccounts: 'No linked accounts.',
+    remove: 'Remove',
+    providerUrl: 'Provider URL',
+    cancel: 'Cancel',
+    linking: 'Linking…',
+    linkAccount: 'Link account',
+    deleteUser: 'Delete user',
+    deleteExplainSignedIn: 'This user has signed in before. Deletion is a deliberate two-step action: archive the user first, then an administrator can permanently delete them.',
+    deleteExplainNever: 'This user has never signed in (pre-provisioned by import, manual creation, or an unredeemed invite). Deleting removes the record together with its course memberships.',
+    deleteButton: 'Delete user…',
+    unarchiveTitle: 'Unarchive user',
+    archiveTitle: 'Archive user',
+    unarchiveMessage: (email: string | null | undefined) => `Unarchive ${email}? They will be able to log in again.`,
+    archiveMessage: (email: string | null | undefined) => `Archive ${email}? They will not be able to log in.`,
+    banTitle: 'Ban user',
+    banMessage: (email: string | null | undefined) => `Ban ${email}? They will be signed out and blocked from authenticating until unbanned.`,
+    banConfirm: 'Ban',
+    unbanTitle: 'Unban user',
+    unbanMessage: (email: string | null | undefined) => `Unban ${email}? They will be able to sign in again.`,
+    unbanConfirm: 'Unban',
+    deleteMessage: (email: string | null | undefined) => `Permanently delete ${email}? This cannot be undone.`,
+    blockedAdmin: 'Users holding an admin role cannot be deleted. Revoke the admin role first.',
+    blockedArchiveFirst: 'This user has signed in before. Archive them first; an administrator can then delete the account.',
+    blockedAdminOnly: 'Only administrators can delete a user who has signed in.',
+    removeTitle: 'Remove linked account',
+    removeMessage: 'Remove this linked account? The user can no longer sign in or be matched through it.',
+  },
+};
+
 export default function UserDetailPage() {
   const userId = useParams().id as string;
   const router = useRouter();
+  const language = useUiLanguage();
+  const t = COPY[language];
   const { isAuthenticated, isLoading: authLoading, user: authUser } = useAuth();
   const { isAdmin, isUserManager } = usePermissions();
   const canManage = isAdmin || isUserManager;
@@ -68,11 +209,11 @@ export default function UserDetailPage() {
       setAccounts(acc);
       setProviders(provs);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load user');
+      setError(e instanceof Error ? e.message : t.loadFailed);
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, t.loadFailed]);
 
   useEffect(() => {
     if (authLoading || !isAuthenticated || !canManage) return;
@@ -94,10 +235,10 @@ export default function UserDetailPage() {
       for (const roleId of toRemove) {
         await userClient.deleteUserRoleEndpointUserRolesUsersUserIdRolesRoleIdDelete({ userId, roleId });
       }
-      notify('Roles updated.', 'success');
+      notify(t.rolesUpdated, 'success');
       await load();
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Failed to update roles', 'error');
+      notify(e instanceof Error ? e.message : t.rolesFailed, 'error');
     } finally {
       setSavingRoles(false);
     }
@@ -110,10 +251,10 @@ export default function UserDetailPage() {
     try {
       if (archiving) await usersClient.routeUsersUsersIdArchivePatch({ id: userId });
       else await usersClient.unarchiveUsersUsersIdUnarchivePatch({ id: userId });
-      notify(archiving ? 'User archived.' : 'User unarchived.', 'success');
+      notify(archiving ? t.archived : t.unarchived, 'success');
       await load();
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Operation failed', 'error');
+      notify(e instanceof Error ? e.message : t.operationFailed, 'error');
     }
   }
 
@@ -122,11 +263,11 @@ export default function UserDetailPage() {
     setShowBanConfirm(false);
     try {
       await usersClient.banUserUsersUserIdBanPatch({ userId, body: { reason: banReason.trim() || null } });
-      notify('User banned. They can no longer sign in.', 'success');
+      notify(t.banned, 'success');
       setBanReason('');
       await load();
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Failed to ban user', 'error');
+      notify(e instanceof Error ? e.message : t.banFailed, 'error');
     }
   }
 
@@ -135,10 +276,10 @@ export default function UserDetailPage() {
     setShowUnbanConfirm(false);
     try {
       await usersClient.unbanUserUsersUserIdUnbanPatch({ userId });
-      notify('User unbanned. They can sign in again.', 'success');
+      notify(t.unbanned, 'success');
       await load();
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Failed to unban user', 'error');
+      notify(e instanceof Error ? e.message : t.unbanFailed, 'error');
     }
   }
 
@@ -154,9 +295,9 @@ export default function UserDetailPage() {
       setProviderUrl('');
       setAccountId('');
       setAccounts(await accountsClient.listAccountsAccountsGet({ userId, limit: 100 }));
-      notify('Account linked.', 'success');
+      notify(t.accountLinked, 'success');
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Failed to add account', 'error');
+      notify(e instanceof Error ? e.message : t.accountAddFailed, 'error');
     } finally {
       setSavingAccount(false);
     }
@@ -166,7 +307,7 @@ export default function UserDetailPage() {
   // "archive first" refusal), so the dialog explains a blocked delete in place.
   async function deleteUser() {
     await usersClient.deleteUsersUsersIdDelete({ id: userId });
-    notify('User deleted.', 'success');
+    notify(t.deleted, 'success');
     router.push('/admin/users');
   }
 
@@ -175,29 +316,29 @@ export default function UserDetailPage() {
     try {
       await accountsClient.deleteAccountsAccountsIdDelete({ id });
       setAccounts((a) => a.filter((x) => x.id !== id));
-      notify('Linked account removed.', 'success');
+      notify(t.accountRemoved, 'success');
     } catch {
-      notify('Failed to remove account', 'error');
+      notify(t.accountRemoveFailed, 'error');
     }
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return <Forbidden message="Requires admin or _user_manager role." backLink="/admin/users" backText="Back" />;
+    return <Forbidden message={t.forbidden} backLink="/admin/users" backText={t.back} />;
   }
 
   return (
     <AuthenticatedLayout>
       <ListPageLayout width="narrow">
         <PageHeader
-          breadcrumbs={[{ label: 'Users', href: '/admin/users' }, { label: user?.email || 'User' }]}
-          title={user?.email || 'User'}
+          breadcrumbs={[{ label: t.users, href: '/admin/users' }, { label: user?.email || t.user }]}
+          title={user?.email || t.user}
           subtitle={user && <span className="text-sm text-muted">{user.given_name} {user.family_name}</span>}
           actions={
             user ? (
               <>
-                <ButtonLink href={`/admin/users/${userId}/edit`} variant="secondary">Edit</ButtonLink>
+                <ButtonLink href={`/admin/users/${userId}/edit`} variant="secondary">{t.edit}</ButtonLink>
                 <Button variant="secondary" onClick={() => setShowArchiveConfirm(true)}>
-                  {user.archived_at ? 'Unarchive' : 'Archive'}
+                  {user.archived_at ? t.unarchive : t.archive}
                 </Button>
               </>
             ) : undefined
@@ -207,57 +348,57 @@ export default function UserDetailPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <ListLoading>Loading…</ListLoading>
+          <ListLoading>{t.loading}</ListLoading>
         ) : user ? (
           <ScrollArea>
             <section className="bg-surface border border-rule rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <div>
-                <dt className="text-muted">Status</dt>
+                <dt className="text-muted">{t.status}</dt>
                 <dd className="text-fg">
-                  {user.banned_at ? <span className="text-danger-text font-medium">Banned</span> : user.archived_at ? 'Archived' : 'Active'}
+                  {user.banned_at ? <span className="text-danger-text font-medium">{t.bannedLabel}</span> : user.archived_at ? t.archivedLabel : t.active}
                 </dd>
               </div>
-              <div><dt className="text-muted">Created</dt><dd className="text-fg">{user.created_at ? new Date(user.created_at).toLocaleString() : '—'}</dd></div>
+              <div><dt className="text-muted">{t.created}</dt><dd className="text-fg">{formatDateTime(user.created_at, language)}</dd></div>
             </section>
 
             {/* Access control (ban / unban) */}
             <section className="bg-surface border border-rule rounded-lg p-6 space-y-3">
-              <h2 className="text-lg font-semibold text-fg">Access control</h2>
+              <h2 className="text-lg font-semibold text-fg">{t.accessControl}</h2>
               {user.banned_at ? (
                 <div className="space-y-2 text-sm">
                   <p className="text-danger-text font-medium">
-                    Banned on {new Date(user.banned_at).toLocaleString()}. This user cannot authenticate.
+                    {t.bannedOn(formatDateTime(user.banned_at, language))}
                   </p>
-                  {user.ban_reason ? <p className="text-muted">Reason: {user.ban_reason}</p> : null}
-                  <Button onClick={() => setShowUnbanConfirm(true)}>Unban user</Button>
+                  {user.ban_reason ? <p className="text-muted">{t.reason(user.ban_reason)}</p> : null}
+                  <Button onClick={() => setShowUnbanConfirm(true)}>{t.unbanUser}</Button>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-sm text-muted">Banning immediately blocks this user from signing in and revokes their active sessions.</p>
+                  <p className="text-sm text-muted">{t.banExplain}</p>
                   <input
                     value={banReason}
                     onChange={(e) => setBanReason(e.target.value)}
-                    placeholder="Reason (optional)"
+                    placeholder={t.reasonPlaceholder}
                     maxLength={1024}
                     className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line"
                   />
-                  <Button variant="danger" onClick={() => setShowBanConfirm(true)}>Ban user</Button>
+                  <Button variant="danger" onClick={() => setShowBanConfirm(true)}>{t.banUser}</Button>
                 </div>
               )}
             </section>
 
             {/* Roles */}
             <section className="bg-surface border border-rule rounded-lg p-6 space-y-3">
-              <h2 className="text-lg font-semibold text-fg">System roles</h2>
+              <h2 className="text-lg font-semibold text-fg">{t.systemRoles}</h2>
               <SystemRoleCheckboxes selected={roles} onToggle={toggleRole} disabled={savingRoles} />
-              <Button onClick={saveRoles} loading={savingRoles} loadingLabel="Saving…">Save roles</Button>
+              <Button onClick={saveRoles} loading={savingRoles} loadingLabel={t.saving}>{t.saveRoles}</Button>
             </section>
 
             {/* Accounts */}
             <section className="bg-surface border border-rule rounded-lg p-6 space-y-3">
-              <h2 className="text-lg font-semibold text-fg">Linked accounts</h2>
+              <h2 className="text-lg font-semibold text-fg">{t.linkedAccounts}</h2>
               {accounts.length === 0 ? (
-                <p className="text-sm text-subtle italic">No linked accounts.</p>
+                <p className="text-sm text-subtle italic">{t.noAccounts}</p>
               ) : (
                 <div className="space-y-2">
                   {accounts.map((acc) => {
@@ -269,7 +410,7 @@ export default function UserDetailPage() {
                           <span className="mx-2 text-faint">·</span>
                           <span className="text-muted">{acc.provider_account_id}</span>
                         </div>
-                        <Button variant="dangerGhost" size="xs" onClick={() => setRemoveAccountId(acc.id)}>Remove</Button>
+                        <Button variant="dangerGhost" size="xs" onClick={() => setRemoveAccountId(acc.id)}>{t.remove}</Button>
                       </div>
                     );
                   })}
@@ -290,7 +431,7 @@ export default function UserDetailPage() {
                     return (
                       <div className="space-y-2">
                         <div>
-                          <label className="block text-xs font-medium text-body mb-1">Provider URL</label>
+                          <label className="block text-xs font-medium text-body mb-1">{t.providerUrl}</label>
                           <input value={providerUrl} onChange={(e) => setProviderUrl(e.target.value)} placeholder="gitlab.com" className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line" autoFocus />
                         </div>
                         <div>
@@ -298,9 +439,9 @@ export default function UserDetailPage() {
                           <input value={accountId} onChange={(e) => setAccountId(e.target.value)} placeholder={prov.placeholder} className="w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line" />
                         </div>
                         <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => setAddProvider(null)}>Cancel</Button>
-                          <Button size="sm" onClick={addAccount} disabled={!providerUrl.trim() || !accountId.trim()} loading={savingAccount} loadingLabel="Linking…">
-                            Link account
+                          <Button variant="ghost" size="sm" onClick={() => setAddProvider(null)}>{t.cancel}</Button>
+                          <Button size="sm" onClick={addAccount} disabled={!providerUrl.trim() || !accountId.trim()} loading={savingAccount} loadingLabel={t.linking}>
+                            {t.linkAccount}
                           </Button>
                         </div>
                       </div>
@@ -325,13 +466,11 @@ export default function UserDetailPage() {
                 refuse so the reader learns it before the attempt. */}
             {!user.is_service && authUser?.id !== user.id && (
               <section className="bg-surface border border-danger-line rounded-lg p-6 space-y-3">
-                <h2 className="text-lg font-semibold text-danger-text">Delete user</h2>
+                <h2 className="text-lg font-semibold text-danger-text">{t.deleteUser}</h2>
                 <p className="text-sm text-muted">
-                  {accounts.some((a) => a.builtin === true)
-                    ? 'This user has signed in before. Deletion is a deliberate two-step action: archive the user first, then an administrator can permanently delete them.'
-                    : 'This user has never signed in (pre-provisioned by import, manual creation, or an unredeemed invite). Deleting removes the record together with its course memberships.'}
+                  {accounts.some((a) => a.builtin === true) ? t.deleteExplainSignedIn : t.deleteExplainNever}
                 </p>
-                <Button variant="danger" onClick={() => setShowDeleteDialog(true)}>Delete user…</Button>
+                <Button variant="danger" onClick={() => setShowDeleteDialog(true)}>{t.deleteButton}</Button>
               </section>
             )}
           </ScrollArea>
@@ -339,46 +478,46 @@ export default function UserDetailPage() {
 
         <ConfirmDialog
           open={showArchiveConfirm}
-          title={user?.archived_at ? 'Unarchive user' : 'Archive user'}
+          title={user?.archived_at ? t.unarchiveTitle : t.archiveTitle}
           message={
             user?.archived_at
-              ? `Unarchive ${user?.email}? They will be able to log in again.`
-              : `Archive ${user?.email}? They will not be able to log in.`
+              ? t.unarchiveMessage(user?.email)
+              : t.archiveMessage(user?.email)
           }
-          confirmLabel={user?.archived_at ? 'Unarchive' : 'Archive'}
+          confirmLabel={user?.archived_at ? t.unarchive : t.archive}
           variant={user?.archived_at ? 'default' : 'danger'}
           onConfirm={toggleArchive}
           onCancel={() => setShowArchiveConfirm(false)}
         />
         <ConfirmDialog
           open={showBanConfirm}
-          title="Ban user"
-          message={`Ban ${user?.email}? They will be signed out and blocked from authenticating until unbanned.`}
-          confirmLabel="Ban"
+          title={t.banTitle}
+          message={t.banMessage(user?.email)}
+          confirmLabel={t.banConfirm}
           variant="danger"
           onConfirm={banUser}
           onCancel={() => setShowBanConfirm(false)}
         />
         <ConfirmDialog
           open={showUnbanConfirm}
-          title="Unban user"
-          message={`Unban ${user?.email}? They will be able to sign in again.`}
-          confirmLabel="Unban"
+          title={t.unbanTitle}
+          message={t.unbanMessage(user?.email)}
+          confirmLabel={t.unbanConfirm}
           onConfirm={unbanUser}
           onCancel={() => setShowUnbanConfirm(false)}
         />
         {showDeleteDialog && user && (
           <ConfirmDeleteDialog
-            title="Delete user"
-            message={`Permanently delete ${user.email}? This cannot be undone.`}
+            title={t.deleteUser}
+            message={t.deleteMessage(user.email)}
             confirmWord={user.email ?? 'DELETE'}
             blockedReason={
               roles.some((r) => r === '_admin' || r.endsWith('_admin'))
-                ? 'Users holding an admin role cannot be deleted. Revoke the admin role first.'
+                ? t.blockedAdmin
                 : accounts.some((a) => a.builtin === true) && !user.archived_at
-                  ? 'This user has signed in before. Archive them first; an administrator can then delete the account.'
+                  ? t.blockedArchiveFirst
                   : accounts.some((a) => a.builtin === true) && !isAdmin
-                    ? 'Only administrators can delete a user who has signed in.'
+                    ? t.blockedAdminOnly
                     : null
             }
             onConfirm={deleteUser}
@@ -387,9 +526,9 @@ export default function UserDetailPage() {
         )}
         <ConfirmDialog
           open={removeAccountId !== null}
-          title="Remove linked account"
-          message="Remove this linked account? The user can no longer sign in or be matched through it."
-          confirmLabel="Remove"
+          title={t.removeTitle}
+          message={t.removeMessage}
+          confirmLabel={t.remove}
           variant="danger"
           onConfirm={() => removeAccountId && removeAccount(removeAccountId)}
           onCancel={() => setRemoveAccountId(null)}

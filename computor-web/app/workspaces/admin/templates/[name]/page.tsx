@@ -19,13 +19,50 @@ import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
 import { CoderClient } from '@/src/clients/CoderClient';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const coderClient = new CoderClient();
+
+const COPY = {
+  de: {
+    workspaces: 'Arbeitsumgebungen',
+    administration: 'Administration',
+    clonedTitle: 'Hier erstellt; die Synchronisierung mit dem Repository fasst sie nie an',
+    clonedFrom: (name: string) => `geklont von ${name}`,
+    subtitle: 'Ressourcenlimits, Platzkontingent, Anzeigedetails, Terraform-Konfiguration und Vorlagendateien',
+    deleteTemplate: 'Vorlage löschen',
+    tabSettings: 'Limits & Einstellungen',
+    tabDetails: 'Details',
+    tabFiles: 'Dateien (Rohansicht)',
+    deleteTitle: 'Vorlage löschen?',
+    deleteMessage: (dir: string) =>
+      `Entfernt das Vorlagenverzeichnis „${dir}“, die zugehörige Coder-Vorlage (nur möglich, solange keine Arbeitsumgebung sie verwendet) sowie ihre Einstellungen und Kurszuweisungen. Gebaute Images bleiben in der Registry. Dies kann nicht rückgängig gemacht werden.`,
+    forbidden: 'Die Vorlagenverwaltung erfordert die Rolle „Workspace-Maintainer“.',
+    back: 'Zurück zu den Arbeitsumgebungen',
+  },
+  en: {
+    workspaces: 'Workspaces',
+    administration: 'Administration',
+    clonedTitle: 'Created here; the repository sync never touches it',
+    clonedFrom: (name: string) => `cloned from ${name}`,
+    subtitle: 'Resource limits, seat quota, display details, Terraform configuration, and template files',
+    deleteTemplate: 'Delete template',
+    tabSettings: 'Limits & settings',
+    tabDetails: 'Details',
+    tabFiles: 'Files (raw)',
+    deleteTitle: 'Delete template?',
+    deleteMessage: (dir: string) =>
+      `Removes the template directory '${dir}', its Coder template (only possible while no workspace uses it), and its settings and course assignments. Built images stay in the registry. This cannot be undone.`,
+    forbidden: 'Template administration requires the workspace maintainer role.',
+    back: 'Back to workspaces',
+  },
+};
 
 type TemplateTab = 'settings' | 'details' | 'files';
 
 function TemplateAdminContent() {
   const router = useRouter();
+  const t = COPY[useUiLanguage()];
   const pathname = usePathname();
   const notify = useNotify();
   const params = useParams<{ name: string }>();
@@ -48,28 +85,25 @@ function TemplateAdminContent() {
     <ListPageLayout>
       <PageHeader
         breadcrumbs={[
-          { label: 'Workspaces', href: '/workspaces' },
-          { label: 'Administration', href: '/workspaces/admin?tab=templates' },
+          { label: t.workspaces, href: '/workspaces' },
+          { label: t.administration, href: '/workspaces/admin?tab=templates' },
           { label: templateName },
         ]}
         title={templateName}
         subtitle={
           <span className="inline-flex flex-wrap items-center gap-2">
             {clonedFrom && (
-              <Badge tone="info" title="Created here; the repository sync never touches it">
-                cloned from {clonedFrom}
+              <Badge tone="info" title={t.clonedTitle}>
+                {t.clonedFrom(clonedFrom)}
               </Badge>
             )}
-            <span>
-              Resource limits, seat quota, display details, Terraform configuration, and template
-              files
-            </span>
+            <span>{t.subtitle}</span>
           </span>
         }
         actions={
           clonedFrom ? (
             <Button variant="danger" onClick={() => setConfirmDelete(true)}>
-              Delete template
+              {t.deleteTemplate}
             </Button>
           ) : undefined
         }
@@ -77,9 +111,9 @@ function TemplateAdminContent() {
 
       <Tabs<TemplateTab>
         tabs={[
-          { id: 'settings', label: 'Limits & settings' },
-          { id: 'details', label: 'Details' },
-          { id: 'files', label: 'Files (raw)' },
+          { id: 'settings', label: t.tabSettings },
+          { id: 'details', label: t.tabDetails },
+          { id: 'files', label: t.tabFiles },
         ]}
         active={tab}
         onSelect={(id) => router.replace(id === 'settings' ? pathname : `${pathname}?tab=${id}`)}
@@ -103,12 +137,8 @@ function TemplateAdminContent() {
 
       {confirmDelete && meta && (
         <ConfirmDeleteDialog
-          title="Delete template?"
-          message={
-            `Removes the template directory '${meta.dir_name}', its Coder template (only ` +
-            'possible while no workspace uses it), and its settings and course assignments. ' +
-            'Built images stay in the registry. This cannot be undone.'
-          }
+          title={t.deleteTitle}
+          message={t.deleteMessage(meta.dir_name)}
           confirmWord={templateName}
           onConfirm={async () => {
             const result = await coderClient.deleteTemplate({ templateName });
@@ -123,15 +153,16 @@ function TemplateAdminContent() {
 }
 
 export default function TemplateAdminPage() {
+  const t = COPY[useUiLanguage()];
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isWorkspaceMaintainer } = usePermissions();
 
   if (!authLoading && isAuthenticated && !isWorkspaceMaintainer) {
     return (
       <Forbidden
-        message="Template administration requires the workspace maintainer role."
+        message={t.forbidden}
         backLink="/workspaces"
-        backText="Back to workspaces"
+        backText={t.back}
       />
     );
   }

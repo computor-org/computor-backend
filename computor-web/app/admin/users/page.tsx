@@ -13,11 +13,58 @@ import Badge from '@/src/components/Badge';
 import Forbidden from '@/src/components/Forbidden';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import { Table, Thead, Tbody, Th } from '@/src/components/ui/Table';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { formatDate } from '@/src/utils/locale';
 
 const PAGE_SIZE = 50;
 const usersClient = new UsersClient();
 
+const COPY = {
+  de: {
+    forbidden: 'Zugriff verweigert. Erfordert die Rolle admin oder _user_manager.',
+    title: 'Benutzer',
+    newUser: 'Neuer Benutzer',
+    searchPlaceholder: 'Nach E-Mail oder Name suchen…',
+    showArchived: 'Archivierte anzeigen',
+    loading: 'Benutzer werden geladen…',
+    user: 'Benutzer',
+    status: 'Status',
+    created: 'Erstellt',
+    banned: 'Gesperrt',
+    archived: 'Archiviert',
+    active: 'Aktiv',
+    service: 'Dienst',
+    manage: 'Verwalten →',
+    empty: 'Keine Benutzer gefunden',
+    page: (n: number) => `Seite ${n}`,
+    previous: 'Zurück',
+    next: 'Weiter',
+  },
+  en: {
+    forbidden: 'Access denied. Requires admin or _user_manager role.',
+    title: 'Users',
+    newUser: 'New User',
+    searchPlaceholder: 'Search by email or name…',
+    showArchived: 'Show archived',
+    loading: 'Loading users…',
+    user: 'User',
+    status: 'Status',
+    created: 'Created',
+    banned: 'Banned',
+    archived: 'Archived',
+    active: 'Active',
+    service: 'Service',
+    manage: 'Manage →',
+    empty: 'No users found',
+    page: (n: number) => `Page ${n}`,
+    previous: 'Previous',
+    next: 'Next',
+  },
+};
+
 export default function UsersPage() {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin, isUserManager } = usePermissions();
   const canManage = isAdmin || isUserManager;
@@ -51,18 +98,18 @@ export default function UsersPage() {
   const hasNext = users.length === PAGE_SIZE;
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return <Forbidden message="Access denied. Requires admin or _user_manager role." />;
+    return <Forbidden message={t.forbidden} />;
   }
 
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Users' }]}
-          title="Users"
+          breadcrumbs={[{ label: t.title }]}
+          title={t.title}
           actions={
             <Link href="/admin/users/create" className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover">
-              New User
+              {t.newUser}
             </Link>
           }
         />
@@ -72,7 +119,7 @@ export default function UsersPage() {
         <div className="flex items-center gap-3">
           <input
             type="text"
-            placeholder="Search by email or name…"
+            placeholder={t.searchPlaceholder}
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="w-full max-w-md px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
@@ -87,20 +134,20 @@ export default function UsersPage() {
               }}
               className="rounded"
             />
-            Show archived
+            {t.showArchived}
           </label>
         </div>
 
         {loading ? (
-          <ListLoading>Loading users…</ListLoading>
+          <ListLoading>{t.loading}</ListLoading>
         ) : (
           <ScrollPanel>
             <Table>
               <Thead>
                 <tr>
-                  <Th>User</Th>
-                  <Th>Status</Th>
-                  <Th>Created</Th>
+                  <Th>{t.user}</Th>
+                  <Th>{t.status}</Th>
+                  <Th>{t.created}</Th>
                   <th className="px-4 py-3" />
                 </tr>
               </Thead>
@@ -120,19 +167,19 @@ export default function UsersPage() {
                     </td>
                     <td className="px-4 py-3">
                       <Badge color={u.banned_at ? 'red' : u.archived_at ? 'gray' : 'green'}>
-                        {u.banned_at ? 'Banned' : u.archived_at ? 'Archived' : 'Active'}
+                        {u.banned_at ? t.banned : u.archived_at ? t.archived : t.active}
                       </Badge>
-                      {u.is_service && <Badge color="yellow" className="ml-1">Service</Badge>}
+                      {u.is_service && <Badge color="yellow" className="ml-1">{t.service}</Badge>}
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted">{u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
+                    <td className="px-4 py-3 text-xs text-muted">{formatDate(u.created_at, language)}</td>
                     <td className="px-4 py-3 text-right">
-                      <Link href={`/admin/users/${u.id}`} className="text-sm text-accent-text hover:underline">Manage →</Link>
+                      <Link href={`/admin/users/${u.id}`} className="text-sm text-accent-text hover:underline">{t.manage}</Link>
                     </td>
                   </tr>
                 ))}
                 {users.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-sm text-muted">No users found</td>
+                    <td colSpan={4} className="px-4 py-8 text-center text-sm text-muted">{t.empty}</td>
                   </tr>
                 )}
               </Tbody>
@@ -143,21 +190,21 @@ export default function UsersPage() {
         {/* Pager — total count isn't exposed via the client, so Next is
             enabled whenever a full page came back. */}
         <div className="shrink-0 flex items-center justify-between">
-          <span className="text-sm text-muted">Page {page + 1}</span>
+          <span className="text-sm text-muted">{t.page(page + 1)}</span>
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0 || loading}
               className="px-3 py-1.5 text-sm border border-rule-strong rounded-lg hover:bg-canvas disabled:opacity-50"
             >
-              Previous
+              {t.previous}
             </button>
             <button
               onClick={() => setPage((p) => p + 1)}
               disabled={!hasNext || loading}
               className="px-3 py-1.5 text-sm border border-rule-strong rounded-lg hover:bg-canvas disabled:opacity-50"
             >
-              Next
+              {t.next}
             </button>
           </div>
         </div>

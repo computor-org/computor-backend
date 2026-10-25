@@ -3,6 +3,7 @@
 import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 import type { CoderTemplate } from '@/src/types/workspaces';
 import TemplateIcon from '@/src/components/workspaces/TemplateIcon';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const PREVIOUS_KEYS = ['ArrowUp', 'ArrowLeft'];
 const NEXT_KEYS = ['ArrowDown', 'ArrowRight'];
@@ -30,13 +31,14 @@ export default function TemplatePicker({
   onChange: (name: string) => void;
   emptyHint?: ReactNode;
 }) {
+  const language = useUiLanguage();
   const groupRef = useRef<HTMLDivElement>(null);
   const selectedIndex = templates.findIndex((t) => t.name === value);
 
   if (templates.length === 0) {
     return (
       <div className="text-sm text-muted space-y-1">
-        <p>No templates available — Coder may still be initializing.</p>
+        <p>{language === 'de' ? 'Keine Vorlagen verfügbar – Coder wird möglicherweise noch initialisiert.' : 'No templates available — Coder may still be initializing.'}</p>
         {emptyHint}
       </div>
     );

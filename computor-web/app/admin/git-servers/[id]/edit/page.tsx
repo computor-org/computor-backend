@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
@@ -15,7 +16,42 @@ import type { GitServerUpdate } from '@/src/generated/types/common';
 
 const gitServersClient = new GitServersClient();
 
+const COPY = {
+  de: {
+    forbidden: 'Admin- oder Organisationsverwaltungsrechte sind erforderlich.',
+    saveFailed: 'Speichern fehlgeschlagen',
+    crumb: 'Git-Server',
+    server: 'Git-Server',
+    edit: 'Bearbeiten',
+    editTitle: (name: string) => `${name} bearbeiten`,
+    name: 'Name',
+    typeUrl: 'Typ und URL (unveränderlich)',
+    managed: 'Verwaltet (Computor betreibt ihn und hält ein Dienst-Token)',
+    token: 'Dienst-Token',
+    tokenHint: (hasToken: boolean) =>
+      `Leer lassen, um das aktuelle Token zu behalten${hasToken ? ' (es ist eines gesetzt)' : ''}. Wird verschlüsselt gespeichert und nie zurückgegeben.`,
+    tokenPlaceholder: 'leer lassen, um das vorhandene zu behalten',
+  },
+  en: {
+    forbidden: 'Admin or organization-manager access is required.',
+    saveFailed: 'Save failed',
+    crumb: 'Git servers',
+    server: 'Git Server',
+    edit: 'Edit',
+    editTitle: (name: string) => `Edit ${name}`,
+    name: 'Name',
+    typeUrl: 'Type & URL (immutable)',
+    managed: 'Managed (Computor operates it and holds a service token)',
+    token: 'Service token',
+    tokenHint: (hasToken: boolean) =>
+      `Leave blank to keep the current token${hasToken ? ' (one is set)' : ''}. Stored encrypted, never returned.`,
+    tokenPlaceholder: 'leave blank to keep existing',
+  },
+};
+
 export default function GitServerEditPage() {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const serverId = useParams().id as string;
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -54,12 +90,12 @@ export default function GitServerEditPage() {
       router.push(`/admin/git-servers/${serverId}`);
     } catch (e) {
       setSaving(false);
-      setSaveError(e instanceof Error ? e.message : 'Save failed');
+      setSaveError(e instanceof Error ? e.message : t.saveFailed);
     }
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return <Forbidden message="Admin or organization-manager access is required." />;
+    return <Forbidden message={t.forbidden} />;
   }
 
   return (
@@ -69,28 +105,28 @@ export default function GitServerEditPage() {
       ) : (
         <FormPanel
           breadcrumbs={[
-            { label: 'Git servers', href: '/admin/git-servers' },
-            { label: server?.name || server?.base_url || 'Git Server', href: `/admin/git-servers/${serverId}` },
-            { label: 'Edit' },
+            { label: t.crumb, href: '/admin/git-servers' },
+            { label: server?.name || server?.base_url || t.server, href: `/admin/git-servers/${serverId}` },
+            { label: t.edit },
           ]}
-          title={`Edit ${server?.name || server?.base_url || 'git server'}`}
+          title={t.editTitle(server?.name || server?.base_url || (language === 'de' ? 'Git-Server' : 'git server'))}
           error={loadError ?? saveError}
           submitting={saving}
           onCancel={() => router.push(`/admin/git-servers/${serverId}`)}
           onSubmit={save}
         >
-          <Field label="Name">
+          <Field label={t.name}>
             <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Type & URL (immutable)">
+          <Field label={t.typeUrl}>
             <input value={`${server?.type ?? ''} · ${server?.base_url ?? ''}`} readOnly className={`${inputCls} bg-canvas text-muted`} />
           </Field>
           <label className="flex items-center gap-2 text-sm text-body">
             <input type="checkbox" checked={managed} onChange={(e) => setManaged(e.target.checked)} />
-            Managed (Computor operates it and holds a service token)
+            {t.managed}
           </label>
-          <Field label="Service token" hint={`Leave blank to keep the current token${server?.has_token ? ' (one is set)' : ''}. Stored encrypted, never returned.`}>
-            <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="leave blank to keep existing" className={inputCls} />
+          <Field label={t.token} hint={t.tokenHint(!!server?.has_token)}>
+            <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder={t.tokenPlaceholder} className={inputCls} />
           </Field>
         </FormPanel>
       )}
