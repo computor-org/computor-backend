@@ -104,12 +104,12 @@ authorities (Art. 18 DSA).
 
 ## 5. Changing or ending the service or contract
 
-We may unilaterally change features and their technical implementation for
-technical, security, legal or operational reasons only if the change is minor,
-objectively justified and reasonable in light of your legitimate interests.
-We may add features without adversely changing the agreed services. Material
-adverse changes require a valid agreement with you or an applicable statutory
-change procedure. We give reasonable advance notice of substantial
+We may change the technical implementation and add features without adversely
+changing the agreed services. We may unilaterally change the agreed services
+for technical, security, legal or operational reasons only if the change is
+minor, objectively justified and reasonable in light of your legitimate
+interests. Material adverse changes require a valid agreement with you or an
+applicable statutory change procedure. We give reasonable advance notice of substantial
 restrictions or planned closure and an opportunity to save your content.
 Necessary measures for urgent security issues or binding legal requirements may
 take effect immediately; we inform you without undue delay.
