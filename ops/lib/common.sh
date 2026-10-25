@@ -138,6 +138,10 @@ assemble_compose_files() {
     # TEMPORAL_TLS_DIR; clients read TEMPORAL_TLS_CERT/KEY/CA from .env.
     if [ "${TEMPORAL_TLS_ENABLED:-}" = "true" ]; then
         COMPOSE_FILES="$COMPOSE_FILES -f ${d}/docker-compose.temporal-tls.yaml"
+        # Namespace-scoped JWT authorization on top of mTLS.
+        if [ "${TEMPORAL_AUTH_ENABLED:-}" = "true" ]; then
+            COMPOSE_FILES="$COMPOSE_FILES -f ${d}/docker-compose.temporal-auth.yaml"
+        fi
     fi
 
     # Self-update sidecar: prod-only, opt-in. The file-exists guard keeps a

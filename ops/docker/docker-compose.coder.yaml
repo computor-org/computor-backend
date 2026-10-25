@@ -343,6 +343,9 @@ services:
       TEMPORAL_TLS_KEY: ${TEMPORAL_TLS_KEY:-}
       TEMPORAL_TLS_CA: ${TEMPORAL_TLS_CA:-}
       TEMPORAL_TLS_SERVER_NAME: ${TEMPORAL_TLS_SERVER_NAME:-}
+      # Execution worker: its own namespace only, never the control token.
+      TEMPORAL_API_KEY: ${TEMPORAL_CODER_API_KEY:-}
+      TEMPORAL_QUEUE_NAMESPACES: ${TEMPORAL_QUEUE_NAMESPACES:-}
       CODER_URL: http://coder:7080
       CODER_ENABLED: "true"
       CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}

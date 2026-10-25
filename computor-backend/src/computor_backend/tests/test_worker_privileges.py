@@ -82,7 +82,10 @@ def test_control_plane_queue_is_the_default_worker_queue():
     shared = {a.__temporal_activity_definition.name for a in setup.ACTIVITIES}
     assert "apply_workspace_credential_updates" not in shared
     assert setup.QUEUE_ACTIVITIES == {
-        DEFAULT_TASK_QUEUE: [setup.apply_workspace_credential_updates],
+        DEFAULT_TASK_QUEUE: [
+            setup.apply_workspace_credential_updates,
+            setup.run_exec_workflow,
+        ],
     }
 
 
@@ -101,6 +104,7 @@ def test_credential_update_is_absent_from_execution_workers(queue):
     names = _registered_names(queue)
     assert "rollout_template_workspaces" in names  # shared ones still there
     assert "apply_workspace_credential_updates" not in names
+    assert "run_exec_workflow" not in names
 
 
 def test_credential_update_is_registered_on_the_control_plane():
@@ -125,7 +129,7 @@ def test_temporal_worker_registers_per_queue(monkeypatch):
         async def shutdown(self):
             return None
 
-    async def _client():
+    async def _client(namespace=None):
         return SimpleNamespace()
 
     monkeypatch.setattr(temporal_worker, "Worker", _Worker)

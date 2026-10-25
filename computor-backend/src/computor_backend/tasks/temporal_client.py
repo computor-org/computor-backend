@@ -3,10 +3,11 @@ Temporal client configuration and initialization.
 """
 
 from temporalio.client import Client, TLSConfig
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 import asyncio
 import base64
 import binascii
+import fnmatch
 
 from .worker_settings import get_worker_settings
 
@@ -14,13 +15,70 @@ from .worker_settings import get_worker_settings
 # Default task queue
 DEFAULT_TASK_QUEUE = "computor-tasks"
 
+# Queues whose workflows are control workflows (enrollment, repositories,
+# support mail). They always stay in the main namespace; mapping one of them to
+# an execution namespace would hand control work to execution workers.
+CONTROL_TASK_QUEUES = frozenset({DEFAULT_TASK_QUEUE, "support"})
+
 # NOTE: there is deliberately no module-level default RetryPolicy here. The one
 # that used to live at this spot had bare ints where temporalio wants
 # timedeltas, so it would have raised on conversion had anything ever used it —
 # nothing did. Per-workflow policy belongs in BaseWorkflow.get_retry_policy().
 
 _client: Optional[Client] = None
+# Clients for the execution namespaces, sharing the main client's connection.
+_namespace_clients: Dict[str, Client] = {}
 _client_lock = asyncio.Lock()
+
+
+def parse_queue_namespaces(value: Optional[str]) -> List[Tuple[str, str]]:
+    """``(queue pattern, namespace)`` pairs from TEMPORAL_QUEUE_NAMESPACES.
+
+    The order is kept: the first matching pattern wins, and lookups by
+    workflow id try the namespaces in this order after the main one.
+    """
+    pairs: List[Tuple[str, str]] = []
+    for item in (value or "").split(","):
+        item = item.strip()
+        if not item:
+            continue
+        pattern, sep, namespace = item.partition("=")
+        pattern, namespace = pattern.strip(), namespace.strip()
+        if not sep or not pattern or not namespace:
+            raise ValueError(
+                f"TEMPORAL_QUEUE_NAMESPACES entry {item!r} is not '<queue pattern>=<namespace>'"
+            )
+        for control_queue in CONTROL_TASK_QUEUES:
+            if fnmatch.fnmatchcase(control_queue, pattern):
+                raise ValueError(
+                    f"TEMPORAL_QUEUE_NAMESPACES pattern {pattern!r} matches the control "
+                    f"queue {control_queue!r}, which must stay in the main namespace"
+                )
+        pairs.append((pattern, namespace))
+    return pairs
+
+
+def namespace_for_queue(task_queue: str, settings=None) -> str:
+    """The namespace whose workers poll ``task_queue``."""
+    settings = settings or get_worker_settings()
+    for pattern, namespace in parse_queue_namespaces(settings.temporal_queue_namespaces):
+        if fnmatch.fnmatchcase(task_queue, pattern):
+            return namespace
+    return settings.temporal_namespace
+
+
+def configured_namespaces(settings=None) -> List[str]:
+    """The main namespace followed by every distinct execution namespace.
+
+    Workflow ids are looked up in this order, so a workflow created in an
+    execution namespace can never shadow a control workflow of the same id.
+    """
+    settings = settings or get_worker_settings()
+    namespaces = [settings.temporal_namespace]
+    for _pattern, namespace in parse_queue_namespaces(settings.temporal_queue_namespaces):
+        if namespace not in namespaces:
+            namespaces.append(namespace)
+    return namespaces
 
 
 def _pem(value: str) -> bytes:
@@ -72,15 +130,20 @@ def build_rpc_metadata(settings, tls_config: Optional[TLSConfig]) -> dict:
     return {"authorization": f"Bearer {token}"}
 
 
-async def get_temporal_client() -> Client:
+async def get_temporal_client(namespace: Optional[str] = None) -> Client:
     """
     Get or create a Temporal client instance.
-    
+
+    Args:
+        namespace: an execution namespace (see ``namespace_for_queue``). None or
+            the main namespace returns the main client; any other namespace gets
+            a client on the same connection and credentials.
+
     Returns:
         Configured Temporal client
     """
     global _client
-    
+
     async with _client_lock:
         if _client is None:
             # Read config lazily (not at import) so the environment / test
@@ -98,7 +161,13 @@ async def get_temporal_client() -> Client:
                 **connect_kwargs,
             )
 
-        return _client
+        if namespace is None or namespace == _client.namespace:
+            return _client
+        client = _namespace_clients.get(namespace)
+        if client is None:
+            client = Client(_client.service_client, namespace=namespace)
+            _namespace_clients[namespace] = client
+        return client
 
 
 def get_task_queue_name(queue_name: Optional[str] = None) -> str:
@@ -118,6 +187,7 @@ async def close_temporal_client():
     """Close the Temporal client connection."""
     global _client
     async with _client_lock:
+        _namespace_clients.clear()
         if _client:
             await _client.close()
             _client = None

@@ -52,6 +52,9 @@ services:
       - TEMPORAL_TLS_CA=${TEMPORAL_TLS_CA:-}
       - TEMPORAL_TLS_SERVER_NAME=${TEMPORAL_TLS_SERVER_NAME:-}
       - TEMPORAL_NAMESPACE=default
+      # Execution worker: its own namespace only, never the control token.
+      - TEMPORAL_API_KEY=${TEMPORAL_TESTING_API_KEY:-}
+      - TEMPORAL_QUEUE_NAMESPACES=${TEMPORAL_QUEUE_NAMESPACES:-}
       # This replica owns exactly one MATLAB engine, and MATLAB runs one command
       # at a time. Pulling more than one test activity at a time would only
       # queue them inside that engine while their timeouts count down. Scale
