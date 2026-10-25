@@ -59,6 +59,19 @@ def build_tls_config(settings) -> Optional[TLSConfig]:
     )
 
 
+def build_rpc_metadata(settings, tls_config: Optional[TLSConfig]) -> dict:
+    """gRPC headers carrying TEMPORAL_API_KEY, or none when it is unset.
+
+    The token is a bearer credential, so it is only sent over TLS.
+    """
+    token = (settings.temporal_api_key or "").strip()
+    if not token:
+        return {}
+    if tls_config is None:
+        raise ValueError("TEMPORAL_API_KEY requires TLS (set TEMPORAL_TLS_CERT and TEMPORAL_TLS_KEY)")
+    return {"authorization": f"Bearer {token}"}
+
+
 async def get_temporal_client() -> Client:
     """
     Get or create a Temporal client instance.
@@ -74,12 +87,15 @@ async def get_temporal_client() -> Client:
             # overrides in effect when the client first connects are honored.
             settings = get_worker_settings()
             tls_config = build_tls_config(settings)
+            rpc_metadata = build_rpc_metadata(settings, tls_config)
 
             # Create client
+            connect_kwargs = {"rpc_metadata": rpc_metadata} if rpc_metadata else {}
             _client = await Client.connect(
                 target_host=f"{settings.temporal_host}:{settings.temporal_port}",
                 namespace=settings.temporal_namespace,
                 tls=tls_config,
+                **connect_kwargs,
             )
 
         return _client
