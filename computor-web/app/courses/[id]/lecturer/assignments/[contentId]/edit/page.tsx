@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import { useResource } from '@/src/hooks/useResource';
@@ -15,6 +16,55 @@ import VisibilitySelect, { type VisibilityValue } from '@/src/components/courses
 import { CourseContentsClient } from '@/src/generated/clients/CourseContentsClient';
 
 const contentsClient = new CourseContentsClient();
+
+const COPY = {
+  de: {
+    assignments: 'Aufgaben',
+    content: 'Inhalt',
+    contentLower: 'Inhalt',
+    saveFailed: 'Speichern fehlgeschlagen',
+    forbidden: 'Zum Bearbeiten dieses Inhalts brauchst du mindestens Lehrenden-Zugriff auf diesen Kurs.',
+    edit: (name: string) => `${name} bearbeiten`,
+    title: 'Titel',
+    description: 'Beschreibung',
+    visibility: 'Sichtbarkeit für Studierende',
+    visibilityHint: 'Wenn du eine Einheit verbirgst, verbirgst du alle Aufgaben darunter. Studierende behalten in beiden Fällen ihre Dateien sowie ihre bisherigen Tests und Abgaben.',
+    path: 'Pfad (hier nicht änderbar)',
+    pathHint: 'Das Verschieben von Inhalten ist eine eigene Aktion, damit die untergeordneten Inhalte mitwandern.',
+    position: 'Position',
+    positionHint: 'Legt die Reihenfolge unter den Inhalten derselben Ebene fest.',
+    maxGroupSize: 'Maximale Gruppengröße',
+    maxGroupSizeHint: 'Leer = Kurs-Standard.',
+    courseDefault: 'Kurs-Standard',
+    maxTestRuns: 'Maximale Testläufe',
+    maxSubmissions: 'Maximale Abgaben',
+    inheritHint: 'Leer = kursweiten Standard übernehmen.',
+    inherit: 'übernehmen',
+  },
+  en: {
+    assignments: 'Assignments',
+    content: 'Content',
+    contentLower: 'content',
+    saveFailed: 'Save failed',
+    forbidden: 'You need lecturer access (or higher) on this course to edit its content.',
+    edit: (name: string) => `Edit ${name}`,
+    title: 'Title',
+    description: 'Description',
+    visibility: 'Student visibility',
+    visibilityHint: 'Hiding a unit hides every assignment under it. Students keep their files and their existing tests and submissions either way.',
+    path: 'Path (immutable here)',
+    pathHint: 'Moving content is a separate action, so its descendants move with it.',
+    position: 'Position',
+    positionHint: 'Orders this content among its siblings.',
+    maxGroupSize: 'Max group size',
+    maxGroupSizeHint: 'Empty = the course default.',
+    courseDefault: 'course default',
+    maxTestRuns: 'Max test runs',
+    maxSubmissions: 'Max submissions',
+    inheritHint: 'Empty = inherit the course-wide default.',
+    inherit: 'inherit',
+  },
+};
 
 /** Blank (or unparseable) means "inherit from the course", i.e. no own limit. */
 const parseLimit = (value: string): number | null => {
@@ -38,13 +88,14 @@ export default function CourseContentEditPage() {
   const courseId = params.id as string;
   const contentId = params.contentId as string;
   const router = useRouter();
+  const t = COPY[useUiLanguage()];
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
 
   const canManage = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
 
   const [title, setTitle] = useState('');
-  const crumbs = useCourseCrumbs(courseId, { label: 'Assignments', href: `/courses/${courseId}/lecturer/assignments` }, title || 'Content');
+  const crumbs = useCourseCrumbs(courseId, { label: t.assignments, href: `/courses/${courseId}/lecturer/assignments` }, title || t.content);
   const [description, setDescription] = useState('');
   const [position, setPosition] = useState('');
   const [maxGroupSize, setMaxGroupSize] = useState('');
@@ -96,13 +147,13 @@ export default function CourseContentEditPage() {
       router.push(backHref);
     } catch (e) {
       setSaving(false);
-      setSaveError(e instanceof Error ? e.message : 'Save failed');
+      setSaveError(e instanceof Error ? e.message : t.saveFailed);
     }
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
     return (
-      <Forbidden message="You need lecturer access (or higher) on this course to edit its content." />
+      <Forbidden message={t.forbidden} />
     );
   }
 
@@ -113,16 +164,16 @@ export default function CourseContentEditPage() {
       ) : (
         <FormPanel
           breadcrumbs={crumbs}
-          title={`Edit ${title || 'content'}`}
+          title={t.edit(title || t.contentLower)}
           error={loadError ?? saveError}
           submitting={saving}
           onCancel={() => router.push(backHref)}
           onSubmit={save}
         >
-          <Field label="Title">
+          <Field label={t.title}>
             <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Description">
+          <Field label={t.description}>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -132,8 +183,8 @@ export default function CourseContentEditPage() {
           </Field>
 
           <Field
-            label="Student visibility"
-            hint="Hiding a unit hides every assignment under it. Students keep their files and their existing tests and submissions either way."
+            label={t.visibility}
+            hint={t.visibilityHint}
           >
             <VisibilitySelect
               scope="content"
@@ -143,11 +194,11 @@ export default function CourseContentEditPage() {
             />
           </Field>
 
-          <Field label="Path (immutable here)" hint="Moving content is a separate action, so its descendants move with it.">
+          <Field label={t.path} hint={t.pathHint}>
             <input value={content?.path || ''} readOnly className={inputCls} />
           </Field>
 
-          <Field label="Position" hint="Orders this content among its siblings.">
+          <Field label={t.position} hint={t.positionHint}>
             <input
               inputMode="decimal"
               value={position}
@@ -156,32 +207,32 @@ export default function CourseContentEditPage() {
             />
           </Field>
 
-          <Field label="Max group size" hint="Empty = the course default.">
+          <Field label={t.maxGroupSize} hint={t.maxGroupSizeHint}>
             <input
               inputMode="numeric"
               value={maxGroupSize}
               onChange={(e) => setMaxGroupSize(e.target.value)}
-              placeholder="course default"
+              placeholder={t.courseDefault}
               className={inputCls}
             />
           </Field>
 
-          <Field label="Max test runs" hint="Empty = inherit the course-wide default.">
+          <Field label={t.maxTestRuns} hint={t.inheritHint}>
             <input
               inputMode="numeric"
               value={maxTestRuns}
               onChange={(e) => setMaxTestRuns(e.target.value)}
-              placeholder="inherit"
+              placeholder={t.inherit}
               className={inputCls}
             />
           </Field>
 
-          <Field label="Max submissions" hint="Empty = inherit the course-wide default.">
+          <Field label={t.maxSubmissions} hint={t.inheritHint}>
             <input
               inputMode="numeric"
               value={maxSubmissions}
               onChange={(e) => setMaxSubmissions(e.target.value)}
-              placeholder="inherit"
+              placeholder={t.inherit}
               className={inputCls}
             />
           </Field>

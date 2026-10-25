@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { useResource } from '@/src/hooks/useResource';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import RoleSelect from '@/src/components/course-members/RoleSelect';
@@ -16,6 +17,51 @@ import Button from '@/src/components/ui/Button';
 const PAGE_SIZE = 10;
 const membersClient = new CourseMembersClient();
 const usersClient = new UsersClient();
+
+const COPY = {
+  de: {
+    pickGroup: 'Wähle eine Gruppe aus, Studierende müssen einer Gruppe zugeordnet sein.',
+    createGroupFirst: 'Lege zuerst eine Kursgruppe an, Studierende müssen einer Gruppe zugeordnet sein.',
+    addFailed: 'Hinzufügen fehlgeschlagen',
+    intro: 'Du siehst nur Nutzer, die deine Berechtigungen zulassen. Nutzer, die schon im Kurs sind, werden ausgeblendet. Wähle eine Rolle und füge sie hinzu. Studierende müssen einer Gruppe zugeordnet sein.',
+    noGroups: 'Dieser Kurs hat noch keine Gruppen, daher können keine Studierenden hinzugefügt werden.',
+    createGroup: 'Lege zuerst eine Gruppe an',
+    createGroupSuffix: '.',
+    search: 'Nach Name oder E-Mail suchen …',
+    loading: 'Nutzer werden geladen …',
+    user: 'Nutzer',
+    role: 'Rolle',
+    group: 'Gruppe',
+    added: 'Hinzugefügt ✓',
+    adding: 'Wird hinzugefügt …',
+    add: 'Hinzufügen',
+    empty: 'Keine Nutzer zum Hinzufügen.',
+    page: (n: number) => `Seite ${n}`,
+    previous: 'Zurück',
+    next: 'Weiter',
+  },
+  en: {
+    pickGroup: 'Pick a group — students must be assigned to one.',
+    createGroupFirst: 'Create a course group first — students must be assigned to one.',
+    addFailed: 'Failed to add',
+    intro: 'You can only see users your permissions allow. Users already in the course are hidden — pick a role and add them. Students must be assigned to a group.',
+    noGroups: 'This course has no groups yet, so students cannot be added.',
+    createGroup: 'Create a group',
+    createGroupSuffix: 'first.',
+    search: 'Search by name or email…',
+    loading: 'Loading users…',
+    user: 'User',
+    role: 'Role',
+    group: 'Group',
+    added: 'Added ✓',
+    adding: 'Adding…',
+    add: 'Add',
+    empty: 'No users to add.',
+    page: (n: number) => `Page ${n}`,
+    previous: 'Previous',
+    next: 'Next',
+  },
+};
 
 function userName(u: UserList): string {
   const name = `${u.given_name ?? ''} ${u.family_name ?? ''}`.trim();
@@ -35,6 +81,7 @@ export default function AddFromUserList({
   groups: CourseGroupList[];
   canManage: boolean;
 }) {
+  const t = COPY[useUiLanguage()];
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
@@ -46,11 +93,11 @@ export default function AddFromUserList({
 
   // Debounce the search box; reset to the first page on a new query.
   useEffect(() => {
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       setSearch(searchInput.trim());
       setPage(0);
     }, 300);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [searchInput]);
 
   const { data: usersData, loading: usersLoading, error: usersError } = useResource(
@@ -92,8 +139,8 @@ export default function AddFromUserList({
       setRowError((prev) => ({
         ...prev,
         [u.id]: groups.length
-          ? 'Pick a group — students must be assigned to one.'
-          : 'Create a course group first — students must be assigned to one.',
+          ? t.pickGroup
+          : t.createGroupFirst,
       }));
       return;
     }
@@ -112,7 +159,7 @@ export default function AddFromUserList({
     } catch (e) {
       setRowError((prev) => ({
         ...prev,
-        [u.id]: e instanceof Error ? e.message : 'Failed to add',
+        [u.id]: e instanceof Error ? e.message : t.addFailed,
       }));
     } finally {
       setAddingId(null);
@@ -122,24 +169,23 @@ export default function AddFromUserList({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
-        You can only see users your permissions allow. Users already in the course are hidden — pick a
-        role and add them. Students must be assigned to a group.
+        {t.intro}
       </p>
       {groups.length === 0 && (
         <p className="text-sm text-warn-text bg-warn-wash border border-warn-line rounded-lg px-3 py-2">
-          This course has no groups yet, so students cannot be added.{' '}
+          {t.noGroups}{' '}
           <Link
             href={`/courses/${courseId}/lecturer/groups/create`}
             className="font-medium text-warn-text underline hover:no-underline"
           >
-            Create a group
+            {t.createGroup}
           </Link>{' '}
-          first.
+          {t.createGroupSuffix}
         </p>
       )}
       <input
         type="text"
-        placeholder="Search by name or email…"
+        placeholder={t.search}
         value={searchInput}
         onChange={(e) => setSearchInput(e.target.value)}
         className="w-full max-w-md px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
@@ -148,15 +194,15 @@ export default function AddFromUserList({
       <ErrorBanner>{usersError}</ErrorBanner>
 
       {usersLoading ? (
-        <div className="text-muted py-8 text-center">Loading users…</div>
+        <div className="text-muted py-8 text-center">{t.loading}</div>
       ) : (
         <div className="bg-surface border border-rule rounded-lg overflow-hidden">
           <Table>
             <thead className="bg-canvas">
               <tr>
-                <Th>User</Th>
-                <Th>Role</Th>
-                <Th>Group</Th>
+                <Th>{t.user}</Th>
+                <Th>{t.role}</Th>
+                <Th>{t.group}</Th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -190,15 +236,15 @@ export default function AddFromUserList({
                     </td>
                     <td className="px-4 py-3 text-right">
                       {isAdded ? (
-                        <span className="text-sm text-success-text">Added ✓</span>
+                        <span className="text-sm text-success-text">{t.added}</span>
                       ) : (
                         <Button
                           size="sm"
                           onClick={() => addUser(u)}
                           loading={addingId === u.id}
-                          loadingLabel="Adding…"
+                          loadingLabel={t.adding}
                         >
-                          Add
+                          {t.add}
                         </Button>
                       )}
                     </td>
@@ -208,7 +254,7 @@ export default function AddFromUserList({
               {visibleUsers.length === 0 && (
                 <tr>
                   <td colSpan={4} className="px-4 py-8 text-center text-sm text-muted">
-                    No users to add.
+                    {t.empty}
                   </td>
                 </tr>
               )}
@@ -218,7 +264,7 @@ export default function AddFromUserList({
       )}
 
       <div className="flex items-center justify-between">
-        <span className="text-sm text-muted">Page {page + 1}</span>
+        <span className="text-sm text-muted">{t.page(page + 1)}</span>
         <div className="flex gap-2">
           <Button
             variant="secondary"
@@ -226,7 +272,7 @@ export default function AddFromUserList({
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             disabled={page === 0 || usersLoading}
           >
-            Previous
+            {t.previous}
           </Button>
           <Button
             variant="secondary"
@@ -234,7 +280,7 @@ export default function AddFromUserList({
             onClick={() => setPage((p) => p + 1)}
             disabled={!hasNext || usersLoading}
           >
-            Next
+            {t.next}
           </Button>
         </div>
       </div>

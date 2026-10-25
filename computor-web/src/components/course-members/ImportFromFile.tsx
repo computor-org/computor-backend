@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import RoleSelect from '@/src/components/course-members/RoleSelect';
 import { CourseMemberImportClient } from '@/src/generated/clients/CourseMemberImportClient';
@@ -12,6 +13,39 @@ import Button from '@/src/components/ui/Button';
 
 const importClient = new CourseMemberImportClient();
 
+const COPY = {
+  de: {
+    noRows: 'In der Datei wurden keine Mitglieder mit E-Mail-Adresse gefunden.',
+    parseFailed: 'Die Datei konnte nicht gelesen werden.',
+    failed: 'Fehlgeschlagen',
+    summary: (ok: number, fail: number) => `${ok} importiert${fail ? `, ${fail} fehlgeschlagen` : ''}.`,
+    intro: 'Lade eine Studierendenliste als CSV, JSON, Excel (.xlsx) oder Excel-XML hoch. Prüfe und passe die Zeilen an und importiere dann die gewünschten. Bestehende Mitglieder werden aktualisiert statt doppelt angelegt.',
+    parsing: 'Datei wird gelesen …',
+    user: 'Nutzer',
+    role: 'Rolle',
+    group: 'Gruppe',
+    status: 'Status',
+    added: 'Hinzugefügt ✓',
+    importing: 'Wird importiert …',
+    importSelected: (n: number) => `${n} Ausgewählte importieren`,
+  },
+  en: {
+    noRows: 'No members with an email address were found in the file.',
+    parseFailed: 'Failed to parse file.',
+    failed: 'Failed',
+    summary: (ok: number, fail: number) => `Imported ${ok}${fail ? `, ${fail} failed` : ''}.`,
+    intro: 'Upload a CSV, JSON, Excel (.xlsx) or Excel-XML student list. Review and adjust the rows, then import the ones you want. Existing members are updated rather than duplicated.',
+    parsing: 'Parsing file…',
+    user: 'User',
+    role: 'Role',
+    group: 'Group',
+    status: 'Status',
+    added: 'Added ✓',
+    importing: 'Importing…',
+    importSelected: (n: number) => `Import ${n} selected`,
+  },
+};
+
 export default function ImportFromFile({
   courseId,
   roleOptions,
@@ -21,6 +55,7 @@ export default function ImportFromFile({
   roleOptions: CourseRoleId[];
   defaultRole: string;
 }) {
+  const t = COPY[useUiLanguage()];
   const [fileParsing, setFileParsing] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [parsedRows, setParsedRows] = useState<CourseMemberImportRow[]>([]);
@@ -58,9 +93,9 @@ export default function ImportFromFile({
       setRowSel(sel);
       setRowRoleFile(roles);
       setRowGroupFile(groups);
-      if (!rows.length) setFileError('No members with an email address were found in the file.');
+      if (!rows.length) setFileError(t.noRows);
     } catch (e) {
-      setFileError(e instanceof Error ? e.message : 'Failed to parse file.');
+      setFileError(e instanceof Error ? e.message : t.parseFailed);
     } finally {
       setFileParsing(false);
     }
@@ -91,17 +126,17 @@ export default function ImportFromFile({
           results[i] = { ok: true };
           ok++;
         } else {
-          results[i] = { ok: false, message: res.message ?? 'Failed' };
+          results[i] = { ok: false, message: res.message ?? t.failed };
           fail++;
         }
       } catch (e) {
-        results[i] = { ok: false, message: e instanceof Error ? e.message : 'Failed' };
+        results[i] = { ok: false, message: e instanceof Error ? e.message : t.failed };
         fail++;
       }
       setFileResults({ ...results });
     }
     setFileImporting(false);
-    setFileSummary(`Imported ${ok}${fail ? `, ${fail} failed` : ''}.`);
+    setFileSummary(t.summary(ok, fail));
   }
 
   const selectedFileCount = parsedRows.filter((_, i) => rowSel[i]).length;
@@ -109,8 +144,7 @@ export default function ImportFromFile({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
-        Upload a CSV, JSON, Excel (.xlsx) or Excel-XML student list. Review and adjust the rows, then
-        import the ones you want. Existing members are updated rather than duplicated.
+        {t.intro}
       </p>
       <input
         type="file"
@@ -126,7 +160,7 @@ export default function ImportFromFile({
       <ErrorBanner>{fileError}</ErrorBanner>
 
       {fileParsing ? (
-        <div className="text-muted py-8 text-center">Parsing file…</div>
+        <div className="text-muted py-8 text-center">{t.parsing}</div>
       ) : parsedRows.length > 0 ? (
         <>
           <div className="bg-surface border border-rule rounded-lg overflow-hidden">
@@ -134,10 +168,10 @@ export default function ImportFromFile({
               <thead className="bg-canvas">
                 <tr>
                   <th className="px-3 py-3 w-8" />
-                  <Th>User</Th>
-                  <Th>Role</Th>
-                  <Th>Group</Th>
-                  <Th>Status</Th>
+                  <Th>{t.user}</Th>
+                  <Th>{t.role}</Th>
+                  <Th>{t.group}</Th>
+                  <Th>{t.status}</Th>
                 </tr>
               </thead>
               <Tbody>
@@ -175,9 +209,9 @@ export default function ImportFromFile({
                       <td className="px-4 py-3 text-sm">
                         {res ? (
                           res.ok ? (
-                            <span className="text-success-text">Added ✓</span>
+                            <span className="text-success-text">{t.added}</span>
                           ) : (
-                            <span className="text-danger-text" title={res.message}>Failed</span>
+                            <span className="text-danger-text" title={res.message}>{t.failed}</span>
                           )
                         ) : (
                           <span className="text-subtle">—</span>
@@ -194,9 +228,9 @@ export default function ImportFromFile({
               onClick={importParsed}
               disabled={selectedFileCount === 0}
               loading={fileImporting}
-              loadingLabel="Importing…"
+              loadingLabel={t.importing}
             >
-              {`Import ${selectedFileCount} selected`}
+              {t.importSelected(selectedFileCount)}
             </Button>
             {fileSummary && <span className="text-sm text-muted">{fileSummary}</span>}
           </div>

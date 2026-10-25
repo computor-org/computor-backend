@@ -1,7 +1,29 @@
 'use client';
 
 import StatGrid, { StatCard } from '@/src/components/ui/StatGrid';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type { CourseMemberGradingsList } from 'types/generated';
+
+const COPY = {
+  de: {
+    students: 'Studierende',
+    average: 'Durchschnittlicher Fortschritt',
+    completed: 'Abgeschlossen',
+    atRisk: 'Gefährdet',
+    atRiskHint: 'unter 25 % Fortschritt',
+    inactive: 'Inaktiv',
+    inactiveHint: 'keine Abgabe in 14 Tagen',
+  },
+  en: {
+    students: 'Students',
+    average: 'Average progress',
+    completed: 'Completed',
+    atRisk: 'At risk',
+    atRiskHint: 'under 25% progress',
+    inactive: 'Inactive',
+    inactiveHint: 'no submission in 14 days',
+  },
+};
 
 function daysSince(dateStr: string | null | undefined): number | null {
   if (!dateStr) return null;
@@ -17,6 +39,7 @@ function daysSince(dateStr: string | null | undefined): number | null {
  * background washes competing with the charts beneath them.
  */
 export default function ProgressStatCards({ students }: { students: CourseMemberGradingsList[] }) {
+  const t = COPY[useUiLanguage()];
   const total = students.length;
   const avgProgress =
     total > 0
@@ -31,11 +54,11 @@ export default function ProgressStatCards({ students }: { students: CourseMember
 
   return (
     <StatGrid columns={5}>
-      <StatCard label="Students" value={total} />
-      <StatCard label="Average progress" value={`${avgProgress}%`} tone="info" />
-      <StatCard label="Completed" value={completed} tone="success" />
-      <StatCard label="At risk" value={atRisk} tone="error" hint="under 25% progress" />
-      <StatCard label="Inactive" value={inactive} tone="warning" hint="no submission in 14 days" />
+      <StatCard label={t.students} value={total} />
+      <StatCard label={t.average} value={`${avgProgress}%`} tone="info" />
+      <StatCard label={t.completed} value={completed} tone="success" />
+      <StatCard label={t.atRisk} value={atRisk} tone="error" hint={t.atRiskHint} />
+      <StatCard label={t.inactive} value={inactive} tone="warning" hint={t.inactiveHint} />
     </StatGrid>
   );
 }

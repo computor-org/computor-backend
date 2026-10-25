@@ -17,6 +17,7 @@ import SubmissionCurve from '@/src/components/progress/SubmissionCurve';
 import StudentActivity from '@/src/components/progress/StudentActivity';
 import { usePersistedCourseDate } from '@/src/hooks/usePersistedCourseDate';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
+import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
 
 // Pulls in recharts — load only when this page renders (keeps the shared
 // bundle free of the charting library).
@@ -27,14 +28,70 @@ const SubmissionDonutChart = dynamic(
 
 const gradingsClient = new CourseMemberGradingsClient();
 
-function relativeDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return 'Never';
+const COPY = {
+  de: {
+    never: 'Nie',
+    today: 'Heute',
+    yesterday: 'Gestern',
+    daysAgo: (n: number) => `vor ${n} Tagen`,
+    weeksAgo: (n: number) => `vor ${n} Wochen`,
+    monthsAgo: (n: number) => `vor ${n} Monaten`,
+    grading: 'Bewertung',
+    student: 'Studierende/r',
+    unknown: 'Unbekannt',
+    progressTitle: 'Fortschritt der Studierenden',
+    matr: 'Matr.',
+    lastActive: 'Zuletzt aktiv:',
+    startDate: 'Startdatum',
+    dueDate: 'Abgabefrist',
+    print: 'Drucken',
+    refresh: 'Aktualisieren',
+    avgGrade: 'Durchschnittliche Bewertung',
+    overall: 'Gesamtfortschritt',
+    submissions: 'Abgaben',
+    submitted: 'Abgegeben',
+    remaining: 'Offen',
+    typeBreakdown: 'Aufschlüsselung nach Inhaltstyp',
+    grade: 'Bewertung',
+    noTypes: 'Keine Daten zu Inhaltstypen verfügbar.',
+  },
+  en: {
+    never: 'Never',
+    today: 'Today',
+    yesterday: 'Yesterday',
+    daysAgo: (n: number) => `${n} days ago`,
+    weeksAgo: (n: number) => `${n} weeks ago`,
+    monthsAgo: (n: number) => `${n} months ago`,
+    grading: 'Grading',
+    student: 'Student',
+    unknown: 'Unknown',
+    progressTitle: 'Student progress',
+    matr: 'Matr.',
+    lastActive: 'Last active:',
+    startDate: 'Start date',
+    dueDate: 'Due date',
+    print: 'Print',
+    refresh: 'Refresh',
+    avgGrade: 'Average Grade',
+    overall: 'Overall Progress',
+    submissions: 'Submissions',
+    submitted: 'Submitted',
+    remaining: 'Remaining',
+    typeBreakdown: 'Content Type Breakdown',
+    grade: 'Grade',
+    noTypes: 'No content type data available.',
+  },
+};
+
+function relativeDate(dateStr: string | null | undefined, language: UiLanguage): string {
+  const t = COPY[language];
+  if (!dateStr) return t.never;
   const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return `${days} days ago`;
-  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
-  return `${Math.floor(days / 30)} months ago`;
+  if (days === 0) return t.today;
+  if (days === 1) return t.yesterday;
+  if (days < 7) return t.daysAgo(days);
+  if (days < 30) return t.weeksAgo(Math.floor(days / 7));
+  return t.monthsAgo(Math.floor(days / 30));
 }
 
 // `<input type="datetime-local">` works in the browser's local time and has no
@@ -49,6 +106,8 @@ function isoToLocalInput(iso: string | null): string {
 
 export default function StudentProgressPage() {
   const params = useParams();
+  const language = useUiLanguage();
+  const t = COPY[language];
   const courseId = params.id as string;
   const memberId = params.memberId as string;
 
@@ -69,13 +128,13 @@ export default function StudentProgressPage() {
   const [dueDate, onDueDateChange] = usePersistedCourseDate(courseId, 'due-date');
 
   const studentName = data
-    ? `${data.given_name || ''} ${data.family_name || ''}`.trim() || data.username || 'Unknown'
+    ? `${data.given_name || ''} ${data.family_name || ''}`.trim() || data.username || t.unknown
     : '';
 
   const crumbs = useCourseCrumbs(
     courseId,
-    { label: 'Grading', href: `/courses/${courseId}/lecturer/grading` },
-    studentName || 'Student',
+    { label: t.grading, href: `/courses/${courseId}/lecturer/grading` },
+    studentName || t.student,
   );
 
   const gradePercent = data?.overall_average_grading != null
@@ -112,15 +171,15 @@ export default function StudentProgressPage() {
         <div id="printable-report" className="contents">
           <PageHeader
             breadcrumbs={crumbs}
-            title={loading ? 'Student progress' : studentName}
+            title={loading ? t.progressTitle : studentName}
             subtitle={
               data && (
                 <div className="space-y-0.5">
                   {data.student_id && (
-                    <p className="text-sm text-muted font-mono">Matr. {data.student_id}</p>
+                    <p className="text-sm text-muted font-mono">{t.matr} {data.student_id}</p>
                   )}
                   <p className="text-xs text-subtle">
-                    Last active: {relativeDate(data.latest_submission_at)}
+                    {t.lastActive} {relativeDate(data.latest_submission_at, language)}
                   </p>
                 </div>
               )
@@ -129,7 +188,7 @@ export default function StudentProgressPage() {
               <div className="flex items-end gap-2 print:hidden">
                 <div className="flex flex-col gap-1">
                   <label htmlFor="start-date" className="text-xs font-medium text-muted">
-                    Start date
+                    {t.startDate}
                   </label>
                   <input
                     id="start-date"
@@ -141,7 +200,7 @@ export default function StudentProgressPage() {
                 </div>
                 <div className="flex flex-col gap-1">
                   <label htmlFor="due-date" className="text-xs font-medium text-muted">
-                    Due date
+                    {t.dueDate}
                   </label>
                   <input
                     id="due-date"
@@ -152,10 +211,10 @@ export default function StudentProgressPage() {
                   />
                 </div>
                 <Button variant="secondary" onClick={() => window.print()}>
-                  Print
+                  {t.print}
                 </Button>
                 <Button variant="secondary" onClick={() => reload()} disabled={loading}>
-                  Refresh
+                  {t.refresh}
                 </Button>
               </div>
             }
@@ -184,7 +243,7 @@ export default function StudentProgressPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* Grade */}
                   <div>
-                    <p className="text-xs font-medium text-muted mb-1">Average Grade</p>
+                    <p className="text-xs font-medium text-muted mb-1">{t.avgGrade}</p>
                     <p className="text-3xl font-bold text-fg">
                       {gradePercent != null ? `${gradePercent}%` : '-'}
                     </p>
@@ -197,7 +256,7 @@ export default function StudentProgressPage() {
 
                   {/* Overall Progress */}
                   <div>
-                    <p className="text-xs font-medium text-muted mb-1">Overall Progress</p>
+                    <p className="text-xs font-medium text-muted mb-1">{t.overall}</p>
                     <p className="text-3xl font-bold text-fg">{progressPercent}%</p>
                     <div className="mt-2">
                       <ProgressBar value={progressPercent} color="#6366f1" />
@@ -206,16 +265,16 @@ export default function StudentProgressPage() {
 
                   {/* Stats */}
                   <div>
-                    <p className="text-xs font-medium text-muted mb-1">Submissions</p>
+                    <p className="text-xs font-medium text-muted mb-1">{t.submissions}</p>
                     <div className="space-y-1.5 mt-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted">Submitted</span>
+                        <span className="text-muted">{t.submitted}</span>
                         <span className="font-medium text-fg">
                           {data.total_submitted_assignments} / {data.total_max_assignments}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted">Remaining</span>
+                        <span className="text-muted">{t.remaining}</span>
                         <span className="font-medium text-fg">{remaining}</span>
                       </div>
                     </div>
@@ -245,7 +304,7 @@ export default function StudentProgressPage() {
 
                 {/* Content Type Breakdown */}
                 <div className="bg-surface rounded-lg border border-rule p-5">
-                  <h3 className="text-sm font-semibold text-fg mb-4">Content Type Breakdown</h3>
+                  <h3 className="text-sm font-semibold text-fg mb-4">{t.typeBreakdown}</h3>
                   <div className="space-y-4">
                     {(data.by_content_type || []).map(ct => {
                       const pct = Math.round(ct.progress_percentage);
@@ -265,7 +324,7 @@ export default function StudentProgressPage() {
                               </span>
                             </div>
                             <span className="text-xs text-muted">
-                              {ct.submitted_assignments}/{ct.max_assignments} ({pct}%) | Grade: {gradeStr}
+                              {ct.submitted_assignments}/{ct.max_assignments} ({pct}%) | {t.grade}: {gradeStr}
                             </span>
                           </div>
                           <ProgressBar
@@ -277,7 +336,7 @@ export default function StudentProgressPage() {
                       );
                     })}
                     {(!data.by_content_type || data.by_content_type.length === 0) && (
-                      <p className="text-sm text-muted">No content type data available.</p>
+                      <p className="text-sm text-muted">{t.noTypes}</p>
                     )}
                   </div>
                 </div>

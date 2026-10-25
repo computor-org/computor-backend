@@ -2,7 +2,19 @@
 
 import Badge from '@/src/components/Badge';
 import { flagTone, sortFlags } from '@/src/utils/courseAnalytics';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type { FlagReason, FlagRule } from 'types/generated';
+
+const COPY = {
+  de: {
+    none: 'Keine Auffälligkeiten. Keine der Regeln unten trifft zu.',
+    how: 'So werden Auffälligkeiten berechnet',
+  },
+  en: {
+    none: 'No flags. None of the rules below applies.',
+    how: 'How flags are computed',
+  },
+};
 
 /**
  * Rule-based flags ("Auffälligkeiten") with the reason each one fired.
@@ -27,8 +39,9 @@ export function FlagChips({ flags }: { flags: FlagReason[] }) {
 }
 
 export default function FlagList({ flags }: { flags: FlagReason[] }) {
+  const t = COPY[useUiLanguage()];
   if (flags.length === 0) {
-    return <p className="text-sm text-muted">No flags. None of the rules below applies.</p>;
+    return <p className="text-sm text-muted">{t.none}</p>;
   }
   return (
     <ul className="space-y-2">
@@ -46,10 +59,11 @@ export default function FlagList({ flags }: { flags: FlagReason[] }) {
 }
 
 export function FlagRules({ rules }: { rules: FlagRule[] }) {
+  const t = COPY[useUiLanguage()];
   if (rules.length === 0) return null;
   return (
     <details className="text-xs text-muted">
-      <summary className="cursor-pointer select-none">How flags are computed</summary>
+      <summary className="cursor-pointer select-none">{t.how}</summary>
       <ul className="mt-2 space-y-1 list-disc pl-5">
         {rules.map((r) => (
           <li key={r.code}>

@@ -1,6 +1,28 @@
 'use client';
 
 import { inputCls } from '@/src/components/ui/tokens';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+
+const COPY = {
+  de: {
+    visibleDefault: 'Sichtbar (Standard)',
+    inherit: 'Von der übergeordneten Einheit übernehmen',
+    visible: 'Sichtbar',
+    hiddenCourse: 'Verborgen: verbirgt den gesamten Inhaltsbaum des Kurses',
+    hiddenContent: 'Verborgen: verbirgt diesen Inhalt und alles darunter',
+    overridden: 'Derzeit trotzdem verborgen: Eine Einheit darüber oder der Kurs selbst ist verborgen. Wenn du diesen Inhalt auf sichtbar stellst, ändert das nichts daran.',
+    hiddenNote: 'Studierende sehen das nicht in ihrem Aufgabenbaum und können nichts testen oder abgeben. Ihre Dateien, bisherigen Tests und Abgaben bleiben erhalten und erscheinen wieder, sobald du es sichtbar machst.',
+  },
+  en: {
+    visibleDefault: 'Visible (default)',
+    inherit: 'Inherit from the unit above',
+    visible: 'Visible',
+    hiddenCourse: 'Hidden — hides the whole course content tree',
+    hiddenContent: 'Hidden — hides this and everything under it',
+    overridden: 'Currently hidden anyway: a unit above this one, or the course itself, is hidden. Setting this to visible will not override that.',
+    hiddenNote: 'Students will not see this in their assignment tree and cannot test or submit. Their files, existing tests and submissions are untouched and reappear when you make it visible again.',
+  },
+};
 
 /**
  * Tri-state student-visibility control (issue #338).
@@ -55,6 +77,7 @@ export default function VisibilitySelect({
   effective,
   disabled,
 }: VisibilitySelectProps) {
+  const t = COPY[useUiLanguage()];
   const overriddenFromAbove = effective === false && value !== false;
 
   return (
@@ -66,30 +89,23 @@ export default function VisibilitySelect({
         className={inputCls}
       >
         <option value="inherit">
-          {scope === 'course'
-            ? 'Visible (default)'
-            : 'Inherit from the unit above'}
+          {scope === 'course' ? t.visibleDefault : t.inherit}
         </option>
-        <option value="visible">Visible</option>
+        <option value="visible">{t.visible}</option>
         <option value="hidden">
-          {scope === 'course'
-            ? 'Hidden — hides the whole course content tree'
-            : 'Hidden — hides this and everything under it'}
+          {scope === 'course' ? t.hiddenCourse : t.hiddenContent}
         </option>
       </select>
 
       {overriddenFromAbove && (
         <p className="text-xs text-warn-text">
-          Currently hidden anyway: a unit above this one, or the course itself,
-          is hidden. Setting this to visible will not override that.
+          {t.overridden}
         </p>
       )}
 
       {value === false && (
         <p className="text-xs text-muted">
-          Students will not see this in their assignment tree and cannot test or
-          submit. Their files, existing tests and submissions are untouched and
-          reappear when you make it visible again.
+          {t.hiddenNote}
         </p>
       )}
     </div>

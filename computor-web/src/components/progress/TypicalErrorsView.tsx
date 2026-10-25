@@ -16,23 +16,78 @@ import { inputCls } from '@/src/components/ui/tokens';
 import { useResource } from '@/src/hooks/useResource';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import { courseAnalyticsClient } from '@/src/clients/CourseAnalyticsClient';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { formatDateTime, formatNumber } from '@/src/utils/locale';
 import { assignmentsOf } from '@/src/utils/courseAnalytics';
 import type { TypicalError } from 'types/generated';
 
 const SCAN_SIZES = [300, 1000, 2000];
 
-function formatWhen(value: string | null | undefined): string {
-  if (!value) return '—';
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString();
-}
+const COPY = {
+  de: {
+    title: 'Typische Fehler',
+    subtitle: 'Fehlgeschlagene Tests über alle Studierenden, gruppiert nach Fehlermeldung',
+    refresh: 'Aktualisieren',
+    assignment: 'Aufgabe',
+    wholeCourse: 'Ganzer Kurs',
+    scan: 'Die neuesten durchsuchen',
+    failingRuns: (n: string) => `${n} fehlgeschlagene Läufe`,
+    errorGroups: 'Fehlergruppen',
+    runsScanned: 'Durchsuchte Läufe',
+    runsScannedHint: 'neueste Testläufe unter voller Punktzahl',
+    largest: 'Größte Gruppe',
+    largestHint: 'Studierende mit demselben Fehler',
+    withoutReport: 'Läufe ohne Bericht',
+    truncated: (n: string) =>
+      `Es gibt mehr fehlgeschlagene Läufe, als durchsucht wurden. Einbezogen sind nur die neuesten ${n}. Wähle einen größeren Umfang oder eine einzelne Aufgabe, um weiter zurückzuschauen.`,
+    noneTitle: 'Keine fehlgeschlagenen Tests gefunden.',
+    noneText: 'Entweder waren alle durchsuchten Läufe erfolgreich, oder zu ihnen sind keine Testberichte gespeichert.',
+    failingTest: 'Fehlgeschlagener Test',
+    message: 'Meldung (normalisiert)',
+    students: 'Studierende',
+    runs: 'Läufe',
+    lastSeen: 'Zuletzt gesehen',
+    examples: 'Beispiele (neueste zuerst)',
+    student: 'Studierende/r',
+    howTitle: 'So werden Meldungen gruppiert',
+  },
+  en: {
+    title: 'Typical errors',
+    subtitle: 'Failing tests across students, grouped by error message',
+    refresh: 'Refresh',
+    assignment: 'Assignment',
+    wholeCourse: 'Whole course',
+    scan: 'Scan the newest',
+    failingRuns: (n: string) => `${n} failing runs`,
+    errorGroups: 'Error groups',
+    runsScanned: 'Runs scanned',
+    runsScannedHint: 'newest test runs below full score',
+    largest: 'Largest group',
+    largestHint: 'students sharing one error',
+    withoutReport: 'Runs without report',
+    truncated: (n: string) =>
+      `More failing runs exist than were scanned. Only the newest ${n} are included; choose a larger scan or a single assignment to look further back.`,
+    noneTitle: 'No failing tests found.',
+    noneText: 'Either every scanned run passed, or no test reports are stored for them.',
+    failingTest: 'Failing test',
+    message: 'Message (normalized)',
+    students: 'Students',
+    runs: 'Runs',
+    lastSeen: 'Last seen',
+    examples: 'Examples (newest first)',
+    student: 'Student',
+    howTitle: 'How messages are grouped',
+  },
+};
 
 /**
  * Typical errors: failing tests across students, grouped by a normalized
  * message so that "assert 3 == 4" and "assert 7 == 2" count as one problem.
  */
 export default function TypicalErrorsView({ courseId }: { courseId: string }) {
-  const crumbs = useCourseCrumbs(courseId, 'Typical errors');
+  const language = useUiLanguage();
+  const t = COPY[language];
+  const crumbs = useCourseCrumbs(courseId, t.title);
   const [contentId, setContentId] = useState('');
   const [maxResults, setMaxResults] = useState(SCAN_SIZES[0]);
   const [open, setOpen] = useState<string | null>(null);
@@ -56,11 +111,11 @@ export default function TypicalErrorsView({ courseId }: { courseId: string }) {
     <ListPageLayout>
       <PageHeader
         breadcrumbs={crumbs}
-        title="Typical errors"
-        subtitle="Failing tests across students, grouped by error message"
+        title={t.title}
+        subtitle={t.subtitle}
         actions={
           <Button variant="secondary" onClick={() => reload()} disabled={loading}>
-            Refresh
+            {t.refresh}
           </Button>
         }
       />
@@ -69,19 +124,19 @@ export default function TypicalErrorsView({ courseId }: { courseId: string }) {
 
         <Panel padding="none">
           <Toolbar className="px-4 py-3">
-            <label className="text-xs font-medium text-muted" htmlFor="te-assignment">Assignment</label>
+            <label className="text-xs font-medium text-muted" htmlFor="te-assignment">{t.assignment}</label>
             <select
               id="te-assignment"
               className={`${inputCls} max-w-xs`}
               value={contentId}
               onChange={(e) => setContentId(e.target.value)}
             >
-              <option value="">Whole course</option>
+              <option value="">{t.wholeCourse}</option>
               {assignments.map((a) => (
                 <option key={a.id} value={a.id}>{a.title}</option>
               ))}
             </select>
-            <label className="text-xs font-medium text-muted ml-4" htmlFor="te-scan">Scan the newest</label>
+            <label className="text-xs font-medium text-muted ml-4" htmlFor="te-scan">{t.scan}</label>
             <select
               id="te-scan"
               className={`${inputCls} max-w-xs`}
@@ -89,7 +144,7 @@ export default function TypicalErrorsView({ courseId }: { courseId: string }) {
               onChange={(e) => setMaxResults(Number(e.target.value))}
             >
               {SCAN_SIZES.map((n) => (
-                <option key={n} value={n}>{n} failing runs</option>
+                <option key={n} value={n}>{t.failingRuns(language === 'de' ? formatNumber(n, language) : String(n))}</option>
               ))}
             </select>
           </Toolbar>
@@ -100,11 +155,11 @@ export default function TypicalErrorsView({ courseId }: { courseId: string }) {
         {!loading && data && (
           <>
             <StatGrid columns={4}>
-              <StatCard label="Error groups" value={errors.length} />
-              <StatCard label="Runs scanned" value={data.results_scanned} hint="newest test runs below full score" />
-              <StatCard label="Largest group" value={largest} hint="students sharing one error" />
+              <StatCard label={t.errorGroups} value={errors.length} />
+              <StatCard label={t.runsScanned} value={data.results_scanned} hint={t.runsScannedHint} />
+              <StatCard label={t.largest} value={largest} hint={t.largestHint} />
               <StatCard
-                label="Runs without report"
+                label={t.withoutReport}
                 value={data.results_without_report}
                 tone={data.results_without_report ? 'warning' : 'muted'}
               />
@@ -112,16 +167,15 @@ export default function TypicalErrorsView({ courseId }: { courseId: string }) {
 
             {data.truncated && (
               <Notice tone="info">
-                More failing runs exist than were scanned. Only the newest {data.results_scanned} are
-                included; choose a larger scan or a single assignment to look further back.
+                {t.truncated(String(data.results_scanned))}
               </Notice>
             )}
 
             {errors.length === 0 ? (
               <EmptyState
                 compact
-                title="No failing tests found."
-                description="Either every scanned run passed, or no test reports are stored for them."
+                title={t.noneTitle}
+                description={t.noneText}
               />
             ) : (
               <Panel padding="none">
@@ -129,12 +183,12 @@ export default function TypicalErrorsView({ courseId }: { courseId: string }) {
                   <Table>
                     <Thead>
                       <tr>
-                        <Th className="normal-case tracking-normal text-sm">Assignment</Th>
-                        <Th className="normal-case tracking-normal text-sm">Failing test</Th>
-                        <Th className="normal-case tracking-normal text-sm">Message (normalized)</Th>
-                        <Th className="normal-case tracking-normal text-sm text-right">Students</Th>
-                        <Th className="normal-case tracking-normal text-sm text-right">Runs</Th>
-                        <Th className="normal-case tracking-normal text-sm">Last seen</Th>
+                        <Th className="normal-case tracking-normal text-sm">{t.assignment}</Th>
+                        <Th className="normal-case tracking-normal text-sm">{t.failingTest}</Th>
+                        <Th className="normal-case tracking-normal text-sm">{t.message}</Th>
+                        <Th className="normal-case tracking-normal text-sm text-right">{t.students}</Th>
+                        <Th className="normal-case tracking-normal text-sm text-right">{t.runs}</Th>
+                        <Th className="normal-case tracking-normal text-sm">{t.lastSeen}</Th>
                       </tr>
                     </Thead>
                     <Tbody>
@@ -153,12 +207,12 @@ export default function TypicalErrorsView({ courseId }: { courseId: string }) {
                               <Td className="py-2.5 font-mono text-xs text-body break-all">{e.message}</Td>
                               <Td className="py-2.5 text-right tabular-nums font-medium">{e.affected_students}</Td>
                               <Td className="py-2.5 text-right tabular-nums">{e.occurrences}</Td>
-                              <Td className="py-2.5 text-xs text-muted whitespace-nowrap">{formatWhen(e.last_seen_at)}</Td>
+                              <Td className="py-2.5 text-xs text-muted whitespace-nowrap">{formatDateTime(e.last_seen_at, language)}</Td>
                             </tr>
                             {isOpen && (
                               <tr>
                                 <Td colSpan={6} className="bg-canvas py-3">
-                                  <p className="text-xs font-medium text-muted mb-2">Examples (newest first)</p>
+                                  <p className="text-xs font-medium text-muted mb-2">{t.examples}</p>
                                   <ul className="space-y-2">
                                     {(e.examples ?? []).map((x) => (
                                       <li key={x.result_id} className="text-sm">
@@ -166,9 +220,9 @@ export default function TypicalErrorsView({ courseId }: { courseId: string }) {
                                           className="font-medium text-accent-text hover:underline"
                                           href={`/courses/${courseId}/lecturer/grading/${x.course_member_id}`}
                                         >
-                                          {x.student_name || 'Student'}
+                                          {x.student_name || t.student}
                                         </Link>
-                                        <span className="ml-2 text-xs text-subtle">{formatWhen(x.created_at)}</span>
+                                        <span className="ml-2 text-xs text-subtle">{formatDateTime(x.created_at, language)}</span>
                                         {x.message && (
                                           <pre className="mt-1 p-2 bg-surface border border-rule rounded text-xs whitespace-pre-wrap break-all max-h-40 overflow-auto">
                                             {x.message}
@@ -190,12 +244,24 @@ export default function TypicalErrorsView({ courseId }: { courseId: string }) {
             )}
 
             <details className="text-xs text-muted">
-              <summary className="cursor-pointer select-none">How messages are grouped</summary>
+              <summary className="cursor-pointer select-none">{t.howTitle}</summary>
               <p className="mt-2">
-                Each failing test of a stored test report counts once per run. Messages are reduced to
-                their first error line; numbers become &lt;n&gt;, quoted values &lt;str&gt; (plain names
-                such as &apos;np&apos; are kept), file paths &lt;path&gt; and memory addresses
-                &lt;addr&gt;. Runs by lecturers and tutors are not included.
+                {language === 'de' ? (
+                  <>
+                    Jeder fehlgeschlagene Test eines gespeicherten Testberichts zählt einmal pro Lauf.
+                    Meldungen werden auf ihre erste Fehlerzeile gekürzt; Zahlen werden zu &lt;n&gt;,
+                    Werte in Anführungszeichen zu &lt;str&gt; (einfache Namen wie &apos;np&apos; bleiben
+                    erhalten), Dateipfade zu &lt;path&gt; und Speicheradressen zu &lt;addr&gt;. Läufe
+                    von Lehrenden und Tutoren sind nicht enthalten.
+                  </>
+                ) : (
+                  <>
+                    Each failing test of a stored test report counts once per run. Messages are reduced to
+                    their first error line; numbers become &lt;n&gt;, quoted values &lt;str&gt; (plain names
+                    such as &apos;np&apos; are kept), file paths &lt;path&gt; and memory addresses
+                    &lt;addr&gt;. Runs by lecturers and tutors are not included.
+                  </>
+                )}
               </p>
             </details>
           </>

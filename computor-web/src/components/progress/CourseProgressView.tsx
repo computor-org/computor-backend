@@ -16,6 +16,7 @@ import { Table, Thead, Tbody, Th, Td } from '@/src/components/ui/Table';
 import { inputCls } from '@/src/components/ui/tokens';
 import { CourseMemberGradingsClient } from '@/src/generated/clients/CourseMemberGradingsClient';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
+import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
 import { usePersistedCourseDate } from '@/src/hooks/usePersistedCourseDate';
 import { courseAnalyticsClient } from '@/src/clients/CourseAnalyticsClient';
 import Badge from '@/src/components/Badge';
@@ -36,6 +37,69 @@ const ContentTypeChart = dynamic(() => import('./ContentTypeChart'), {
 
 const gradingsClient = new CourseMemberGradingsClient();
 
+const COPY = {
+  de: {
+    title: 'Bewertung',
+    subtitle: 'Überblick über Fortschritt und Bewertung der Studierenden',
+    refresh: 'Aktualisieren',
+    loadFailed: 'Fortschrittsdaten konnten nicht geladen werden.',
+    flagsFailed: 'Auffälligkeiten konnten nicht geladen werden.',
+    flags: 'Auffälligkeiten',
+    flagsLoading: 'Auffälligkeiten werden geladen …',
+    flagsSummary: (n: number, total: number) =>
+      `${n} von ${total} Studierenden erfüllen mindestens eine Regel. Eine Auffälligkeit ist ein Anlass zum Hinsehen, kein Urteil.`,
+    dueDate: 'Abgabefrist (für Fristregeln)',
+    students: (n: number, total: number | null) => `Studierende (${n}${total !== null ? ` / ${total}` : ''})`,
+    onlyFlagged: 'Nur auffällige',
+    searchPlaceholder: 'Studierende suchen …',
+    search: 'Studierende suchen',
+    student: 'Studierende',
+    progress: 'Fortschritt',
+    byType: 'Nach Typ',
+    grade: 'Bewertung',
+    lastActive: 'Zuletzt aktiv',
+    flagsCol: 'Auffälligkeiten',
+    noMatch: 'Keine Studierenden entsprechen deiner Suche',
+    noData: 'Keine Daten zu Studierenden verfügbar',
+    never: 'Nie',
+    today: 'Heute',
+    yesterday: 'Gestern',
+    daysAgo: (n: number) => `vor ${n} T.`,
+    weeksAgo: (n: number) => `vor ${n} Wo.`,
+    monthsAgo: (n: number) => `vor ${n} Mon.`,
+  },
+  en: {
+    title: 'Grading',
+    subtitle: 'Overview of student progress and grading',
+    refresh: 'Refresh',
+    loadFailed: 'Failed to load progress data',
+    flagsFailed: 'Failed to load flags',
+    flags: 'Flags',
+    flagsLoading: 'Loading flags…',
+    flagsSummary: (n: number, total: number) =>
+      `${n} of ${total} students match at least one rule. A flag is a prompt to look, not a verdict.`,
+    dueDate: 'Due date (for deadline rules)',
+    students: (n: number, total: number | null) => `Students (${n}${total !== null ? ` / ${total}` : ''})`,
+    onlyFlagged: 'Only flagged',
+    searchPlaceholder: 'Search students…',
+    search: 'Search students',
+    student: 'Student',
+    progress: 'Progress',
+    byType: 'By type',
+    grade: 'Grade',
+    lastActive: 'Last active',
+    flagsCol: 'Flags',
+    noMatch: 'No students match your search',
+    noData: 'No student data available',
+    never: 'Never',
+    today: 'Today',
+    yesterday: 'Yesterday',
+    daysAgo: (n: number) => `${n}d ago`,
+    weeksAgo: (n: number) => `${n}w ago`,
+    monthsAgo: (n: number) => `${n}mo ago`,
+  },
+};
+
 // `<input type="datetime-local">` has no timezone; show an ISO instant in local time.
 function isoToLocalInput(iso: string | null): string {
   if (!iso) return '';
@@ -50,14 +114,15 @@ function daysSince(dateStr: string | null | undefined): number | null {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
 }
 
-function relativeDate(dateStr: string | null | undefined): string {
+function relativeDate(dateStr: string | null | undefined, language: UiLanguage): string {
+  const t = COPY[language];
   const days = daysSince(dateStr);
-  if (days === null) return 'Never';
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Yesterday';
-  if (days < 7) return `${days}d ago`;
-  if (days < 30) return `${Math.floor(days / 7)}w ago`;
-  return `${Math.floor(days / 30)}mo ago`;
+  if (days === null) return t.never;
+  if (days === 0) return t.today;
+  if (days === 1) return t.yesterday;
+  if (days < 7) return t.daysAgo(days);
+  if (days < 30) return t.weeksAgo(Math.floor(days / 7));
+  return t.monthsAgo(Math.floor(days / 30));
 }
 
 function activityDotColor(dateStr: string | null | undefined): string {
@@ -79,7 +144,9 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
 
-  const crumbs = useCourseCrumbs(courseId, 'Grading');
+  const language = useUiLanguage();
+  const t = COPY[language];
+  const crumbs = useCourseCrumbs(courseId, t.title);
   const [students, setStudents] = useState<CourseMemberGradingsList[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,20 +167,20 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
       setStudents(data);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load progress data');
+      setError(err instanceof Error ? err.message : t.loadFailed);
     } finally {
       setLoading(false);
     }
-  }, [courseId]);
+  }, [courseId, t]);
 
   const fetchFlags = useCallback(async () => {
     try {
       setFlagData(await courseAnalyticsClient.courseFlags(courseId, dueDate));
       setFlagError(null);
     } catch (err) {
-      setFlagError(err instanceof Error ? err.message : 'Failed to load flags');
+      setFlagError(err instanceof Error ? err.message : t.flagsFailed);
     }
-  }, [courseId, dueDate]);
+  }, [courseId, dueDate, t]);
 
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
@@ -196,8 +263,8 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
     <ListPageLayout>
       <PageHeader
         breadcrumbs={crumbs}
-        title="Grading"
-        subtitle="Overview of student progress and grading"
+        title={t.title}
+        subtitle={t.subtitle}
         actions={
           <Button
             variant="secondary"
@@ -207,7 +274,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
             }}
             disabled={loading}
           >
-            Refresh
+            {t.refresh}
           </Button>
         }
       />
@@ -247,16 +314,16 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
             <Panel className="space-y-3">
               <div className="flex flex-wrap items-end gap-4">
                 <div>
-                  <h3 className="text-sm font-semibold text-fg">Flags</h3>
+                  <h3 className="text-sm font-semibold text-fg">{t.flags}</h3>
                   <p className="text-xs text-muted mt-0.5">
                     {flagData
-                      ? `${flagData.students?.length ?? 0} of ${students.length} students match at least one rule. A flag is a prompt to look, not a verdict.`
-                      : 'Loading flags…'}
+                      ? t.flagsSummary(flagData.students?.length ?? 0, students.length)
+                      : t.flagsLoading}
                   </p>
                 </div>
                 <div className="flex flex-col gap-1 ml-auto">
                   <label htmlFor="flags-due-date" className="text-xs font-medium text-muted">
-                    Due date (for deadline rules)
+                    {t.dueDate}
                   </label>
                   <input
                     id="flags-due-date"
@@ -284,8 +351,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
             <Panel padding="none">
               <Toolbar className="px-4 py-3 border-b border-rule">
                 <h3 className="text-sm font-semibold text-fg">
-                  Students ({filtered.length}
-                  {filtered.length !== students.length ? ` / ${students.length}` : ''})
+                  {t.students(filtered.length, filtered.length !== students.length ? students.length : null)}
                 </h3>
                 <label className="ml-auto flex items-center gap-2 text-sm text-body">
                   <input
@@ -293,15 +359,15 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
                     checked={onlyFlagged}
                     onChange={(e) => setOnlyFlagged(e.target.checked)}
                   />
-                  Only flagged
+                  {t.onlyFlagged}
                 </label>
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className={`${inputCls} max-w-xs`}
-                  placeholder="Search students…"
-                  aria-label="Search students"
+                  placeholder={t.searchPlaceholder}
+                  aria-label={t.search}
                 />
               </Toolbar>
               <div className="overflow-x-auto">
@@ -312,35 +378,35 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
                         className="cursor-pointer select-none normal-case tracking-normal text-sm"
                         onClick={() => handleSort('name')}
                       >
-                        Student {sortIcon('name')}
+                        {t.student} {sortIcon('name')}
                       </Th>
                       <Th
                         className="cursor-pointer select-none w-48 normal-case tracking-normal text-sm"
                         onClick={() => handleSort('progress')}
                       >
-                        Progress {sortIcon('progress')}
+                        {t.progress} {sortIcon('progress')}
                       </Th>
-                      <Th className="normal-case tracking-normal text-sm">By type</Th>
+                      <Th className="normal-case tracking-normal text-sm">{t.byType}</Th>
                       <Th
                         className="cursor-pointer select-none w-20 normal-case tracking-normal text-sm"
                         onClick={() => handleSort('grade')}
                       >
-                        Grade {sortIcon('grade')}
+                        {t.grade} {sortIcon('grade')}
                       </Th>
                       <Th
                         className="cursor-pointer select-none w-28 normal-case tracking-normal text-sm"
                         onClick={() => handleSort('lastActive')}
                       >
-                        Last active {sortIcon('lastActive')}
+                        {t.lastActive} {sortIcon('lastActive')}
                       </Th>
-                      <Th className="normal-case tracking-normal text-sm">Flags</Th>
+                      <Th className="normal-case tracking-normal text-sm">{t.flagsCol}</Th>
                     </tr>
                   </Thead>
                   <Tbody>
                     {sorted.length === 0 ? (
                       <tr>
                         <Td colSpan={6} className="py-8 text-center text-muted">
-                          {searchQuery ? 'No students match your search' : 'No student data available'}
+                          {searchQuery ? t.noMatch : t.noData}
                         </Td>
                       </tr>
                     ) : (
@@ -413,7 +479,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
                                 <span
                                   className={`inline-block w-2 h-2 rounded-full ${activityDotColor(s.latest_submission_at)}`}
                                 />
-                                <span className="text-xs text-muted">{relativeDate(s.latest_submission_at)}</span>
+                                <span className="text-xs text-muted">{relativeDate(s.latest_submission_at, language)}</span>
                               </div>
                             </Td>
 

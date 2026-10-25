@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { useResource } from '@/src/hooks/useResource';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import { useContentTree } from '@/src/hooks/useContentTree';
@@ -21,9 +22,94 @@ import StatGrid, { StatCard } from '@/src/components/ui/StatGrid';
 import TreeRow, { TreeRows } from '@/src/components/ui/TreeRow';
 import type { CourseContentLecturerList, CourseContentTypeList } from 'types/generated';
 
+const COPY = {
+  de: {
+    assignments: 'Aufgaben',
+    releaseFailedStatus: (status: number) => `Freigabe fehlgeschlagen (${status})`,
+    releaseStarted: 'Freigabe gestartet. Der Status wechselt zu „Wird bereitgestellt“ und dann zu „Bereitgestellt“.',
+    releaseFailed: 'Freigabe fehlgeschlagen',
+    failedStatus: (status: number) => `Fehlgeschlagen (${status})`,
+    visibilityFailed: 'Die Sichtbarkeit konnte nicht geändert werden',
+    contents: 'Inhalte',
+    deployed: 'Bereitgestellt',
+    pending: 'Ausstehend',
+    failedNone: 'Fehlgeschlagen / keine',
+    outdated: (n: number) => `Für ${n} bereitgestellte(n) Inhalt(e) ist eine neuere Beispielversion verfügbar.`,
+    releasing: 'Wird freigegeben …',
+    releaseAllTitle: 'Alle ausstehenden oder fehlgeschlagenen Aufgaben im Vorlagen-Repository bereitstellen',
+    releaseAll: (n: number) => `Alle ausstehenden freigeben (${n})`,
+    rereleasing: 'Wird erneut freigegeben …',
+    rereleaseTitle: 'ALLE Aufgaben erneut bereitstellen (auch bereits bereitgestellte), füllt Vorlagen- und Referenz-Repository',
+    rereleaseAll: 'Alle erneut freigeben (erzwingen)',
+    collapseAll: 'Alle einklappen',
+    expandAll: 'Alle ausklappen',
+    emptyTitle: 'Noch keine Kursinhalte',
+    emptyDescription: 'Einheiten und Aufgaben kommen durch das Hochladen einer Kurs-Deployment-Datei hinzu.',
+    contentMarker: 'Inhalt',
+    hiddenHereTitle: 'Studierende sehen das und alles darunter nicht.',
+    hiddenAboveTitle: 'Verborgen, weil eine Einheit darüber oder der Kurs verborgen ist.',
+    invisible: 'Unsichtbar',
+    limitsTitle: (runs: string, subs: string) => `Testläufe: ${runs} · Abgaben: ${subs}`,
+    limitsBadge: (runs: string, subs: string) => `${runs}T / ${subs}A`,
+    newerTitle: 'Eine neuere Beispielversion ist verfügbar',
+    updateAvailable: 'Update verfügbar',
+    showTitle: 'Das wieder für Studierende anzeigen',
+    hideTitle: 'Das samt allem darunter vor Studierenden verbergen',
+    show: 'Einblenden',
+    hide: 'Ausblenden',
+    release: 'Freigeben',
+    releaseUnitTitle: (n: number) => `${n} Aufgabe(n) in dieser Einheit freigeben`,
+    releaseUnit: (n: number) => `Einheit freigeben (${n})`,
+    open: 'Öffnen',
+    archived: (n: number) => `${n} archivierte(r) Inhalt(e) ausgeblendet.`,
+  },
+  en: {
+    assignments: 'Assignments',
+    releaseFailedStatus: (status: number) => `Release failed (${status})`,
+    releaseStarted: 'Release started — badges move to “deploying”, then “deployed”.',
+    releaseFailed: 'Release failed',
+    failedStatus: (status: number) => `Failed (${status})`,
+    visibilityFailed: 'Could not change visibility',
+    contents: 'Contents',
+    deployed: 'Deployed',
+    pending: 'Pending',
+    failedNone: 'Failed / none',
+    outdated: (n: number) => `${n} deployed content(s) have a newer example version available.`,
+    releasing: 'Releasing…',
+    releaseAllTitle: 'Deploy every pending/failed assignment into the template repo',
+    releaseAll: (n: number) => `Release all pending (${n})`,
+    rereleasing: 'Re-releasing…',
+    rereleaseTitle: 'Re-deploy ALL assignments (including already-deployed) — fills both the template and reference repos',
+    rereleaseAll: 'Re-release all (force)',
+    collapseAll: 'Collapse all',
+    expandAll: 'Expand all',
+    emptyTitle: 'No course contents yet',
+    emptyDescription: 'Units and assignments arrive by uploading a course deployment file.',
+    contentMarker: 'content',
+    hiddenHereTitle: 'Students do not see this or anything under it.',
+    hiddenAboveTitle: 'Hidden because a unit above this one, or the course, is hidden.',
+    invisible: 'Invisible',
+    limitsTitle: (runs: string, subs: string) => `Test runs: ${runs} · Submissions: ${subs}`,
+    limitsBadge: (runs: string, subs: string) => `${runs}T / ${subs}S`,
+    newerTitle: 'A newer example version is available',
+    updateAvailable: 'update available',
+    showTitle: 'Show this to students again',
+    hideTitle: 'Hide this from students, along with everything under it',
+    show: 'Show',
+    hide: 'Hide',
+    release: 'Release',
+    releaseUnitTitle: (n: number) => `Release ${n} assignment(s) in this unit`,
+    releaseUnit: (n: number) => `Release unit (${n})`,
+    open: 'Open',
+    archived: (n: number) => `${n} archived content(s) hidden.`,
+  },
+};
+
 export default function LecturerContentPage() {
   const courseId = useParams().id as string;
-  const crumbs = useCourseCrumbs(courseId, 'Assignments');
+  const language = useUiLanguage();
+  const t = COPY[language];
+  const crumbs = useCourseCrumbs(courseId, t.assignments);
 
   // reload re-fetches everything (badges move pending → deploying → deployed as
   // the release workflow runs).
@@ -43,7 +129,7 @@ export default function LecturerContentPage() {
     let typeMap: Record<string, CourseContentTypeList> = {};
     if (ctRes.ok) {
       const types: CourseContentTypeList[] = await ctRes.json();
-      typeMap = Object.fromEntries(types.map((t) => [t.id, t]));
+      typeMap = Object.fromEntries(types.map((ty) => [ty.id, ty]));
     }
     return { contents, typeMap };
   }, [courseId]);
@@ -72,12 +158,12 @@ export default function LecturerContentPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.detail || err?.message || `Release failed (${res.status})`);
+        throw new Error(err?.detail || err?.message || t.releaseFailedStatus(res.status));
       }
-      setReleaseMsg('Release started — badges move to “deploying”, then “deployed”.');
+      setReleaseMsg(t.releaseStarted);
       setTimeout(() => reload(), 3000);
     } catch (e) {
-      setReleaseMsg(e instanceof Error ? e.message : 'Release failed');
+      setReleaseMsg(e instanceof Error ? e.message : t.releaseFailed);
     } finally {
       setReleasing(null);
     }
@@ -103,11 +189,11 @@ export default function LecturerContentPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.detail || err?.message || `Failed (${res.status})`);
+        throw new Error(err?.detail || err?.message || t.failedStatus(res.status));
       }
       reload();
     } catch (e) {
-      setReleaseMsg(e instanceof Error ? e.message : 'Could not change visibility');
+      setReleaseMsg(e instanceof Error ? e.message : t.visibilityFailed);
     } finally {
       setTogglingVisibility(null);
     }
@@ -137,7 +223,7 @@ export default function LecturerContentPage() {
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
-        <PageHeader breadcrumbs={crumbs} title="Assignments" />
+        <PageHeader breadcrumbs={crumbs} title={t.assignments} />
 
         <ErrorBanner>{error}</ErrorBanner>
 
@@ -147,16 +233,16 @@ export default function LecturerContentPage() {
           <ScrollArea>
             {/* Summary — the at-a-glance deployment signal */}
             <StatGrid columns={5}>
-              <StatCard label="Contents" value={active.length} />
-              <StatCard label="Assignments" value={submittable} tone="info" />
-              <StatCard label="Deployed" value={counts.deployed} tone="success" />
-              <StatCard label="Pending" value={counts.pending} tone="warning" />
-              <StatCard label="Failed / none" value={counts.failed + counts.none} tone="error" />
+              <StatCard label={t.contents} value={active.length} />
+              <StatCard label={t.assignments} value={submittable} tone="info" />
+              <StatCard label={t.deployed} value={counts.deployed} tone="success" />
+              <StatCard label={t.pending} value={counts.pending} tone="warning" />
+              <StatCard label={t.failedNone} value={counts.failed + counts.none} tone="error" />
             </StatGrid>
 
             {outdated > 0 && (
               <Notice tone="warning">
-                {outdated} deployed content(s) have a newer example version available.
+                {t.outdated(outdated)}
               </Notice>
             )}
 
@@ -166,10 +252,10 @@ export default function LecturerContentPage() {
                 size="sm"
                 disabled={releasing !== null || counts.pending + counts.failed === 0}
                 loading={releasing === 'all'}
-                loadingLabel="Releasing…"
-                title="Deploy every pending/failed assignment into the template repo"
+                loadingLabel={t.releasing}
+                title={t.releaseAllTitle}
               >
-                Release all pending ({counts.pending + counts.failed})
+                {t.releaseAll(counts.pending + counts.failed)}
               </Button>
               <Button
                 variant="secondary"
@@ -177,24 +263,24 @@ export default function LecturerContentPage() {
                 onClick={() => release('all-force', undefined, true)}
                 disabled={releasing !== null || counts.deployed + counts.pending + counts.failed === 0}
                 loading={releasing === 'all-force'}
-                loadingLabel="Re-releasing…"
-                title="Re-deploy ALL assignments (including already-deployed) — fills both the template and reference repos"
+                loadingLabel={t.rereleasing}
+                title={t.rereleaseTitle}
               >
-                Re-release all (force)
+                {t.rereleaseAll}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setAllExpanded(false)}>
-                Collapse all
+                {t.collapseAll}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setAllExpanded(true)}>
-                Expand all
+                {t.expandAll}
               </Button>
             </Toolbar>
 
             {/* Content tree with deployment badges */}
             {active.length === 0 ? (
               <EmptyState
-                title="No course contents yet"
-                description="Units and assignments arrive by uploading a course deployment file."
+                title={t.emptyTitle}
+                description={t.emptyDescription}
               />
             ) : (
               <TreeRows>
@@ -204,7 +290,7 @@ export default function LecturerContentPage() {
                   if (!item) return null;
                   const c = item;
                   const type = c.course_content_type ?? typeMap[c.course_content_type_id];
-                  const badge = deploymentBadge(c);
+                  const badge = deploymentBadge(c, language);
                   // Hidden here, or hidden by a unit above / the course itself.
                   const hidden = c.visible_effective === false;
                   const hiddenHere = c.visible === false;
@@ -219,7 +305,7 @@ export default function LecturerContentPage() {
                       expanded={expanded}
                       onToggle={toggle}
                       markerColor={type?.color}
-                      markerTitle={type?.title || type?.slug || 'content'}
+                      markerTitle={type?.title || type?.slug || t.contentMarker}
                       label={label}
                       hidden={hidden}
                     >
@@ -229,11 +315,11 @@ export default function LecturerContentPage() {
                           className="shrink-0"
                           title={
                             hiddenHere
-                              ? 'Students do not see this or anything under it.'
-                              : 'Hidden because a unit above this one, or the course, is hidden.'
+                              ? t.hiddenHereTitle
+                              : t.hiddenAboveTitle
                           }
                         >
-                          Invisible
+                          {t.invisible}
                         </Badge>
                       )}
                       {type && (
@@ -246,16 +332,18 @@ export default function LecturerContentPage() {
                           tone="info"
                           className="shrink-0"
                           title={
-                            `Test runs: ${formatLimit(c.max_test_runs)} · ` +
-                            `Submissions: ${formatLimit(c.max_submissions)}`
+                            t.limitsTitle(
+                              formatLimit(c.max_test_runs, language),
+                              formatLimit(c.max_submissions, language),
+                            )
                           }
                         >
-                          {formatLimit(c.max_test_runs)}T / {formatLimit(c.max_submissions)}S
+                          {t.limitsBadge(formatLimit(c.max_test_runs, language), formatLimit(c.max_submissions, language))}
                         </Badge>
                       )}
                       {c.deployment?.has_newer_version && (
-                        <Badge tone="warning" className="shrink-0" title="A newer example version is available">
-                          update available
+                        <Badge tone="warning" className="shrink-0" title={t.newerTitle}>
+                          {t.updateAvailable}
                         </Badge>
                       )}
                       {/* Only offered where the lecturer can actually change
@@ -272,11 +360,11 @@ export default function LecturerContentPage() {
                           onClick={() => toggleVisibility(c)}
                           title={
                             hiddenHere
-                              ? 'Show this to students again'
-                              : 'Hide this from students, along with everything under it'
+                              ? t.showTitle
+                              : t.hideTitle
                           }
                         >
-                          {hiddenHere ? 'Show' : 'Hide'}
+                          {hiddenHere ? t.show : t.hide}
                         </Button>
                       )}
                       {canReleaseOne && (
@@ -289,7 +377,7 @@ export default function LecturerContentPage() {
                           loading={releasing === c.id}
                           loadingLabel="…"
                         >
-                          Release
+                          {t.release}
                         </Button>
                       )}
                       {!canReleaseOne && unitKids.length > 0 && (
@@ -301,9 +389,9 @@ export default function LecturerContentPage() {
                           disabled={releasing !== null}
                           loading={releasing === c.id}
                           loadingLabel="…"
-                          title={`Release ${unitKids.length} assignment(s) in this unit`}
+                          title={t.releaseUnitTitle(unitKids.length)}
                         >
-                          Release unit ({unitKids.length})
+                          {t.releaseUnit(unitKids.length)}
                         </Button>
                       )}
                       <Badge tone={badge.tone} className="shrink-0">
@@ -315,7 +403,7 @@ export default function LecturerContentPage() {
                         size="xs"
                         className="shrink-0"
                       >
-                        Open
+                        {t.open}
                       </ButtonLink>
                     </TreeRow>
                   );
@@ -324,7 +412,7 @@ export default function LecturerContentPage() {
             )}
 
             {archivedCount > 0 && (
-              <p className="text-xs text-subtle">{archivedCount} archived content(s) hidden.</p>
+              <p className="text-xs text-subtle">{t.archived(archivedCount)}</p>
             )}
           </ScrollArea>
         )}

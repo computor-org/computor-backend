@@ -11,6 +11,7 @@ import Button from '@/src/components/ui/Button';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/src/components/ui/Table';
 import WorkspaceStatusBadge from '@/src/components/workspaces/WorkspaceStatusBadge';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
@@ -24,9 +25,147 @@ import { userName } from '@/src/utils/userName';
 const membersClient = new CourseMembersClient();
 const courseWorkspacesClient = new CourseWorkspacesClient();
 
+const COPY = {
+  de: {
+    workspaces: 'Arbeitsumgebungen',
+    policySaved: 'Richtlinie gespeichert. Neue Arbeitsumgebungen übernehmen sie sofort.',
+    policySaveFailed: 'Die Richtlinie konnte nicht gespeichert werden',
+    applied: (n: number) => `${n} Arbeitsumgebung(en) unter der aktuellen Richtlinie neu gestartet`,
+    appliedSkipped: (n: number) => `; ${n} unverändert gelassen (siehe Liste)`,
+    applyFailed: 'Die Richtlinie konnte nicht angewendet werden',
+    provisioned: (n: number) => `${n} Arbeitsumgebung(en) bereitgestellt`,
+    provisionedFailed: (n: number) => `, ${n} fehlgeschlagen`,
+    provisionFailed: 'Bereitstellung fehlgeschlagen',
+    deleted: 'Arbeitsumgebung gelöscht',
+    deleteFailed: 'Die Arbeitsumgebung konnte nicht gelöscht werden',
+    title: 'Arbeitsumgebungen der Studierenden',
+    subtitle: 'Stelle (temporäre) Arbeitsumgebungen für deine Studierenden bereit und verwalte die vorhandenen.',
+    loading: 'Wird geladen …',
+    notEnabled: 'Die Bereitstellung durch Lehrende ist für diesen Kurs nicht aktiviert. Eine Person mit Wartungsrechten für Arbeitsumgebungen kann sie im Verwaltungsbereich für Arbeitsumgebungen aktivieren.',
+    noTemplates: 'Diesem Kurs sind noch keine Arbeitsumgebungs-Vorlagen zugewiesen. Eine Person mit Wartungsrechten für Arbeitsumgebungen kann sie im Verwaltungsbereich für Arbeitsumgebungen zuweisen.',
+    rootInternetFor: (name: string) => `Root und Internet für ${name}`,
+    policyIntro: 'Was die Arbeitsumgebungen dieses Kurses mit dieser Vorlage erhalten. Ein Kurs kann nur Zugriff wegnehmen, eine Option ist gesperrt, wenn die Vorlage sie bereits verweigert. Neue Arbeitsumgebungen übernehmen das sofort, bestehende behalten, womit sie erstellt wurden, bis du es anwendest oder sie das nächste Mal starten.',
+    root: 'Root (sudo)',
+    internet: 'Internet',
+    templateDenies: 'Die Vorlage verweigert das, ein Kurs kann es nicht gewähren.',
+    offForTemplate: '(für diese Vorlage aus)',
+    applying: 'Wird angewendet …',
+    applyRunning: 'Auf laufende Arbeitsumgebungen anwenden',
+    applyHint: 'Startet sie neu, damit die Änderung sofort gilt. Laufende Prozesse werden beendet, Dateien bleiben unberührt. Gestoppte Arbeitsumgebungen übernehmen sie beim nächsten Start.',
+    provisionTitle: 'Für Studierende bereitstellen',
+    provisionIntro: 'Erstellt eine Arbeitsumgebung pro ausgewählter studierender Person. Die Studierenden können diese öffnen und starten, aber keine neuen bereitstellen. Eine temporäre Arbeitsumgebung nutzt ein eigenes temporäres Home-Volume, das zusammen mit der Arbeitsumgebung gelöscht wird. Die regulären Dateien der Studierenden bleiben unberührt.',
+    template: 'Vorlage',
+    notSetUp: ' — auf diesem Server nicht eingerichtet',
+    notDeployable: 'Dieser Arbeitsumgebungstyp ist auf diesem Server noch nicht eingerichtet, daher kann nichts darauf bereitgestellt werden. Eine Person mit Wartungsrechten für Arbeitsumgebungen richtet ihn in der Verwaltung der Arbeitsumgebungen ein.',
+    studentsGet: 'Studierende erhalten',
+    withRoot: 'Root',
+    noRoot: 'kein Root',
+    and: 'und',
+    withInternet: 'Internet',
+    noInternet: 'kein Internet',
+    home: 'Home-Verzeichnis',
+    homeScratch: 'Temporär (wird mit der Arbeitsumgebung gelöscht)',
+    homeShared: 'Übliches Home (von allen Arbeitsumgebungen gemeinsam genutzt)',
+    label: 'Bezeichnung',
+    labelHint: 'Namenssuffix (z. B. „exam1“), damit sie sich von den eigenen Arbeitsumgebungen der Studierenden unterscheiden.',
+    selectAll: 'Alle Mitglieder auswählen',
+    member: 'Mitglied',
+    role: 'Rolle',
+    lastRun: 'Letzter Lauf',
+    select: (name: string) => `${name} auswählen`,
+    provisionedName: (name: string) => `${name} bereitgestellt`,
+    noMembers: 'Keine Kursmitglieder.',
+    provisioning: 'Wird bereitgestellt …',
+    provisionSelected: (n: number) => `Für ${n} Ausgewählte bereitstellen`,
+    provisionHint: 'Läuft nacheinander, Fehler werden pro Person gemeldet und brechen den Stapel nie ab.',
+    existingTitle: 'Vorhandene Arbeitsumgebungen der Studierenden',
+    existingIntro: 'Für diesen Kurs bereitgestellte Arbeitsumgebungen. Die eigene Arbeitsumgebung eines Mitglieds wird hier nicht aufgeführt, auch wenn sie eine dieser Vorlagen nutzt. Sie gehört der Person, nicht dem Kurs, und wird in der Verwaltung der Arbeitsumgebungen verwaltet.',
+    student: 'Studierende(r)',
+    workspace: 'Arbeitsumgebung',
+    homeCol: 'Home',
+    status: 'Status',
+    actions: 'Aktionen',
+    throwaway: 'Temporär',
+    shared: 'Gemeinsam',
+    confirmDelete: 'Löschen bestätigen',
+    delete: 'Löschen',
+    noStudentWorkspaces: 'Keine Arbeitsumgebungen der Studierenden mit den Vorlagen dieses Kurses.',
+    forbidden: 'Die Arbeitsumgebungs-Konsole erfordert die Lehrenden-Rolle in diesem Kurs.',
+    backToCourse: 'Zurück zum Kurs',
+  },
+  en: {
+    workspaces: 'Workspaces',
+    policySaved: 'Policy saved. New workspaces get it immediately.',
+    policySaveFailed: 'Failed to save the policy',
+    applied: (n: number) => `${n} workspace(s) restarted under the current policy`,
+    appliedSkipped: (n: number) => `; ${n} left alone (see the list)`,
+    applyFailed: 'Failed to apply the policy',
+    provisioned: (n: number) => `${n} workspace(s) provisioned`,
+    provisionedFailed: (n: number) => `, ${n} failed`,
+    provisionFailed: 'Provisioning failed',
+    deleted: 'Workspace deleted',
+    deleteFailed: 'Failed to delete workspace',
+    title: 'Student workspaces',
+    subtitle: 'Provision (throwaway) workspaces for your students and manage the ones that exist',
+    loading: 'Loading…',
+    notEnabled: 'Lecturer provisioning is not enabled for this course. A workspace maintainer can enable it in the workspace administration area.',
+    noTemplates: 'This course has no workspace templates yet. A workspace maintainer can assign templates in the workspace administration area.',
+    rootInternetFor: (name: string) => `Root & internet for ${name}`,
+    policyIntro: "What this course's workspaces of this template get. A course can only take access away — a control is locked when the template itself already denies it. New workspaces get this immediately; existing ones keep what they were created with until you apply it or they next start.",
+    root: 'Root (sudo)',
+    internet: 'Internet',
+    templateDenies: 'The template denies this; a course cannot grant it.',
+    offForTemplate: '(off for this template)',
+    applying: 'Applying…',
+    applyRunning: 'Apply to running workspaces',
+    applyHint: 'Restarts them so the change takes effect now — running processes end, files are untouched. Stopped workspaces pick it up when they next start.',
+    provisionTitle: 'Provision for students',
+    provisionIntro: "Creates one workspace per selected student. Students can open and start these, but not provision new ones. A throwaway workspace uses its own scratch home volume that is deleted together with the workspace — the student's regular files stay untouched.",
+    template: 'Template',
+    notSetUp: ' — not set up on this server',
+    notDeployable: 'This workspace type is not set up on this server yet, so nothing can be provisioned onto it. A workspace maintainer deploys it under workspace administration.',
+    studentsGet: 'Students get',
+    withRoot: 'root',
+    noRoot: 'no root',
+    and: 'and',
+    withInternet: 'internet',
+    noInternet: 'no internet',
+    home: 'Home directory',
+    homeScratch: 'Throwaway (deleted with the workspace)',
+    homeShared: 'Usual home (shared across workspaces)',
+    label: 'Label',
+    labelHint: 'Name suffix (e.g. "exam1") — keeps these apart from the students\' own workspaces.',
+    selectAll: 'Select all members',
+    member: 'Member',
+    role: 'Role',
+    lastRun: 'Last run',
+    select: (name: string) => `Select ${name}`,
+    provisionedName: (name: string) => `Provisioned ${name}`,
+    noMembers: 'No course members.',
+    provisioning: 'Provisioning…',
+    provisionSelected: (n: number) => `Provision for ${n} selected`,
+    provisionHint: 'Runs one at a time; failures are reported per student and never abort the batch.',
+    existingTitle: 'Existing student workspaces',
+    existingIntro: "Workspaces provisioned for this course. A member's own workspace is not listed here even when it uses one of these templates — it belongs to them, not to the course, and is managed under workspace administration.",
+    student: 'Student',
+    workspace: 'Workspace',
+    homeCol: 'Home',
+    status: 'Status',
+    actions: 'Actions',
+    throwaway: 'Throwaway',
+    shared: 'Shared',
+    confirmDelete: 'Confirm delete',
+    delete: 'Delete',
+    noStudentWorkspaces: "No student workspaces on this course's templates.",
+    forbidden: 'The workspace console requires the lecturer role for this course.',
+    backToCourse: 'Back to course',
+  },
+};
+
 function LecturerWorkspacesContent() {
   const courseId = useParams().id as string;
-  const crumbs = useCourseCrumbs(courseId, 'Workspaces');
+  const t = COPY[useUiLanguage()];
+  const crumbs = useCourseCrumbs(courseId, t.workspaces);
   const notify = useNotify();
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -61,15 +200,15 @@ function LecturerWorkspacesContent() {
         .sort((a, b) => userName(a.user).localeCompare(userName(b.user))),
     [data],
   );
-  const templates = (settings?.templates ?? []).filter((t) => t.enabled);
+  const templates = (settings?.templates ?? []).filter((tpl) => tpl.enabled);
   // A course keeps its templates by name, so it can offer one Coder does not
   // have — never deployed, or deleted since. Provisioning onto it fails per
   // student, which here means one failure per person in the selection.
   // (`exists_in_coder` is null when Coder was unreachable: claim nothing then.)
-  const deployable = templates.filter((t) => t.exists_in_coder !== false);
+  const deployable = templates.filter((tpl) => tpl.exists_in_coder !== false);
   const provisionAllowed = (settings?.lecturer_provision_enabled ?? false) || (settings?.can_manage ?? false);
   const effectiveTemplate = template || deployable[0]?.template_name || '';
-  const selectedTemplate = templates.find((t) => t.template_name === effectiveTemplate);
+  const selectedTemplate = templates.find((tpl) => tpl.template_name === effectiveTemplate);
   const selectedIsDeployable = selectedTemplate ? selectedTemplate.exists_in_coder !== false : false;
   // Editing the policy stays a workspace-maintainer job; a lecturer sees the
   // effective values read-only next to the template picker.
@@ -99,26 +238,26 @@ function LecturerWorkspacesContent() {
       await courseWorkspacesClient.updateSettings({
         courseId,
         body: {
-          template_names: settings.templates.map((t) => t.template_name),
+          template_names: settings.templates.map((tpl) => tpl.template_name),
           lecturer_provision_enabled: settings.lecturer_provision_enabled,
           template_policies: Object.fromEntries(
-            settings.templates.map((t) => [
-              t.template_name,
-              t.template_name === selectedTemplate.template_name
+            settings.templates.map((tpl) => [
+              tpl.template_name,
+              tpl.template_name === selectedTemplate.template_name
                 ? {
-                    allow_root: t.allow_root ?? null,
-                    allow_internet: t.allow_internet ?? null,
+                    allow_root: tpl.allow_root ?? null,
+                    allow_internet: tpl.allow_internet ?? null,
                     [key]: allowed ? null : false,
                   }
-                : { allow_root: t.allow_root ?? null, allow_internet: t.allow_internet ?? null },
+                : { allow_root: tpl.allow_root ?? null, allow_internet: tpl.allow_internet ?? null },
             ]),
           ),
         },
       });
-      notify('Policy saved. New workspaces get it immediately.', 'success');
+      notify(t.policySaved, 'success');
       await reload();
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Failed to save the policy', 'error');
+      notify(e instanceof Error ? e.message : t.policySaveFailed, 'error');
     } finally {
       setSavingPolicy(false);
     }
@@ -130,13 +269,12 @@ function LecturerWorkspacesContent() {
       const result = await courseWorkspacesClient.applyPolicy({ courseId });
       const skipped = result.outcomes.filter((o) => !o.success).length;
       notify(
-        `${result.succeeded} workspace(s) restarted under the current policy` +
-          (skipped ? `; ${skipped} left alone (see the list)` : ''),
+        t.applied(result.succeeded) + (skipped ? t.appliedSkipped(skipped) : ''),
         'success',
       );
       await reload();
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Failed to apply the policy', 'error');
+      notify(e instanceof Error ? e.message : t.applyFailed, 'error');
     } finally {
       setApplying(false);
     }
@@ -158,13 +296,12 @@ function LecturerWorkspacesContent() {
       });
       setOutcomes(result.outcomes);
       notify(
-        `${result.succeeded} workspace(s) provisioned` +
-          (result.failed > 0 ? `, ${result.failed} failed` : ''),
+        t.provisioned(result.succeeded) + (result.failed > 0 ? t.provisionedFailed(result.failed) : ''),
         result.failed > 0 ? 'error' : 'success',
       );
       await reload();
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Provisioning failed', 'error');
+      notify(e instanceof Error ? e.message : t.provisionFailed, 'error');
     } finally {
       setProvisioning(false);
     }
@@ -180,10 +317,10 @@ function LecturerWorkspacesContent() {
     setDeleting(key);
     try {
       await courseWorkspacesClient.deleteStudentWorkspace({ courseId, username, workspaceName });
-      notify('Workspace deleted', 'success');
+      notify(t.deleted, 'success');
       await reload();
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Failed to delete workspace', 'error');
+      notify(e instanceof Error ? e.message : t.deleteFailed, 'error');
     } finally {
       setDeleting(null);
     }
@@ -198,25 +335,23 @@ function LecturerWorkspacesContent() {
     <ListPageLayout>
       <PageHeader
         breadcrumbs={crumbs}
-        title="Student workspaces"
-        subtitle="Provision (throwaway) workspaces for your students and manage the ones that exist"
+        title={t.title}
+        subtitle={t.subtitle}
       />
 
       <ErrorBanner>{error}</ErrorBanner>
 
       {loading ? (
-        <ListLoading>Loading…</ListLoading>
+        <ListLoading>{t.loading}</ListLoading>
       ) : (
         <ScrollArea>
           {!provisionAllowed ? (
             <div className="rounded-lg border border-warn-line bg-warn-wash p-4 text-sm text-warn-text">
-              Lecturer provisioning is not enabled for this course. A workspace maintainer can
-              enable it in the workspace administration area.
+              {t.notEnabled}
             </div>
           ) : templates.length === 0 ? (
             <div className="rounded-lg border border-warn-line bg-warn-wash p-4 text-sm text-warn-text">
-              This course has no workspace templates yet. A workspace maintainer can assign
-              templates in the workspace administration area.
+              {t.noTemplates}
             </div>
           ) : (
             <>
@@ -224,25 +359,22 @@ function LecturerWorkspacesContent() {
               <div className="bg-surface rounded-lg border border-rule p-5 space-y-4">
                 <div>
                   <h2 className="text-lg font-semibold text-fg">
-                    Root &amp; internet for {selectedTemplate.display_name || selectedTemplate.template_name}
+                    {t.rootInternetFor(selectedTemplate.display_name || selectedTemplate.template_name)}
                   </h2>
                   <p className="text-sm text-muted mt-1">
-                    What this course&apos;s workspaces of this template get. A course can only take
-                    access away — a control is locked when the template itself already denies it.
-                    New workspaces get this immediately; existing ones keep what they were created
-                    with until you apply it or they next start.
+                    {t.policyIntro}
                   </p>
                 </div>
 
                 <div className="flex flex-wrap gap-x-6 gap-y-2">
                   {([
-                    ['allow_root', 'Root (sudo)', selectedTemplate.template_allow_root, selectedTemplate.allow_root],
-                    ['allow_internet', 'Internet', selectedTemplate.template_allow_internet, selectedTemplate.allow_internet],
+                    ['allow_root', t.root, selectedTemplate.template_allow_root, selectedTemplate.allow_root],
+                    ['allow_internet', t.internet, selectedTemplate.template_allow_internet, selectedTemplate.allow_internet],
                   ] as const).map(([key, label, ceiling, courseValue]) => (
                     <label
                       key={key}
                       className={`flex items-center gap-2 text-sm ${ceiling ? 'text-body' : 'text-subtle'}`}
-                      title={ceiling ? undefined : 'The template denies this; a course cannot grant it.'}
+                      title={ceiling ? undefined : t.templateDenies}
                     >
                       <input
                         type="checkbox"
@@ -251,19 +383,18 @@ function LecturerWorkspacesContent() {
                         onChange={(event) => savePolicy(key, event.target.checked)}
                       />
                       {label}
-                      {!ceiling && <span className="text-xs">(off for this template)</span>}
+                      {!ceiling && <span className="text-xs">{t.offForTemplate}</span>}
                     </label>
                   ))}
                 </div>
 
                 <div className="flex items-center gap-3">
                   <Button variant="secondary" onClick={applyPolicy} loading={applying}
-                          loadingLabel="Applying…">
-                    Apply to running workspaces
+                          loadingLabel={t.applying}>
+                    {t.applyRunning}
                   </Button>
                   <span className="text-xs text-muted">
-                    Restarts them so the change takes effect now — running processes end, files are
-                    untouched. Stopped workspaces pick it up when they next start.
+                    {t.applyHint}
                   </span>
                 </div>
               </div>
@@ -271,19 +402,16 @@ function LecturerWorkspacesContent() {
 
             <div className="bg-surface rounded-lg border border-rule p-5 space-y-4">
               <div>
-                <h2 className="text-lg font-semibold text-fg">Provision for students</h2>
+                <h2 className="text-lg font-semibold text-fg">{t.provisionTitle}</h2>
                 <p className="text-sm text-muted mt-1">
-                  Creates one workspace per selected student. Students can open and start these,
-                  but not provision new ones. A throwaway workspace uses its own scratch home
-                  volume that is deleted together with the workspace — the student&apos;s regular
-                  files stay untouched.
+                  {t.provisionIntro}
                 </p>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
                   <label htmlFor="sw-template" className="block text-xs font-medium text-body mb-1">
-                    Template
+                    {t.template}
                   </label>
                   <select
                     id="sw-template"
@@ -291,24 +419,22 @@ function LecturerWorkspacesContent() {
                     onChange={(event) => setTemplate(event.target.value)}
                     className={inputCls}
                   >
-                    {templates.map((t) => (
+                    {templates.map((tpl) => (
                       <option
-                        key={t.template_name}
-                        value={t.template_name}
+                        key={tpl.template_name}
+                        value={tpl.template_name}
                         // Listed but unpickable: the course asks for it, so
                         // hiding it would look like the course lost a template.
-                        disabled={t.exists_in_coder === false}
+                        disabled={tpl.exists_in_coder === false}
                       >
-                        {t.display_name || t.template_name}
-                        {t.exists_in_coder === false ? ' — not set up on this server' : ''}
+                        {tpl.display_name || tpl.template_name}
+                        {tpl.exists_in_coder === false ? t.notSetUp : ''}
                       </option>
                     ))}
                   </select>
                   {selectedTemplate && !selectedIsDeployable && (
                     <p className="mt-1 text-xs text-warn-text">
-                      This workspace type is not set up on this server yet, so nothing can be
-                      provisioned onto it. A workspace maintainer deploys it under workspace
-                      administration.
+                      {t.notDeployable}
                     </p>
                   )}
                   {selectedTemplate && (
@@ -316,20 +442,20 @@ function LecturerWorkspacesContent() {
                     // per template and per course. Shown here so a lecturer
                     // knows what the students they provision for will get.
                     <p className="mt-1 text-xs text-muted">
-                      Students get{' '}
+                      {t.studentsGet}{' '}
                       <span className="font-medium">
-                        {selectedTemplate.effective_allow_root ? 'root' : 'no root'}
+                        {selectedTemplate.effective_allow_root ? t.withRoot : t.noRoot}
                       </span>{' '}
-                      and{' '}
+                      {t.and}{' '}
                       <span className="font-medium">
-                        {selectedTemplate.effective_allow_internet ? 'internet' : 'no internet'}
+                        {selectedTemplate.effective_allow_internet ? t.withInternet : t.noInternet}
                       </span>
                       .
                     </p>
                   )}
                 </div>
                 <div>
-                  <span className="block text-xs font-medium text-body mb-1">Home directory</span>
+                  <span className="block text-xs font-medium text-body mb-1">{t.home}</span>
                   <div className="space-y-1 text-sm text-body">
                     <label className="flex items-center gap-2">
                       <input
@@ -338,7 +464,7 @@ function LecturerWorkspacesContent() {
                         checked={homeMode === 'scratch'}
                         onChange={() => setHomeMode('scratch')}
                       />
-                      Throwaway (deleted with the workspace)
+                      {t.homeScratch}
                     </label>
                     <label className="flex items-center gap-2">
                       <input
@@ -347,13 +473,13 @@ function LecturerWorkspacesContent() {
                         checked={homeMode === 'shared'}
                         onChange={() => setHomeMode('shared')}
                       />
-                      Usual home (shared across workspaces)
+                      {t.homeShared}
                     </label>
                   </div>
                 </div>
                 <div>
                   <label htmlFor="sw-label" className="block text-xs font-medium text-body mb-1">
-                    Label
+                    {t.label}
                   </label>
                   <input
                     id="sw-label"
@@ -364,8 +490,7 @@ function LecturerWorkspacesContent() {
                     className={inputCls}
                   />
                   <p className="text-xs text-muted mt-1">
-                    Name suffix (e.g. &quot;exam1&quot;) — keeps these apart from the students&apos;
-                    own workspaces.
+                    {t.labelHint}
                   </p>
                 </div>
               </div>
@@ -377,14 +502,14 @@ function LecturerWorkspacesContent() {
                       <Th className="w-10">
                         <input
                           type="checkbox"
-                          aria-label="Select all members"
+                          aria-label={t.selectAll}
                           checked={members.length > 0 && selected.size === members.length}
                           onChange={toggleAll}
                         />
                       </Th>
-                      <Th>Member</Th>
-                      <Th>Role</Th>
-                      <Th>Last run</Th>
+                      <Th>{t.member}</Th>
+                      <Th>{t.role}</Th>
+                      <Th>{t.lastRun}</Th>
                     </tr>
                   </Thead>
                   <Tbody>
@@ -395,7 +520,7 @@ function LecturerWorkspacesContent() {
                           <Td>
                             <input
                               type="checkbox"
-                              aria-label={`Select ${userName(member.user)}`}
+                              aria-label={t.select(userName(member.user))}
                               checked={selected.has(member.id)}
                               onChange={() => toggleMember(member.id)}
                             />
@@ -406,7 +531,7 @@ function LecturerWorkspacesContent() {
                             {outcome ? (
                               outcome.success ? (
                                 <span className="text-success-text">
-                                  Provisioned {outcome.workspace_name}
+                                  {t.provisionedName(outcome.workspace_name ?? '')}
                                 </span>
                               ) : (
                                 <span className="text-danger-text">{outcome.error}</span>
@@ -421,7 +546,7 @@ function LecturerWorkspacesContent() {
                     {members.length === 0 && (
                       <Tr>
                         <Td colSpan={4} className="py-6 text-center text-sm text-muted">
-                          No course members.
+                          {t.noMembers}
                         </Td>
                       </Tr>
                     )}
@@ -433,13 +558,13 @@ function LecturerWorkspacesContent() {
                 <Button
                   onClick={provision}
                   loading={provisioning}
-                  loadingLabel="Provisioning…"
+                  loadingLabel={t.provisioning}
                   disabled={selected.size === 0 || !effectiveTemplate || !selectedIsDeployable}
                 >
-                  Provision for {selected.size} selected
+                  {t.provisionSelected(selected.size)}
                 </Button>
                 <span className="text-xs text-muted">
-                  Runs one at a time; failures are reported per student and never abort the batch.
+                  {t.provisionHint}
                 </span>
               </div>
             </div>
@@ -448,22 +573,20 @@ function LecturerWorkspacesContent() {
 
           <div className="bg-surface rounded-lg border border-rule p-5 space-y-3">
             <div>
-              <h2 className="text-lg font-semibold text-fg">Existing student workspaces</h2>
+              <h2 className="text-lg font-semibold text-fg">{t.existingTitle}</h2>
               <p className="text-sm text-muted mt-1">
-                Workspaces provisioned for this course. A member&apos;s own workspace is not
-                listed here even when it uses one of these templates — it belongs to them, not to
-                the course, and is managed under workspace administration.
+                {t.existingIntro}
               </p>
             </div>
             <Table>
               <Thead>
                 <tr>
-                  <Th>Student</Th>
-                  <Th>Workspace</Th>
-                  <Th>Template</Th>
-                  <Th>Home</Th>
-                  <Th>Status</Th>
-                  <Th className="text-right">Actions</Th>
+                  <Th>{t.student}</Th>
+                  <Th>{t.workspace}</Th>
+                  <Th>{t.template}</Th>
+                  <Th>{t.homeCol}</Th>
+                  <Th>{t.status}</Th>
+                  <Th className="text-right">{t.actions}</Th>
                 </tr>
               </Thead>
               <Tbody>
@@ -482,11 +605,11 @@ function LecturerWorkspacesContent() {
                         <Td>
                           {scratch ? (
                             <span className="inline-flex items-center rounded bg-warn-wash px-2 py-0.5 text-xs font-medium text-warn-text">
-                              Throwaway
+                              {t.throwaway}
                             </span>
                           ) : (
                             <span className="text-xs text-muted">
-                              {w.home_mode === 'shared' ? 'Shared' : '—'}
+                              {w.home_mode === 'shared' ? t.shared : '—'}
                             </span>
                           )}
                         </Td>
@@ -506,7 +629,7 @@ function LecturerWorkspacesContent() {
                                 loading={deleting === key}
                                 onClick={() => deleteWorkspace(w.owner_name, w.name, key)}
                               >
-                                {armedDelete === key ? 'Confirm delete' : 'Delete'}
+                                {armedDelete === key ? t.confirmDelete : t.delete}
                               </Button>
                             )}
                           </div>
@@ -518,7 +641,7 @@ function LecturerWorkspacesContent() {
                 {(data?.studentWorkspaces?.students ?? []).length === 0 && (
                   <Tr>
                     <Td colSpan={6} className="py-6 text-center text-sm text-muted">
-                      No student workspaces on this course&apos;s templates.
+                      {t.noStudentWorkspaces}
                     </Td>
                   </Tr>
                 )}
@@ -533,15 +656,16 @@ function LecturerWorkspacesContent() {
 
 export default function LecturerWorkspacesPage() {
   const courseId = useParams().id as string;
+  const t = COPY[useUiLanguage()];
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { courseHasAtLeast } = usePermissions();
 
   if (!authLoading && isAuthenticated && !courseHasAtLeast(courseId, '_lecturer')) {
     return (
       <Forbidden
-        message="The workspace console requires the lecturer role for this course."
+        message={t.forbidden}
         backLink={`/courses/${courseId}`}
-        backText="Back to course"
+        backText={t.backToCourse}
       />
     );
   }

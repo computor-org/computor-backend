@@ -4,6 +4,7 @@
  */
 
 import type { Tone } from '@/src/components/ui/tones';
+import type { UiLanguage } from '@/src/hooks/useUiLanguage';
 import type {
   ActivityEvent,
   FlagReason,
@@ -11,24 +12,33 @@ import type {
 } from 'types/generated';
 
 /** "45 min", "2 h 5 min", "3 d 4 h" — for durations and estimates. */
-export function formatMinutes(minutes: number | null | undefined): string {
+export function formatMinutes(
+  minutes: number | null | undefined,
+  language: UiLanguage = 'en',
+): string {
   if (minutes == null || Number.isNaN(minutes)) return '—';
+  // German writes hours as "Std." and days as "T".
+  const [hu, du] = language === 'de' ? ['Std.', 'T'] : ['h', 'd'];
   const m = Math.round(minutes);
   if (m < 60) return `${m} min`;
   const h = Math.floor(m / 60);
   if (h < 24) {
     const rest = m % 60;
-    return rest ? `${h} h ${rest} min` : `${h} h`;
+    return rest ? `${h} ${hu} ${rest} min` : `${h} ${hu}`;
   }
   const d = Math.floor(h / 24);
   const restH = h % 24;
-  return restH ? `${d} d ${restH} h` : `${d} d`;
+  return restH ? `${d} ${du} ${restH} ${hu}` : `${d} ${du}`;
 }
 
 /** Relation of the last submission to the due date, in words. */
-export function formatDueRelation(hoursBeforeDue: number | null | undefined): string {
+export function formatDueRelation(
+  hoursBeforeDue: number | null | undefined,
+  language: UiLanguage = 'en',
+): string {
   if (hoursBeforeDue == null) return '—';
-  const text = formatMinutes(Math.abs(hoursBeforeDue) * 60);
+  const text = formatMinutes(Math.abs(hoursBeforeDue) * 60, language);
+  if (language === 'de') return hoursBeforeDue >= 0 ? `${text} vor der Frist` : `${text} nach der Frist`;
   return hoursBeforeDue >= 0 ? `${text} before due` : `${text} after due`;
 }
 

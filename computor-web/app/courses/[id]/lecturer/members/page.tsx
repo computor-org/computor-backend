@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
@@ -22,6 +23,7 @@ import {
   assignableRoles,
   canManageMemberRole,
   courseRoleLabel,
+  localizedRoleLabel,
   highestCourseRole,
   maxAssignableRole,
 } from '@/src/utils/courseRoles';
@@ -31,9 +33,62 @@ const PAGE_SIZE = 25;
 const membersClient = new CourseMembersClient();
 const groupsClient = new CourseGroupsClient();
 
+const COPY = {
+  de: {
+    courseMembers: 'Kursmitglieder',
+    roleFailed: 'Rolle konnte nicht geändert werden',
+    groupFailed: 'Gruppe konnte nicht geändert werden',
+    studentNeedsGroup: 'Studierende müssen einer Gruppe zugeordnet sein.',
+    forbidden: 'Zum Verwalten der Mitglieder brauchst du mindestens Lehrenden-Zugriff auf diesen Kurs.',
+    backToCourse: 'Zurück zum Kurs',
+    subtitle: 'Verwalte, wer zu diesem Kurs gehört, und welche Rollen die Mitglieder haben.',
+    addMembers: 'Mitglieder hinzufügen',
+    loading: 'Mitglieder werden geladen …',
+    member: 'Mitglied',
+    role: 'Rolle',
+    group: 'Gruppe',
+    you: '(du)',
+    noGroup: '— keine Gruppe —',
+    untitled: 'Gruppe ohne Titel',
+    remove: 'Entfernen',
+    empty: 'Keine Mitglieder auf dieser Seite.',
+    page: (n: number) => `Seite ${n}`,
+    previous: 'Zurück',
+    next: 'Weiter',
+    removeTitle: 'Mitglied entfernen',
+    removeMessage: (name: string) => `${name} aus diesem Kurs entfernen? Dadurch wird die Mitgliedschaft gelöscht, das Konto bleibt unberührt.`,
+  },
+  en: {
+    courseMembers: 'Course members',
+    roleFailed: 'Failed to change role',
+    groupFailed: 'Failed to change group',
+    studentNeedsGroup: 'Students must be assigned to a group.',
+    forbidden: 'You need lecturer access (or higher) on this course to manage its members.',
+    backToCourse: 'Back to course',
+    subtitle: 'Manage who belongs to this course and their roles.',
+    addMembers: 'Add members',
+    loading: 'Loading members…',
+    member: 'Member',
+    role: 'Role',
+    group: 'Group',
+    you: '(you)',
+    noGroup: '— no group —',
+    untitled: 'Untitled group',
+    remove: 'Remove',
+    empty: 'No members on this page.',
+    page: (n: number) => `Page ${n}`,
+    previous: 'Previous',
+    next: 'Next',
+    removeTitle: 'Remove member',
+    removeMessage: (name: string) => `Remove ${name} from this course? This deletes their membership; their account is not affected.`,
+  },
+};
+
 export default function CourseMembersPage() {
   const courseId = useParams().id as string;
-  const crumbs = useCourseCrumbs(courseId, 'Course members');
+  const language = useUiLanguage();
+  const t = COPY[language];
+  const crumbs = useCourseCrumbs(courseId, t.courseMembers);
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const { isAdmin, isOrganizationManager, courseRoles, courseHasAtLeast } = usePermissions();
 
@@ -87,7 +142,7 @@ export default function CourseMembersPage() {
       });
       await reload();
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Failed to change role');
+      setActionError(e instanceof Error ? e.message : t.roleFailed);
     } finally {
       setSavingId(null);
     }
@@ -99,7 +154,7 @@ export default function CourseMembersPage() {
     // A student must keep a group (DB check constraint); block clearing it with a
     // clear message rather than surfacing the raw constraint error.
     if (!next && member.course_role_id === '_student') {
-      setActionError('Students must be assigned to a group.');
+      setActionError(t.studentNeedsGroup);
       return;
     }
     setSavingId(member.id);
@@ -111,7 +166,7 @@ export default function CourseMembersPage() {
       });
       await reload();
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Failed to change group');
+      setActionError(e instanceof Error ? e.message : t.groupFailed);
     } finally {
       setSavingId(null);
     }
@@ -126,9 +181,9 @@ export default function CourseMembersPage() {
   if (!authLoading && isAuthenticated && !canManage) {
     return (
       <Forbidden
-        message="You need lecturer access (or higher) on this course to manage its members."
+        message={t.forbidden}
         backLink={`/courses/${courseId}`}
-        backText="Back to course"
+        backText={t.backToCourse}
       />
     );
   }
@@ -138,14 +193,14 @@ export default function CourseMembersPage() {
       <ListPageLayout>
         <PageHeader
           breadcrumbs={crumbs}
-          title="Course members"
-          subtitle="Manage who belongs to this course and their roles."
+          title={t.courseMembers}
+          subtitle={t.subtitle}
           actions={
             <Link
               href={`/courses/${courseId}/lecturer/members/add`}
               className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover"
             >
-              Add members
+              {t.addMembers}
             </Link>
           }
         />
@@ -153,15 +208,15 @@ export default function CourseMembersPage() {
         <ErrorBanner>{error || actionError}</ErrorBanner>
 
         {loading ? (
-          <ListLoading>Loading members…</ListLoading>
+          <ListLoading>{t.loading}</ListLoading>
         ) : (
           <ScrollPanel>
             <Table>
               <Thead>
                 <tr>
-                  <Th>Member</Th>
-                  <Th>Role</Th>
-                  <Th>Group</Th>
+                  <Th>{t.member}</Th>
+                  <Th>{t.role}</Th>
+                  <Th>{t.group}</Th>
                   <th className="px-4 py-3" />
                 </tr>
               </Thead>
@@ -179,7 +234,7 @@ export default function CourseMembersPage() {
                       <td className="px-4 py-3">
                         <div className="font-medium text-fg text-sm">
                           {memberName(m)}
-                          {isSelf && <span className="ml-2 text-xs text-subtle">(you)</span>}
+                          {isSelf && <span className="ml-2 text-xs text-subtle">{t.you}</span>}
                         </div>
                         <div className="text-xs text-muted">{m.user?.email ?? '—'}</div>
                       </td>
@@ -193,12 +248,12 @@ export default function CourseMembersPage() {
                           >
                             {options.map((r) => (
                               <option key={r} value={r}>
-                                {courseRoleLabel(r)}
+                                {localizedRoleLabel(courseRoleLabel(r), language)}
                               </option>
                             ))}
                           </select>
                         ) : (
-                          <Badge color="gray">{courseRoleLabel(m.course_role_id)}</Badge>
+                          <Badge color="gray">{localizedRoleLabel(courseRoleLabel(m.course_role_id), language)}</Badge>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -209,10 +264,10 @@ export default function CourseMembersPage() {
                             onChange={(e) => changeGroup(m, e.target.value)}
                             className="px-2 py-1 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent disabled:opacity-50"
                           >
-                            <option value="">— no group —</option>
+                            <option value="">{t.noGroup}</option>
                             {groups.map((g) => (
                               <option key={g.id} value={g.id}>
-                                {g.title || 'Untitled group'}
+                                {g.title || t.untitled}
                               </option>
                             ))}
                           </select>
@@ -228,7 +283,7 @@ export default function CourseMembersPage() {
                             onClick={() => setToRemove(m)}
                             className="text-sm text-danger-text hover:underline"
                           >
-                            Remove
+                            {t.remove}
                           </button>
                         )}
                       </td>
@@ -238,7 +293,7 @@ export default function CourseMembersPage() {
                 {members.length === 0 && (
                   <tr>
                     <td colSpan={4} className="px-4 py-8 text-center text-sm text-muted">
-                      No members on this page.
+                      {t.empty}
                     </td>
                   </tr>
                 )}
@@ -250,21 +305,21 @@ export default function CourseMembersPage() {
         {/* Pager — pinned below the scrolling list. Total count isn't exposed
             via the client, so Next is enabled whenever a full page came back. */}
         <div className="shrink-0 flex items-center justify-between">
-          <span className="text-sm text-muted">Page {page + 1}</span>
+          <span className="text-sm text-muted">{t.page(page + 1)}</span>
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0 || loading}
               className="px-3 py-1.5 text-sm border border-rule-strong rounded-lg hover:bg-canvas disabled:opacity-50"
             >
-              Previous
+              {t.previous}
             </button>
             <button
               onClick={() => setPage((p) => p + 1)}
               disabled={!hasNext || loading}
               className="px-3 py-1.5 text-sm border border-rule-strong rounded-lg hover:bg-canvas disabled:opacity-50"
             >
-              Next
+              {t.next}
             </button>
           </div>
         </div>
@@ -272,8 +327,8 @@ export default function CourseMembersPage() {
 
       {toRemove && (
         <ConfirmDeleteDialog
-          title="Remove member"
-          message={`Remove ${memberName(toRemove)} from this course? This deletes their membership; their account is not affected.`}
+          title={t.removeTitle}
+          message={t.removeMessage(memberName(toRemove))}
           confirmWord={toRemove.user?.email || memberName(toRemove)}
           onConfirm={() => removeMember(toRemove)}
           onClose={() => setToRemove(null)}
