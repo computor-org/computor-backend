@@ -1,6 +1,6 @@
 # Nutzungsbedingungen computor.at
 
-Version 1.2, gültig ab 22.10.2026
+Version 1.3, gültig ab 25.10.2026
 
 ## Das Wichtigste in Kürze
 
@@ -77,16 +77,22 @@ kein Zeugnis und keine Bestätigung von Kenntnissen. Zieht eine
 Lehrveranstaltung Ergebnisse für eine Beurteilung heran, entscheidet die
 jeweilige Lehrperson nach den dafür geltenden Vorschriften.
 
-3.6 Lena erzeugt KI-Lernhilfe, wenn Sie Lena fragen. Über die Schaltfläche
-„Lena fragen“ nutzt Lena Ihre Frage, Ihren ausgewählten Text und die sichtbare
-Aufgabe. Wenn Sie Lena in einer Nachricht zu einer Aufgabe erwähnen, nutzt Lena
-außerdem den Nachrichtenverlauf, Ihre letzte Abgabe und deren Testergebnisse und
-antwortet im Verlauf. Lena führt keinen Code aus und bewertet keine Abgaben.
+3.6 Lena erzeugt KI-Lernhilfe über die Schaltfläche „Lena fragen“ und in
+Kursnachrichten. Über die Schaltfläche nutzt Lena Ihre Frage, Ihren ausgewählten
+Text und die sichtbare Aufgabe. Sie können Lena mit @lena ansprechen und im
+Verlauf antworten. In Kursen mit automatischer Lena-Zuordnung werden auch
+Nachrichten von Lernenden ohne andere erwähnte Person Lena zugeordnet, sofern
+Lena zum Empfängerkreis gehört und verfügbar ist. Dabei wird eine sichtbare
+Lena-Erwähnung ergänzt. Lena nutzt den Nachrichtenverlauf und bei Aufgaben
+zusätzlich Ihre letzte Abgabe und deren Testergebnisse und antwortet im Verlauf.
+Lena führt keinen Code aus und bewertet keine Abgaben.
 Prüfen Sie Antworten, denn sie können falsch sein. Anfragen und Antworten werden
 wie in der Datenschutzerklärung beschrieben verarbeitet, einschließlich
-begrenzter Inferenz-Caches. Ihre Inhalte werden weder protokolliert noch zum
-Modelltraining verwendet. Verfügbarkeit und Anfragegrenzen hängen von der
-Kapazität ab. Öffentliche Beispiele können Sie auch mit Desktop-VS-Code oder
+begrenzter Inferenz-Caches. Nachrichten und Antworten im Verlauf bleiben dort
+gespeichert. Die Inferenzdienste erstellen keine zusätzlichen Inhaltsprotokolle
+und verwenden Ihre Inhalte nicht zum Modelltraining. Verfügbarkeit und
+Anfragegrenzen hängen von der Kapazität ab. Öffentliche Beispiele können Sie
+auch mit Desktop-VS-Code oder
 optional GitHub Codespaces nach den dortigen Bedingungen bearbeiten.
 
 ## 4. Änderung und Einstellung von Leistungen

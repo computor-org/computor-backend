@@ -1,6 +1,6 @@
 # Privacy Notice computor.at
 
-Version 1.2, effective 22 October 2026
+Version 1.3, effective 25 October 2026
 
 In this privacy notice, we inform you about how personal data are processed on
 the learning platform computor.at and in the chat chat.computor.at. This
@@ -14,8 +14,9 @@ Telecommunications Act (“TKG 2021”). The German version is authoritative.
 ## Summary
 
 - We process only what we need to provide your account, courses, workspace,
-  automatic tests, chat and the Lena help you request.
-- No advertising, no tracking, no analytics, no third-party services embedded
+  automatic tests, chat and Lena learning assistance. In courses configured for
+  automatic routing, messages can also be addressed to Lena automatically (section 4.8).
+- No advertising, no external tracking or analytics services, no third-party services embedded
   in our web pages, no sale of data, no use of your data to train AI models.
 - Only technically necessary cookies, so there is no cookie banner.
 - Platform servers are in Germany (Hetzner); Lena inference runs at TU Graz in Austria.
@@ -76,7 +77,8 @@ server), automatic test results, points, feedback from teaching staff,
 messages about assignments, timestamps.
 
 Purpose: running the courses, automatically testing your code, feedback and
-support by teaching staff and tutors.
+support by teaching staff and tutors, and overviews of learning progress and
+test errors.
 
 Legal basis: Art. 6(1)(e) GDPR in conjunction with §§ 2 and 3 UG.
 
@@ -164,9 +166,9 @@ The same applies when you use "Report a problem" in the web app or in the VS
 Code extension: your description, any files you choose to attach (such as a
 screenshot or a log) and technical details of the program (application,
 version, page or command) are stored with your account as a request to our
-support team. You see replies in the web app. Nothing is published. The support
-team may copy a summary without any details about you into the project's
-non-public bug tracker.
+support team. You see replies in the web app. Your request and attachments are
+not published automatically. After review, the support team may publish a
+summary without personal data in the project's public GitHub issue tracker.
 
 Legal basis: Art. 6(1)(e) GDPR in conjunction with §§ 2 and 3 UG; for reports
 of illegal content, Art. 6(1)(c) GDPR in conjunction with Articles 16 and 17 of
@@ -177,19 +179,22 @@ traceability and the defence of legal claims.
 
 ### 4.8 Lena learning assistance
 
-Lena is available in two ways: the "Ask Lena" button on an assignment and
-messages about an assignment. Lena acts only when you address Lena in one of
-these ways. Lena gives learning help; it does not run your code or decide grades.
+Lena is available through the "Ask Lena" button on an assignment and in course
+messages. In courses with automatic Lena routing, messages can also be forwarded
+to Lena without an explicit mention. Lena gives learning help; it does not run
+your code or decide grades.
 
 **"Ask Lena" button:** we process your question, the text you choose to submit,
 the assignment description visible to you and the generated answer.
 
-**Messages about an assignment:** when you mention Lena in a message (@lena), we
-process that message, the earlier messages in the same thread, the assignment
-description, your latest submission for this assignment and its test results.
-Lena's answer is stored as a message in the thread. Like your other messages
-about assignments, it is visible to you and to the course's teaching staff and
-tutors.
+**Course messages:** you can address Lena with @lena and reply in the thread.
+If automatic Lena routing is enabled for the course, learner messages that
+mention nobody else are also addressed to Lena when Lena is available and
+included in the message's audience. A visible Lena mention is added. We process
+the message and earlier messages in the same thread. For messages about an
+assignment, we also use the assignment description, your latest submission for
+that assignment and its test results. Lena's answer is stored as a message in
+the thread, subject to the same visibility as other messages in that thread.
 
 In both cases inference takes place on TU Graz machines in Austria, without an
 external AI provider or model training.
@@ -198,7 +203,8 @@ Legal basis: Art. 6(1)(e) GDPR in conjunction with §§ 2 and 3 UG.
 
 A request made with the button is held temporarily on computor.at for at most 15 minutes; after
 completion it is removed, and only you can retrieve the answer for 24 hours.
-The Lena services keep no prompt or answer files or content logs. The model
+The inference services keep no additional prompt or answer files or content logs.
+Messages in the thread remain stored as described above. The model
 uses bounded memory and local disk caches to reuse computations. Cache entries
 are replaced when capacity is needed or the cache is cleared; they have no fixed
 time-based expiry. These caches are private to the inference service and are
@@ -221,7 +227,9 @@ telemetry without question, submitted-text or answer contents.
 
 We run all services of the platform ourselves (sign-in with Keycloak, Forgejo
 Git server, database, file storage, test system, workspaces with Coder, chat
-with Zulip). Fonts are served from our own servers. We do not embed content delivery networks, analytics, advertising or external AI services. Lena is operated by TU Graz.
+with Zulip). Fonts are served from our own servers. We do not embed external
+content delivery, tracking, analytics, advertising or AI services. Lena is
+operated by TU Graz.
 
 | Recipient | Role | Location | Basis |
 |---|---|---|---|
@@ -267,7 +275,7 @@ Without these cookies, however, signing in is not possible.
 |---|---|
 | Account, course enrolments, submissions, Git repositories, test results | until your account is deleted |
 | Workspace files (home directory) | until your account is deleted |
-| Messages about assignments, including Lena's answers | until your account is deleted |
+| Course and assignment messages, including Lena's answers | until your account is deleted |
 | Lena requests made with the button | at most 15 minutes; removed on completion |
 | Lena answers to the button | 24 hours, visible only to the author |
 | Lena inference caches | bounded capacity; replacement on capacity pressure or clearing |

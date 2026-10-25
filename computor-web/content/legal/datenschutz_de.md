@@ -1,6 +1,6 @@
 # Datenschutzerklärung computor.at
 
-Version 1.2, gültig ab 22.10.2026
+Version 1.3, gültig ab 25.10.2026
 
 In dieser Datenschutzerklärung informieren wir Sie über die Verarbeitung
 personenbezogener Daten auf der Lernplattform computor.at und im Chat
@@ -14,10 +14,12 @@ Bestimmungen zum Datenschutz und zur Datensicherheit, insbesondere nach dem
 ## Das Wichtigste in Kürze
 
 - Wir verarbeiten nur, was wir brauchen, um Ihnen Konto, Kurse,
-  Arbeitsumgebung, automatische Tests, Chat und angefragte Lena-Lernhilfe bereitzustellen.
-- Keine Werbung, kein Tracking, keine Analyse-Werkzeuge, keine Einbindung von
-  Diensten Dritter in die Webseiten, kein Verkauf von Daten, keine Auswertung
-  Ihrer Daten zum Training von KI-Modellen.
+  Arbeitsumgebung, automatische Tests, Chat und Lena-Lernhilfe bereitzustellen.
+  In entsprechend eingerichteten Kursen werden Nachrichten auch automatisch
+  Lena zugeordnet (Abschnitt 4.8).
+- Keine Werbung, keine externen Tracking- oder Analyse-Dienste, keine Einbindung
+  von Diensten Dritter in die Webseiten, kein Verkauf von Daten, keine
+  Auswertung Ihrer Daten zum Training von KI-Modellen.
 - Nur technisch notwendige Cookies, daher kein Cookie-Banner.
 - Die Plattformserver stehen in Deutschland (Hetzner); Lena läuft an der TU Graz in Österreich.
 - Sie registrieren sich mit bestätigter E-Mail-Adresse und Passwort. Öffentliche Beispiele benötigen kein Konto.
@@ -80,7 +82,8 @@ unserem eigenen Git-Server Forgejo), automatische Testergebnisse, Punkte,
 Feedback von Lehrenden, Nachrichten zu Aufgaben, Zeitstempel.
 
 Zweck: Durchführung der Kurse, automatische Prüfung Ihres Codes, Feedback und
-Betreuung durch Lehrende und Tutor*innen.
+Betreuung durch Lehrende und Tutor*innen sowie Übersichten über den
+Lernfortschritt und aufgetretene Testfehler.
 
 Rechtsgrundlage: Art. 6 Abs. 1 lit. e DSGVO iVm §§ 2 und 3 UG.
 
@@ -174,9 +177,9 @@ VS-Code-Erweiterung ein Problem melden: Ihre Beschreibung, die von Ihnen selbst
 beigefügten Dateien (etwa ein Screenshot oder ein Protokoll) und technische
 Angaben zum Programm (Anwendung, Version, Seite oder Befehl) werden mit Ihrem
 Konto als Anfrage an unser Support-Team gespeichert. Antworten sehen Sie in der
-Web-App. Veröffentlicht wird nichts. Das Support-Team kann eine Zusammenfassung
-ohne Angaben zu Ihrer Person in das nicht öffentliche Fehlerverzeichnis des
-Projekts übernehmen.
+Web-App. Ihre Anfrage und Anhänge werden nicht automatisch veröffentlicht.
+Das Support-Team kann nach Prüfung eine Zusammenfassung ohne personenbezogene
+Angaben im öffentlichen GitHub-Fehlerverzeichnis des Projekts veröffentlichen.
 
 Rechtsgrundlage: Art. 6 Abs. 1 lit. e DSGVO iVm §§ 2 und 3 UG; bei Meldungen
 rechtswidriger Inhalte Art. 6 Abs. 1 lit. c DSGVO iVm Art. 16 und 17 der
@@ -188,21 +191,25 @@ Nachvollziehbarkeit und zur Abwehr von Ansprüchen.
 
 ### 4.8 Lena-Lernhilfe
 
-Lena steht auf zwei Wegen zur Verfügung: über die Schaltfläche „Lena fragen“
-bei einer Aufgabe und in Nachrichten zu einer Aufgabe. Lena wird nur tätig,
-wenn Sie Lena auf einem dieser Wege ansprechen. Lena gibt Lernhilfe, führt
-keinen Code aus und entscheidet keine Noten.
+Lena steht über die Schaltfläche „Lena fragen“ bei einer Aufgabe und in
+Kursnachrichten zur Verfügung. In Kursen mit automatischer Lena-Zuordnung
+können auch Nachrichten ohne ausdrückliche Lena-Erwähnung an Lena weitergeleitet
+werden. Lena gibt Lernhilfe, führt keinen Code aus und entscheidet keine Noten.
 
 **Schaltfläche „Lena fragen“:** Wir verarbeiten Ihre Frage, den von Ihnen
 ausgewählten Text, die für Sie sichtbare Aufgabenbeschreibung und die erzeugte
 Antwort.
 
-**Nachrichten zu einer Aufgabe:** Wenn Sie Lena in einer Nachricht erwähnen
-(@lena), verarbeiten wir diese Nachricht, die früheren Nachrichten im selben
-Verlauf, die Aufgabenbeschreibung, Ihre letzte Abgabe zu dieser Aufgabe und
-deren Testergebnisse. Lenas Antwort wird als Nachricht im Verlauf gespeichert.
-Sie ist wie Ihre anderen Nachrichten zu Aufgaben für Sie sowie für die
-Lehrenden und Tutor*innen des Kurses sichtbar.
+**Kursnachrichten:** Sie können Lena mit @lena ansprechen und im Verlauf
+antworten. Ist die automatische Lena-Zuordnung im Kurs aktiviert, werden auch
+Nachrichten von Lernenden ohne andere erwähnte Person Lena zugeordnet, sofern
+Lena zum Empfängerkreis gehört und verfügbar ist. Dabei wird eine sichtbare
+Lena-Erwähnung ergänzt. Wir verarbeiten die Nachricht und frühere Nachrichten
+im selben Verlauf. Bei Nachrichten zu einer Aufgabe kommen die
+Aufgabenbeschreibung, Ihre letzte Abgabe zu dieser Aufgabe und deren
+Testergebnisse hinzu. Lenas Antwort wird als Nachricht im Verlauf gespeichert.
+Für ihre Sichtbarkeit gilt derselbe Empfängerkreis wie für die übrigen
+Nachrichten im Verlauf.
 Auf beiden Wegen erfolgt die Inferenz auf Rechnern der TU Graz in Österreich,
 ohne externen KI-Anbieter und ohne Training von Modellen mit Ihren Daten.
 
@@ -210,8 +217,9 @@ Rechtsgrundlage: Art. 6 Abs. 1 lit. e DSGVO iVm §§ 2 und 3 UG.
 
 Eine Anfrage über die Schaltfläche liegt auf computor.at höchstens 15 Minuten vor und wird nach
 Fertigstellung entfernt; die Antwort ist danach 24 Stunden nur für Sie abrufbar.
-Die Lena-Dienste erstellen keine Dateien oder Inhaltsprotokolle von Fragen
-und Antworten. Das Modell verwendet begrenzte Speicher- und lokale
+Die Inferenzdienste erstellen keine zusätzlichen Dateien oder Inhaltsprotokolle
+von Fragen und Antworten. Nachrichten im Verlauf bleiben wie oben beschrieben
+gespeichert. Das Modell verwendet begrenzte Speicher- und lokale
 Festplatten-Caches zur Wiederverwendung von Berechnungen. Einträge werden bei
 Kapazitätsbedarf oder beim Leeren ersetzt; eine feste zeitliche Ablaufgrenze
 besteht nicht. Diese Caches sind nicht für Lernende zugänglich. Größen-, Status-
@@ -234,8 +242,8 @@ und Zeitmesswerte enthalten keine Fragen, eingereichten Texte oder Antworten.
 Alle Dienste der Plattform (Anmeldung mit Keycloak, Git-Server Forgejo,
 Datenbank, Dateispeicher, Testsystem, Workspaces mit Coder, Chat mit Zulip)
 betreiben wir selbst. Schriftarten werden von unseren eigenen Servern
-geladen. Wir binden keine Content-Delivery-Netzwerke, Analyse-, Werbe- oder
-externe KI-Dienste ein. Lena betreibt die TU Graz selbst.
+geladen. Wir binden keine externen Content-Delivery-, Tracking-, Analyse-,
+Werbe- oder KI-Dienste ein. Lena betreibt die TU Graz selbst.
 
 | Empfänger | Rolle | Ort | Grundlage |
 |---|---|---|---|
@@ -283,7 +291,7 @@ jedoch nicht möglich.
 |---|---|
 | Konto, Kurseinschreibungen, Abgaben, Git-Repositories, Testergebnisse | bis zur Löschung Ihres Kontos |
 | Workspace-Dateien (Home-Verzeichnis) | bis zur Löschung Ihres Kontos |
-| Nachrichten zu Aufgaben, auch Antworten von Lena | bis zur Löschung Ihres Kontos |
+| Kurs- und Aufgabennachrichten, auch Antworten von Lena | bis zur Löschung Ihres Kontos |
 | Lena-Anfragen über die Schaltfläche | höchstens 15 Minuten; Entfernung bei Fertigstellung |
 | Lena-Antworten über die Schaltfläche | 24 Stunden, nur für die anfragende Person |
 | Lena-Inferenz-Caches | begrenzte Kapazität; Ersatz bei Kapazitätsbedarf oder Leeren |
