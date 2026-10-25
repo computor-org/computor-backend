@@ -37,7 +37,9 @@ resource "docker_container" "workspace" {
   cpus          = var.cpus != "" && var.cpus != "0" ? var.cpus : null
   cgroup_parent = var.cgroup_parent != "" ? var.cgroup_parent : null
   storage_opts  = var.storage_size != "" ? { size = var.storage_size } : null
-  tmpfs         = var.tmp_size != "" ? { "/tmp" = "rw,nosuid,nodev,mode=1777,size=${var.tmp_size}" } : null
+  # exec: the Coder agent bootstrap downloads and runs its binary from /tmp
+  # (Docker mounts a tmpfs noexec unless told otherwise).
+  tmpfs         = var.tmp_size != "" ? { "/tmp" = "rw,exec,nosuid,nodev,mode=1777,size=${var.tmp_size}" } : null
   shm_size      = var.shm_size
 
   # Root policy (see allow_root). no-new-privileges makes the kernel refuse the
