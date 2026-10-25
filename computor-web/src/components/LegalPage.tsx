@@ -89,6 +89,13 @@ export default function LegalPage({
               remarkPlugins={[remarkGfm]}
               components={{
                 h2: ({ children }) => <h2 id={slug(textOf(children))}>{children}</h2>,
+                // Wide tables (the privacy notice's processing overview) scroll
+                // inside their own box instead of widening the page on phones.
+                table: ({ children }) => (
+                  <div className="overflow-x-auto">
+                    <table>{children}</table>
+                  </div>
+                ),
               }}
             >
               {body}

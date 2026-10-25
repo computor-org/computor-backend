@@ -96,7 +96,7 @@ export default function OrganizationDetailPage() {
               {families.length === 0 ? (
                 <div className="text-muted border border-dashed border-rule-strong rounded-lg p-8 text-center">No course families yet.</div>
               ) : (
-                <div className="bg-surface border border-rule rounded-lg divide-y">
+                <div className="bg-surface border border-rule rounded-lg divide-y divide-rule">
                   {families.map((f) => (
                     <Link key={f.id} href={`/course-families/${f.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-canvas">
                       <div className="min-w-0">

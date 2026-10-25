@@ -92,7 +92,7 @@ export default function CourseFamilyDetailPage() {
             {courses.length === 0 ? (
               <div className="text-muted border border-dashed border-rule-strong rounded-lg p-8 text-center">No courses in this family yet.</div>
             ) : (
-              <div className="bg-surface border border-rule rounded-lg divide-y">
+              <div className="bg-surface border border-rule rounded-lg divide-y divide-rule">
                 {courses.map((c) => (
                   <Link key={c.id} href={`/courses/${c.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-canvas">
                     <div className="min-w-0 flex items-center gap-2">

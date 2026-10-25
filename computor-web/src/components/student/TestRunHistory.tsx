@@ -72,6 +72,15 @@ function formatWhen(value: string | null | undefined, language: UiLanguage): str
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(language === 'de' ? 'de-AT' : undefined);
 }
 
+/**
+ * A commit hash shortens to its first eight characters, as in git. Other
+ * version identifiers (a VS Code submission's "qa-returning-week_1.basis1")
+ * are names, and cutting them off at eight characters leaves "qa-retur".
+ */
+function shortVersion(version: string): string {
+  return /^[0-9a-f]{12,64}$/i.test(version) ? version.slice(0, 8) : version;
+}
+
 export default function TestRunHistory({
   results,
   artifacts,
@@ -115,8 +124,8 @@ export default function TestRunHistory({
                     {isSubmission ? t.submission : t.testRun}
                   </Badge>
                 </td>
-                <td className="py-2 px-4 font-mono text-xs text-muted">
-                  {r.version_identifier ? r.version_identifier.slice(0, 8) : '—'}
+                <td className="py-2 px-4 font-mono text-xs text-muted" title={r.version_identifier ?? undefined}>
+                  {r.version_identifier ? shortVersion(r.version_identifier) : '—'}
                 </td>
                 <td className="py-2 px-4 text-right">
                   <Score value={r.result} decimals={1} />

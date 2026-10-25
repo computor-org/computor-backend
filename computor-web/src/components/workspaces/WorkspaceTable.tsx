@@ -44,7 +44,7 @@ const COPY = {
 interface WorkspaceTableProps {
   workspaces: CoderWorkspace[];
   onStart: (owner: string, name: string) => Promise<void>;
-  onStop: (owner: string, name: string) => Promise<void>;
+  onStop: (owner: string, name: string) => Promise<unknown>;
   /**
    * Delete the workspace. Optional, and the button is only rendered when it is
    * given: the backend has no self-service delete, so offering it to a plain
@@ -71,7 +71,7 @@ function WorkspaceRow({
 }: {
   workspace: CoderWorkspace;
   onStart: (owner: string, name: string) => Promise<void>;
-  onStop: (owner: string, name: string) => Promise<void>;
+  onStop: (owner: string, name: string) => Promise<unknown>;
   onDelete?: (owner: string, name: string) => void;
   onViewDetails: (owner: string, name: string) => void;
   onLaunch?: (owner: string, name: string) => void;
@@ -84,7 +84,7 @@ function WorkspaceRow({
   const category = categorizeStatus(workspace.latest_build_status, transition);
   const version = workspaceVersionLabel(workspace.template_version_created_at, language);
 
-  const runAction = async (action: 'start' | 'stop', fn: (o: string, n: string) => Promise<void>) => {
+  const runAction = async (action: 'start' | 'stop', fn: (o: string, n: string) => Promise<unknown>) => {
     if (!owner) return;
     setActionLoading(action);
     try {

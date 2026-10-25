@@ -38,12 +38,12 @@ const COPY = {
     launch: 'Arbeitsumgebung starten',
     setUp: 'Arbeitsumgebung einrichten',
     setUpHint:
-      'Hier programmierst, testest und gibst du ab. Öffnet diesen Kurs in deiner Arbeitsumgebung.',
+      'Hier programmierst, testest und gibst du ab. Damit öffnest du diesen Kurs in deiner Arbeitsumgebung.',
     openIn: (label: string) => `In ${label} öffnen`,
     startAndOpen: 'Starten und öffnen',
     startAgain: 'Erneut starten',
     openHint: (label: string) =>
-      `In ${label} programmieren, testen und abgeben. Öffnet diesen Kurs in deiner Arbeitsumgebung oder verwendet den offenen Editor weiter. Deine Dateien bleiben erhalten.`,
+      `In ${label} programmieren, testen und abgeben. Damit öffnest du diesen Kurs in deiner Arbeitsumgebung oder arbeitest im bereits offenen Editor weiter. Deine Dateien bleiben erhalten.`,
     stopHint: (label: string) =>
       `Wenn du fertig bist, beende ${label} mit „Stoppen“. Schließt du nur den Tab, stoppt die Arbeitsumgebung nach einer Weile ohne Nutzung von selbst. Beim nächsten Start wird sie bei Bedarf aktualisiert.`,
     yours: 'Weitere Arbeitsumgebungen',
@@ -52,6 +52,7 @@ const COPY = {
     start: 'Starten',
     stop: 'Stoppen',
     stopping: 'Wird gestoppt …',
+    stopInProgress: 'Deine Arbeitsumgebung wird gerade gestoppt. Sobald sie gestoppt ist, kannst du sie wieder starten.',
   },
   en: {
     targetLoading: 'VS Code is still loading. Please try again shortly.',
@@ -77,6 +78,7 @@ const COPY = {
     start: 'Start',
     stop: 'Stop',
     stopping: 'Stopping…',
+    stopInProgress: 'Your workspace is stopping. You can start it again once it has stopped.',
   },
 };
 
@@ -288,12 +290,28 @@ export default function CourseWorkspaceLaunchButtons({
   async function stopExisting(workspace: CoderWorkspace) {
     if (!workspace.owner_name) return;
     setStopping(workspace.id);
-    try {
-      await actions.stop(workspace.owner_name, workspace.name);
-    } finally {
-      setStopping(null);
-    }
+    // On success `stopping` stays set until the listing shows the stop build
+    // (see below): the delayed refresh leaves a few seconds in which the row
+    // still reads "running", and starting then would race the stop.
+    if (!(await actions.stop(workspace.owner_name, workspace.name))) setStopping(null);
   }
+
+  // The listing has caught up with the stop request: from here on the build's
+  // own transition says whether a stop is still under way.
+  if (stopping && workspaces.some((w) => w.id === stopping && w.latest_build_transition === 'stop')) {
+    setStopping(null);
+  }
+
+  /**
+   * A stop is under way: requested here and not yet listed, or a stop build
+   * that has not finished. Starting the workspace now would either open an
+   * editor that is about to go away or queue a start behind the stop, so the
+   * start actions wait until the workspace has stopped.
+   */
+  const stopInFlight = (w: CoderWorkspace) =>
+    (stopping === w.id && w.latest_build_transition !== 'stop') ||
+    (w.latest_build_transition === 'stop' &&
+      categorizeStatus(w.latest_build_status, w.latest_build_transition) === 'pending');
 
   // One mounted course launcher serves every exercise action on the page.
   // No row needs its own template/workspace fetches or provisioning logic.
@@ -306,6 +324,11 @@ export default function CourseWorkspaceLaunchButtons({
       const vscode = courseOptions.find((option) => option.name === 'vscode-workspace' && isUsable(option));
       if (!vscode) {
         notify(t.targetUnavailable, 'error');
+        return;
+      }
+      const running = personal.get(vscode.name);
+      if (running && stopInFlight(running)) {
+        notify(t.stopInProgress, 'info');
         return;
       }
       void provisionAndLaunch(vscode.name, targetId, launchOptions?.sameTab);
@@ -397,6 +420,8 @@ export default function CourseWorkspaceLaunchButtons({
                     onClick={() => provisionAndLaunch(option.name)}
                     loading={launching === option.name}
                     loadingLabel={t.launching}
+                    disabled={stopInFlight(w)}
+                    title={stopInFlight(w) ? t.stopInProgress : undefined}
                   >
                     {primary}
                   </Button>
@@ -405,7 +430,7 @@ export default function CourseWorkspaceLaunchButtons({
                       size="sm"
                       variant="secondary"
                       onClick={() => stopExisting(w)}
-                      loading={stopping === w.id}
+                      loading={stopInFlight(w)}
                       loadingLabel={t.stopping}
                     >
                       {t.stop}
@@ -469,7 +494,12 @@ export default function CourseWorkspaceLaunchButtons({
                       status={w.latest_build_status}
                       transition={w.latest_build_transition}
                     />
-                    <Button size="xs" onClick={() => openExisting(w)}>
+                    <Button
+                      size="xs"
+                      onClick={() => openExisting(w)}
+                      disabled={stopInFlight(w)}
+                      title={stopInFlight(w) ? t.stopInProgress : undefined}
+                    >
                       {category === 'running' ? t.open : category === 'failed' ? t.retry : t.start}
                     </Button>
                     {category === 'running' && (
@@ -477,7 +507,7 @@ export default function CourseWorkspaceLaunchButtons({
                         size="xs"
                         variant="secondary"
                         onClick={() => stopExisting(w)}
-                        loading={stopping === w.id}
+                        loading={stopInFlight(w)}
                         loadingLabel={t.stopping}
                       >
                         {t.stop}

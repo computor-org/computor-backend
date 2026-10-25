@@ -8,7 +8,8 @@ import ListPageLayout, { ScrollArea, PageLoading } from '@/src/components/ListPa
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Button from '@/src/components/ui/Button';
-import { inputCls, fileInputCls } from '@/src/components/ui/tokens';
+import { inputCls } from '@/src/components/ui/tokens';
+import FileInput from '@/src/components/ui/FileInput';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { APP_VERSION } from '@/src/utils/appVersion';
@@ -318,16 +319,14 @@ function ReportForm() {
                 {t.steps}
                 <textarea className={`${inputCls} mt-1 min-h-20`} value={steps} onChange={(e) => setSteps(e.target.value)} />
               </label>
-              <label className="block text-sm text-muted">
-                {t.screenshot}
-                <input
-                  key={fileKey}
-                  type="file"
-                  accept={SCREENSHOT_TYPES.join(',')}
-                  className={`${fileInputCls} mt-1`}
-                  onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
-                />
-              </label>
+              <FileInput
+                key={fileKey}
+                label={t.screenshot}
+                accept={SCREENSHOT_TYPES.join(',')}
+                file={screenshot}
+                onChange={pickFile}
+                language={language}
+              />
             </>
           )}
           <Button type="submit" disabled={!description.trim()} loading={sending} loadingLabel={t.sending}>

@@ -134,7 +134,7 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
             Not enrolled in any course.
           </div>
         ) : (
-          <div className="border border-rule rounded-lg divide-y">
+          <div className="border border-rule rounded-lg divide-y divide-rule">
             {members.map((m) => (
               <div key={m.id} className="flex items-center justify-between px-4 py-3 gap-4">
                 <div className="min-w-0">

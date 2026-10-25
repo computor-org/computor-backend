@@ -1,6 +1,7 @@
 'use client';
 
 import type { Tone } from './tones';
+import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
 
 /**
  * A test result as a percentage, coloured by whether it passed.
@@ -14,9 +15,21 @@ import type { Tone } from './tones';
 /** Fraction at or above which a score reads as a pass. */
 export const SCORE_PASS_AT = 0.5;
 
-/** `54.0%`, or an em dash when there is no score. */
-export function formatScore(value: number | null | undefined, decimals = 0): string {
-  return value == null ? '—' : `${(value * 100).toFixed(decimals)}%`;
+/**
+ * `54.0%` (English) or `54,0 %` (German), or an em dash when there is no score.
+ * Without a language the English form is used.
+ */
+export function formatScore(
+  value: number | null | undefined,
+  decimals = 0,
+  language: UiLanguage = 'en',
+): string {
+  if (value == null) return '—';
+  return new Intl.NumberFormat(language === 'de' ? 'de-AT' : 'en-US', {
+    style: 'percent',
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(value);
 }
 
 /**
@@ -41,6 +54,7 @@ export default function Score({
   decimals?: number;
   className?: string;
 }) {
+  const language = useUiLanguage();
   if (value == null) {
     return <span className={`text-sm text-subtle tabular-nums ${className}`}>&mdash;</span>;
   }
@@ -49,7 +63,7 @@ export default function Score({
     <span
       className={`text-sm font-medium tabular-nums ${passing ? 'text-success-text' : 'text-danger-text'} ${className}`}
     >
-      {formatScore(value, decimals)}
+      {formatScore(value, decimals, language)}
     </span>
   );
 }

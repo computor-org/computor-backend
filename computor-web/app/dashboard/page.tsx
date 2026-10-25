@@ -108,7 +108,14 @@ function SectionHeading({ title, href, linkLabel }: { title: string; href?: stri
  */
 export default function DashboardPage() {
   const { user, isAuthenticated } = useAuth();
-  const { courseRole, isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
+  const {
+    courseRole,
+    isAdmin,
+    isOrganizationManager,
+    isWorkspaceUser,
+    isWorkspaceMaintainer,
+    courseHasAtLeast,
+  } = usePermissions();
   const courseLaunchers = useRef(new Map<string, CourseWorkspaceLauncher>());
   const openAssignment = (courseId: string, contentId: string) => {
     if (isAdmin || isOrganizationManager || !courseHasAtLeast(courseId, '_student') || courseHasAtLeast(courseId, '_tutor')) return false;
@@ -161,7 +168,11 @@ export default function DashboardPage() {
 
     const courseWorkspaceTemplates = await Promise.all(courses.map(async (course) => {
       const settings = await courseWorkspacesClient.getSettings({ courseId: course.id }).catch(() => null);
-      return { courseId: course.id, templates: (settings?.templates ?? []).filter((t) => t.enabled).map((t) => t.template_name) };
+      return {
+        courseId: course.id,
+        templates: (settings?.templates ?? []).filter((t) => t.enabled).map((t) => t.template_name),
+        offersTemplates: (settings?.templates ?? []).length > 0,
+      };
     }));
 
     return {
@@ -175,17 +186,28 @@ export default function DashboardPage() {
   // The launch/editor runs in another tab, so its lifecycle changes must not
   // leave the mounted dashboard showing the pre-launch snapshot. Only poll
   // workspace state; courses, progress and announcements remain one-shot.
+  //
+  // The backend lists workspaces for a workspace role, or for a member of a
+  // course that offers workspace templates, and answers everyone else with
+  // 403. Mirror that here so a lecturer without either does not poll a 403
+  // into the console every three seconds.
+  const mayListWorkspaces =
+    isWorkspaceUser ||
+    isWorkspaceMaintainer ||
+    (data?.courseWorkspaceTemplates ?? []).some(
+      (c) => c.offersTemplates && courseHasAtLeast(c.courseId, '_student'),
+    );
   const { data: workspaceData, refresh: refreshWorkspaces } = useResource(
     async () => (await coderClient.listWorkspaces()).workspaces,
     [],
-    { refetchInterval: 3000 },
+    { refetchInterval: 3000, enabled: mayListWorkspaces },
   );
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !mayListWorkspaces) return;
     const onFocus = () => { void refreshWorkspaces(); };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [isAuthenticated, refreshWorkspaces]);
+  }, [isAuthenticated, mayListWorkspaces, refreshWorkspaces]);
 
   const courses = data?.courses ?? [];
   const courseTitles = new Map(courses.map((c) => [c.id, displayName(c, t.untitledCourse)]));
@@ -195,6 +217,12 @@ export default function DashboardPage() {
   // Every state, not just running: a workspace stops after an hour without
   // use, so the one a returning learner comes back for is usually stopped.
   // Only a workspace being deleted is left out.
+  // "Nothing sent back for correction" only means something to someone who
+  // submits work; lecturers, tutors and admins get no subtitle instead.
+  const learnsSomewhere =
+    !isAdmin &&
+    !isOrganizationManager &&
+    courses.some((c) => courseHasAtLeast(c.id, '_student') && !courseHasAtLeast(c.id, '_tutor'));
   const ownWorkspaces = workspaces.filter((ws) => ws.latest_build_transition !== 'delete');
 
   return (
@@ -210,7 +238,9 @@ export default function DashboardPage() {
                 ? t.sentBack(attention.length)
                 : courses.length === 0
                   ? t.notEnrolled
-                  : t.nothingSentBack
+                  : learnsSomewhere
+                    ? t.nothingSentBack
+                    : undefined
           }
         />
 

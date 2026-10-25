@@ -158,7 +158,7 @@ export default function PrivacyNoticesPage() {
                 No privacy notice has been published yet. The consent gate stays inactive until the first version is published.
               </div>
             ) : (
-              <div className="border border-rule rounded-lg divide-y">
+              <div className="border border-rule rounded-lg divide-y divide-rule">
                 {versions.map((v) => {
                   const scheduled = new Date(v.effective_from).getTime() > now;
                   const isCurrent = v.version === currentVersion;
