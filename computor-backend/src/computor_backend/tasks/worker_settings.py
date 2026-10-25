@@ -84,6 +84,11 @@ class WorkerSettings(BaseSettings):
     temporal_tls_ca: Optional[str] = Field(
         default=None, validation_alias="TEMPORAL_TLS_CA"
     )
+    # TLS name to verify the frontend certificate against when it differs from
+    # TEMPORAL_HOST (for example when connecting by IP over WireGuard).
+    temporal_tls_server_name: Optional[str] = Field(
+        default=None, validation_alias="TEMPORAL_TLS_SERVER_NAME"
+    )
 
     # --- Temporal worker activity thread pool (tasks/temporal_worker.py) ---
     # Blocking activities (GitPython clone/push, sync SQLAlchemy, sync
