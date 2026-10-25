@@ -1,0 +1,73 @@
+"""Learner-facing runner messages follow the course language."""
+
+import pytest
+
+from ctcore.i18n import ENV_VAR, MESSAGES, tr
+from testers.tests.test_base import check_occurrence_range
+
+
+def _fail_text(monkeypatch, language, *args):
+    if language is None:
+        monkeypatch.delenv(ENV_VAR, raising=False)
+    else:
+        monkeypatch.setenv(ENV_VAR, language)
+    with pytest.raises(pytest.fail.Exception) as exc:
+        check_occurrence_range(*args)
+    return exc.value.msg
+
+
+def test_german_message_and_placeholders(monkeypatch):
+    monkeypatch.setenv(ENV_VAR, "de")
+    text = tr("variable_not_found", name="x_start")
+    assert text == "Die Variable `x_start` wurde in deiner Lösung nicht gefunden"
+
+
+@pytest.mark.parametrize("language", [None, "en", "fr", "", "xx-YY"])
+def test_english_default_and_unknown_language_fallback(monkeypatch, language):
+    if language is None:
+        monkeypatch.delenv(ENV_VAR, raising=False)
+    else:
+        monkeypatch.setenv(ENV_VAR, language)
+    assert tr("variable_not_found", name="x_start") == (
+        "Variable `x_start` not found in student namespace"
+    )
+
+
+def test_language_code_variants(monkeypatch):
+    for value in ("de", "DE", "de-AT", "de_DE"):
+        monkeypatch.setenv(ENV_VAR, value)
+        assert tr("file_empty", file="a.py").startswith("Die Datei")
+
+
+def test_every_entry_has_en_de_with_same_placeholders():
+    import string
+
+    def fields(t):
+        return {f for _, f, _, _ in string.Formatter().parse(t) if f}
+
+    for key, entry in MESSAGES.items():
+        assert set(entry) == {"en", "de"}, key
+        assert fields(entry["en"]) == fields(entry["de"]), key
+
+
+@pytest.mark.parametrize("args", [
+    (3, [0, 0], "`for`"),
+    (1, [2, 0], "`for`"),
+    (9, [2, 5], "`for`"),
+    (9, [2, 5], "Words", "is"),
+])
+def test_same_outcome_in_en_and_de(monkeypatch, args):
+    en = _fail_text(monkeypatch, "en", *args)
+    de = _fail_text(monkeypatch, "de", *args)
+    assert en != de
+    assert "`for`" in de or "Words" in de
+    # Within the allowed range both languages pass without a message.
+    for language in ("en", "de"):
+        monkeypatch.setenv(ENV_VAR, language)
+        check_occurrence_range(3, [3, 3], "x")
+
+
+def test_unknown_language_gives_english_failure(monkeypatch):
+    en = _fail_text(monkeypatch, "en", 9, [2, 5], "`for`")
+    assert _fail_text(monkeypatch, "zz", 9, [2, 5], "`for`") == en
+    assert en == "`for` found 9 times, expected 2-5"

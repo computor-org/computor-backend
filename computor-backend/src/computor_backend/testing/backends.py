@@ -29,9 +29,14 @@ _HARNESS_KEEP_COMPUTOR = {"COMPUTOR_SANDBOX_ENABLE", "COMPUTOR_SANDBOX_DISABLE"}
 _HARNESS_KEEP_COMPUTOR_PREFIX = "COMPUTOR_JOB_"
 
 
-def _harness_env() -> Dict[str, str]:
-    """Worker environment with credentials stripped, for the test harness."""
-    return {
+def _harness_env(language: Optional[str] = None) -> Dict[str, str]:
+    """Worker environment with credentials stripped, for the test harness.
+
+    ``language`` is the course language; the runner reads it from
+    ``COMPUTOR_TEST_LANGUAGE`` to write learner-facing messages. A value
+    inherited from the worker's own environment is never passed on.
+    """
+    env = {
         k: v
         for k, v in os.environ.items()
         if k not in _HARNESS_BLOCKED_ENV
@@ -41,6 +46,10 @@ def _harness_env() -> Dict[str, str]:
             and not k.startswith(_HARNESS_KEEP_COMPUTOR_PREFIX)
         )
     }
+    env.pop("COMPUTOR_TEST_LANGUAGE", None)
+    if language:
+        env["COMPUTOR_TEST_LANGUAGE"] = str(language)[:8]
+    return env
 
 
 # The harness's own stdout/stderr is only logged; keep at most this much of
@@ -366,7 +375,7 @@ class ComputorTestingBackend(TestingBackend):
             # is not inherited by the harness or anything it spawns (#241).
             result = _run_harness(
                 cmd_parts,
-                env=_harness_env(),
+                env=_harness_env(test_job_config.get("language")),
                 timeout=backend_properties.get("timeout_seconds", 300),
             )
 

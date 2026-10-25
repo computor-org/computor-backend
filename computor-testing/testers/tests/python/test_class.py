@@ -29,6 +29,7 @@ from ctexec.safe_io import read_untrusted_bytes, read_untrusted_text
 
 from .conftest import report_key, Solution
 from ctcore.helpers import get_property_as_list, token_exchange
+from ctcore.i18n import tr
 from testers.executors.python import PyExecutor, PyExecutionError
 from ..test_base import (
     main_idx_by_dependency,
@@ -391,7 +392,7 @@ class TestComputorPython:
                 try:
                     val_student = eval(sub.name, solution_student)
                 except Exception:
-                    pytest.fail(f"Variable `{sub.name}` not found in student namespace")
+                    pytest.fail(tr("variable_not_found", name=sub.name))
 
             # Get reference value for verifyEqual
             val_reference = None
@@ -446,14 +447,14 @@ class TestComputorPython:
             matches = globlib.glob(student_path)
 
             if not matches:
-                pytest.fail(f"File '{file_pattern}' not found in student directory")
+                pytest.fail(tr("file_not_found", file=file_pattern))
 
             allow_empty = getattr(sub, 'allowEmpty', False)
             if not allow_empty:
                 for filepath in matches:
                     if os.path.isfile(filepath) and os.path.getsize(filepath) == 0:
                         rel_path = os.path.relpath(filepath, dir_student)
-                        pytest.fail(f"File '{rel_path}' is empty (0 bytes)")
+                        pytest.fail(tr("file_empty", file=rel_path))
 
             _report["student_file_list"].extend(matches)
 
@@ -466,7 +467,7 @@ class TestComputorPython:
                 file_path = py_files[0] if py_files else None
 
             if not file_path or not os.path.exists(file_path):
-                pytest.fail("Python file not found for structural test")
+                pytest.fail(tr("python_file_not_found_structural"))
 
             if sub.allowedOccuranceRange is None and sub.countRequirement is None:
                 pytest.skip("allowedOccuranceRange not set")
@@ -477,7 +478,7 @@ class TestComputorPython:
                 try:
                     count = len(safe_regex_findall(sub.pattern, source))
                 except RegexTimeoutError:
-                    pytest.fail(f"Pattern `{sub.pattern}` timed out (possible ReDoS)")
+                    pytest.fail(tr("pattern_timed_out", pattern=sub.pattern))
             elif sub.occuranceType:
                 count = _count_single_token(
                     file_path, sub.name, occurance_type=sub.occuranceType,
@@ -492,8 +493,8 @@ class TestComputorPython:
                 )
             elif count != sub.countRequirement:
                 pytest.fail(
-                    f"`{sub.name}` found {count} times, "
-                    f"expected {sub.countRequirement}"
+                    tr("occurrence_found_exact", subject=f"`{sub.name}`", count=count,
+                       expected=sub.countRequirement)
                 )
 
         elif testtype == TypeEnum.linting:
@@ -507,7 +508,7 @@ class TestComputorPython:
                 file_path = py_files[0] if py_files else None
 
             if not file_path or not os.path.exists(file_path):
-                pytest.fail("Python file not found for linting")
+                pytest.fail(tr("python_file_not_found_linting"))
 
             ignore_pattern = sub.pattern or ""
             result = subprocess.run(
@@ -519,7 +520,7 @@ class TestComputorPython:
                 lines = result.stdout.strip().split('\n')
                 error_count = len([l for l in lines if l])
                 if error_count > 0:
-                    pytest.fail(f"{error_count} linting errors in `{main.file}`")
+                    pytest.fail(tr("linting_errors", count=error_count, file=main.file))
 
         elif testtype == TypeEnum.error:
             sol_student = get_solution(monkeymodule, pytestconfig, idx_main, Solution.student)
