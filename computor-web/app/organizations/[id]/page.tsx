@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useCascadeDelete } from '@/src/hooks/useCascadeDelete';
@@ -20,7 +21,40 @@ import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClie
 const organizationsClient = new OrganizationsClient();
 const courseFamiliesClient = new CourseFamiliesClient();
 
+const COPY = {
+  de: {
+    crumb: 'Organisationen',
+    organization: 'Organisation',
+    edit: 'Bearbeiten',
+    delete: 'Löschen',
+    loading: 'Wird geladen …',
+    families: 'Kursfamilien',
+    newFamily: 'Neue Kursfamilie',
+    noFamilies: 'Noch keine Kursfamilien.',
+    untitledFamily: 'Kursfamilie ohne Titel',
+    deleteTitle: (name: string) => `Organisation „${name}“ löschen?`,
+    deleteMessage:
+      'Die Organisation wird dauerhaft gelöscht, das lässt sich nicht rückgängig machen. Sie darf vorher keine Kursfamilien mehr enthalten.',
+  },
+  en: {
+    crumb: 'Organizations',
+    organization: 'Organization',
+    edit: 'Edit',
+    delete: 'Delete',
+    loading: 'Loading…',
+    families: 'Course Families',
+    newFamily: 'New course family',
+    noFamilies: 'No course families yet.',
+    untitledFamily: 'Untitled Course Family',
+    deleteTitle: (name: string) => `Delete organization “${name}”?`,
+    deleteMessage:
+      'This permanently deletes the organization and is irreversible. It must have no course families first.',
+  },
+};
+
 export default function OrganizationDetailPage() {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const orgId = useParams().id as string;
   const router = useRouter();
   const { refreshPermissions } = useAuth();
@@ -35,7 +69,7 @@ export default function OrganizationDetailPage() {
   );
   const org = data?.org ?? null;
   const families = data?.families ?? [];
-  const orgName = displayName(org, 'Organization');
+  const orgName = displayName(org, t.organization);
 
   // Preview (dry run) first, then the real delete behind the typed-path dialog.
   // Deleting removes the caller's own _owner role, so the cached scopes are
@@ -53,18 +87,18 @@ export default function OrganizationDetailPage() {
     <AuthenticatedLayout>
       <ListPageLayout width="narrow">
         <PageHeader
-          breadcrumbs={[{ label: 'Organizations', href: '/organizations' }, { label: orgName }]}
+          breadcrumbs={[{ label: t.crumb, href: '/organizations' }, { label: orgName }]}
           title={orgName}
           subtitle={org && <span className="text-sm text-muted">{org.organization_type}</span>}
           actions={
             org ? (
               <>
                 {canManage && (
-                  <ButtonLink href={`/organizations/${org.id}/edit`} variant="secondary">Edit</ButtonLink>
+                  <ButtonLink href={`/organizations/${org.id}/edit`} variant="secondary">{t.edit}</ButtonLink>
                 )}
                 {canDeleteOrganization(orgId) && (
-                  <Button variant="dangerGhost" onClick={del.begin} loading={del.opening} loadingLabel="Delete">
-                    Delete
+                  <Button variant="dangerGhost" onClick={del.begin} loading={del.opening} loadingLabel={t.delete}>
+                    {t.delete}
                   </Button>
                 )}
               </>
@@ -75,7 +109,7 @@ export default function OrganizationDetailPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <ListLoading>Loading…</ListLoading>
+          <ListLoading>{t.loading}</ListLoading>
         ) : org ? (
           <ScrollArea>
             {org.description && (
@@ -87,20 +121,20 @@ export default function OrganizationDetailPage() {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-xl font-semibold text-fg">
-                  Course Families <span className="text-subtle font-normal">({families.length})</span>
+                  {t.families} <span className="text-subtle font-normal">({families.length})</span>
                 </h2>
                 {canCreateCourseFamily(orgId) && (
-                  <Link href={`/course-families/create?organization_id=${orgId}`} className="text-sm text-accent-text hover:underline">New course family</Link>
+                  <Link href={`/course-families/create?organization_id=${orgId}`} className="text-sm text-accent-text hover:underline">{t.newFamily}</Link>
                 )}
               </div>
               {families.length === 0 ? (
-                <div className="text-muted border border-dashed border-rule-strong rounded-lg p-8 text-center">No course families yet.</div>
+                <div className="text-muted border border-dashed border-rule-strong rounded-lg p-8 text-center">{t.noFamilies}</div>
               ) : (
                 <div className="bg-surface border border-rule rounded-lg divide-y divide-rule">
                   {families.map((f) => (
                     <Link key={f.id} href={`/course-families/${f.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-canvas">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-fg truncate">{displayName(f, 'Untitled Course Family')}</div>
+                        <div className="text-sm font-medium text-fg truncate">{displayName(f, t.untitledFamily)}</div>
                       </div>
                       <span className="text-faint">›</span>
                     </Link>
@@ -114,8 +148,8 @@ export default function OrganizationDetailPage() {
 
       {del.preview && org && (
         <ConfirmDeleteDialog
-          title={`Delete organization “${orgName}”?`}
-          message="This permanently deletes the organization and is irreversible. It must have no course families first."
+          title={t.deleteTitle(orgName)}
+          message={t.deleteMessage}
           confirmWord={org.path}
           preview={<CascadeDeletePreview result={del.preview} />}
           blockedReason={del.preview.blocked_reason}

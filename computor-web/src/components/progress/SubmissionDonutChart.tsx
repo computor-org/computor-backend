@@ -1,7 +1,13 @@
 'use client';
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type { ContentTypeGradingStats } from 'types/generated';
+
+const COPY = {
+  de: { remaining: 'Offen', title: 'Abgaben nach Typ' },
+  en: { remaining: 'Remaining', title: 'Submissions by Type' },
+};
 
 interface SubmissionDonutChartProps {
   byContentType: ContentTypeGradingStats[];
@@ -10,6 +16,7 @@ interface SubmissionDonutChartProps {
 }
 
 export default function SubmissionDonutChart({ byContentType, totalMax, totalSubmitted }: SubmissionDonutChartProps) {
+  const t = COPY[useUiLanguage()];
   const remaining = Math.max(0, totalMax - totalSubmitted);
 
   const data = [
@@ -20,7 +27,7 @@ export default function SubmissionDonutChart({ byContentType, totalMax, totalSub
       max: ct.max_assignments,
     })),
     ...(remaining > 0
-      ? [{ name: 'Remaining', value: remaining, color: '#e5e7eb', max: remaining }]
+      ? [{ name: t.remaining, value: remaining, color: '#e5e7eb', max: remaining }]
       : []),
   ].filter(d => d.value > 0);
 
@@ -28,7 +35,7 @@ export default function SubmissionDonutChart({ byContentType, totalMax, totalSub
 
   return (
     <div className="bg-surface rounded-lg border border-rule p-5">
-      <h3 className="text-sm font-semibold text-fg mb-4">Submissions by Type</h3>
+      <h3 className="text-sm font-semibold text-fg mb-4">{t.title}</h3>
       <div className="h-52">
         {/* A fixed height (h-52) keeps the first render, before the width is
             measured, from logging recharts' "width(-1) and height(-1)" warning. */}

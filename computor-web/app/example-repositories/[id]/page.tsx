@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ExampleRepositoriesClient } from '@/src/generated/clients/ExampleRepositoriesClient';
 import { ExamplesClient } from '@/src/generated/clients/ExamplesClient';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -19,7 +20,42 @@ import type { ExampleList } from 'types/generated';
 const exampleRepositoriesClient = new ExampleRepositoriesClient();
 const examplesClient = new ExamplesClient();
 
+const COPY = {
+  de: {
+    forbidden: 'Du hast keinen Zugriff auf Beispiel-Repositories.',
+    back: 'Zurück',
+    crumb: 'Beispiel-Repositories',
+    repository: 'Repository',
+    upload: 'Beispiele hochladen',
+    edit: 'Bearbeiten',
+    delete: 'Löschen',
+    loading: 'Wird geladen …',
+    examples: 'Beispiele',
+    noExamples: 'Noch keine Beispiele.',
+    noExamplesUpload: ' Lade ein ZIP-Archiv mit einem oder mehreren Beispielen hoch (jeweils mit einer meta.yaml).',
+    deleteTitle: (name: string) => `Repository „${name}“ löschen?`,
+    deleteMessage: 'Entfernt das Beispiel-Repository. Es darf vorher keine Beispiele mehr enthalten.',
+  },
+  en: {
+    forbidden: 'You do not have access to example repositories.',
+    back: 'Back',
+    crumb: 'Example repositories',
+    repository: 'Repository',
+    upload: 'Upload examples',
+    edit: 'Edit',
+    delete: 'Delete',
+    loading: 'Loading…',
+    examples: 'Examples',
+    noExamples: 'No examples yet.',
+    noExamplesUpload: ' Upload a zip containing one or more examples (each with a meta.yaml).',
+    deleteTitle: (name: string) => `Delete repository “${name}”?`,
+    deleteMessage: 'Removes the example repository. It must contain no examples first.',
+  },
+};
+
 export default function ExampleRepositoryDetailPage() {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const repoId = useParams().id as string;
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -43,7 +79,7 @@ export default function ExampleRepositoryDetailPage() {
   }
 
   if (!authLoading && isAuthenticated && !canViewExamples) {
-    return <Forbidden message="You do not have access to example repositories." backLink="/example-repositories" backText="Back" />;
+    return <Forbidden message={t.forbidden} backLink="/example-repositories" backText={t.back} />;
   }
 
   const uploadable = repo?.source_type === 'minio' || repo?.source_type === 's3';
@@ -52,17 +88,17 @@ export default function ExampleRepositoryDetailPage() {
     <AuthenticatedLayout>
       <ListPageLayout width="narrow">
         <PageHeader
-          breadcrumbs={[{ label: 'Example repositories', href: '/example-repositories' }, { label: repo?.name || 'Repository' }]}
-          title={repo?.name || 'Repository'}
+          breadcrumbs={[{ label: t.crumb, href: '/example-repositories' }, { label: repo?.name || t.repository }]}
+          title={repo?.name || t.repository}
           subtitle={repo && <span className="font-mono text-sm text-muted">{repo.source_type} · {repo.source_url}</span>}
           actions={
             repo && canManageExamples ? (
               <>
                 {uploadable && (
-                  <Link href={`/examples/upload?repository=${repo.id}`} className="px-3 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover">Upload examples</Link>
+                  <Link href={`/examples/upload?repository=${repo.id}`} className="px-3 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover">{t.upload}</Link>
                 )}
-                <Link href={`/example-repositories/${repo.id}/edit`} className="px-3 py-2 text-sm font-medium text-body border border-rule-strong rounded-lg hover:bg-canvas">Edit</Link>
-                <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-danger-text border border-danger-line rounded-lg hover:bg-danger-wash">Delete</button>
+                <Link href={`/example-repositories/${repo.id}/edit`} className="px-3 py-2 text-sm font-medium text-body border border-rule-strong rounded-lg hover:bg-canvas">{t.edit}</Link>
+                <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-danger-text border border-danger-line rounded-lg hover:bg-danger-wash">{t.delete}</button>
               </>
             ) : undefined
           }
@@ -71,7 +107,7 @@ export default function ExampleRepositoryDetailPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <ListLoading>Loading…</ListLoading>
+          <ListLoading>{t.loading}</ListLoading>
         ) : repo ? (
           <ScrollArea>
             {repo.description && (
@@ -82,11 +118,11 @@ export default function ExampleRepositoryDetailPage() {
 
             <div>
               <h2 className="text-xl font-semibold text-fg mb-3">
-                Examples <span className="text-subtle font-normal">({examples.length})</span>
+                {t.examples} <span className="text-subtle font-normal">({examples.length})</span>
               </h2>
               {examples.length === 0 ? (
                 <div className="text-muted border border-dashed border-rule-strong rounded-lg p-8 text-center">
-                  No examples yet.{uploadable ? ' Upload a zip containing one or more examples (each with a meta.yaml).' : ''}
+                  {t.noExamples}{uploadable ? t.noExamplesUpload : ''}
                 </div>
               ) : (
                 <div className="bg-surface border border-rule rounded-lg divide-y divide-rule">
@@ -108,8 +144,8 @@ export default function ExampleRepositoryDetailPage() {
 
       {confirmDelete && repo && (
         <ConfirmDeleteDialog
-          title={`Delete repository “${repo.name}”?`}
-          message="Removes the example repository. It must contain no examples first."
+          title={t.deleteTitle(repo.name)}
+          message={t.deleteMessage}
           confirmWord={repo.name}
           onConfirm={doDelete}
           onClose={() => setConfirmDelete(false)}

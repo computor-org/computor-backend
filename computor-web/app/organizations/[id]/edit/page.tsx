@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
@@ -17,7 +18,40 @@ const organizationsClient = new OrganizationsClient();
 
 const ORG_TYPES: OrganizationType[] = ['organization', 'community', 'user'];
 
+const COPY = {
+  de: {
+    forbidden: 'Du hast keine Berechtigung, Organisationen zu bearbeiten.',
+    saveFailed: 'Speichern fehlgeschlagen',
+    crumb: 'Organisationen',
+    organization: 'Organisation',
+    organizationLower: 'Organisation',
+    edit: 'Bearbeiten',
+    titleLabel: 'Titel',
+    type: 'Typ',
+    description: 'Beschreibung',
+    path: 'Pfad (unveränderlich)',
+    pathHint: 'Der hierarchische Pfad steht nach dem Erstellen fest.',
+    editTitle: (name: string) => `${name} bearbeiten`,
+  },
+  en: {
+    forbidden: 'You do not have permission to edit organizations.',
+    saveFailed: 'Save failed',
+    crumb: 'Organizations',
+    organization: 'Organization',
+    organizationLower: 'organization',
+    edit: 'Edit',
+    titleLabel: 'Title',
+    type: 'Type',
+    description: 'Description',
+    path: 'Path (immutable)',
+    pathHint: 'The hierarchical path is fixed after creation.',
+    editTitle: (name: string) => `Edit ${name}`,
+  },
+};
+
 export default function OrganizationEditPage() {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const orgId = useParams().id as string;
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -61,12 +95,12 @@ export default function OrganizationEditPage() {
       router.push(`/organizations/${orgId}`);
     } catch (e) {
       setSaving(false);
-      setSaveError(e instanceof Error ? e.message : 'Save failed');
+      setSaveError(e instanceof Error ? e.message : t.saveFailed);
     }
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return <Forbidden message="You do not have permission to edit organizations." />;
+    return <Forbidden message={t.forbidden} />;
   }
 
   return (
@@ -76,30 +110,30 @@ export default function OrganizationEditPage() {
       ) : (
         <FormPanel
           breadcrumbs={[
-            { label: 'Organizations', href: '/organizations' },
-            { label: org?.title || org?.path || 'Organization', href: `/organizations/${orgId}` },
-            { label: 'Edit' },
+            { label: t.crumb, href: '/organizations' },
+            { label: org?.title || org?.path || t.organization, href: `/organizations/${orgId}` },
+            { label: t.edit },
           ]}
-          title={`Edit ${org?.title || org?.path || 'organization'}`}
+          title={t.editTitle(org?.title || org?.path || t.organizationLower)}
           error={loadError ?? saveError}
           submitting={saving}
           onCancel={() => router.push(`/organizations/${orgId}`)}
           onSubmit={save}
         >
-          <Field label="Title">
+          <Field label={t.titleLabel}>
             <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Type">
+          <Field label={t.type}>
             <select value={orgType} onChange={(e) => setOrgType(e.target.value as OrganizationType)} className={inputCls}>
               {ORG_TYPES.map((t) => (
                 <option key={t} value={t}>{t}</option>
               ))}
             </select>
           </Field>
-          <Field label="Description">
+          <Field label={t.description}>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className={inputCls} />
           </Field>
-          <Field label="Path (immutable)" hint="The hierarchical path is fixed after creation.">
+          <Field label={t.path} hint={t.pathHint}>
             <input value={org?.path || ''} readOnly className={`${inputCls} bg-canvas text-muted`} />
           </Field>
         </FormPanel>

@@ -1,13 +1,20 @@
 'use client';
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type { CourseMemberGradingsList, ContentTypeGradingStats } from 'types/generated';
+
+const COPY = {
+  de: { title: 'Ø Fortschritt nach Inhaltstyp', avg: 'Ø Fortschritt' },
+  en: { title: 'Avg Progress by Content Type', avg: 'Avg Progress' },
+};
 
 interface ContentTypeChartProps {
   students: CourseMemberGradingsList[];
 }
 
 export default function ContentTypeChart({ students }: ContentTypeChartProps) {
+  const t = COPY[useUiLanguage()];
   if (students.length === 0) return null;
 
   // Aggregate content type stats across all students
@@ -42,7 +49,7 @@ export default function ContentTypeChart({ students }: ContentTypeChartProps) {
 
   return (
     <div className="bg-surface rounded-lg border border-rule p-5">
-      <h3 className="text-sm font-semibold text-fg mb-4">Avg Progress by Content Type</h3>
+      <h3 className="text-sm font-semibold text-fg mb-4">{t.title}</h3>
       <div className="h-52">
         {/* A fixed height (h-52) keeps the first render, before the width is
             measured, from logging recharts' "width(-1) and height(-1)" warning. */}
@@ -53,7 +60,7 @@ export default function ContentTypeChart({ students }: ContentTypeChartProps) {
             <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11 }} />
             <Tooltip
               contentStyle={{ fontSize: 12 }}
-              formatter={(value) => [`${value}%`, 'Avg Progress']}
+              formatter={(value) => [`${value}%`, t.avg]}
             />
             <Bar dataKey="progress" radius={[0, 4, 4, 0]}>
               {data.map((entry) => (

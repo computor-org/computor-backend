@@ -14,6 +14,8 @@ import { useResource } from '@/src/hooks/useResource';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { ConsentClient } from '@/src/generated/clients/ConsentClient';
 import type { PolicyVersionCreate } from 'types/generated';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { formatDateTime } from '@/src/utils/locale';
 
 const consentClient = new ConsentClient();
 
@@ -22,11 +24,105 @@ type LangRow = { lang: string; text: string; filename?: string };
 const inputCls =
   'w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-accent-line focus:border-accent-line text-sm';
 
-function fmtDate(s?: string | null): string {
-  return s ? new Date(s).toLocaleString() : '—';
-}
+const COPY = {
+  de: {
+    versionRequired: 'Eine Versionskennung ist erforderlich (z. B. 2026-07-05).',
+    addLanguage: 'Füge mindestens eine Sprache mit Text der Datenschutzerklärung hinzu.',
+    duplicate: (code: string) => `Doppelter Sprachcode: „${code}“.`,
+    exists: (version: string) => `Die Version „${version}“ existiert bereits, Versionen werden nur angehängt.`,
+    published: (version: string) => `Version ${version} der Datenschutzerklärung veröffentlicht`,
+    publishFailed: 'Die Version konnte nicht veröffentlicht werden',
+    denied: 'Zugriff verweigert',
+    adminRequired: 'Zum Verwalten der Datenschutzhinweise sind Administratorrechte erforderlich.',
+    title: 'Datenschutzhinweise',
+    subtitle: 'Veröffentliche und prüfe die DSGVO-Versionen der Datenschutzerklärung, auf denen die Einwilligungsabfrage beruht.',
+    beforePublish: 'Bevor du veröffentlichst',
+    warnAppendBefore: 'Versionen werden ',
+    warnAppendStrong: 'nur angehängt',
+    warnAppendAfter: ': Eine Version kann nur einmal veröffentlicht werden. Erhöhe die Version bei jeder Änderung.',
+    warnRegateBefore: 'Eine Veröffentlichung mit sofortigem Gültigkeitsdatum ',
+    warnRegateStrong: 'fragt jeden Benutzer erneut ab',
+    warnRegateAfter: ', der der neuen Version noch nicht zugestimmt hat.',
+    warnExtension: 'Die VS-Code-Erweiterung unterstützt noch keine Einwilligung, Benutzer ohne Einwilligung erhalten dort Fehler.',
+    publishedVersions: 'Veröffentlichte Versionen',
+    loading: 'Wird geladen…',
+    none: 'Es wurde noch keine Datenschutzerklärung veröffentlicht. Die Einwilligungsabfrage bleibt inaktiv, bis die erste Version veröffentlicht ist.',
+    current: 'aktuell',
+    scheduled: 'geplant',
+    versionLine: (effective: string, languages: string, created: string) =>
+      `gültig ab ${effective} · Sprachen: ${languages} · veröffentlicht ${created}`,
+    publishNew: 'Neue Version veröffentlichen',
+    version: 'Version',
+    versionPlaceholder: 'z. B. 2026-07-05',
+    effectiveFrom: 'Gültig ab',
+    effectiveHint: 'Leer lassen, damit die Version sofort gilt. Ein Datum in der Zukunft plant sie ein.',
+    noticeText: 'Text der Datenschutzerklärung (Markdown, je Sprache einer)',
+    langPlaceholder: 'Sprache (en)',
+    langAria: 'Sprachcode',
+    replace: (name: string) => `${name} ersetzen`,
+    upload: '.md hochladen',
+    remove: 'Entfernen',
+    textPlaceholder: '# Datenschutzerklärung\n\nLade eine .md-Datei hoch oder füge das Markdown hier ein…',
+    addLang: '+ Sprache hinzufügen',
+    publishing: 'Wird veröffentlicht…',
+    publishVersion: 'Version veröffentlichen',
+    confirmTitle: 'Datenschutzerklärung veröffentlichen',
+    confirmScheduled: (version: string) => `Version „${version}“ veröffentlichen? Sie gilt ab dem geplanten Zeitpunkt, dann werden die Benutzer erneut abgefragt.`,
+    confirmNow: (version: string) => `Version „${version}“ veröffentlichen? Sie gilt sofort und fragt jeden Benutzer erneut ab, der ihr noch nicht zugestimmt hat. Das lässt sich nicht rückgängig machen (Versionen werden nur angehängt).`,
+    confirmLabel: 'Veröffentlichen',
+  },
+  en: {
+    versionRequired: 'A version identifier is required (e.g. 2026-07-05).',
+    addLanguage: 'Add at least one language with notice text.',
+    duplicate: (code: string) => `Duplicate language code: "${code}".`,
+    exists: (version: string) => `Version "${version}" already exists — versions are append-only.`,
+    published: (version: string) => `Published privacy notice version ${version}`,
+    publishFailed: 'Failed to publish policy version',
+    denied: 'Access Denied',
+    adminRequired: 'Admin privileges are required to manage privacy notices.',
+    title: 'Privacy notices',
+    subtitle: 'Publish and review the GDPR consent policy versions that back the consent gate.',
+    beforePublish: 'Before you publish',
+    warnAppendBefore: 'Versions are ',
+    warnAppendStrong: 'append-only',
+    warnAppendAfter: ' — a version can be published once. Bump the version for any change.',
+    warnRegateBefore: 'Publishing with an effective date of now ',
+    warnRegateStrong: 're-gates every user',
+    warnRegateAfter: ' who hasn’t consented to the new version.',
+    warnExtension: 'The VS Code extension has no consent handling yet — unconsented users will get errors there.',
+    publishedVersions: 'Published versions',
+    loading: 'Loading…',
+    none: 'No privacy notice has been published yet. The consent gate stays inactive until the first version is published.',
+    current: 'current',
+    scheduled: 'scheduled',
+    versionLine: (effective: string, languages: string, created: string) =>
+      `effective ${effective} · languages: ${languages} · published ${created}`,
+    publishNew: 'Publish a new version',
+    version: 'Version',
+    versionPlaceholder: 'e.g. 2026-07-05',
+    effectiveFrom: 'Effective from',
+    effectiveHint: 'Leave empty to become current immediately. A future date schedules it.',
+    noticeText: 'Notice text (Markdown, one per language)',
+    langPlaceholder: 'lang (en)',
+    langAria: 'Language code',
+    replace: (name: string) => `Replace ${name}`,
+    upload: 'Upload .md',
+    remove: 'Remove',
+    textPlaceholder: '# Privacy notice\n\nUpload a .md file or paste the Markdown here…',
+    addLang: '+ Add language',
+    publishing: 'Publishing…',
+    publishVersion: 'Publish version',
+    confirmTitle: 'Publish privacy notice',
+    confirmScheduled: (version: string) => `Publish version "${version}"? It becomes current at the scheduled time; users are re-gated then.`,
+    confirmNow: (version: string) => `Publish version "${version}"? It becomes current immediately and re-gates every user who has not consented to it. This cannot be undone (versions are append-only).`,
+    confirmLabel: 'Publish',
+  },
+};
 
 export default function PrivacyNoticesPage() {
+  const language = useUiLanguage();
+  const t = COPY[language];
+  const fmtDate = (s?: string | null) => formatDateTime(s, language);
   const { isLoading: authLoading } = useAuth();
   const { isAdmin } = usePermissions();
   const notify = useNotify();
@@ -74,13 +170,13 @@ export default function PrivacyNoticesPage() {
   const codes = filledLangs.map((l) => l.lang.trim());
   const dupCode = codes.find((c, i) => codes.indexOf(c) !== i);
   const validationError = !version.trim()
-    ? 'A version identifier is required (e.g. 2026-07-05).'
+    ? t.versionRequired
     : filledLangs.length === 0
-    ? 'Add at least one language with notice text.'
+    ? t.addLanguage
     : dupCode
-    ? `Duplicate language code: "${dupCode}".`
+    ? t.duplicate(dupCode)
     : versions.some((v) => v.version === version.trim())
-    ? `Version "${version.trim()}" already exists — versions are append-only.`
+    ? t.exists(version.trim())
     : null;
 
   const doPublish = async () => {
@@ -92,13 +188,13 @@ export default function PrivacyNoticesPage() {
       const body: PolicyVersionCreate = { version: version.trim(), texts };
       if (effectiveFrom) body.effective_from = new Date(effectiveFrom).toISOString();
       const created = await consentClient.publishPolicyVersionConsentPolicyVersionsPost({ body });
-      notify(`Published privacy notice version ${created.version}`, 'success');
+      notify(t.published(created.version), 'success');
       setVersion('');
       setEffectiveFrom('');
       setLangs([{ lang: 'en', text: '' }]);
       await reload();
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Failed to publish policy version', 'error');
+      notify(err instanceof Error ? err.message : t.publishFailed, 'error');
     } finally {
       setPublishing(false);
     }
@@ -118,8 +214,8 @@ export default function PrivacyNoticesPage() {
       <AuthenticatedLayout>
         <div className="p-6">
           <div className="bg-danger-wash border border-danger-line rounded-lg p-6 text-center">
-            <h2 className="text-lg font-semibold text-danger-text">Access Denied</h2>
-            <p className="text-sm text-danger-text mt-2">Admin privileges are required to manage privacy notices.</p>
+            <h2 className="text-lg font-semibold text-danger-text">{t.denied}</h2>
+            <p className="text-sm text-danger-text mt-2">{t.adminRequired}</p>
           </div>
         </div>
       </AuthenticatedLayout>
@@ -130,9 +226,9 @@ export default function PrivacyNoticesPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Privacy notices' }]}
-          title="Privacy notices"
-          subtitle="Publish and review the GDPR consent policy versions that back the consent gate."
+          breadcrumbs={[{ label: t.title }]}
+          title={t.title}
+          subtitle={t.subtitle}
         />
 
         <ErrorBanner>{error}</ErrorBanner>
@@ -140,22 +236,22 @@ export default function PrivacyNoticesPage() {
         <ScrollArea>
           {/* Warning */}
           <div className="bg-warn-wash border border-warn-line rounded-lg p-4">
-            <h2 className="text-sm font-semibold text-warn-text mb-1">Before you publish</h2>
+            <h2 className="text-sm font-semibold text-warn-text mb-1">{t.beforePublish}</h2>
             <ul className="text-sm text-warn-text space-y-1 list-disc list-inside">
-              <li>Versions are <strong>append-only</strong> — a version can be published once. Bump the version for any change.</li>
-              <li>Publishing with an effective date of now <strong>re-gates every user</strong> who hasn’t consented to the new version.</li>
-              <li>The VS Code extension has no consent handling yet — unconsented users will get errors there.</li>
+              <li>{t.warnAppendBefore}<strong>{t.warnAppendStrong}</strong>{t.warnAppendAfter}</li>
+              <li>{t.warnRegateBefore}<strong>{t.warnRegateStrong}</strong>{t.warnRegateAfter}</li>
+              <li>{t.warnExtension}</li>
             </ul>
           </div>
 
           {/* Published versions */}
           <div className="bg-surface rounded-lg shadow border border-rule p-6">
-            <h2 className="text-lg font-semibold text-fg mb-4">Published versions</h2>
+            <h2 className="text-lg font-semibold text-fg mb-4">{t.publishedVersions}</h2>
             {loading ? (
-              <div className="text-sm text-muted">Loading…</div>
+              <div className="text-sm text-muted">{t.loading}</div>
             ) : versions.length === 0 ? (
               <div className="text-sm text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">
-                No privacy notice has been published yet. The consent gate stays inactive until the first version is published.
+                {t.none}
               </div>
             ) : (
               <div className="border border-rule rounded-lg divide-y divide-rule">
@@ -167,11 +263,11 @@ export default function PrivacyNoticesPage() {
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-fg flex items-center gap-2">
                           <span className="font-mono">{v.version}</span>
-                          {isCurrent && <Badge color="green" pill>current</Badge>}
-                          {scheduled && <Badge color="blue" pill>scheduled</Badge>}
+                          {isCurrent && <Badge color="green" pill>{t.current}</Badge>}
+                          {scheduled && <Badge color="blue" pill>{t.scheduled}</Badge>}
                         </div>
                         <div className="text-xs text-muted">
-                          effective {fmtDate(v.effective_from)} · languages: {(v.languages || []).join(', ') || '—'} · published {fmtDate(v.created_at)}
+                          {t.versionLine(fmtDate(v.effective_from), (v.languages || []).join(', ') || '—', fmtDate(v.created_at))}
                         </div>
                       </div>
                     </div>
@@ -183,31 +279,31 @@ export default function PrivacyNoticesPage() {
 
           {/* Publish new */}
           <div className="bg-surface rounded-lg shadow border border-rule p-6">
-            <h2 className="text-lg font-semibold text-fg mb-4">Publish a new version</h2>
+            <h2 className="text-lg font-semibold text-fg mb-4">{t.publishNew}</h2>
 
             <div className="flex flex-wrap gap-4 mb-4">
               <div className="flex-1 min-w-[12rem]">
-                <label className="block text-sm font-medium text-body mb-1">Version</label>
+                <label className="block text-sm font-medium text-body mb-1">{t.version}</label>
                 <input
                   className={inputCls}
                   value={version}
                   onChange={(e) => setVersion(e.target.value)}
-                  placeholder="e.g. 2026-07-05"
+                  placeholder={t.versionPlaceholder}
                 />
               </div>
               <div className="flex-1 min-w-[12rem]">
-                <label className="block text-sm font-medium text-body mb-1">Effective from</label>
+                <label className="block text-sm font-medium text-body mb-1">{t.effectiveFrom}</label>
                 <input
                   type="datetime-local"
                   className={inputCls}
                   value={effectiveFrom}
                   onChange={(e) => setEffectiveFrom(e.target.value)}
                 />
-                <p className="text-xs text-muted mt-1">Leave empty to become current immediately. A future date schedules it.</p>
+                <p className="text-xs text-muted mt-1">{t.effectiveHint}</p>
               </div>
             </div>
 
-            <label className="block text-sm font-medium text-body mb-2">Notice text (Markdown, one per language)</label>
+            <label className="block text-sm font-medium text-body mb-2">{t.noticeText}</label>
             <div className="space-y-4">
               {langs.map((l, i) => (
                 <div key={i} className="border border-rule rounded-lg p-3">
@@ -216,11 +312,11 @@ export default function PrivacyNoticesPage() {
                       className="w-28 px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-accent-line focus:border-accent-line text-sm"
                       value={l.lang}
                       onChange={(e) => setLangCode(i, e.target.value)}
-                      placeholder="lang (en)"
-                      aria-label="Language code"
+                      placeholder={t.langPlaceholder}
+                      aria-label={t.langAria}
                     />
                     <label className="px-3 py-2 text-sm font-medium text-accent-text bg-accent-wash rounded-lg hover:bg-accent-wash cursor-pointer">
-                      {l.filename ? `Replace ${l.filename}` : 'Upload .md'}
+                      {l.filename ? t.replace(l.filename) : t.upload}
                       <input type="file" accept=".md,.markdown,text/markdown" className="hidden" onChange={(e) => onPickFile(i, e)} />
                     </label>
                     {langs.length > 1 && (
@@ -229,7 +325,7 @@ export default function PrivacyNoticesPage() {
                         onClick={() => removeLang(i)}
                         className="ml-auto text-sm text-danger-text hover:underline"
                       >
-                        Remove
+                        {t.remove}
                       </button>
                     )}
                   </div>
@@ -238,7 +334,7 @@ export default function PrivacyNoticesPage() {
                     rows={8}
                     value={l.text}
                     onChange={(e) => setLangText(i, e.target.value)}
-                    placeholder={'# Privacy notice\n\nUpload a .md file or paste the Markdown here…'}
+                    placeholder={t.textPlaceholder}
                   />
                 </div>
               ))}
@@ -246,7 +342,7 @@ export default function PrivacyNoticesPage() {
 
             <div className="mt-3 flex items-center gap-4">
               <button type="button" onClick={addLang} className="text-sm text-accent-text hover:underline">
-                + Add language
+                {t.addLang}
               </button>
             </div>
 
@@ -260,22 +356,18 @@ export default function PrivacyNoticesPage() {
             onClick={onClickPublish}
             disabled={publishing || !!validationError}
             loading={publishing}
-            loadingLabel="Publishing…"
+            loadingLabel={t.publishing}
           >
-            Publish version
+            {t.publishVersion}
           </Button>
           {validationError && <span className="text-sm text-muted">{validationError}</span>}
         </PageActions>
 
         <ConfirmDialog
           open={showConfirm}
-          title="Publish privacy notice"
-          message={
-            effectiveFrom
-              ? `Publish version "${version.trim()}"? It becomes current at the scheduled time; users are re-gated then.`
-              : `Publish version "${version.trim()}"? It becomes current immediately and re-gates every user who has not consented to it. This cannot be undone (versions are append-only).`
-          }
-          confirmLabel="Publish"
+          title={t.confirmTitle}
+          message={effectiveFrom ? t.confirmScheduled(version.trim()) : t.confirmNow(version.trim())}
+          confirmLabel={t.confirmLabel}
           variant="danger"
           onConfirm={doPublish}
           onCancel={() => setShowConfirm(false)}

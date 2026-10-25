@@ -3,7 +3,41 @@
 import type { CourseMemberGradingNode } from 'types/generated';
 import { useContentTree, type ContentTreeRow } from '@/src/hooks/useContentTree';
 import Panel from '@/src/components/ui/Panel';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { gradingStatusDot, gradingStatusLabel } from '@/src/components/student/gradingStatus';
+
+const COPY = {
+  de: {
+    collapse: (label: string) => `${label} einklappen`,
+    expand: (label: string) => `${label} ausklappen`,
+    hiddenTitle: 'Für Studierende derzeit nicht sichtbar. Wird unten trotzdem mitgezählt.',
+    hidden: 'unsichtbar',
+    empty: 'Keine Kursinhalte verfügbar.',
+    title: 'Fortschritt im Kursinhalt',
+    content: 'Inhalt',
+    progress: 'Fortschritt',
+    tests: 'Tests',
+    subs: 'Abg.',
+    result: 'Ergebnis',
+    grade: 'Bewertung',
+    status: 'Status',
+  },
+  en: {
+    collapse: (label: string) => `Collapse ${label}`,
+    expand: (label: string) => `Expand ${label}`,
+    hiddenTitle: 'Students cannot currently see this. It is still counted below.',
+    hidden: 'invisible',
+    empty: 'No course content available.',
+    title: 'Course content progress',
+    content: 'Content',
+    progress: 'Progress',
+    tests: 'Tests',
+    subs: 'Subs',
+    result: 'Result',
+    grade: 'Grade',
+    status: 'Status',
+  },
+};
 
 interface ContentTreeProps {
   nodes: CourseMemberGradingNode[];
@@ -16,6 +50,8 @@ interface ContentTreeProps {
  * agree on nesting order, indent and expand behaviour.
  */
 function TreeNodeRow({ row }: { row: ContentTreeRow<CourseMemberGradingNode> }) {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const { item, depth, label, expanded, hasChildren, toggle } = row;
   // The grading endpoint returns every node; nothing is synthesised here.
   if (!item) return null;
@@ -43,7 +79,7 @@ function TreeNodeRow({ row }: { row: ContentTreeRow<CourseMemberGradingNode> }) 
               <button
                 onClick={toggle}
                 aria-expanded={expanded}
-                aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
+                aria-label={expanded ? t.collapse(label) : t.expand(label)}
                 className="w-5 h-5 flex items-center justify-center text-subtle hover:text-muted flex-shrink-0"
               >
                 <svg className={`h-3.5 w-3.5 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -76,9 +112,9 @@ function TreeNodeRow({ row }: { row: ContentTreeRow<CourseMemberGradingNode> }) 
             {hidden && (
               <span
                 className="shrink-0 px-1.5 py-0.5 text-[11px] font-medium bg-sunken text-muted rounded"
-                title="Students cannot currently see this. It is still counted below."
+                title={t.hiddenTitle}
               >
-                invisible
+                {t.hidden}
               </span>
             )}
           </div>
@@ -130,9 +166,9 @@ function TreeNodeRow({ row }: { row: ContentTreeRow<CourseMemberGradingNode> }) 
         {/* Status */}
         <td className="py-2 px-2 w-20">
           {isAssignment && node.status ? (
-            <div className="flex items-center gap-1.5" title={gradingStatusLabel(node.status)}>
+            <div className="flex items-center gap-1.5" title={gradingStatusLabel(node.status, language)}>
               <span className={`inline-block w-2 h-2 rounded-full ${gradingStatusDot(node.status)}`} />
-              <span className="text-xs text-muted truncate">{gradingStatusLabel(node.status)}</span>
+              <span className="text-xs text-muted truncate">{gradingStatusLabel(node.status, language)}</span>
             </div>
           ) : null}
         </td>
@@ -144,12 +180,13 @@ function TreeNodeRow({ row }: { row: ContentTreeRow<CourseMemberGradingNode> }) 
 export default function ContentTree({ nodes }: ContentTreeProps) {
   // Units open, their contents visible: a lecturer reading one student's report
   // wants the whole picture, not a tree to click open.
+  const t = COPY[useUiLanguage()];
   const { rows } = useContentTree(nodes, {});
 
   if (rows.length === 0) {
     return (
       <div className="text-center py-8 text-sm text-muted">
-        No course content available.
+        {t.empty}
       </div>
     );
   }
@@ -157,19 +194,19 @@ export default function ContentTree({ nodes }: ContentTreeProps) {
   return (
     <Panel padding="none" className="overflow-hidden">
       <div className="px-5 py-3 border-b border-rule">
-        <h3 className="text-sm font-semibold text-fg">Course content progress</h3>
+        <h3 className="text-sm font-semibold text-fg">{t.title}</h3>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-canvas border-b border-rule text-xs font-medium text-muted">
-              <th className="text-left py-2 px-2 pl-3">Content</th>
-              <th className="text-left py-2 px-2 w-28">Progress</th>
-              <th className="text-center py-2 px-2 w-16">Tests</th>
-              <th className="text-center py-2 px-2 w-16">Subs</th>
-              <th className="text-center py-2 px-2 w-16">Result</th>
-              <th className="text-center py-2 px-2 w-16">Grade</th>
-              <th className="text-left py-2 px-2 w-20">Status</th>
+              <th className="text-left py-2 px-2 pl-3">{t.content}</th>
+              <th className="text-left py-2 px-2 w-28">{t.progress}</th>
+              <th className="text-center py-2 px-2 w-16">{t.tests}</th>
+              <th className="text-center py-2 px-2 w-16">{t.subs}</th>
+              <th className="text-center py-2 px-2 w-16">{t.result}</th>
+              <th className="text-center py-2 px-2 w-16">{t.grade}</th>
+              <th className="text-left py-2 px-2 w-20">{t.status}</th>
             </tr>
           </thead>
           <tbody>

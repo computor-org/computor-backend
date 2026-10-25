@@ -16,11 +16,44 @@ import WorkspaceCoursesPanel from '@/src/components/workspaces/WorkspaceCoursesP
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 type AdminTab = 'users' | 'fleet' | 'templates' | 'courses' | 'volumes';
 
+const COPY = {
+  de: {
+    workspaces: 'Arbeitsumgebungen',
+    administration: 'Administration',
+    title: 'Administration der Arbeitsumgebungen',
+    subtitle: 'Rollen für Arbeitsumgebungen, Zugriff pro Person, verfügbare Vorlagen und Image-Rollouts für alle Arbeitsumgebungen',
+    newTemplate: 'Neue Vorlage',
+    tabUsers: 'Personen & Rollen',
+    tabFleet: 'Alle Arbeitsumgebungen',
+    tabTemplates: 'Vorlagen',
+    tabCourses: 'Kurse',
+    tabVolumes: 'Volumes',
+    forbidden: 'Die Administration der Arbeitsumgebungen erfordert die Rolle „Workspace-Maintainer“.',
+    back: 'Zurück zu den Arbeitsumgebungen',
+  },
+  en: {
+    workspaces: 'Workspaces',
+    administration: 'Administration',
+    title: 'Workspace administration',
+    subtitle: 'Workspace roles, per-user access, which templates are available, and fleet-wide image rollouts',
+    newTemplate: 'New template',
+    tabUsers: 'Users & roles',
+    tabFleet: 'Fleet',
+    tabTemplates: 'Templates',
+    tabCourses: 'Courses',
+    tabVolumes: 'Volumes',
+    forbidden: 'Workspace administration requires the workspace maintainer role.',
+    back: 'Back to workspaces',
+  },
+};
+
 function WorkspaceAdminContent() {
   const router = useRouter();
+  const t = COPY[useUiLanguage()];
   const pathname = usePathname();
   // URL-backed tabs (?tab=fleet) so all are deep-linkable.
   const rawTab = useSearchParam('tab');
@@ -34,23 +67,23 @@ function WorkspaceAdminContent() {
   return (
     <ListPageLayout>
       <PageHeader
-        breadcrumbs={[{ label: 'Workspaces', href: '/workspaces' }, { label: 'Administration' }]}
-        title="Workspace administration"
-        subtitle="Workspace roles, per-user access, which templates are available, and fleet-wide image rollouts"
+        breadcrumbs={[{ label: t.workspaces, href: '/workspaces' }, { label: t.administration }]}
+        title={t.title}
+        subtitle={t.subtitle}
         actions={
           tab === 'templates' ? (
-            <ButtonLink href="/workspaces/admin/templates/create">New template</ButtonLink>
+            <ButtonLink href="/workspaces/admin/templates/create">{t.newTemplate}</ButtonLink>
           ) : undefined
         }
       />
 
       <Tabs<AdminTab>
         tabs={[
-          { id: 'users', label: 'Users & roles' },
-          { id: 'fleet', label: 'Fleet' },
-          { id: 'templates', label: 'Templates' },
-          { id: 'courses', label: 'Courses' },
-          { id: 'volumes', label: 'Volumes' },
+          { id: 'users', label: t.tabUsers },
+          { id: 'fleet', label: t.tabFleet },
+          { id: 'templates', label: t.tabTemplates },
+          { id: 'courses', label: t.tabCourses },
+          { id: 'volumes', label: t.tabVolumes },
         ]}
         active={tab}
         onSelect={(id) => router.replace(id === 'users' ? pathname : `${pathname}?tab=${id}`)}
@@ -89,13 +122,14 @@ function WorkspaceAdminContent() {
 export default function WorkspaceAdminPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isWorkspaceMaintainer } = usePermissions();
+  const t = COPY[useUiLanguage()];
 
   if (!authLoading && isAuthenticated && !isWorkspaceMaintainer) {
     return (
       <Forbidden
-        message="Workspace administration requires the workspace maintainer role."
+        message={t.forbidden}
         backLink="/workspaces"
-        backText="Back to workspaces"
+        backText={t.back}
       />
     );
   }

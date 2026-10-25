@@ -17,7 +17,47 @@ import TutorGradeForm from '@/src/components/tutor/TutorGradeForm';
 import { memberName, tutorsClient } from '@/src/components/tutor/tutorData';
 import { useResource } from '@/src/hooks/useResource';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type { CourseContentStudentList, TutorGradeCreate } from 'types/generated';
+
+const COPY = {
+  de: {
+    tutor: 'Tutor',
+    grading: 'Bewertung',
+    student: 'Studierende/r',
+    assignments: 'Aufgaben',
+    noAssignments: 'Keine Aufgaben.',
+    toReview: 'zu prüfen',
+    submissions: (n: number) => `${n} ${n === 1 ? 'Abgabe' : 'Abgaben'}`,
+    runs: (n: number) => `${n} ${n === 1 ? 'Testlauf' : 'Testläufe'}`,
+    testRuns: (n: number) => `${n} ${n === 1 ? 'Testlauf' : 'Testläufe'}`,
+    choose: 'Wähle links eine Aufgabe aus.',
+    latestResult: 'Letztes Testergebnis:',
+    gradeLatest: 'Letzte Abgabe bewerten',
+    nothingSubmitted: 'Noch nichts eingereicht.',
+    needsSubmission: 'Für die Bewertung ist eine offizielle Abgabe nötig.',
+    gradesFeedback: 'Bewertungen und Feedback',
+    latestTests: 'Details zum letzten Test',
+  },
+  en: {
+    tutor: 'Tutor',
+    grading: 'Grading',
+    student: 'Student',
+    assignments: 'Assignments',
+    noAssignments: 'No assignments.',
+    toReview: 'to review',
+    submissions: (n: number) => `${n} submission${n === 1 ? '' : 's'}`,
+    runs: (n: number) => `${n} runs`,
+    testRuns: (n: number) => `${n} test runs`,
+    choose: 'Choose an assignment on the left.',
+    latestResult: 'Latest test result:',
+    gradeLatest: 'Grade the latest submission',
+    nothingSubmitted: 'Nothing submitted yet.',
+    needsSubmission: 'Grading needs an official submission.',
+    gradesFeedback: 'Grades and feedback',
+    latestTests: 'Latest test details',
+  },
+};
 
 /** Read `?content=` once on the client; avoids a Suspense boundary for useSearchParams. */
 function initialContent(): string | null {
@@ -35,6 +75,8 @@ function isAssignment(c: CourseContentStudentList): boolean {
  */
 export default function TutorStudentGradingPage() {
   const params = useParams();
+  const language = useUiLanguage();
+  const t = COPY[language];
   const courseId = params.id as string;
   const memberId = params.memberId as string;
   const [selected, setSelected] = useState<string | null>(null);
@@ -64,11 +106,11 @@ export default function TutorStudentGradingPage() {
     [memberId, selected],
   );
 
-  const name = member.data ? memberName(member.data) : 'Student';
+  const name = member.data ? memberName(member.data, language) : t.student;
   const crumbs = useCourseCrumbs(
     courseId,
-    { label: 'Tutor', href: `/courses/${courseId}/tutor` },
-    { label: 'Grading', href: `/courses/${courseId}/tutor/grading` },
+    { label: t.tutor, href: `/courses/${courseId}/tutor` },
+    { label: t.grading, href: `/courses/${courseId}/tutor/grading` },
     name,
   );
 
@@ -103,12 +145,12 @@ export default function TutorStudentGradingPage() {
           <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 items-start">
             <Panel padding="none">
               <div className="px-4 py-3 border-b border-rule">
-                <h3 className="text-sm font-semibold text-fg">Assignments</h3>
+                <h3 className="text-sm font-semibold text-fg">{t.assignments}</h3>
               </div>
               {contents.loading ? (
                 <div className="h-40 bg-sunken animate-pulse" />
               ) : assignments.length === 0 ? (
-                <div className="p-4"><EmptyState compact title="No assignments." /></div>
+                <div className="p-4"><EmptyState compact title={t.noAssignments} /></div>
               ) : (
                 <ul className="divide-y divide-rule-soft">
                   {assignments.map((c) => (
@@ -120,12 +162,12 @@ export default function TutorStudentGradingPage() {
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-sm font-medium text-fg truncate">{c.title || c.path}</span>
-                          {(c.unreviewed_count ?? 0) > 0 && <Badge tone="warning">to review</Badge>}
+                          {(c.unreviewed_count ?? 0) > 0 && <Badge tone="warning">{t.toReview}</Badge>}
                         </div>
                         <div className="flex items-center gap-2 mt-1">
                           <Score value={c.result?.result ?? null} />
                           <span className="text-xs text-subtle">
-                            {c.submission_count} submission{c.submission_count === 1 ? '' : 's'} · {c.result_count} runs
+                            {t.submissions(c.submission_count)} · {t.runs(c.result_count)}
                           </span>
                           <GradingStatusBadge status={c.status ?? null} />
                         </div>
@@ -138,7 +180,7 @@ export default function TutorStudentGradingPage() {
 
             <div className="space-y-4">
               {!selected ? (
-                <EmptyState compact title="Choose an assignment on the left." />
+                <EmptyState compact title={t.choose} />
               ) : detail.loading ? (
                 <div className="h-64 bg-sunken rounded-lg animate-pulse" />
               ) : detail.error ? (
@@ -148,14 +190,14 @@ export default function TutorStudentGradingPage() {
                   <Panel className="space-y-2">
                     <h3 className="text-sm font-semibold text-fg">{item.title || item.path}</h3>
                     <p className="text-sm text-muted">
-                      Latest test result: <Score value={item.result?.result ?? null} decimals={1} /> ·{' '}
-                      {item.submission_count} submission{item.submission_count === 1 ? '' : 's'} ·{' '}
-                      {item.result_count} test runs
+                      {t.latestResult} <Score value={item.result?.result ?? null} decimals={1} /> ·{' '}
+                      {t.submissions(item.submission_count)} ·{' '}
+                      {t.testRuns(item.result_count)}
                     </p>
                   </Panel>
 
                   <Panel className="space-y-3">
-                    <h3 className="text-sm font-semibold text-fg">Grade the latest submission</h3>
+                    <h3 className="text-sm font-semibold text-fg">{t.gradeLatest}</h3>
                     {group?.latest_submitted_artifact_id ? (
                       <TutorGradeForm
                         key={`${selected}-${group.latest_submitted_artifact_id}`}
@@ -164,18 +206,18 @@ export default function TutorStudentGradingPage() {
                         onSubmit={grade}
                       />
                     ) : (
-                      <EmptyState compact title="Nothing submitted yet." description="Grading needs an official submission." />
+                      <EmptyState compact title={t.nothingSubmitted} description={t.needsSubmission} />
                     )}
                   </Panel>
 
                   <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-fg">Grades and feedback</h3>
+                    <h3 className="text-sm font-semibold text-fg">{t.gradesFeedback}</h3>
                     <GradingPanel group={group} submitted={item.submitted} audience="staff" />
                   </div>
 
                   {resultJson?.tests && resultJson.tests.length > 0 && (
                     <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-fg">Latest test details</h3>
+                      <h3 className="text-sm font-semibold text-fg">{t.latestTests}</h3>
                       <TestResultTree tests={resultJson.tests} />
                     </div>
                   )}

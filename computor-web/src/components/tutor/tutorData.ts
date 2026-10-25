@@ -6,14 +6,18 @@
 import { TutorsClient } from '@/src/generated/clients/TutorsClient';
 import { CourseContentsClient } from '@/src/generated/clients/CourseContentsClient';
 import type { TutorCourseMemberList } from 'types/generated';
+import type { UiLanguage } from '@/src/hooks/useUiLanguage';
 
 export const tutorsClient = new TutorsClient();
 const contentsClient = new CourseContentsClient();
 
-export function memberName(m: Pick<TutorCourseMemberList, 'user'> | null | undefined): string {
+export function memberName(
+  m: Pick<TutorCourseMemberList, 'user'> | null | undefined,
+  language: UiLanguage = 'en',
+): string {
   const u = m?.user;
   const name = [u?.given_name, u?.family_name].filter(Boolean).join(' ').trim();
-  return name || u?.email || 'Student';
+  return name || u?.email || (language === 'de' ? 'Studierende/r' : 'Student');
 }
 
 /** Students of the course, by family name. */

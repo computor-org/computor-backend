@@ -1,13 +1,20 @@
 'use client';
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type { CourseMemberGradingsList } from 'types/generated';
+
+const COPY = {
+  de: { title: 'Verteilung des Fortschritts', students: (n: unknown) => `${n} Studierende`, count: 'Anzahl' },
+  en: { title: 'Progress Distribution', students: (n: unknown) => `${n} students`, count: 'Count' },
+};
 
 interface ProgressDistributionChartProps {
   students: CourseMemberGradingsList[];
 }
 
 export default function ProgressDistributionChart({ students }: ProgressDistributionChartProps) {
+  const t = COPY[useUiLanguage()];
   const buckets = Array(10).fill(0);
   students.forEach(s => {
     const idx = Math.min(Math.floor(s.overall_progress_percentage / 10), 9);
@@ -21,7 +28,7 @@ export default function ProgressDistributionChart({ students }: ProgressDistribu
 
   return (
     <div className="bg-surface rounded-lg border border-rule p-5">
-      <h3 className="text-sm font-semibold text-fg mb-4">Progress Distribution</h3>
+      <h3 className="text-sm font-semibold text-fg mb-4">{t.title}</h3>
       <div className="h-52">
         {/* A fixed height (h-52) keeps the first render, before the width is
             measured, from logging recharts' "width(-1) and height(-1)" warning. */}
@@ -32,7 +39,7 @@ export default function ProgressDistributionChart({ students }: ProgressDistribu
             <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
             <Tooltip
               contentStyle={{ fontSize: 12 }}
-              formatter={(value) => [`${value} students`, 'Count']}
+              formatter={(value) => [t.students(value), t.count]}
             />
             <Bar dataKey="students" fill="#6366f1" radius={[4, 4, 0, 0]} />
           </BarChart>

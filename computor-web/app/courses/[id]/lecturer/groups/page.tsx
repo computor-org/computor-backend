@@ -3,6 +3,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
@@ -22,15 +23,64 @@ import { CourseGroupsClient } from '@/src/generated/clients/CourseGroupsClient';
 import { CourseMembersClient } from '@/src/generated/clients/CourseMembersClient';
 import type { CourseGroupList } from 'types/generated';
 import { buildRoster, fetchCourseRoster } from '@/src/components/course-members/roster';
-import { courseRoleLabel } from '@/src/utils/courseRoles';
+import { courseRoleLabel, localizedRoleLabel } from '@/src/utils/courseRoles';
 import { memberName } from '@/src/utils/userName';
 
 const groupsClient = new CourseGroupsClient();
 const membersClient = new CourseMembersClient();
 
+const COPY = {
+  de: {
+    courseGroups: 'Kursgruppen',
+    deleteFailed: 'Gruppe konnte nicht gelöscht werden',
+    forbidden: 'Zum Verwalten der Gruppen brauchst du mindestens Lehrenden-Zugriff auf diesen Kurs.',
+    backToCourse: 'Zurück zum Kurs',
+    subtitle: 'Gruppen (Übungsgruppen, Tutorien), denen Studierende zugeordnet werden. Jede studierende Person muss einer Gruppe angehören.',
+    newGroup: 'Neue Gruppe',
+    loading: 'Gruppen werden geladen …',
+    emptyTitle: 'Noch keine Gruppen',
+    emptyDescription: 'Lege eine an, damit Studierende ihr zugeordnet werden können.',
+    emptyNotice: 'Noch keine Gruppen – lege eine an, damit Studierende ihr zugeordnet werden können.',
+    collapseAll: 'Alle einklappen',
+    expandAll: 'Alle ausklappen',
+    member: 'Mitglied',
+    members: 'Mitglieder',
+    edit: 'Bearbeiten',
+    delete: 'Löschen',
+    reassign: 'Weise die Mitglieder dieser Gruppe neu zu, bevor du sie löschst.',
+    deleteTitle: 'Gruppe löschen',
+    untitled: 'Gruppe ohne Titel',
+    deleteMessage: (title: string) => `Die Gruppe „${title}“ löschen? Das kann nicht rückgängig gemacht werden.`,
+  },
+  en: {
+    courseGroups: 'Course groups',
+    deleteFailed: 'Failed to delete group',
+    forbidden: 'You need lecturer access (or higher) on this course to manage its groups.',
+    backToCourse: 'Back to course',
+    subtitle: 'Groups (lab sections, tutorial cohorts) students are assigned to. Every student must belong to a group.',
+    newGroup: 'New group',
+    loading: 'Loading groups…',
+    emptyTitle: 'No groups yet',
+    emptyDescription: 'Create one so students can be assigned to it.',
+    emptyNotice: 'No groups yet — create one so students can be assigned to it.',
+    collapseAll: 'Collapse all',
+    expandAll: 'Expand all',
+    member: 'member',
+    members: 'members',
+    edit: 'Edit',
+    delete: 'Delete',
+    reassign: "Reassign this group's members before deleting it.",
+    deleteTitle: 'Delete group',
+    untitled: 'Untitled group',
+    deleteMessage: (title: string) => `Delete the group "${title}"? This cannot be undone.`,
+  },
+};
+
 export default function CourseGroupsPage() {
   const courseId = useParams().id as string;
-  const crumbs = useCourseCrumbs(courseId, 'Course groups');
+  const language = useUiLanguage();
+  const t = COPY[language];
+  const crumbs = useCourseCrumbs(courseId, t.courseGroups);
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
 
@@ -56,8 +106,8 @@ export default function CourseGroupsPage() {
   );
 
   const roster = useMemo(
-    () => buildRoster(data?.groups ?? [], data?.members ?? []),
-    [data?.groups, data?.members],
+    () => buildRoster(data?.groups ?? [], data?.members ?? [], language),
+    [data?.groups, data?.members, language],
   );
 
   function toggle(key: string) {
@@ -75,7 +125,7 @@ export default function CourseGroupsPage() {
       setToDelete(null);
       await reload();
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Failed to delete group');
+      setActionError(e instanceof Error ? e.message : t.deleteFailed);
       setToDelete(null);
     }
   }
@@ -83,9 +133,9 @@ export default function CourseGroupsPage() {
   if (!authLoading && isAuthenticated && !canManage) {
     return (
       <Forbidden
-        message="You need lecturer access (or higher) on this course to manage its groups."
+        message={t.forbidden}
         backLink={`/courses/${courseId}`}
-        backText="Back to course"
+        backText={t.backToCourse}
       />
     );
   }
@@ -95,35 +145,35 @@ export default function CourseGroupsPage() {
       <ListPageLayout>
         <PageHeader
           breadcrumbs={crumbs}
-          title="Course groups"
-          subtitle="Groups (lab sections, tutorial cohorts) students are assigned to. Every student must belong to a group."
+          title={t.courseGroups}
+          subtitle={t.subtitle}
           actions={
-            <ButtonLink href={`/courses/${courseId}/lecturer/groups/create`}>New group</ButtonLink>
+            <ButtonLink href={`/courses/${courseId}/lecturer/groups/create`}>{t.newGroup}</ButtonLink>
           }
         />
 
         <ErrorBanner>{error || actionError}</ErrorBanner>
 
         {loading ? (
-          <ListLoading>Loading groups…</ListLoading>
+          <ListLoading>{t.loading}</ListLoading>
         ) : (
           <ScrollArea spacing="rows">
             {roster.length === 0 ? (
               <EmptyState
-                title="No groups yet"
-                description="Create one so students can be assigned to it."
+                title={t.emptyTitle}
+                description={t.emptyDescription}
               />
             ) : (
               <>
                 {(data?.groups ?? []).length === 0 && (
                   <Notice tone="info">
-                    No groups yet — create one so students can be assigned to it.
+                    {t.emptyNotice}
                   </Notice>
                 )}
 
                 <Toolbar>
                   <Button variant="ghost" size="sm" onClick={() => setExpanded(new Set())}>
-                    Collapse all
+                    {t.collapseAll}
                   </Button>
                   <Button
                     variant="ghost"
@@ -134,7 +184,7 @@ export default function CourseGroupsPage() {
                       )
                     }
                   >
-                    Expand all
+                    {t.expandAll}
                   </Button>
                 </Toolbar>
 
@@ -151,7 +201,7 @@ export default function CourseGroupsPage() {
                           label={title}
                         >
                           <Badge tone="muted" className="shrink-0">
-                            {members.length} {members.length === 1 ? 'member' : 'members'}
+                            {members.length} {members.length === 1 ? t.member : t.members}
                           </Badge>
                           {/* The unassigned bucket is a view, not a row anyone
                               can edit or delete — it has no group behind it. */}
@@ -162,7 +212,7 @@ export default function CourseGroupsPage() {
                               size="xs"
                               className="shrink-0"
                             >
-                              Edit
+                              {t.edit}
                             </ButtonLink>
                           )}
                           {group && (
@@ -173,12 +223,12 @@ export default function CourseGroupsPage() {
                               disabled={members.length > 0}
                               title={
                                 members.length > 0
-                                  ? "Reassign this group's members before deleting it."
+                                  ? t.reassign
                                   : undefined
                               }
                               onClick={() => setToDelete(group)}
                             >
-                              Delete
+                              {t.delete}
                             </Button>
                           )}
                         </TreeRow>
@@ -200,7 +250,7 @@ export default function CourseGroupsPage() {
                               }
                             >
                               <Badge tone="muted" className="shrink-0">
-                                {courseRoleLabel(m.course_role_id)}
+                                {localizedRoleLabel(courseRoleLabel(m.course_role_id), language)}
                               </Badge>
                             </TreeRow>
                           ))}
@@ -216,9 +266,9 @@ export default function CourseGroupsPage() {
 
       {toDelete && (
         <ConfirmDeleteDialog
-          title="Delete group"
-          message={`Delete the group "${toDelete.title || 'Untitled group'}"? This cannot be undone.`}
-          confirmWord={toDelete.title || 'Untitled group'}
+          title={t.deleteTitle}
+          message={t.deleteMessage(toDelete.title || t.untitled)}
+          confirmWord={toDelete.title || t.untitled}
           onConfirm={() => deleteGroup(toDelete)}
           onClose={() => setToDelete(null)}
         />

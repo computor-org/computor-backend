@@ -17,8 +17,117 @@ import type {
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/src/components/ui/Table';
 import TemplateIcon from './TemplateIcon';
 import TemplateTaskProgress from './TemplateTaskProgress';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { formatNumber } from '@/src/utils/locale';
 
 const coderClient = new CoderClient();
+
+const COPY = {
+  de: {
+    notDeployed: 'Nicht bereitgestellt',
+    disabled: 'Deaktiviert',
+    available: 'Verfügbar',
+    updateFailed: 'Vorlage konnte nicht aktualisiert werden',
+    building: (name: string) => `${name} wird gebaut – das dauert einige Minuten.`,
+    buildingMany: (n: number) => `${n} Vorlagen werden gebaut – das dauert einige Minuten.`,
+    buildFailed: 'Build konnte nicht gestartet werden',
+    intro1: 'Alle Vorlagen für Arbeitsumgebungen, die diese Installation mitbringt. Eine Vorlage wird Nutzenden angeboten, sobald sie ',
+    deployed: 'bereitgestellt',
+    intro2: ' (ihr Image ist gebaut und nach Coder gepusht) und ',
+    enabled: 'aktiviert',
+    intro3:
+      ' ist. Wird sie deaktiviert, ist sie für Nutzende und Kurse ausgeblendet, ohne die darauf laufenden Arbeitsumgebungen anzufassen. Ressourcenlimits und Terraform-Variablen gelten ab dem nächsten Build, Platzkontingente sofort.',
+    noDir:
+      'Das Vorlagenverzeichnis ist vom Backend aus nicht lesbar (CODER_TEMPLATES_DIR); daher werden nur Vorlagen aufgeführt, die bereits in Coder liegen – von hier aus lässt sich nichts Neues bereitstellen.',
+    firstRunTitle: 'Es sind noch keine Vorlagen für Arbeitsumgebungen bereitgestellt',
+    firstRunBody:
+      'Wähle die Vorlagen aus, die diese Installation anbieten soll, und stelle sie bereit. Jede baut ein Container-Image, was einige Minuten und einige Gigabyte braucht – wähle daher nur, was du brauchst. Du kannst jederzeit weitere bereitstellen.',
+    starting: 'Wird gestartet …',
+    selectOne: 'Wähle mindestens eine nicht bereitgestellte Vorlage aus',
+    deploySelected: (n: number) => `Auswahl bereitstellen (${n})`,
+    deployAllTitle: 'Alle Vorlagen dieser Installation bauen und pushen',
+    deployAll: (n: number) => `Alle bereitstellen (${n})`,
+    buildRunning: 'Ein Build läuft bereits – warte, bis er fertig ist.',
+    loading: 'Vorlagen werden geladen …',
+    selectAll: 'Alle nicht bereitgestellten Vorlagen auswählen',
+    thTemplate: 'Vorlage',
+    thState: 'Status',
+    thEnabled: 'Aktiviert',
+    thWorkspaces: 'Arbeitsumgebungen',
+    thMemory: 'Speicherlimit',
+    thCpu: 'CPU-Anteile',
+    thSeats: 'Plätze (laufend / max.)',
+    thActions: 'Aktionen',
+    select: (name: string) => `${name} auswählen`,
+    clonedTitle: (from: string) => `Hier aus „${from}“ erstellt; die Synchronisierung mit dem Repository fasst sie nie an`,
+    clonedFrom: (from: string) => `geklont von ${from}`,
+    customizedTitle: 'Auf dem Datenträger bearbeitet; wird nicht mehr aus dem Repository synchronisiert',
+    customized: 'angepasst',
+    noDirectory: 'kein Vorlagenverzeichnis',
+    availableToUsers: (name: string) => `${name} für Nutzende verfügbar`,
+    deployFirst: 'Stelle die Vorlage bereit, bevor sie Nutzenden angeboten werden kann',
+    unlimited: 'Unbegrenzt',
+    default: 'Standard',
+    busyTitle: 'Eine andere Vorlagenoperation läuft',
+    deployTitle: 'Image bauen und Vorlage nach Coder pushen',
+    deploy: 'Bereitstellen',
+    configure: 'Konfigurieren',
+    clone: 'Klonen',
+    none: 'Keine Vorlagen.',
+  },
+  en: {
+    notDeployed: 'Not deployed',
+    disabled: 'Disabled',
+    available: 'Available',
+    updateFailed: 'Failed to update template',
+    building: (name: string) => `Building ${name} — this takes a few minutes.`,
+    buildingMany: (n: number) => `Building ${n} templates — this takes a few minutes.`,
+    buildFailed: 'Failed to start the build',
+    intro1: 'Every workspace template this deployment ships. A template is offered to users once it is ',
+    deployed: 'deployed',
+    intro2: ' (its image is built and pushed to Coder) and ',
+    enabled: 'enabled',
+    intro3:
+      '; disabling one hides it from users and courses without touching the workspaces already running on it. Resource limits and Terraform variables apply at the next build; seat quotas apply immediately.',
+    noDir:
+      'The templates directory is not readable from the backend (CODER_TEMPLATES_DIR), so only templates already in Coder are listed — nothing new can be deployed from here.',
+    firstRunTitle: 'No workspace templates are deployed yet',
+    firstRunBody:
+      'Pick the ones this deployment should offer and deploy them — each builds a container image, which takes a few minutes and a few gigabytes, so it is worth choosing only what you need. You can come back and deploy more at any time.',
+    starting: 'Starting…',
+    selectOne: 'Select at least one undeployed template',
+    deploySelected: (n: number) => `Deploy selected (${n})`,
+    deployAllTitle: 'Build and push every template this deployment ships',
+    deployAll: (n: number) => `Deploy all (${n})`,
+    buildRunning: 'A build is already running — wait for it to finish.',
+    loading: 'Loading templates…',
+    selectAll: 'Select all undeployed templates',
+    thTemplate: 'Template',
+    thState: 'State',
+    thEnabled: 'Enabled',
+    thWorkspaces: 'Workspaces',
+    thMemory: 'Memory cap',
+    thCpu: 'CPU shares',
+    thSeats: 'Seats (running / max)',
+    thActions: 'Actions',
+    select: (name: string) => `Select ${name}`,
+    clonedTitle: (from: string) => `Created here from '${from}'; the repository sync never touches it`,
+    clonedFrom: (from: string) => `cloned from ${from}`,
+    customizedTitle: 'Edited on disk; no longer re-synced from the repo',
+    customized: 'customized',
+    noDirectory: 'no template directory',
+    availableToUsers: (name: string) => `${name} available to users`,
+    deployFirst: 'Deploy the template before it can be offered to users',
+    unlimited: 'Unlimited',
+    default: 'Default',
+    busyTitle: 'Another template operation is running',
+    deployTitle: 'Build the image and push the template to Coder',
+    deploy: 'Deploy',
+    configure: 'Configure',
+    clone: 'Clone',
+    none: 'No templates.',
+  },
+};
 
 const TERMINAL = new Set<TaskStatus>([
   TaskStatus.FINISHED,
@@ -27,10 +136,13 @@ const TERMINAL = new Set<TaskStatus>([
 ]);
 
 /** What an admin has to do next to make this template usable, if anything. */
-function availability(template: TemplateCatalogEntry): { label: string; color: 'green' | 'gray' | 'yellow' } {
-  if (!template.deployed) return { label: 'Not deployed', color: 'gray' };
-  if (!template.enabled) return { label: 'Disabled', color: 'yellow' };
-  return { label: 'Available', color: 'green' };
+function availability(
+  template: TemplateCatalogEntry,
+  t: (typeof COPY)['en'],
+): { label: string; color: 'green' | 'gray' | 'yellow' } {
+  if (!template.deployed) return { label: t.notDeployed, color: 'gray' };
+  if (!template.enabled) return { label: t.disabled, color: 'yellow' };
+  return { label: t.available, color: 'green' };
 }
 
 /** A template can only be built if this deployment ships its directory. */
@@ -51,6 +163,8 @@ function isDeployable(template: TemplateCatalogEntry): boolean {
  */
 export default function WorkspaceTemplatesPanel() {
   const notify = useNotify();
+  const language = useUiLanguage();
+  const t = COPY[language];
   const [toggling, setToggling] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
@@ -116,7 +230,7 @@ export default function WorkspaceTemplatesPanel() {
       });
       reload();
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Failed to update template', 'error');
+      notify(err instanceof Error ? err.message : t.updateFailed, 'error');
     } finally {
       setToggling(null);
     }
@@ -132,14 +246,14 @@ export default function WorkspaceTemplatesPanel() {
       await coderClient.pushTemplates({ templates: dirs, build_images: true });
       notify(
         dirs.length === 1
-          ? `Building ${entries[0].display_name || entries[0].name} — this takes a few minutes.`
-          : `Building ${dirs.length} templates — this takes a few minutes.`,
+          ? t.building(entries[0].display_name || entries[0].name)
+          : t.buildingMany(dirs.length),
         'success',
       );
       setSelected(new Set());
       await refresh();
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Failed to start the build', 'error');
+      notify(err instanceof Error ? err.message : t.buildFailed, 'error');
     } finally {
       setSubmitting(false);
     }
@@ -151,17 +265,13 @@ export default function WorkspaceTemplatesPanel() {
 
       <div className="shrink-0 space-y-2">
         <p className="text-sm text-muted">
-          Every workspace template this deployment ships. A template is offered to users once it
-          is <span className="font-medium">deployed</span> (its image is built and pushed to
-          Coder) and <span className="font-medium">enabled</span>; disabling one hides it from
-          users and courses without touching the workspaces already running on it. Resource
-          limits and Terraform variables apply at the next build; seat quotas apply immediately.
+          {t.intro1}<span className="font-medium">{t.deployed}</span>
+          {t.intro2}<span className="font-medium">{t.enabled}</span>
+          {t.intro3}
         </p>
         {data && !data.catalog.templates_dir_available && (
           <p className="text-sm text-warn-text">
-            The templates directory is not readable from the backend
-            (CODER_TEMPLATES_DIR), so only templates already in Coder are listed — nothing new
-            can be deployed from here.
+            {t.noDir}
           </p>
         )}
       </div>
@@ -173,14 +283,8 @@ export default function WorkspaceTemplatesPanel() {
       */}
       {nothingDeployed && !activeTask && (
         <div className="shrink-0 rounded-lg border border-accent-line bg-accent-wash p-4">
-          <h3 className="text-sm font-semibold text-fg">
-            No workspace templates are deployed yet
-          </h3>
-          <p className="mt-1 text-sm text-muted">
-            Pick the ones this deployment should offer and deploy them — each builds a
-            container image, which takes a few minutes and a few gigabytes, so it is worth
-            choosing only what you need. You can come back and deploy more at any time.
-          </p>
+          <h3 className="text-sm font-semibold text-fg">{t.firstRunTitle}</h3>
+          <p className="mt-1 text-sm text-muted">{t.firstRunBody}</p>
         </div>
       )}
 
@@ -195,34 +299,30 @@ export default function WorkspaceTemplatesPanel() {
           <Button
             disabled={busy || selectedNames.length === 0}
             loading={submitting}
-            loadingLabel="Starting…"
+            loadingLabel={t.starting}
             title={
-              selectedNames.length === 0
-                ? 'Select at least one undeployed template'
-                : undefined
+              selectedNames.length === 0 ? t.selectOne : undefined
             }
             onClick={() => deploy(selectedNames)}
           >
-            Deploy selected ({selectedNames.length})
+            {t.deploySelected(selectedNames.length)}
           </Button>
           <Button
             variant="secondary"
             disabled={busy}
             onClick={() => deploy(deployable)}
-            title="Build and push every template this deployment ships"
+            title={t.deployAllTitle}
           >
-            Deploy all ({deployable.length})
+            {t.deployAll(deployable.length)}
           </Button>
           {activeTask && (
-            <span className="text-sm text-muted">
-              A build is already running — wait for it to finish.
-            </span>
+            <span className="text-sm text-muted">{t.buildRunning}</span>
           )}
         </div>
       )}
 
       {loading ? (
-        <ListLoading>Loading templates…</ListLoading>
+        <ListLoading>{t.loading}</ListLoading>
       ) : (
         <ScrollPanel>
           <Table>
@@ -231,7 +331,7 @@ export default function WorkspaceTemplatesPanel() {
                 <Th className="w-10">
                   <input
                     type="checkbox"
-                    aria-label="Select all undeployed templates"
+                    aria-label={t.selectAll}
                     disabled={deployable.length === 0}
                     checked={
                       deployable.length > 0 && selectedNames.length === deployable.length
@@ -245,20 +345,20 @@ export default function WorkspaceTemplatesPanel() {
                     }
                   />
                 </Th>
-                <Th>Template</Th>
-                <Th>State</Th>
-                <Th>Enabled</Th>
-                <Th>Workspaces</Th>
-                <Th>Memory cap</Th>
-                <Th>CPU shares</Th>
-                <Th>Seats (running / max)</Th>
-                <Th className="text-right">Actions</Th>
+                <Th>{t.thTemplate}</Th>
+                <Th>{t.thState}</Th>
+                <Th>{t.thEnabled}</Th>
+                <Th>{t.thWorkspaces}</Th>
+                <Th>{t.thMemory}</Th>
+                <Th>{t.thCpu}</Th>
+                <Th>{t.thSeats}</Th>
+                <Th className="text-right">{t.thActions}</Th>
               </tr>
             </Thead>
             <Tbody>
               {templates.map((template) => {
                 const settings = settingsByName.get(template.name);
-                const state = availability(template);
+                const state = availability(template, t);
                 // Not currently offered to users, so the row reads quieter —
                 // but as a muted TITLE, never as opacity on the <tr>. Opacity
                 // composites the whole subtree and a child cannot opt out, so
@@ -274,7 +374,7 @@ export default function WorkspaceTemplatesPanel() {
                       {isDeployable(template) && (
                         <input
                           type="checkbox"
-                          aria-label={`Select ${template.display_name || template.name}`}
+                          aria-label={t.select(template.display_name || template.name)}
                           checked={selected.has(template.name)}
                           onChange={() => toggleSelected(template.name)}
                         />
@@ -304,17 +404,17 @@ export default function WorkspaceTemplatesPanel() {
                         {template.cloned_from ? (
                           <Badge
                             tone="info"
-                            title={`Created here from '${template.cloned_from}'; the repository sync never touches it`}
+                            title={t.clonedTitle(template.cloned_from)}
                           >
-                            cloned from {template.cloned_from}
+                            {t.clonedFrom(template.cloned_from)}
                           </Badge>
                         ) : template.customized ? (
-                          <Badge tone="info" title="Edited on disk; no longer re-synced from the repo">
-                            customized
+                          <Badge tone="info" title={t.customizedTitle}>
+                            {t.customized}
                           </Badge>
                         ) : null}
                         {!template.dir_name && (
-                          <span className="text-xs text-subtle">no template directory</span>
+                          <span className="text-xs text-subtle">{t.noDirectory}</span>
                         )}
                       </div>
                     </Td>
@@ -329,24 +429,24 @@ export default function WorkspaceTemplatesPanel() {
                         <Toggle
                           checked={template.enabled}
                           busy={toggling === template.name}
-                          label={`${template.display_name || template.name} available to users`}
+                          label={t.availableToUsers(template.display_name || template.name)}
                           onChange={() => toggleEnabled(template.name, settings)}
                         />
                       ) : (
                         <span
                           className="text-sm text-subtle"
-                          title="Deploy the template before it can be offered to users"
+                          title={t.deployFirst}
                         >
                           —
                         </span>
                       )}
                     </Td>
-                    <Td className="text-sm text-body">{template.workspace_count}</Td>
+                    <Td className="text-sm text-body">{formatNumber(template.workspace_count, language)}</Td>
                     <Td className="text-sm text-body">
-                      {settings?.memory_mb ? `${settings.memory_mb} MiB` : 'Unlimited'}
+                      {settings?.memory_mb ? `${formatNumber(settings.memory_mb, language)} MiB` : t.unlimited}
                     </Td>
                     <Td className="text-sm text-body">
-                      {settings?.cpu_shares ? settings.cpu_shares : 'Default'}
+                      {settings?.cpu_shares ? formatNumber(settings.cpu_shares, language) : t.default}
                     </Td>
                     <Td className="text-sm text-body">
                       {template.running_workspace_count} / {settings?.max_running_workspaces ?? '∞'}
@@ -357,14 +457,10 @@ export default function WorkspaceTemplatesPanel() {
                           <Button
                             size="xs"
                             disabled={busy}
-                            title={
-                              busy
-                                ? 'Another template operation is running'
-                                : 'Build the image and push the template to Coder'
-                            }
+                            title={busy ? t.busyTitle : t.deployTitle}
                             onClick={() => deploy([template])}
                           >
-                            Deploy
+                            {t.deploy}
                           </Button>
                         )}
                         {template.dir_name && (
@@ -373,7 +469,7 @@ export default function WorkspaceTemplatesPanel() {
                             size="xs"
                             variant="secondary"
                           >
-                            Configure
+                            {t.configure}
                           </ButtonLink>
                         )}
                         {template.dir_name && (
@@ -382,7 +478,7 @@ export default function WorkspaceTemplatesPanel() {
                             size="xs"
                             variant="ghost"
                           >
-                            Clone
+                            {t.clone}
                           </ButtonLink>
                         )}
                       </div>
@@ -393,7 +489,7 @@ export default function WorkspaceTemplatesPanel() {
               {templates.length === 0 && (
                 <Tr>
                   <Td colSpan={9} className="py-8 text-center text-sm text-muted">
-                    No templates.
+                    {t.none}
                   </Td>
                 </Tr>
               )}

@@ -11,9 +11,52 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
 import { InstanceStatusClient } from '@/src/generated/clients/InstanceStatusClient';
-import { WEB_COMMIT, duration, shortCommit, stamp } from '@/src/utils/instanceStatus';
+import { WEB_COMMIT, duration, shortCommit } from '@/src/utils/instanceStatus';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { formatDateTime } from '@/src/utils/locale';
 
 const statusClient = new InstanceStatusClient();
+
+const COPY = {
+  de: {
+    denied: 'Zugriff verweigert',
+    adminRequired: 'Für diese Seite sind Administratorrechte erforderlich.',
+    title: 'Status',
+    subtitle: 'Wann diese Instanz zuletzt neu gestartet wurde und welche Version läuft.',
+    apiServer: 'API-Server',
+    lastRestart: 'Letzter Neustart',
+    up: 'Laufzeit',
+    builtAt: 'Erstellt am',
+    notBuilt: 'kein erstelltes Image (Entwicklung)',
+    runningCommit: 'Laufender Commit',
+    unknown: 'unbekannt',
+    branch: 'Branch',
+    webBuild: 'Web-Version',
+    devServer: 'Entwicklungsserver',
+    newerBefore: 'Ob es eine neuere Version gibt, ist eine andere Frage, die ',
+    newerAfter: ' beantwortet.',
+    updatesLink: 'System → Updates',
+  },
+  en: {
+    denied: 'Access Denied',
+    adminRequired: 'Admin privileges are required to access this page.',
+    title: 'Status',
+    subtitle: 'When this deployment last restarted, and which build it is running.',
+    apiServer: 'API server',
+    lastRestart: 'Last restart',
+    up: 'up',
+    builtAt: 'Built at',
+    notBuilt: 'not a built image (development)',
+    runningCommit: 'Running commit',
+    unknown: 'unknown',
+    branch: 'Branch',
+    webBuild: 'Web build',
+    devServer: 'development server',
+    newerBefore: 'Whether a newer build exists is a different question — ',
+    newerAfter: ' answers it.',
+    updatesLink: 'System → Updates',
+  },
+};
 
 /**
  * What is running here, and since when (#350).
@@ -35,6 +78,8 @@ const statusClient = new InstanceStatusClient();
  * measurement, and an operator would size the machine on it.
  */
 export default function InstanceStatusPage() {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const { isLoading: authLoading } = useAuth();
   const { isAdmin } = usePermissions();
 
@@ -50,9 +95,9 @@ export default function InstanceStatusPage() {
       <AuthenticatedLayout>
         <div className="p-6">
           <div className="bg-danger-wash border border-danger-line rounded-lg p-6 text-center">
-            <h2 className="text-lg font-semibold text-danger-text">Access Denied</h2>
+            <h2 className="text-lg font-semibold text-danger-text">{t.denied}</h2>
             <p className="text-sm text-danger-text mt-2">
-              Admin privileges are required to access this page.
+              {t.adminRequired}
             </p>
           </div>
         </div>
@@ -60,17 +105,17 @@ export default function InstanceStatusPage() {
     );
   }
 
-  const started = stamp(data?.started_at);
-  const built = stamp(data?.build_time);
+  const started = formatDateTime(data?.started_at, language, '') || null;
+  const built = formatDateTime(data?.build_time, language, '') || null;
   const commit = shortCommit(data?.commit);
 
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Status' }]}
-          title="Status"
-          subtitle="When this deployment last restarted, and which build it is running."
+          breadcrumbs={[{ label: t.title }]}
+          title={t.title}
+          subtitle={t.subtitle}
         />
 
         <ErrorBanner>{error}</ErrorBanner>
@@ -84,38 +129,38 @@ export default function InstanceStatusPage() {
           )}
 
           {data && (
-            <SectionCard title="API server">
+            <SectionCard title={t.apiServer}>
               <DescriptionList
                 items={[
                   {
-                    term: 'Last restart',
-                    value: started ? `${started} · up ${duration(data.uptime_seconds)}` : '—',
+                    term: t.lastRestart,
+                    value: started ? `${started} · ${t.up} ${duration(data.uptime_seconds)}` : '—',
                   },
                   {
-                    term: 'Built at',
+                    term: t.builtAt,
                     // No build time means no build: the API is running from a
                     // working tree. Saying so beats an em dash nobody can read.
-                    value: built ?? 'not a built image (development)',
+                    value: built ?? t.notBuilt,
                   },
                   {
-                    term: 'Running commit',
-                    value: commit ?? 'unknown',
+                    term: t.runningCommit,
+                    value: commit ?? t.unknown,
                     mono: commit != null,
                   },
-                  { term: 'Branch', value: data.branch },
+                  { term: t.branch, value: data.branch },
                   {
-                    term: 'Web build',
-                    value: WEB_COMMIT ? WEB_COMMIT.slice(0, 7) : 'development server',
+                    term: t.webBuild,
+                    value: WEB_COMMIT ? WEB_COMMIT.slice(0, 7) : t.devServer,
                     mono: !!WEB_COMMIT,
                   },
                 ]}
               />
               <p className="text-sm text-muted">
-                Whether a newer build exists is a different question —{' '}
+                {t.newerBefore}
                 <Link href="/admin/updates" className="text-accent-text hover:underline">
-                  System → Updates
-                </Link>{' '}
-                answers it.
+                  {t.updatesLink}
+                </Link>
+                {t.newerAfter}
               </p>
             </SectionCard>
           )}

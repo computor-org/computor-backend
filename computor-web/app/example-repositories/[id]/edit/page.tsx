@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ExampleRepositoriesClient } from '@/src/generated/clients/ExampleRepositoriesClient';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
@@ -14,7 +15,36 @@ import { inputCls } from '@/src/components/ui/tokens';
 
 const exampleRepositoriesClient = new ExampleRepositoriesClient();
 
+const COPY = {
+  de: {
+    forbidden: 'Du hast keinen Zugriff auf Beispiel-Repositories.',
+    saveFailed: 'Speichern fehlgeschlagen',
+    crumb: 'Beispiel-Repositories',
+    repository: 'Repository',
+    edit: 'Bearbeiten',
+    editTitle: (name: string) => `${name} bearbeiten`,
+    name: 'Name',
+    description: 'Beschreibung',
+    storage: 'Speicher (unveränderlich)',
+    storageHint: 'Quelltyp und URL stehen fest, sobald das Repository existiert.',
+  },
+  en: {
+    forbidden: 'You do not have access to example repositories.',
+    saveFailed: 'Save failed',
+    crumb: 'Example repositories',
+    repository: 'Repository',
+    edit: 'Edit',
+    editTitle: (name: string) => `Edit ${name}`,
+    name: 'Name',
+    description: 'Description',
+    storage: 'Storage (immutable)',
+    storageHint: 'Source type and URL are fixed once a repository exists.',
+  },
+};
+
 export default function ExampleRepositoryEditPage() {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const repoId = useParams().id as string;
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -49,12 +79,12 @@ export default function ExampleRepositoryEditPage() {
       router.push(`/example-repositories/${repoId}`);
     } catch (e) {
       setSaving(false);
-      setSaveError(e instanceof Error ? e.message : 'Save failed');
+      setSaveError(e instanceof Error ? e.message : t.saveFailed);
     }
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return <Forbidden message="You do not have access to example repositories." />;
+    return <Forbidden message={t.forbidden} />;
   }
 
   return (
@@ -64,24 +94,24 @@ export default function ExampleRepositoryEditPage() {
       ) : (
         <FormPanel
           breadcrumbs={[
-            { label: 'Example repositories', href: '/example-repositories' },
-            { label: repo?.name || 'Repository', href: `/example-repositories/${repoId}` },
-            { label: 'Edit' },
+            { label: t.crumb, href: '/example-repositories' },
+            { label: repo?.name || t.repository, href: `/example-repositories/${repoId}` },
+            { label: t.edit },
           ]}
-          title={`Edit ${repo?.name || 'repository'}`}
+          title={t.editTitle(repo?.name || (language === 'de' ? 'Repository' : 'repository'))}
           error={loadError ?? saveError}
           submitting={saving}
           disabled={!name.trim()}
           onCancel={() => router.push(`/example-repositories/${repoId}`)}
           onSubmit={save}
         >
-          <Field label="Name" required>
+          <Field label={t.name} required>
             <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Description">
+          <Field label={t.description}>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={inputCls} />
           </Field>
-          <Field label="Storage (immutable)" hint="Source type and URL are fixed once a repository exists.">
+          <Field label={t.storage} hint={t.storageHint}>
             <input value={`${repo?.source_type ?? ''} · ${repo?.source_url ?? ''}`} readOnly className={`${inputCls} bg-canvas text-muted`} />
           </Field>
         </FormPanel>

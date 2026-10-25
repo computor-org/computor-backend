@@ -3,6 +3,7 @@
 import Badge from '@/src/components/Badge';
 import ProgressTrack from '@/src/components/ui/ProgressTrack';
 import { TaskStatus, type TaskInfo } from '@/src/types/workspaces';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { phaseLabel, taskLabel, templateTaskStage } from './templateTaskStage';
 
 /**
@@ -14,7 +15,14 @@ import { phaseLabel, taskLabel, templateTaskStage } from './templateTaskStage';
  * and cards scatter that across a grid whose row wrapping changes with the
  * window width. Every template gets its own bar, plus one for the run.
  */
+const COPY = {
+  de: { templates: 'Vorlagen' },
+  en: { templates: 'templates' },
+};
+
 export default function TemplateTaskProgress({ task }: { task: TaskInfo }) {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const progress = task.progress;
   const templates = progress?.templates ?? [];
   const total = progress?.total ?? templates.length;
@@ -30,10 +38,10 @@ export default function TemplateTaskProgress({ task }: { task: TaskInfo }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-medium text-fg">
-            {taskLabel(task.task_name)} · {phaseLabel(progress?.phase)}
+            {taskLabel(task.task_name, language)} · {phaseLabel(progress?.phase, language)}
           </p>
           <p className="text-xs text-muted mt-0.5">
-            {completed} / {total} templates
+            {completed} / {total} {t.templates}
             {progress?.image_tag ? ` · ${progress.image_tag}` : ''}
             {task.duration ? ` · ${task.duration}` : ''}
           </p>
@@ -51,7 +59,7 @@ export default function TemplateTaskProgress({ task }: { task: TaskInfo }) {
       {templates.length > 0 && (
         <ul role="list" className="divide-y divide-rule rounded-md border border-rule bg-surface">
           {templates.map((template) => {
-            const stage = templateTaskStage(template, task.task_name);
+            const stage = templateTaskStage(template, task.task_name, language);
             return (
               <li key={template.key} className="px-3 py-2.5">
                 <div className="flex items-center gap-3">

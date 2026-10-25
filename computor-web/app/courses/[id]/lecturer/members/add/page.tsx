@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import { useResource } from '@/src/hooks/useResource';
@@ -19,11 +20,37 @@ import { assignableRoles, highestCourseRole, maxAssignableRole } from '@/src/uti
 
 const groupsClient = new CourseGroupsClient();
 
+const COPY = {
+  de: {
+    courseMembers: 'Kursmitglieder',
+    add: 'Hinzufügen',
+    forbidden: 'Zum Hinzufügen von Mitgliedern brauchst du mindestens Lehrenden-Zugriff auf diesen Kurs.',
+    backToCourse: 'Zurück zum Kurs',
+    title: 'Mitglieder hinzufügen',
+    subtitle: 'Füge bestehende Nutzer aus der Liste hinzu oder lade neue Personen per E-Mail ein.',
+    tabList: 'Aus Nutzerliste',
+    tabEmail: 'Per E-Mail',
+    tabFile: 'Datei importieren',
+  },
+  en: {
+    courseMembers: 'Course members',
+    add: 'Add',
+    forbidden: 'You need lecturer access (or higher) on this course to add members.',
+    backToCourse: 'Back to course',
+    title: 'Add members',
+    subtitle: 'Add existing users from the list, or invite someone new by email.',
+    tabList: 'From user list',
+    tabEmail: 'By email',
+    tabFile: 'Import file',
+  },
+};
+
 type AddTab = 'list' | 'email' | 'file';
 
 export default function AddCourseMembersPage() {
   const courseId = useParams().id as string;
-  const crumbs = useCourseCrumbs(courseId, { label: 'Course members', href: `/courses/${courseId}/lecturer/members` }, 'Add');
+  const t = COPY[useUiLanguage()];
+  const crumbs = useCourseCrumbs(courseId, { label: t.courseMembers, href: `/courses/${courseId}/lecturer/members` }, t.add);
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin, isOrganizationManager, courseRoles, courseHasAtLeast } = usePermissions();
 
@@ -52,9 +79,9 @@ export default function AddCourseMembersPage() {
   if (!authLoading && isAuthenticated && !canManage) {
     return (
       <Forbidden
-        message="You need lecturer access (or higher) on this course to add members."
+        message={t.forbidden}
         backLink={`/courses/${courseId}`}
-        backText="Back to course"
+        backText={t.backToCourse}
       />
     );
   }
@@ -69,21 +96,21 @@ export default function AddCourseMembersPage() {
       <ListPageLayout>
         <PageHeader
           breadcrumbs={crumbs}
-          title="Add members"
-          subtitle="Add existing users from the list, or invite someone new by email."
+          title={t.title}
+          subtitle={t.subtitle}
         />
 
         {/* Tabs: the two add flows are mutually exclusive, so show one at a time. */}
         <div className="border-b border-rule">
           <nav className="flex gap-6">
             <button type="button" onClick={() => setTab('list')} className={tabClass(tab === 'list')}>
-              From user list
+              {t.tabList}
             </button>
             <button type="button" onClick={() => setTab('email')} className={tabClass(tab === 'email')}>
-              By email
+              {t.tabEmail}
             </button>
             <button type="button" onClick={() => setTab('file')} className={tabClass(tab === 'file')}>
-              Import file
+              {t.tabFile}
             </button>
           </nav>
         </div>

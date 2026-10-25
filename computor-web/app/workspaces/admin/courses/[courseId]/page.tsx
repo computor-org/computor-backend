@@ -16,9 +16,73 @@ import { useNotify } from '@/src/contexts/NotificationContext';
 import { CourseWorkspacesClient } from '@/src/clients/CourseWorkspacesClient';
 import { CoderClient } from '@/src/clients/CoderClient';
 import type { CourseWorkspaceTemplatePolicy } from '@/src/types/workspaces';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const courseWorkspacesClient = new CourseWorkspacesClient();
 const coderClient = new CoderClient();
+
+const COPY = {
+  de: {
+    saved: 'Konfiguration der Kurs-Arbeitsumgebungen gespeichert',
+    saveFailed: 'Die Konfiguration konnte nicht gespeichert werden',
+    workspaces: 'Arbeitsumgebungen',
+    administration: 'Administration',
+    courseWorkspaces: 'Kurs-Arbeitsumgebungen',
+    title: 'Konfiguration der Kurs-Arbeitsumgebungen',
+    subtitle: 'Vorlagen, die dieser Kurs seinen Mitgliedern anbietet, und ob Lehrende Arbeitsumgebungen für Studierende bereitstellen dürfen',
+    loading: 'Konfiguration wird geladen …',
+    allowed: 'Erlaubte Vorlagen',
+    allowedIntro:
+      'Mitglieder dieses Kurses können die angehakten Vorlagen von der Kursseite aus starten, eine globale Rolle für Arbeitsumgebungen ist dafür nicht nötig. Global deaktivierte Vorlagen bleiben zugeordnet, sind für Studierende aber ausgeblendet, bis sie wieder aktiviert werden.',
+    noTemplates: 'Keine Vorlagen verfügbar. Möglicherweise ist Coder nicht erreichbar oder wird noch initialisiert.',
+    globallyDisabled: 'Global deaktiviert',
+    policyHeading: 'Root- & Internet-Richtlinie',
+    policyIntro:
+      'Was Mitglieder dieses Kurses beim Start jeder Vorlage erhalten. Ein Kurs kann nur Zugriff entziehen: Eine Option ist gesperrt, wenn die Vorlage sie bereits verbietet. Gilt für neu bereitgestellte Arbeitsumgebungen, bestehende behalten ihre Richtlinie bis zum Neuaufbau.',
+    templateDenies: 'Die Vorlage verbietet dies, ein Kurs kann es nicht erlauben.',
+    offForTemplate: '(für diese Vorlage aus)',
+    root: 'Root (sudo)',
+    internet: 'Internet',
+    provisioning: 'Bereitstellung durch Lehrende',
+    provisioningIntro:
+      'Lehrende des Kurses dürfen Arbeitsumgebungen für ihre Studierenden gesammelt bereitstellen, auch temporäre Arbeitsumgebungen mit einem Scratch-Home-Volume, das mit der Arbeitsumgebung gelöscht wird. Studierende können diese öffnen und starten, aber keine neuen bereitstellen.',
+    saving: 'Wird gespeichert …',
+    save: 'Konfiguration speichern',
+    discard: 'Änderungen verwerfen',
+    forbidden: 'Die Konfiguration der Kurs-Arbeitsumgebungen erfordert die Rolle „Workspace-Maintainer“.',
+    back: 'Zurück zu den Arbeitsumgebungen',
+  },
+  en: {
+    saved: 'Course workspace configuration saved',
+    saveFailed: 'Failed to save configuration',
+    workspaces: 'Workspaces',
+    administration: 'Administration',
+    courseWorkspaces: 'Course workspaces',
+    title: 'Course workspace configuration',
+    subtitle: 'Templates this course offers its members, and whether lecturers may provision workspaces for students',
+    loading: 'Loading configuration…',
+    allowed: 'Allowed templates',
+    allowedIntro:
+      'Members of this course can launch the checked templates from the course page — no global workspace role needed. Globally disabled templates stay associated but are hidden from students until re-enabled.',
+    noTemplates: 'No templates available — Coder may be unreachable or still initializing.',
+    globallyDisabled: 'Globally disabled',
+    policyHeading: 'Root & internet policy',
+    policyIntro:
+      'What members of this course get when they launch each template. A course can only take access away — a control is locked when the template itself already denies it. Applies to newly provisioned workspaces; existing ones keep their policy until they are rebuilt.',
+    templateDenies: 'The template denies this; a course cannot grant it.',
+    offForTemplate: '(off for this template)',
+    root: 'Root (sudo)',
+    internet: 'Internet',
+    provisioning: 'Lecturer provisioning',
+    provisioningIntro:
+      'Course lecturers may bulk-provision workspaces for their students — including throwaway workspaces with a scratch home volume that is deleted with the workspace. Students can open and start these, but not provision new ones.',
+    saving: 'Saving…',
+    save: 'Save configuration',
+    discard: 'Discard changes',
+    forbidden: 'Course workspace configuration requires the workspace maintainer role.',
+    back: 'Back to workspaces',
+  },
+};
 
 /** A course can only restrict, so a policy checkbox is off when either the
  *  template's ceiling denies it or this course does. */
@@ -27,6 +91,7 @@ function policyChecked(ceiling: boolean, courseValue: boolean | null | undefined
 }
 
 function CourseWorkspaceConfigContent() {
+  const t = COPY[useUiLanguage()];
   const params = useParams<{ courseId: string }>();
   const courseId = params.courseId;
   const notify = useNotify();
@@ -135,11 +200,11 @@ function CourseWorkspaceConfigContent() {
           ),
         },
       });
-      notify('Course workspace configuration saved', 'success');
+      notify(t.saved, 'success');
       setDraft(null);
       await reload();
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Failed to save configuration', 'error');
+      notify(e instanceof Error ? e.message : t.saveFailed, 'error');
     } finally {
       setSaving(false);
     }
@@ -149,33 +214,31 @@ function CourseWorkspaceConfigContent() {
     <ListPageLayout>
       <PageHeader
         breadcrumbs={[
-          { label: 'Workspaces', href: '/workspaces' },
-          { label: 'Administration', href: '/workspaces/admin?tab=courses' },
-          { label: 'Course workspaces' },
+          { label: t.workspaces, href: '/workspaces' },
+          { label: t.administration, href: '/workspaces/admin?tab=courses' },
+          { label: t.courseWorkspaces },
         ]}
-        title="Course workspace configuration"
-        subtitle="Templates this course offers its members, and whether lecturers may provision workspaces for students"
+        title={t.title}
+        subtitle={t.subtitle}
       />
 
       <ErrorBanner>{error}</ErrorBanner>
 
       {loading ? (
-        <ListLoading>Loading configuration…</ListLoading>
+        <ListLoading>{t.loading}</ListLoading>
       ) : (
         <ScrollArea>
           <div className="bg-surface rounded-lg border border-rule p-5 space-y-4">
             <div>
-              <h2 className="text-lg font-semibold text-fg">Allowed templates</h2>
+              <h2 className="text-lg font-semibold text-fg">{t.allowed}</h2>
               <p className="text-sm text-muted mt-1">
-                Members of this course can launch the checked templates from the course page —
-                no global workspace role needed. Globally disabled templates stay associated
-                but are hidden from students until re-enabled.
+                {t.allowedIntro}
               </p>
             </div>
 
             {pickerItems.length === 0 ? (
               <p className="text-sm text-muted">
-                No templates available — Coder may be unreachable or still initializing.
+                {t.noTemplates}
               </p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -205,7 +268,7 @@ function CourseWorkspaceConfigContent() {
                         )}
                         {item.globallyDisabled && (
                           <span className="mt-1 inline-flex items-center rounded bg-warn-wash px-2 py-0.5 text-xs font-medium text-warn-text">
-                            Globally disabled
+                            {t.globallyDisabled}
                           </span>
                         )}
                       </span>
@@ -219,12 +282,9 @@ function CourseWorkspaceConfigContent() {
           {form.selected.length > 0 && (
             <div className="bg-surface rounded-lg border border-rule p-5 space-y-4">
               <div>
-                <h2 className="text-lg font-semibold text-fg">Root &amp; internet policy</h2>
+                <h2 className="text-lg font-semibold text-fg">{t.policyHeading}</h2>
                 <p className="text-sm text-muted mt-1">
-                  What members of this course get when they launch each template. A course can
-                  only take access away — a control is locked when the template itself already
-                  denies it. Applies to newly provisioned workspaces; existing ones keep their
-                  policy until they are rebuilt.
+                  {t.policyIntro}
                 </p>
               </div>
 
@@ -237,8 +297,8 @@ function CourseWorkspaceConfigContent() {
                       <p className="text-sm font-medium text-fg">{name}</p>
                       <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2">
                         {([
-                          ['allow_root', 'Root (sudo)', ceiling.root, policy.allow_root],
-                          ['allow_internet', 'Internet', ceiling.internet, policy.allow_internet],
+                          ['allow_root', t.root, ceiling.root, policy.allow_root],
+                          ['allow_internet', t.internet, ceiling.internet, policy.allow_internet],
                         ] as const).map(([key, label, allowedByTemplate, courseValue]) => (
                           <label
                             key={key}
@@ -248,7 +308,7 @@ function CourseWorkspaceConfigContent() {
                             title={
                               allowedByTemplate
                                 ? undefined
-                                : 'The template denies this; a course cannot grant it.'
+                                : t.templateDenies
                             }
                           >
                             <input
@@ -259,7 +319,7 @@ function CourseWorkspaceConfigContent() {
                             />
                             {label}
                             {!allowedByTemplate && (
-                              <span className="text-xs">(off for this template)</span>
+                              <span className="text-xs">{t.offForTemplate}</span>
                             )}
                           </label>
                         ))}
@@ -281,12 +341,10 @@ function CourseWorkspaceConfigContent() {
               />
               <span>
                 <span className="block text-sm font-medium text-fg">
-                  Lecturer provisioning
+                  {t.provisioning}
                 </span>
                 <span className="block text-xs text-muted">
-                  Course lecturers may bulk-provision workspaces for their students — including
-                  throwaway workspaces with a scratch home volume that is deleted with the
-                  workspace. Students can open and start these, but not provision new ones.
+                  {t.provisioningIntro}
                 </span>
               </span>
             </label>
@@ -299,12 +357,12 @@ function CourseWorkspaceConfigContent() {
           position rather than only after scrolling past the template picker. */}
       {!loading && (
         <PageActions>
-          <Button onClick={save} loading={saving} loadingLabel="Saving…">
-            Save configuration
+          <Button onClick={save} loading={saving} loadingLabel={t.saving}>
+            {t.save}
           </Button>
           {draft && (
             <Button variant="ghost" onClick={() => setDraft(null)} disabled={saving}>
-              Discard changes
+              {t.discard}
             </Button>
           )}
         </PageActions>
@@ -316,13 +374,14 @@ function CourseWorkspaceConfigContent() {
 export default function CourseWorkspaceConfigPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isWorkspaceMaintainer } = usePermissions();
+  const t = COPY[useUiLanguage()];
 
   if (!authLoading && isAuthenticated && !isWorkspaceMaintainer) {
     return (
       <Forbidden
-        message="Course workspace configuration requires the workspace maintainer role."
+        message={t.forbidden}
         backLink="/workspaces"
-        backText="Back to workspaces"
+        backText={t.back}
       />
     );
   }

@@ -7,9 +7,10 @@ import {
   availabilityLabel,
   isUsable,
   templateLabel,
+  optionReason,
   type TemplateOption,
-  UNAVAILABLE_REASON_DE,
 } from './templateOptions';
+import { stageLabel } from './templateTaskStage';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 /**
@@ -47,7 +48,7 @@ export default function TemplateCard({
   const usable = isUsable(option);
   const label = templateLabel(option);
   const stage = option.stage;
-  const reason = language === 'de' && option.availability === 'unavailable' ? UNAVAILABLE_REASON_DE : option.reason;
+  const reason = optionReason(option, language);
 
   return (
     <button
@@ -85,12 +86,12 @@ export default function TemplateCard({
             active={stage.active}
             size="xs"
             className="mt-1.5"
-            label={`${label}: ${stage.label}`}
+            label={`${label}: ${stageLabel(stage.key, language)}`}
           />
         )}
         {usable && stage && (
           <span className="mt-1 block whitespace-normal break-words text-xs text-subtle">
-            {language === 'de' ? 'Wird aktualisiert' : 'Updating'} · {stage.label}
+            {language === 'de' ? 'Wird aktualisiert' : 'Updating'} · {stageLabel(stage.key, language)}
           </span>
         )}
       </span>

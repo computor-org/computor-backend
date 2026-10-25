@@ -25,5 +25,7 @@ export const formatUsageCompact = (
 };
 
 /** Short label for a cap on its own, e.g. in a lecturer-facing badge. */
-export const formatLimit = (max: number | null | undefined): string =>
-  max == null ? 'unlimited' : String(max);
+export const formatLimit = (
+  max: number | null | undefined,
+  language: 'de' | 'en' = 'en',
+): string => (max == null ? (language === 'de' ? 'unbegrenzt' : 'unlimited') : String(max));

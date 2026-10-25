@@ -8,9 +8,53 @@ import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { COURSE_ROLES, COURSE_ROLE_LABEL } from '@/src/utils/courseRoles';
 import type { CourseList, CourseMemberList } from 'types/generated';
 import { displayName } from '@/src/utils/displayName';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const courseMembersClient = new CourseMembersClient();
 const coursesClient = new CoursesClient();
+
+const COPY = {
+  de: {
+    loadFailed: 'Kursmitgliedschaften konnten nicht geladen werden',
+    unknownCourse: 'Unbekannter Kurs',
+    enrolFailed: 'Der Dienst konnte nicht eingeschrieben werden',
+    heading: 'Kursmitgliedschaften',
+    intro:
+      'Wird dieser Dienst in einen Kurs eingeschrieben, erhält er die Berechtigungen der gewählten Kursrolle – so bekommt ein Agent Zugriff auf einen bestimmten Kurs. Für ihn wird kein Git-Repository angelegt.',
+    course: 'Kurs',
+    selectCourse: 'Kurs auswählen …',
+    untitledCourse: 'Unbenannter Kurs',
+    role: 'Rolle',
+    adding: 'Wird hinzugefügt …',
+    add: 'Zum Kurs hinzufügen',
+    loading: 'Wird geladen …',
+    empty: 'In keinem Kurs eingeschrieben.',
+    remove: 'Entfernen',
+    removeTitle: 'Aus Kurs entfernen',
+    removeMessage: (role: string, course: string) =>
+      `Dieser Dienst verliert seinen Zugriff als ${role} auf ${course}.`,
+  },
+  en: {
+    loadFailed: 'Could not load course memberships',
+    unknownCourse: 'Unknown course',
+    enrolFailed: 'Could not enrol the service',
+    heading: 'Course memberships',
+    intro:
+      "Enrolling this service in a course grants it that course role's permissions — the way an agent gets access to a specific course. No git repository is provisioned for it.",
+    course: 'Course',
+    selectCourse: 'Select a course…',
+    untitledCourse: 'Untitled Course',
+    role: 'Role',
+    adding: 'Adding…',
+    add: 'Add to course',
+    loading: 'Loading…',
+    empty: 'Not enrolled in any course.',
+    remove: 'Remove',
+    removeTitle: 'Remove from course',
+    removeMessage: (role: string, course: string) =>
+      `This service will lose its ${role} access to ${course}.`,
+  },
+} as const;
 
 /**
  * Course memberships for a service account.
@@ -24,6 +68,7 @@ const coursesClient = new CoursesClient();
  * `requires_workspace`, which the seeded `agent` type does not.
  */
 export default function ServiceCoursesSection({ userId }: { userId: string }) {
+  const t = COPY[useUiLanguage()];
   const [members, setMembers] = useState<CourseMemberList[]>([]);
   const [courses, setCourses] = useState<CourseList[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,11 +88,11 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
       setMembers(memberList);
       setCourses(courseList);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load course memberships');
+      setError(e instanceof Error ? e.message : t.loadFailed);
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, t]);
 
   useEffect(() => {
     void load();
@@ -60,7 +105,7 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
   const available = courses.filter((c) => !enrolledCourseIds.has(c.id));
   const courseLabel = (id: string) => {
     const course = courses.find((c) => c.id === id);
-    return displayName(course, 'Unknown course');
+    return displayName(course, t.unknownCourse);
   };
 
   async function enrol() {
@@ -73,7 +118,7 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
       setCourseId('');
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not enrol the service');
+      setError(e instanceof Error ? e.message : t.enrolFailed);
     } finally {
       setSaving(false);
     }
@@ -82,10 +127,9 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
   return (
     <div className="bg-surface border border-rule rounded-lg">
       <div className="px-6 py-4 border-b border-rule-soft">
-        <h2 className="text-base font-semibold text-fg">Course memberships</h2>
+        <h2 className="text-base font-semibold text-fg">{t.heading}</h2>
         <p className="text-sm text-muted mt-0.5">
-          Enrolling this service in a course grants it that course role&apos;s permissions — the way an
-          agent gets access to a specific course. No git repository is provisioned for it.
+          {t.intro}
         </p>
       </div>
 
@@ -102,16 +146,16 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
           className="flex flex-wrap items-end gap-3 mb-5"
         >
           <div className="flex-1 min-w-[14rem]">
-            <label className="block text-xs font-medium text-body mb-1">Course</label>
+            <label className="block text-xs font-medium text-body mb-1">{t.course}</label>
             <select className={inputCls} value={courseId} onChange={(e) => setCourseId(e.target.value)}>
-              <option value="">Select a course…</option>
+              <option value="">{t.selectCourse}</option>
               {available.map((c) => (
-                <option key={c.id} value={c.id}>{displayName(c, 'Untitled Course')}</option>
+                <option key={c.id} value={c.id}>{displayName(c, t.untitledCourse)}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-body mb-1">Role</label>
+            <label className="block text-xs font-medium text-body mb-1">{t.role}</label>
             <select className={inputCls} value={roleId} onChange={(e) => setRoleId(e.target.value)}>
               {COURSE_ROLES.map((r) => (
                 <option key={r} value={r}>{COURSE_ROLE_LABEL[r] ?? r}</option>
@@ -123,15 +167,15 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
             disabled={saving || !courseId}
             className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50"
           >
-            {saving ? 'Adding…' : 'Add to course'}
+            {saving ? t.adding : t.add}
           </button>
         </form>
 
         {loading ? (
-          <div className="text-sm text-muted">Loading…</div>
+          <div className="text-sm text-muted">{t.loading}</div>
         ) : members.length === 0 ? (
           <div className="text-sm text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">
-            Not enrolled in any course.
+            {t.empty}
           </div>
         ) : (
           <div className="border border-rule rounded-lg divide-y divide-rule">
@@ -145,7 +189,7 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
                   onClick={() => setConfirmRemove(m)}
                   className="text-sm text-danger-text hover:underline whitespace-nowrap"
                 >
-                  Remove
+                  {t.remove}
                 </button>
               </div>
             ))}
@@ -156,9 +200,9 @@ export default function ServiceCoursesSection({ userId }: { userId: string }) {
       {confirmRemove && (
         <ConfirmDialog
           open
-          title="Remove from course"
-          message={`This service will lose its ${COURSE_ROLE_LABEL[confirmRemove.course_role_id] ?? confirmRemove.course_role_id} access to ${courseLabel(confirmRemove.course_id)}.`}
-          confirmLabel="Remove"
+          title={t.removeTitle}
+          message={t.removeMessage(COURSE_ROLE_LABEL[confirmRemove.course_role_id] ?? confirmRemove.course_role_id, courseLabel(confirmRemove.course_id))}
+          confirmLabel={t.remove}
           variant="danger"
           onConfirm={async () => {
             await courseMembersClient.deleteCourseMembersCourseMembersIdDelete({ id: confirmRemove.id });
