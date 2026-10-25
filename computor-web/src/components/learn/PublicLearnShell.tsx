@@ -9,6 +9,7 @@ import LanguageSwitch from '@/src/components/LanguageSwitch';
 import LegalLinks from '@/src/components/LegalLinks';
 import NetideeNotice from '@/src/components/NetideeNotice';
 import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
+import { applyDocumentLanguage } from '@/src/utils/documentLanguage';
 
 const COPY = {
   de: { courses: 'Kurse', signIn: 'Anmelden', signOut: 'Abmelden', report: 'Problem melden' },
@@ -28,7 +29,7 @@ export default function PublicLearnShell({
   const language = useBrowserLanguage();
   const t = COPY[language];
   useEffect(() => {
-    document.documentElement.lang = language;
+    applyDocumentLanguage(language);
   }, [language]);
 
   async function signOut() {
