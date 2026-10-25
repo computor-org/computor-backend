@@ -92,13 +92,7 @@ export default function WorkspaceTypeGrid({
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {options.map((option) => {
-        // What provisioning without a name would produce — the workspace a
-        // click on this card opens, or creates. Self-provisioners never get
-        // any other name, so for them this is simply "their" workspace.
-        const derived = derivedWorkspaceName(option.name);
-        const own = workspaces.find(
-          (w) => w.template_name === option.name && w.name === derived,
-        );
+        const own = ownWorkspace(option, workspaces);
 
         if (!own) {
           return (
@@ -141,6 +135,19 @@ export default function WorkspaceTypeGrid({
       })}
     </div>
   );
+}
+
+/**
+ * What provisioning without a name would produce for this type — the
+ * workspace a click on its card opens, or creates. Self-provisioners never get
+ * any other name, so for them this is simply "their" workspace.
+ */
+export function ownWorkspace(
+  option: TemplateOption,
+  workspaces: CoderWorkspace[],
+): CoderWorkspace | undefined {
+  const derived = derivedWorkspaceName(option.name);
+  return workspaces.find((w) => w.template_name === option.name && w.name === derived);
 }
 
 /** Types a maintainer may pick in the custom-name form. */

@@ -13,7 +13,7 @@ import { CoderClient } from '@/src/clients/CoderClient';
 import WorkspaceTable from '@/src/components/workspaces/WorkspaceTable';
 import { workspaceDeleteMessage } from '@/src/components/workspaces/deleteMessage';
 import WorkspaceDetailsModal from '@/src/components/workspaces/WorkspaceDetailsModal';
-import WorkspaceTypeGrid, { usableOptions } from '@/src/components/workspaces/WorkspaceTypeGrid';
+import WorkspaceTypeGrid, { ownWorkspace, usableOptions } from '@/src/components/workspaces/WorkspaceTypeGrid';
 import NewWorkspaceForm from '@/src/components/workspaces/NewWorkspaceForm';
 import { categorizeStatus } from '@/src/components/workspaces/WorkspaceStatusBadge';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
@@ -45,6 +45,8 @@ const COPY = {
     stillWorking: (n: number) =>
       n === 1 ? '1 Arbeitsumgebung ist noch in Arbeit' : `${n} Arbeitsumgebungen sind noch in Arbeit`,
     createHeading: 'Arbeitsumgebung erstellen',
+    openHeading: 'Arbeitsumgebung öffnen',
+    openOrCreateHeading: 'Arbeitsumgebung öffnen oder erstellen',
     loading: 'Arbeitsumgebungen werden geladen …',
     emptyTitle: 'Keine Arbeitsumgebungen',
     emptyCreate: 'Wähle oben eine Art von Arbeitsumgebung aus, um deine erste zu erstellen.',
@@ -68,6 +70,8 @@ const COPY = {
     stillWorking: (n: number) =>
       n === 1 ? '1 workspace is still working' : `${n} workspaces are still working`,
     createHeading: 'Create a workspace',
+    openHeading: 'Open a workspace',
+    openOrCreateHeading: 'Open or create a workspace',
     loading: 'Loading workspaces…',
     emptyTitle: 'No workspaces',
     emptyCreate: 'Pick a workspace type above to create your first one.',
@@ -114,6 +118,7 @@ export default function WorkspacesPage() {
     error: templatesError,
     refresh: refreshTemplates,
   } = useCoderTemplates({ refetchInterval: 10000 });
+  const ownedTypes = options.filter((option) => ownWorkspace(option, workspaces)).length;
 
   // Coder health for the status strip (no polling — cheap indicator only).
   const { data: health } = useResource<CoderHealthResponse>(
@@ -260,7 +265,14 @@ export default function WorkspacesPage() {
 
         {!templatesError && (
           <div className="shrink-0 space-y-3">
-            <h2 className="text-sm font-semibold text-fg">{t.createHeading}</h2>
+            {/* The cards open the workspace a type already has, so "create" alone is only right while there is none. */}
+            <h2 className="text-sm font-semibold text-fg">
+              {ownedTypes === 0
+                ? t.createHeading
+                : ownedTypes === options.length
+                  ? t.openHeading
+                  : t.openOrCreateHeading}
+            </h2>
             {customFormOpen && (
               <NewWorkspaceForm
                 options={creatable}
