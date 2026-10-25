@@ -80,11 +80,11 @@ MESSAGES = {
     },
     "occurrence_is_range": {
         "en": "{subject} is {count}, expected {min}-{max}",
-        "de": "{subject} ist {count}, erwartet wird {min}-{max}",
+        "de": "{subject} ist {count}, erwartet wird {min} bis {max}",
     },
     "occurrence_found_range": {
         "en": "{subject} found {count} times, expected {min}-{max}",
-        "de": "{subject} kommt {count}-mal vor, erwartet wird {min}-{max}",
+        "de": "{subject} kommt {count}-mal vor, erwartet wird {min} bis {max}",
     },
     "occurrence_found_exact": {
         "en": "{subject} found {count} times, expected {expected}",
