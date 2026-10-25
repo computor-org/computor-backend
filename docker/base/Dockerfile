@@ -18,7 +18,7 @@
 #                    --no-deps. Cheap; rebuilds on every source change.
 #
 # pip --user into ~/.local is kept (not a uv venv) because the testing, coder
-# and matlab workers COPY ~/.local onto other Python 3.10 interpreters.
+# and matlab workers COPY ~/.local onto other Python 3.12 interpreters.
 
 # ---------------------------------------------------------------------------
 # Stage: export uv.lock to hashed requirements files (uv never reaches the
@@ -27,7 +27,7 @@
 # ---------------------------------------------------------------------------
 FROM ghcr.io/astral-sh/uv:0.12.17@sha256:10787c682e4184e4f290de1171fd4703dc63de99221f10fe1c99002ce7fa9acc AS uv
 
-FROM python:3.10.21-slim@sha256:31dd4d9529d02d7436659061cb7564cd4733fc90e5e152709a942d53382ec8d0 AS lock-export
+FROM python:3.12.15-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704 AS lock-export
 COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /src
 COPY computor-types/pyproject.toml    computor-types/
@@ -45,7 +45,7 @@ RUN mkdir /locks \
 # ---------------------------------------------------------------------------
 # Runtime image
 # ---------------------------------------------------------------------------
-FROM python:3.10.21-slim@sha256:31dd4d9529d02d7436659061cb7564cd4733fc90e5e152709a942d53382ec8d0
+FROM python:3.12.15-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         postgresql-client \

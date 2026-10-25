@@ -186,7 +186,7 @@ compose() {
 # the hash onto the image as a label, and compare it on the next run.
 #
 # The digest covers OUR inputs only — it cannot see upstream drift in
-# mathworks/matlab:<release>, ghcr.io/coder/code-server:latest or python:3.10-slim.
+# mathworks/matlab:<release>, ghcr.io/coder/code-server:latest or python:3.12-slim.
 # Refreshing those is what `--build-base` is for, and it wants `--pull` with it.
 
 # sha256 over the Dockerfile, its context files and the build args.

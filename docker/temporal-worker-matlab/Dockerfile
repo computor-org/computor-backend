@@ -3,7 +3,7 @@
 ARG MATLAB_BASE_IMAGE=computor-matlab-base:r2025b
 # Reuse the already-installed computor python environment from the shared base.
 # The matlab base is a different OS image, so we can't `FROM computor-base`; we
-# COPY from it instead. Both run CPython 3.10, so the installed wheels are ABI
+# COPY from it instead. Both run CPython 3.12, so the installed wheels are ABI
 # compatible. See docker/base/Dockerfile.
 FROM computor-base AS pybase
 
@@ -13,25 +13,18 @@ USER root
 
 # Install Python and system dependencies including tini for proper PID 1 handling.
 #
-# python3.10 comes from deadsnakes because the OS under the MATLAB image moved
-# to Ubuntu 24.04 (noble) with R2025b, and noble packages python3.12 ONLY —
-# `apt-get install python3.10` there fails with "Unable to locate package".
-# R2024b sat on jammy, whose system python IS 3.10, which is why this worked
-# without a PPA until the release bump. The 3.10 pin itself is not negotiable
-# here: the computor packages and their compiled dependencies are COPYed in
-# below as cp310 wheels built in computor-base, so the interpreter that runs
-# them has to be 3.10 as well.
+# Python 3.12 is the system interpreter of Ubuntu 24.04 (noble), the OS under
+# the R2025b MATLAB image, so no PPA is needed. It must match computor-base: the
+# computor packages and their compiled dependencies are COPYed in below as
+# cp312 wheels built there, so the interpreter that runs them has to be 3.12.
+# Installing python3.12 here also pulls its current noble security update.
 RUN export DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install --no-install-recommends --yes \
-        software-properties-common \
-        ca-certificates \
-    && add-apt-repository --yes ppa:deadsnakes/ppa \
-    && apt-get update \
-    && apt-get install --no-install-recommends --yes \
-        python3.10 \
-        python3.10-venv \
-        python3.10-dev \
+        python3.12 \
+        python3.12-venv \
+        python3.12-dev \
+        python3-pip \
         git \
         nano \
         curl \
@@ -40,33 +33,29 @@ RUN export DEBIAN_FRONTEND=noninteractive \
     && apt-get autoremove \
     && rm -rf /var/lib/apt/lists/*
 
-# Bootstrap pip for 3.10 and pin setuptools. Must come BEFORE the engine install
-# below, which needs setuptools for this interpreter.
+# Pin setuptools and the other build tools for the system 3.12. Must come
+# BEFORE the engine install below, which needs setuptools for this interpreter.
 #
-# ensurepip (shipped by python3.10-venv) rather than the `python3-pip` package:
-# that one belongs to the system 3.12. It is still *importable* from 3.10 —
-# Debian puts arch-independent modules in /usr/lib/python3/dist-packages, which
-# is on every Debian python's sys.path — but it is dpkg-owned and carries no
-# RECORD, so pip refuses to uninstall or upgrade it ("Cannot uninstall pip 24.0,
-# RECORD file not found"). Hence: never upgrade pip itself here, and pass
-# --ignore-installed for the other dpkg-owned distributions (wheel, packaging)
-# so they are installed fresh into /usr/local/lib/python3.10/dist-packages,
-# which precedes /usr/lib/python3/dist-packages on the path.
+# pip is the dpkg-owned python3-pip of noble. It carries no RECORD, so pip
+# refuses to uninstall or upgrade it ("Cannot uninstall pip 24.0, RECORD file
+# not found"). Hence: never upgrade pip itself here, and pass
+# --ignore-installed so setuptools, wheel and packaging are installed fresh
+# into /usr/local/lib/python3.12/dist-packages, which precedes the dpkg-owned
+# /usr/lib/python3/dist-packages on the path. --break-system-packages is
+# needed because noble marks its interpreter EXTERNALLY-MANAGED; these are
+# image-build tools only, installed outside the dpkg-owned directories.
 #
-# setuptools gets its own step WITHOUT --ignore-installed on purpose: ensurepip
-# leaves a 79.x behind, and ignoring it would let that shadow the version we ask
-# for here. The < 70 pin is not cosmetic — the COPYed computor deps include
+# The < 70 setuptools pin is not cosmetic — the COPYed computor deps include
 # grapheme, which has no setuptools of its own and resolves pkg_resources from
 # this interpreter at runtime.
 # Both steps install from hash-locked, wheel-only files (compiled with the
-# 7-day cooldown: uv pip compile --generate-hashes --python-version 3.10
+# 7-day cooldown: uv pip compile --generate-hashes --python-version 3.12
 # --exclude-newer <cutoff>), so the rebuild cannot pick up a newer release.
 COPY docker/temporal-worker-matlab/bootstrap-setuptools.lock docker/temporal-worker-matlab/bootstrap-tools.lock /tmp/
-RUN python3.10 -m ensurepip --upgrade \
-    && python3.10 -m pip install --upgrade --require-hashes --only-binary :all: \
-        -r /tmp/bootstrap-setuptools.lock \
-    && python3.10 -m pip install --upgrade --ignore-installed --require-hashes \
-        --only-binary :all: -r /tmp/bootstrap-tools.lock \
+RUN python3.12 -m pip install --break-system-packages --ignore-installed \
+        --require-hashes --only-binary :all: -r /tmp/bootstrap-setuptools.lock \
+    && python3.12 -m pip install --break-system-packages --ignore-installed \
+        --require-hashes --only-binary :all: -r /tmp/bootstrap-tools.lock \
     && rm /tmp/bootstrap-setuptools.lock /tmp/bootstrap-tools.lock
 
 # Derive MATLAB's root instead of naming a release. This image is built FROM
@@ -75,15 +64,14 @@ RUN python3.10 -m ensurepip --upgrade \
 # `cd` into a missing directory, so it fails loudly rather than silently, but
 # only after everything above it has already been built.
 #
-# Python 3.10 stays supported by the engine in R2025b (its setup.py lists
-# 3.9-3.12, unchanged from R2024b), which is what lets the worker keep the
-# 3.10 pin it shares with computor-base.
+# The engine in R2025b supports Python 3.9-3.12 (its setup.py lists them),
+# which covers the 3.12 interpreter the worker shares with computor-base.
 #
-# Invoked as `python3.10`, not `python`: noble has no unversioned `python` on
+# Invoked as `python3.12`, not `python`: noble has no unversioned `python` on
 # PATH, and the engine has to land in the site-packages of the interpreter the
-# worker runs — not the system 3.12's.
+# worker runs.
 RUN cd "$(dirname "$(dirname "$(readlink -f "$(which matlab)")")")/extern/engines/python" \
-    && python3.10 setup.py install
+    && python3.12 setup.py install
 
 # Drop the passwordless-sudo grant the MathWorks image ships and clear the
 # matlab account password. Nothing below uses sudo, so this belongs up here with
@@ -105,7 +93,7 @@ RUN install -d -o matlab -g matlab /home/worker
 
 # Bring in the computor packages + their installed third-party deps from the
 # shared base, at the SAME /home/worker path the editable installs were built
-# against (so they resolve). PYTHONUSERBASE points matlab's python3.10 at the
+# against (so they resolve). PYTHONUSERBASE points matlab's python3.12 at the
 # copied user-site; the MATLAB engine stays in the system site-packages.
 #
 # --chown rather than a trailing `chmod -R 777`: that chmod rewrote the mode bits
@@ -120,16 +108,11 @@ COPY --from=pybase --chown=matlab:matlab /home/worker/computor-backend  /home/wo
 # Copy the matlab-server.py script
 COPY --chown=matlab:matlab docker/temporal-worker-matlab/matlab-server.py /home/worker/matlab-server.py
 
-# The PPA helper and its Python HTTP/OAuth/apt dependencies are build tools.
-# They are unused by MATLAB or the worker; remove them from the runtime image.
-RUN apt-get purge --yes software-properties-common python3-software-properties \
-        python3-oauthlib python3-httplib2 python3-apt
-
 USER matlab
 WORKDIR /home/matlab
 
-# Ensure python3.10 is used
-ENV PYTHON_EXECUTABLE=/usr/bin/python3.10
+# Ensure python3.12 is used
+ENV PYTHON_EXECUTABLE=/usr/bin/python3.12
 
 # Use the computor env copied from the base: user-site deps + source on the path
 ENV PYTHONUSERBASE=/home/worker/.local
@@ -139,4 +122,4 @@ ENV PYTHONPATH=/home/worker/computor-backend/src
 # Default entrypoint - tini with -s registers as subreaper for zombie reaping
 # even when not PID 1; -u for unbuffered Python output. matlab-server.py starts
 # the temporal worker internally.
-ENTRYPOINT ["/usr/bin/tini", "-s", "--", "python3.10", "-u", "/home/worker/matlab-server.py"]
+ENTRYPOINT ["/usr/bin/tini", "-s", "--", "python3.12", "-u", "/home/worker/matlab-server.py"]

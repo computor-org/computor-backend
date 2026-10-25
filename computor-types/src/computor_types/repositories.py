@@ -16,7 +16,7 @@ class Repository(BaseModel):
 
     @field_validator('url')
     def validate_git_url(cls, v):
-        git_url_pattern = "(?:git|ssh|https?|git@[-\w.]+):(\/\/)?(.*?)(\.git)(\/?|\#[-\d\w._]+?)$"
+        git_url_pattern = r"(?:git|ssh|https?|git@[-\w.]+):(\/\/)?(.*?)(\.git)(\/?|\#[-\d\w._]+?)$"
 
         if not re.match(git_url_pattern, v):
             raise ValueError('URL must be a valid Git repository URL')

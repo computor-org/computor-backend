@@ -3,8 +3,8 @@
 #
 # The runtimes (Octave/R/C/Fortran/Python 3.13/Julia) live in their own image so
 # editing project source no longer recompiles them. We build FROM the runtimes
-# and COPY the (small, fast-changing) computor env on top — both are python:3.10-slim
-# based, so the CPython-3.10 env is ABI-compatible.
+# and COPY the (small, fast-changing) computor env on top — both are python:3.12-slim
+# based, so the CPython-3.12 env is ABI-compatible.
 # See docker/testing-runtimes/Dockerfile and docker/base/Dockerfile.
 FROM computor-base AS pybase
 
@@ -25,7 +25,7 @@ RUN groupmod -g "${WORKER_GID}" worker && \
         -exec chown -h "${WORKER_UID}:${WORKER_GID}" {} +
 
 # Bring in the computor python project env from the shared base. Same /home/worker
-# path + CPython 3.10, so the editable installs + their deps resolve.
+# path + CPython 3.12, so the editable installs + their deps resolve.
 COPY --from=pybase --chown=worker:worker /home/worker/.local           /home/worker/.local
 COPY --from=pybase --chown=worker:worker /home/worker/computor-types    /home/worker/computor-types
 COPY --from=pybase --chown=worker:worker /home/worker/computor-client   /home/worker/computor-client
