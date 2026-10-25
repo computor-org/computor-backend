@@ -411,7 +411,7 @@ export default function SettingsPage() {
               ) : activeTokens.length === 0 ? (
                 <div className="text-sm text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">{t.noTokens}</div>
               ) : (
-                <div className="border border-rule rounded-lg divide-y">
+                <div className="border border-rule rounded-lg divide-y divide-rule">
                   {activeTokens.map((tok) => (
                     <div key={tok.id} className="flex items-center justify-between px-4 py-3 gap-4">
                       <div className="min-w-0">
@@ -454,7 +454,7 @@ export default function SettingsPage() {
               ) : accounts.length === 0 ? (
                 <div className="text-sm text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">{t.noAccounts}</div>
               ) : (
-                <div className="border border-rule rounded-lg divide-y">
+                <div className="border border-rule rounded-lg divide-y divide-rule">
                   {accounts.map((a) => (
                     <div key={a.id} className="flex items-center justify-between px-4 py-3 gap-4">
                       <div className="min-w-0">

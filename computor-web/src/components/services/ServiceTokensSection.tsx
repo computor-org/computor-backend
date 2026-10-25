@@ -178,7 +178,7 @@ export default function ServiceTokensSection({
             No active tokens — this service cannot authenticate yet.
           </div>
         ) : (
-          <div className="border border-rule rounded-lg divide-y">
+          <div className="border border-rule rounded-lg divide-y divide-rule">
             {activeTokens.map((t) => (
               <div key={t.id} className="flex items-center justify-between px-4 py-3 gap-4">
                 <div className="min-w-0">
