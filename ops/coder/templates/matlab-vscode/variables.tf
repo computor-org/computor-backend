@@ -82,6 +82,12 @@ variable "cgroup_parent" {
   type        = string
 }
 
+variable "tmp_size" {
+  default     = ""
+  description = "Size of a tmpfs mounted at /tmp (e.g. \"512m\"; counts towards memory_mb). Set from CODER_WORKSPACE_TMP_SIZE at push time. Empty = /tmp stays in the container rootfs."
+  type        = string
+}
+
 variable "storage_size" {
   default     = ""
   description = "Writable-layer size cap (docker storage-opt size, e.g. \"10G\"). Only works for overlay2 on xfs with pquota; empty = unbounded."

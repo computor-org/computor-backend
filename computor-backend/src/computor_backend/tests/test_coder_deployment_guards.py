@@ -54,3 +54,14 @@ def test_rollout_allowed_with_worker_role(monkeypatch):
     db = _FakeDb(True)
     coder_api._require_worker_db_role(db)
     assert db.params == {"role": "computor_coder_worker"}
+
+
+def test_workspace_size_caps_come_from_the_deployment(monkeypatch):
+    monkeypatch.setenv("CODER_WORKSPACE_ROOTFS_SIZE", "10G")
+    monkeypatch.setenv("CODER_WORKSPACE_TMP_SIZE", "512m")
+    variables = coder_api._deployment_template_variables()
+    assert variables["storage_size"] == "10G"
+    assert variables["tmp_size"] == "512m"
+    # Deployment-managed, so managers cannot override them per template.
+    reasons = coder_api._locked_variable_reasons()
+    assert "storage_size" in reasons and "tmp_size" in reasons
