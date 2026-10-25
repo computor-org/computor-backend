@@ -438,7 +438,7 @@ if __name__ == '__main__':
 
     # Pass command line arguments to the temporal worker
     # This allows docker-compose to specify --queues=testing-matlab
-    argv = ["python3.10", "-m", "computor_backend.tasks.temporal_worker", *sys.argv[1:]]
+    argv = ["python3.12", "-m", "computor_backend.tasks.temporal_worker", *sys.argv[1:]]
     print(f"Starting temporal worker with command: {' '.join(argv)}", flush=True)
 
     # Popen (not run()) so worker startup and activity logs flow through, and no

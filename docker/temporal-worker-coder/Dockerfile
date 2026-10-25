@@ -4,7 +4,7 @@
 # The Docker CLI + coder CLI live in their own image (computor-coder-runtime) so
 # editing project source no longer re-runs that apt/curl install. We build FROM
 # the runtime and COPY the (small, fast-changing) computor env on top — both are
-# python:3.10-slim based, so the CPython-3.10 env is ABI-compatible. This mirrors
+# python:3.12-slim based, so the CPython-3.12 env is ABI-compatible. This mirrors
 # the testing/matlab workers; see docker/coder-runtime/Dockerfile and
 # docker/base/Dockerfile.
 FROM computor-base AS pybase
@@ -12,7 +12,7 @@ FROM computor-base AS pybase
 FROM computor-coder-runtime
 
 # Bring in the computor python project env from the shared base. Same /home/worker
-# path + CPython 3.10, so the editable installs + their deps resolve.
+# path + CPython 3.12, so the editable installs + their deps resolve.
 COPY --from=pybase --chown=worker:worker /home/worker/.local           /home/worker/.local
 COPY --from=pybase --chown=worker:worker /home/worker/computor-types    /home/worker/computor-types
 COPY --from=pybase --chown=worker:worker /home/worker/computor-client   /home/worker/computor-client

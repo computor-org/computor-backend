@@ -8,9 +8,9 @@
 # temporal-worker-testing layers the computor env (copied from computor-base)
 # on top of this image, and the runtimes are built once.
 #
-# python:3.10-slim base (same as computor-base) so the copied CPython-3.10
+# python:3.12-slim base (same as computor-base) so the copied CPython-3.12
 # computor env is ABI-compatible.
-FROM python:3.10-slim@sha256:31dd4d9529d02d7436659061cb7564cd4733fc90e5e152709a942d53382ec8d0
+FROM python:3.12.15-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
@@ -44,7 +44,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV TZ=UTC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# Python 3.13 for test execution (alongside the worker's 3.10). Pinned patch
+# Python 3.13 for test execution (alongside the worker's 3.12). Pinned patch
 # release + SHA-256 from python.org's release-file API (sha256_sum), verified
 # before extraction so a tampered or swapped tarball fails the build.
 ARG PYTHON313_VERSION=3.13.15
