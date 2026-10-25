@@ -38,12 +38,12 @@ const COPY = {
     launch: 'Arbeitsumgebung starten',
     setUp: 'Arbeitsumgebung einrichten',
     setUpHint:
-      'Hier programmierst, testest und gibst du ab. Öffnet diesen Kurs in deiner Arbeitsumgebung.',
+      'Hier programmierst, testest und gibst du ab. Damit öffnest du diesen Kurs in deiner Arbeitsumgebung.',
     openIn: (label: string) => `In ${label} öffnen`,
     startAndOpen: 'Starten und öffnen',
     startAgain: 'Erneut starten',
     openHint: (label: string) =>
-      `In ${label} programmieren, testen und abgeben. Öffnet diesen Kurs in deiner Arbeitsumgebung oder verwendet den offenen Editor weiter. Deine Dateien bleiben erhalten.`,
+      `In ${label} programmieren, testen und abgeben. Damit öffnest du diesen Kurs in deiner Arbeitsumgebung oder arbeitest im bereits offenen Editor weiter. Deine Dateien bleiben erhalten.`,
     stopHint: (label: string) =>
       `Wenn du fertig bist, beende ${label} mit „Stoppen“. Schließt du nur den Tab, stoppt die Arbeitsumgebung nach einer Weile ohne Nutzung von selbst. Beim nächsten Start wird sie bei Bedarf aktualisiert.`,
     yours: 'Weitere Arbeitsumgebungen',
@@ -420,6 +420,8 @@ export default function CourseWorkspaceLaunchButtons({
                     onClick={() => provisionAndLaunch(option.name)}
                     loading={launching === option.name}
                     loadingLabel={t.launching}
+                    disabled={stopInFlight(w)}
+                    title={stopInFlight(w) ? t.stopInProgress : undefined}
                   >
                     {primary}
                   </Button>
@@ -428,7 +430,7 @@ export default function CourseWorkspaceLaunchButtons({
                       size="sm"
                       variant="secondary"
                       onClick={() => stopExisting(w)}
-                      loading={stopping === w.id}
+                      loading={stopInFlight(w)}
                       loadingLabel={t.stopping}
                     >
                       {t.stop}
@@ -492,7 +494,12 @@ export default function CourseWorkspaceLaunchButtons({
                       status={w.latest_build_status}
                       transition={w.latest_build_transition}
                     />
-                    <Button size="xs" onClick={() => openExisting(w)}>
+                    <Button
+                      size="xs"
+                      onClick={() => openExisting(w)}
+                      disabled={stopInFlight(w)}
+                      title={stopInFlight(w) ? t.stopInProgress : undefined}
+                    >
                       {category === 'running' ? t.open : category === 'failed' ? t.retry : t.start}
                     </Button>
                     {category === 'running' && (
@@ -500,7 +507,7 @@ export default function CourseWorkspaceLaunchButtons({
                         size="xs"
                         variant="secondary"
                         onClick={() => stopExisting(w)}
-                        loading={stopping === w.id}
+                        loading={stopInFlight(w)}
                         loadingLabel={t.stopping}
                       >
                         {t.stop}
