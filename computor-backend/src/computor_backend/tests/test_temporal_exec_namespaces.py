@@ -291,3 +291,35 @@ def test_rollout_control_applies_credentials_from_the_main_namespace(
     assert "apply_workspace_credential_updates" not in scheduled
     raw = b"".join(e.SerializeToString() for e in exec_history.events)
     assert b"argon2" not in raw
+
+
+def test_poller_report_counts_each_queue_in_its_namespace(split_namespaces, monkeypatch):
+    """The sentinel's report sees the testing worker only in the grading namespace."""
+    from computor_backend.tasks.queue_health import poller_report
+
+    async def scenario():
+        env = await _start_env()
+        try:
+            _use_env_client(monkeypatch, env)
+            grading = await get_temporal_client(GRADING_NS)
+            async with Worker(grading, task_queue="testing", workflows=[_ProbeWorkflow]):
+                report = {}
+                for _ in range(50):  # the poller registers with the first poll
+                    report = await poller_report(["testing", "coder-tasks"])
+                    if report["testing"]["pollers"]:
+                        break
+                    await asyncio.sleep(0.1)
+                assert report == {
+                    "testing": {"namespace": GRADING_NS, "pollers": 1},
+                    "coder-tasks": {"namespace": CODER_NS, "pollers": 0},
+                }
+                # The same queue name in the main namespace has no worker.
+                monkeypatch.setenv("TEMPORAL_QUEUE_NAMESPACES", "")
+                get_worker_settings.cache_clear()
+                assert (await poller_report(["testing"]))["testing"] == {
+                    "namespace": MAIN, "pollers": 0,
+                }
+        finally:
+            await env.shutdown()
+
+    asyncio.run(scenario())

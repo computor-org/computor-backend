@@ -1404,6 +1404,12 @@ async def apply_workspace_credential_updates(
 
     An owner without a Computor user (Coder's own ``admin``) keeps the
     credential of its previous build.
+
+    The list comes from the Coder-side workflow, which runs with execution
+    credentials, so it is not trusted: each workspace is looked up in the
+    Coder API first, and one whose real owner or active template version
+    differs from the report is skipped (logged, counted as an error) before
+    any credential is derived for it.
     """
     from computor_backend.coder.client import CoderClient
 
@@ -1411,10 +1417,11 @@ async def apply_workspace_credential_updates(
     errors: List[str] = []
     failure = None
     try:
-        owners = sorted({w["owner_name"] for w in workspaces if w.get("owner_name")})
-        credentials = await asyncio.to_thread(_current_owner_credentials, owners)
         async with CoderClient() as client:
-            updated_now = await _update_workspaces(client, version_id, workspaces, credentials, errors)
+            verified = await _verified_workspaces(client, version_id, workspaces, errors)
+            owners = sorted({w["owner_name"] for w in verified if w.get("owner_name")})
+            credentials = await asyncio.to_thread(_current_owner_credentials, owners)
+            updated_now = await _update_workspaces(client, version_id, verified, credentials, errors)
     except Exception as e:  # noqa: BLE001 - setup errors can embed secrets
         logger.exception("Control-plane credential update failed")
         failure = type(e).__name__
@@ -1423,6 +1430,46 @@ async def apply_workspace_credential_updates(
         # the original (e.g. a settings error quoting a password) enters history.
         raise ApplicationError(f"credential update failed ({failure})")
     return {"updated_now": updated_now, "errors": errors}
+
+
+async def _verified_workspaces(client, version_id, workspaces, errors) -> List[Dict[str, str]]:
+    """The reported workspaces whose owner and template version Coder confirms.
+
+    Returned entries carry Coder's own id, name and owner, never the reported
+    values. Refusals go to the log in full and into ``errors`` (Temporal
+    history) with the reported id only.
+    """
+    active_versions: Dict[str, str] = {}
+    verified: List[Dict[str, str]] = []
+    for w in workspaces:
+        reported_id = str(w.get("id", ""))[:64]
+        reported_owner = w.get("owner_name") or ""
+        try:
+            actual = await client.get_workspace_by_id(reported_id)
+            template = actual.template_name or ""
+            if template not in active_versions:
+                active_versions[template] = await client.get_template_active_version(template)
+        except Exception as e:  # noqa: BLE001 - collect per-workspace failures
+            logger.warning(f"Credential update of workspace {reported_id!r} refused: lookup failed ({e})")
+            errors.append(f"{reported_id}: not verified ({type(e).__name__})")
+            continue
+        actual_owner = actual.owner_name or ""
+        if actual_owner != reported_owner:
+            logger.warning(
+                f"Credential update of workspace {reported_id!r} refused: reported owner "
+                f"{reported_owner!r}, Coder owner {actual_owner!r}"
+            )
+            errors.append(f"{reported_id}: owner mismatch, skipped")
+            continue
+        if active_versions[template] != version_id:
+            logger.warning(
+                f"Credential update of workspace {reported_id!r} refused: version {version_id!r} "
+                f"is not the active version of template {template!r}"
+            )
+            errors.append(f"{reported_id}: template version mismatch, skipped")
+            continue
+        verified.append({"id": str(actual.id), "name": actual.name, "owner_name": actual_owner})
+    return verified
 
 
 async def _update_workspaces(client, version_id, workspaces, credentials, errors) -> int:

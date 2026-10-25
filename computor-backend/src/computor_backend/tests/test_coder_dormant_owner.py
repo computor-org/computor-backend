@@ -150,3 +150,34 @@ async def test_forwardauth_activity_restores_owner_before_deadline_bump(monkeypa
     await keepalive._extend("uowner", "vscode", 3_600_000)
     client.ensure_user_active.assert_awaited_once_with("uowner")
     client.extend_workspace_deadline.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_workspace_lookup_by_id_rejects_malformed_ids_and_maps_404():
+    from computor_backend.coder.exceptions import CoderWorkspaceNotFoundError
+
+    ws_id = "6f1c2a43-8a51-4a9e-9a52-0d1f4f7e0c11"
+    paths = []
+
+    def coder(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        if request.url.path == f"/api/v2/workspaces/{ws_id}":
+            return httpx.Response(200, json={
+                "id": ws_id, "name": "ws", "owner_id": "o", "owner_name": "uowner",
+                "template_id": "t", "template_name": "vscode-ws",
+                "latest_build": {"template_version_id": "v2"},
+            })
+        return httpx.Response(404, json={})
+
+    client = _client(httpx.MockTransport(coder))
+    try:
+        ws = await client.get_workspace_by_id(ws_id.upper())
+        assert (str(ws.id), ws.owner_name, ws.template_name) == (ws_id, "uowner", "vscode-ws")
+        with pytest.raises(CoderWorkspaceNotFoundError):
+            await client.get_workspace_by_id("../users/me")
+        with pytest.raises(CoderWorkspaceNotFoundError):
+            await client.get_workspace_by_id("00000000-0000-0000-0000-000000000000")
+    finally:
+        await client.close()
+    assert paths == [f"/api/v2/workspaces/{ws_id}",
+                     "/api/v2/workspaces/00000000-0000-0000-0000-000000000000"]

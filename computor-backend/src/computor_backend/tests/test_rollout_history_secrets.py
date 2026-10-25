@@ -42,6 +42,9 @@ class _FakeCoder:
     async def list_all_workspaces(self):
         return self.workspaces
 
+    async def get_workspace_by_id(self, workspace_id):
+        return next(w for w in self.workspaces if w.id == workspace_id)
+
     async def set_workspace_auto_update(self, workspace_id, enabled):
         return True
 

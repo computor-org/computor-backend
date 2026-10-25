@@ -464,4 +464,7 @@ if __name__ == '__main__':
     for stop_signal in (signal.SIGTERM, signal.SIGINT):
         signal.signal(stop_signal, forward_shutdown)
 
-    worker.wait()  # Wait for the worker to drain and exit
+    # Wait for the worker to drain and exit, and pass its exit code on, so a
+    # worker that quit on a fatal error (e.g. a refused token) restarts the
+    # container instead of ending it with status 0.
+    sys.exit(worker.wait())
