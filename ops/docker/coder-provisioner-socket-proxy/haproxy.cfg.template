@@ -1,0 +1,223 @@
+# Docker API allowlist for the Coder server (coder-provisioner-socket-proxy).
+#
+# Coder's provisioner runs Terraform with the kreuzwerker/docker provider
+# (ops/coder/templates/*), which reaches Docker through DOCKER_HOST. With the
+# raw socket a compromised Coder server, or anyone who can run a provisioner
+# job, is root on the host: one privileged container with / bind-mounted. This
+# file admits only the calls the provider makes for workspace create, start,
+# stop and delete (captured from Coder v2.37.3 / provider 4.6.0 against
+# Docker 29), and checks the bodies that could otherwise ask for host access:
+#
+#   HEAD/GET /_ping, GET /version, GET /info        client handshake
+#   GET  /images/json, /images/{n}/json             image lookup
+#   POST /images/create?fromImage=<registry>/...    pull, own registry only
+#   POST /volumes/create                            coder-(home|scratch)-*, local driver
+#   GET  /volumes/{n}, DELETE /volumes/coder-scratch-*
+#   GET  /containers/json, /containers/{id}/json
+#   POST /containers/create?name=coder-*            body checked, see below
+#   POST /containers/{id}/start|stop|wait, DELETE /containers/{id}
+#   POST /networks/<workspace networks>/connect, /networks/bridge/disconnect
+#
+# Exec, attach, archive upload, image build/load/import/push/tag/delete,
+# volume prune, network create, swarm, plugin, secret, session and every
+# other endpoint are refused.
+#
+# Request bodies (create, volume create, network connect/disconnect) are
+# buffered whole and matched as text. Docker decodes them with Go's
+# encoding/json, which matches keys case-insensitively, decodes \uXXXX escapes
+# and lets the last duplicate key win. The checks are therefore written so
+# that every occurrence of a key counts (deny on any match), ignore case, and
+# are made sound for the remaining decoder features by refusing them outright:
+# any byte outside printable ASCII (also closes Go's Unicode case folding of
+# K and s), any \u escape except the \u0026 \u003c \u003e \u2028 \u2029 that
+# Go's encoder itself emits (so no key or value can be spelled through
+# escapes), chunked or compressed bodies, and bodies over 32 KiB or not fully
+# received. A container create is then refused when it asks for:
+#
+#   Privileged or PublishAllPorts other than false
+#   Binds other than coder-home-*/coder-scratch-* named volumes (no host path)
+#   Mounts, VolumesFrom, Links, Devices, DeviceCgroupRules, DeviceRequests
+#   MaskedPaths/ReadonlyPaths at all (an empty list unmasks /proc)
+#   PortBindings, Sysctls, Annotations, NetworkingConfig.EndpointsConfig
+#   PidMode, IpcMode, UTSMode, UsernsMode, CgroupnsMode, Cgroup, VolumeDriver
+#   or Runtime other than empty; NetworkMode other than bridge/default/empty
+#   CapAdd beyond the templates' root set (AUDIT_WRITE CHOWN DAC_OVERRIDE
+#   FOWNER KILL SETGID SETUID); SecurityOpt other than no-new-privileges
+#   a log driver other than json-file/local
+#   an Image outside ${CODER_REGISTRY_HOST}/
+#
+# What this does NOT make safe: it is a text filter in front of the daemon,
+# not a JSON parser, so a Docker field this list does not know about (a new
+# API version) passes unchecked. Coder still starts, stops, deletes and
+# inspects any container on the host by id (inspect shows other services'
+# environment, i.e. their secrets), can attach any container to a workspace
+# network, can choose any CgroupParent/OomScoreAdj/ulimits (resource limits)
+# and keeps full control of the workspaces themselves. It is no longer
+# root-equivalent on the host through the known create options; it is not a
+# sandbox.
+global
+    log stdout format raw daemon "${LOG_LEVEL}"
+    pidfile /run/haproxy.pid
+    maxconn 256
+    server-state-file /var/lib/haproxy/server-state
+    # A request body is only checked if it fits one buffer (create bodies are
+    # ~7 KiB); bodies over 32 KiB are refused below.
+    tune.bufsize 65536
+
+defaults
+    mode http
+    log global
+    option httplog
+    option dontlognull
+    option http-server-close
+    option redispatch
+    retries 3
+    timeout http-request 10s
+    timeout queue 1m
+    timeout connect 10s
+    timeout client 10m
+    timeout server 10m
+    timeout http-keep-alive 10s
+    timeout check 10s
+    maxconn 200
+    load-server-state-from-file global
+    errorfile 400 /usr/local/etc/haproxy/errors/400.http
+    errorfile 403 /usr/local/etc/haproxy/errors/403.http
+    errorfile 408 /usr/local/etc/haproxy/errors/408.http
+    errorfile 500 /usr/local/etc/haproxy/errors/500.http
+    errorfile 502 /usr/local/etc/haproxy/errors/502.http
+    errorfile 503 /usr/local/etc/haproxy/errors/503.http
+    errorfile 504 /usr/local/etc/haproxy/errors/504.http
+
+backend dockerbackend
+    server dockersocket $SOCKET_PATH
+
+# A cold pull of a workspace image (MATLAB: many GiB) streams for a long time.
+backend dockerlong
+    timeout server 3h
+    server dockersocket $SOCKET_PATH
+
+frontend dockerfrontend
+    bind ${BIND_CONFIG}
+    timeout client 3h
+    option http-buffer-request
+
+    # No dot segments or encoded slashes: the path checks below must see the
+    # path Docker routes. HAProxy's urlp() also splits on ";", Go does not.
+    http-request deny if { path,url_dec -m sub .. }
+    http-request deny if { path -m sub -i %2f }
+    http-request deny if { query -m sub ";" }
+
+    # --- routes -------------------------------------------------------------
+    acl handshake   path,url_dec -m reg -i ^(/v[0-9.]+)?/(_ping|version|info)$
+    acl images_list path,url_dec -m reg -i ^(/v[0-9.]+)?/images/json$
+    acl image_json  path,url_dec -m reg -i ^(/v[0-9.]+)?/images/[a-z0-9_./:@-]+/json$
+    acl image_pull  path,url_dec -m reg -i ^(/v[0-9.]+)?/images/create$
+    acl vol_create  path,url_dec -m reg -i ^(/v[0-9.]+)?/volumes/create$
+    acl vol_one     path,url_dec -m reg -i ^(/v[0-9.]+)?/volumes/[a-z0-9][a-z0-9_.-]*$
+    acl vol_scratch path,url_dec -m reg -i ^(/v[0-9.]+)?/volumes/coder-scratch-[a-z0-9-]+$
+    acl ctr_list    path,url_dec -m reg -i ^(/v[0-9.]+)?/containers/json$
+    acl ctr_create  path,url_dec -m reg -i ^(/v[0-9.]+)?/containers/create$
+    acl ctr_json    path,url_dec -m reg -i ^(/v[0-9.]+)?/containers/[a-z0-9_.-]+/json$
+    acl ctr_start   path,url_dec -m reg -i ^(/v[0-9.]+)?/containers/[a-z0-9_.-]+/start$
+    acl ctr_stop    path,url_dec -m reg -i ^(/v[0-9.]+)?/containers/[a-z0-9_.-]+/(stop|wait)$
+    acl ctr_one     path,url_dec -m reg -i ^(/v[0-9.]+)?/containers/[a-z0-9_.-]+$
+    acl net_connect path,url_dec,regsub(^/v[0-9.]+/,/) -m str "/networks/${CODER_WORKSPACE_NETWORK}/connect" "/networks/${CODER_WORKSPACE_NETWORK_OFFLINE}/connect"
+    acl net_bridge  path,url_dec -m reg ^(/v[0-9.]+)?/networks/bridge/disconnect$
+
+    # --- query strings (raw, case-sensitive like Go's r.Form) ---------------
+    acl q_pull_extra  query -m reg (^|&)(?!(fromImage|tag|platform)=)
+    acl q_pull_reg    urlp(fromImage),url_dec -m beg "${CODER_REGISTRY_HOST}/"
+    acl q_pull_multi  query -m reg (^|&)fromImage=.*&fromImage=
+    acl q_create_xtra query -m reg (^|&)(?!(name|platform)=)
+    acl q_create_name urlp(name) -m reg ^coder-[a-z0-9_.-]+$
+    acl q_create_mult query -m reg (^|&)name=.*&name=
+    acl q_any         query -m len gt 0
+
+    # --- request body framing -----------------------------------------------
+    # Same paths as ctr_create, vol_create, net_connect and net_bridge (an ACL
+    # cannot reference ACLs; repeated names are ORed).
+    acl body_route  path,url_dec -m reg -i ^(/v[0-9.]+)?/(containers|volumes)/create$
+    acl body_route  path,url_dec,regsub(^/v[0-9.]+/,/) -m str "/networks/${CODER_WORKSPACE_NETWORK}/connect" "/networks/${CODER_WORKSPACE_NETWORK_OFFLINE}/connect"
+    acl body_route  path,url_dec -m reg ^(/v[0-9.]+)?/networks/bridge/disconnect$
+    acl has_body    req.hdr_val(content-length) gt 0
+    acl body_big    req.hdr_val(content-length) gt 32768
+    acl one_type    req.fhdr_cnt(content-type) eq 1
+    acl json_type   req.fhdr(content-type) -m reg -i ^application/json[[:space:]]*(;.*)?$
+    http-request deny if { req.hdr_cnt(transfer-encoding) gt 0 }
+    http-request deny if { req.hdr_cnt(content-encoding) gt 0 }
+    http-request deny if { req.hdr_cnt(content-length) gt 1 }
+    http-request deny if has_body !body_route
+    http-request deny if body_route !has_body
+    http-request deny if body_route body_big
+    http-request deny if body_route !one_type
+    http-request deny if body_route !json_type
+    http-request set-var(txn.clen) req.hdr_val(content-length) if body_route
+    http-request deny if body_route !{ req.body_len,sub(txn.clen) eq 0 }
+
+    # --- request body content (see the header for why these are sound) -----
+    acl b_bytes   req.body -m reg '[^\t\n\r\x20-\x7e]'
+    acl b_escape  req.body -m reg -i '\\u(?!00(26|3c|3e)|202[89])'
+    acl b_bool    req.body -m reg -i '"(privileged|publishallports)"\s*:\s*(?!false|null)'
+    acl b_mode    req.body -m reg -i '"(pidmode|ipcmode|utsmode|usernsmode|cgroupnsmode|cgroup|volumedriver|runtime)"\s*:\s*(?!""|null)'
+    acl b_netmode req.body -m reg -i '"networkmode"\s*:\s*(?!"(bridge|default)?"|null)'
+    acl b_list    req.body -m reg -i '"(mounts|volumesfrom|links|devices|devicecgrouprules|devicerequests|aliases|dnsnames)"\s*:\s*(?!null|\[\s*\])'
+    acl b_paths   req.body -m reg -i '"(maskedpaths|readonlypaths)"\s*:\s*(?!null)'
+    acl b_object  req.body -m reg -i '"(portbindings|sysctls|annotations|endpointsconfig|driveropts)"\s*:\s*(?!null|\{\s*\})'
+    acl b_logtype req.body -m reg -i '"type"\s*:\s*(?!"(json-file|local)?"|null)'
+    acl b_driver  req.body -m reg -i '"driver"\s*:\s*(?!"(local)?"|null)'
+    # Arrays whose every element must be allowed: null, or [ E (, E)* ] / [].
+    acl b_binds   req.body -m reg -i '"binds"\s*:\s*(?!null|\[\s*(?:"coder-(?:home|scratch)-[a-z0-9-]+:(?:[^"\\]++|\\.)*+"\s*(?:,\s*"coder-(?:home|scratch)-[a-z0-9-]+:(?:[^"\\]++|\\.)*+"\s*)*+)?\])'
+    acl b_capadd  req.body -m reg -i '"capadd"\s*:\s*(?!null|\[\s*(?:"(?:cap_)?(?:audit_write|chown|dac_override|fowner|kill|setgid|setuid)"\s*(?:,\s*"(?:cap_)?(?:audit_write|chown|dac_override|fowner|kill|setgid|setuid)"\s*)*+)?\])'
+    acl b_secopt  req.body -m reg -i '"securityopt"\s*:\s*(?!null|\[\s*(?:"no-new-privileges(?::true)?"\s*(?:,\s*"no-new-privileges(?::true)?"\s*)*+)?\])'
+    acl b_image   req.body -m reg -i '"image"\s*:\s*(?!"'"${CODER_REGISTRY_HOST}"'/)'
+    acl b_volname req.body -m reg -i '"name"\s*:\s*(?!"coder-(home|scratch)-[a-z0-9-]+")'
+
+    http-request deny if body_route b_bytes
+    http-request deny if body_route b_escape
+    http-request deny if body_route b_bool
+    http-request deny if body_route b_mode
+    http-request deny if body_route b_netmode
+    http-request deny if body_route b_list
+    http-request deny if body_route b_paths
+    http-request deny if body_route b_object
+    http-request deny if body_route b_logtype
+    http-request deny if body_route b_driver
+    http-request deny if body_route b_binds
+    http-request deny if body_route b_capadd
+    http-request deny if body_route b_secopt
+    http-request deny if ctr_create b_image
+    http-request deny if vol_create b_volname
+
+    # --- per-route query checks ---------------------------------------------
+    http-request deny if image_pull q_pull_extra
+    http-request deny if image_pull !q_pull_reg
+    http-request deny if image_pull q_pull_multi
+    http-request deny if ctr_create q_create_xtra
+    http-request deny if ctr_create !q_create_name
+    http-request deny if ctr_create q_create_mult
+    http-request deny if ctr_start q_any
+    http-request deny if vol_create q_any
+    http-request deny if net_connect q_any
+    http-request deny if net_bridge q_any
+
+    # --- allowlist ----------------------------------------------------------
+    http-request allow if handshake METH_GET
+    http-request allow if images_list METH_GET
+    http-request allow if image_json METH_GET
+    http-request allow if image_pull METH_POST
+    http-request allow if vol_create METH_POST
+    http-request allow if vol_one METH_GET
+    http-request allow if vol_scratch METH_DELETE
+    http-request allow if ctr_list METH_GET
+    http-request allow if ctr_create METH_POST
+    http-request allow if ctr_json METH_GET
+    http-request allow if ctr_start METH_POST
+    http-request allow if ctr_stop METH_POST
+    http-request allow if ctr_one METH_DELETE
+    http-request allow if net_connect METH_POST
+    http-request allow if net_bridge METH_POST
+    http-request deny
+
+    use_backend dockerlong if image_pull
+    default_backend dockerbackend

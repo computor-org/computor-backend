@@ -288,6 +288,44 @@ chown or GC requests (limited to workspace volumes and the registry).
 Without them, repairs fail with "host operations are not set up" and builds
 skip the registry garbage collection (reported in the build result).
 
+### Coder server Docker access
+
+The Coder server has no Docker socket either. Its provisioner runs the
+templates' Terraform with the kreuzwerker/docker provider, which takes
+`DOCKER_HOST=tcp://coder-provisioner-socket-proxy:2375` from the container
+environment (the templates leave `docker_socket` empty). The proxy sits on the
+internal `coder-provisioner-docker` network, shared only with `coder`, and
+`ops/docker/coder-provisioner-socket-proxy/haproxy.cfg.template` admits the
+calls the provider makes for workspace create, start, stop and delete: image
+lookup and pull from `CODER_REGISTRY_HOST/` only, `coder-home-*`/
+`coder-scratch-*` volume create (local driver, no options) and scratch volume
+delete, container create/inspect/start/stop/wait/delete, connect to the two
+workspace networks and disconnect from the default bridge. Exec, attach,
+archive upload, container update, builds, image push/tag/delete and network
+create are refused.
+
+Container create bodies are checked as text, case-insensitively and on every
+occurrence of a key: `Privileged` and `PublishAllPorts` must be false, `Binds`
+may only name `coder-home-*`/`coder-scratch-*` volumes, `Mounts`, `VolumesFrom`,
+`Devices`, device rules and requests, `PortBindings`, `Sysctls`, `Links` and
+endpoint configs must be empty, `MaskedPaths`/`ReadonlyPaths` absent, host or
+container namespace modes, `VolumeDriver` and `Runtime` unset, `NetworkMode`
+the default bridge, `CapAdd` within the templates' root set, `SecurityOpt` only
+`no-new-privileges`, the log driver json-file or local and the image under
+`CODER_REGISTRY_HOST/`. Bodies with non-ASCII bytes, `\u` escapes other than
+those Go's encoder emits, chunked or compressed framing or over 32 KiB are
+refused, so Go's decoder cannot see a key the filter missed.
+
+This removes the known ways to root on the host through Coder; it is not a
+sandbox. A field Docker adds in a future API version passes unchecked until it
+is listed. Coder can still stop, start, delete and inspect any container on
+the host (inspect shows other containers' environment), connect any container
+to a workspace network, choose resource settings such as `CgroupParent` and
+`OomScoreAdj`, and it keeps full control of the workspaces. When a template
+needs another Docker field or call, the proxy log shows a 403 for it; add it
+to the template together with a probe in
+`ops/tests/test_coder_provisioner_socket_proxy.sh` (run in CI).
+
 ### Execution-side privileges
 
 The services that run next to untrusted workspaces hold as little as they can
@@ -298,7 +336,7 @@ The services that run next to untrusted workspaces hold as little as they can
 |---|---|---|---|
 | `temporal-worker-coder` | 1000 | none | read-only, `/tmp` tmpfs (`CODER_WORKER_TMP_SIZE`, 1g) |
 | `workspace-ingress` | 65534 | none | read-only |
-| `coder-socket-proxy`, `coder-worker-socket-proxy` | 0 (owns the socket) | none | writable (the entrypoint renders haproxy.cfg) |
+| `coder-socket-proxy`, `coder-worker-socket-proxy`, `coder-provisioner-socket-proxy` | 0 (owns the socket) | none | writable (the entrypoint renders haproxy.cfg) |
 | `temporal-worker-testing` | 23100 | none | writable (startup installs, example cache) |
 
 All of them also set `no-new-privileges`.

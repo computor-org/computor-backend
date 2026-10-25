@@ -1,4 +1,4 @@
-"""temporal-worker-coder reaches Docker only through its allowlist proxy.
+"""Coder and temporal-worker-coder reach Docker only through allowlist proxies.
 
 Renders ops/docker (base + prod + coder, and the split worker-host overlay)
 with `docker compose config`. Skipped without the docker CLI.
@@ -82,3 +82,51 @@ def test_allowlist_has_no_container_or_exec_route():
     for section in ("containers", "exec", "networks", "plugins", "swarm", "session", "grpc"):
         assert f"/{section}" not in joined
     assert "env(" not in joined  # not switchable by the upstream env flags
+
+
+def test_coder_server_has_no_docker_socket(config):
+    coder = config["services"]["coder"]
+    assert not any("docker.sock" in (v.get("source") or "") for v in coder["volumes"])
+    assert "group_add" not in coder
+    assert coder["environment"]["DOCKER_HOST"] == "tcp://coder-provisioner-socket-proxy:2375"
+    assert "coder-provisioner-socket-proxy" in coder["depends_on"]
+    assert "coder-provisioner-docker" in coder["networks"]
+
+
+def test_provisioner_proxy_uses_the_allowlist_and_is_private(config):
+    proxy = config["services"]["coder-provisioner-socket-proxy"]
+    targets = {v["target"]: v for v in proxy["volumes"]}
+    assert targets["/var/run/docker.sock"]["read_only"] is True
+    template = targets["/usr/local/etc/haproxy/haproxy.cfg.template"]
+    assert template["source"].endswith(
+        "ops/docker/coder-provisioner-socket-proxy/haproxy.cfg.template")
+    assert list(proxy["networks"]) == ["coder-provisioner-docker"]
+    assert config["networks"]["coder-provisioner-docker"]["internal"] is True
+    assert "ports" not in proxy
+    # Only coder shares the proxy's network.
+    on_net = [name for name, svc in config["services"].items()
+              if "coder-provisioner-docker" in (svc.get("networks") or {})]
+    assert sorted(on_net) == ["coder", "coder-provisioner-socket-proxy"]
+    # Pulls only from the registry the worker pushes to; connects only to the
+    # networks the compose stack gives workspaces.
+    worker = config["services"]["temporal-worker-coder"]
+    assert proxy["environment"]["CODER_REGISTRY_HOST"] == worker["environment"]["CODER_REGISTRY_HOST"]
+    nets = config["networks"]
+    assert proxy["environment"]["CODER_WORKSPACE_NETWORK"] == nets["computor-coder-workspaces"]["name"]
+    assert (proxy["environment"]["CODER_WORKSPACE_NETWORK_OFFLINE"]
+            == nets["computor-coder-workspaces-offline"]["name"])
+
+
+def test_provisioner_allowlist_has_no_exec_or_build_route():
+    path = os.path.join(COMPOSE_DIR, "coder-provisioner-socket-proxy", "haproxy.cfg.template")
+    rules = [
+        line.strip() for line in open(path, encoding="utf-8")
+        if line.strip().startswith(("acl ", "http-request"))
+    ]
+    assert rules[-1] == "http-request deny"  # default deny
+    joined = "\n".join(rules)
+    for section in ("exec", "attach", "archive", "update", "build", "plugins", "swarm",
+                    "session", "grpc", "secrets", "commit"):
+        assert section not in joined, section
+    assert "env(" not in joined  # not switchable by the upstream env flags
+    assert "option http-buffer-request" in open(path, encoding="utf-8").read()

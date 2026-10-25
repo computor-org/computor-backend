@@ -152,6 +152,7 @@ services:
       - computor-network
       - computor-coder-workspaces
       - computor-coder-workspaces-offline
+      - coder-provisioner-docker
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder
     restart: unless-stopped
     security_opt:
@@ -173,10 +174,11 @@ services:
       CODER_DISABLE_PASSWORD_AUTH: ${CODER_DISABLE_PASSWORD_AUTH:-false}
       CODER_DISABLE_SESSION_EXPIRY_REFRESH: ${CODER_DISABLE_SESSION_EXPIRY_REFRESH:-false}
       CODER_TELEMETRY_ENABLE: ${CODER_TELEMETRY_ENABLE:-false}
-    group_add:
-      - "${DOCKER_GID}"
+      # No Docker socket: the provisioner's Terraform docker provider reads
+      # DOCKER_HOST (the templates leave their docker_socket variable empty),
+      # and the proxy admits only the workspace lifecycle.
+      DOCKER_HOST: tcp://coder-provisioner-socket-proxy:2375
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - ${SYSTEM_DEPLOYMENT_PATH}/coder/home:/home/coder
       - ${SYSTEM_DEPLOYMENT_PATH}/coder/templates:/templates
     depends_on:
@@ -184,6 +186,8 @@ services:
         condition: service_healthy
       coder-registry:
         condition: service_healthy
+      coder-provisioner-socket-proxy:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7080/api/v2/buildinfo"]
       interval: 5s
@@ -224,6 +228,44 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # Docker API for the Coder server's provisioner (Terraform kreuzwerker/docker
+  # provider): method + path allowlist for the workspace lifecycle (pull from
+  # the local registry, volume and container create/start/stop/delete, network
+  # connect to the workspace networks), with container create bodies checked
+  # for privileged mode, host binds and mounts, host namespaces, extra
+  # capabilities, devices and foreign images. Without it Coder held the raw
+  # socket and was root on the host. Rules and limits are in
+  # haproxy.cfg.template; reachable only on the internal
+  # coder-provisioner-docker network.
+  coder-provisioner-socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0@sha256:9e4b9e7517a6b660f2cc903a19b257b1852d5b3344794e3ea334ff00ae677ac2
+    container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-provisioner-socket-proxy
+    networks:
+      - coder-provisioner-docker
+    restart: unless-stopped
+    # As coder-socket-proxy: uid 0 owns the socket, no capability is needed.
+    cap_drop:
+      - ALL
+    security_opt:
+      - "no-new-privileges:true"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    volumes:
+      - ${DOCKER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock:ro
+      - ./coder-provisioner-socket-proxy/haproxy.cfg.template:/usr/local/etc/haproxy/haproxy.cfg.template:ro
+    environment:
+      # Workspace images are pulled from this registry only; it must equal
+      # the registry the templates' workspace_image points at.
+      CODER_REGISTRY_HOST: localhost:5000
+      # The only networks a workspace container may be connected to.
+      CODER_WORKSPACE_NETWORK: ${CODER_WORKSPACE_NETWORK:-computor-coder-workspaces}
+      CODER_WORKSPACE_NETWORK_OFFLINE: ${CODER_WORKSPACE_NETWORK_OFFLINE:-computor-coder-workspaces-offline}
+    labels:
+      - "traefik.enable=false"
 
   # Docker API for temporal-worker-coder: a fixed method+path allowlist (build,
   # image tag/push/inspect/untag, distribution inspect, volume inspect/delete,
@@ -338,6 +380,10 @@ services:
         condition: service_started
 
 networks:
+  # coder <-> coder-provisioner-socket-proxy only, internal like the next one.
+  coder-provisioner-docker:
+    internal: true
+
   # temporal-worker-coder <-> coder-worker-socket-proxy only. Internal: the
   # proxy needs no egress, and no other service can reach the Docker API.
   coder-worker-docker:
