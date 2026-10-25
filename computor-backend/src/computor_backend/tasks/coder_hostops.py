@@ -52,14 +52,15 @@ def available() -> bool:
 
 
 def parse_result(text: str) -> Dict[str, object]:
-    """Parse the host's answer; ``removed`` may repeat, every other key once."""
-    values: Dict[str, object] = {"removed": []}
+    """Parse the host's answer; ``removed`` and ``volume`` may repeat, every
+    other key once."""
+    values: Dict[str, object] = {"removed": [], "volume": []}
     for line in text.splitlines():
         if "=" not in line:
             continue
         key, value = line.split("=", 1)
-        if key == "removed":
-            values["removed"].append(value)  # type: ignore[union-attr]
+        if key in ("removed", "volume"):
+            values[key].append(value)  # type: ignore[union-attr]
         else:
             values[key] = value
     return values

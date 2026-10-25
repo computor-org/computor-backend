@@ -12,6 +12,10 @@ RequiresMountsFor=/var/lib/docker-ws
 
 [Service]
 Type=notify
+# Direct I/O on the data-root's loop device: without it the backing file's
+# page cache is charged to whichever container writes, and a large write
+# OOM-kills it (seen in rehearsal). The mount unit cannot set it.
+ExecStartPre=/bin/sh -c 'losetup --direct-io=on "$$(findmnt -n -o SOURCE --mountpoint /var/lib/docker-ws)"'
 ExecStart=/usr/bin/dockerd --config-file /etc/docker/daemon-ws.json --containerd=/run/containerd/containerd.sock
 # Socket directory survives daemon restarts, so bind mounts of it stay valid.
 RuntimeDirectory=computor-ws-docker

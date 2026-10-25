@@ -12,7 +12,7 @@ the main daemon that runs grading workers, the registry, Postgres and Coder.
   (`CODER_WORKSPACE_DOCKER_MOUNT=/run/computor-ws-docker`,
   `CODER_WORKSPACE_DOCKER_SOCKET=/var/run/workspace-docker/docker.sock`).
 - **Data-root:** a sparse XFS image (`/var/lib/computor-ws/dataroot.img`,
-  `prjquota`, loop with direct I/O) bounds all workspace images and layers and
+  `prjquota`, loop with direct I/O set by `dockerd-ws.service`) bounds all workspace images and layers and
   lets overlay2 enforce `storage_size` per container. No `nodev` on it:
   overlay2's quota probe needs a device node there.
 - **Homes:** `computor-ws-homes.py` is a Docker volume plugin (driver
@@ -23,6 +23,27 @@ the main daemon that runs grading workers, the registry, Postgres and Coder.
   the host when a container needs it. Default 5G (`/etc/default/computor-ws-homes`,
   per-volume sizes in `/etc/computor/ws-home-sizes`, grow with
   `computor-ws-home-grow`). Home volumes cannot be removed through Docker.
+- **Fail closed:** if the plugin is unreachable, Docker would create an
+  unknown `coder-home-*` as an unlimited local volume. `install.sh` makes the
+  daemon's local-volume directory (`<DockerRootDir>/volumes`) immutable
+  (`chattr +i`), so any local volume create fails with EPERM and the
+  workspace does not start (verified 2026-10-25 with the plugin socket
+  removed). `dockerd-ws` also `Requires=` the plugin service.
+- **Admin operations:** the coder worker lists and deletes these homes
+  through `ops/coder/hostops` (`list-volumes`, `delete-volume`;
+  worker env `CODER_WORKSPACE_VOLUMES_HOSTOPS=true`), and the ownership
+  repair (`chown-volume`) runs on this daemon, all with
+  `COMPUTOR_WORKSPACE_DOCKER=unix:///run/computor-ws-docker/docker.sock` in
+  `/etc/default/computor-coder-hostops`. The home watchdog runs against this
+  daemon with `DOCKER_HOST` set in `/etc/default/computor-home-watchdog`
+  (homes and rootfs have hard sizes, so it is a second line only; keep
+  `COMPUTOR_LAYER_LIMIT_GIB` above `CODER_WORKSPACE_ROOTFS_SIZE`).
+- **Disk bound (sparse images):** the images allocate on write, so the host
+  disk is shared, not reserved. Worst case on the host filesystem of
+  `/var/lib/computor-ws` = data-root size + sum of all home and scratch image
+  sizes (2026-10-25: 120G + 17 x 5G = 205G against ~300G free). The
+  computor-infra sentinel alerts when the host's free space is below the
+  images' remaining growth (overcommit) or a disk passes 85%.
 - **Network:** `docker-compose.workspace-daemon.yaml` (project `computor-ws`)
   creates the workspace networks on this daemon (172.30.0.0/20 online,
   172.30.16.0/20 internal) and runs the workspace ingress there with its own

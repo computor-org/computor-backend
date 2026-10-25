@@ -360,6 +360,10 @@ services:
       CODER_ADMIN_EMAIL: ${CODER_ADMIN_EMAIL}
       CODER_ADMIN_PASSWORD: ${CODER_ADMIN_PASSWORD}
       CODER_TEMPLATES_DIR: /templates
+      # true on the computor.at worker (workspace daemon, ops/coder/ws-daemon):
+      # list/delete workspace volumes through the host operations, which see
+      # the image-backed homes; set COMPUTOR_WORKSPACE_DOCKER for hostops too.
+      CODER_WORKSPACE_VOLUMES_HOSTOPS: ${CODER_WORKSPACE_VOLUMES_HOSTOPS:-false}
       # localhost:5000 (not coder-registry:5000): the worker calls the host
       # docker daemon via the proxy, so this name is resolved from the daemon's
       # perspective. localhost:5000 reaches the registry's port binding and is

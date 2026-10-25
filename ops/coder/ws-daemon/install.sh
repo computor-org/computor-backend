@@ -40,3 +40,11 @@ systemctl daemon-reload
 systemctl enable --now 'var-lib-docker\x2dws.mount' computor-ws-homes.service dockerd-ws.service
 for i in $(seq 30); do docker -H unix:///run/computor-ws-docker/docker.sock info >/dev/null 2>&1 && break; sleep 1; done
 docker -H unix:///run/computor-ws-docker/docker.sock info --format 'workspace daemon: {{.ServerVersion}} {{.Driver}} {{.DockerRootDir}} {{.SecurityOptions}}'
+# Fail closed: if the volume plugin is unreachable, Docker would silently
+# create coder-home-*/coder-scratch-* as unlimited local volumes. An immutable
+# local-volume directory makes every local volume create fail (EPERM) instead.
+# The workspace daemon needs no local volumes (the compose project has none,
+# the workspace images declare no VOLUME).
+root=$(docker -H unix:///run/computor-ws-docker/docker.sock info --format '{{.DockerRootDir}}')
+chattr +i "$root/volumes"
+lsattr -d "$root/volumes"
