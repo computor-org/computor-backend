@@ -104,7 +104,7 @@ function json(route: Route, body: unknown, status = 200) {
   return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 }
 
-async function signIn(page: Page, { contents = CONTENTS, roles = ['_student'], systemRoles = [], workspace = false, workspaceState = 'running' }: { contents?: Row[]; roles?: string[]; systemRoles?: string[]; workspace?: boolean; workspaceState?: 'running' | 'stopped' | 'missing' } = {}) {
+async function signIn(page: Page, { contents = CONTENTS, roles = ['_student'], systemRoles = [], workspace = false, workspaceState = 'running', selfEnrolled = false }: { contents?: Row[]; roles?: string[]; systemRoles?: string[]; workspace?: boolean; workspaceState?: 'running' | 'stopped' | 'missing'; selfEnrolled?: boolean } = {}) {
   const requested: string[] = [];
   await page.addInitScript((systemRoles) => {
     sessionStorage.setItem('auth_user', JSON.stringify({
@@ -144,7 +144,9 @@ async function signIn(page: Page, { contents = CONTENTS, roles = ['_student'], s
       workspace: OWN_WORKSPACE, status: state, access_url: state === 'running' ? EDITOR : null,
       code_server_url: state === 'running' ? EDITOR : null, ready: state === 'running', agent_lifecycle: 'ready', resources: {},
     });
-    if (path === `/user/courses/${COURSE_ID}/self-enrollment`) return json(route, { detail: 'Not found' }, 404);
+    if (path === `/user/courses/${COURSE_ID}/self-enrollment`) {
+      return json(route, { course_id: COURSE_ID, self_registered: selfEnrolled, can_leave: selfEnrolled });
+    }
     if (path === `/user/courses/${COURSE_ID}/repository`) return json(route, { detail: 'Not found' }, 404);
     if (path === `/user/courses/${COURSE_ID}/git`) return json(route, { configured: false });
     if (path === `/courses/${COURSE_ID}`) return json(route, COURSE);
@@ -483,6 +485,21 @@ test('a missing legacy exercise cannot provision a workspace', async ({ page }) 
   await expect(page.getByRole('main').getByText('Not found', { exact: true })).toBeVisible();
   expect(requested).not.toContain('/coder/workspaces/provision');
 });
+
+for (const selfEnrolled of [false, true]) {
+  test(`an ungraded submission ${selfEnrolled ? 'in a course without tutors does not promise a review' : 'waits for a tutor'}`, async ({ page }) => {
+    await signIn(page, { selfEnrolled });
+    await page.goto(`/courses/${COURSE_ID}/student/assignments/a-week1.constants?view=results`);
+    if (selfEnrolled) {
+      await expect(page.getByText('Submitted.', { exact: true })).toBeVisible();
+      await expect(page.getByText('This course has no tutors who review submissions. The test results are your feedback.')).toBeVisible();
+      await expect(page.getByText(/waiting for a tutor/)).toHaveCount(0);
+    } else {
+      await expect(page.getByText('Not reviewed yet.', { exact: true })).toBeVisible();
+      await expect(page.getByText('Your submission is waiting for a tutor to look at it.')).toBeVisible();
+    }
+  });
+}
 
 test('an actual zero result remains accessible without the exercise reader', async ({ page }) => {
   await signIn(page, { contents: EXACT_CONTENTS, workspace: true });
