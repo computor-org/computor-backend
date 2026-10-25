@@ -238,6 +238,8 @@ export default function CoursePage() {
   const canManageMembers = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
   // Progress is the learner's own: a tutor or lecturer has no submissions here.
   const isLearner = courseHasAtLeast(courseId, '_student') && !courseHasAtLeast(courseId, '_tutor');
+  // Any course role at all, without the admin bypass of courseHasAtLeast.
+  const isMember = courseRole(courseId) != null;
   const isOrdinaryLearner = !isAdmin && !isOrganizationManager && isLearner;
 
   const { data, loading, error, reload } = useResource(
@@ -250,18 +252,23 @@ export default function CoursePage() {
         canManageMembers
           ? coursesClient.getCourseGitBindingEndpointCoursesCourseIdGitGet({ courseId }).catch(() => null)
           : Promise.resolve(null),
-        // The caller's own repository. 404s (→ null) when they aren't a member.
-        userClient.getStudentRepositoryEndpointUserCoursesCourseIdRepositoryGet({ courseId }).catch(() => null),
+        // The caller's own repository and enrolment exist only for members;
+        // asking for them as a non-member (an admin browsing a course) is a
+        // 404 in the console on every visit, so skip both.
+        isMember
+          ? userClient.getStudentRepositoryEndpointUserCoursesCourseIdRepositoryGet({ courseId }).catch(() => null)
+          : Promise.resolve(null),
         // Whether this course provisions git at all — drives the repo section
         // (everyone), so a non-git course never shows the provision button.
         userClient.getCourseGitDescriptorEndpointUserCoursesCourseIdGitGet({ courseId }).catch(() => null),
         // Whether the caller joined through the catalog (help block, leave).
-        // 404s (→ null) when they aren't a member.
-        userClient.getOwnSelfEnrollmentUserCoursesCourseIdSelfEnrollmentGet({ courseId }).catch(() => null),
+        isMember
+          ? userClient.getOwnSelfEnrollmentUserCoursesCourseIdSelfEnrollmentGet({ courseId }).catch(() => null)
+          : Promise.resolve(null),
       ]);
       return { course, organization, courseFamily, gitBinding, myRepo, gitDescriptor, selfEnrollment };
     },
-    [courseId, canManageMembers],
+    [courseId, canManageMembers, isMember],
   );
   const course = data?.course ?? null;
   const organization = data?.organization ?? null;
