@@ -144,14 +144,22 @@ def configure(base, realm, token, secret, apply=True, backup=None, cost=10000, t
     listeners = list(settings.get('eventsListeners') or [])
     if 'computor-registration-activity' not in listeners:
         listeners.append('computor-registration-activity')
+    # A realm PUT replaces the whole attribute map, and the client and offline
+    # session timeouts among others live there, so the lifespan is merged
+    # into the attributes the realm already has instead of sent alone.
+    attributes = {**(settings.get('attributes') or {}),
+                  VERIFY_EMAIL_LIFESPAN_ATTRIBUTE: str(VERIFY_EMAIL_LIFESPAN)}
     kc.request('PUT', '', {'registrationFlow': REGISTRATION, 'resetCredentialsFlow': RESET,
-                          'eventsListeners': listeners,
-                          'attributes': {VERIFY_EMAIL_LIFESPAN_ATTRIBUTE: str(VERIFY_EMAIL_LIFESPAN)}})
+                          'eventsListeners': listeners, 'attributes': attributes})
     stored = kc.request('GET', '')
     if stored.get('registrationFlow') != REGISTRATION or stored.get('resetCredentialsFlow') != RESET:
         raise RuntimeError('Protected flow bindings did not persist')
-    if (stored.get('attributes') or {}).get(VERIFY_EMAIL_LIFESPAN_ATTRIBUTE) != str(VERIFY_EMAIL_LIFESPAN):
+    stored_attributes = stored.get('attributes') or {}
+    if stored_attributes.get(VERIFY_EMAIL_LIFESPAN_ATTRIBUTE) != str(VERIFY_EMAIL_LIFESPAN):
         raise RuntimeError('Verification link lifespan did not persist')
+    lost = sorted(key for key, value in attributes.items() if stored_attributes.get(key) != value)
+    if lost:
+        raise RuntimeError('Realm attributes did not survive the update: ' + ', '.join(lost))
     return result
 
 
