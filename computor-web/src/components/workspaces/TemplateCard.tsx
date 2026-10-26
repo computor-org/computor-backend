@@ -100,11 +100,10 @@ export default function TemplateCard({
 }
 
 /**
- * Compact variant for the course cards, where a row of types has to fit under
- * a title: the type's icon with a short "In VS Code öffnen" label. It used to
- * be the icon alone, which named its action only in a tooltip. No room for a
- * stage bar, so the state goes in the tooltip, but an unusable type is still
- * visibly out of reach rather than a click that fails.
+ * Icon-only variant for the course cards, where a row of types has to fit
+ * under a title. No room for a stage bar, so the state goes in the tooltip —
+ * but an unusable type is still visibly out of reach rather than a click that
+ * fails.
  */
 export function TemplateIconButton({
   option,
@@ -122,25 +121,24 @@ export function TemplateIconButton({
   const usable = isUsable(option);
   const label = templateLabel(option);
   const state = availabilityLabel(option, de ? 'de' : 'en');
-  const launch = de ? `In ${label} öffnen` : `Open in ${label}`;
+  const launch = de ? `${label} starten` : `Launch ${label}`;
 
   return (
     <button
       type="button"
       disabled={!usable || busy}
-      title={usable ? undefined : `${label} — ${state}`}
-      aria-label={usable ? undefined : `${label} — ${state}`}
+      title={usable ? launch : `${label} — ${state}`}
+      aria-label={usable ? (de ? `Arbeitsumgebung ${label} starten` : `Launch ${label} workspace`) : `${label} — ${state}`}
       onClick={(event) => {
         // The course card wraps this row in a link; keep the click local.
         event.stopPropagation();
         onClick?.();
       }}
-      className={`inline-flex items-center gap-2 rounded-lg border border-rule bg-surface pr-3 text-sm font-medium text-fg transition-opacity ${
-        usable ? 'hover:bg-canvas' : 'cursor-not-allowed opacity-40 grayscale'
+      className={`rounded-lg transition-opacity ${
+        usable ? 'hover:opacity-75' : 'cursor-not-allowed opacity-40 grayscale'
       } ${busy ? 'animate-pulse' : ''} ${dimmed && usable ? 'opacity-50' : ''}`}
     >
       <TemplateIcon template={{ icon: option.icon, name: option.name }} size="sm" />
-      <span>{usable ? launch : label}</span>
     </button>
   );
 }

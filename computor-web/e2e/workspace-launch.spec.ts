@@ -601,7 +601,7 @@ test('the compact course-card launcher reuses the running workspace without prov
   ], { courseWorkspaces: true });
   await page.goto('/courses');
   const popup = page.waitForEvent('popup');
-  await page.getByRole('button', { name: 'Open in VS Code' }).first().click();
+  await page.getByRole('button', { name: 'Launch VS Code workspace' }).first().click();
   const launchTab = await popup;
   await launchTab.waitForURL(COURSE_WORKSPACE_URL);
   expect(page.url()).toMatch(/\/courses$/);
@@ -650,7 +650,9 @@ test('the dashboard offers a stopped workspace with a labelled start action', as
   const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Your workspaces' }) });
   await expect(section.getByText('VS Code', { exact: true })).toBeVisible();
   await expect(section.getByText('Stopped')).toBeVisible();
-  await expect(section.getByText(/^Version of \d{1,2} Oct 2026, \d{2}:\d{2}$/)).toBeVisible();
+  // The version date is in the status chip's tooltip, not a line of its own.
+  await expect(section.getByTitle(/· Version of \d{1,2} Oct 2026, \d{2}:\d{2}$/)).toBeVisible();
+  await expect(section.getByText(/Version of/)).toHaveCount(0);
 
   await section.getByRole('combobox', { name: 'Choose a course' }).selectOption(COURSE_A);
   const popup = page.waitForEvent('popup');
@@ -864,8 +866,8 @@ test('a never-enrolled learner without a workspace gets a first welcome in Engli
 });
 
 for (const [locale, event, stopped, running, start, open, courseLaunch] of [
-  ['en-US', 'focus', 'Stopped', 'Running', 'Start and open', 'Open', 'Open in VS Code'],
-  ['de-DE', 'visibilitychange', 'Gestoppt', 'Läuft', 'Starten und öffnen', 'Öffnen', 'In VS Code öffnen'],
+  ['en-US', 'focus', 'Stopped', 'Running', 'Start and open', 'Open', 'Launch VS Code workspace'],
+  ['de-DE', 'visibilitychange', 'Gestoppt', 'Läuft', 'Starten und öffnen', 'Öffnen', 'Arbeitsumgebung VS Code starten'],
 ] as const) {
   test.describe(`dashboard workspace return refresh ${locale}`, () => {
     test.use({ locale });
@@ -913,19 +915,18 @@ for (const locale of ['de-DE', 'en-US']) {
   test.describe(`course continuation permissions ${locale}`, () => {
     test.use({ locale, viewport: { width: locale === 'de-DE' ? 390 : 1440, height: 900 } });
     for (const persona of [
-      { name: 'learner', courseRoles: ['_student'], systemRoles: [], continues: true },
-      { name: 'tutor', courseRoles: ['_student', '_tutor'], systemRoles: [], continues: false },
-      { name: 'teacher', courseRoles: ['_lecturer'], systemRoles: [], continues: false },
-      { name: 'admin enrolled as learner', courseRoles: ['_student'], systemRoles: ['_admin'], continues: false },
-      { name: 'organization manager enrolled as learner', courseRoles: ['_student'], systemRoles: ['_organization_manager'], continues: false },
-      { name: 'member without course permissions', courseRoles: [], systemRoles: [], continues: false },
+      { name: 'learner', courseRoles: ['_student'], systemRoles: [], screenshot: true },
+      { name: 'tutor', courseRoles: ['_student', '_tutor'], systemRoles: [], screenshot: false },
+      { name: 'teacher', courseRoles: ['_lecturer'], systemRoles: [], screenshot: false },
+      { name: 'admin enrolled as learner', courseRoles: ['_student'], systemRoles: ['_admin'], screenshot: false },
+      { name: 'organization manager enrolled as learner', courseRoles: ['_student'], systemRoles: ['_organization_manager'], screenshot: false },
+      { name: 'member without course permissions', courseRoles: [], systemRoles: [], screenshot: false },
     ]) {
       test(`existing course links keep the right destination for ${persona.name}`, async ({ page }, testInfo) => {
         await setup(page, [details({ status: 'stopped' })], { courseWorkspaces: true, ...persona });
-        const destination = `/courses/${COURSE_A}${persona.continues ? '/student/assignments' : ''}`;
-        const label = persona.continues
-          ? (locale === 'de-DE' ? 'Weiterlernen' : 'Continue')
-          : (locale === 'de-DE' ? 'Kurs ansehen' : 'View Course');
+        // Every role lands on the course overview, as on main.
+        const destination = `/courses/${COURSE_A}`;
+        const label = locale === 'de-DE' ? 'Kurs ansehen' : 'View Course';
         for (const surface of ['/dashboard', '/courses']) {
           await page.goto(surface);
           const title = page.getByRole('link', { name: /^Course A(?:\s|$)/ });
@@ -938,7 +939,7 @@ for (const locale of ['de-DE', 'en-US']) {
           await expect(title).toHaveAttribute('href', destination);
           const card = title.locator('..');
           await expect(card.getByRole('link', { name: label, exact: true })).toHaveAttribute('href', destination);
-          if (persona.continues) {
+          if (persona.screenshot) {
             await card.getByRole('link', { name: label, exact: true }).scrollIntoViewIfNeeded();
             await page.screenshot({ path: testInfo.outputPath(`continue-${locale}-${surface.slice(1)}.png`) });
           }
@@ -970,13 +971,13 @@ for (const locale of ['de-DE', 'en-US']) {
       const callback = new URL(login.searchParams.get('redirect_uri')!);
       expect(callback.origin).toBe(new URL(baseURL!).origin);
       expect(callback.pathname).toBe('/auth/success');
-      await expect(page.getByRole('link', { name: locale === 'de-DE' ? 'Weiterlernen' : 'Continue', exact: true })).toHaveCount(0);
+      await expect(page.getByRole('link', { name: locale === 'de-DE' ? 'Kurs ansehen' : 'View Course', exact: true })).toHaveCount(0);
     });
   });
 }
 
 
-test('catalog cards keep plain titles and joining while enrolled learners continue to assignments', async ({ page }) => {
+test('catalog cards keep plain titles and joining while enrolled learners open the course overview', async ({ page }) => {
   await setup(page, [details({ status: 'stopped' })]);
   await page.route(`${API_ORIGIN}/courses/public**`, (route) => json(route, [
     { id: COURSE_A, title: 'Course A', enrolled: false },
@@ -987,7 +988,7 @@ test('catalog cards keep plain titles and joining while enrolled learners contin
   await expect(page.getByRole('heading', { name: 'Course B', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: /^Course [AB](?:\s|$)/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Join course', exact: true })).toHaveCount(1);
-  await expect(page.getByRole('link', { name: 'Continue', exact: true })).toHaveAttribute('href', `/courses/${COURSE_B}/student/assignments`);
+  await expect(page.getByRole('link', { name: 'Open course', exact: true })).toHaveAttribute('href', `/courses/${COURSE_B}`);
 });
 
 
@@ -1086,7 +1087,7 @@ for (const language of ['de', 'en'] as const) {
       ? 'Deine Auswahl konnte in deiner Arbeitsumgebung nicht geöffnet werden. Versuch es noch einmal.'
       : 'Your selection could not be opened in your workspace. Please retry.', { exact: true })).toBeVisible();
     await expect(page.getByText(/PRIVATE_INTERNAL_ERROR_PATH/)).toHaveCount(0);
-    await page.getByRole('button', { name: language === 'de' ? 'In VS Code öffnen' : 'Open in VS Code', exact: true }).first().click();
+    await page.getByRole('button', { name: language === 'de' ? 'Arbeitsumgebung VS Code starten' : 'Launch VS Code workspace', exact: true }).first().click();
     await expect.poll(() => launchRequests.length).toBe(4);
     expect(launchRequests[3].course_content_id).toBeUndefined();
     await expect(page.getByText(/PRIVATE_INTERNAL_ERROR_PATH/)).toHaveCount(0);
@@ -1247,7 +1248,7 @@ for (const isolation of ['user', 'template', 'workspace'] as const) {
       await portal.getByRole('combobox', { name: 'Choose a course' }).selectOption(COURSE_A);
       await portal.getByRole('button', { name: 'Open', exact: true }).click();
     } else {
-      await portal.getByRole('button', { name: `Open in ${workspace.template_display_name}`, exact: true }).first().click();
+      await portal.getByRole('button', { name: `Launch ${workspace.template_display_name} workspace`, exact: true }).first().click();
     }
     const other = await popup;
     await other.waitForURL(otherUrl);
@@ -1287,8 +1288,8 @@ test('an unmounted named launch cannot provision after its delayed workspace loo
   await page.getByRole('link', { name: /Exercise A/ }).click();
   const waiter = await popup;
   await expect.poll(() => lookups).toBeGreaterThan(0);
-  await page.getByRole('link', { name: 'Continue', exact: true }).first().click();
-  await page.waitForURL(`**/courses/${COURSE_A}/student/assignments`);
+  await page.getByRole('link', { name: 'View Course', exact: true }).first().click();
+  await page.waitForURL(`**/courses/${COURSE_A}`);
   release();
   // Let the held response and any request it causes settle after the real
   // client-side route change, which retains the original async JavaScript.
