@@ -1,10 +1,16 @@
 # Terms of Use computor.at
 
-Version 1.5, dated 25 October 2026
+Version 1.6, valid from {{TERMS_EFFECTIVE_FROM}}
 
-This version applies to new usage contracts. Existing contracts keep their terms
-until validly changed;
-[version 1.4](https://github.com/computor-org/computor-backend/blob/3b91ebda6ceb22783aa3350a95e4a34d9662462e/computor-web/content/legal/terms_en.md) remains available and links to version 1.3. The German version is authoritative.
+This version applies to new usage contracts from its publication. For existing
+contracts under an earlier version it replaces that version from
+{{TERMS_EFFECTIVE_FROM}}, after notice under its change rule (section 11 of
+versions 1.0 to 1.3). [What changes](/terms/en/changes) · Earlier versions:
+[1.0](https://github.com/computor-org/computor-backend/blob/54ea77021304f1bd77ef4bf7c5712b5edfb6843f/computor-web/content/legal/terms_en.md),
+[1.1](https://github.com/computor-org/computor-backend/blob/93a7c2cde0d11186b2dbcd167ebabc851c882496/computor-web/content/legal/terms_en.md),
+[1.2](https://github.com/computor-org/computor-backend/blob/f166ccf38e58c03e6e0c9c6d68448f5127ed28a4/computor-web/content/legal/terms_en.md),
+[1.5](https://github.com/computor-org/computor-backend/blob/bcbe73611c806a67c7183efb7a717a9a386b5233/computor-web/content/legal/terms_en.md).
+The German version is authoritative.
 
 ## 1. Provider, account and free service
 
@@ -26,43 +32,40 @@ them. Each person may have only one non-transferable account. Protect your
 password and email account and report suspected unauthorised access immediately
 to security@computor.at.
 
-## 2. Learning, workspaces and additional tools
+## 2. Services
 
-Computor offers courses and programming exercises, automatic tests, submission
-repositories, communication and learning help. The service explains which
-features and ways of working are available. Browser workspaces currently run on
-our servers; suitable tools on your device are an alternative. A browser
-interface does not mean computation happens on your device.
+Computor offers courses and programming exercises with automatic tests,
+submission repositories, workspaces and additional tools, communication, and
+learning aids including AI. The service shows which features are available; new
+features and learning aids are added as additional services. Browser workspaces
+currently run on our servers; suitable tools on your device are an alternative.
+External services you choose have their own terms and possible charges; they do
+not replace the free service.
 
-Computing time, memory, storage, network access, course places and concurrent
-workspaces are limited. Inactive workspaces may be stopped; their files
-remain. Capacity limits may temporarily prevent access; there is no
-entitlement to a particular course place. We operate with the care customary
-for a university learning service but cannot promise uninterrupted availability
-or recovery of individual files.
-Keep important work through Git or downloads.
+Computing time, memory, network access, course places and the number and
+running time of workspaces are limited. Workspaces stop after about one hour
+without activity; their files remain. Capacity limits may temporarily prevent
+access; there is no entitlement to a particular course place. We operate with
+the care customary for a university learning service and announce maintenance
+on the platform in advance where possible, but cannot promise uninterrupted
+availability or recovery of individual files. Keep important work through Git
+or downloads.
 
 Tests and points are learning aids, not an examination certificate or proof of
 competence. If a course uses results for assessment, the teacher decides under
-the applicable rules. Lena currently gives AI learning help through a button
-and course messages, including automatic routing in configured courses. It does
-not execute code or decide grades. The Privacy notice explains its context,
-audience and storage. Check AI answers because they may be wrong; availability
-and request limits depend on capacity.
-
-Depending on the available feature, you work on your device or in a provided
-environment. External services you choose have their own terms and possible
-charges; they do not replace the agreed free service. The Privacy notice
-explains the data flows.
+the applicable rules. The AI learning aid Lena currently answers through a
+button and course messages, including automatic routing in configured courses.
+It does not execute code or decide grades. The Privacy notice explains its
+context, audience and storage. Check AI answers because they may be wrong;
+availability and request limits depend on capacity.
 
 ## 3. Acceptable use and your content
 
 Use the platform to learn and teach. Resource abuse (such as unauthorised
-mining), spam, unauthorised attacks and port or vulnerability scans are prohibited. Network
-services, proxies, VPN/Tor nodes and security exercises are allowed where the
-course or platform provides or expressly permits them. Provided or expressly
-authorised course and platform features remain allowed, including those using
-agents.
+mining), spam, unauthorised attacks and port or vulnerability scans are
+prohibited. Network services, proxies, VPN/Tor nodes and security exercises are
+allowed where the course or platform provides or expressly permits them, also
+for features that use agents.
 Do not bypass resource, access or participation limits, access other people's
 accounts or data, or try to escape the workspace. Illegal content, distributing
 malware, copyright infringement, child sexual abuse material, incitement to
@@ -72,9 +75,10 @@ assessed exercises where the course prohibits it.
 
 Security research needs prior agreement through security@computor.at. Report
 vulnerabilities confidentially without accessing other people's data or
-disrupting operations. We log usage-related technical access and security events
-where necessary for secure operation. The Privacy notice explains the data,
-purposes, authorised access and retention periods.
+disrupting operations; we take no legal action over such a report made in good
+faith. There is no general monitoring of content. We log usage-related
+technical access and security events where necessary for secure operation; the
+Privacy notice explains the data, purposes, authorised access and retention.
 
 Your code, texts and files remain yours. You grant TU Graz only the free,
 non-exclusive rights to process your content as needed to operate the service,
@@ -84,8 +88,9 @@ These rights end on deletion; backup copies follow the deletion rules explained
 in the Privacy notice. Upload only content for which you hold the necessary
 rights.
 
-Course material and [software](https://github.com/computor-org) use their stated
-licences; rights in third-party material remain unaffected.
+Unless stated otherwise, course texts and exercises are licensed under CC BY 4.0
+and course code under the MIT licence; the [software](https://github.com/computor-org)
+is open source. Third-party material is marked and may be under other licences.
 
 ## 4. Moderation and appeals
 
@@ -97,34 +102,37 @@ where there is acute danger.
 
 We explain by email the measure, facts, rules concerned, use of reports or
 automated detection, and remedies, unless law or an authority prohibits this
-(Art. 17 DSA). You may appeal to contact@computor.at within six months. Appeals
-are reviewed under human supervision; we give you a reasoned outcome. You may go to court at any time. If we suspect a criminal offence
-threatening people's life or safety, we promptly inform the competent
-authorities (Art. 18 DSA).
+(Art. 17 DSA). You may appeal to contact@computor.at within six months. Where
+possible, a person not involved in the original decision reviews the appeal; we
+give you a reasoned outcome. You may go to court at any time. If we suspect a
+criminal offence threatening people's life or safety, we promptly inform the
+competent authorities (Art. 18 DSA).
 
 ## 5. Changing or ending the service or contract
 
-We may change the technical implementation and add features without adversely
-changing the agreed services. We may unilaterally change the agreed services
-for technical, security, legal or operational reasons only if the change is
-minor, objectively justified and reasonable in light of your legitimate
-interests. Material adverse changes require a valid agreement with you or an
-applicable statutory change procedure. We give reasonable advance notice of substantial
-restrictions or planned closure and an opportunity to save your content.
-Necessary measures for urgent security issues or binding legal requirements may
-take effect immediately; we inform you without undue delay.
+We may change and develop the platform where this is reasonable for you, in
+particular because the change is minor and objectively justified, for example by
+technical development, security, legal requirements or changed operating means.
+We announce substantial restrictions (such as dropping a course you are enrolled
+in, or the workspace service) and a planned closure at least 30 days in advance
+by email and on the platform, with reasons; during that time you can download
+or request your data. If there is acute danger to the security of the platform,
+its users or third parties, or a binding legal requirement, we may restrict
+features immediately and inform you as soon as possible of the reason and the
+expected duration.
 
-You may end the user contract at any time and request account deletion at
-privacy@computor.at. We may terminate on reasonable notice, taking your
-legitimate interests into account. Serious legal or usage breaches, or repetition
-despite a warning, may lead to suspension or immediate termination; the reasons
-and appeal rights in section 4 still apply. Statutory rights remain unaffected.
+You may end the usage contract at any time and request account deletion at
+privacy@computor.at. We may terminate for objective reasons, such as closure of
+the platform, with 30 days' notice by email. Serious legal or usage breaches, or
+repetition despite a warning, may lead to suspension or immediate termination;
+the reasons and appeal rights in section 4 still apply. Statutory rights remain
+unaffected.
 
-Accounts unused for 24 months follow this deletion rule: we give reasonable
-advance warning by email; signing in during that period keeps the account.
-Deletion is handled across the services involved and is not completed merely by
-archiving an account. The Privacy notice explains legally required retention
-and backups.
+Accounts nobody has signed in to for 24 months are deleted after notice by
+email at least 30 days in advance; signing in during that period keeps the
+account. Deletion is handled across the services involved and is not completed
+merely by archiving an account. The Privacy notice explains legally required
+retention and backups.
 
 ## 6. Liability
 
@@ -149,8 +157,17 @@ subject-matter jurisdiction is competent.
 
 ## 8. Changes to these terms and contact
 
-We inform you of significant changes to these terms. Where your agreement is
-required, we obtain it separately.
+We may change these terms if the platform, the law or the conditions for its
+operation change. We inform you at least 30 days before the changes take effect,
+by email and with a notice at sign-in, provide the new version and highlight the
+changes. Changes that do not put you in a worse position (such as
+clarifications, additional services or adjustments required by mandatory law)
+apply from the announced date. Changes that put you in a materially worse
+position apply only if you expressly agree to them; we ask for this at sign-in.
+Merely continuing to use the platform is not agreement. Without your agreement
+the previous version continues to apply to you; we may then terminate the
+contract under section 5. Updates of the Privacy notice inform you and need no
+consent; we inform you of new processing before it starts.
 
 General enquiries and appeals: contact@computor.at; illegal content:
 abuse@computor.at; privacy: privacy@computor.at or datenschutz@tugraz.at;
