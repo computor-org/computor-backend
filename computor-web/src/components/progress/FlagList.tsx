@@ -2,6 +2,7 @@
 
 import Badge from '@/src/components/Badge';
 import { flagTone, sortFlags } from '@/src/utils/courseAnalytics';
+import { flagReason, flagRuleDescription, flagTitle } from '@/src/utils/flagText';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type { FlagReason, FlagRule } from 'types/generated';
 
@@ -24,14 +25,15 @@ const COPY = {
  * thresholds so nothing is a black box.
  */
 export function FlagChips({ flags }: { flags: FlagReason[] }) {
+  const language = useUiLanguage();
   if (flags.length === 0) return <span className="text-xs text-subtle">—</span>;
   const titles = new Map<string, FlagReason>();
   for (const f of sortFlags(flags)) if (!titles.has(f.code)) titles.set(f.code, f);
   return (
     <div className="flex flex-wrap gap-1">
       {[...titles.values()].map((f) => (
-        <span key={f.code} title={flags.filter((x) => x.code === f.code).map((x) => x.reason).join('\n')}>
-          <Badge tone={flagTone(f.severity)}>{f.title}</Badge>
+        <span key={f.code} title={flags.filter((x) => x.code === f.code).map((x) => flagReason(x, language)).join('\n')}>
+          <Badge tone={flagTone(f.severity)}>{flagTitle(f.code, f.title, language)}</Badge>
         </span>
       ))}
     </div>
@@ -39,7 +41,8 @@ export function FlagChips({ flags }: { flags: FlagReason[] }) {
 }
 
 export default function FlagList({ flags }: { flags: FlagReason[] }) {
-  const t = COPY[useUiLanguage()];
+  const language = useUiLanguage();
+  const t = COPY[language];
   if (flags.length === 0) {
     return <p className="text-sm text-muted">{t.none}</p>;
   }
@@ -47,11 +50,11 @@ export default function FlagList({ flags }: { flags: FlagReason[] }) {
     <ul className="space-y-2">
       {sortFlags(flags).map((f, i) => (
         <li key={`${f.code}-${f.course_content_id ?? ''}-${i}`} className="flex flex-wrap items-baseline gap-2">
-          <Badge tone={flagTone(f.severity)}>{f.title}</Badge>
+          <Badge tone={flagTone(f.severity)}>{flagTitle(f.code, f.title, language)}</Badge>
           {f.course_content_title && (
             <span className="text-sm font-medium text-fg">{f.course_content_title}</span>
           )}
-          <span className="text-sm text-body">{f.reason}</span>
+          <span className="text-sm text-body">{flagReason(f, language)}</span>
         </li>
       ))}
     </ul>
@@ -59,7 +62,8 @@ export default function FlagList({ flags }: { flags: FlagReason[] }) {
 }
 
 export function FlagRules({ rules }: { rules: FlagRule[] }) {
-  const t = COPY[useUiLanguage()];
+  const language = useUiLanguage();
+  const t = COPY[language];
   if (rules.length === 0) return null;
   return (
     <details className="text-xs text-muted">
@@ -67,7 +71,7 @@ export function FlagRules({ rules }: { rules: FlagRule[] }) {
       <ul className="mt-2 space-y-1 list-disc pl-5">
         {rules.map((r) => (
           <li key={r.code}>
-            <span className="font-medium text-body">{r.title}:</span> {r.description}
+            <span className="font-medium text-body">{flagTitle(r.code, r.title, language)}:</span> {flagRuleDescription(r, language)}
           </li>
         ))}
       </ul>
