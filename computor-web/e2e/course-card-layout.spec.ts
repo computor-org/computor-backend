@@ -81,8 +81,8 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       expect(overlaps).toBe(false);
     }
     await expect(page.getByRole('button', { name: 'Join course' })).toHaveCount(2);
-    // An enrolled learner continues with the course's assignments (issues#521).
-    await expect(page.getByRole('link', { name: 'Continue' })).toHaveAttribute('href', '/courses/intermediate/student/assignments');
+    // An enrolled learner opens the course overview, as before (issues#521).
+    await expect(page.getByRole('link', { name: 'Open course' })).toHaveAttribute('href', '/courses/intermediate');
   });
 
   test(`member course titles and role badges remain readable at ${viewport.width}px`, async ({ page }, testInfo) => {

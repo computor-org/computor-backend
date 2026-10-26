@@ -39,7 +39,6 @@ const COPY = {
     backToCourses: 'Zurück zu deinen Kursen',
     enrolledBadge: 'Beigetreten',
     openCourse: 'Kurs öffnen',
-    continue: 'Weiterlernen',
     full: 'Voll',
     seatsLeft: (n: number) => (n === 1 ? '1 Platz frei' : `${n} Plätze frei`),
     join: 'Kurs beitreten',
@@ -62,7 +61,6 @@ const COPY = {
     backToCourses: 'Back to your courses',
     enrolledBadge: 'Enrolled',
     openCourse: 'Open course',
-    continue: 'Continue',
     full: 'Full',
     seatsLeft: (n: number) => (n === 1 ? '1 seat left' : `${n} seats left`),
     join: 'Join course',
@@ -113,11 +111,12 @@ function CourseCatalog() {
   const invalidTarget = hasContentTarget && (!validContentPath || !joinCourse);
   const blockedTarget = (course: CoursePublicList) => invalidTarget
     && course.id === joinCourse?.id && !courseStaff(course.id);
-  const destination = (course: CoursePublicList, learner: boolean) => {
-    const base = `/courses/${course.id}${learner ? '/student/assignments' : ''}`;
-    return learner && hasContentTarget && !invalidTarget && course.id === joinCourse?.id
-      ? `${base}?contentPath=${encodeURIComponent(contentPath)}` : base;
-  };
+  // Joining lands on the course overview, as before; only a requested
+  // exercise (?contentPath=) goes on to that exercise.
+  const destination = (course: CoursePublicList, learner: boolean) =>
+    learner && hasContentTarget && !invalidTarget && course.id === joinCourse?.id
+      ? `/courses/${course.id}/student/assignments?contentPath=${encodeURIComponent(contentPath)}`
+      : `/courses/${course.id}`;
   const dialogCourse = pending
     ?? (joinCourse && !invalidTarget && !joinCourse.enrolled && !joinCourse.full && !joinDismissed ? joinCourse : null);
 
@@ -206,10 +205,10 @@ function CourseCatalog() {
                 }
                 footer={
                   course.enrolled ? blockedTarget(course) ? (
-                    <Button size="sm" disabled>{t.continue}</Button>
+                    <Button size="sm" disabled>{t.openCourse}</Button>
                   ) : (
                     <ButtonLink href={destination(course, courseLearner(course.id))} size="sm">
-                      {courseLearner(course.id) ? t.continue : t.openCourse}
+                      {t.openCourse}
                     </ButtonLink>
                   ) : (
                     <div className="flex items-center gap-3">
