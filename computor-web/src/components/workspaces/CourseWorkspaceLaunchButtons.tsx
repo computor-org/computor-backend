@@ -13,7 +13,8 @@ import WorkspaceStatusBadge, {
   categorizeStatus,
 } from '@/src/components/workspaces/WorkspaceStatusBadge';
 import TemplateCard, { TemplateIconButton } from '@/src/components/workspaces/TemplateCard';
-import { courseTemplateOption, isUsable } from '@/src/components/workspaces/templateOptions';
+import TemplateIcon from '@/src/components/workspaces/TemplateIcon';
+import { courseTemplateOption, isUsable, templateLabel } from '@/src/components/workspaces/templateOptions';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { CourseWorkspacesClient } from '@/src/clients/CourseWorkspacesClient';
 import {
@@ -35,7 +36,12 @@ const COPY = {
     selectionFailed: 'Deine Auswahl konnte in deiner Arbeitsumgebung nicht geöffnet werden. Versuch es noch einmal.',
     launching: 'Wird gestartet …',
     launch: 'Arbeitsumgebung starten',
-    yours: 'Deine Arbeitsumgebungen',
+    setUp: 'Arbeitsumgebung einrichten',
+    openIn: (label: string) => `In ${label} öffnen`,
+    startAndOpen: 'Starten und öffnen',
+    startAgain: 'Erneut starten',
+    stopHint: (label: string) => `Beendet ${label}. Deine Dateien bleiben erhalten.`,
+    yours: 'Weitere Arbeitsumgebungen',
     open: 'Öffnen',
     retry: 'Erneut versuchen',
     start: 'Starten',
@@ -51,7 +57,12 @@ const COPY = {
     selectionFailed: 'Your selection could not be opened in your workspace. Please retry.',
     launching: 'Launching…',
     launch: 'Launch workspace',
-    yours: 'Your workspaces',
+    setUp: 'Set up workspace',
+    openIn: (label: string) => `Open in ${label}`,
+    startAndOpen: 'Start and open',
+    startAgain: 'Start again',
+    stopHint: (label: string) => `Shuts down ${label}. Your files are kept.`,
+    yours: 'Other workspaces',
     open: 'Open',
     retry: 'Retry',
     start: 'Start',
@@ -66,12 +77,20 @@ const courseWorkspacesClient = new CourseWorkspacesClient();
 /**
  * Launch buttons for a course's allowed workspace templates.
  *
- * Renders one card per (enabled) template — clicking reuses the caller's
+ * One control per (enabled) template — clicking reuses the caller's
  * per-template workspace, or provisions it when missing, and opens the launch
- * tab. Reusing keeps the running editor and its credentials intact. The
- * non-compact variant also lists the caller's existing workspaces on course templates, which covers
- * lecturer-provisioned throwaway workspaces (students can open and start
- * those, but not provision them).
+ * tab. Reusing keeps the running editor and its credentials intact.
+ *
+ * On the course page a template whose personal workspace already exists is a
+ * single row with its state and one state-aware action ("In VS Code öffnen",
+ * "Starten und öffnen", "Erneut starten"), plus Stop while it runs, with no
+ * text beside them: what Stop does is its tooltip. The tile
+ * that sets a workspace up appears only while there is none: a tile next to a
+ * row for the same workspace made returning learners guess which one resumes
+ * their work and whether the tile creates a second workspace. Other
+ * workspaces on course templates, such as lecturer-provisioned throwaway
+ * ones (students can open and start those, but not provision them), are
+ * listed below.
  *
  * A course holds its templates by name, so it can go on offering one Coder
  * does not have — never deployed, or still building. Those render dimmed and
@@ -93,6 +112,7 @@ export default function CourseWorkspaceLaunchButtons({
   autoLaunch = false,
   ref,
   compact = false,
+  single = false,
   className,
   title,
 }: {
@@ -102,6 +122,9 @@ export default function CourseWorkspaceLaunchButtons({
   autoLaunch?: boolean;
   ref?: Ref<CourseWorkspaceLauncher>;
   compact?: boolean;
+  /** With `compact`: one "In VS Code öffnen" button instead of the icon row,
+      for the assignment page, where it opens `courseContentId`. */
+  single?: boolean;
   /** Extra classes on the root, e.g. outer spacing — only rendered when the
       component itself renders, so callers don't get stray margins when it
       self-hides. */
@@ -169,6 +192,14 @@ export default function CourseWorkspaceLaunchButtons({
   });
 
   const workspaces = workspacesData ?? [];
+  // The personal workspace per template, the one provisionAndLaunch reuses.
+  // Unknown until the first listing answers, which keeps the neutral tile.
+  const personal = new Map(
+    workspaces
+      .filter((w) => w.template_name && w.name === derivedWorkspaceName(w.template_name))
+      .map((w) => [w.template_name as string, w]),
+  );
+  const others = workspaces.filter((w) => personal.get(w.template_name ?? '') !== w);
   const [launchError, setLaunchError] = useState(false);
 
   // Same stop as the /workspaces table (notification + delayed refresh) — the
@@ -297,6 +328,25 @@ export default function CourseWorkspaceLaunchButtons({
 
   if (templates.length === 0) return null;
 
+  const ownOptions = courseOptions.filter((option) => personal.has(option.name));
+  const newOptions = courseOptions.filter((option) => !personal.has(option.name));
+
+  if (compact && single) {
+    const vscode = courseOptions.find((option) => option.name === 'vscode-workspace' && isUsable(option));
+    if (!vscode) return null;
+    return (
+      <Button
+        size="sm"
+        className={className}
+        onClick={() => provisionAndLaunch(vscode.name)}
+        loading={launching === vscode.name}
+        loadingLabel={t.launching}
+      >
+        {t.openIn(templateLabel(vscode))}
+      </Button>
+    );
+  }
+
   if (compact) {
     return (
       <div className={`mt-2 flex flex-wrap items-center gap-1.5 ${className ?? ''}`}>
@@ -318,23 +368,91 @@ export default function CourseWorkspaceLaunchButtons({
     <div className={`space-y-4 ${className ?? ''}`}>
       {launchError && <LearningOptions capacity language={language} />}
       {title && <h2 className="text-lg font-semibold text-fg">{title}</h2>}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {courseOptions.map((option) => (
-          <TemplateCard
-            key={option.name}
-            option={option}
-            actionLabel={launching === option.name ? t.launching : t.launch}
-            busy={launching === option.name}
-            onClick={() => provisionAndLaunch(option.name)}
-          />
-        ))}
-      </div>
+      {ownOptions.length > 0 && (
+        <ul className="space-y-3">
+          {ownOptions.map((option) => {
+            const w = personal.get(option.name)!;
+            const category = categorizeStatus(w.latest_build_status, w.latest_build_transition);
+            const label = templateLabel(option);
+            // A workspace that is stopping is started again once it has
+            // stopped, which is what the launch page does.
+            const primary =
+              category === 'failed'
+                ? t.startAgain
+                : category === 'stopped' || w.latest_build_transition === 'stop'
+                  ? t.startAndOpen
+                  : t.openIn(label);
+            return (
+              <li
+                key={option.name}
+                className="flex flex-wrap items-center gap-x-3 gap-y-3 rounded-lg border border-rule bg-surface p-3 pr-4"
+              >
+                {/* On a phone the icon would take a line of its own; the name says it. */}
+                <span className="hidden sm:block">
+                  <TemplateIcon template={{ icon: option.icon, name: option.name }} />
+                </span>
+                {/* basis-48: on a phone the actions wrap below instead of squeezing the text. */}
+                <div className="min-w-0 flex-1 basis-48">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-fg">{label}</span>
+                    <WorkspaceStatusBadge
+                      status={w.latest_build_status}
+                      transition={w.latest_build_transition}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+                  {/* Same click as the tile: a fresh lookup, then reuse. */}
+                  <Button
+                    size="sm"
+                    onClick={() => provisionAndLaunch(option.name)}
+                    loading={launching === option.name}
+                    loadingLabel={t.launching}
+                  >
+                    {primary}
+                  </Button>
+                  {category === 'running' && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      title={t.stopHint(label)}
+                      onClick={() => stopExisting(w)}
+                      loading={stopping === w.id}
+                      loadingLabel={t.stopping}
+                    >
+                      {t.stop}
+                    </Button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
-      {workspaces.length > 0 && (
+      {newOptions.length > 0 && (
+        <div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {newOptions.map((option) => (
+              <TemplateCard
+                key={option.name}
+                option={option}
+                actionLabel={
+                  launching === option.name ? t.launching : workspacesData ? t.setUp : t.launch
+                }
+                busy={launching === option.name}
+                onClick={() => provisionAndLaunch(option.name)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {others.length > 0 && (
         <div>
           <h3 className="text-sm font-medium text-body mb-2">{t.yours}</h3>
           <ul className="space-y-1.5">
-            {workspaces.map((w) => {
+            {others.map((w) => {
               const category = categorizeStatus(w.latest_build_status, w.latest_build_transition);
               return (
                 <li
