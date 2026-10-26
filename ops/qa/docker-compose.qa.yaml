@@ -211,3 +211,7 @@ services:
   coder-worker-socket-proxy:
     cpus: 0.25
     mem_limit: 128m
+
+  coder-provisioner-socket-proxy:
+    cpus: 0.25
+    mem_limit: 128m
