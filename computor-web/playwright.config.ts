@@ -30,6 +30,12 @@ export default defineConfig({
     url: `http://localhost:${PORT}`,
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,
-    env: { NEXT_PUBLIC_API_URL: API },
+    // computor.at profile with a scheduled terms rollout (terms-notice.spec.ts
+    // moves the browser clock around this date).
+    env: {
+      NEXT_PUBLIC_API_URL: API,
+      NEXT_PUBLIC_LEGAL_PROFILE: 'computor-at',
+      NEXT_PUBLIC_TERMS_EFFECTIVE_FROM: '2026-12-07',
+    },
   },
 });

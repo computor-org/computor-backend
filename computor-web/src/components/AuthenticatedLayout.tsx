@@ -7,6 +7,7 @@ import { CourseProvider } from '@/src/contexts/CourseContext';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import MaintenanceBanner from './MaintenanceBanner';
+import TermsNoticeBanner from './TermsNoticeBanner';
 import LegalLinks from './LegalLinks';
 import NetideeNotice from './NetideeNotice';
 import { LEGAL_LINKS } from '@/src/config/legal';
@@ -81,6 +82,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
         {/* Top Bar */}
         <TopBar />
         <MaintenanceBanner />
+        <TermsNoticeBanner />
 
         {/*
           Page content. Padding deliberately lives on the page scaffold
