@@ -58,6 +58,18 @@ function details({
 }
 
 /**
+ * The dashboard reserves its named launch tab blank inside the click and
+ * only then sends it to the launch page, so the course appears in the tab's
+ * URL after the popup event, not with it.
+ */
+async function launchedFor(tab: Page, courseId: string) {
+  await tab.waitForURL(
+    (url) => url.pathname === '/workspaces/launch' && url.searchParams.get('courseId') === courseId,
+    { waitUntil: 'commit' },
+  );
+}
+
+/**
  * Serve workspace-details responses. Pass an array to script one per poll (the
  * last repeating), or a supplier for tests that need to control exactly when the
  * status changes — the page re-fetches on mount as well as on the poll timer, so
@@ -644,7 +656,7 @@ test('the dashboard offers a stopped workspace with a labelled start action', as
   const popup = page.waitForEvent('popup');
   await section.getByRole('button', { name: 'Start and open' }).click();
   const launchTab = await popup;
-  expect(new URL(launchTab.url()).searchParams.get('courseId')).toBe(COURSE_A);
+  await launchedFor(launchTab, COURSE_A);
   await expect.poll(() => starts.length).toBe(1);
   body = details({ status: 'running', ready: true, name: 'vscode' });
   await launchTab.waitForURL(COURSE_WORKSPACE_URL);
@@ -688,7 +700,7 @@ test('the dashboard reopens the course the server remembers, also in a fresh bro
   const popup = page.waitForEvent('popup');
   await section.getByRole('button', { name: 'Open', exact: true }).click();
   const launchTab = await popup;
-  expect(new URL(launchTab.url()).searchParams.get('courseId')).toBe(COURSE_B);
+  await launchedFor(launchTab, COURSE_B);
   await launchTab.waitForURL(COURSE_WORKSPACE_URL);
   expect(contexts).toEqual([{ course_id: COURSE_B }]);
   await launchTab.close();
@@ -851,9 +863,9 @@ test('a never-enrolled learner without a workspace gets a first welcome in Engli
   await expect(page.getByRole('heading', { name: 'Welcome, Wanda', exact: true })).toBeVisible();
 });
 
-for (const [locale, event, stopped, running, start, open] of [
-  ['en-US', 'focus', 'Stopped', 'Running', 'Start and open', 'Open'],
-  ['de-DE', 'visibilitychange', 'Gestoppt', 'Läuft', 'Starten und öffnen', 'Öffnen'],
+for (const [locale, event, stopped, running, start, open, courseLaunch] of [
+  ['en-US', 'focus', 'Stopped', 'Running', 'Start and open', 'Open', 'Open in VS Code'],
+  ['de-DE', 'visibilitychange', 'Gestoppt', 'Läuft', 'Starten und öffnen', 'Öffnen', 'In VS Code öffnen'],
 ] as const) {
   test.describe(`dashboard workspace return refresh ${locale}`, () => {
     test.use({ locale });
@@ -875,6 +887,10 @@ for (const [locale, event, stopped, running, start, open] of [
       await page.goto('/dashboard');
       await expect(page.getByText(stopped, { exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: start, exact: true })).toBeVisible();
+      // Each course card loads its course's workspace settings once when it
+      // mounts, which can land after the workspace row. Count those reads as
+      // part of the first load before checking that a return re-reads none.
+      await expect(page.getByRole('button', { name: courseLaunch, exact: true })).toHaveCount(2);
       const initialHeavyReads = [...heavyReads];
       expect(initialHeavyReads).toContain('/courses');
       // The editor/launch tab updates the server while this dashboard stays mounted.
