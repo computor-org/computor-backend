@@ -298,7 +298,9 @@ export default function PublicCourseReader({
                         </p>
                         <h2 className="mt-1 text-2xl font-bold text-fg">{localizedTitle(outline, content.id, content.title, (content.selected_language ?? uiLanguage) as UiLanguage)}</h2>
                       </div>
-                      {content.available_languages.length > 1 && (
+                      {/* The header's DE/EN switch picks the content language too; this
+                          toggle only appears when the content is not in the UI language. */}
+                      {content.available_languages.length > 1 && content.selected_language !== uiLanguage && (
                         <div className="flex rounded-lg border border-rule-strong p-1" aria-label={t.language}>
                           {content.available_languages.map(language => (
                             <button
