@@ -96,17 +96,6 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - run: bash ops/tests/test_coder_worker_socket_proxy.sh
 
-  coder-provisioner-socket-proxy:
-    # Required jobs run in the merge queue, not on pull request events.
-    if: github.event_name != 'pull_request'
-    # Behavioural check of the Coder server's Docker allowlist: a workspace
-    # lifecycle end to end, privileged/host-bind/host-namespace creates, exec,
-    # foreign images -> 403.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - run: bash ops/tests/test_coder_provisioner_socket_proxy.sh
-
   workspace-git-clone:
     if: github.event_name != 'pull_request'
     # A managed-Forgejo student repository, provisioned by the backend's own
@@ -120,6 +109,17 @@ jobs:
           enable-cache: true
       - run: uv sync --project computor-backend --python 3.12 --locked
       - run: bash ops/tests/test_workspace_git_clone.sh
+
+  coder-provisioner-socket-proxy:
+    # Required jobs run in the merge queue, not on pull request events.
+    if: github.event_name != 'pull_request'
+    # Behavioural check of the Coder server's Docker allowlist: a workspace
+    # lifecycle end to end, privileged/host-bind/host-namespace creates, exec,
+    # foreign images -> 403.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - run: bash ops/tests/test_coder_provisioner_socket_proxy.sh
 
   public-course-contract:
     # Required jobs run in the merge queue, not on pull request events.
