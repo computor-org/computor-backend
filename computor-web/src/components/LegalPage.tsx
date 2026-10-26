@@ -82,13 +82,20 @@ export default function LegalPage({
 
       <main className="flex-1 container mx-auto px-4 py-10">
         <article lang={lang} className="max-w-3xl mx-auto">
-          <h1 className="text-3xl font-bold text-fg">{title}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-fg break-words">{title}</h1>
           {version ? <p className="mt-2 text-sm text-muted">{version}</p> : null}
           <div className="prose markdown max-w-none mt-8">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
                 h2: ({ children }) => <h2 id={slug(textOf(children))}>{children}</h2>,
+                // Wide tables (the privacy notice's processing overview) scroll
+                // inside their own box instead of widening the page on phones.
+                table: ({ children }) => (
+                  <div className="overflow-x-auto">
+                    <table>{children}</table>
+                  </div>
+                ),
               }}
             >
               {body}

@@ -49,7 +49,7 @@ const COPY = {
     anyStatus: 'Beliebiger Status',
     status: { open: 'Offen', in_progress: 'In Bearbeitung', waiting: 'Wartet', done: 'Erledigt' } as Record<TicketStatus, string>,
     searchLabel: 'Anfragen suchen',
-    searchPlaceholder: 'Betreff, Absender suchen …',
+    searchPlaceholder: 'Tickets durchsuchen',
     search: 'Suchen',
     loading: 'Wird geladen …',
     empty: 'Keine passenden Anfragen.',
@@ -83,7 +83,7 @@ const COPY = {
     anyStatus: 'Any status',
     status: { open: 'Open', in_progress: 'In progress', waiting: 'Waiting', done: 'Done' } as Record<TicketStatus, string>,
     searchLabel: 'Search tickets',
-    searchPlaceholder: 'Search subject, reporter…',
+    searchPlaceholder: 'Search tickets',
     search: 'Search',
     loading: 'Loading…',
     empty: 'No tickets match.',
@@ -196,7 +196,7 @@ export default function SupportPage() {
             ))}
           </select>
           <form
-            className="flex items-center gap-2"
+            className="flex w-full min-w-0 items-center gap-2 sm:w-auto"
             onSubmit={(e) => {
               e.preventDefault();
               setSearch(searchInput.trim());
@@ -210,7 +210,7 @@ export default function SupportPage() {
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder={t.searchPlaceholder}
               maxLength={200}
-              className={`${inputCls} !w-64`}
+              className={`${inputCls} min-w-0 flex-1 sm:!w-64 sm:flex-none`}
             />
             <Button type="submit" variant="secondary">
               {t.search}

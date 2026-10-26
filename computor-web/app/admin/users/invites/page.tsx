@@ -20,6 +20,7 @@ import type { InviteLinkList, InviteLinkCreate } from 'types/generated';
 import { Table, Thead, Tbody, Th } from '@/src/components/ui/Table';
 import Button from '@/src/components/ui/Button';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { roleTitle } from '@/src/utils/systemRoles';
 import { formatDate } from '@/src/utils/locale';
 
 const invitesClient = new InviteLinkClient();
@@ -151,7 +152,7 @@ export default function InvitesPage() {
   });
 
   const { roles: systemRoles } = useSystemRoles();
-  const roleLabel = (id: string) => systemRoles.find(r => r.id === id)?.title ?? id;
+  const roleLabel = (id: string) => roleTitle(id, systemRoles.find(r => r.id === id)?.title, language);
 
   // Backend-refreshed scopes (via usePermissions) instead of the cached
   // session's role string, which can go stale between logins.

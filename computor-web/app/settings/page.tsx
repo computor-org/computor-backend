@@ -20,6 +20,7 @@ import { ConsentClient } from '@/src/generated/clients/ConsentClient';
 import { InstanceStatusClient } from '@/src/generated/clients/InstanceStatusClient';
 import DescriptionList from '@/src/components/DescriptionList';
 import { WEB_COMMIT, duration, shortCommit } from '@/src/utils/instanceStatus';
+import { LEGAL_LINKS, englishLegalLink } from '@/src/config/legal';
 
 const tokensClient = new TokensClient();
 const accountsClient = new AccountsClient();
@@ -62,6 +63,10 @@ function stamp(value: string | null | undefined, language: UiLanguage): string |
   return Number.isNaN(date.getTime()) ? null : date.toLocaleString(language === 'de' ? 'de-AT' : undefined);
 }
 
+/** Lifetimes offered for a new API token, in days; empty means no expiry. */
+const TOKEN_LIFETIME_DAYS = [7, 30, 90, 365];
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const COPY = {
   de: {
     loadFailed: 'Einstellungen konnten nicht geladen werden',
@@ -78,14 +83,16 @@ const COPY = {
     apiTokens: 'API-Tokens',
     apiTokensDesc: 'Persönliche Zugriffstokens für die CLI, die VS-Code-Erweiterung und Skripte. Behandle sie wie Passwörter.',
     tokenWarnStrong: 'Ein Token hat alle deine Berechtigungen.',
-    tokenWarn: 'Bereiche fügen nur Berechtigungen hinzu und nehmen nie welche weg. Wer eines dieser Tokens besitzt, kann alles tun, was du kannst.',
+    tokenWarn: 'Wer eines deiner Tokens besitzt, kann alles tun, was du kannst.',
     tokenCreated: 'Token erstellt. Kopiere es jetzt, du kannst es später nicht mehr sehen.',
     copied: 'Kopiert',
     copy: 'Kopieren',
     dismiss: 'Schließen',
     tokenName: 'Token-Name',
     tokenNamePlaceholder: 'z. B. Laptop-CLI',
-    expires: 'Läuft ab (optional)',
+    expires: 'Gültigkeit',
+    lifetimeNever: 'Unbegrenzt',
+    lifetimeDays: (days: number) => (days === 365 ? '1 Jahr' : `${days} Tage`),
     creating: 'Wird erstellt …',
     createToken: 'Token erstellen',
     loading: 'Wird geladen …',
@@ -108,6 +115,7 @@ const COPY = {
     privacy: 'Datenschutz und Einwilligung',
     privacyDesc: 'Sieh dir die aktuelle Datenschutzerklärung an und verwalte deine Einwilligung.',
     noNotice: 'Aktuell ist keine Datenschutzerklärung hinterlegt.',
+    noConsentNeeded: 'Diese Instanz verlangt keine gesonderte Einwilligung. Was mit deinen Daten geschieht, steht in der Datenschutzerklärung.',
     noticeVersion: 'Version der Datenschutzerklärung:',
     consentGiven: (date: string) => `Einwilligung erteilt am ${date}.`,
     notConsented: 'Du hast der aktuellen Datenschutzerklärung nicht zugestimmt.',
@@ -143,14 +151,16 @@ const COPY = {
     apiTokens: 'API tokens',
     apiTokensDesc: 'Personal access tokens for the CLI, VS Code extension and scripts. Treat them like passwords.',
     tokenWarnStrong: 'A token acts with your full permissions.',
-    tokenWarn: 'Scopes only add permissions — they never remove any. Anyone holding one of these tokens can do anything you can.',
+    tokenWarn: 'Anyone holding one of your tokens can do anything you can.',
     tokenCreated: 'Token created — copy it now. You won’t be able to see it again.',
     copied: 'Copied',
     copy: 'Copy',
     dismiss: 'Dismiss',
     tokenName: 'Token name',
     tokenNamePlaceholder: 'e.g. laptop CLI',
-    expires: 'Expires (optional)',
+    expires: 'Valid for',
+    lifetimeNever: 'No expiry',
+    lifetimeDays: (days: number) => (days === 365 ? '1 year' : `${days} days`),
     creating: 'Creating…',
     createToken: 'Create token',
     loading: 'Loading…',
@@ -173,6 +183,7 @@ const COPY = {
     privacy: 'Privacy & Consent',
     privacyDesc: 'Review the current privacy notice and manage your consent.',
     noNotice: 'No privacy notice is currently configured.',
+    noConsentNeeded: 'This instance does not ask for separate consent. The privacy notice explains what happens to your data.',
     noticeVersion: 'Privacy notice version:',
     consentGiven: (date: string) => `Consent given on ${date}.`,
     notConsented: 'You have not consented to the current privacy notice.',
@@ -214,6 +225,9 @@ export default function SettingsPage() {
   const [instanceStatus, setInstanceStatus] = useState<InstanceStatusGet | null>(null);
 
   // Consent / privacy
+  const publishedPrivacy = LEGAL_LINKS.find((link) => link.label === 'Datenschutz');
+  const privacyLink =
+    publishedPrivacy && language === 'en' ? englishLegalLink(publishedPrivacy) : publishedPrivacy;
   const [consentStatus, setConsentStatus] = useState<ConsentStatusGet | null>(null);
   const [consentLoading, setConsentLoading] = useState(true);
   const [withdrawing, setWithdrawing] = useState(false);
@@ -265,7 +279,7 @@ export default function SettingsPage() {
       const created = await tokensClient.createTokenEndpointApiTokensPost({
         body: {
           name: newName.trim(),
-          expires_at: newExpiry ? new Date(newExpiry).toISOString() : null,
+          expires_at: newExpiry ? new Date(Date.now() + Number(newExpiry) * DAY_MS).toISOString() : null,
         },
       });
       setCreatedToken(created);
@@ -355,7 +369,8 @@ export default function SettingsPage() {
               {/*
                 Scopes are additive claims (PrincipalBuilder.build), so a
                 personal token is never weaker than the account. Users assume
-                the opposite; say it where the token is minted.
+                the opposite; say it where the token is minted. The form offers
+                no scopes, so the warning does not mention them either.
               */}
               <div className="mb-5 rounded-lg border border-warn-line bg-warn-wash p-3 text-sm text-warn-text">
                 <strong className="font-medium">{t.tokenWarnStrong}</strong>{' '}
@@ -394,8 +409,25 @@ export default function SettingsPage() {
                   <input className={inputCls} value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t.tokenNamePlaceholder} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-body mb-1">{t.expires}</label>
-                  <input type="date" className={inputCls} value={newExpiry} onChange={(e) => setNewExpiry(e.target.value)} />
+                  {/*
+                    A lifetime rather than <input type="date">: the native date
+                    field shows its placeholder in the browser's language
+                    (mm/dd/yyyy on an English browser), whatever the page says.
+                  */}
+                  <label htmlFor="token-expiry" className="block text-xs font-medium text-body mb-1">{t.expires}</label>
+                  <select
+                    id="token-expiry"
+                    className={`${inputCls} !w-auto`}
+                    value={newExpiry}
+                    onChange={(e) => setNewExpiry(e.target.value)}
+                  >
+                    <option value="">{t.lifetimeNever}</option>
+                    {TOKEN_LIFETIME_DAYS.map((days) => (
+                      <option key={days} value={String(days)}>
+                        {t.lifetimeDays(days)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <button
                   type="submit"
@@ -411,7 +443,7 @@ export default function SettingsPage() {
               ) : activeTokens.length === 0 ? (
                 <div className="text-sm text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">{t.noTokens}</div>
               ) : (
-                <div className="border border-rule rounded-lg divide-y">
+                <div className="border border-rule rounded-lg divide-y divide-rule">
                   {activeTokens.map((tok) => (
                     <div key={tok.id} className="flex items-center justify-between px-4 py-3 gap-4">
                       <div className="min-w-0">
@@ -454,7 +486,7 @@ export default function SettingsPage() {
               ) : accounts.length === 0 ? (
                 <div className="text-sm text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">{t.noAccounts}</div>
               ) : (
-                <div className="border border-rule rounded-lg divide-y">
+                <div className="border border-rule rounded-lg divide-y divide-rule">
                   {accounts.map((a) => (
                     <div key={a.id} className="flex items-center justify-between px-4 py-3 gap-4">
                       <div className="min-w-0">
@@ -498,7 +530,22 @@ export default function SettingsPage() {
               {consentLoading ? (
                 <div className="text-sm text-muted">{t.loading}</div>
               ) : !consentStatus?.required_version ? (
-                <div className="text-sm text-muted">{t.noNotice}</div>
+                // No in-app consent version is configured, but the deployment
+                // may still publish a privacy notice (footer "Datenschutz").
+                privacyLink ? (
+                  <div className="space-y-4">
+                    <p className="text-sm text-body">{t.noConsentNeeded}</p>
+                    <a
+                      href={privacyLink.href}
+                      {...(privacyLink.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                      className="inline-block px-4 py-2 rounded-lg border border-rule-strong text-body hover:bg-canvas text-sm font-medium"
+                    >
+                      {t.viewNotice}
+                    </a>
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted">{t.noNotice}</div>
+                )
               ) : (
                 <div className="space-y-4">
                   <div className="text-sm text-body space-y-1">
