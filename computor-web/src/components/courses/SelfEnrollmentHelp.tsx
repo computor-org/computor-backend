@@ -24,15 +24,9 @@ const mention = (text: string) => <code className="rounded bg-canvas px-1 font-m
 const COPY = {
   de: {
     title: 'Hilfe & Kontakt',
-    lena: (
-      <>
-        In diesem Kurs gibt es keine Tutorinnen und Tutoren, die Nachrichten beantworten. Fragen zum
-        Kursinhalt beantwortet die KI-Tutorin Lena: Schreib {mention('@lena')} in die Nachrichten zu
-        einer Aufgabe. Lena gibt Hinweise statt fertiger Lösungen.
-      </>
-    ),
-    support: 'Probleme mit der Plattform oder mit deinem Konto meldest du dem Computor-Support-Team über',
+    lena: <>Fragen zum Kurs? Schreib {mention('@lena')} in die Nachrichten einer Aufgabe. Technische Probleme:</>,
     report: 'Problem melden',
+    more: 'Mehr Hilfe',
     guides: 'Anleitungen (auf Englisch)',
     browser: 'Im Browser arbeiten',
     local: 'Mit VS Code auf dem eigenen Rechner arbeiten',
@@ -47,29 +41,18 @@ const COPY = {
         als ZIP-Datei gespeichert.
       </>
     ),
-    leaveTitle: 'Kurs verlassen',
-    leaveText:
-      'Du bist diesem Kurs selbst beigetreten und kannst ihn auch selbst wieder verlassen. Deine Abgaben und Ergebnisse bleiben gespeichert.',
     leave: 'Kurs verlassen',
     leaving: 'Wird verlassen …',
     confirmTitle: 'Kurs verlassen?',
-    confirmMessage: (title: string) =>
-      `Du wirst aus ${title} ausgetragen und siehst den Kurs nicht mehr unter „Meine Kurse“. ` +
-      'Deine Abgaben und Ergebnisse bleiben gespeichert. Trittst du dem Kurs später über den Katalog wieder bei, ist alles wieder da.',
+    confirmMessage: (title: string) => `Du wirst aus ${title} ausgetragen. Deine Abgaben bleiben gespeichert.`,
     account: 'Soll dein ganzes Konto gelöscht werden? Das geht über eine Anfrage an den Support:',
     deleteAccount: 'Konto löschen',
   },
   en: {
     title: 'Help & contact',
-    lena: (
-      <>
-        This course has no tutors who answer messages. Questions about the course content are answered
-        by Lena, the AI tutor: write {mention('@lena')} in the messages of an assignment. Lena gives hints
-        instead of complete solutions.
-      </>
-    ),
-    support: 'Problems with the platform or your account go to the Computor support team via',
+    lena: <>Questions? Write {mention('@lena')} in an assignment&apos;s messages. Technical problems:</>,
     report: 'Report a problem',
+    more: 'More help',
     guides: 'Guides',
     browser: 'Working in the browser',
     local: 'Working with VS Code on your own computer',
@@ -84,15 +67,10 @@ const COPY = {
         saved as a ZIP file.
       </>
     ),
-    leaveTitle: 'Leave the course',
-    leaveText:
-      'You joined this course yourself and can leave it yourself. Your submissions and results are kept.',
     leave: 'Leave course',
     leaving: 'Leaving…',
     confirmTitle: 'Leave this course?',
-    confirmMessage: (title: string) =>
-      `You will be removed from ${title} and no longer see it under “My courses”. ` +
-      'Your submissions and results are kept. If you join the course again from the catalog, everything is back.',
+    confirmMessage: (title: string) => `You leave ${title}. Your submissions are kept.`,
     account: 'Do you want your whole account deleted? Send a request to support:',
     deleteAccount: 'Delete account',
   },
@@ -142,20 +120,23 @@ export default function SelfEnrollmentHelp({
 
   return (
     <SectionCard title={t.title}>
-      <p className="text-body">{t.lena}</p>
       <p className="text-sm text-body">
-        {t.support}{' '}
+        {t.lena}{' '}
         <Link href={`/problem?from=${from}`} className="text-accent-text hover:underline">
           {t.report}
         </Link>
         .
       </p>
 
-      <div>
-        <h3 className="text-sm font-semibold text-fg">{t.guides}</h3>
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-body marker:text-muted">
-          <li><External href={HELP.browser}>{t.browser}</External></li>
-          <li><External href={HELP.local}>{t.local}</External></li>
+      {/* Guides, export and account deletion only on request. */}
+      <details className="text-sm text-body">
+        <summary className="cursor-pointer text-accent-text hover:underline">{t.more}</summary>
+        <ul className="mt-2 list-disc space-y-1 pl-5 marker:text-muted">
+          <li>
+            {t.guides}: <External href={HELP.browser}>{t.browser}</External>
+            {', '}
+            <External href={HELP.local}>{t.local}</External>
+          </li>
           <li>
             {t.structure} <External href={HELP.course}>{t.course}</External>
             {', '}
@@ -167,28 +148,20 @@ export default function SelfEnrollmentHelp({
             <External href={HELP.files}>{t.files}</External>
             {t.filesHow}
           </li>
+          <li>
+            {t.account}{' '}
+            <Link href={`/problem?topic=delete-account&from=${from}`} className="text-accent-text hover:underline">
+              {t.deleteAccount}
+            </Link>
+          </li>
         </ul>
-      </div>
+      </details>
 
-      <div className="space-y-3 border-t border-rule-soft pt-4">
-        {canLeave && (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-fg">{t.leaveTitle}</h3>
-              <p className="mt-1 text-sm text-muted">{t.leaveText}</p>
-            </div>
-            <Button variant="secondary" className="shrink-0 self-start sm:self-center" onClick={() => setConfirming(true)}>
-              {t.leave}
-            </Button>
-          </div>
-        )}
-        <p className="text-sm text-muted">
-          {t.account}{' '}
-          <Link href={`/problem?topic=delete-account&from=${from}`} className="text-accent-text hover:underline">
-            {t.deleteAccount}
-          </Link>
-        </p>
-      </div>
+      {canLeave && (
+        <Button variant="ghost" size="xs" onClick={() => setConfirming(true)}>
+          {t.leave}
+        </Button>
+      )}
 
       <ConfirmDialog
         open={confirming}

@@ -81,11 +81,14 @@ test.describe('German learner', () => {
 
     const help = page.getByRole('heading', { name: 'Hilfe & Kontakt' });
     await expect(help).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('keine Tutorinnen und Tutoren', { exact: false })).toBeVisible();
+    await expect(page.getByText('Fragen zum Kurs?', { exact: false })).toBeVisible();
     await expect(page.getByText('@lena', { exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Problem melden' }).last()).toHaveAttribute(
       'href', `/problem?from=${encodeURIComponent(`/courses/${COURSE_ID}`)}`,
     );
+    // Guides, export and account deletion wait behind "Mehr Hilfe".
+    await expect(page.getByRole('link', { name: 'Konto löschen' })).toHaveCount(0);
+    await page.getByText('Mehr Hilfe', { exact: true }).click();
     await expect(page.getByRole('link', { name: 'Mit VS Code auf dem eigenen Rechner arbeiten' })).toHaveAttribute(
       'href', /computor-vscode\/blob\/main\/docs\/user-guide\.md#getting-started$/,
     );
@@ -98,7 +101,7 @@ test.describe('German learner', () => {
 
     await page.getByRole('button', { name: 'Kurs verlassen' }).click();
     const dialog = page.getByRole('dialog');
-    await expect(dialog.getByText('Deine Abgaben und Ergebnisse bleiben gespeichert.', { exact: false })).toBeVisible();
+    await expect(dialog.getByText(`Du wirst aus ${COURSE.title} ausgetragen. Deine Abgaben bleiben gespeichert.`, { exact: true })).toBeVisible();
     await dialog.getByRole('button', { name: 'Kurs verlassen' }).click();
 
     await expect(page).toHaveURL(/\/courses$/);
@@ -151,6 +154,7 @@ test('the English course page offers the same help', async ({ page }) => {
   await signIn(page, { self_registered: true, can_leave: true });
   await page.goto(`/courses/${COURSE_ID}`);
   await expect(page.getByRole('heading', { name: 'Help & contact' })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('This course has no tutors who answer messages.', { exact: false })).toBeVisible();
+  await expect(page.getByText('Questions? Write', { exact: false })).toBeVisible();
+  await expect(page.getByText('More help', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Leave course' })).toBeVisible();
 });
