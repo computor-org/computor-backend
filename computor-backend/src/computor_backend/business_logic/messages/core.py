@@ -5,7 +5,7 @@ from typing import Tuple, List
 from sqlalchemy import literal
 from sqlalchemy.orm import Session
 
-from computor_backend.exceptions import BadRequestException, NotImplementedException
+from computor_backend.exceptions import BadRequestException
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.core import check_permissions
 from computor_backend.model.message import Message
@@ -18,6 +18,7 @@ from .permissions import (
     _check_global_write_permission,
     _check_user_message_write_permission,
     _check_submission_group_write_permission,
+    _check_course_member_write_permission,
     _check_course_content_write_permission,
     _check_course_group_write_permission,
     _check_course_write_permission,
@@ -110,7 +111,7 @@ def create_message_with_author(
     | None (global)         | admin only on write; everyone can read           |
     | user_id               | direct chat — implemented but currently disabled |
     |                       | (raises NotImplementedException)                 |
-    | course_member_id      | not implemented yet (raises NotImplementedException) |
+    | course_member_id      | member owner OR course role >= _tutor                 |
     | submission_group_id   | submission_group_member OR course role >= _tutor |
     | course_content_id     | course role >= _lecturer                         |
     | course_group_id       | course role >= _lecturer                         |
@@ -121,8 +122,7 @@ def create_message_with_author(
 
     Raises:
         BadRequestException: If content missing or reply scope mismatch.
-        NotImplementedException: For not-yet-enabled targets (user_id,
-            course_member_id).
+        NotImplementedException: For the not-yet-enabled user_id target.
         ForbiddenException: If the principal lacks the role required for
             the target's scope.
     """
@@ -193,9 +193,10 @@ def create_message_with_author(
     elif primary_target == 'user_id':
         _check_user_message_write_permission(permissions, model_dump['user_id'], db)
     elif primary_target == 'course_member_id':
-        raise NotImplementedException(
-            detail="Course member messages (course_member_id target) are not implemented yet"
-        )
+        if (parent_message is not None
+                and str(parent_message.course_member_id) != str(model_dump['course_member_id'])):
+            raise BadRequestException(detail="Replies must retain their course member conversation")
+        _check_course_member_write_permission(permissions, model_dump['course_member_id'], db)
     elif primary_target == 'submission_group_id':
         _check_submission_group_write_permission(permissions, model_dump['submission_group_id'], db)
     elif primary_target == 'course_content_id':
