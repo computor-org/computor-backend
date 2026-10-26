@@ -51,6 +51,7 @@ from ..model.artifact import (
     SubmissionGrade,
     SubmissionReview,
 )
+from ..permissions.roles import LEARNER_COURSE_ROLES
 from ..services.storage_service import StorageService, get_storage_service
 from ..services.cascade_cleanup import (
     cleanup_submission_artifacts_batch,
@@ -194,15 +195,15 @@ def count_course_entities(db: Session, course_id: str) -> EntityDeleteCount:
         ).count()
 
         # Of those, the ones that are a STUDENT's: artifacts in a submission
-        # group with at least one ``_student`` member. Staff self-tests do not
-        # count. This is the figure that decides whether the course may be
+        # group with at least one ``_student`` member or learner who left
+        # (``_inactive``, issues#458). Staff self-tests do not count. This is the figure that decides whether the course may be
         # deleted at all (see ``course_delete_block_reason``).
         student_group_ids = (
             db.query(SubmissionGroupMember.submission_group_id)
             .join(CourseMember, CourseMember.id == SubmissionGroupMember.course_member_id)
             .filter(
                 SubmissionGroupMember.submission_group_id.in_(submission_group_ids),
-                CourseMember.course_role_id == "_student",
+                CourseMember.course_role_id.in_(LEARNER_COURSE_ROLES),
             )
         )
         counts.student_submissions = db.query(SubmissionArtifact).filter(

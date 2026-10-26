@@ -54,7 +54,7 @@ from computor_backend.model.course import (
 from computor_backend.model.result import Result
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.principal import Principal
-from computor_backend.permissions.roles import CourseRole
+from computor_backend.permissions.roles import LEARNER_COURSE_ROLES, CourseRole
 
 logger = logging.getLogger(__name__)
 
@@ -900,7 +900,9 @@ async def get_student_activity(
         for c in content_ids
     ]
 
-    is_student = member.course_role_id == CourseRole.STUDENT.value
+    # A learner who left (``_inactive``) is still judged against the course's
+    # assignments when a lecturer opens their history.
+    is_student = member.course_role_id in LEARNER_COURSE_ROLES
     submittable = _submittable_ids(db, course_id) if is_student else set()
     flags = evaluate_flags(
         runs_by_content,
@@ -936,7 +938,12 @@ async def get_course_flags(
     now = _utc(now) or datetime.now(timezone.utc)
     students = _student_rows(db, course_id)
     titles = _content_titles(db, course_id)
-    member_ids = list(students)
+    # Flags ask for a lecturer's attention now; a learner who left the course
+    # (``_inactive``) is not flagged, although their history stays readable.
+    member_ids = [
+        mid for mid, s in students.items()
+        if s.get("course_role_id") == CourseRole.STUDENT.value
+    ]
     runs_all, subs_all, _ = _member_activity(db, course_id, member_ids)
     submittable = _submittable_ids(db, course_id)
 
