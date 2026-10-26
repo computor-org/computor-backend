@@ -37,6 +37,13 @@ class CourseRole(str, Enum):
 # again turns it back into ``_student``.
 INACTIVE_COURSE_ROLE = "_inactive"
 
+# Roles of everyone who is or was a learner in a course. Staff-facing reads
+# (gradebook, grading statistics, typical errors, the course deletion guard)
+# use this, so the submissions and results of a learner who left stay visible
+# and keep protecting the course. Learner-facing reads and access checks keep
+# using ``_student`` or the hierarchy, neither of which admits ``_inactive``.
+LEARNER_COURSE_ROLES: Tuple[str, ...] = (CourseRole.STUDENT.value, INACTIVE_COURSE_ROLE)
+
 
 class ScopeRole(str, Enum):
     """Organization / course-family role identifiers.
