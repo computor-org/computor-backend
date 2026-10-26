@@ -350,6 +350,7 @@ def deploy_course_from_config(
 
     course = Course(
         title=config.name,
+        position=config.position,
         description=config.description or "",
         path=Ltree(config.path),
         course_family_id=family.id,
