@@ -37,15 +37,10 @@ const COPY = {
     launching: 'Wird gestartet …',
     launch: 'Arbeitsumgebung starten',
     setUp: 'Arbeitsumgebung einrichten',
-    setUpHint:
-      'Hier programmierst, testest und gibst du ab. Damit öffnest du diesen Kurs in deiner Arbeitsumgebung.',
     openIn: (label: string) => `In ${label} öffnen`,
     startAndOpen: 'Starten und öffnen',
     startAgain: 'Erneut starten',
-    openHint: (label: string) =>
-      `In ${label} programmieren, testen und abgeben. Damit öffnest du diesen Kurs in deiner Arbeitsumgebung oder arbeitest im bereits offenen Editor weiter. Deine Dateien bleiben erhalten.`,
-    stopHint: (label: string) =>
-      `Wenn du fertig bist, beende ${label} mit „Stoppen“. Schließt du nur den Tab, stoppt die Arbeitsumgebung nach einer Weile ohne Nutzung von selbst. Beim nächsten Start wird sie bei Bedarf aktualisiert.`,
+    stopHint: (label: string) => `Beendet ${label}. Deine Dateien bleiben erhalten.`,
     yours: 'Weitere Arbeitsumgebungen',
     open: 'Öffnen',
     retry: 'Erneut versuchen',
@@ -64,14 +59,10 @@ const COPY = {
     launching: 'Launching…',
     launch: 'Launch workspace',
     setUp: 'Set up workspace',
-    setUpHint:
-      'Edit, test and submit here. Opens this course in your workspace.',
     openIn: (label: string) => `Open in ${label}`,
     startAndOpen: 'Start and open',
     startAgain: 'Start again',
-    openHint: (label: string) => `Edit, test and submit in ${label}. Opens this course in your workspace or reuses the open editor. Your files are kept.`,
-    stopHint: (label: string) =>
-      `When you are done, shut down ${label} with Stop. If you only close the tab, the workspace stops by itself after a while without use. The next start updates the workspace if needed.`,
+    stopHint: (label: string) => `Shuts down ${label}. Your files are kept.`,
     yours: 'Other workspaces',
     open: 'Open',
     retry: 'Retry',
@@ -94,7 +85,8 @@ const courseWorkspacesClient = new CourseWorkspacesClient();
  *
  * On the course page a template whose personal workspace already exists is a
  * single row with its state and one state-aware action ("In VS Code öffnen",
- * "Starten und öffnen", "Erneut starten"), plus Stop while it runs. The tile
+ * "Starten und öffnen", "Erneut starten"), plus Stop while it runs, with no
+ * text beside them: what Stop does is its tooltip. The tile
  * that sets a workspace up appears only while there is none: a tile next to a
  * row for the same workspace made returning learners guess which one resumes
  * their work and whether the tile creates a second workspace. Other
@@ -122,6 +114,7 @@ export default function CourseWorkspaceLaunchButtons({
   autoLaunch = false,
   ref,
   compact = false,
+  single = false,
   className,
   title,
 }: {
@@ -131,6 +124,9 @@ export default function CourseWorkspaceLaunchButtons({
   autoLaunch?: boolean;
   ref?: Ref<CourseWorkspaceLauncher>;
   compact?: boolean;
+  /** With `compact`: one "In VS Code öffnen" button instead of the icon row,
+      for the assignment page, where it opens `courseContentId`. */
+  single?: boolean;
   /** Extra classes on the root, e.g. outer spacing — only rendered when the
       component itself renders, so callers don't get stray margins when it
       self-hides. */
@@ -358,6 +354,22 @@ export default function CourseWorkspaceLaunchButtons({
   const ownOptions = courseOptions.filter((option) => personal.has(option.name));
   const newOptions = courseOptions.filter((option) => !personal.has(option.name));
 
+  if (compact && single) {
+    const vscode = courseOptions.find((option) => option.name === 'vscode-workspace' && isUsable(option));
+    if (!vscode) return null;
+    return (
+      <Button
+        size="sm"
+        className={className}
+        onClick={() => provisionAndLaunch(vscode.name)}
+        loading={launching === vscode.name}
+        loadingLabel={t.launching}
+      >
+        {t.openIn(templateLabel(vscode))}
+      </Button>
+    );
+  }
+
   if (compact) {
     return (
       <div className={`mt-2 flex flex-wrap items-center gap-1.5 ${className ?? ''}`}>
@@ -411,7 +423,6 @@ export default function CourseWorkspaceLaunchButtons({
                       transition={w.latest_build_transition}
                     />
                   </div>
-                  <p className="mt-0.5 text-xs text-muted">{t.openHint(label)}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
                   {/* Same click as the tile: a fresh lookup, then reuse. */}
@@ -429,6 +440,7 @@ export default function CourseWorkspaceLaunchButtons({
                     <Button
                       size="sm"
                       variant="secondary"
+                      title={t.stopHint(label)}
                       onClick={() => stopExisting(w)}
                       loading={stopInFlight(w)}
                       loadingLabel={t.stopping}
@@ -437,9 +449,6 @@ export default function CourseWorkspaceLaunchButtons({
                     </Button>
                   )}
                 </div>
-                {category === 'running' && (
-                  <p className="basis-full text-xs text-subtle">{t.stopHint(label)}</p>
-                )}
               </li>
             );
           })}
@@ -461,9 +470,6 @@ export default function CourseWorkspaceLaunchButtons({
               />
             ))}
           </div>
-          {workspacesData && newOptions.some(isUsable) && (
-            <p className="mt-2 text-xs text-muted">{t.setUpHint}</p>
-          )}
         </div>
       )}
 

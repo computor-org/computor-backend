@@ -101,7 +101,6 @@ function WorkspaceRow({
       </Td>
       <Td className="text-sm text-muted">
         {workspace.template_display_name || workspace.template_name || '—'}
-        {version && <div className="text-xs">{version}</div>}
       </Td>
       <Td>
         {/*
@@ -109,7 +108,7 @@ function WorkspaceRow({
           with no stages to report, and the chip already names it ("stopping") —
           a bar beside it drew a second, vaguer copy of the same word.
         */}
-        <WorkspaceStatusBadge status={workspace.latest_build_status} transition={transition} />
+        <WorkspaceStatusBadge status={workspace.latest_build_status} transition={transition} detail={version} />
       </Td>
       <Td className="text-sm text-muted whitespace-nowrap">
         {workspace.created_at ? new Date(workspace.created_at).toLocaleDateString(language === 'de' ? 'de-AT' : undefined) : '—'}

@@ -46,7 +46,7 @@ const COPY = {
     sentBack: (n: number) =>
       n === 1 ? '1 Aufgabe wurde von Tutoren zurückgegeben.' : `${n} Aufgaben wurden von Tutoren zurückgegeben.`,
     notEnrolled: 'Du bist noch in keinem Kurs.',
-    nothingSentBack: 'Dir wurde keine Aufgabe zur Korrektur zurückgegeben.',
+    nothingWaiting: 'Im Moment wartet nichts auf dich.',
     announcements: 'Ankündigungen',
     new: 'Neu',
     announcement: 'Ankündigung',
@@ -66,7 +66,7 @@ const COPY = {
     welcomeBack: (name?: string) => `Welcome back, ${name}`,
     sentBack: (n: number) => `${n} ${n === 1 ? 'assignment' : 'assignments'} sent back by a tutor.`,
     notEnrolled: "You're not enrolled in any courses yet.",
-    nothingSentBack: 'No assignment has been sent back to you for correction.',
+    nothingWaiting: 'Nothing is waiting on you right now.',
     announcements: 'Announcements',
     new: 'New',
     announcement: 'Announcement',
@@ -239,7 +239,7 @@ export default function DashboardPage() {
                 : courses.length === 0
                   ? t.notEnrolled
                   : learnsSomewhere
-                    ? t.nothingSentBack
+                    ? t.nothingWaiting
                     : undefined
           }
         />

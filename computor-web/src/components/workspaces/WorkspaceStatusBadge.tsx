@@ -126,17 +126,22 @@ function statusLabel(
 export default function WorkspaceStatusBadge({
   status,
   transition,
+  detail,
 }: {
   status?: WorkspaceBuildStatus | string | null;
   /** The build's transition ('start' | 'stop' | 'delete') — pass it when known. */
   transition?: string | null;
+  /** Extra tooltip line, e.g. the workspace's "Version vom …". */
+  detail?: string | null;
 }) {
   const language = useUiLanguage();
   const category = categorizeStatus(status, transition);
+  const title = [status ? `${COPY[language].buildStatus}: ${COPY[language].raw[status.toLowerCase()] ?? status}` : null, detail]
+    .filter(Boolean).join(' · ');
   return (
     <Badge color={categoryColor[category]} pill>
       <span className={`h-1.5 w-1.5 rounded-full mr-1.5 ${categoryDots[category]}`} />
-      <span title={status ? `${COPY[language].buildStatus}: ${COPY[language].raw[status.toLowerCase()] ?? status}` : undefined}>
+      <span title={title || undefined}>
         {statusLabel(status, transition, language)}
       </span>
     </Badge>

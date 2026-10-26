@@ -112,7 +112,6 @@ export default function DashboardWorkspaces({
                 {courseId && (
                   <div className="text-xs text-muted">{(rememberedCourse ? t.lastCourse : t.course)(courseTitles.get(courseId)!)}</div>
                 )}
-                {version && <div className="text-xs text-muted">{version}</div>}
               </div>
               {!rememberedCourse && candidates.length > 1 && (
                 <select
@@ -126,7 +125,7 @@ export default function DashboardWorkspaces({
                 </select>
               )}
               <div className="flex shrink-0 items-center gap-2 ml-auto">
-                <WorkspaceStatusBadge status={ws.latest_build_status} transition={ws.latest_build_transition} />
+                <WorkspaceStatusBadge status={ws.latest_build_status} transition={ws.latest_build_transition} detail={version} />
                 <Button size="sm" onClick={launch} disabled={!owner || (candidates.length > 1 && !courseId)}>
                   {label}
                 </Button>
