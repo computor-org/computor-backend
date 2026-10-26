@@ -551,6 +551,8 @@ def execute_tests_activity(
         "testing_service_id": test_config.get("testing_service_id"),
         "student_path": student_path,
         "reference_path": reference_path,
+        # Course language for the runner's learner-facing messages.
+        "language": test_config.get("language"),
     }
 
     # Execute tests. execute_tests_with_backend is async-by-convention (its work
