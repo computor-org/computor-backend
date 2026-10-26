@@ -1,6 +1,6 @@
 # Datenschutzerklärung computor.at
 
-Version 1.5, Stand 25.10.2026
+Version 1.6, Stand 26.10.2026
 
 Computor ist ein kostenloses Lernangebot der TU Graz. Öffentliche Materialien
 können Sie ohne Konto lesen. Für Konto, Kurse, Abgaben, Arbeitsumgebung,
@@ -44,7 +44,7 @@ Konto.
 | Gehostete Workspaces | Dateien, laufende Prozesse sowie Start- und Stoppzeiten; für die Programmierumgebung auf unseren Servern. Ein gestoppter Workspace behält seine Home-Dateien. | Technischer Zugang des Betriebsteams; Inhaltszugriff, soweit für Betrieb, Wiederherstellung, Support oder Sicherheit erforderlich. |
 | Kursnachrichten | Nachrichten mit Änderungsverlauf und Zeitstempeln; für Austausch und Betreuung. | Der jeweilige Empfängerkreis; nicht pauschal alle Kursteilnehmenden. |
 | Lena | Fragen, ausgewählter Text, Aufgaben- und Nachrichtenkontext sowie Antworten; für Lernhilfe wie unten beschrieben. | Bei Schaltflächen-Anfragen nur Sie; im Nachrichtenverlauf dessen Empfängerkreis. |
-| Support und Meldungen | E-Mails, Kontaktangaben, Problembeschreibung, selbst beigefügte Anhänge und technische Angaben wie Anwendung, Version, Seite oder Befehl; für Bearbeitung und Antworten. | Support-Team; Anfragen und Anhänge werden nicht automatisch veröffentlicht. Nach Prüfung kann eine Zusammenfassung ohne personenbezogene Angaben im öffentlichen GitHub-Fehlerverzeichnis erscheinen. |
+| Support und Meldungen | E-Mails, Kontaktangaben, Problembeschreibung, selbst beigefügte Anhänge und technische Angaben wie Anwendung, Version, Seite oder Befehl; für Bearbeitung und Antworten, unterstützt durch Software und lokale KI-Modelle wie unten beschrieben. | Support-Team; Anfragen und Anhänge werden nicht automatisch veröffentlicht. Nach Prüfung kann eine Zusammenfassung ohne personenbezogene Angaben im öffentlichen GitHub-Fehlerverzeichnis erscheinen. |
 | Zugriff und Sicherheit | IP-Adresse, Zeit, aufgerufene Ressource, Datenmenge, Status, Browser/Betriebssystem und Herkunftsseite sowie gegebenenfalls Konto- oder Workspace-Kennungen, Anmeldeereignisse, Verwaltungsaktionen und Diagnosemeldungen; zur Fehler- und Angriffserkennung sowie für Verfügbarkeit und sicheren Betrieb. | Technischer Betrieb und Sicherheitsbetreuung, beschränkt auf ihre Rolle und die genannten Betriebs- und Sicherheitszwecke. |
 
 Technischer Serverzugang dient Betrieb, Fehlerbehebung und Missbrauchsabwehr
@@ -72,6 +72,16 @@ Berechnungen; sie sind nicht für Lernende zugänglich und werden bei
 Kapazitätsbedarf ersetzt oder geleert, ohne feste Zeitfrist. Numerische
 Größen-, Status- und Zeitmesswerte enthalten keine Fragen, übermittelten Texte
 oder Antworten.
+
+**Support:** Eingehende Support-E-Mails und Meldungen werden automatisch
+eingelesen, bereinigt und einer Anfrage zugeordnet. Lokale KI-Modelle können
+eine Anfrage zusammenfassen, einordnen und einen Antwortentwurf vorschlagen.
+Jede Antwort prüft und versendet eine Person aus dem Support-Team; die KI
+entscheidet nicht über Konto, Sperren, Abgaben oder Noten. Die Modelle laufen
+auf Rechnern der TU Graz in Österreich und auf unseren Servern bei Hetzner in
+Deutschland (Abschnitt 3), ohne externen KI-Anbieter und ohne Modelltraining
+mit Ihren Daten. Zusammenfassungen, Einordnungen und Entwürfe gehören zur
+Anfrage und folgen deren Löschfrist (Abschnitt 4).
 
 ## 3. Verarbeitungsorte und zusätzliche Arbeitswege
 
