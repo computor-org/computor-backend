@@ -35,6 +35,10 @@ ENV NEXT_PUBLIC_GIT_COMMIT=$GIT_COMMIT
 # Legal footer/pages profile: computor-at | tugraz-internal | none (default).
 ARG NEXT_PUBLIC_LEGAL_PROFILE=none
 ENV NEXT_PUBLIC_LEGAL_PROFILE=$NEXT_PUBLIC_LEGAL_PROFILE
+# Date (YYYY-MM-DD) the current Terms of Use take effect for existing contracts
+# (computor.at; src/config/terms.ts). Empty: no terms rollout scheduled.
+ARG NEXT_PUBLIC_TERMS_EFFECTIVE_FROM=
+ENV NEXT_PUBLIC_TERMS_EFFECTIVE_FROM=$NEXT_PUBLIC_TERMS_EFFECTIVE_FROM
 
 # Disable Next.js telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
