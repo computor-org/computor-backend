@@ -30,6 +30,21 @@ class CourseRole(str, Enum):
     STUDENT = "_student"
 
 
+# A self-enrolled learner who left the course (issues#458). The membership row
+# stays, so submissions and results keep their course_member, but the role is
+# outside the hierarchy: it satisfies no role check, ``db_get_course_claims``
+# emits no claim for it, and it is not counted as a student. Joining the course
+# again turns it back into ``_student``.
+INACTIVE_COURSE_ROLE = "_inactive"
+
+# Roles of everyone who is or was a learner in a course. Staff-facing reads
+# (gradebook, grading statistics, typical errors, the course deletion guard)
+# use this, so the submissions and results of a learner who left stay visible
+# and keep protecting the course. Learner-facing reads and access checks keep
+# using ``_student`` or the hierarchy, neither of which admits ``_inactive``.
+LEARNER_COURSE_ROLES: Tuple[str, ...] = (CourseRole.STUDENT.value, INACTIVE_COURSE_ROLE)
+
+
 class ScopeRole(str, Enum):
     """Organization / course-family role identifiers.
 

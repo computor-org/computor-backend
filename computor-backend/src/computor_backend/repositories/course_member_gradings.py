@@ -26,6 +26,7 @@ from computor_backend.model.course import (
 )
 from computor_backend.model.artifact import SubmissionArtifact
 from computor_backend.model.auth import User
+from computor_backend.permissions.roles import LEARNER_COURSE_ROLES
 from computor_backend.business_logic.content_visibility import (
     load_course_visible,
     resolve_visible,
@@ -250,7 +251,9 @@ class CourseMemberGradingsRepository:
         course_id: UUID | str,
     ) -> List[Dict[str, Any]]:
         """
-        Get all course members with student role in a course.
+        Get all learners of a course: ``_student`` members and learners who
+        left (``_inactive``), whose submissions and results stay visible to
+        staff. ``course_role_id`` tells them apart.
 
         Args:
             course_id: The course ID
@@ -273,6 +276,7 @@ class CourseMemberGradingsRepository:
                 User.given_name.label("given_name"),
                 User.family_name.label("family_name"),
                 StudentProfile.student_id.label("student_id"),
+                CourseMember.course_role_id.label("course_role_id"),
             )
             .join(User, User.id == CourseMember.user_id)
             .outerjoin(
@@ -284,7 +288,8 @@ class CourseMemberGradingsRepository:
             )
             .filter(
                 CourseMember.course_id == course_id,
-                CourseMember.course_role_id == "_student",  # literal: model CourseRole is imported here
+                # Learners who left (``_inactive``) stay in the gradebook.
+                CourseMember.course_role_id.in_(LEARNER_COURSE_ROLES),
             )
             .order_by(User.family_name, User.given_name)
             .all()
@@ -297,6 +302,7 @@ class CourseMemberGradingsRepository:
                 "given_name": r.given_name,
                 "family_name": r.family_name,
                 "student_id": r.student_id,
+                "course_role_id": r.course_role_id,
             }
             for r in results
         ]
@@ -620,7 +626,8 @@ class CourseMemberGradingsRepository:
             GROUP BY content_type_id, content_type_slug, content_type_title, content_type_color
         ),
         all_students AS (
-            -- Get all students in the course with student_id from student_profile
+            -- Get all learners in the course with student_id from student_profile,
+            -- including learners who left (_inactive): their work stays graded.
             SELECT
                 cm.id as course_member_id,
                 cm.user_id,
@@ -633,7 +640,7 @@ class CourseMemberGradingsRepository:
             LEFT JOIN student_profile sp ON sp.user_id = cm.user_id
                 AND sp.organization_id = (SELECT organization_id FROM course_org)
             WHERE cm.course_id = :course_id
-              AND cm.course_role_id = '_student'
+              AND cm.course_role_id IN :learner_roles
             ORDER BY u.family_name, u.given_name
         ),
         submitted_by_member_and_type AS (
@@ -718,7 +725,8 @@ class CourseMemberGradingsRepository:
         ORDER BY s.family_name, s.given_name, ctc.content_type_slug
         """)
 
-        params = {"course_id": str(course_id)}
+        sql = sql.bindparams(bindparam("learner_roles", expanding=True))
+        params = {"course_id": str(course_id), "learner_roles": list(LEARNER_COURSE_ROLES)}
         if path_prefix:
             params["path_prefix"] = path_prefix
         if course_content_type_id:

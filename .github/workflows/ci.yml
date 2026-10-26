@@ -153,6 +153,7 @@ jobs:
           uv run --project computor-backend pytest -q
           computor-backend/src/computor_backend/tests/test_public_learning.py
           computor-backend/src/computor_backend/tests/test_public_catalog_anonymous.py
+          computor-backend/src/computor_backend/tests/test_public_course_registration.py
           computor-backend/src/computor_backend/tests/test_course_public_flag_authz.py
           computor-backend/src/computor_backend/tests/test_public_luna_access.py
           computor-backend/src/computor_backend/tests/test_public_testing_admission.py
@@ -206,7 +207,7 @@ jobs:
       - run: yarn test:public-learning
       - run: yarn build
       - run: npx playwright install --with-deps chromium
-      - run: yarn test:e2e e2e/public-learning.spec.ts e2e/course-card-layout.spec.ts e2e/workspace-launch.spec.ts e2e/teacher-dashboard.spec.ts e2e/support-tickets.spec.ts e2e/student-description-language.spec.ts --workers=2
+      - run: yarn test:e2e e2e/public-learning.spec.ts e2e/course-card-layout.spec.ts e2e/workspace-launch.spec.ts e2e/teacher-dashboard.spec.ts e2e/support-tickets.spec.ts e2e/student-description-language.spec.ts e2e/self-enrollment-help.spec.ts --workers=2
 
   keycloak-abuse:
     # Required jobs run in the merge queue, not on pull request events.
