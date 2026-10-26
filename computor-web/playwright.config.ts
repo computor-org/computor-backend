@@ -30,10 +30,13 @@ export default defineConfig({
     url: `http://localhost:${PORT}`,
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,
+    // computor.at profile with a scheduled terms rollout (terms-notice.spec.ts
+    // moves the browser clock around this date); NEXT_PUBLIC_LEGAL_PROFILE
+    // overrides the profile.
     env: {
       NEXT_PUBLIC_API_URL: API,
-      // Unset by default; set to computor-at to also exercise the legal pages.
-      ...(process.env.NEXT_PUBLIC_LEGAL_PROFILE ? { NEXT_PUBLIC_LEGAL_PROFILE: process.env.NEXT_PUBLIC_LEGAL_PROFILE } : {}),
+      NEXT_PUBLIC_LEGAL_PROFILE: process.env.NEXT_PUBLIC_LEGAL_PROFILE ?? 'computor-at',
+      NEXT_PUBLIC_TERMS_EFFECTIVE_FROM: '2026-12-07',
     },
   },
 });

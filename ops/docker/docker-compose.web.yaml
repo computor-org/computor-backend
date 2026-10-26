@@ -12,6 +12,7 @@ services:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
         - GIT_COMMIT=${GIT_COMMIT:-}
         - NEXT_PUBLIC_LEGAL_PROFILE=${NEXT_PUBLIC_LEGAL_PROFILE:-none}
+        - NEXT_PUBLIC_TERMS_EFFECTIVE_FROM=${NEXT_PUBLIC_TERMS_EFFECTIVE_FROM:-}
     networks:
       - computor-network
     restart: unless-stopped

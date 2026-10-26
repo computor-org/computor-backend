@@ -162,6 +162,7 @@ export class SSOAuthService implements ISSOAuthProvider {
       role: determineRole(roleIds, views),
       systemRoles: roleIds,
       language: userInfo.profile?.language_code || null,
+      createdAt: userInfo.created_at || null,
     };
   }
 
