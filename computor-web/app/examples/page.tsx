@@ -1,5 +1,6 @@
 'use client';
 
+import { useLecturerCopy } from '@/src/hooks/useLecturerCopy';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ExamplesClient } from '@/src/generated/clients/ExamplesClient';
@@ -18,6 +19,7 @@ const examplesClient = new ExamplesClient();
 const exampleRepositoriesClient = new ExampleRepositoriesClient();
 
 export default function ExamplesPage() {
+  const t = useLecturerCopy();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { canViewExamples, canManageExamples } = usePermissions();
   const [repoFilter, setRepoFilter] = useState('');
@@ -41,40 +43,42 @@ export default function ExamplesPage() {
   const visible = repoFilter ? examples.filter((e) => e.example_repository_id === repoFilter) : examples;
 
   if (!authLoading && isAuthenticated && !canViewExamples) {
-    return <Forbidden message="You do not have access to examples." />;
+    return <Forbidden message={t("You do not have access to examples.")} />;
   }
 
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
-        <PageHeader
-          breadcrumbs={[{ label: 'Examples' }]}
-          title="Examples"
-          subtitle={
-            <>Reusable assignment content. <Link href="/example-repositories" className="text-accent-text hover:underline">Manage repositories</Link>.</>
-          }
-          actions={
-            <>
-              <select value={repoFilter} onChange={(e) => setRepoFilter(e.target.value)} className="px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line">
-                <option value="">All repositories</option>
-                {repos.map((r) => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
-              </select>
-              {canManageExamples && (
-                <Link href="/examples/upload" className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover whitespace-nowrap">Upload examples</Link>
-              )}
-            </>
-          }
-        />
+        <div className="[&>div>div]:flex-wrap [&>div>div>div]:flex-wrap">
+          <PageHeader
+            breadcrumbs={[{ label: t("Examples") }]}
+            title={t("Examples")}
+            subtitle={
+              <>{t('Reusable assignment content.')} <Link href="/example-repositories" className="text-accent-text hover:underline">{t("Manage repositories")}</Link>.</>
+            }
+            actions={
+              <>
+                <select value={repoFilter} onChange={(e) => setRepoFilter(e.target.value)} className="px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line">
+                  <option value="">{t("All repositories")}</option>
+                  {repos.map((r) => (
+                    <option key={r.id} value={r.id}>{r.name === 'Default Examples' ? t('Default Examples') : r.name}</option>
+                  ))}
+                </select>
+                {canManageExamples && (
+                  <Link href="/examples/upload" className="px-4 py-2 bg-accent text-on-accent rounded-lg text-sm font-medium hover:bg-accent-hover whitespace-nowrap">{t("Upload examples")}</Link>
+                )}
+              </>
+            }
+          />
+        </div>
 
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <ListLoading>Loading…</ListLoading>
+          <ListLoading>{t("Loading…")}</ListLoading>
         ) : visible.length === 0 ? (
           <div className="text-muted border border-dashed border-rule-strong rounded-lg p-8 text-center">
-            {examples.length === 0 ? 'No examples yet. Upload a zip of one or more examples to get started.' : 'No examples in this repository.'}
+            {examples.length === 0 ? t("No examples yet. Upload a zip of one or more examples to get started.") : t("No examples in this repository.")}
           </div>
         ) : (
           <ScrollArea spacing="rows">
@@ -88,7 +92,7 @@ export default function ExamplesPage() {
                   {(ex.tags || []).slice(0, 2).map((t) => (
                     <span key={t} className="px-2 py-0.5 text-xs bg-sunken text-muted rounded">{t}</span>
                   ))}
-                  <span className="text-xs text-subtle">{repoName[ex.example_repository_id] || ''}</span>
+                  <span className="text-xs text-subtle">{repoName[ex.example_repository_id] === 'Default Examples' ? t('Default Examples') : repoName[ex.example_repository_id] || ''}</span>
                   <span className="text-faint">›</span>
                 </div>
               </Link>
