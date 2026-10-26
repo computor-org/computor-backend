@@ -4,7 +4,9 @@ import "katex/dist/katex.min.css";
 import "./globals.css";
 import { AuthProvider } from "@/src/contexts/AuthContext";
 import { NotificationProvider } from "@/src/contexts/NotificationContext";
+import { CourseProvider } from "@/src/contexts/CourseContext";
 import { THEME_INIT_SCRIPT } from "@/src/utils/theme";
+import { APP_TITLES } from "@/src/utils/documentLanguage";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,7 +21,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   // German first, like the server render of the public pages; the pages set
   // <html lang> to the visitor's language on hydration.
-  title: "Computor – Lernplattform für Programmierung",
+  title: APP_TITLES.de,
   description: "Programmieren lernen mit interaktiven Kursen, automatischen Tests und gemeinsamem Arbeiten",
 };
 
@@ -39,7 +41,13 @@ export default function RootLayout({
       >
         <AuthProvider>
           <NotificationProvider>
-            {children}
+            {/*
+              Above every page, not inside AuthenticatedLayout: pages call
+              useCourseCrumbs before they render that layout, and below it
+              they only ever saw the context's default, so the breadcrumb read
+              "Kurs" where the course's name belonged.
+            */}
+            <CourseProvider>{children}</CourseProvider>
           </NotificationProvider>
         </AuthProvider>
       </body>

@@ -3,7 +3,7 @@
 import { useSystemRoles } from '@/src/hooks/useSystemRoles';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
-import { adminRoleLockedHint, grantsAdmin } from '@/src/utils/systemRoles';
+import { adminRoleLockedHint, grantsAdmin, roleDescription, roleTitle } from '@/src/utils/systemRoles';
 
 /**
  * Checkbox list of the builtin system roles, labelled with each role's
@@ -51,8 +51,10 @@ export default function SystemRoleCheckboxes({
               disabled={disabled || locked}
             />
             <span>
-              <span className="text-sm font-medium text-fg">{r.title ?? r.id}</span>
-              {r.description && <span className="block text-xs text-subtle">{r.description}</span>}
+              <span className="text-sm font-medium text-fg">{roleTitle(r.id, r.title, language)}</span>
+              {roleDescription(r.id, r.description, language) && (
+                <span className="block text-xs text-subtle">{roleDescription(r.id, r.description, language)}</span>
+              )}
               {locked && <span className="block text-xs text-subtle italic">{lockedHint}</span>}
             </span>
           </label>

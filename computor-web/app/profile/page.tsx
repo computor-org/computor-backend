@@ -51,7 +51,7 @@ const COPY = {
   en: {
     loadFailed: 'Failed to load profile',
     saveFailed: 'Save failed',
-    breadcrumb: 'My Profile',
+    breadcrumb: 'My profile',
     title: 'My profile',
     subtitle: 'Your identity and public profile across Computor.',
     saved: 'Saved',

@@ -23,7 +23,7 @@ const COPY = {
     untitled: 'Untitled Course',
     notifications: (unread: number) => (unread > 0 ? `Notifications (${unread} unread)` : 'Notifications'),
     userMenu: 'User menu',
-    profile: 'My Profile',
+    profile: 'My profile',
     settings: 'Settings',
     signOut: 'Sign Out',
   },

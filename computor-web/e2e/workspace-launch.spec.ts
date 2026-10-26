@@ -400,9 +400,13 @@ test('creating a workspace opens a launch tab for the name the server chose', as
       preparing: [],
     }),
   );
+  // Hold the response until the test has seen the tab parked on the creating
+  // state. A fixed delay lost that race whenever next dev compiled the launch
+  // page more slowly than the delay.
+  let releaseProvision!: () => void;
+  const provisionReleased = new Promise<void>((resolve) => { releaseProvision = resolve; });
   await page.route(`${API_ORIGIN}/coder/workspaces/provision`, async (route) => {
-    // Hold the response so the test can see the tab parked on the creating state.
-    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    await provisionReleased;
     return json(route, {
       user: { id: 'u-me', username: 'u-me', email: USER.email },
       // A self-provisioner's requested name is discarded and re-derived server
@@ -423,6 +427,7 @@ test('creating a workspace opens a launch tab for the name the server chose', as
   // While provisioning round-trips, the tab is already the launch spinner —
   // never a blank about:blank page.
   await expect(launchTab.getByText('Creating your workspace…')).toBeVisible();
+  releaseProvision();
 
   await launchTab.waitForURL(/owner=u-me/);
   expect(launchTab.url()).toContain('name=vscode');
@@ -631,11 +636,38 @@ test('staff Overview offers one state-aware control for the personal workspace',
   await expect(card.getByRole('button', { name: 'Stop', exact: true })).toHaveAttribute('title', 'Shuts down VS Code. Your files are kept.');
   await expect(card.getByRole('button', { name: 'Start and open' })).toHaveCount(0);
 
-  // Stopping: said so, and the launch page would start it again once stopped.
+  // Stopping: said so, and starting waits until the stop has finished.
   workspaces[0] = { ...COURSE_WORKSPACE, latest_build_status: 'stopping', latest_build_transition: 'stop' };
   await expect(card.getByText('Stopping', { exact: true })).toBeVisible();
-  await expect(card.getByRole('button', { name: 'Start and open' })).toBeVisible();
+  await expect(card.getByRole('button', { name: 'Start and open' })).toBeDisabled();
   await expect(card.getByRole('button', { name: 'Open in VS Code' })).toHaveCount(0);
+});
+
+test('a stop in progress keeps the workspace from being started until it has stopped', async ({ page }) => {
+  const workspaces: Partial<typeof COURSE_WORKSPACE>[] = [COURSE_WORKSPACE];
+  const { stops, starts, contexts } = await setup(page, [details({ status: 'running', ready: true, name: 'vscode' })], {
+    courseWorkspaces: true,
+    courseRoles: ['_lecturer'],
+    workspaces,
+  });
+  await page.goto(`/courses/${COURSE_A}`);
+  await page.getByRole('button', { name: 'Stop', exact: true }).click();
+  await expect.poll(() => stops).toHaveLength(1);
+
+  // The stop is accepted, but the listing still says running: opening now
+  // would land in an editor that is about to go away.
+  await expect(page.getByRole('button', { name: 'Open in VS Code' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Stopping…' })).toBeDisabled();
+
+  // The stop build shows up and runs: still no start.
+  workspaces[0] = { ...COURSE_WORKSPACE, latest_build_status: 'stopping', latest_build_transition: 'stop' };
+  await expect(page.getByRole('button', { name: 'Start and open' })).toBeDisabled();
+
+  // Stopped: starting is offered again.
+  workspaces[0] = { ...COURSE_WORKSPACE, latest_build_status: 'stopped', latest_build_transition: 'stop' };
+  await expect(page.getByRole('button', { name: 'Start and open' })).toBeEnabled();
+  expect(starts).toHaveLength(0);
+  expect(contexts).toHaveLength(0);
 });
 
 test('Stop on staff Overview stops the personal workspace without opening it', async ({ page }) => {

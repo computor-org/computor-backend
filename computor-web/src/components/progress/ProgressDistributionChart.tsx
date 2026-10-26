@@ -30,7 +30,9 @@ export default function ProgressDistributionChart({ students }: ProgressDistribu
     <div className="bg-surface rounded-lg border border-rule p-5">
       <h3 className="text-sm font-semibold text-fg mb-4">{t.title}</h3>
       <div className="h-52">
-        <ResponsiveContainer width="100%" height="100%">
+        {/* A fixed height (h-52) keeps the first render, before the width is
+            measured, from logging recharts' "width(-1) and height(-1)" warning. */}
+        <ResponsiveContainer width="100%" height={208}>
           <BarChart data={data} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="range" tick={{ fontSize: 11 }} />

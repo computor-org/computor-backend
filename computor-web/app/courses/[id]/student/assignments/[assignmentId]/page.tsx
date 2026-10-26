@@ -136,16 +136,23 @@ export default function AssignmentDetailPage() {
     courseHasAtLeast(courseId, '_student') && !courseHasAtLeast(courseId, '_tutor');
 
   const { data, loading, error } = useResource(async () => {
-    const assignment = await studentsClient.studentGetCourseContentEndpointStudentsCourseContentsCourseContentIdGet(
-      { courseContentId: assignmentId },
-    );
+    const [assignment, selfEnrollment] = await Promise.all([
+      studentsClient.studentGetCourseContentEndpointStudentsCourseContentsCourseContentIdGet(
+        { courseContentId: assignmentId },
+      ),
+      // A course joined through the catalog has no tutors (issues#458), so the
+      // grading panel must not promise that one will look at the submission.
+      isOrdinaryLearner
+        ? userClient.getOwnSelfEnrollmentUserCoursesCourseIdSelfEnrollmentGet({ courseId }).catch(() => null)
+        : Promise.resolve(null),
+    ]);
     // The released README in the reading language; the stored title and the
     // example's meta description are only the fallback.
     const language = await contentLanguage(courseId);
     const readme = await fetchStudentDescription(assignmentId, language).catch(() => null);
     const submissionGroupId = assignment.submission_group?.id;
     // Nothing has been attempted yet — there is no group to hang runs off.
-    if (!submissionGroupId) return { assignment, language, readme, results: [], artifacts: [] };
+    if (!submissionGroupId) return { assignment, selfEnrollment, language, readme, results: [], artifacts: [] };
 
     // The artifacts are only here to say which runs were official submissions;
     // a Result carries the artifact id but not its `submit` flag.
@@ -157,8 +164,8 @@ export default function AssignmentDetailPage() {
       }),
       submissionsClient.listSubmissionArtifactsSubmissionsArtifactsGet({ submissionGroupId }),
     ]);
-    return { assignment, language, readme, results, artifacts };
-  }, [assignmentId, courseId]);
+    return { assignment, selfEnrollment, language, readme, results, artifacts };
+  }, [assignmentId, courseId, isOrdinaryLearner]);
 
   const assignment = data?.assignment ?? null;
   const group = assignment?.submission_group ?? null;
@@ -226,12 +233,12 @@ export default function AssignmentDetailPage() {
             <StatGrid columns={4}>
               <StatCard
                 label={t.grade}
-                value={formatScore(group?.grading, 1)}
+                value={formatScore(group?.grading, 1, language)}
                 tone={scoreTone(group?.grading)}
               />
               <StatCard
                 label={t.latestTestResult}
-                value={formatScore(testScore, 1)}
+                value={formatScore(testScore, 1, language)}
                 tone={scoreTone(testScore)}
               />
               <StatCard
@@ -245,7 +252,11 @@ export default function AssignmentDetailPage() {
             </StatGrid>
 
             <SectionCard title={t.grading}>
-              <GradingPanel group={group} submitted={assignment.submitted} />
+              <GradingPanel
+                group={group}
+                submitted={assignment.submitted}
+                hasTutors={!data?.selfEnrollment?.self_registered}
+              />
             </SectionCard>
 
             <SectionCard title={t.description}>

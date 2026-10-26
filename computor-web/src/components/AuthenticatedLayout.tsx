@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
-import { CourseProvider } from '@/src/contexts/CourseContext';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import MaintenanceBanner from './MaintenanceBanner';
@@ -15,6 +14,7 @@ import { API_BASE_URL, apiGet, redirectToConsent } from '@/src/utils/apiClient';
 import type { ConsentStatusGet as ConsentStatus } from 'types/generated';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { loginPathFor } from '@/src/utils/safeRedirect';
+import { applyDocumentLanguage } from '@/src/utils/documentLanguage';
 
 // Consent bootstrap check runs once per authenticated session per page load;
 // mid-session changes (withdrawal, policy version bump) are caught by the 403
@@ -29,7 +29,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
 
   // The root layout renders lang="en"; the signed-in interface follows the user.
   useEffect(() => {
-    document.documentElement.lang = language;
+    applyDocumentLanguage(language);
   }, [language]);
 
   useEffect(() => {
@@ -71,9 +71,6 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
   }
 
   return (
-    // CourseProvider wraps the chrome, not just the page: the top bar shows the
-    // course name too, and it used to fetch the course a second time to get it.
-    <CourseProvider>
     <div className="h-dvh overflow-hidden bg-canvas flex">
       {/* Sidebar (fixed; scrolls internally via its own nav) */}
       <Sidebar />
@@ -107,6 +104,5 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
         )}
       </div>
     </div>
-    </CourseProvider>
   );
 }
