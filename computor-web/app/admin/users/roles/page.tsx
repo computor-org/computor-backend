@@ -10,7 +10,8 @@ import Forbidden from '@/src/components/Forbidden';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
-import { ADMIN_ROLE_LOCKED_HINT, grantsAdmin } from '@/src/utils/systemRoles';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { adminRoleLockedHint, grantsAdmin } from '@/src/utils/systemRoles';
 import { RolesClient } from '@/src/generated/clients/RolesClient';
 import { RoleClaimClient } from '@/src/generated/clients/RoleClaimClient';
 import { UserRolesClient } from '@/src/generated/clients/UserRolesClient';
@@ -21,6 +22,73 @@ const rolesClient = new RolesClient();
 const roleClaimsClient = new RoleClaimClient();
 const userRolesClient = new UserRolesClient();
 const usersClient = new UsersClient();
+
+const COPY = {
+  de: {
+    loadRolesFailed: 'Rollen konnten nicht geladen werden',
+    loadDetailFailed: 'Rollendetails konnten nicht geladen werden',
+    memberAdded: 'Benutzer zur Rolle hinzugefügt',
+    addFailed: 'Mitglied konnte nicht hinzugefügt werden',
+    memberRemoved: 'Benutzer aus der Rolle entfernt',
+    removeFailed: 'Mitglied konnte nicht entfernt werden',
+    forbidden: 'Erfordert die Rolle admin oder _user_manager.',
+    backToDashboard: 'Zurück zur Übersicht',
+    users: 'Benutzer',
+    roles: 'Rollen',
+    title: 'Rollen und Claims',
+    subtitle: (n: number) => `${n} ${n === 1 ? 'Rolle' : 'Rollen'}`,
+    loading: 'Wird geladen…',
+    system: 'System',
+    custom: 'Benutzerdefiniert',
+    selectRole: 'Wähle eine Rolle, um ihre Claims und Mitglieder zu sehen',
+    builtIn: 'integriert',
+    claims: 'Claims',
+    claimsTotal: (n: number) => `(${n} insgesamt, nur lesbar)`,
+    noClaims: 'Für diese Rolle sind keine Claims definiert.',
+    members: 'Mitglieder',
+    noMembers: 'Kein Benutzer hat diese Rolle.',
+    remove: 'Entfernen',
+    addUser: 'Benutzer zur Rolle hinzufügen',
+    searchPlaceholder: 'Nach E-Mail oder Name suchen…',
+    adding: 'Wird hinzugefügt…',
+    add: 'Hinzufügen',
+    noMatch: 'Keine passenden Benutzer gefunden.',
+    removeTitle: 'Aus der Rolle entfernen?',
+    removeMessage: (email: string, role: string) => `${email} aus ${role} entfernen?`,
+  },
+  en: {
+    loadRolesFailed: 'Failed to load roles',
+    loadDetailFailed: 'Failed to load role detail',
+    memberAdded: 'User added to role',
+    addFailed: 'Failed to add member',
+    memberRemoved: 'User removed from role',
+    removeFailed: 'Failed to remove member',
+    forbidden: 'Requires admin or _user_manager role.',
+    backToDashboard: 'Back to Dashboard',
+    users: 'Users',
+    roles: 'Roles',
+    title: 'Roles & claims',
+    subtitle: (n: number) => `${n} roles`,
+    loading: 'Loading…',
+    system: 'System',
+    custom: 'Custom',
+    selectRole: 'Select a role to view its claims and members',
+    builtIn: 'built-in',
+    claims: 'Claims',
+    claimsTotal: (n: number) => `(${n} total — read-only)`,
+    noClaims: 'No claims defined for this role.',
+    members: 'Members',
+    noMembers: 'No users have this role.',
+    remove: 'Remove',
+    addUser: 'Add user to role',
+    searchPlaceholder: 'Search by email or name…',
+    adding: 'Adding…',
+    add: 'Add',
+    noMatch: 'No matching users found.',
+    removeTitle: 'Remove from role?',
+    removeMessage: (email: string, role: string) => `Remove ${email} from ${role}?`,
+  },
+};
 
 // Readable label per claim_value prefix
 const CLAIM_COLORS: Record<string, string> = {
@@ -60,6 +128,8 @@ function RoleBadge({ role }: { role: RoleList | RoleGet }) {
 }
 
 export default function RolesPage() {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   // Backend-refreshed scopes (via usePermissions) instead of the cached
@@ -95,7 +165,7 @@ export default function RolesPage() {
 
     rolesClient.listRolesRolesGet({ limit: 200 })
       .then(data => { setRoles(data); setRolesLoading(false); })
-      .catch(e => { setRolesError(e instanceof Error ? e.message : 'Failed to load roles'); setRolesLoading(false); });
+      .catch(e => { setRolesError(e instanceof Error ? e.message : t.loadRolesFailed); setRolesLoading(false); });
 
     // Kept only for the member-list email display: UserRoleList carries just
     // user_id, and /users has no bulk id filter. The add-member picker below
@@ -103,19 +173,19 @@ export default function RolesPage() {
     usersClient.listUsersUsersGet({ limit: 500 })
       .then(setAllUsers)
       .catch(() => {});
-  }, [authLoading, isAuthenticated, isUserManager]);
+  }, [authLoading, isAuthenticated, isUserManager, t.loadRolesFailed]);
 
   // Debounced server-side search for the add-member picker (limit 20), so
   // users beyond the display preload above are still findable.
   useEffect(() => {
     const q = addSearch.trim();
     if (!q || addUserId) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       usersClient.listUsersUsersGet({ search: q, limit: 20 })
         .then(res => { setPickerResults(res); setPickerQuery(q); })
         .catch(() => {});
     }, 300);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [addSearch, addUserId]);
 
   const userMap = useMemo(() => {
@@ -145,11 +215,11 @@ export default function RolesPage() {
       setClaims(roleClaims);
       setMembers(userRoles);
     } catch (e) {
-      setDetailError(e instanceof Error ? e.message : 'Failed to load role detail');
+      setDetailError(e instanceof Error ? e.message : t.loadDetailFailed);
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [t.loadDetailFailed]);
 
   const handleSelectRole = (roleId: string) => {
     setSelectedRoleId(roleId);
@@ -167,9 +237,9 @@ export default function RolesPage() {
       setMembers(updated);
       setAddSearch('');
       setAddUserId('');
-      notify('User added to role', 'success');
+      notify(t.memberAdded, 'success');
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Failed to add member', 'error');
+      notify(e instanceof Error ? e.message : t.addFailed, 'error');
     } finally {
       setAddingMember(false);
     }
@@ -183,9 +253,9 @@ export default function RolesPage() {
         roleId: selectedRoleId,
       });
       setMembers(m => m.filter(x => x.user_id !== userId));
-      notify('User removed from role', 'success');
+      notify(t.memberRemoved, 'success');
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Failed to remove member', 'error');
+      notify(e instanceof Error ? e.message : t.removeFailed, 'error');
     }
     setRemoveConfirm(null);
   };
@@ -210,16 +280,16 @@ export default function RolesPage() {
   // Guard
   if (authLoading) return <AuthenticatedLayout><PageLoading width="wide" /></AuthenticatedLayout>;
   if (!isAuthenticated || !isUserManager) {
-    return <Forbidden message="Requires admin or _user_manager role." backLink="/dashboard" backText="Back to Dashboard" />;
+    return <Forbidden message={t.forbidden} backLink="/dashboard" backText={t.backToDashboard} />;
   }
 
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Users', href: '/admin/users' }, { label: 'Roles' }]}
-          title="Roles & claims"
-          subtitle={`${roles.length} roles`}
+          breadcrumbs={[{ label: t.users, href: '/admin/users' }, { label: t.roles }]}
+          title={t.title}
+          subtitle={t.subtitle(roles.length)}
         />
 
         <div className="flex-1 min-h-0 flex overflow-hidden rounded-lg border border-rule bg-surface">
@@ -228,14 +298,14 @@ export default function RolesPage() {
         <div className="w-72 shrink-0 border-r border-rule bg-canvas flex flex-col">
           <div className="flex-1 overflow-y-auto scroll-slim">
             {rolesLoading ? (
-              <div className="p-4 text-sm text-subtle">Loading…</div>
+              <div className="p-4 text-sm text-subtle">{t.loading}</div>
             ) : rolesError ? (
               <div className="p-4 text-sm text-danger-text">{rolesError}</div>
             ) : (
               <>
                 {/* Builtin roles */}
                 <div className="px-3 pt-3 pb-1">
-                  <p className="text-xs font-semibold text-subtle uppercase tracking-wider">System</p>
+                  <p className="text-xs font-semibold text-subtle uppercase tracking-wider">{t.system}</p>
                 </div>
                 {roles.filter(r => r.builtin).map(r => (
                   <RoleRow key={r.id} role={r} selected={r.id === selectedRoleId} onClick={() => handleSelectRole(r.id)} />
@@ -245,7 +315,7 @@ export default function RolesPage() {
                 {roles.some(r => !r.builtin) && (
                   <>
                     <div className="px-3 pt-4 pb-1">
-                      <p className="text-xs font-semibold text-subtle uppercase tracking-wider">Custom</p>
+                      <p className="text-xs font-semibold text-subtle uppercase tracking-wider">{t.custom}</p>
                     </div>
                     {roles.filter(r => !r.builtin).map(r => (
                       <RoleRow key={r.id} role={r} selected={r.id === selectedRoleId} onClick={() => handleSelectRole(r.id)} />
@@ -261,10 +331,10 @@ export default function RolesPage() {
         <div className="flex-1 overflow-y-auto scroll-slim">
           {!selectedRoleId ? (
             <div className="flex items-center justify-center h-full text-subtle text-sm">
-              Select a role to view its claims and members
+              {t.selectRole}
             </div>
           ) : detailLoading ? (
-            <div className="p-8 text-subtle text-sm">Loading…</div>
+            <div className="p-8 text-subtle text-sm">{t.loading}</div>
           ) : detailError ? (
             <div className="p-8 text-danger-text text-sm">{detailError}</div>
           ) : roleDetail ? (
@@ -276,7 +346,7 @@ export default function RolesPage() {
                   <h2 className="text-xl font-semibold text-fg">{roleDetail.title ?? roleDetail.id}</h2>
                   <RoleBadge role={roleDetail} />
                   {roleDetail.builtin && (
-                    <span className="text-xs text-subtle italic">built-in</span>
+                    <span className="text-xs text-subtle italic">{t.builtIn}</span>
                   )}
                 </div>
                 {roleDetail.description && (
@@ -287,11 +357,11 @@ export default function RolesPage() {
               {/* Claims */}
               <section>
                 <h3 className="text-sm font-semibold text-body mb-3">
-                  Claims
-                  <span className="ml-2 text-xs font-normal text-subtle">({claims.length} total — read-only)</span>
+                  {t.claims}
+                  <span className="ml-2 text-xs font-normal text-subtle">{t.claimsTotal(claims.length)}</span>
                 </h3>
                 {claims.length === 0 ? (
-                  <p className="text-sm text-subtle italic">No claims defined for this role.</p>
+                  <p className="text-sm text-subtle italic">{t.noClaims}</p>
                 ) : (
                   <div className="space-y-3">
                     {Object.entries(claimsByType).sort().map(([type, typeClaims]) => (
@@ -314,12 +384,12 @@ export default function RolesPage() {
               {/* Members */}
               <section>
                 <h3 className="text-sm font-semibold text-body mb-3">
-                  Members
+                  {t.members}
                   <span className="ml-2 text-xs font-normal text-subtle">({members.length})</span>
                 </h3>
 
                 {members.length === 0 ? (
-                  <p className="text-sm text-subtle italic mb-3">No users have this role.</p>
+                  <p className="text-sm text-subtle italic mb-3">{t.noMembers}</p>
                 ) : (
                   <div className="mb-4 space-y-1">
                     {members.map(m => {
@@ -336,7 +406,7 @@ export default function RolesPage() {
                               onClick={() => setRemoveConfirm({ userId: m.user_id, email: u?.email ?? m.user_id })}
                               className="text-xs text-danger-text hover:text-danger-text transition-colors ml-4"
                             >
-                              Remove
+                              {t.remove}
                             </button>
                           )}
                         </div>
@@ -348,10 +418,10 @@ export default function RolesPage() {
                 {/* Add member — blocked for admin-conferring roles for non-admins */}
                 {(isAdmin || !grantsAdmin(roleDetail.id)) && (
                   <div className="relative">
-                    <p className="text-xs font-medium text-muted mb-1.5">Add user to role</p>
+                    <p className="text-xs font-medium text-muted mb-1.5">{t.addUser}</p>
                     <input
                       type="text"
-                      placeholder="Search by email or name…"
+                      placeholder={t.searchPlaceholder}
                       value={addSearch}
                       onChange={e => { setAddSearch(e.target.value); setAddUserId(''); }}
                       className="w-full max-w-sm px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent"
@@ -376,16 +446,16 @@ export default function RolesPage() {
                         disabled={addingMember}
                         className="mt-2 px-4 py-2 text-sm bg-accent text-on-accent rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors"
                       >
-                        {addingMember ? 'Adding…' : 'Add'}
+                        {addingMember ? t.adding : t.add}
                       </button>
                     )}
                     {addSearch && addCandidates.length === 0 && !addUserId && pickerQuery === addSearch.trim() && (
-                      <p className="mt-1 text-xs text-subtle">No matching users found.</p>
+                      <p className="mt-1 text-xs text-subtle">{t.noMatch}</p>
                     )}
                   </div>
                 )}
                 {!isAdmin && grantsAdmin(roleDetail.id) && (
-                  <p className="text-xs text-subtle italic">{ADMIN_ROLE_LOCKED_HINT}</p>
+                  <p className="text-xs text-subtle italic">{adminRoleLockedHint(language)}</p>
                 )}
               </section>
 
@@ -396,9 +466,9 @@ export default function RolesPage() {
 
         <ConfirmDialog
           open={removeConfirm !== null}
-          title="Remove from role?"
-          message={`Remove ${removeConfirm?.email ?? ''} from ${selectedRoleId ?? ''}?`}
-          confirmLabel="Remove"
+          title={t.removeTitle}
+          message={t.removeMessage(removeConfirm?.email ?? '', selectedRoleId ?? '')}
+          confirmLabel={t.remove}
           variant="danger"
           onConfirm={() => removeConfirm && handleRemoveMember(removeConfirm.userId)}
           onCancel={() => setRemoveConfirm(null)}

@@ -8,9 +8,25 @@ import Spinner from '@/src/components/ui/Spinner';
 import { inputCls } from '@/src/components/ui/tokens';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import type { UserList } from 'types/generated';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const usersClient = new UsersClient();
 const PAGE_SIZE = 8;
+
+const COPY = {
+  de: {
+    select: 'Auswählen',
+    placeholder: 'Nach Name oder E-Mail suchen…',
+    searching: 'Benutzer werden gesucht',
+    none: 'Keine passenden Benutzer.',
+  },
+  en: {
+    select: 'Select',
+    placeholder: 'Search by name or email…',
+    searching: 'Searching users',
+    none: 'No matching users.',
+  },
+};
 
 /** "Given Family", falling back to email, then id — same rule as the roster picker. */
 export function userDisplayName(u: {
@@ -35,8 +51,8 @@ export default function UserSearchPicker({
   excludeId,
   onPick,
   busy = false,
-  pickLabel = 'Select',
-  placeholder = 'Search by name or email…',
+  pickLabel,
+  placeholder,
 }: {
   /** User hidden from the results (e.g. the user already on screen). */
   excludeId?: string;
@@ -46,6 +62,7 @@ export default function UserSearchPicker({
   pickLabel?: string;
   placeholder?: string;
 }) {
+  const t = COPY[useUiLanguage()];
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
 
@@ -72,16 +89,16 @@ export default function UserSearchPicker({
         type="text"
         value={searchInput}
         onChange={(e) => setSearchInput(e.target.value)}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t.placeholder}
         className={`${inputCls} max-w-md`}
       />
       <ErrorBanner>{error}</ErrorBanner>
       {loading ? (
         <div className="py-4 text-center">
-          <Spinner size="sm" label="Searching users" />
+          <Spinner size="sm" label={t.searching} />
         </div>
       ) : users.length === 0 ? (
-        <p className="text-sm text-subtle italic">No matching users.</p>
+        <p className="text-sm text-subtle italic">{t.none}</p>
       ) : (
         <ul className="bg-surface border border-rule rounded-md divide-y divide-rule-soft">
           {users.map((u) => (
@@ -91,7 +108,7 @@ export default function UserSearchPicker({
                 <div className="text-xs text-muted truncate">{u.email ?? '—'}</div>
               </div>
               <Button size="xs" variant="secondary" disabled={busy} onClick={() => onPick(u)}>
-                {pickLabel}
+                {pickLabel ?? t.select}
               </Button>
             </li>
           ))}

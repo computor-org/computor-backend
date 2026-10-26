@@ -11,16 +11,42 @@
  * it needs no snapshot and no extra request.
  */
 
+import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
+import { localeFor } from '@/src/utils/locale';
+
+const COPY = {
+  de: {
+    title: 'Abgabeverlauf',
+    noneInWindow: 'Keine offiziellen Abgaben im gewählten Zeitraum.',
+    nothingToPlot: 'Keine offiziellen Abgaben zum Darstellen.',
+    chartLabel: 'Kumulierte offizielle Abgaben im Zeitverlauf',
+    due: 'Frist',
+    cumulative: 'Insgesamt abgegebene Aufgaben',
+    fromStart: ' · ab Startdatum',
+    afterDue: (n: number) => ` · ${n} nach der Frist`,
+  },
+  en: {
+    title: 'Submission timeline',
+    noneInWindow: 'No official submissions in the selected window.',
+    nothingToPlot: 'No official submissions to plot.',
+    chartLabel: 'Cumulative official submissions over time',
+    due: 'due',
+    cumulative: 'Cumulative assignments submitted',
+    fromStart: ' · from start date',
+    afterDue: (n: number) => ` · ${n} after due date`,
+  },
+};
+
 type CurvePoint = { at: string; label?: string | null };
 
 const W = 720;
 const H = 200;
 const PAD = { top: 16, right: 16, bottom: 28, left: 32 };
 
-function fmt(iso: string): string {
+function fmt(iso: string, language: UiLanguage): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString(localeFor(language), {
     year: 'numeric',
     month: 'short',
     day: '2-digit',
@@ -40,6 +66,8 @@ export default function SubmissionCurve({
   startDate: string | null;
   dueDate: string | null;
 }) {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const startMs = startDate ? new Date(startDate).getTime() : NaN;
   const startValid = !Number.isNaN(startMs);
   const dueMs = dueDate ? new Date(dueDate).getTime() : NaN;
@@ -54,9 +82,9 @@ export default function SubmissionCurve({
   if (windowed.length === 0) {
     return (
       <div className="bg-surface rounded-lg border border-rule p-5">
-        <h3 className="text-sm font-semibold text-fg mb-2">Submission timeline</h3>
+        <h3 className="text-sm font-semibold text-fg mb-2">{t.title}</h3>
         <p className="rounded-md bg-canvas px-3 py-6 text-center text-sm text-muted">
-          {startValid ? 'No official submissions in the selected window.' : 'No official submissions to plot.'}
+          {startValid ? t.noneInWindow : t.nothingToPlot}
         </p>
       </div>
     );
@@ -90,14 +118,14 @@ export default function SubmissionCurve({
   return (
     <figure className="bg-surface rounded-lg border border-rule p-5 m-0">
       <figcaption className="text-sm font-semibold text-fg mb-3">
-        Submission timeline
+        {t.title}
       </figcaption>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="block w-full"
         style={{ height: 'auto' }}
         role="img"
-        aria-label="Cumulative official submissions over time"
+        aria-label={t.chartLabel}
       >
         {/* baseline + top gridline */}
         <line x1={PAD.left} y1={y(0)} x2={W - PAD.right} y2={y(0)} stroke="#e5e7eb" />
@@ -124,7 +152,7 @@ export default function SubmissionCurve({
               y={PAD.top + 10}
               className="fill-orange-500 text-[10px] font-medium"
             >
-              due
+              {t.due}
             </text>
           </g>
         )}
@@ -142,7 +170,7 @@ export default function SubmissionCurve({
         ))}
 
         <text x={PAD.left} y={H - 8} className="fill-gray-400 text-[10px]">
-          {fmt(new Date(minT).toISOString())}
+          {fmt(new Date(minT).toISOString(), language)}
         </text>
         <text
           x={W - PAD.right}
@@ -150,14 +178,14 @@ export default function SubmissionCurve({
           textAnchor="end"
           className="fill-gray-400 text-[10px]"
         >
-          {fmt(new Date(maxT).toISOString())}
+          {fmt(new Date(maxT).toISOString(), language)}
         </text>
       </svg>
       <figcaption className="mt-2 text-center text-xs text-subtle">
-        Cumulative assignments submitted ({windowed.length}/{total})
-        {startValid && <span> · from start date</span>}
+        {t.cumulative} ({windowed.length}/{total})
+        {startValid && <span>{t.fromStart}</span>}
         {dueValid && lateCount > 0 && (
-          <span className="text-danger-text"> · {lateCount} after due date</span>
+          <span className="text-danger-text">{t.afterDue(lateCount)}</span>
         )}
       </figcaption>
     </figure>

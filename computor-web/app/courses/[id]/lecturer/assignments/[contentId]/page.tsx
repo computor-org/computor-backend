@@ -4,6 +4,8 @@ import { useParams } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { formatDateTime } from '@/src/utils/locale';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
@@ -18,10 +20,75 @@ import { ButtonLink } from '@/src/components/ui/Button';
 import StatGrid, { StatCard } from '@/src/components/ui/StatGrid';
 import { formatLimit } from '@/src/utils/limits';
 import { displayName } from '@/src/utils/displayName';
-import { deploymentBadge } from '@/src/utils/deployment';
+import { deploymentBadge, deploymentStatusLabel } from '@/src/utils/deployment';
 import { CourseContentsClient } from '@/src/generated/clients/CourseContentsClient';
 
 const contentsClient = new CourseContentsClient();
+
+const COPY = {
+  de: {
+    content: 'Inhalt',
+    assignments: 'Aufgaben',
+    forbidden: 'Zum Ansehen dieses Inhalts brauchst du mindestens Lehrenden-Zugriff auf diesen Kurs.',
+    assignment: 'Aufgabe',
+    unit: 'Einheit',
+    hiddenHereTitle: 'Studierende sehen das und alles darunter nicht.',
+    hiddenAboveTitle: 'Verborgen, weil eine Einheit darüber oder der Kurs verborgen ist.',
+    invisible: 'Für Studierende unsichtbar',
+    edit: 'Bearbeiten',
+    maxGroupSize: 'Maximale Gruppengröße',
+    maxTestRuns: 'Maximale Testläufe',
+    maxSubmissions: 'Maximale Abgaben',
+    description: 'Beschreibung',
+    noDescription: 'Keine Beschreibung.',
+    placement: 'Einordnung',
+    path: 'Pfad',
+    type: 'Typ',
+    kind: 'Art',
+    position: 'Position',
+    deployment: 'Bereitstellung',
+    example: 'Beispiel',
+    version: 'Version',
+    status: 'Status',
+    deployed: 'Bereitgestellt',
+    notYet: 'Noch nicht',
+    message: 'Meldung',
+    noExample: 'Dieser Aufgabe ist noch kein Beispiel zugewiesen.',
+    noExampleUnit: 'Einheiten haben kein eigenes Beispiel.',
+    history: 'Verlauf',
+  },
+  en: {
+    content: 'Content',
+    assignments: 'Assignments',
+    forbidden: 'You need lecturer access (or higher) on this course to see its content.',
+    assignment: 'Assignment',
+    unit: 'Unit',
+    hiddenHereTitle: 'Students do not see this or anything under it.',
+    hiddenAboveTitle: 'Hidden because a unit above this one, or the course, is hidden.',
+    invisible: 'Invisible to students',
+    edit: 'Edit',
+    maxGroupSize: 'Max group size',
+    maxTestRuns: 'Max test runs',
+    maxSubmissions: 'Max submissions',
+    description: 'Description',
+    noDescription: 'No description.',
+    placement: 'Placement',
+    path: 'Path',
+    type: 'Type',
+    kind: 'Kind',
+    position: 'Position',
+    deployment: 'Deployment',
+    example: 'Example',
+    version: 'Version',
+    status: 'Status',
+    deployed: 'Deployed',
+    notYet: 'Not yet',
+    message: 'Message',
+    noExample: 'No example assigned to this assignment yet.',
+    noExampleUnit: 'Units carry no example of their own.',
+    history: 'History',
+  },
+};
 
 /**
  * Read-only view of one unit or assignment.
@@ -35,6 +102,8 @@ export default function CourseContentDetailPage() {
   const params = useParams();
   const courseId = params.id as string;
   const contentId = params.contentId as string;
+  const language = useUiLanguage();
+  const t = COPY[language];
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
 
@@ -56,18 +125,18 @@ export default function CourseContentDetailPage() {
   );
 
   const content = data?.content ?? null;
-  const name = displayName(content, 'Content');
+  const name = displayName(content, t.content);
   const crumbs = useCourseCrumbs(
     courseId,
-    { label: 'Assignments', href: `/courses/${courseId}/lecturer/assignments` },
+    { label: t.assignments, href: `/courses/${courseId}/lecturer/assignments` },
     name,
   );
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return <Forbidden message="You need lecturer access (or higher) on this course to see its content." />;
+    return <Forbidden message={t.forbidden} />;
   }
 
-  const badge = content ? deploymentBadge(content) : null;
+  const badge = content ? deploymentBadge(content, language) : null;
   const type = content?.course_content_type;
   const deployment = data?.deployment?.deployment ?? null;
   const history = data?.deployment?.history ?? [];
@@ -86,18 +155,18 @@ export default function CourseContentDetailPage() {
           content && (
             <div className="flex flex-wrap items-center gap-2">
               {badge && <Badge tone={badge.tone}>{badge.label}</Badge>}
-              {content.is_submittable && <Badge tone="info">Assignment</Badge>}
-              {!content.is_submittable && <Badge tone="muted">Unit</Badge>}
+              {content.is_submittable && <Badge tone="info">{t.assignment}</Badge>}
+              {!content.is_submittable && <Badge tone="muted">{t.unit}</Badge>}
               {hidden && (
                 <Badge
                   tone="muted"
                   title={
                     hiddenHere
-                      ? 'Students do not see this or anything under it.'
-                      : 'Hidden because a unit above this one, or the course, is hidden.'
+                      ? t.hiddenHereTitle
+                      : t.hiddenAboveTitle
                   }
                 >
-                  Invisible to students
+                  {t.invisible}
                 </Badge>
               )}
             </div>
@@ -109,7 +178,7 @@ export default function CourseContentDetailPage() {
               href={`/courses/${courseId}/lecturer/assignments/${contentId}/edit`}
               variant="secondary"
             >
-              Edit
+              {t.edit}
             </ButtonLink>
           )
         }
@@ -118,48 +187,46 @@ export default function CourseContentDetailPage() {
           <>
             {content.is_submittable && (
               <StatGrid columns={3}>
-                <StatCard label="Max group size" value={formatLimit(content.max_group_size)} />
-                <StatCard label="Max test runs" value={formatLimit(content.max_test_runs)} />
-                <StatCard label="Max submissions" value={formatLimit(content.max_submissions)} />
+                <StatCard label={t.maxGroupSize} value={formatLimit(content.max_group_size, language)} />
+                <StatCard label={t.maxTestRuns} value={formatLimit(content.max_test_runs, language)} />
+                <StatCard label={t.maxSubmissions} value={formatLimit(content.max_submissions, language)} />
               </StatGrid>
             )}
 
-            <SectionCard title="Description">
+            <SectionCard title={t.description}>
               {content.description ? (
                 <div className="prose markdown max-w-none">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{content.description}</ReactMarkdown>
                 </div>
               ) : (
-                <EmptyState compact title="No description." />
+                <EmptyState compact title={t.noDescription} />
               )}
             </SectionCard>
 
-            <SectionCard title="Placement">
+            <SectionCard title={t.placement}>
               <DescriptionList
                 items={[
-                  { term: 'Path', value: content.path, mono: true },
-                  { term: 'Type', value: type ? displayName(type, type.slug) : '—' },
-                  { term: 'Kind', value: content.course_content_kind_id },
-                  { term: 'Position', value: String(content.position) },
+                  { term: t.path, value: content.path, mono: true },
+                  { term: t.type, value: type ? displayName(type, type.slug) : '—' },
+                  { term: t.kind, value: content.course_content_kind_id },
+                  { term: t.position, value: String(content.position) },
                 ]}
               />
             </SectionCard>
 
-            <SectionCard title="Deployment">
+            <SectionCard title={t.deployment}>
               {deployment ? (
                 <DescriptionList
                   items={[
-                    { term: 'Example', value: deployment.example_identifier ?? '—', mono: true },
-                    { term: 'Version', value: deployment.version_tag ?? deployment.version_identifier ?? '—' },
-                    { term: 'Status', value: deployment.deployment_status },
+                    { term: t.example, value: deployment.example_identifier ?? '—', mono: true },
+                    { term: t.version, value: deployment.version_tag ?? deployment.version_identifier ?? '—' },
+                    { term: t.status, value: deploymentStatusLabel(deployment.deployment_status, language) },
                     {
-                      term: 'Deployed',
-                      value: deployment.deployed_at
-                        ? new Date(deployment.deployed_at).toLocaleString()
-                        : 'Not yet',
+                      term: t.deployed,
+                      value: formatDateTime(deployment.deployed_at, language, t.notYet),
                     },
                     ...(deployment.deployment_message
-                      ? [{ term: 'Message', value: deployment.deployment_message }]
+                      ? [{ term: t.message, value: deployment.deployment_message }]
                       : []),
                   ]}
                 />
@@ -168,20 +235,20 @@ export default function CourseContentDetailPage() {
                   compact
                   title={
                     content.is_submittable
-                      ? 'No example assigned to this assignment yet.'
-                      : 'Units carry no example of their own.'
+                      ? t.noExample
+                      : t.noExampleUnit
                   }
                 />
               )}
 
               {history.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-fg mb-2">History</h3>
+                  <h3 className="text-sm font-semibold text-fg mb-2">{t.history}</h3>
                   <ul className="text-sm text-muted space-y-1">
                     {history.slice(0, 10).map((h) => (
                       <li key={h.id} className="flex gap-3">
                         <span className="text-subtle shrink-0 w-40">
-                          {h.created_at ? new Date(h.created_at).toLocaleString() : '—'}
+                          {formatDateTime(h.created_at, language)}
                         </span>
                         <span className="min-w-0">
                           {h.action}

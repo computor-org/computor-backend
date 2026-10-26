@@ -7,11 +7,46 @@ import { ButtonLink } from '@/src/components/ui/Button';
 import { CoderClient } from '@/src/clients/CoderClient';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/src/components/ui/Table';
 import { displayName } from '@/src/utils/displayName';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const coderClient = new CoderClient();
 
+const COPY = {
+  de: {
+    intro:
+      'Welche Arbeitsumgebungs-Vorlagen jeder Kurs seinen Mitgliedern anbietet. Mitglieder eines Kurses mit mindestens einer Vorlage können diese Arbeitsumgebungen von der Kursseite aus starten, eine globale Rolle für Arbeitsumgebungen ist dafür nicht nötig. Mit der Bereitstellung durch Lehrende können die Lehrenden des Kurses zusätzlich (temporäre) Arbeitsumgebungen für ihre Studierenden anlegen.',
+    loading: 'Kurse werden geladen …',
+    course: 'Kurs',
+    templates: 'Vorlagen',
+    provisioning: 'Bereitstellung durch Lehrende',
+    actions: 'Aktionen',
+    untitled: 'Kurs ohne Titel',
+    none: 'Keine',
+    enabled: 'Aktiv',
+    off: 'Aus',
+    configure: 'Konfigurieren',
+    empty: 'Keine Kurse.',
+  },
+  en: {
+    intro:
+      "Which workspace templates each course offers its members. Members of a course with at least one template can launch those workspaces from the course page — no global workspace role needed. Lecturer provisioning additionally lets the course's lecturers create (throwaway) workspaces for their students.",
+    loading: 'Loading courses…',
+    course: 'Course',
+    templates: 'Templates',
+    provisioning: 'Lecturer provisioning',
+    actions: 'Actions',
+    untitled: 'Untitled Course',
+    none: 'None',
+    enabled: 'Enabled',
+    off: 'Off',
+    configure: 'Configure',
+    empty: 'No courses.',
+  },
+};
+
 /** All courses with their allowed workspace templates, linking to the editor. */
 export default function WorkspaceCoursesPanel() {
+  const t = COPY[useUiLanguage()];
   const { data, loading, error } = useResource(() => coderClient.listAdminCourses(), []);
   const courses = data?.courses ?? [];
 
@@ -20,23 +55,20 @@ export default function WorkspaceCoursesPanel() {
       <ErrorBanner>{error}</ErrorBanner>
 
       <p className="shrink-0 text-sm text-muted">
-        Which workspace templates each course offers its members. Members of a course with at
-        least one template can launch those workspaces from the course page — no global
-        workspace role needed. Lecturer provisioning additionally lets the course&apos;s
-        lecturers create (throwaway) workspaces for their students.
+        {t.intro}
       </p>
 
       {loading ? (
-        <ListLoading>Loading courses…</ListLoading>
+        <ListLoading>{t.loading}</ListLoading>
       ) : (
         <ScrollPanel>
           <Table>
             <Thead>
               <tr>
-                <Th>Course</Th>
-                <Th>Templates</Th>
-                <Th>Lecturer provisioning</Th>
-                <Th className="text-right">Actions</Th>
+                <Th>{t.course}</Th>
+                <Th>{t.templates}</Th>
+                <Th>{t.provisioning}</Th>
+                <Th className="text-right">{t.actions}</Th>
               </tr>
             </Thead>
             <Tbody>
@@ -44,7 +76,7 @@ export default function WorkspaceCoursesPanel() {
                 <Tr key={course.course_id} className="hover:bg-canvas">
                   <Td>
                     <div className="text-sm font-medium text-fg">
-                      {displayName(course, 'Untitled Course')}
+                      {displayName(course, t.untitled)}
                     </div>
                   </Td>
                   <Td>
@@ -60,16 +92,16 @@ export default function WorkspaceCoursesPanel() {
                         ))}
                       </div>
                     ) : (
-                      <span className="text-sm text-subtle">None</span>
+                      <span className="text-sm text-subtle">{t.none}</span>
                     )}
                   </Td>
                   <Td>
                     {course.lecturer_provision_enabled ? (
                       <span className="inline-flex items-center rounded bg-success-wash px-2 py-0.5 text-xs font-medium text-success-text">
-                        Enabled
+                        {t.enabled}
                       </span>
                     ) : (
-                      <span className="text-sm text-subtle">Off</span>
+                      <span className="text-sm text-subtle">{t.off}</span>
                     )}
                   </Td>
                   <Td>
@@ -79,7 +111,7 @@ export default function WorkspaceCoursesPanel() {
                         size="xs"
                         variant="secondary"
                       >
-                        Configure
+                        {t.configure}
                       </ButtonLink>
                     </div>
                   </Td>
@@ -88,7 +120,7 @@ export default function WorkspaceCoursesPanel() {
               {courses.length === 0 && (
                 <Tr>
                   <Td colSpan={4} className="py-8 text-center text-sm text-muted">
-                    No courses.
+                    {t.empty}
                   </Td>
                 </Tr>
               )}

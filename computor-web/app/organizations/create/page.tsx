@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
@@ -15,7 +16,48 @@ const organizationsClient = new OrganizationsClient();
 
 const ORG_TYPES: OrganizationType[] = ['organization', 'community', 'user'];
 
+const COPY = {
+  de: {
+    forbidden: 'Du hast keine Berechtigung, Organisationen zu erstellen.',
+    createFailed: 'Erstellen fehlgeschlagen',
+    crumb: 'Organisationen',
+    crumbNew: 'Neu',
+    title: 'Neue Organisation',
+    description:
+      'Eine Organisation ist eine Fakultät oder ein Institut – die oberste Ebene der Hierarchie. Sie besitzt die Kursfamilien (Lehrveranstaltungen), die darunter unterrichtet werden.',
+    submit: 'Erstellen',
+    path: 'Pfad (Slug)',
+    pathHint: 'Kleingeschriebener, URL-tauglicher Bezeichner im Hierarchiepfad. Später nur schwer zu ändern.',
+    type: 'Typ',
+    typeHint: 'Verwende „organization“ für eine Fakultät oder ein Institut.',
+    titleLabel: 'Titel',
+    titleHint: 'Anzeigename in Listen, z. B. „Institut für Softwaretechnologie“.',
+    titlePlaceholder: 'Institut für Softwaretechnologie',
+    descriptionLabel: 'Beschreibung',
+  },
+  en: {
+    forbidden: 'You do not have permission to create organizations.',
+    createFailed: 'Create failed',
+    crumb: 'Organizations',
+    crumbNew: 'New',
+    title: 'New organization',
+    description:
+      'An organization is a faculty or institute — the top of the hierarchy. It owns the course families (lectures) taught under it.',
+    submit: 'Create',
+    path: 'Path (slug)',
+    pathHint: 'Lowercase, URL-safe identifier used in the hierarchy path. Hard to change later.',
+    type: 'Type',
+    typeHint: "Use 'organization' for a faculty or institute.",
+    titleLabel: 'Title',
+    titleHint: "Display name shown in lists, e.g. 'Institute of Software Technology'.",
+    titlePlaceholder: 'Institute of Software Technology',
+    descriptionLabel: 'Description',
+  },
+};
+
 export default function OrganizationCreatePage() {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading, refreshPermissions } = useAuth();
   const { canCreateOrganization } = usePermissions();
@@ -45,41 +87,41 @@ export default function OrganizationCreatePage() {
       router.push(`/organizations/${org.id}`);
     } catch (e) {
       setSaving(false);
-      setError(e instanceof Error ? e.message : 'Create failed');
+      setError(e instanceof Error ? e.message : t.createFailed);
     }
   }
 
   if (!authLoading && isAuthenticated && !canCreateOrganization) {
-    return <Forbidden message="You do not have permission to create organizations." />;
+    return <Forbidden message={t.forbidden} />;
   }
 
   return (
     <AuthenticatedLayout>
       <FormPanel
-        breadcrumbs={[{ label: 'Organizations', href: '/organizations' }, { label: 'New' }]}
-        title="New organization"
-        description="An organization is a faculty or institute — the top of the hierarchy. It owns the course families (lectures) taught under it."
+        breadcrumbs={[{ label: t.crumb, href: '/organizations' }, { label: t.crumbNew }]}
+        title={t.title}
+        description={t.description}
         error={error}
         submitting={saving}
         disabled={!path.trim()}
-        submitLabel="Create"
+        submitLabel={t.submit}
         onCancel={() => router.push('/organizations')}
         onSubmit={save}
       >
-        <Field label="Path (slug)" required hint="Lowercase, URL-safe identifier used in the hierarchy path. Hard to change later.">
+        <Field label={t.path} required hint={t.pathHint}>
           <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="acme" className={inputCls} />
         </Field>
-        <Field label="Type" hint="Use 'organization' for a faculty or institute.">
+        <Field label={t.type} hint={t.typeHint}>
           <select value={orgType} onChange={(e) => setOrgType(e.target.value as OrganizationType)} className={inputCls}>
             {ORG_TYPES.map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
         </Field>
-        <Field label="Title" hint="Display name shown in lists, e.g. 'Institute of Software Technology'.">
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Institute of Software Technology" className={inputCls} />
+        <Field label={t.titleLabel} hint={t.titleHint}>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.titlePlaceholder} className={inputCls} />
         </Field>
-        <Field label="Description">
+        <Field label={t.descriptionLabel}>
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={inputCls} />
         </Field>
       </FormPanel>

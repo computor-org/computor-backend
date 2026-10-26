@@ -13,6 +13,8 @@ import { UpdateClient } from '@/src/clients/UpdateClient';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 import type { SystemUpdateState, SystemUpdateStatusGet } from 'types/generated';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { formatDateTime } from '@/src/utils/locale';
 
 const updateClient = new UpdateClient();
 
@@ -22,19 +24,221 @@ const IN_PROGRESS_GRACE_MS = 30 * 60 * 1000;
 const shortCommit = (commit: string | null | undefined) =>
   commit ? commit.slice(0, 7) : '—';
 
-const PHASE_LABELS: Record<string, string> = {
-  preflight: 'Running preflight checks',
-  checking: 'Fetching from repository',
-  checking_out: 'Checking out new version',
-  building: 'Building images',
-  entering_maintenance: 'Entering maintenance mode',
-  starting: 'Starting services',
-  health_check: 'Waiting for services to become healthy',
-  finalizing: 'Finalizing',
-  rolling_back: 'Rolling back to previous version',
+const COPY = {
+  de: {
+    phases: {
+      preflight: 'Vorabprüfungen laufen',
+      checking: 'Daten werden vom Repository geholt',
+      checking_out: 'Neue Version wird ausgecheckt',
+      building: 'Images werden gebaut',
+      entering_maintenance: 'Wartungsmodus wird aktiviert',
+      starting: 'Dienste werden gestartet',
+      health_check: 'Warten, bis die Dienste fehlerfrei laufen',
+      finalizing: 'Abschluss',
+      rolling_back: 'Rückkehr zur vorherigen Version',
+    } as Record<string, string>,
+    working: 'Es läuft',
+    updateCompleted: 'Update erfolgreich abgeschlossen',
+    updateRolledBack: 'Update fehlgeschlagen, die vorherige Version wurde wiederhergestellt',
+    updateFailed: 'Update fehlgeschlagen',
+    checkFailed: 'Update-Prüfung fehlgeschlagen',
+    requested: 'Update angefordert, das System wechselt in Kürze in den Wartungsmodus',
+    requestFailed: 'Update konnte nicht angefordert werden',
+    scheduled: 'Update geplant',
+    scheduleFailed: 'Update konnte nicht geplant werden',
+    scheduleCancelled: 'Geplantes Update abgebrochen',
+    cancelFailed: 'Geplantes Update konnte nicht abgebrochen werden',
+    hashCopied: 'Commit-Hash kopiert',
+    copyFailed: 'Kopieren in die Zwischenablage nicht möglich',
+    denied: 'Zugriff verweigert',
+    adminRequired: 'Für diese Seite sind Administratorrechte erforderlich.',
+    disabledSelfUpdate: 'Selbst-Update ist deaktiviert. Setze UPDATE_ENABLED=true in der .env und starte neu, um es zu aktivieren.',
+    disabledUpdater: 'Der Updater-Sidecar läuft nicht (Entwicklungsumgebung oder der Sidecar ist ausgefallen). Updates lassen sich nur in der Produktion auslösen.',
+    disabledInProgress: 'Ein Update läuft bereits.',
+    breadcrumb: 'Updates',
+    title: 'System-Updates',
+    subtitle: 'Vergleiche die laufende Version mit dem beobachteten Branch des Repositorys und führe Updates mit einem Klick aus.',
+    downtimeTitle: 'Update läuft, das System startet neu',
+    downtimeBody: 'Diese Seite wird automatisch fortgesetzt, sobald die API wieder erreichbar ist. Schließe diesen Tab nicht.',
+    version: 'Version',
+    updateAvailable: 'Update verfügbar',
+    upToDate: 'Aktuell',
+    runningCommit: 'Laufender Commit:',
+    copyHash: 'Vollständigen Hash kopieren',
+    runningBranch: 'Laufender Branch:',
+    trackedRepo: 'Beobachtetes Repository',
+    checking: 'Wird geprüft…',
+    checkNow: 'Jetzt prüfen',
+    repository: 'Repository:',
+    notConfigured: 'SYSTEM_REPO_URL ist nicht konfiguriert',
+    trackedBranch: 'Beobachteter Branch:',
+    latestCommit: 'Neuester Commit:',
+    checkedAt: (when: string) => `geprüft ${when}`,
+    checkFailedLabel: 'Update-Prüfung fehlgeschlagen:',
+    scheduledUpdate: 'Geplantes Update',
+    missedBefore: 'Das für ',
+    missedAfter: ' geplante Update wurde nicht ausgeführt:',
+    earlierTime: 'einen früheren Zeitpunkt',
+    dismiss: 'Ausblenden',
+    scheduledBefore: 'Ein Update ist für ',
+    scheduledAfter: ' geplant',
+    scheduledBy: (name: string) => ` von ${name}`,
+    scheduledTail: '. Das System wechselt in den Wartungsmodus und aktualisiert sich automatisch.',
+    cancelling: 'Wird abgebrochen…',
+    cancelSchedule: 'Planung abbrechen',
+    dateTime: 'Datum und Uhrzeit',
+    scheduling: 'Wird geplant…',
+    scheduleUpdate: 'Update planen',
+    scheduleExplain: 'Zum geplanten Zeitpunkt wechselt das System in den Wartungsmodus, aktualisiert auf den neuesten Commit des beobachteten Branches und kehrt automatisch zurück, falls das Update fehlschlägt. Benutzer erhalten vorher Countdown-Benachrichtigungen.',
+    inProgress: 'Update läuft',
+    lastUpdate: 'Letztes Update',
+    success: 'Erfolgreich',
+    failed: 'Fehlgeschlagen',
+    rolledBack: 'Zurückgesetzt',
+    running: 'Läuft',
+    phase: 'Phase:',
+    fromTo: 'Von → bis:',
+    requestedBy: 'Angefordert von:',
+    finished: 'Beendet:',
+    updatedReload: 'Das System wurde aktualisiert. Lade die Seite neu, um die neue Frontend-Version zu laden.',
+    reload: 'Seite neu laden',
+    actions: 'Aktionen',
+    requesting: 'Wird angefordert…',
+    updateNow: 'Jetzt aktualisieren',
+    alreadyUpToDate: 'Das System ist bereits aktuell.',
+    updatesToBefore: 'Aktualisiert auf ',
+    updatesToMid: ' auf Branch ',
+    updatesToAfter: '.',
+    howTitle: 'So funktioniert das Selbst-Update',
+    downtime: 'Ausfallzeit:',
+    downtimeText: ' Das Update baut zuerst die neuen Images und zeigt dann eine statische Wartungsseite an, während die Dienste neu starten. Rechne mit einigen Minuten Ausfall.',
+    rollback: 'Rollback:',
+    rollbackText: ' Läuft das System danach nicht fehlerfrei, kehrt der Updater automatisch zur vorherigen Version zurück.',
+    migrations: 'Datenbankmigrationen',
+    migrationsBefore: ' laufen beim Start automatisch und werden bei einem Rollback ',
+    migrationsNot: 'nicht',
+    migrationsAfter: ' rückgängig gemacht. Migrationen müssen daher für eine Version abwärtskompatibel bleiben.',
+    configuration: 'Konfiguration:',
+    configBefore: ' Das beobachtete Repository und der Branch stammen aus ',
+    configIn: ' in der ',
+    configAfter: '. Deine .env wird von einem Update nie verändert.',
+    cancelTitle: 'Geplantes Update abbrechen',
+    cancelMessage: 'Das ausstehende geplante Update wird entfernt, und das System aktualisiert sich nicht automatisch. Planung abbrechen?',
+    cancelConfirm: 'Planung abbrechen',
+    updateTitle: 'System aktualisieren',
+    updateMessage: 'Das gesamte System, auch diese Seite, ist während des Updates einige Minuten offline. Besteht die neue Version die Integritätsprüfung nicht, wird die vorherige Version automatisch wiederhergestellt. Update starten?',
+    updateConfirm: 'Jetzt aktualisieren',
+  },
+  en: {
+    phases: {
+      preflight: 'Running preflight checks',
+      checking: 'Fetching from repository',
+      checking_out: 'Checking out new version',
+      building: 'Building images',
+      entering_maintenance: 'Entering maintenance mode',
+      starting: 'Starting services',
+      health_check: 'Waiting for services to become healthy',
+      finalizing: 'Finalizing',
+      rolling_back: 'Rolling back to previous version',
+    } as Record<string, string>,
+    working: 'Working',
+    updateCompleted: 'Update completed successfully',
+    updateRolledBack: 'Update failed — rolled back to the previous version',
+    updateFailed: 'Update failed',
+    checkFailed: 'Update check failed',
+    requested: 'Update requested — the system will go into maintenance shortly',
+    requestFailed: 'Failed to request update',
+    scheduled: 'Update scheduled',
+    scheduleFailed: 'Failed to schedule update',
+    scheduleCancelled: 'Scheduled update cancelled',
+    cancelFailed: 'Failed to cancel scheduled update',
+    hashCopied: 'Commit hash copied',
+    copyFailed: 'Could not copy to clipboard',
+    denied: 'Access Denied',
+    adminRequired: 'Admin privileges are required to access this page.',
+    disabledSelfUpdate: 'Self-update is disabled. Set UPDATE_ENABLED=true in .env and restart to enable it.',
+    disabledUpdater: 'The updater sidecar is not running (development environment, or the sidecar is down). Updates can only be triggered in production.',
+    disabledInProgress: 'An update is already in progress.',
+    breadcrumb: 'Updates',
+    title: 'System updates',
+    subtitle: 'Compare the running version with the tracked repository branch and run one-click updates.',
+    downtimeTitle: 'Update in progress — the system is restarting',
+    downtimeBody: 'This page will resume automatically when the API is back. Do not close this tab.',
+    version: 'Version',
+    updateAvailable: 'Update available',
+    upToDate: 'Up to date',
+    runningCommit: 'Running commit:',
+    copyHash: 'copy full hash',
+    runningBranch: 'Running branch:',
+    trackedRepo: 'Tracked Repository',
+    checking: 'Checking…',
+    checkNow: 'Check now',
+    repository: 'Repository:',
+    notConfigured: 'SYSTEM_REPO_URL not configured',
+    trackedBranch: 'Tracked branch:',
+    latestCommit: 'Latest commit:',
+    checkedAt: (when: string) => `checked ${when}`,
+    checkFailedLabel: 'Update check failed:',
+    scheduledUpdate: 'Scheduled Update',
+    missedBefore: 'The update scheduled for ',
+    missedAfter: ' did not run:',
+    earlierTime: 'an earlier time',
+    dismiss: 'Dismiss',
+    scheduledBefore: 'An update is scheduled for ',
+    scheduledAfter: '',
+    scheduledBy: (name: string) => ` by ${name}`,
+    scheduledTail: '. The system will go into maintenance and update itself automatically.',
+    cancelling: 'Cancelling…',
+    cancelSchedule: 'Cancel Schedule',
+    dateTime: 'Date & Time',
+    scheduling: 'Scheduling…',
+    scheduleUpdate: 'Schedule Update',
+    scheduleExplain: 'At the scheduled time the system enters maintenance, updates to the latest commit on the tracked branch, and rolls back automatically if the update fails. Users get countdown notifications beforehand.',
+    inProgress: 'Update in Progress',
+    lastUpdate: 'Last Update',
+    success: 'Success',
+    failed: 'Failed',
+    rolledBack: 'Rolled back',
+    running: 'Running',
+    phase: 'Phase:',
+    fromTo: 'From → to:',
+    requestedBy: 'Requested by:',
+    finished: 'Finished:',
+    updatedReload: 'The system was updated. Reload to load the new frontend version.',
+    reload: 'Reload page',
+    actions: 'Actions',
+    requesting: 'Requesting…',
+    updateNow: 'Update now',
+    alreadyUpToDate: 'The system is already up to date.',
+    updatesToBefore: 'Updates to ',
+    updatesToMid: ' on ',
+    updatesToAfter: '.',
+    howTitle: 'How Self-Update Works',
+    downtime: 'Downtime:',
+    downtimeText: ' the update builds the new images first, then serves a static maintenance page while services restart — expect a few minutes of downtime.',
+    rollback: 'Rollback:',
+    rollbackText: ' if the system does not come back healthy, the updater automatically rolls back to the previous version.',
+    migrations: 'Database migrations',
+    migrationsBefore: ' run automatically on startup and are ',
+    migrationsNot: 'not',
+    migrationsAfter: ' reverted by a rollback — migrations must stay backward-compatible for one version.',
+    configuration: 'Configuration:',
+    configBefore: ' the tracked repository and branch come from ',
+    configIn: ' in ',
+    configAfter: '; your .env is never modified by an update.',
+    cancelTitle: 'Cancel Scheduled Update',
+    cancelMessage: 'The pending scheduled update will be removed and the system will not update automatically. Cancel the schedule?',
+    cancelConfirm: 'Cancel schedule',
+    updateTitle: 'Update the system',
+    updateMessage: 'The entire system — including this page — will go offline for several minutes while the update runs. If the new version fails its health check, the previous version is restored automatically. Start the update?',
+    updateConfirm: 'Update now',
+  },
 };
 
 export default function UpdatesPage() {
+  const language = useUiLanguage();
+  const t = COPY[language];
+  const when = (value: string) => formatDateTime(value, language);
   const { isLoading: authLoading } = useAuth();
   const { isAdmin } = usePermissions();
   const notify = useNotify();
@@ -83,10 +287,10 @@ export default function UpdatesPage() {
     ) {
       notify(
         s.status === 'success'
-          ? 'Update completed successfully'
+          ? t.updateCompleted
           : s.status === 'rolled_back'
-            ? 'Update failed — rolled back to the previous version'
-            : 'Update failed',
+            ? t.updateRolledBack
+            : t.updateFailed,
         s.status === 'success' ? 'success' : 'error',
       );
     }
@@ -100,7 +304,7 @@ export default function UpdatesPage() {
       await updateClient.checkNow();
       await reload();
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Update check failed', 'error');
+      notify(err instanceof Error ? err.message : t.checkFailed, 'error');
     } finally {
       setChecking(false);
     }
@@ -111,10 +315,10 @@ export default function UpdatesPage() {
     setTriggering(true);
     try {
       await updateClient.triggerUpdate();
-      notify('Update requested — the system will go into maintenance shortly', 'success');
+      notify(t.requested, 'success');
       await reload();
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Failed to request update', 'error');
+      notify(err instanceof Error ? err.message : t.requestFailed, 'error');
     } finally {
       setTriggering(false);
     }
@@ -126,11 +330,11 @@ export default function UpdatesPage() {
     setScheduling(true);
     try {
       await updateClient.scheduleUpdate(new Date(scheduleDate).toISOString());
-      notify('Update scheduled', 'success');
+      notify(t.scheduled, 'success');
       setScheduleDate('');
       await reload();
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Failed to schedule update', 'error');
+      notify(err instanceof Error ? err.message : t.scheduleFailed, 'error');
     } finally {
       setScheduling(false);
     }
@@ -141,10 +345,10 @@ export default function UpdatesPage() {
     setCancellingSchedule(true);
     try {
       await updateClient.cancelSchedule();
-      notify('Scheduled update cancelled', 'success');
+      notify(t.scheduleCancelled, 'success');
       await reload();
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Failed to cancel scheduled update', 'error');
+      notify(err instanceof Error ? err.message : t.cancelFailed, 'error');
     } finally {
       setCancellingSchedule(false);
     }
@@ -154,9 +358,9 @@ export default function UpdatesPage() {
     if (!commit) return;
     try {
       await navigator.clipboard.writeText(commit);
-      notify('Commit hash copied', 'success');
+      notify(t.hashCopied, 'success');
     } catch {
-      notify('Could not copy to clipboard', 'error');
+      notify(t.copyFailed, 'error');
     }
   };
 
@@ -166,8 +370,8 @@ export default function UpdatesPage() {
       <AuthenticatedLayout>
         <div className="p-6">
           <div className="bg-danger-wash border border-danger-line rounded-lg p-6 text-center">
-            <h2 className="text-lg font-semibold text-danger-text">Access Denied</h2>
-            <p className="text-sm text-danger-text mt-2">Admin privileges are required to access this page.</p>
+            <h2 className="text-lg font-semibold text-danger-text">{t.denied}</h2>
+            <p className="text-sm text-danger-text mt-2">{t.adminRequired}</p>
           </div>
         </div>
       </AuthenticatedLayout>
@@ -178,20 +382,20 @@ export default function UpdatesPage() {
   const updateDisabledReason = !view
     ? null
     : !view.update_enabled
-      ? 'Self-update is disabled. Set UPDATE_ENABLED=true in .env and restart to enable it.'
+      ? t.disabledSelfUpdate
       : !view.updater_online
-        ? 'The updater sidecar is not running (development environment, or the sidecar is down). Updates can only be triggered in production.'
+        ? t.disabledUpdater
         : runInProgress
-          ? 'An update is already in progress.'
+          ? t.disabledInProgress
           : null;
 
   return (
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Updates' }]}
-          title="System updates"
-          subtitle="Compare the running version with the tracked repository branch and run one-click updates."
+          breadcrumbs={[{ label: t.breadcrumb }]}
+          title={t.title}
+          subtitle={t.subtitle}
         />
 
         {/* API down during an update is expected — show progress, not an error */}
@@ -204,11 +408,10 @@ export default function UpdatesPage() {
               </svg>
               <div>
                 <p className="text-sm font-medium text-accent-text">
-                  Update in progress — the system is restarting
+                  {t.downtimeTitle}
                 </p>
                 <p className="text-sm text-accent-text">
-                  {(state?.phase && PHASE_LABELS[state.phase]) || 'Working'}… This page will resume
-                  automatically when the API is back. Do not close this tab.
+                  {(state?.phase && t.phases[state.phase]) || t.working}… {t.downtimeBody}
                 </p>
               </div>
             </div>
@@ -231,16 +434,16 @@ export default function UpdatesPage() {
               {/* Version card */}
               <div className="bg-surface rounded-lg shadow border border-rule p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-fg">Version</h2>
+                  <h2 className="text-lg font-semibold text-fg">{t.version}</h2>
                   {view.update_available ? (
-                    <Badge color="yellow" pill>Update available</Badge>
+                    <Badge color="yellow" pill>{t.updateAvailable}</Badge>
                   ) : view.remote_commit ? (
-                    <Badge color="green" pill>Up to date</Badge>
+                    <Badge color="green" pill>{t.upToDate}</Badge>
                   ) : null}
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-muted w-36">Running commit:</span>
+                    <span className="text-sm font-medium text-muted w-36">{t.runningCommit}</span>
                     <code className="text-sm font-mono text-fg">{shortCommit(view.running_commit)}</code>
                     {view.running_commit !== 'unknown' && (
                       <button
@@ -248,12 +451,12 @@ export default function UpdatesPage() {
                         className="text-xs text-accent-text hover:text-accent-text"
                         title={view.running_commit}
                       >
-                        copy full hash
+                        {t.copyHash}
                       </button>
                     )}
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-muted w-36">Running branch:</span>
+                    <span className="text-sm font-medium text-muted w-36">{t.runningBranch}</span>
                     <span className="text-sm text-fg">{view.running_branch}</span>
                   </div>
                 </div>
@@ -262,39 +465,39 @@ export default function UpdatesPage() {
               {/* Remote card */}
               <div className="bg-surface rounded-lg shadow border border-rule p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-fg">Tracked Repository</h2>
+                  <h2 className="text-lg font-semibold text-fg">{t.trackedRepo}</h2>
                   <button
                     onClick={handleCheckNow}
                     disabled={checking || !view.repo_url}
                     className="px-3 py-1.5 text-sm font-medium text-accent-text bg-accent-wash rounded-lg hover:bg-accent-wash disabled:opacity-50 transition-colors"
                   >
-                    {checking ? 'Checking…' : 'Check now'}
+                    {checking ? t.checking : t.checkNow}
                   </button>
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-muted w-36">Repository:</span>
+                    <span className="text-sm font-medium text-muted w-36">{t.repository}</span>
                     <span className="text-sm text-fg break-all">
-                      {view.repo_url || <span className="text-subtle">SYSTEM_REPO_URL not configured</span>}
+                      {view.repo_url || <span className="text-subtle">{t.notConfigured}</span>}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-muted w-36">Tracked branch:</span>
+                    <span className="text-sm font-medium text-muted w-36">{t.trackedBranch}</span>
                     <span className="text-sm text-fg">{view.tracked_branch}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-muted w-36">Latest commit:</span>
+                    <span className="text-sm font-medium text-muted w-36">{t.latestCommit}</span>
                     <code className="text-sm font-mono text-fg">{shortCommit(view.remote_commit)}</code>
                     {view.remote_checked_at && (
                       <span className="text-xs text-muted">
-                        checked {new Date(view.remote_checked_at).toLocaleString()}
+                        {t.checkedAt(when(view.remote_checked_at))}
                       </span>
                     )}
                   </div>
                   {view.remote_error && (
                     <div className="p-3 bg-danger-wash border border-danger-line rounded-lg">
                       <p className="text-sm text-danger-text">
-                        <strong>Update check failed:</strong> {view.remote_error}
+                        <strong>{t.checkFailedLabel}</strong> {view.remote_error}
                       </p>
                     </div>
                   )}
@@ -303,18 +506,18 @@ export default function UpdatesPage() {
 
               {/* Scheduled update */}
               <div className="bg-surface rounded-lg shadow border border-rule p-6">
-                <h2 className="text-lg font-semibold text-fg mb-4">Scheduled Update</h2>
+                <h2 className="text-lg font-semibold text-fg mb-4">{t.scheduledUpdate}</h2>
                 {view.last_schedule_result &&
                   ['missed', 'skipped_lock'].includes(view.last_schedule_result.outcome ?? '') &&
                   dismissedResult !== view.last_schedule_result.resolved_at && (
                     <div className="p-3 mb-4 bg-warn-wash border border-warn-line rounded-lg flex items-start justify-between gap-3">
                       <p className="text-sm text-warn-text">
                         <strong>
-                          The update scheduled for{' '}
+                          {t.missedBefore}
                           {view.last_schedule_result.scheduled_at
-                            ? new Date(view.last_schedule_result.scheduled_at).toLocaleString()
-                            : 'an earlier time'}{' '}
-                          did not run:
+                            ? when(view.last_schedule_result.scheduled_at)
+                            : t.earlierTime}
+                          {t.missedAfter}
                         </strong>{' '}
                         {view.last_schedule_result.detail}
                       </p>
@@ -322,24 +525,25 @@ export default function UpdatesPage() {
                         onClick={() => setDismissedResult(view.last_schedule_result?.resolved_at ?? '')}
                         className="text-xs text-warn-text hover:text-warn-text shrink-0"
                       >
-                        Dismiss
+                        {t.dismiss}
                       </button>
                     </div>
                   )}
                 {view.schedule ? (
                   <div className="flex items-center gap-4">
                     <p className="text-sm text-muted">
-                      An update is scheduled for{' '}
-                      <strong>{new Date(view.schedule.scheduled_at).toLocaleString()}</strong>
-                      {view.schedule.scheduled_by_name && <> by {view.schedule.scheduled_by_name}</>}.
-                      The system will go into maintenance and update itself automatically.
+                      {t.scheduledBefore}
+                      <strong>{when(view.schedule.scheduled_at)}</strong>
+                      {t.scheduledAfter}
+                      {view.schedule.scheduled_by_name && t.scheduledBy(view.schedule.scheduled_by_name)}
+                      {t.scheduledTail}
                     </p>
                     <button
                       onClick={() => setShowCancelScheduleConfirm(true)}
                       disabled={cancellingSchedule}
                       className="px-4 py-2 text-sm font-medium text-danger-text bg-danger-wash rounded-lg hover:bg-danger-wash disabled:opacity-50 transition-colors shrink-0"
                     >
-                      {cancellingSchedule ? 'Cancelling…' : 'Cancel Schedule'}
+                      {cancellingSchedule ? t.cancelling : t.cancelSchedule}
                     </button>
                   </div>
                 ) : (
@@ -347,7 +551,7 @@ export default function UpdatesPage() {
                     <div className="flex flex-wrap items-end gap-4">
                       <div className="flex-1 min-w-[200px] max-w-xs">
                         <label htmlFor="update-schedule-date" className="block text-sm font-medium text-body mb-1">
-                          Date & Time
+                          {t.dateTime}
                         </label>
                         <input
                           id="update-schedule-date"
@@ -363,12 +567,11 @@ export default function UpdatesPage() {
                         disabled={!!updateDisabledReason || scheduling || !scheduleDate}
                         className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors"
                       >
-                        {scheduling ? 'Scheduling…' : 'Schedule Update'}
+                        {scheduling ? t.scheduling : t.scheduleUpdate}
                       </button>
                     </div>
                     <p className="text-sm text-muted">
-                      {updateDisabledReason ??
-                        'At the scheduled time the system enters maintenance, updates to the latest commit on the tracked branch, and rolls back automatically if the update fails. Users get countdown notifications beforehand.'}
+                      {updateDisabledReason ?? t.scheduleExplain}
                     </p>
                   </form>
                 )}
@@ -379,25 +582,25 @@ export default function UpdatesPage() {
                 <div className="bg-surface rounded-lg shadow border border-rule p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-fg">
-                      {runInProgress ? 'Update in Progress' : 'Last Update'}
+                      {runInProgress ? t.inProgress : t.lastUpdate}
                     </h2>
-                    {state.status === 'success' && <Badge color="green" pill>Success</Badge>}
-                    {state.status === 'failed' && <Badge color="red" pill>Failed</Badge>}
-                    {state.status === 'rolled_back' && <Badge color="yellow" pill>Rolled back</Badge>}
-                    {runInProgress && <Badge color="blue" pill>Running</Badge>}
+                    {state.status === 'success' && <Badge color="green" pill>{t.success}</Badge>}
+                    {state.status === 'failed' && <Badge color="red" pill>{t.failed}</Badge>}
+                    {state.status === 'rolled_back' && <Badge color="yellow" pill>{t.rolledBack}</Badge>}
+                    {runInProgress && <Badge color="blue" pill>{t.running}</Badge>}
                   </div>
                   <div className="space-y-3">
                     {runInProgress && state.phase && (
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-muted w-36">Phase:</span>
+                        <span className="text-sm font-medium text-muted w-36">{t.phase}</span>
                         <span className="text-sm text-fg">
-                          {PHASE_LABELS[state.phase] || state.phase}…
+                          {t.phases[state.phase] || state.phase}…
                         </span>
                       </div>
                     )}
                     {state.from_commit && (
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-muted w-36">From → to:</span>
+                        <span className="text-sm font-medium text-muted w-36">{t.fromTo}</span>
                         <code className="text-sm font-mono text-fg">
                           {shortCommit(state.from_commit)} → {shortCommit(state.to_commit)}
                         </code>
@@ -405,14 +608,14 @@ export default function UpdatesPage() {
                     )}
                     {state.requested_by && (
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-muted w-36">Requested by:</span>
+                        <span className="text-sm font-medium text-muted w-36">{t.requestedBy}</span>
                         <span className="text-sm text-fg">{state.requested_by_name || state.requested_by}</span>
                       </div>
                     )}
                     {state.finished_at && (
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-muted w-36">Finished:</span>
-                        <span className="text-sm text-fg">{new Date(state.finished_at).toLocaleString()}</span>
+                        <span className="text-sm font-medium text-muted w-36">{t.finished}</span>
+                        <span className="text-sm text-fg">{when(state.finished_at)}</span>
                       </div>
                     )}
                     {state.error && (
@@ -423,13 +626,13 @@ export default function UpdatesPage() {
                     {state.status === 'success' && (
                       <div className="p-3 bg-success-wash border border-success-line rounded-lg flex items-center justify-between gap-3">
                         <p className="text-sm text-success-text">
-                          The system was updated. Reload to load the new frontend version.
+                          {t.updatedReload}
                         </p>
                         <button
                           onClick={() => window.location.reload()}
                           className="px-3 py-1.5 text-sm font-medium text-on-accent bg-success rounded-lg hover:bg-success-hover transition-colors shrink-0"
                         >
-                          Reload page
+                          {t.reload}
                         </button>
                       </div>
                     )}
@@ -439,48 +642,44 @@ export default function UpdatesPage() {
 
               {/* Actions */}
               <div className="bg-surface rounded-lg shadow border border-rule p-6">
-                <h2 className="text-lg font-semibold text-fg mb-4">Actions</h2>
+                <h2 className="text-lg font-semibold text-fg mb-4">{t.actions}</h2>
                 <button
                   onClick={() => setShowUpdateConfirm(true)}
                   disabled={!!updateDisabledReason || triggering || !view.update_available}
                   className="px-4 py-2 text-sm font-medium text-on-accent bg-danger rounded-lg hover:bg-danger-hover disabled:opacity-50 transition-colors"
                 >
-                  {triggering ? 'Requesting…' : 'Update now'}
+                  {triggering ? t.requesting : t.updateNow}
                 </button>
                 {updateDisabledReason ? (
                   <p className="text-sm text-muted mt-2">{updateDisabledReason}</p>
                 ) : !view.update_available ? (
-                  <p className="text-sm text-muted mt-2">The system is already up to date.</p>
+                  <p className="text-sm text-muted mt-2">{t.alreadyUpToDate}</p>
                 ) : (
                   <p className="text-sm text-muted mt-2">
-                    Updates to <code className="font-mono">{shortCommit(view.remote_commit)}</code> on{' '}
-                    <code className="font-mono">{view.tracked_branch}</code>.
+                    {t.updatesToBefore}<code className="font-mono">{shortCommit(view.remote_commit)}</code>{t.updatesToMid}
+                    <code className="font-mono">{view.tracked_branch}</code>{t.updatesToAfter}
                   </p>
                 )}
               </div>
 
               {/* Info */}
               <div className="bg-canvas rounded-lg border border-rule p-6">
-                <h2 className="text-sm font-semibold text-fg mb-3">How Self-Update Works</h2>
+                <h2 className="text-sm font-semibold text-fg mb-3">{t.howTitle}</h2>
                 <ul className="text-sm text-muted space-y-2">
                   <li>
-                    <strong>Downtime:</strong> the update builds the new images first, then serves a static
-                    maintenance page while services restart — expect a few minutes of downtime.
+                    <strong>{t.downtime}</strong>{t.downtimeText}
                   </li>
                   <li>
-                    <strong>Rollback:</strong> if the system does not come back healthy, the updater
-                    automatically rolls back to the previous version.
+                    <strong>{t.rollback}</strong>{t.rollbackText}
                   </li>
                   <li>
-                    <strong>Database migrations</strong> run automatically on startup and are <em>not</em> reverted
-                    by a rollback — migrations must stay backward-compatible for one version.
+                    <strong>{t.migrations}</strong>{t.migrationsBefore}<em>{t.migrationsNot}</em>{t.migrationsAfter}
                   </li>
                   <li>
-                    <strong>Configuration:</strong> the tracked repository and branch come from{' '}
+                    <strong>{t.configuration}</strong>{t.configBefore}
                     <code className="px-1.5 py-0.5 bg-sunken rounded text-xs font-mono">SYSTEM_REPO_URL</code> /{' '}
-                    <code className="px-1.5 py-0.5 bg-sunken rounded text-xs font-mono">SYSTEM_REPO_BRANCH</code> in{' '}
-                    <code className="px-1.5 py-0.5 bg-sunken rounded text-xs font-mono">.env</code>; your .env is
-                    never modified by an update.
+                    <code className="px-1.5 py-0.5 bg-sunken rounded text-xs font-mono">SYSTEM_REPO_BRANCH</code>{t.configIn}
+                    <code className="px-1.5 py-0.5 bg-sunken rounded text-xs font-mono">.env</code>{t.configAfter}
                   </li>
                 </ul>
               </div>
@@ -490,9 +689,9 @@ export default function UpdatesPage() {
 
         <ConfirmDialog
           open={showCancelScheduleConfirm}
-          title="Cancel Scheduled Update"
-          message="The pending scheduled update will be removed and the system will not update automatically. Cancel the schedule?"
-          confirmLabel="Cancel schedule"
+          title={t.cancelTitle}
+          message={t.cancelMessage}
+          confirmLabel={t.cancelConfirm}
           variant="danger"
           onConfirm={handleCancelSchedule}
           onCancel={() => setShowCancelScheduleConfirm(false)}
@@ -500,9 +699,9 @@ export default function UpdatesPage() {
 
         <ConfirmDialog
           open={showUpdateConfirm}
-          title="Update the system"
-          message="The entire system — including this page — will go offline for several minutes while the update runs. If the new version fails its health check, the previous version is restored automatically. Start the update?"
-          confirmLabel="Update now"
+          title={t.updateTitle}
+          message={t.updateMessage}
+          confirmLabel={t.updateConfirm}
           variant="danger"
           onConfirm={handleTriggerUpdate}
           onCancel={() => setShowUpdateConfirm(false)}

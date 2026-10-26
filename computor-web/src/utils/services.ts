@@ -22,6 +22,8 @@ export const TESTING_LANGUAGES = [
   'matlab',
 ] as const;
 
+import type { UiLanguage } from '@/src/hooks/useBrowserLanguage';
+
 /**
  * Human-readable freshness for a service heartbeat.
  *
@@ -29,20 +31,23 @@ export const TESTING_LANGUAGES = [
  * worth surfacing prominently, since a task queue with no listening worker
  * leaves test workflows queued indefinitely rather than failing.
  */
-export function lastSeenLabel(lastSeenAt?: string | null): string {
-  if (!lastSeenAt) return 'never';
+export function lastSeenLabel(lastSeenAt?: string | null, language: UiLanguage = 'en'): string {
+  const de = language === 'de';
+  const never = de ? 'nie' : 'never';
+  if (!lastSeenAt) return never;
 
   const seen = new Date(lastSeenAt).getTime();
-  if (Number.isNaN(seen)) return 'never';
+  if (Number.isNaN(seen)) return never;
 
   const minutes = Math.floor((Date.now() - seen) / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 1) return de ? 'gerade eben' : 'just now';
+  if (minutes < 60) return de ? `vor ${minutes} Min.` : `${minutes} min ago`;
 
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
+  if (hours < 24) return de ? `vor ${hours} Std.` : `${hours} h ago`;
 
-  return `${Math.floor(hours / 24)} d ago`;
+  const days = Math.floor(hours / 24);
+  return de ? `vor ${days} ${days === 1 ? 'Tag' : 'Tagen'}` : `${days} d ago`;
 }
 
 /** Read `config.language` off a service without fighting the JSON typing. */

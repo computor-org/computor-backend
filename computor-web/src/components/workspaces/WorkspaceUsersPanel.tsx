@@ -13,13 +13,96 @@ import Badge from '@/src/components/Badge';
 import Button from '@/src/components/ui/Button';
 import { inputCls } from '@/src/components/ui/tokens';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/src/components/ui/Table';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const coderClient = new CoderClient();
 const rolesClient = new WorkspaceRolesClient();
 const WORKSPACE_ROLES = ['_workspace_user', '_workspace_maintainer'] as const;
 
+const COPY = {
+  de: {
+    assignedProvisioned: 'Rolle zugewiesen und Arbeitsumgebung bereitgestellt',
+    assignedProvisionFailed: 'Rolle zugewiesen, aber die Bereitstellung der Arbeitsumgebung ist fehlgeschlagen',
+    assigned: 'Rolle erfolgreich zugewiesen',
+    assignFailed: 'Die Rolle konnte nicht zugewiesen werden',
+    removed: 'Rolle entfernt',
+    removeFailed: 'Die Rolle konnte nicht entfernt werden',
+    added: 'Rolle hinzugefügt',
+    addFailed: 'Die Rolle konnte nicht hinzugefügt werden',
+    provisioned: 'Arbeitsumgebung bereitgestellt',
+    provisionFailed: 'Bereitstellung fehlgeschlagen',
+    assignHeading: 'Rolle zuweisen',
+    email: 'E-Mail',
+    role: 'Rolle',
+    provisionWorkspace: 'Arbeitsumgebung bereitstellen',
+    assigning: 'Wird zugewiesen …',
+    assign: 'Zuweisen',
+    searchPlaceholder: 'Nach Name, E-Mail oder Benutzername suchen …',
+    name: 'Name',
+    username: 'Benutzername',
+    roles: 'Rollen',
+    workspace: 'Arbeitsumgebung',
+    actions: 'Aktionen',
+    noMatch: 'Keine Personen entsprechen deiner Suche',
+    noUsers: 'Keine Personen mit Rollen für Arbeitsumgebungen',
+    removeRole: 'Rolle entfernen',
+    add: '+ Hinzufügen',
+    na: 'k. A.',
+    checking: 'Wird geprüft …',
+    yes: 'Ja',
+    provision: 'Bereitstellen',
+    unknown: 'Unbekannt',
+    manage: 'Verwalten',
+    removeTitle: 'Rolle entfernen',
+    removeMessage: (role: string | undefined, email: string) =>
+      `Rolle „${role}“ von ${email} entfernen?`,
+    thisUser: 'dieser Person',
+    remove: 'Entfernen',
+  },
+  en: {
+    assignedProvisioned: 'Role assigned and workspace provisioned',
+    assignedProvisionFailed: 'Role assigned but workspace provisioning failed',
+    assigned: 'Role assigned successfully',
+    assignFailed: 'Failed to assign role',
+    removed: 'Role removed',
+    removeFailed: 'Failed to remove role',
+    added: 'Role added',
+    addFailed: 'Failed to add role',
+    provisioned: 'Workspace provisioned',
+    provisionFailed: 'Provisioning failed',
+    assignHeading: 'Assign Role',
+    email: 'Email',
+    role: 'Role',
+    provisionWorkspace: 'Provision workspace',
+    assigning: 'Assigning...',
+    assign: 'Assign',
+    searchPlaceholder: 'Search by name, email, or username...',
+    name: 'Name',
+    username: 'Username',
+    roles: 'Roles',
+    workspace: 'Workspace',
+    actions: 'Actions',
+    noMatch: 'No users match your search',
+    noUsers: 'No users with workspace roles',
+    removeRole: 'Remove role',
+    add: '+ Add',
+    na: 'N/A',
+    checking: 'Checking...',
+    yes: 'Yes',
+    provision: 'Provision',
+    unknown: 'Unknown',
+    manage: 'Manage',
+    removeTitle: 'Remove Role',
+    removeMessage: (role: string | undefined, email: string) =>
+      `Remove role "${role}" from ${email}?`,
+    thisUser: 'this user',
+    remove: 'Remove',
+  },
+};
+
 /** "Users & roles" admin tab: workspace role assignment + per-user overview. */
 export default function WorkspaceUsersPanel() {
+  const t = COPY[useUiLanguage()];
   const notify = useNotify();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -77,12 +160,12 @@ export default function WorkspaceUsersPanel() {
       if (assignProvision) {
         try {
           await coderClient.provisionWorkspace({ body: { email: assignEmail } });
-          notify('Role assigned and workspace provisioned', 'success');
+          notify(t.assignedProvisioned, 'success');
         } catch {
-          notify('Role assigned but workspace provisioning failed', 'error');
+          notify(t.assignedProvisionFailed, 'error');
         }
       } else {
-        notify('Role assigned successfully', 'success');
+        notify(t.assigned, 'success');
       }
 
       setAssignEmail('');
@@ -91,7 +174,7 @@ export default function WorkspaceUsersPanel() {
       setWorkspaceStatus({});
       await fetchUsers();
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Failed to assign role', 'error');
+      notify(err instanceof Error ? err.message : t.assignFailed, 'error');
     } finally {
       setAssigning(false);
     }
@@ -101,11 +184,11 @@ export default function WorkspaceUsersPanel() {
     if (!removeTarget) return;
     try {
       await rolesClient.removeRole({ userId: removeTarget.userId, roleId: removeTarget.roleId });
-      notify('Role removed', 'success');
+      notify(t.removed, 'success');
       setRemoveTarget(null);
       await fetchUsers();
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Failed to remove role', 'error');
+      notify(err instanceof Error ? err.message : t.removeFailed, 'error');
       setRemoveTarget(null);
     }
   };
@@ -115,10 +198,10 @@ export default function WorkspaceUsersPanel() {
     if (!u?.email) return;
     try {
       await rolesClient.assignRole({ body: { email: u.email, role_id: roleId } });
-      notify('Role added', 'success');
+      notify(t.added, 'success');
       await fetchUsers();
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Failed to add role', 'error');
+      notify(err instanceof Error ? err.message : t.addFailed, 'error');
     }
   };
 
@@ -126,10 +209,10 @@ export default function WorkspaceUsersPanel() {
     try {
       // Server-default template; pick a specific one on the user detail page.
       await coderClient.provisionWorkspace({ body: { email } });
-      notify('Workspace provisioned', 'success');
+      notify(t.provisioned, 'success');
       setWorkspaceStatus({});
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Provisioning failed', 'error');
+      notify(err instanceof Error ? err.message : t.provisionFailed, 'error');
     }
   };
 
@@ -149,10 +232,10 @@ export default function WorkspaceUsersPanel() {
     <>
       {/* Assign Role Form */}
       <div className="shrink-0 bg-surface rounded-lg border border-rule p-6">
-        <h2 className="text-lg font-semibold text-fg mb-4">Assign Role</h2>
+        <h2 className="text-lg font-semibold text-fg mb-4">{t.assignHeading}</h2>
         <form onSubmit={handleAssignRole} className="flex flex-wrap items-end gap-4">
           <div className="flex-1 min-w-[200px]">
-            <label htmlFor="assign-email" className="block text-sm font-medium text-body mb-1">Email</label>
+            <label htmlFor="assign-email" className="block text-sm font-medium text-body mb-1">{t.email}</label>
             <input
               id="assign-email"
               type="email"
@@ -164,7 +247,7 @@ export default function WorkspaceUsersPanel() {
             />
           </div>
           <div className="w-48">
-            <label htmlFor="assign-role" className="block text-sm font-medium text-body mb-1">Role</label>
+            <label htmlFor="assign-role" className="block text-sm font-medium text-body mb-1">{t.role}</label>
             <select
               id="assign-role"
               value={assignRole}
@@ -183,10 +266,10 @@ export default function WorkspaceUsersPanel() {
               onChange={(e) => setAssignProvision(e.target.checked)}
               className="rounded border-rule-strong text-accent-text focus:ring-accent-line"
             />
-            Provision workspace
+            {t.provisionWorkspace}
           </label>
-          <Button type="submit" loading={assigning} loadingLabel="Assigning...">
-            Assign
+          <Button type="submit" loading={assigning} loadingLabel={t.assigning}>
+            {t.assign}
           </Button>
         </form>
       </div>
@@ -198,7 +281,7 @@ export default function WorkspaceUsersPanel() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className={`${inputCls} max-w-md`}
-          placeholder="Search by name, email, or username..."
+          placeholder={t.searchPlaceholder}
         />
       </div>
 
@@ -223,19 +306,19 @@ export default function WorkspaceUsersPanel() {
           <Table className="text-sm">
             <Thead>
               <tr>
-                <Th>Name</Th>
-                <Th>Email</Th>
-                <Th>Username</Th>
-                <Th>Roles</Th>
-                <Th>Workspace</Th>
-                <Th>Actions</Th>
+                <Th>{t.name}</Th>
+                <Th>{t.email}</Th>
+                <Th>{t.username}</Th>
+                <Th>{t.roles}</Th>
+                <Th>{t.workspace}</Th>
+                <Th>{t.actions}</Th>
               </tr>
             </Thead>
             <Tbody>
               {filteredUsers.length === 0 ? (
                 <Tr>
                   <Td colSpan={6} className="py-8 text-center text-muted">
-                    {searchQuery ? 'No users match your search' : 'No users with workspace roles'}
+                    {searchQuery ? t.noMatch : t.noUsers}
                   </Td>
                 </Tr>
               ) : (
@@ -261,7 +344,7 @@ export default function WorkspaceUsersPanel() {
                               <button
                                 onClick={() => setRemoveTarget({ userId: u.user_id, roleId: role, email: u.email || '' })}
                                 className="text-blue-400 hover:text-danger-text ml-1"
-                                title="Remove role"
+                                title={t.removeRole}
                               >
                                 &times;
                               </button>
@@ -275,7 +358,7 @@ export default function WorkspaceUsersPanel() {
                                 if (e.target.value) handleInlineAddRole(u.user_id, e.target.value);
                               }}
                             >
-                              <option value="">+ Add</option>
+                              <option value="">{t.add}</option>
                               {missingRoles.map((r) => (
                                 <option key={r} value={r}>{r}</option>
                               ))}
@@ -285,17 +368,17 @@ export default function WorkspaceUsersPanel() {
                       </Td>
                       <Td>
                         {!hasWsRole ? (
-                          <span className="text-xs text-subtle">N/A</span>
+                          <span className="text-xs text-subtle">{t.na}</span>
                         ) : wsStatus === 'loading' ? (
-                          <span className="text-xs text-subtle">Checking...</span>
+                          <span className="text-xs text-subtle">{t.checking}</span>
                         ) : wsStatus === true ? (
-                          <Badge color="green" pill>Yes</Badge>
+                          <Badge color="green" pill>{t.yes}</Badge>
                         ) : wsStatus === false ? (
                           <Button size="xs" variant="secondary" onClick={() => u.email && handleProvisionForUser(u.email)}>
-                            Provision
+                            {t.provision}
                           </Button>
                         ) : (
-                          <span className="text-xs text-subtle">Unknown</span>
+                          <span className="text-xs text-subtle">{t.unknown}</span>
                         )}
                       </Td>
                       <Td>
@@ -303,7 +386,7 @@ export default function WorkspaceUsersPanel() {
                           href={`/workspaces/admin/${u.user_id}`}
                           className="text-sm text-accent-text hover:text-accent-text font-medium"
                         >
-                          Manage
+                          {t.manage}
                         </Link>
                       </Td>
                     </Tr>
@@ -318,9 +401,9 @@ export default function WorkspaceUsersPanel() {
       {/* Remove role confirmation */}
       <ConfirmDialog
         open={removeTarget !== null}
-        title="Remove Role"
-        message={`Remove role "${removeTarget?.roleId}" from ${removeTarget?.email || 'this user'}?`}
-        confirmLabel="Remove"
+        title={t.removeTitle}
+        message={t.removeMessage(removeTarget?.roleId, removeTarget?.email || t.thisUser)}
+        confirmLabel={t.remove}
         variant="danger"
         onConfirm={handleRemoveRole}
         onCancel={() => setRemoveTarget(null)}

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useResource } from '@/src/hooks/useResource';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
@@ -14,7 +15,36 @@ import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClie
 
 const courseFamiliesClient = new CourseFamiliesClient();
 
+const COPY = {
+  de: {
+    forbidden: 'Du hast keine Berechtigung, Kursfamilien zu bearbeiten.',
+    saveFailed: 'Speichern fehlgeschlagen',
+    crumb: 'Kursfamilien',
+    family: 'Kursfamilie',
+    edit: 'Bearbeiten',
+    editTitle: (name: string) => `${name} bearbeiten`,
+    titleLabel: 'Titel',
+    description: 'Beschreibung',
+    path: 'Pfad (unveränderlich)',
+    pathHint: 'Der hierarchische Pfad steht nach dem Erstellen fest.',
+  },
+  en: {
+    forbidden: 'You do not have permission to edit course families.',
+    saveFailed: 'Save failed',
+    crumb: 'Course families',
+    family: 'Course Family',
+    edit: 'Edit',
+    editTitle: (name: string) => `Edit ${name}`,
+    titleLabel: 'Title',
+    description: 'Description',
+    path: 'Path (immutable)',
+    pathHint: 'The hierarchical path is fixed after creation.',
+  },
+};
+
 export default function CourseFamilyEditPage() {
+  const language = useUiLanguage();
+  const t = COPY[language];
   const familyId = useParams().id as string;
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -52,12 +82,12 @@ export default function CourseFamilyEditPage() {
       router.push(`/course-families/${familyId}`);
     } catch (e) {
       setSaving(false);
-      setSaveError(e instanceof Error ? e.message : 'Save failed');
+      setSaveError(e instanceof Error ? e.message : t.saveFailed);
     }
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return <Forbidden message="You do not have permission to edit course families." />;
+    return <Forbidden message={t.forbidden} />;
   }
 
   return (
@@ -67,23 +97,23 @@ export default function CourseFamilyEditPage() {
       ) : (
         <FormPanel
           breadcrumbs={[
-            { label: 'Course families', href: '/course-families' },
-            { label: family?.title || family?.path || 'Course Family', href: `/course-families/${familyId}` },
-            { label: 'Edit' },
+            { label: t.crumb, href: '/course-families' },
+            { label: family?.title || family?.path || t.family, href: `/course-families/${familyId}` },
+            { label: t.edit },
           ]}
-          title={`Edit ${family?.title || family?.path || 'course family'}`}
+          title={t.editTitle(family?.title || family?.path || (language === 'de' ? 'Kursfamilie' : 'course family'))}
           error={loadError ?? saveError}
           submitting={saving}
           onCancel={() => router.push(`/course-families/${familyId}`)}
           onSubmit={save}
         >
-          <Field label="Title">
+          <Field label={t.titleLabel}>
             <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Description">
+          <Field label={t.description}>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className={inputCls} />
           </Field>
-          <Field label="Path (immutable)" hint="The hierarchical path is fixed after creation.">
+          <Field label={t.path} hint={t.pathHint}>
             <input value={family?.path || ''} readOnly className={`${inputCls} bg-canvas text-muted`} />
           </Field>
         </FormPanel>

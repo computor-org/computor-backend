@@ -12,10 +12,140 @@ import { useResource } from '@/src/hooks/useResource';
 import { MaintenanceClient } from '@/src/clients/MaintenanceClient';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { formatDateTime } from '@/src/utils/locale';
 
 const maintenanceClient = new MaintenanceClient();
 
+const COPY = {
+  de: {
+    defaultActivateMessage: 'Das System wird gerade planmäßig gewartet.',
+    defaultScheduleMessage: 'Eine Wartung ist geplant.',
+    activated: 'Wartungsmodus aktiviert',
+    activateFailed: 'Aktivierung fehlgeschlagen',
+    deactivated: 'Wartungsmodus deaktiviert',
+    deactivateFailed: 'Deaktivierung fehlgeschlagen',
+    scheduled: 'Wartung geplant',
+    scheduleFailed: 'Planung fehlgeschlagen',
+    cancelled: 'Geplante Wartung abgebrochen',
+    cancelFailed: 'Planung konnte nicht abgebrochen werden',
+    denied: 'Zugriff verweigert',
+    adminRequired: 'Für diese Seite sind Administratorrechte erforderlich.',
+    breadcrumb: 'Wartung',
+    title: 'Wartungsmodus',
+    subtitle: 'Verwalte den Wartungszustand des Systems und plane künftige Wartungsfenster.',
+    currentStatus: 'Aktueller Status',
+    status: 'Status:',
+    active: 'Aktiv',
+    inactive: 'Inaktiv',
+    message: 'Nachricht:',
+    activatedAt: 'Aktiviert am:',
+    activatedBy: 'Aktiviert von:',
+    scheduledMaintenance: 'Geplante Wartung',
+    plannedFor: (when: string) => `Geplant für: ${when}`,
+    scheduledBy: (who: string) => `Geplant von: ${who}`,
+    actions: 'Aktionen',
+    activeNote: 'Der Wartungsmodus ist derzeit aktiv. Benutzer ohne Adminrechte können keine Schreibvorgänge ausführen.',
+    deactivating: 'Wird deaktiviert…',
+    deactivate: 'Wartung deaktivieren',
+    maintenanceMessage: 'Wartungsnachricht',
+    messagePlaceholder: 'Nachricht, die Benutzern während der Wartung angezeigt wird…',
+    activating: 'Wird aktiviert…',
+    activate: 'Wartung aktivieren',
+    scheduleHeading: 'Wartung planen',
+    scheduledFor: (when: string) => `Die Wartung ist für ${when} geplant.`,
+    cancelling: 'Wird abgebrochen…',
+    cancelSchedule: 'Planung abbrechen',
+    dateTime: 'Datum und Uhrzeit',
+    messageLabel: 'Nachricht',
+    schedulePlaceholder: 'Nachricht zur Planung…',
+    scheduling: 'Wird geplant…',
+    howTitle: 'So funktioniert der Wartungsmodus',
+    apiLevel: 'Wartung auf API-Ebene:',
+    apiLevelText: ' Blockiert POST-, PUT-, PATCH- und DELETE-Anfragen von Benutzern ohne Adminrechte. GET-Anfragen bleiben für den schreibgeschützten Zugriff verfügbar.',
+    adminAccess: 'Admin-Zugriff:',
+    adminAccessText: ' Admins sind nicht betroffen und können weiterhin alle Endpunkte nutzen.',
+    ws: 'WebSocket-Benachrichtigung:',
+    wsText: ' Alle verbundenen Benutzer werden per WebSocket benachrichtigt, wenn die Wartung aktiviert, deaktiviert, geplant oder abgebrochen wird.',
+    full: 'Vollständige Infrastrukturwartung:',
+    fullBefore: ' Für vollständige Abschaltungen (Docker-Container stoppen) verwende das Skript ',
+    fullAfter: ' auf dem Server. Es liefert über Traefik eine statische Wartungsseite aus.',
+    activateTitle: 'Wartungsmodus aktivieren',
+    activateConfirmMessage: 'Dadurch werden alle Schreibvorgänge für Benutzer ohne Adminrechte blockiert. Verbundene Benutzer werden per WebSocket benachrichtigt. Bist du sicher?',
+    activateConfirm: 'Aktivieren',
+    deactivateTitle: 'Wartungsmodus deaktivieren',
+    deactivateConfirmMessage: 'Dadurch steht der volle Dienst wieder allen Benutzern zur Verfügung. Verbundene Benutzer werden benachrichtigt.',
+    deactivateConfirm: 'Deaktivieren',
+    cancelTitle: 'Geplante Wartung abbrechen',
+    cancelConfirmMessage: 'Dadurch wird das geplante Wartungsfenster abgebrochen. Verbundene Benutzer werden benachrichtigt.',
+  },
+  en: {
+    defaultActivateMessage: 'The system is undergoing scheduled maintenance.',
+    defaultScheduleMessage: 'Scheduled maintenance is planned.',
+    activated: 'Maintenance mode activated',
+    activateFailed: 'Failed to activate',
+    deactivated: 'Maintenance mode deactivated',
+    deactivateFailed: 'Failed to deactivate',
+    scheduled: 'Maintenance scheduled',
+    scheduleFailed: 'Failed to schedule',
+    cancelled: 'Scheduled maintenance cancelled',
+    cancelFailed: 'Failed to cancel schedule',
+    denied: 'Access Denied',
+    adminRequired: 'Admin privileges are required to access this page.',
+    breadcrumb: 'Maintenance',
+    title: 'Maintenance mode',
+    subtitle: 'Manage system maintenance state and schedule future maintenance windows.',
+    currentStatus: 'Current Status',
+    status: 'Status:',
+    active: 'Active',
+    inactive: 'Inactive',
+    message: 'Message:',
+    activatedAt: 'Activated at:',
+    activatedBy: 'Activated by:',
+    scheduledMaintenance: 'Scheduled Maintenance',
+    plannedFor: (when: string) => `Planned for: ${when}`,
+    scheduledBy: (who: string) => `Scheduled by: ${who}`,
+    actions: 'Actions',
+    activeNote: 'Maintenance mode is currently active. Non-admin users cannot perform write operations.',
+    deactivating: 'Deactivating...',
+    deactivate: 'Deactivate Maintenance',
+    maintenanceMessage: 'Maintenance Message',
+    messagePlaceholder: 'Message shown to users during maintenance...',
+    activating: 'Activating...',
+    activate: 'Activate Maintenance',
+    scheduleHeading: 'Schedule Maintenance',
+    scheduledFor: (when: string) => `Maintenance is scheduled for ${when}.`,
+    cancelling: 'Cancelling...',
+    cancelSchedule: 'Cancel Schedule',
+    dateTime: 'Date & Time',
+    messageLabel: 'Message',
+    schedulePlaceholder: 'Schedule message...',
+    scheduling: 'Scheduling...',
+    howTitle: 'How Maintenance Mode Works',
+    apiLevel: 'API-Level Maintenance:',
+    apiLevelText: ' Blocks POST, PUT, PATCH, DELETE requests for non-admin users. GET requests remain available for read-only access.',
+    adminAccess: 'Admin Access:',
+    adminAccessText: ' Admin users are not affected and can continue using all endpoints.',
+    ws: 'WebSocket Notification:',
+    wsText: ' All connected users are notified via WebSocket when maintenance is activated, deactivated, scheduled, or cancelled.',
+    full: 'Full Infrastructure Maintenance:',
+    fullBefore: ' For complete shutdowns (stopping Docker containers), use the ',
+    fullAfter: ' script on the server. This serves a static maintenance page via Traefik.',
+    activateTitle: 'Activate Maintenance Mode',
+    activateConfirmMessage: 'This will block all write operations for non-admin users. Connected users will be notified via WebSocket. Are you sure?',
+    activateConfirm: 'Activate',
+    deactivateTitle: 'Deactivate Maintenance Mode',
+    deactivateConfirmMessage: 'This will restore full service for all users. Connected users will be notified.',
+    deactivateConfirm: 'Deactivate',
+    cancelTitle: 'Cancel Scheduled Maintenance',
+    cancelConfirmMessage: 'This will cancel the scheduled maintenance window. Connected users will be notified.',
+  },
+};
+
 export default function MaintenancePage() {
+  const language = useUiLanguage();
+  const t = COPY[language];
+  const when = (value: string) => formatDateTime(value, language);
   const { isLoading: authLoading } = useAuth();
   const { isAdmin } = usePermissions();
   const notify = useNotify();
@@ -29,7 +159,9 @@ export default function MaintenancePage() {
   );
 
   // Activate form
-  const [activateMessage, setActivateMessage] = useState('The system is undergoing scheduled maintenance.');
+  // null until edited, so the default follows the interface language.
+  const [activateEdit, setActivateEdit] = useState<string | null>(null);
+  const activateMessage = activateEdit ?? t.defaultActivateMessage;
   const [showActivateConfirm, setShowActivateConfirm] = useState(false);
   const [activating, setActivating] = useState(false);
 
@@ -39,7 +171,8 @@ export default function MaintenancePage() {
 
   // Schedule form
   const [scheduleDate, setScheduleDate] = useState('');
-  const [scheduleMessage, setScheduleMessage] = useState('Scheduled maintenance is planned.');
+  const [scheduleEdit, setScheduleEdit] = useState<string | null>(null);
+  const scheduleMessage = scheduleEdit ?? t.defaultScheduleMessage;
   const [scheduling, setScheduling] = useState(false);
 
   // Cancel schedule confirm
@@ -51,10 +184,10 @@ export default function MaintenancePage() {
     setActivating(true);
     try {
       await maintenanceClient.activate(activateMessage);
-      notify('Maintenance mode activated', 'success');
+      notify(t.activated, 'success');
       await fetchStatus();
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Failed to activate', 'error');
+      notify(err instanceof Error ? err.message : t.activateFailed, 'error');
     } finally {
       setActivating(false);
     }
@@ -65,10 +198,10 @@ export default function MaintenancePage() {
     setDeactivating(true);
     try {
       await maintenanceClient.deactivate();
-      notify('Maintenance mode deactivated', 'success');
+      notify(t.deactivated, 'success');
       await fetchStatus();
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Failed to deactivate', 'error');
+      notify(err instanceof Error ? err.message : t.deactivateFailed, 'error');
     } finally {
       setDeactivating(false);
     }
@@ -82,11 +215,11 @@ export default function MaintenancePage() {
     try {
       const isoDate = new Date(scheduleDate).toISOString();
       await maintenanceClient.schedule(isoDate, scheduleMessage);
-      notify('Maintenance scheduled', 'success');
+      notify(t.scheduled, 'success');
       setScheduleDate('');
       await fetchStatus();
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Failed to schedule', 'error');
+      notify(err instanceof Error ? err.message : t.scheduleFailed, 'error');
     } finally {
       setScheduling(false);
     }
@@ -97,10 +230,10 @@ export default function MaintenancePage() {
     setCancelling(true);
     try {
       await maintenanceClient.cancelSchedule();
-      notify('Scheduled maintenance cancelled', 'success');
+      notify(t.cancelled, 'success');
       await fetchStatus();
     } catch (err) {
-      notify(err instanceof Error ? err.message : 'Failed to cancel schedule', 'error');
+      notify(err instanceof Error ? err.message : t.cancelFailed, 'error');
     } finally {
       setCancelling(false);
     }
@@ -112,8 +245,8 @@ export default function MaintenancePage() {
       <AuthenticatedLayout>
         <div className="p-6">
           <div className="bg-danger-wash border border-danger-line rounded-lg p-6 text-center">
-            <h2 className="text-lg font-semibold text-danger-text">Access Denied</h2>
-            <p className="text-sm text-danger-text mt-2">Admin privileges are required to access this page.</p>
+            <h2 className="text-lg font-semibold text-danger-text">{t.denied}</h2>
+            <p className="text-sm text-danger-text mt-2">{t.adminRequired}</p>
           </div>
         </div>
       </AuthenticatedLayout>
@@ -124,9 +257,9 @@ export default function MaintenancePage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Maintenance' }]}
-          title="Maintenance mode"
-          subtitle="Manage system maintenance state and schedule future maintenance windows."
+          breadcrumbs={[{ label: t.breadcrumb }]}
+          title={t.title}
+          subtitle={t.subtitle}
         />
 
         {/* Error */}
@@ -144,32 +277,32 @@ export default function MaintenancePage() {
         {/* Status Card */}
         {!loading && status && (
           <div className="bg-surface rounded-lg shadow border border-rule p-6">
-            <h2 className="text-lg font-semibold text-fg mb-4">Current Status</h2>
+            <h2 className="text-lg font-semibold text-fg mb-4">{t.currentStatus}</h2>
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-muted">Status:</span>
+                <span className="text-sm font-medium text-muted">{t.status}</span>
                 {status.active ? (
-                  <Badge color="yellow" pill>Active</Badge>
+                  <Badge color="yellow" pill>{t.active}</Badge>
                 ) : (
-                  <Badge color="green" pill>Inactive</Badge>
+                  <Badge color="green" pill>{t.inactive}</Badge>
                 )}
               </div>
 
               {status.active && (
                 <>
                   <div className="flex items-start gap-3">
-                    <span className="text-sm font-medium text-muted">Message:</span>
+                    <span className="text-sm font-medium text-muted">{t.message}</span>
                     <span className="text-sm text-fg">{status.message}</span>
                   </div>
                   {status.activated_at && (
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-muted">Activated at:</span>
-                      <span className="text-sm text-fg">{new Date(status.activated_at).toLocaleString()}</span>
+                      <span className="text-sm font-medium text-muted">{t.activatedAt}</span>
+                      <span className="text-sm text-fg">{when(status.activated_at)}</span>
                     </div>
                   )}
                   {status.activated_by && (
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-muted">Activated by:</span>
+                      <span className="text-sm font-medium text-muted">{t.activatedBy}</span>
                       <span className="text-sm text-fg">{status.activated_by_name || status.activated_by}</span>
                     </div>
                   )}
@@ -182,13 +315,13 @@ export default function MaintenancePage() {
                     <svg className="h-4 w-4 text-accent-text" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span className="text-sm font-medium text-accent-text">Scheduled Maintenance</span>
+                    <span className="text-sm font-medium text-accent-text">{t.scheduledMaintenance}</span>
                   </div>
                   <p className="text-sm text-accent-text">
-                    Planned for: {new Date(status.scheduled_at).toLocaleString()}
+                    {t.plannedFor(when(status.scheduled_at))}
                   </p>
                   {status.scheduled_by && (
-                    <p className="text-xs text-accent-text mt-1">Scheduled by: {status.scheduled_by_name || status.scheduled_by}</p>
+                    <p className="text-xs text-accent-text mt-1">{t.scheduledBy(status.scheduled_by_name || status.scheduled_by)}</p>
                   )}
                 </div>
               )}
@@ -199,41 +332,41 @@ export default function MaintenancePage() {
         {/* Actions */}
         {!loading && status && (
           <div className="bg-surface rounded-lg shadow border border-rule p-6">
-            <h2 className="text-lg font-semibold text-fg mb-4">Actions</h2>
+            <h2 className="text-lg font-semibold text-fg mb-4">{t.actions}</h2>
             <div className="space-y-6">
               {/* Activate / Deactivate */}
               {status.active ? (
                 <div>
                   <p className="text-sm text-muted mb-3">
-                    Maintenance mode is currently active. Non-admin users cannot perform write operations.
+                    {t.activeNote}
                   </p>
                   <button
                     onClick={() => setShowDeactivateConfirm(true)}
                     disabled={deactivating}
                     className="px-4 py-2 text-sm font-medium text-on-accent bg-success rounded-lg hover:bg-success-hover disabled:opacity-50 transition-colors"
                   >
-                    {deactivating ? 'Deactivating...' : 'Deactivate Maintenance'}
+                    {deactivating ? t.deactivating : t.deactivate}
                   </button>
                 </div>
               ) : (
                 <div>
                   <label htmlFor="activate-message" className="block text-sm font-medium text-body mb-1">
-                    Maintenance Message
+                    {t.maintenanceMessage}
                   </label>
                   <textarea
                     id="activate-message"
                     value={activateMessage}
-                    onChange={(e) => setActivateMessage(e.target.value)}
+                    onChange={(e) => setActivateEdit(e.target.value)}
                     rows={2}
                     className="w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-accent-line focus:border-accent-line text-sm mb-3"
-                    placeholder="Message shown to users during maintenance..."
+                    placeholder={t.messagePlaceholder}
                   />
                   <button
                     onClick={() => setShowActivateConfirm(true)}
                     disabled={activating}
                     className="px-4 py-2 text-sm font-medium text-on-accent bg-danger rounded-lg hover:bg-danger-hover disabled:opacity-50 transition-colors"
                   >
-                    {activating ? 'Activating...' : 'Activate Maintenance'}
+                    {activating ? t.activating : t.activate}
                   </button>
                 </div>
               )}
@@ -243,18 +376,18 @@ export default function MaintenancePage() {
 
               {/* Schedule */}
               <div>
-                <h3 className="text-sm font-semibold text-fg mb-3">Schedule Maintenance</h3>
+                <h3 className="text-sm font-semibold text-fg mb-3">{t.scheduleHeading}</h3>
                 {status.scheduled_at ? (
                   <div className="flex items-center gap-4">
                     <p className="text-sm text-muted">
-                      Maintenance is scheduled for {new Date(status.scheduled_at).toLocaleString()}.
+                      {t.scheduledFor(when(status.scheduled_at))}
                     </p>
                     <button
                       onClick={() => setShowCancelConfirm(true)}
                       disabled={cancelling}
                       className="px-4 py-2 text-sm font-medium text-danger-text bg-danger-wash rounded-lg hover:bg-danger-wash disabled:opacity-50 transition-colors"
                     >
-                      {cancelling ? 'Cancelling...' : 'Cancel Schedule'}
+                      {cancelling ? t.cancelling : t.cancelSchedule}
                     </button>
                   </div>
                 ) : (
@@ -262,7 +395,7 @@ export default function MaintenancePage() {
                     <div className="flex flex-wrap gap-4">
                       <div className="flex-1 min-w-[200px]">
                         <label htmlFor="schedule-date" className="block text-sm font-medium text-body mb-1">
-                          Date & Time
+                          {t.dateTime}
                         </label>
                         <input
                           id="schedule-date"
@@ -275,15 +408,15 @@ export default function MaintenancePage() {
                       </div>
                       <div className="flex-1 min-w-[200px]">
                         <label htmlFor="schedule-message" className="block text-sm font-medium text-body mb-1">
-                          Message
+                          {t.messageLabel}
                         </label>
                         <input
                           id="schedule-message"
                           type="text"
                           value={scheduleMessage}
-                          onChange={(e) => setScheduleMessage(e.target.value)}
+                          onChange={(e) => setScheduleEdit(e.target.value)}
                           className="w-full px-3 py-2 border border-rule-strong rounded-lg focus:ring-2 focus:ring-accent-line focus:border-accent-line text-sm"
-                          placeholder="Schedule message..."
+                          placeholder={t.schedulePlaceholder}
                         />
                       </div>
                     </div>
@@ -292,7 +425,7 @@ export default function MaintenancePage() {
                       disabled={scheduling}
                       className="px-4 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover disabled:opacity-50 transition-colors"
                     >
-                      {scheduling ? 'Scheduling...' : 'Schedule Maintenance'}
+                      {scheduling ? t.scheduling : t.scheduleHeading}
                     </button>
                   </form>
                 )}
@@ -303,19 +436,19 @@ export default function MaintenancePage() {
 
         {/* Info Section */}
         <div className="bg-canvas rounded-lg border border-rule p-6">
-          <h2 className="text-sm font-semibold text-fg mb-3">How Maintenance Mode Works</h2>
+          <h2 className="text-sm font-semibold text-fg mb-3">{t.howTitle}</h2>
           <ul className="text-sm text-muted space-y-2">
             <li>
-              <strong>API-Level Maintenance:</strong> Blocks POST, PUT, PATCH, DELETE requests for non-admin users. GET requests remain available for read-only access.
+              <strong>{t.apiLevel}</strong>{t.apiLevelText}
             </li>
             <li>
-              <strong>Admin Access:</strong> Admin users are not affected and can continue using all endpoints.
+              <strong>{t.adminAccess}</strong>{t.adminAccessText}
             </li>
             <li>
-              <strong>WebSocket Notification:</strong> All connected users are notified via WebSocket when maintenance is activated, deactivated, scheduled, or cancelled.
+              <strong>{t.ws}</strong>{t.wsText}
             </li>
             <li>
-              <strong>Full Infrastructure Maintenance:</strong> For complete shutdowns (stopping Docker containers), use the <code className="px-1.5 py-0.5 bg-sunken rounded text-xs font-mono">./maintenance.sh</code> script on the server. This serves a static maintenance page via Traefik.
+              <strong>{t.full}</strong>{t.fullBefore}<code className="px-1.5 py-0.5 bg-sunken rounded text-xs font-mono">./maintenance.sh</code>{t.fullAfter}
             </li>
           </ul>
         </div>
@@ -324,9 +457,9 @@ export default function MaintenancePage() {
         {/* Confirm Dialogs */}
         <ConfirmDialog
           open={showActivateConfirm}
-          title="Activate Maintenance Mode"
-          message="This will block all write operations for non-admin users. Connected users will be notified via WebSocket. Are you sure?"
-          confirmLabel="Activate"
+          title={t.activateTitle}
+          message={t.activateConfirmMessage}
+          confirmLabel={t.activateConfirm}
           variant="danger"
           onConfirm={handleActivate}
           onCancel={() => setShowActivateConfirm(false)}
@@ -334,9 +467,9 @@ export default function MaintenancePage() {
 
         <ConfirmDialog
           open={showDeactivateConfirm}
-          title="Deactivate Maintenance Mode"
-          message="This will restore full service for all users. Connected users will be notified."
-          confirmLabel="Deactivate"
+          title={t.deactivateTitle}
+          message={t.deactivateConfirmMessage}
+          confirmLabel={t.deactivateConfirm}
           variant="default"
           onConfirm={handleDeactivate}
           onCancel={() => setShowDeactivateConfirm(false)}
@@ -344,9 +477,9 @@ export default function MaintenancePage() {
 
         <ConfirmDialog
           open={showCancelConfirm}
-          title="Cancel Scheduled Maintenance"
-          message="This will cancel the scheduled maintenance window. Connected users will be notified."
-          confirmLabel="Cancel Schedule"
+          title={t.cancelTitle}
+          message={t.cancelConfirmMessage}
+          confirmLabel={t.cancelSchedule}
           variant="danger"
           onConfirm={handleCancelSchedule}
           onCancel={() => setShowCancelConfirm(false)}

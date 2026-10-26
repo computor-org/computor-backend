@@ -1,6 +1,7 @@
 import type { CourseMembersClient } from '@/src/generated/clients/CourseMembersClient';
 import type { CourseGroupList, CourseMemberList } from 'types/generated';
 import { memberName } from '@/src/utils/userName';
+import type { UiLanguage } from '@/src/hooks/useUiLanguage';
 
 /** Rows per request. The API caps nothing; this is only how big a page we ask for. */
 const PAGE = 500;
@@ -60,7 +61,9 @@ const byName = (a: string, b: string) => a.localeCompare(b, undefined, { numeric
 export function buildRoster(
   groups: CourseGroupList[],
   members: CourseMemberList[],
+  language: UiLanguage = 'en',
 ): RosterGroup[] {
+  const de = language === 'de';
   const buckets = new Map<string, CourseMemberList[]>();
   const unassigned: CourseMemberList[] = [];
 
@@ -81,7 +84,7 @@ export function buildRoster(
     .map((group) => ({
       group,
       key: group.id,
-      title: group.title || 'Untitled group',
+      title: group.title || (de ? 'Gruppe ohne Titel' : 'Untitled group'),
       members: sortMembers(buckets.get(group.id) ?? []),
     }))
     .sort((a, b) => byName(a.title, b.title));
@@ -90,7 +93,7 @@ export function buildRoster(
     rows.push({
       group: null,
       key: '__unassigned__',
-      title: 'Not in a group',
+      title: de ? 'Ohne Gruppe' : 'Not in a group',
       members: sortMembers(unassigned),
     });
   }

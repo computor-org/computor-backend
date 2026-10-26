@@ -10,12 +10,68 @@ import Button from '@/src/components/ui/Button';
 import ConfirmDialog from '@/src/components/ConfirmDialog';
 import { inputCls } from '@/src/components/ui/tokens';
 import { CoderClient } from '@/src/clients/CoderClient';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const coderClient = new CoderClient();
+
+const COPY = {
+  de: {
+    saveFailed: 'Datei konnte nicht gespeichert werden',
+    restoreFailed: 'Verwalteter Zustand konnte nicht wiederhergestellt werden',
+    loading: 'Vorlagendateien werden geladen …',
+    title: 'Vorlagendateien',
+    hint: 'Direkte Bearbeitung der bereitgestellten Terraform-Dateien. Gespeicherte .tf-Dateien werden auf Syntaxfehler geprüft; maßgeblich bleibt der terraform plan beim nächsten Push der Vorlage.',
+    clonedTitle: 'Hier erstellt; die Synchronisierung mit dem Repository fasst sie nie an',
+    clonedFrom: (name: string) => `geklont von ${name}`,
+    customized: 'angepasst',
+    managed: 'verwaltet',
+    restoreManaged: 'Verwalteten Zustand wiederherstellen',
+    noFiles: 'Keine bearbeitbaren Dateien.',
+    contentOf: (name: string) => `Inhalt von ${name}`,
+    saving: 'Wird gespeichert …',
+    save: (name: string | null) => `${name ?? 'Datei'} speichern`,
+    discard: 'Änderungen verwerfen',
+    effect: 'Änderungen wirken nach dem nächsten Push der Vorlage (Tab „Flotte“).',
+    confirmTitle: 'Diese Vorlage anpassen?',
+    confirmMessage:
+      'Durch das Speichern gilt die Vorlage als vom Betrieb angepasst: Sie wird bei Neustarts des Systems nicht mehr automatisch aus dem Repository aktualisiert (bis du sie wieder auf „verwaltet“ zurücksetzt). Fortfahren?',
+    confirmLabel: 'Speichern & anpassen',
+    restoreTitle: 'Verwalteten Zustand wiederherstellen?',
+    restoreMessage:
+      'Die Repository-Vorgaben ersetzen beim nächsten Systemstart ALLE angepassten Dateien dieser Vorlage – deine Anpassungen gehen dann verloren. Fortfahren?',
+  },
+  en: {
+    saveFailed: 'Failed to save file',
+    restoreFailed: 'Failed to restore managed state',
+    loading: 'Loading template files…',
+    title: 'Template files',
+    hint: 'Raw editing of the deployed Terraform files. Saved .tf files are syntax-checked; the real gate stays the terraform plan run by the next template push.',
+    clonedTitle: 'Created here; the repository sync never touches it',
+    clonedFrom: (name: string) => `cloned from ${name}`,
+    customized: 'customized',
+    managed: 'managed',
+    restoreManaged: 'Restore managed',
+    noFiles: 'No editable files.',
+    contentOf: (name: string) => `Content of ${name}`,
+    saving: 'Saving…',
+    save: (name: string | null) => `Save ${name ?? 'file'}`,
+    discard: 'Discard changes',
+    effect: 'Changes take effect after the next template push (Fleet tab).',
+    confirmTitle: 'Customize this template?',
+    confirmMessage:
+      'Saving marks the template as operator-customized: it will no longer be updated automatically from the repository on system restarts (until you restore it to managed). Continue?',
+    confirmLabel: 'Save & customize',
+    restoreTitle: 'Restore managed state?',
+    restoreMessage:
+      'The repository defaults will replace ALL customized files of this template on the next system startup — your customizations will be lost then. Continue?',
+  },
+};
 
 /** Raw editor over the deployed template directory's files. */
 export default function TemplateFilesPanel({ templateName }: { templateName: string }) {
   const notify = useNotify();
+  const language = useUiLanguage();
+  const t = COPY[language];
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -52,7 +108,7 @@ export default function TemplateFilesPanel({ templateName }: { templateName: str
       });
       await reload();
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Failed to save file', 'error');
+      notify(e instanceof Error ? e.message : t.saveFailed, 'error');
     } finally {
       setSaving(false);
     }
@@ -70,11 +126,11 @@ export default function TemplateFilesPanel({ templateName }: { templateName: str
       notify(response.message, 'success');
       await reload();
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Failed to restore managed state', 'error');
+      notify(e instanceof Error ? e.message : t.restoreFailed, 'error');
     }
   }
 
-  if (loading) return <ListLoading>Loading template files…</ListLoading>;
+  if (loading) return <ListLoading>{t.loading}</ListLoading>;
 
   return (
     <>
@@ -91,28 +147,25 @@ export default function TemplateFilesPanel({ templateName }: { templateName: str
         <div className="flex-1 min-h-0 flex flex-col gap-4 bg-surface rounded-lg border border-rule p-5">
           <div className="shrink-0 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="text-lg font-semibold text-fg">Template files</h2>
-              <p className="text-sm text-muted mt-1">
-                Raw editing of the deployed Terraform files. Saved .tf files are syntax-checked;
-                the real gate stays the terraform plan run by the next template push.
-              </p>
+              <h2 className="text-lg font-semibold text-fg">{t.title}</h2>
+              <p className="text-sm text-muted mt-1">{t.hint}</p>
             </div>
             <div className="flex items-center gap-2">
               {data && (
                 data.cloned_from ? (
-                  <Badge tone="info" title="Created here; the repository sync never touches it">
-                    cloned from {data.cloned_from}
+                  <Badge tone="info" title={t.clonedTitle}>
+                    {t.clonedFrom(data.cloned_from)}
                   </Badge>
                 ) : (
                   <Badge tone={data.customized ? 'warning' : 'success'}>
-                    {data.customized ? 'customized' : 'managed'}
+                    {data.customized ? t.customized : t.managed}
                   </Badge>
                 )
               )}
               {/* A clone has no repo copy to restore to. */}
               {data?.customized && !data.cloned_from && (
                 <Button size="xs" variant="ghost" onClick={() => setConfirmRestore(true)}>
-                  Restore managed
+                  {t.restoreManaged}
                 </Button>
               )}
             </div>
@@ -130,7 +183,7 @@ export default function TemplateFilesPanel({ templateName }: { templateName: str
                 {isDirty(file.name) && <span className="text-warn-text ml-1">•</span>}
               </Button>
             ))}
-            {files.length === 0 && <p className="text-sm text-muted">No editable files.</p>}
+            {files.length === 0 && <p className="text-sm text-muted">{t.noFiles}</p>}
           </div>
 
           {currentFile && (
@@ -144,7 +197,7 @@ export default function TemplateFilesPanel({ templateName }: { templateName: str
               // ends exactly where the card does. min-h keeps it usable on a
               // very short window — then, and only then, the page scrolls again.
               className={`${inputCls} flex-1 min-h-48 resize-none font-mono text-xs leading-5 whitespace-pre`}
-              aria-label={`Content of ${currentFile.name}`}
+              aria-label={t.contentOf(currentFile.name)}
               disabled={saving}
             />
           )}
@@ -154,9 +207,9 @@ export default function TemplateFilesPanel({ templateName }: { templateName: str
               onClick={requestSave}
               disabled={!active || !isDirty(active)}
               loading={saving}
-              loadingLabel="Saving…"
+              loadingLabel={t.saving}
             >
-              Save {active ?? 'file'}
+              {t.save(active)}
             </Button>
             {active && isDirty(active) && (
               <Button
@@ -170,11 +223,11 @@ export default function TemplateFilesPanel({ templateName }: { templateName: str
                   })
                 }
               >
-                Discard changes
+                {t.discard}
               </Button>
             )}
             <span className="text-xs text-muted">
-              Changes take effect after the next template push (Fleet tab).
+              {t.effect}
             </span>
           </div>
         </div>
@@ -183,13 +236,9 @@ export default function TemplateFilesPanel({ templateName }: { templateName: str
       {confirmSave && (
         <ConfirmDialog
           open={confirmSave}
-          title="Customize this template?"
-          message={
-            'Saving marks the template as operator-customized: it will no longer be ' +
-            'updated automatically from the repository on system restarts (until you ' +
-            'restore it to managed). Continue?'
-          }
-          confirmLabel="Save & customize"
+          title={t.confirmTitle}
+          message={t.confirmMessage}
+          confirmLabel={t.confirmLabel}
           onConfirm={() => {
             setConfirmSave(false);
             void saveActive();
@@ -201,13 +250,10 @@ export default function TemplateFilesPanel({ templateName }: { templateName: str
       {confirmRestore && (
         <ConfirmDialog
           open={confirmRestore}
-          title="Restore managed state?"
+          title={t.restoreTitle}
           variant="danger"
-          message={
-            'The repository defaults will replace ALL customized files of this template ' +
-            'on the next system startup — your customizations will be lost then. Continue?'
-          }
-          confirmLabel="Restore managed"
+          message={t.restoreMessage}
+          confirmLabel={t.restoreManaged}
           onConfirm={() => {
             setConfirmRestore(false);
             void restoreManaged();

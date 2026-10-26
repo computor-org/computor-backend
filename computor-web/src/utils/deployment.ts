@@ -20,13 +20,33 @@ const STATUS_STYLES: Record<string, { label: string; tone: Tone }> = {
   unassigned: { label: 'Unassigned', tone: 'muted' },
 };
 
-export function deploymentBadge(content: DeployableContent): { label: string; tone: Tone } {
+const GERMAN_LABELS: Record<string, string> = {
+  deployed: 'Bereitgestellt',
+  deploying: 'Wird bereitgestellt',
+  pending: 'Ausstehend',
+  failed: 'Fehlgeschlagen',
+  unassigned: 'Nicht zugewiesen',
+};
+
+/** A deployment status as the badge names it (unknown statuses are shown as sent). */
+export function deploymentStatusLabel(status: string, language: 'de' | 'en' = 'en'): string {
+  if (language === 'de') return GERMAN_LABELS[status] ?? status;
+  return STATUS_STYLES[status]?.label ?? status;
+}
+
+export function deploymentBadge(
+  content: DeployableContent,
+  language: 'de' | 'en' = 'en',
+): { label: string; tone: Tone } {
+  const de = language === 'de';
   const status = content.deployment_status || (content.has_deployment ? 'deployed' : null);
   if (!status) {
     // A unit isn't deployable (no example of its own) — label it as such rather
     // than implying a submittable assignment is missing its example.
-    if (!content.is_submittable) return { label: 'Unit', tone: 'muted' };
-    return { label: 'No example', tone: 'muted' };
+    if (!content.is_submittable) return { label: de ? 'Einheit' : 'Unit', tone: 'muted' };
+    return { label: de ? 'Kein Beispiel' : 'No example', tone: 'muted' };
   }
-  return STATUS_STYLES[status] ?? { label: status, tone: 'muted' };
+  const style = STATUS_STYLES[status];
+  if (de) return { label: GERMAN_LABELS[status] ?? status, tone: style?.tone ?? 'muted' };
+  return style ?? { label: status, tone: 'muted' };
 }

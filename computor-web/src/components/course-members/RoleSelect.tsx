@@ -1,6 +1,7 @@
 'use client';
 
-import { courseRoleLabel } from '@/src/utils/courseRoles';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { courseRoleLabel, localizedRoleLabel } from '@/src/utils/courseRoles';
 
 const CELL_CLS =
   'px-2 py-1 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent disabled:opacity-50';
@@ -19,6 +20,7 @@ export default function RoleSelect({
   disabled?: boolean;
   className?: string;
 }) {
+  const language = useUiLanguage();
   return (
     <select
       value={value}
@@ -28,7 +30,7 @@ export default function RoleSelect({
     >
       {options.map((r) => (
         <option key={r} value={r}>
-          {courseRoleLabel(r)}
+          {localizedRoleLabel(courseRoleLabel(r), language)}
         </option>
       ))}
     </select>

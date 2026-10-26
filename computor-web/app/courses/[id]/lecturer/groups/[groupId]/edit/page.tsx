@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import { useResource } from '@/src/hooks/useResource';
@@ -15,18 +16,42 @@ import { CourseGroupsClient } from '@/src/generated/clients/CourseGroupsClient';
 
 const groupsClient = new CourseGroupsClient();
 
+const COPY = {
+  de: {
+    courseGroups: 'Kursgruppen',
+    group: 'Gruppe',
+    groupFallback: 'Gruppe',
+    saveFailed: 'Speichern fehlgeschlagen',
+    forbidden: 'Zum Verwalten der Gruppen brauchst du mindestens Lehrenden-Zugriff auf diesen Kurs.',
+    edit: (name: string) => `${name} bearbeiten`,
+    titleField: 'Titel',
+    descriptionField: 'Beschreibung',
+  },
+  en: {
+    courseGroups: 'Course groups',
+    group: 'Group',
+    groupFallback: 'group',
+    saveFailed: 'Save failed',
+    forbidden: 'You need lecturer access (or higher) on this course to manage its groups.',
+    edit: (name: string) => `Edit ${name}`,
+    titleField: 'Title',
+    descriptionField: 'Description',
+  },
+};
+
 export default function CourseGroupEditPage() {
   const params = useParams();
   const courseId = params.id as string;
   const groupId = params.groupId as string;
   const router = useRouter();
+  const t = COPY[useUiLanguage()];
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
 
   const canManage = isAdmin || isOrganizationManager || courseHasAtLeast(courseId, '_lecturer');
 
   const [title, setTitle] = useState('');
-  const crumbs = useCourseCrumbs(courseId, { label: 'Course groups', href: `/courses/${courseId}/lecturer/groups` }, title || 'Group');
+  const crumbs = useCourseCrumbs(courseId, { label: t.courseGroups, href: `/courses/${courseId}/lecturer/groups` }, title || t.group);
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -58,12 +83,12 @@ export default function CourseGroupEditPage() {
       router.push(`/courses/${courseId}/lecturer/groups`);
     } catch (e) {
       setSaving(false);
-      setSaveError(e instanceof Error ? e.message : 'Save failed');
+      setSaveError(e instanceof Error ? e.message : t.saveFailed);
     }
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return <Forbidden message="You need lecturer access (or higher) on this course to manage its groups." />;
+    return <Forbidden message={t.forbidden} />;
   }
 
   return (
@@ -73,17 +98,17 @@ export default function CourseGroupEditPage() {
       ) : (
         <FormPanel
           breadcrumbs={crumbs}
-          title={`Edit ${title || 'group'}`}
+          title={t.edit(title || t.groupFallback)}
           error={loadError ?? saveError}
           submitting={saving}
           disabled={!title.trim()}
           onCancel={() => router.push(`/courses/${courseId}/lecturer/groups`)}
           onSubmit={save}
         >
-          <Field label="Title" required>
+          <Field label={t.titleField} required>
             <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Description">
+          <Field label={t.descriptionField}>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}

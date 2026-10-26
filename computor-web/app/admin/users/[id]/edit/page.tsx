@@ -11,12 +11,42 @@ import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
 import { inputCls } from '@/src/components/ui/tokens';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const usersClient = new UsersClient();
+
+const COPY = {
+  de: {
+    saveFailed: 'Speichern fehlgeschlagen',
+    forbidden: 'Erfordert die Rolle admin oder _user_manager.',
+    users: 'Benutzer',
+    user: 'Benutzer',
+    edit: 'Bearbeiten',
+    title: (name: string) => `${name} bearbeiten`,
+    userFallback: 'Benutzer',
+    email: 'E-Mail',
+    givenName: 'Vorname',
+    familyName: 'Nachname',
+  },
+  en: {
+    saveFailed: 'Save failed',
+    forbidden: 'Requires admin or _user_manager role.',
+    users: 'Users',
+    user: 'User',
+    edit: 'Edit',
+    title: (name: string) => `Edit ${name}`,
+    userFallback: 'user',
+    email: 'Email',
+    givenName: 'Given name',
+    familyName: 'Family name',
+  },
+};
 
 export default function UserEditPage() {
   const userId = useParams().id as string;
   const router = useRouter();
+  const language = useUiLanguage();
+  const t = COPY[language];
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isAdmin, isUserManager } = usePermissions();
   const canManage = isAdmin || isUserManager;
@@ -55,12 +85,12 @@ export default function UserEditPage() {
       router.push(`/admin/users/${userId}`);
     } catch (e) {
       setSaving(false);
-      setSaveError(e instanceof Error ? e.message : 'Save failed');
+      setSaveError(e instanceof Error ? e.message : t.saveFailed);
     }
   }
 
   if (!authLoading && isAuthenticated && !canManage) {
-    return <Forbidden message="Requires admin or _user_manager role." />;
+    return <Forbidden message={t.forbidden} />;
   }
 
   return (
@@ -70,24 +100,24 @@ export default function UserEditPage() {
       ) : (
         <FormPanel
           breadcrumbs={[
-            { label: 'Users', href: '/admin/users' },
-            { label: user?.email || 'User', href: `/admin/users/${userId}` },
-            { label: 'Edit' },
+            { label: t.users, href: '/admin/users' },
+            { label: user?.email || t.user, href: `/admin/users/${userId}` },
+            { label: t.edit },
           ]}
-          title={`Edit ${user?.email || 'user'}`}
+          title={t.title(user?.email || t.userFallback)}
           error={loadError ?? saveError}
           submitting={saving}
           onCancel={() => router.push(`/admin/users/${userId}`)}
           onSubmit={save}
         >
-          <Field label="Email">
+          <Field label={t.email}>
             <input value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Given name">
+            <Field label={t.givenName}>
               <input value={givenName} onChange={(e) => setGivenName(e.target.value)} className={inputCls} />
             </Field>
-            <Field label="Family name">
+            <Field label={t.familyName}>
               <input value={familyName} onChange={(e) => setFamilyName(e.target.value)} className={inputCls} />
             </Field>
           </div>

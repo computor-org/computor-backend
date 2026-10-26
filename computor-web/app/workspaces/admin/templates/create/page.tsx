@@ -15,19 +15,89 @@ import { inputCls, readOnlyInputCls } from '@/src/components/ui/tokens';
 import TemplateIcon from '@/src/components/workspaces/TemplateIcon';
 import { CoderClient } from '@/src/clients/CoderClient';
 import type { TemplateCatalogEntry } from '@/src/types/workspaces';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const coderClient = new CoderClient();
+
+const COPY = {
+  de: {
+    atMost: (n: number) => `Höchstens ${n} Zeichen.`,
+    keyFormat: 'Nur Kleinbuchstaben, Ziffern und Bindestriche innerhalb des Schlüssels.',
+    keySuffix: 'Lass „-workspace“ weg – es wird automatisch angehängt.',
+    copySuffix: 'Kopie',
+    created: 'Vorlage erstellt. Stelle sie im Tab „Vorlagen“ bereit, um ihr Image zu bauen.',
+    createFailed: 'Erstellen fehlgeschlagen',
+    forbidden: 'Die Vorlagenverwaltung erfordert die Rolle „Workspace-Maintainer“.',
+    back: 'Zurück zu den Arbeitsumgebungen',
+    workspaces: 'Arbeitsumgebungen',
+    administration: 'Administration',
+    newTemplate: 'Neue Vorlage',
+    title: 'Neue Vorlage für Arbeitsumgebungen',
+    description:
+      'Kopiert eine bestehende Vorlage – Terraform, Dockerfile, Payload und Limits – in eine unabhängige Vorlage, die du bearbeiten und bereitstellen kannst. Sie liegt nur im Vorlagenverzeichnis dieser Installation und wird nie von der Synchronisierung mit dem Repository überschrieben.',
+    createTemplate: 'Vorlage erstellen',
+    copyFrom: 'Kopieren von',
+    copyFromHint: 'Die Vorlage, aus deren Dateien, Dockerfile und Einstellungen die neue entsteht.',
+    loadingTemplates: 'Vorlagen werden geladen …',
+    noDirs: 'Keine Vorlagenverzeichnisse verfügbar',
+    key: 'Schlüssel',
+    keyHint: (n: number) =>
+      `Verzeichnisname der neuen Vorlage: bis zu ${n} Kleinbuchstaben, Ziffern und Bindestriche innerhalb des Namens, z. B. python-ds. Coder-Name und Image-Name werden daraus abgeleitet.`,
+    directory: 'Verzeichnis',
+    coderName: 'Name der Coder-Vorlage',
+    image: 'Image',
+    displayName: 'Anzeigename',
+    displayNameHint: 'Das sehen Nutzende auf den Karten der Arbeitsumgebungen.',
+    descriptionLabel: 'Beschreibung',
+    icon: 'Symbol',
+    iconHint:
+      'Eine https://-Bild-URL oder einer der eingebauten Coder-Pfade /icon/<name>.svg. Leer verwendet das Standardsymbol.',
+  },
+  en: {
+    atMost: (n: number) => `At most ${n} characters.`,
+    keyFormat: 'Lowercase letters, digits and inner hyphens only.',
+    keySuffix: "Leave out '-workspace' — it is added automatically.",
+    copySuffix: 'copy',
+    created: 'Template created. Deploy it from the Templates tab to build its image.',
+    createFailed: 'Create failed',
+    forbidden: 'Template administration requires the workspace maintainer role.',
+    back: 'Back to workspaces',
+    workspaces: 'Workspaces',
+    administration: 'Administration',
+    newTemplate: 'New template',
+    title: 'New workspace template',
+    description:
+      "Copies an existing template — Terraform, Dockerfile, payload and limits — into an independent template you can edit and deploy. It lives only in this deployment's templates directory and is never overwritten by the repository sync.",
+    createTemplate: 'Create template',
+    copyFrom: 'Copy from',
+    copyFromHint: 'The template whose files, Dockerfile and settings the new one starts from.',
+    loadingTemplates: 'Loading templates…',
+    noDirs: 'No template directories available',
+    key: 'Key',
+    keyHint: (n: number) =>
+      `Directory name of the new template: up to ${n} lowercase letters, digits and inner hyphens, e.g. python-ds. The Coder name and image name are derived from it.`,
+    directory: 'Directory',
+    coderName: 'Coder template name',
+    image: 'Image',
+    displayName: 'Display name',
+    displayNameHint: 'What users see on the workspace cards.',
+    descriptionLabel: 'Description',
+    icon: 'Icon',
+    iconHint:
+      "An https:// image URL, or one of Coder's built-in /icon/<name>.svg paths. Empty uses the default glyph.",
+  },
+};
 
 // Mirrors templates_fs.TEMPLATE_KEY_RE / TEMPLATE_KEY_MAX_LEN so the form can
 // explain a bad key before submitting; the server remains the gate.
 const KEY_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 const KEY_MAX_LEN = 22;
 
-function keyProblem(key: string): string | null {
+function keyProblem(key: string, t: (typeof COPY)['en']): string | null {
   if (!key) return null;
-  if (key.length > KEY_MAX_LEN) return `At most ${KEY_MAX_LEN} characters.`;
-  if (!KEY_RE.test(key)) return 'Lowercase letters, digits and inner hyphens only.';
-  if (key.endsWith('-workspace')) return "Leave out '-workspace' — it is added automatically.";
+  if (key.length > KEY_MAX_LEN) return t.atMost(KEY_MAX_LEN);
+  if (!KEY_RE.test(key)) return t.keyFormat;
+  if (key.endsWith('-workspace')) return t.keySuffix;
   return null;
 }
 
@@ -41,6 +111,7 @@ type SourceEntry = TemplateCatalogEntry & { dir_name: string };
 function CreateInner() {
   const router = useRouter();
   const notify = useNotify();
+  const t = COPY[useUiLanguage()];
   const fromParam = useSearchParam('from');
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { isWorkspaceMaintainer } = usePermissions();
@@ -70,10 +141,10 @@ function CreateInner() {
   const [error, setError] = useState<string | null>(null);
 
   const displayNameValue =
-    displayName ?? (source ? `${source.display_name || source.name} (copy)` : '');
+    displayName ?? (source ? `${source.display_name || source.name} (${t.copySuffix})` : '');
   const descriptionValue = description ?? source?.description ?? '';
   const iconValue = icon ?? source?.icon ?? '';
-  const problem = keyProblem(key);
+  const problem = keyProblem(key, t);
   const coderName = key ? `${key}-workspace` : '';
   const imageName = key ? `computor-workspace-${key}` : '';
   const canSubmit =
@@ -93,22 +164,22 @@ function CreateInner() {
           icon: iconValue.trim() || null,
         },
       });
-      notify('Template created. Deploy it from the Templates tab to build its image.', 'success');
+      notify(t.created, 'success');
       router.push(
         `/workspaces/admin/templates/${encodeURIComponent(created.template_name)}?tab=details`,
       );
     } catch (e) {
       setSaving(false);
-      setError(e instanceof Error ? e.message : 'Create failed');
+      setError(e instanceof Error ? e.message : t.createFailed);
     }
   }
 
   if (!authLoading && isAuthenticated && !isWorkspaceMaintainer) {
     return (
       <Forbidden
-        message="Template administration requires the workspace maintainer role."
+        message={t.forbidden}
         backLink="/workspaces"
-        backText="Back to workspaces"
+        backText={t.back}
       />
     );
   }
@@ -117,23 +188,23 @@ function CreateInner() {
     <AuthenticatedLayout>
       <FormPanel
         breadcrumbs={[
-          { label: 'Workspaces', href: '/workspaces' },
-          { label: 'Administration', href: '/workspaces/admin?tab=templates' },
-          { label: 'New template' },
+          { label: t.workspaces, href: '/workspaces' },
+          { label: t.administration, href: '/workspaces/admin?tab=templates' },
+          { label: t.newTemplate },
         ]}
-        title="New workspace template"
-        description="Copies an existing template — Terraform, Dockerfile, payload and limits — into an independent template you can edit and deploy. It lives only in this deployment's templates directory and is never overwritten by the repository sync."
+        title={t.title}
+        description={t.description}
         error={error ?? loadError}
         submitting={saving}
         disabled={!canSubmit || loading}
-        submitLabel="Create template"
+        submitLabel={t.createTemplate}
         onCancel={() => router.push('/workspaces/admin?tab=templates')}
         onSubmit={save}
       >
         <Field
-          label="Copy from"
+          label={t.copyFrom}
           required
-          hint="The template whose files, Dockerfile and settings the new one starts from."
+          hint={t.copyFromHint}
         >
           <select
             value={source?.dir_name ?? ''}
@@ -143,7 +214,7 @@ function CreateInner() {
           >
             {sources.length === 0 && (
               <option value="">
-                {loading ? 'Loading templates…' : 'No template directories available'}
+                {loading ? t.loadingTemplates : t.noDirs}
               </option>
             )}
             {sources.map((t) => (
@@ -155,12 +226,9 @@ function CreateInner() {
         </Field>
 
         <Field
-          label="Key"
+          label={t.key}
           required
-          hint={
-            problem ??
-            `Directory name of the new template: up to ${KEY_MAX_LEN} lowercase letters, digits and inner hyphens, e.g. python-ds. The Coder name and image name are derived from it.`
-          }
+          hint={problem ?? t.keyHint(KEY_MAX_LEN)}
         >
           <input
             value={key}
@@ -173,7 +241,7 @@ function CreateInner() {
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Directory">
+          <Field label={t.directory}>
             <input
               value={key || '—'}
               readOnly
@@ -181,7 +249,7 @@ function CreateInner() {
               className={`${readOnlyInputCls} font-mono`}
             />
           </Field>
-          <Field label="Coder template name">
+          <Field label={t.coderName}>
             <input
               value={coderName || '—'}
               readOnly
@@ -189,7 +257,7 @@ function CreateInner() {
               className={`${readOnlyInputCls} font-mono`}
             />
           </Field>
-          <Field label="Image">
+          <Field label={t.image}>
             <input
               value={imageName || '—'}
               readOnly
@@ -199,7 +267,7 @@ function CreateInner() {
           </Field>
         </div>
 
-        <Field label="Display name" required hint="What users see on the workspace cards.">
+        <Field label={t.displayName} required hint={t.displayNameHint}>
           <input
             value={displayNameValue}
             onChange={(e) => setDisplayName(e.target.value)}
@@ -208,7 +276,7 @@ function CreateInner() {
           />
         </Field>
 
-        <Field label="Description">
+        <Field label={t.descriptionLabel}>
           <textarea
             value={descriptionValue}
             onChange={(e) => setDescription(e.target.value)}
@@ -222,7 +290,7 @@ function CreateInner() {
             preview plus an input. Wrapper owns the width — inputCls is w-full. */}
         <div>
           <label htmlFor="tpl-icon" className="block text-xs font-medium text-body mb-1">
-            Icon
+            {t.icon}
           </label>
           <div className="flex items-center gap-3">
             <TemplateIcon template={{ icon: iconValue, name: coderName || 'workspace' }} size="sm" />
@@ -239,8 +307,7 @@ function CreateInner() {
             </div>
           </div>
           <p className="mt-1 text-xs text-subtle">
-            An https:// image URL, or one of Coder&apos;s built-in /icon/&lt;name&gt;.svg paths.
-            Empty uses the default glyph.
+            {t.iconHint}
           </p>
         </div>
       </FormPanel>
