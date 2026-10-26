@@ -45,7 +45,7 @@ class EntityDeleteCount(BaseModel):
     example_dependencies: int = 0
     student_profiles: int = 0
     # Submission artifacts whose submission group has at least one ``_student``
-    # member. This — not the raw ``submission_artifacts`` — is what decides
+    # member or learner who left the course (``_inactive``). This — not the raw ``submission_artifacts`` — is what decides
     # whether a course may be deleted at all (owners never, admins after
     # archiving). Lecturer/tutor self-test uploads do not count.
     student_submissions: int = 0

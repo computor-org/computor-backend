@@ -276,3 +276,105 @@ def test_course_flags_list_only_flagged_students_with_reasons(world):
     assert "Eve Synthetic" not in by_name
     assert all(f.reason for s in out.students for f in s.flags)
     assert {r.code for r in out.rules} >= {"inactive", "low_progress", "late_submission"}
+
+
+@pytest.fixture
+def left_learner(world):
+    """Dan worked on Loops, submitted it and then left the course (issues#458).
+
+    The membership stays with the role ``_inactive``; staff-facing reads must
+    still show his work, and his submission must keep protecting the course.
+    """
+    db = world["db"]
+    if db.get(CourseRole, "_inactive") is None:
+        db.add(CourseRole(id="_inactive", title="Inactive", builtin=True))
+        db.flush()
+    main = world["main"]
+    group_id = world["m"]["ada"].course_group_id
+    dan = User(given_name="Dan", family_name="Synthetic", email=f"dan.{uuid.uuid4().hex[:10]}@test.local")
+    db.add(dan)
+    db.flush()
+    member = CourseMember(user_id=dan.id, course_id=main.id, course_role_id="_inactive",
+                          course_group_id=group_id)
+    db.add(member)
+    db.flush()
+    sg = SubmissionGroup(max_group_size=2, course_id=main.id, course_content_id=world["loops"].id)
+    db.add(sg)
+    db.flush()
+    db.add(SubmissionGroupMember(course_id=main.id, submission_group_id=sg.id, course_member_id=member.id))
+    db.add(SubmissionArtifact(submission_group_id=sg.id, uploaded_by_course_member_id=member.id,
+                              file_size=1, bucket_name="submissions",
+                              object_key=f"{sg.id}/{uuid.uuid4().hex}", submit=True,
+                              created_at=T0 + timedelta(minutes=50)))
+    r = Result(course_member_id=member.id, submission_group_id=sg.id,
+               course_content_id=world["loops"].id,
+               course_content_type_id=world["loops"].course_content_type_id,
+               version_identifier=uuid.uuid4().hex, status=0, grade=0.0, result=0.0,
+               created_at=T0 + timedelta(minutes=45))
+    db.add(r)
+    db.flush()
+    original_fetch = world["fetch"]
+
+    async def fetch(result_id):
+        if result_id == str(r.id):
+            return _failing("sum", "assert 5 == 6")
+        return await original_fetch(result_id)
+
+    return {**world, "dan": member, "fetch": fetch}
+
+
+def test_learner_who_left_stays_in_the_gradebook(left_learner):
+    from computor_backend.repositories.course_member_gradings import CourseMemberGradingsRepository
+
+    repo = CourseMemberGradingsRepository(left_learner["db"])
+    course_id = str(left_learner["main"].id)
+    dan_id = str(left_learner["dan"].id)
+    members = {m["course_member_id"]: m for m in repo.get_all_course_members_with_students_role(course_id)}
+    assert members[dan_id]["course_role_id"] == "_inactive"
+    assert members[str(left_learner["m"]["ada"].id)]["course_role_id"] == "_student"
+    assert str(left_learner["m"]["lect"].id) not in members
+
+    stats = [r for r in repo.get_course_level_stats_for_all_members(course_id) if r["course_member_id"] == dan_id]
+    assert stats and stats[0]["submitted_assignments"] == 1
+
+
+def test_typical_errors_include_a_learner_who_left(left_learner):
+    out = asyncio.run(ca.get_typical_errors(
+        str(left_learner["main"].id), _p(left_learner["users"]["lect"]), left_learner["db"],
+        fetch_report=left_learner["fetch"]))
+    top = out.errors[0]
+    assert top.test_name == "unit / sum"
+    assert top.affected_students == 4
+    assert "Dan Synthetic" in {e.student_name for e in top.examples}
+
+
+def test_course_flags_skip_a_learner_who_left(left_learner):
+    out = asyncio.run(ca.get_course_flags(
+        str(left_learner["main"].id), _p(left_learner["users"]["lect"]), left_learner["db"],
+        now=T0 + timedelta(days=30)))
+    names = {s.student_name for s in out.students}
+    assert "Cyd Synthetic" in names and "Dan Synthetic" not in names
+
+
+def test_submission_of_a_learner_who_left_blocks_course_deletion(left_learner):
+    from computor_backend.business_logic.cascade_deletion import (
+        count_course_entities,
+        course_delete_block_reason,
+    )
+
+    db = left_learner["db"]
+    course_id = str(left_learner["main"].id)
+    before = count_course_entities(db, course_id).student_submissions
+    # Only Dan's submission is left once the active team's artifacts are gone,
+    # so the count shows whether a learner who left is counted at all.
+    db.query(SubmissionArtifact).filter(
+        SubmissionArtifact.uploaded_by_course_member_id != left_learner["dan"].id,
+        SubmissionArtifact.submission_group_id.in_(
+            db.query(SubmissionGroup.id).filter(SubmissionGroup.course_id == course_id)
+        ),
+    ).delete(synchronize_session=False)
+    db.flush()
+    counts = count_course_entities(db, course_id)
+    assert before == 2
+    assert counts.student_submissions == 1
+    assert course_delete_block_reason(counts, archived=False, is_admin=False) is not None
