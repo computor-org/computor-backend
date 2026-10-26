@@ -170,12 +170,12 @@ the terms page before any token is issued. For a new terms version, update
 the script; the signup dialog then shows the new version to new accounts only.
 Existing accounts get the new version through the change clause of their terms
 (§ 11 of 1.0–1.3, § 8 of 1.6), not through a Keycloak prompt: set
-`NEXT_PUBLIC_TERMS_EFFECTIVE_FROM` (release day + 35 days) before the web build,
+`NEXT_PUBLIC_TERMS_EFFECTIVE_FROM` (deploy day + 35 days) before the web build,
 which dates the pages and shows the sign-in notice, and send the notice email
 once from the support worker with
 `python -m computor_backend.support.terms_notice --effective-from DATE [--apply]`
 (dry run without `--apply`; a rerun sends nothing twice). computor-infra
-`prod/upgrade-release.sh` scripts these steps.
+`prod/deploy.sh` scripts these steps.
 
 ## Notes
 
