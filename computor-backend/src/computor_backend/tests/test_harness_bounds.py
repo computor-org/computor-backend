@@ -129,3 +129,12 @@ def test_report_size_is_capped(tmp_path):
         f.truncate(1 << 30)  # 1 GiB, sparse
     with pytest.raises(UnsafeReportError, match="too large"):
         _read_test_report(str(tmp_path), "testSummary.json")
+
+
+def test_harness_env_carries_course_language_only_from_the_job(monkeypatch):
+    from computor_backend.testing.backends import _harness_env
+
+    monkeypatch.setenv("COMPUTOR_TEST_LANGUAGE", "fr")  # worker's own value
+    assert "COMPUTOR_TEST_LANGUAGE" not in _harness_env()
+    assert _harness_env("de")["COMPUTOR_TEST_LANGUAGE"] == "de"
+    assert _harness_env(None).get("COMPUTOR_TEST_LANGUAGE") is None

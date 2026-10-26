@@ -504,7 +504,10 @@ async def _dispatch_submission_test(
     if already_tested is not None:
         return None
 
-    from computor_backend.business_logic.testing_service import resolve_testing_service
+    from computor_backend.business_logic.testing_service import (
+        resolve_course_language,
+        resolve_testing_service,
+    )
 
     service = resolve_testing_service(course_content, db)
     if service is None:
@@ -551,6 +554,7 @@ async def _dispatch_submission_test(
         "example_version_id": str(deployment.example_version_id),
         "artifact_id": str(artifact.id),
         "version_identifier": version_identifier,
+        "language": resolve_course_language(course_content, db),
     }
 
     result = Result(

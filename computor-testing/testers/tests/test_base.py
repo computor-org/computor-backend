@@ -28,6 +28,7 @@ from ctcore.models import (
     QualificationEnum,
 )
 from ctcore.helpers import get_property_as_list, token_exchange
+from ctcore.i18n import tr
 from ctexec.safe_io import read_untrusted_text
 
 
@@ -117,16 +118,14 @@ def _shape_hint(actual_shape, expected_shape) -> str:
     a, e = tuple(actual_shape), tuple(expected_shape)
     # Transposed 2D
     if len(a) == 2 and len(e) == 2 and a == e[::-1]:
-        return "  hint: shapes look transposed — did you forget `.T` or transpose?"
+        return tr("hint_transposed")
     # Reversed in any rank
     if len(a) == len(e) and a == e[::-1] and len(a) > 1:
-        return "  hint: shapes are reversed — check axis order."
+        return tr("hint_reversed")
     # Same total size: maybe needs reshape
     try:
         if int(np.prod(a)) == int(np.prod(e)):
-            return "  hint: total element count matches — try `.reshape({})`.".format(
-                tuple(e)
-            )
+            return tr("hint_reshape", shape=tuple(e))
     except Exception:  # noqa: BLE001 — defensive, formatting must never raise
         pass
     return ""
@@ -589,7 +588,7 @@ def check_solution_status(solution: dict):
     if solution["status"] == StatusEnum.skipped:
         pytest.skip(solution["errormsg"])
     elif solution["status"] == StatusEnum.timedout:
-        pytest.fail(f"Execution timed out: {solution['errormsg']}")
+        pytest.fail(tr("execution_timed_out", detail=solution['errormsg']))
     elif solution["status"] != StatusEnum.completed:
         pytest.fail(solution["errormsg"])
 
@@ -614,14 +613,14 @@ def check_exist(
     matches = globlib.glob(student_path)
 
     if not matches:
-        pytest.fail(f"File '{file_pattern}' not found in student directory")
+        pytest.fail(tr("file_not_found", file=file_pattern))
 
     allow_empty = getattr(sub, 'allowEmpty', False)
     if not allow_empty:
         for filepath in matches:
             if os.path.isfile(filepath) and os.path.getsize(filepath) == 0:
                 rel_path = os.path.relpath(filepath, dir_student)
-                pytest.fail(f"File '{rel_path}' is empty (0 bytes)")
+                pytest.fail(tr("file_empty", file=rel_path))
 
     report.setdefault("student_file_list", []).extend(matches)
     return matches
@@ -662,16 +661,20 @@ def check_occurrence_range(
 
     if c_min == 0 and c_max == 0:
         if style == "is":
-            pytest.fail(f"{subject} is {count}, but must be 0")
-        pytest.fail(f"{subject} found {count} times, but must not occur")
+            pytest.fail(tr("occurrence_is_forbidden", subject=subject, count=count))
+        pytest.fail(tr("occurrence_found_forbidden", subject=subject, count=count))
     elif c_max == float('inf'):
         if style == "is":
-            pytest.fail(f"{subject} is {count}, expected at least {c_min}")
-        pytest.fail(f"{subject} found {count} times, expected at least {c_min}")
+            pytest.fail(tr("occurrence_is_min", subject=subject, count=count, min=c_min))
+        pytest.fail(tr("occurrence_found_min", subject=subject, count=count, min=c_min))
     else:
         if style == "is":
-            pytest.fail(f"{subject} is {count}, expected {c_min}-{c_max}")
-        pytest.fail(f"{subject} found {count} times, expected {c_min}-{c_max}")
+            pytest.fail(
+                tr("occurrence_is_range", subject=subject, count=count, min=c_min, max=c_max)
+            )
+        pytest.fail(
+            tr("occurrence_found_range", subject=subject, count=count, min=c_min, max=c_max)
+        )
 
 
 def check_structural(
@@ -703,20 +706,20 @@ def check_structural(
                 break
 
     if not file_path or not os.path.exists(file_path):
-        pytest.fail(f"Source file not found for structural test")
+        pytest.fail(tr("source_not_found"))
 
     # Student-controlled: no symlink in any component, regular file only
     # (a FIFO must not block the harness), size-capped (#237).
     try:
         code = read_untrusted_text(file_path, root=dir_student)
     except OSError as e:
-        pytest.fail(f"Source file rejected for structural test: {e}")
+        pytest.fail(tr("source_rejected", detail=e))
 
     if pattern:
         try:
             occurrences = len(safe_regex_findall(pattern, code))
         except RegexTimeoutError:
-            pytest.fail(f"Pattern `{pattern}` timed out (possible ReDoS)")
+            pytest.fail(tr("pattern_timed_out", pattern=pattern))
     else:
         occurrences = code.count(name)
 
@@ -725,7 +728,8 @@ def check_structural(
     elif count_requirement is not None:
         if occurrences != count_requirement:
             pytest.fail(
-                f"'{name}' found {occurrences} times, expected {count_requirement}"
+                tr("occurrence_found_exact", subject=f"'{name}'", count=occurrences,
+                   expected=count_requirement)
             )
 
 
@@ -737,7 +741,7 @@ def check_error(solution: dict, pattern: Optional[str] = None):
         try:
             found = any(safe_regex_search(pattern, str(e)) for e in errors)
         except RegexTimeoutError:
-            pytest.fail(f"Pattern `{pattern}` timed out (possible ReDoS)")
+            pytest.fail(tr("pattern_timed_out", pattern=pattern))
         assert found, f"Expected error matching `{pattern}` not found"
     else:
         assert len(errors) > 0, "Expected an error but none occurred"
@@ -751,7 +755,7 @@ def check_warning(solution: dict, pattern: Optional[str] = None):
         try:
             found = any(safe_regex_search(pattern, str(w)) for w in warnings)
         except RegexTimeoutError:
-            pytest.fail(f"Pattern `{pattern}` timed out (possible ReDoS)")
+            pytest.fail(tr("pattern_timed_out", pattern=pattern))
         assert found, f"Expected warning matching `{pattern}` not found"
     else:
         assert len(warnings) > 0, "Expected a warning but none occurred"
@@ -794,7 +798,7 @@ def check_stdout(
         try:
             match = safe_regex_search(pattern, stdout)
         except RegexTimeoutError:
-            pytest.fail(f"Pattern `{pattern}` timed out (possible ReDoS)")
+            pytest.fail(tr("pattern_timed_out", pattern=pattern))
         assert match, f"Output does not match pattern '{pattern}'"
 
 
@@ -839,8 +843,8 @@ def compare_variable_by_qualification(
             if type_student != type_reference:
                 if not _types_compatible(type_student, type_reference):
                     pytest.fail(
-                        f"Variable `{name}` has incorrect type: "
-                        f"{type_student} vs {type_reference}"
+                        tr("type_incorrect", name=name, actual=type_student,
+                           expected=type_reference)
                     )
 
         # Shape check
@@ -883,7 +887,7 @@ def compare_variable_by_qualification(
         try:
             match = safe_regex_search(pattern, actual_str)
         except RegexTimeoutError:
-            pytest.fail(f"Pattern `{pattern}` timed out (possible ReDoS)")
+            pytest.fail(tr("pattern_timed_out", pattern=pattern))
         if not match:
             raise AssertionError(
                 _format_pattern_diff(actual_str, pattern, "regexp", name)
@@ -930,11 +934,8 @@ def _check_shape_common(actual, expected, name: str):
         else:
             shape_expected = ()
         if shape_actual != shape_expected:
-            msg = (
-                f"Variable `{name}` has wrong shape:\n"
-                f"  expected: {shape_expected}\n"
-                f"  actual:   {shape_actual}"
-            )
+            msg = tr("shape_wrong", name=name, expected=shape_expected,
+                     actual=shape_actual)
             hint = _shape_hint(shape_actual, shape_expected)
             if hint:
                 msg += "\n" + hint
@@ -942,9 +943,7 @@ def _check_shape_common(actual, expected, name: str):
     elif hasattr(actual, '__len__') and hasattr(expected, '__len__'):
         if len(actual) != len(expected):
             pytest.fail(
-                f"Variable `{name}` has wrong length:\n"
-                f"  expected: {len(expected)}\n"
-                f"  actual:   {len(actual)}"
+                tr("length_wrong", name=name, expected=len(expected), actual=len(actual))
             )
 
 
@@ -1198,7 +1197,7 @@ class BaseTestClass(ABC):
             for filepath in matches:
                 if os.path.isfile(filepath) and os.path.getsize(filepath) == 0:
                     rel_path = os.path.relpath(filepath, dir_student)
-                    pytest.fail(f"File '{rel_path}' is empty (0 bytes)")
+                    pytest.fail(tr("file_empty", file=rel_path))
 
         # Store found files for token exchange
         _report.setdefault("student_file_list", []).extend(matches)
@@ -1294,7 +1293,7 @@ class CompiledTestClass(BaseTestClass):
         if student_sol["status"] == StatusEnum.skipped:
             pytest.skip(student_sol["errormsg"])
         elif student_sol["status"] == StatusEnum.timedout:
-            pytest.fail(f"Execution timed out: {student_sol['errormsg']}")
+            pytest.fail(tr("execution_timed_out", detail=student_sol['errormsg']))
         elif student_sol["status"] != StatusEnum.completed:
             pytest.fail(student_sol["errormsg"])
 
@@ -1418,7 +1417,7 @@ class CompiledTestClass(BaseTestClass):
                 if not safe_regex_search(pattern, combined):
                     pytest.fail(f"Expected pattern not found in compiler output: {pattern}")
             except RegexTimeoutError:
-                pytest.fail(f"Pattern `{pattern}` timed out (possible ReDoS)")
+                pytest.fail(tr("pattern_timed_out", pattern=pattern))
 
     def _test_error(self, context: Dict[str, Any]):
         """Handle error test type for compiled languages."""
@@ -1448,7 +1447,7 @@ class CompiledTestClass(BaseTestClass):
                 if not safe_regex_search(pattern, error_output):
                     pytest.fail(f"Expected error matching `{pattern}` not found")
             except RegexTimeoutError:
-                pytest.fail(f"Pattern `{pattern}` timed out (possible ReDoS)")
+                pytest.fail(tr("pattern_timed_out", pattern=pattern))
 
     def _test_warning(self, context: Dict[str, Any]):
         """Handle warning test type for compiled languages."""
@@ -1473,7 +1472,7 @@ class CompiledTestClass(BaseTestClass):
             try:
                 found = any(safe_regex_search(pattern, w) for w in comp.warnings)
             except RegexTimeoutError:
-                pytest.fail(f"Pattern `{pattern}` timed out (possible ReDoS)")
+                pytest.fail(tr("pattern_timed_out", pattern=pattern))
             if not found:
                 pytest.fail(f"Expected warning matching `{pattern}` not found")
 
