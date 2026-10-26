@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
+import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
-import CourseWorkspaceLaunchButtons, { type CourseWorkspaceLauncher } from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
+import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import { useContentTree } from '@/src/hooks/useContentTree';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
@@ -39,7 +40,6 @@ const COPY = {
     items: (n: number) => (n === 1 ? '1 Element' : `${n} Elemente`),
     unitProgress: (s: number, n: number) => `${s}/${n} eingereicht`,
     unitProgressTitle: (s: number, n: number) => `${s} von ${n} Aufgaben dieser Einheit eingereicht`,
-    nextUp: 'Weiter hier',
     submitted: 'Eingereicht',
     notSubmitted: 'Nicht eingereicht',
     usageTitle: 'Testläufe und Abgaben im Verhältnis zu deinem Kontingent',
@@ -64,7 +64,6 @@ const COPY = {
     items: (n: number) => `${n} ${n === 1 ? 'item' : 'items'}`,
     unitProgress: (s: number, n: number) => `${s}/${n} submitted`,
     unitProgressTitle: (s: number, n: number) => `${s} of ${n} assignments in this unit submitted`,
-    nextUp: 'Next up',
     submitted: 'Submitted',
     notSubmitted: 'Not submitted',
     usageTitle: 'Test runs and submissions used, against your budget',
@@ -95,7 +94,6 @@ export default function StudentCourseContentsPage() {
   const courseId = useParams().id as string;
   const language = useUiLanguage();
   const t = COPY[language];
-  const launcher = useRef<CourseWorkspaceLauncher>(null);
   const requestedPaths = useSearchParams().getAll('contentPath');
   const crumbs = useCourseCrumbs(courseId, t.title);
   const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
@@ -124,7 +122,7 @@ export default function StudentCourseContentsPage() {
     ...(isOrdinaryLearner ? { collapseBelowDepth: 0, defaultExpandedPaths: nextGroups } : {}),
   });
   const workspaceAction = isOrdinaryLearner ? (
-    <CourseWorkspaceLaunchButtons ref={launcher} courseId={courseId} courseContentId={progress.started ? nextId : undefined} />
+    <CourseWorkspaceLaunchButtons courseId={courseId} courseContentId={progress.started ? nextId : undefined} />
   ) : undefined;
 
   const requestedTargets = requestedPaths.length === 1 && /^[a-z0-9_]+(\.[a-z0-9_]+)*$/.test(requestedPaths[0])
@@ -173,7 +171,6 @@ export default function StudentCourseContentsPage() {
               <>
                 <CourseProgressSummary
                   courseId={courseId} progress={progress} language={language} compact
-                  onOpenAssignment={isOrdinaryLearner ? (id) => launcher.current?.launch(id) : undefined}
                   workspaceAction={workspaceAction}
                 />
 
@@ -196,7 +193,6 @@ export default function StudentCourseContentsPage() {
                     const hasResults = item && (item.result != null || item.submitted ||
                       item.submission_group?.grading != null || isGradingVerdict(item.status) || (item.unread_message_count ?? 0) > 0 ||
                       (item.result_count ?? 0) > 0 || (item.submission_count ?? 0) > 0);
-                    const hasUsage = item && ((item.result_count ?? 0) > 0 || (item.submission_count ?? 0) > 0);
 
                     return (
                       <TreeRow
@@ -207,13 +203,18 @@ export default function StudentCourseContentsPage() {
                         onToggle={toggle}
                         markerColor={item?.color}
                         markerTitle={item?.course_content_type?.slug}
-                        label={isOrdinaryLearner && (isAuthoredContent || hasChildren) ? (
+                        label={isOrdinaryLearner && hasChildren ? (
                           <button
                             type="button"
                             className="text-left hover:underline"
-                            onClick={hasChildren ? toggle : isAuthoredContent && item ? () => launcher.current?.launch(item.id) : toggle}
-                            aria-expanded={hasChildren ? expanded : undefined}
+                            onClick={toggle}
+                            aria-expanded={expanded}
                           >{label}</button>
+                        ) : isOrdinaryLearner && isAuthoredContent && item ? (
+                          // The title opens the task page, as on main; VS Code opens from there.
+                          <Link href={`/courses/${courseId}/student/assignments/${item.id}`} className="hover:underline">
+                            {label}
+                          </Link>
                         ) : label}
                       >
                         {!isAssignment && hasChildren && (
@@ -234,12 +235,6 @@ export default function StudentCourseContentsPage() {
 
                         {item && isAssignment && (
                           <>
-                            {item.id === nextId && (
-                              <Badge tone="info" className="shrink-0">
-                                {t.nextUp}
-                              </Badge>
-                            )}
-
                             {/* Only a verdict a human reached. `not_reviewed` is
                                 the default state of most of a semester, and a
                                 grey chip on every row of 72 would say nothing. */}
@@ -257,7 +252,8 @@ export default function StudentCourseContentsPage() {
                               </Badge>
                             )}
 
-                            {(!isOrdinaryLearner || hasUsage) && <Badge
+                            {/* Staff only: learners find the counts on the results page. */}
+                            {!isOrdinaryLearner && <Badge
                               tone="muted"
                               className="shrink-0 tabular-nums"
                               title={t.usageTitle}
@@ -279,7 +275,7 @@ export default function StudentCourseContentsPage() {
 
                         {item && (!isOrdinaryLearner || (isAssignment && hasResults)) && (
                           <ButtonLink
-                            href={`/courses/${courseId}/student/assignments/${item.id}${isOrdinaryLearner ? '?view=results' : ''}`}
+                            href={`/courses/${courseId}/student/assignments/${item.id}`}
                             variant="ghost"
                             size="xs"
                             className="shrink-0"

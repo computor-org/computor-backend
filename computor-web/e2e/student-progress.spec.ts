@@ -177,7 +177,10 @@ test.describe('German learner', () => {
     await expect(card.getByRole('progressbar', { name: 'Eingereichte Aufgaben' })).toHaveAttribute('aria-valuenow', '67');
     // German number format: a space before the percent sign.
     await expect(card).toContainText(/Weiter mit: Woche 3 › Beta-Absorption \(zuletzt getestet: 0\s%\)/);
-    await expect(card.getByRole('button', { name: 'Beta-Absorption', exact: true })).toBeVisible();
+    // The title opens the task page, as on main, rather than VS Code.
+    await expect(card.getByRole('link', { name: 'Beta-Absorption', exact: true })).toHaveAttribute(
+      'href', new RegExp(`^/courses/${COURSE_ID}/student/assignments/[^/?]+$`),
+    );
     await expect(card.getByRole('link', { name: 'Aufgabe lesen' })).toHaveCount(0);
     await expect(card.getByRole('link', { name: 'Alle Aufgaben' })).toHaveAttribute(
       'href', `/courses/${COURSE_ID}/student/assignments`,
@@ -201,16 +204,15 @@ test.describe('German learner', () => {
     await expect(card.getByRole('link', { name: 'Aufgabe lesen' })).toHaveCount(0);
   });
 
-  test('the assignment list counts each unit and marks the next assignment', async ({ page }) => {
+  test('the assignment list counts each unit and names the next assignment once', async ({ page }) => {
     await signIn(page);
     await page.goto(`/courses/${COURSE_ID}/student/assignments`);
 
     await expect(page.getByTestId('course-progress')).toContainText('Weiter mit: Woche 3 › Beta-Absorption', { timeout: 15_000 });
     await expect(page.getByText('2/2 eingereicht')).toHaveCount(2);
     await expect(page.getByText('2 Elemente', { exact: true })).toBeVisible();
-    const marked = page.getByText('Weiter hier', { exact: true });
-    await expect(marked).toHaveCount(1);
-    await expect(page.locator('div', { has: marked }).filter({ hasText: 'Beta-Absorption' }).last()).toBeVisible();
+    // Only the "Weiter mit" line points at it; the row has no second marker.
+    await expect(page.getByText('Weiter hier', { exact: true })).toHaveCount(0);
   });
 });
 
@@ -240,7 +242,7 @@ test.describe('English learner', () => {
     await expect(page.getByRole('heading', { name: 'Your progress' })).toBeVisible({ timeout: 15_000 });
     await expect(card.getByText('4 of 6 assignments submitted')).toBeVisible();
     await expect(card).toContainText('Continue with: Woche 3 › Beta-Absorption (last tested: 0%)');
-    await expect(card.getByRole('button', { name: 'Beta-Absorption', exact: true })).toBeVisible();
+    await expect(card.getByRole('link', { name: 'Beta-Absorption', exact: true })).toBeVisible();
     await expect(card.getByRole('link', { name: 'Read task', exact: true })).toHaveCount(0);
   });
 });
@@ -294,7 +296,7 @@ for (const language of ['de', 'en'] as const) {
         await expect(card).toContainText(language === 'de' ? '1 von 6 Aufgaben eingereicht' : '1 of 6 assignments submitted');
         await expect(card.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '17');
         await expect(card).toContainText(language === 'de' ? 'Weiter mit: Woche 1 › Listen' : 'Continue with: Woche 1 › Listen');
-        await expect(card.getByRole('button', { name: 'Listen', exact: true })).toBeVisible();
+        await expect(card.getByRole('link', { name: 'Listen', exact: true })).toBeVisible();
         expect(await mountedCard?.evaluate((node) => node === document.querySelector('[data-testid="course-progress"]'))).toBe(true);
         expect(new URL(page.url()).pathname).toBe(path);
         // The existing workspace templates refresh on visibility only where
@@ -391,65 +393,73 @@ function recordTargets(page: Page) {
 for (const language of ['de', 'en'] as const) {
   test.describe(`Exact exercise entry (${language})`, () => {
     test.use({ locale: language === 'de' ? 'de-DE' : 'en-US' });
-    test('one primary action and exercise titles reuse the personal editor with exact targets', async ({ page }) => {
+    test('one primary action, titles that open the task page, and one VS Code button there', async ({ page }) => {
       const requested = await signIn(page, { contents: EXACT_CONTENTS, workspace: true });
       const targets = recordTargets(page);
       await page.goto(`/courses/${COURSE_ID}/student/assignments`);
-      const primary = page.getByRole('button', { name: language === 'de' ? 'In VS Code öffnen' : 'Open in VS Code', exact: true });
+      const openLabel = language === 'de' ? 'In VS Code öffnen' : 'Open in VS Code';
+      const primary = page.getByRole('button', { name: openLabel, exact: true });
       await expect(primary).toHaveCount(1);
       await expect(page.getByRole('link', { name: /Read task|Aufgabe lesen/ })).toHaveCount(0);
       await expect(page.getByRole('button', { name: /^(Expand all|Collapse all|Alle ausklappen|Alle einklappen)$/ })).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Topic B', exact: true })).toHaveAttribute('aria-expanded', 'false');
-      await expect(page.getByRole('button', { name: 'Second exercise', exact: true })).toHaveCount(0);
-      await expect(page.getByRole('link', { name: language === 'de' ? 'Ergebnisse' : 'Results', exact: true })).toHaveAttribute('href', `/courses/${COURSE_ID}/student/assignments/${FIRST}?view=results`);
+      await expect(page.getByRole('link', { name: 'Second exercise', exact: true })).toHaveCount(0);
+      // A learner row is title · status · score · results: no usage badge.
+      await expect(page.getByText(/\d+[TA] \/ /)).toHaveCount(0);
+      await expect(page.getByRole('link', { name: language === 'de' ? 'Ergebnisse' : 'Results', exact: true })).toHaveAttribute('href', `/courses/${COURSE_ID}/student/assignments/${FIRST}`);
       await expect(page.locator(`[title="${language === 'de' ? 'Letztes Testergebnis' : 'Latest test result'}"]`)).toContainText(language === 'de' ? /^0\s%$/ : '0%');
-      const settingsBefore = requested.filter((path) => path.endsWith('/workspace-settings')).length;
-      for (const [target, click] of [
-        [FIRST, () => primary.click()],
-        [SECOND, async () => {
-          await page.getByRole('button', { name: 'Topic B', exact: true }).click();
-          await page.getByRole('button', { name: 'Second exercise', exact: true }).click();
-        }],
-        [WELCOME, () => page.getByRole('button', { name: 'Course introduction', exact: true }).click()],
-      ] as const) {
-        const popupReady = page.waitForEvent('popup');
-        await click();
-        const editor = await popupReady;
-        await expect(editor).toHaveURL(EDITOR);
-        expect(targets.at(-1)).toEqual({ course_id: COURSE_ID, course_content_id: target, ui_language: language });
-        await editor.close();
+      await page.getByRole('button', { name: 'Topic B', exact: true }).click();
+      for (const [name, id] of [['First exercise', FIRST], ['Second exercise', SECOND], ['Course introduction', WELCOME]] as const) {
+        // .last(): the row, below the "Weiter mit" line that may name the same task.
+        await expect(page.getByRole('link', { name, exact: true }).last()).toHaveAttribute('href', `/courses/${COURSE_ID}/student/assignments/${id}`);
       }
-      expect(requested).not.toContain('/coder/workspaces/provision');
+      const settingsBefore = requested.filter((path) => path.endsWith('/workspace-settings')).length;
+      let popupReady = page.waitForEvent('popup');
+      await primary.click();
+      let editor = await popupReady;
+      await expect(editor).toHaveURL(EDITOR);
+      expect(targets.at(-1)).toEqual({ course_id: COURSE_ID, course_content_id: FIRST, ui_language: language });
+      await editor.close();
       expect(requested.filter((path) => path.endsWith('/workspace-settings'))).toHaveLength(settingsBefore);
+
+      // A title shows the task; VS Code opens only from the page's one button.
+      await page.getByRole('link', { name: 'Second exercise', exact: true }).click();
+      await expect(page).toHaveURL(`/courses/${COURSE_ID}/student/assignments/${SECOND}`);
+      await expect(page.getByText('Second instructions', { exact: true })).toBeVisible();
+      expect(targets).toHaveLength(1);
+      popupReady = page.waitForEvent('popup');
+      await page.getByRole('button', { name: openLabel, exact: true }).click();
+      editor = await popupReady;
+      await expect(editor).toHaveURL(EDITOR);
+      expect(targets.at(-1)).toEqual({ course_id: COURSE_ID, course_content_id: SECOND, ui_language: language });
+      await editor.close();
+      expect(requested).not.toContain('/coder/workspaces/provision');
     });
   });
 }
 
-test('legacy exercise waits for the real template then auto-opens once in the same tab', async ({ page }) => {
+test('the assignment page shows the task and never opens VS Code by itself', async ({ page }) => {
   const requested = await signIn(page, { contents: EXACT_CONTENTS, workspace: true, workspaceState: 'missing' });
   const targets = recordTargets(page);
-  let ready = false;
-  await page.context().route(`${API_ORIGIN}/coder/templates`, (route) => json(route, ready
-    ? { templates: [{ id: 't-vscode', name: 'vscode-workspace', display_name: 'VS Code' }], preparing: [] }
-    : { templates: [], preparing: [{ name: 'vscode-workspace', display_name: 'VS Code', status: 'running', task_name: 'template.deploy' }] }));
   await page.goto(`/courses/${COURSE_ID}/student/assignments/${FIRST}`);
-  await expect(page.getByRole('main').getByRole('alert')).toContainText('not currently available');
+  await expect(page.getByRole('heading', { name: 'Description', exact: true })).toBeVisible();
+  await expect(page.getByText('Exercise instructions', { exact: true })).toBeVisible();
+  await expect(page.getByText('0.0%', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open in VS Code', exact: true })).toHaveCount(1);
+  await page.waitForLoadState('networkidle');
   expect(requested).not.toContain('/coder/workspaces/provision');
   expect(targets).toEqual([]);
-  ready = true;
-  await expect(page).toHaveURL(EDITOR, { timeout: 20_000 });
-  expect(page.context().pages()).toHaveLength(1);
-  expect(requested.filter((path) => path === '/coder/workspaces/provision')).toHaveLength(1);
-  expect(targets).toEqual([{ course_id: COURSE_ID, course_content_id: FIRST, ui_language: 'en' }]);
+  expect(page.url()).toMatch(new RegExp(`/student/assignments/${FIRST}$`));
 });
 
-test('German legacy failure is bounded and never exposes raw API text', async ({ page }) => {
+test('German failure on the assignment page is bounded and never exposes raw API text', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.addInitScript(() => localStorage.setItem('computor.language', 'de'));
   await signIn(page, { contents: EXACT_CONTENTS, workspace: true });
   await page.context().route(`${API_ORIGIN}/coder/workspaces`, (route) => json(route, { detail: '/private/tester.py: secret internal failure' }, 500));
   await page.goto(`/courses/${COURSE_ID}/student/assignments/${FIRST}`);
-  await expect(page.getByRole('main').getByRole('alert')).toContainText('Die Arbeitsumgebung konnte nicht gestartet werden');
+  await page.getByRole('button', { name: 'In VS Code öffnen', exact: true }).click();
+  await expect(page.getByText('Deine Auswahl konnte in deiner Arbeitsumgebung nicht geöffnet werden. Versuch es noch einmal.', { exact: true })).toBeVisible();
   await expect(page.locator('body')).not.toContainText('/private/tester.py');
   expect(page.context().pages()).toHaveLength(1);
 });
@@ -490,7 +500,7 @@ test('a missing legacy exercise cannot provision a workspace', async ({ page }) 
 for (const selfEnrolled of [false, true]) {
   test(`an ungraded submission ${selfEnrolled ? 'in a course without tutors does not promise a review' : 'waits for a tutor'}`, async ({ page }) => {
     await signIn(page, { selfEnrolled });
-    await page.goto(`/courses/${COURSE_ID}/student/assignments/a-week1.constants?view=results`);
+    await page.goto(`/courses/${COURSE_ID}/student/assignments/a-week1.constants`);
     if (selfEnrolled) {
       await expect(page.getByText('Submitted.', { exact: true })).toBeVisible();
       await expect(page.getByText('This course has no tutors who review submissions. The test results are your feedback.')).toBeVisible();
@@ -501,15 +511,6 @@ for (const selfEnrolled of [false, true]) {
     }
   });
 }
-
-test('an actual zero result remains accessible without the exercise reader', async ({ page }) => {
-  await signIn(page, { contents: EXACT_CONTENTS, workspace: true });
-  await page.goto(`/courses/${COURSE_ID}/student/assignments/${FIRST}?view=results`);
-  await expect(page.getByText('0.0%', { exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Description', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: 'Ask Lena', exact: true })).toHaveCount(0);
-  await expect(page.locator('body')).not.toContainText('Exercise instructions');
-});
 
 for (const staff of [
   { name: 'tutor', roles: ['_student', '_tutor'], systemRoles: [] },
@@ -532,8 +533,10 @@ test('an authored unit-only course still mounts one launcher and opens its intro
   const targets = recordTargets(page);
   await page.goto(`/courses/${COURSE_ID}/student/assignments`);
   await expect(page.getByRole('button', { name: 'Open in VS Code', exact: true })).toHaveCount(1);
+  await page.getByRole('link', { name: 'Course introduction', exact: true }).click();
+  await expect(page.getByText('Authored introduction', { exact: true })).toBeVisible();
   const popupReady = page.waitForEvent('popup');
-  await page.getByRole('button', { name: 'Course introduction', exact: true }).click();
+  await page.getByRole('button', { name: 'Open in VS Code', exact: true }).click();
   const editor = await popupReady;
   await expect(editor).toHaveURL(EDITOR);
   expect(targets).toEqual([{ course_id: COURSE_ID, course_content_id: WELCOME, ui_language: 'en' }]);
@@ -544,13 +547,17 @@ for (const language of ['de', 'en'] as const) {
     await signIn(page, { contents: EXACT_CONTENTS.map((item) => ({ ...item, result: null })), workspace: true });
     const targets = recordTargets(page);
     await page.goto(`/courses/${COURSE_ID}/student/assignments`);
-    const primary = page.getByRole('button', { name: language === 'de' ? 'In VS Code öffnen' : 'Open in VS Code', exact: true });
-    for (const [click, expected] of [
-      [() => primary.click(), { course_id: COURSE_ID, ui_language: language }],
-      [() => page.getByRole('button', { name: 'First exercise', exact: true }).first().click(), { course_id: COURSE_ID, course_content_id: FIRST, ui_language: language }],
+    const openLabel = language === 'de' ? 'In VS Code öffnen' : 'Open in VS Code';
+    for (const [open, expected] of [
+      [async () => {}, { course_id: COURSE_ID, ui_language: language }],
+      [async () => {
+        await page.getByRole('link', { name: 'First exercise', exact: true }).first().click();
+        await expect(page).toHaveURL(`/courses/${COURSE_ID}/student/assignments/${FIRST}`);
+      }, { course_id: COURSE_ID, course_content_id: FIRST, ui_language: language }],
     ] as const) {
+      await open();
       const popupReady = page.waitForEvent('popup');
-      await click();
+      await page.getByRole('button', { name: openLabel, exact: true }).click();
       const editor = await popupReady;
       await expect(editor).toHaveURL(EDITOR);
       expect(targets.at(-1)).toEqual(expected);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import ReactMarkdown from 'react-markdown';
@@ -134,7 +134,6 @@ export default function AssignmentDetailPage() {
   const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
   const isOrdinaryLearner = !isAdmin && !isOrganizationManager &&
     courseHasAtLeast(courseId, '_student') && !courseHasAtLeast(courseId, '_tutor');
-  const resultsOnly = useSearchParams().get('view') === 'results';
 
   const { data, loading, error } = useResource(async () => {
     const [assignment, selfEnrollment] = await Promise.all([
@@ -150,7 +149,7 @@ export default function AssignmentDetailPage() {
     // The released README in the reading language; the stored title and the
     // example's meta description are only the fallback.
     const language = await contentLanguage(courseId);
-    const readme = isOrdinaryLearner ? null : await fetchStudentDescription(assignmentId, language).catch(() => null);
+    const readme = await fetchStudentDescription(assignmentId, language).catch(() => null);
     const submissionGroupId = assignment.submission_group?.id;
     // Nothing has been attempted yet — there is no group to hang runs off.
     if (!submissionGroupId) return { assignment, selfEnrollment, language, readme, results: [], artifacts: [] };
@@ -189,22 +188,11 @@ export default function AssignmentDetailPage() {
   const description = readme
     ? (readmeHeading ? withoutLeadingHeading(readme.markdown) : readme.markdown)
     : assignment?.description || assignment?.deployment?.example_version?.description;
-  const validTarget = assignment?.id === assignmentId && assignment.course_id === courseId &&
-    ['unit', 'assignment'].includes(assignment.course_content_kind_id) &&
-    (assignment.course_content_kind_id === 'unit'
+  // What VS Code can open: a released assignment, or a unit with authored text.
+  const openable = assignment?.course_id === courseId && assignment.visible_effective !== false && (
+    assignment.course_content_kind_id === 'unit'
       ? Boolean(assignment.description?.trim() || assignment.has_deployment || assignment.deployment)
-      : Boolean(assignment.has_deployment || assignment.deployment)) && assignment.visible_effective !== false;
-  if (isOrdinaryLearner && !resultsOnly) {
-    return (
-      <AuthenticatedLayout>
-        <DetailPanel breadcrumbs={crumbs} title={name} loading={loading}
-          error={error || (!loading && !validTarget ? t.notFound : null)}>
-          {validTarget && <CourseWorkspaceLaunchButtons courseId={courseId} courseContentId={assignmentId} autoLaunch />}
-        </DetailPanel>
-      </AuthenticatedLayout>
-    );
-  }
-
+      : Boolean(assignment.has_deployment || assignment.deployment));
   const repository = group?.repository ?? null;
   const members = group?.members ?? [];
 
@@ -215,6 +203,10 @@ export default function AssignmentDetailPage() {
         title={name}
         loading={loading}
         error={error || (!loading && !assignment ? t.notFound : null)}
+        // The task stays on this page, as on main; one button opens it in VS Code.
+        actions={isOrdinaryLearner && openable ? (
+          <CourseWorkspaceLaunchButtons courseId={courseId} courseContentId={assignmentId} compact single />
+        ) : undefined}
         subtitle={
           assignment && (
             <div className="flex flex-wrap items-center gap-2">
@@ -267,7 +259,7 @@ export default function AssignmentDetailPage() {
               />
             </SectionCard>
 
-            {!isOrdinaryLearner && <SectionCard title={t.description}>
+            <SectionCard title={t.description}>
               {description ? (
                 <div className="prose markdown max-w-none">
                   <ReactMarkdown
@@ -289,9 +281,9 @@ export default function AssignmentDetailPage() {
               ) : (
                 <EmptyState compact title={t.noDescription} />
               )}
-            </SectionCard>}
+            </SectionCard>
 
-            {!isOrdinaryLearner && <PublicLunaPanel key={assignmentId} assignmentId={assignmentId} language={language} />}
+            <PublicLunaPanel key={assignmentId} assignmentId={assignmentId} language={language} />
 
             <SectionCard
               title={t.latestTestResult}

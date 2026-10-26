@@ -1,8 +1,9 @@
 'use client';
 
-import { useRef, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
+import Link from 'next/link';
 import { usePermissions } from '@/src/hooks/usePermissions';
-import CourseWorkspaceLaunchButtons, { type CourseWorkspaceLauncher } from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
+import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import SectionCard from '@/src/components/SectionCard';
 import Panel from '@/src/components/ui/Panel';
 import ProgressTrack from '@/src/components/ui/ProgressTrack';
@@ -22,7 +23,6 @@ const COPY = {
     continueWith: 'Weiter mit',
     startWith: 'Beginne mit',
     lastTested: (score: string) => `zuletzt getestet: ${score}`,
-    open: 'Aufgabe lesen',
     all: 'Alle Aufgaben',
     done: 'Du hast alle Aufgaben eingereicht. Deine Ergebnisse und Bewertungen findest du bei den Aufgaben.',
   },
@@ -33,7 +33,6 @@ const COPY = {
     continueWith: 'Continue with',
     startWith: 'Start with',
     lastTested: (score: string) => `last tested: ${score}`,
-    open: 'Read task',
     all: 'All assignments',
     done: 'You have submitted every assignment. Your results and grades are listed with the assignments.',
   },
@@ -50,14 +49,12 @@ export function CourseProgressSummary<T extends ProgressContent>({
   progress,
   language,
   compact = false,
-  onOpenAssignment,
   workspaceAction,
 }: {
   courseId: string;
   progress: CourseProgress<T>;
   language: UiLanguage;
   compact?: boolean;
-  onOpenAssignment?: (id: string) => void;
   workspaceAction?: ReactNode;
 }) {
   const t = COPY[language];
@@ -84,25 +81,17 @@ export function CourseProgressSummary<T extends ProgressContent>({
           <p className="min-w-0 text-sm">
             <span className="text-muted">{progress.started ? t.continueWith : t.startWith}: </span>
             {next.trail.length > 0 && <span className="text-muted">{next.trail.join(' › ')} › </span>}
-            {onOpenAssignment ? (
-              <button type="button" className="font-medium text-fg text-left hover:underline" onClick={() => onOpenAssignment(next.item.id)}>
-                {displayName(next.item)}
-              </button>
-            ) : <span className="font-medium text-fg">{displayName(next.item)}</span>}
+            {/* The title opens the task page, as on main; VS Code opens from there. */}
+            <Link href={`${assignmentsHref}/${next.item.id}`} className="font-medium text-fg hover:underline">
+              {displayName(next.item)}
+            </Link>
             {score != null && <span className="text-muted"> ({t.lastTested(formatScore(score, 0, language))})</span>}
           </p>
-          <div className="flex shrink-0 flex-wrap gap-2">
-            {!onOpenAssignment && (
-              <ButtonLink href={`${assignmentsHref}/${next.item.id}`} variant="secondary" size="sm">
-                {t.open}
-              </ButtonLink>
-            )}
-            {!compact && (
-              <ButtonLink href={assignmentsHref} variant="secondary" size="sm">
-                {t.all}
-              </ButtonLink>
-            )}
-          </div>
+          {!compact && (
+            <ButtonLink href={assignmentsHref} variant="secondary" size="sm" className="shrink-0">
+              {t.all}
+            </ButtonLink>
+          )}
         </div>
       ) : (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -122,7 +111,6 @@ export function CourseProgressSummary<T extends ProgressContent>({
 
 /** The course page's card: loads the learner's own contents and renders the summary. */
 export default function CourseProgressCard({ courseId, language }: { courseId: string; language: UiLanguage }) {
-  const launcher = useRef<CourseWorkspaceLauncher>(null);
   const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
   const isOrdinaryLearner = !isAdmin && !isOrganizationManager &&
     courseHasAtLeast(courseId, '_student') && !courseHasAtLeast(courseId, '_tutor');
@@ -139,7 +127,6 @@ export default function CourseProgressCard({ courseId, language }: { courseId: s
     courseId={courseId}
     progress={progress}
     language={language}
-    onOpenAssignment={isOrdinaryLearner ? (id) => launcher.current?.launch(id) : undefined}
-    workspaceAction={isOrdinaryLearner ? <CourseWorkspaceLaunchButtons ref={launcher} courseId={courseId} courseContentId={progress.started ? progress.next?.item.id : undefined} /> : undefined}
+    workspaceAction={isOrdinaryLearner ? <CourseWorkspaceLaunchButtons courseId={courseId} courseContentId={progress.started ? progress.next?.item.id : undefined} /> : undefined}
   />;
 }

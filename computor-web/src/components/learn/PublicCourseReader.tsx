@@ -313,7 +313,7 @@ export default function PublicCourseReader({
                         <p className="text-xs font-semibold uppercase tracking-wide text-accent-text">{t.startHere}</p>
                         <h2 className="mt-2 text-2xl font-bold text-fg">{t.welcome}</h2>
                       </div>
-                      {content && <LanguageSwitch content={content} label={t.language} />}
+                      {content && content.selected_language !== uiLanguage && <LanguageSwitch content={content} label={t.language} />}
                     </div>
                     {content?.markdown ? (
                       <div className="mt-4">
@@ -348,7 +348,9 @@ export default function PublicCourseReader({
                         </p>
                         <h2 className="mt-1 text-2xl font-bold text-fg"><PublicMarkdownTitle markdown={localizedTitle(outline, content.id, content.title, (content.selected_language ?? uiLanguage) as UiLanguage)} /></h2>
                       </div>
-                      <LanguageSwitch content={content} label={t.language} />
+                      {/* The header's DE/EN switch picks the content language too; this
+                          toggle only appears when the content is not in the UI language. */}
+                      {content.selected_language !== uiLanguage && <LanguageSwitch content={content} label={t.language} />}
                     </div>
                     {content.markdown ? (
                       <PublicMarkdown assetBaseUrl={content.asset_base_url} mediaFiles={content.media_files} markdown={content.markdown} />

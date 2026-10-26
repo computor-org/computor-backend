@@ -21,22 +21,14 @@ SUBJECT = {"de": "Willkommen bei computor.at", "en": "Welcome to computor.at"}
 
 _DE = """Hallo {name},
 
-deine Registrierung bei computor.at ist abgeschlossen. So kommst du zu deiner ersten Aufgabe:
-
-1. Melde dich unter {url} an und wähle in der Kursliste "Kurs beitreten".
-2. Öffne den Kurs und klicke auf "Arbeitsumgebung starten". Die Arbeitsumgebung öffnet sich in einem neuen Tab und ist nach kurzer Zeit bereit.
-3. Wähle eine Aufgabe, teste sie mit dem Reagenzglas-Symbol und gib sie mit dem Wolken-Symbol ab.
+deine Registrierung ist abgeschlossen. Melde dich unter {url} an, tritt im Kurskatalog einem Kurs bei und klicke auf „In VS Code öffnen“.
 
 Bei Fragen antworte einfach auf diese Nachricht.
 """
 
 _EN = """Hello {name},
 
-your registration at computor.at is complete. This is how you get to your first assignment:
-
-1. Sign in at {url} and choose "Join course" in the course list.
-2. Open the course and click "Launch workspace". The workspace opens in a new tab and is ready after a short while.
-3. Pick an assignment, test it with the beaker icon and submit it with the cloud icon.
+your registration is complete. Sign in at {url} and join a course in the course catalog, then click "Open in VS Code".
 
 If you have questions, just reply to this message.
 """
