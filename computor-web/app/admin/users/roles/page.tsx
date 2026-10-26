@@ -11,7 +11,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
-import { adminRoleLockedHint, grantsAdmin } from '@/src/utils/systemRoles';
+import { adminRoleLockedHint, grantsAdmin, roleDescription, roleTitle } from '@/src/utils/systemRoles';
 import { RolesClient } from '@/src/generated/clients/RolesClient';
 import { RoleClaimClient } from '@/src/generated/clients/RoleClaimClient';
 import { UserRolesClient } from '@/src/generated/clients/UserRolesClient';
@@ -343,14 +343,14 @@ export default function RolesPage() {
               {/* Role header */}
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <h2 className="text-xl font-semibold text-fg">{roleDetail.title ?? roleDetail.id}</h2>
+                  <h2 className="text-xl font-semibold text-fg">{roleTitle(roleDetail.id, roleDetail.title, language)}</h2>
                   <RoleBadge role={roleDetail} />
                   {roleDetail.builtin && (
                     <span className="text-xs text-subtle italic">{t.builtIn}</span>
                   )}
                 </div>
-                {roleDetail.description && (
-                  <p className="text-sm text-muted">{roleDetail.description}</p>
+                {roleDescription(roleDetail.id, roleDetail.description, language) && (
+                  <p className="text-sm text-muted">{roleDescription(roleDetail.id, roleDetail.description, language)}</p>
                 )}
               </div>
 
@@ -479,6 +479,8 @@ export default function RolesPage() {
 }
 
 function RoleRow({ role, selected, onClick }: { role: RoleList; selected: boolean; onClick: () => void }) {
+  const language = useUiLanguage();
+  const title = roleTitle(role.id, role.title, language);
   return (
     <button
       onClick={onClick}
@@ -486,7 +488,7 @@ function RoleRow({ role, selected, onClick }: { role: RoleList; selected: boolea
     >
       <div className="min-w-0">
         <div className="text-xs font-mono font-medium text-fg truncate">{role.id}</div>
-        {role.title && <div className="text-xs text-muted truncate mt-0.5">{role.title}</div>}
+        {title && <div className="text-xs text-muted truncate mt-0.5">{title}</div>}
       </div>
     </button>
   );

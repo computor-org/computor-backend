@@ -55,8 +55,10 @@ export function useWorkspaceActions(refresh: () => void) {
         await coderClient.stopWorkspace({ username: owner, workspaceName: name });
         notify(t.stopping, 'success');
         setTimeout(refresh, 2000);
+        return true;
       } catch (err) {
         notify(err instanceof Error ? err.message : t.stopFailed, 'error');
+        return false;
       }
     },
     [notify, refresh, t],

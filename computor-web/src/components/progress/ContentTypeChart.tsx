@@ -51,7 +51,9 @@ export default function ContentTypeChart({ students }: ContentTypeChartProps) {
     <div className="bg-surface rounded-lg border border-rule p-5">
       <h3 className="text-sm font-semibold text-fg mb-4">{t.title}</h3>
       <div className="h-52">
-        <ResponsiveContainer width="100%" height="100%">
+        {/* A fixed height (h-52) keeps the first render, before the width is
+            measured, from logging recharts' "width(-1) and height(-1)" warning. */}
+        <ResponsiveContainer width="100%" height={208}>
           <BarChart data={data} layout="vertical" margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" horizontal={false} />
             <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />

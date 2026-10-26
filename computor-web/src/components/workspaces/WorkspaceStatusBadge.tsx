@@ -72,6 +72,21 @@ const COPY = {
       canceling: 'wird abgebrochen',
       deleting: 'wird gelöscht',
     } as Record<string, string>,
+    // The raw build status for the tooltip. German pages show it in German;
+    // English pages keep Coder's own word, which is already English.
+    raw: {
+      pending: 'ausstehend',
+      starting: 'startet',
+      running: 'läuft',
+      stopping: 'wird gestoppt',
+      stopped: 'gestoppt',
+      failed: 'fehlgeschlagen',
+      canceling: 'wird abgebrochen',
+      canceled: 'abgebrochen',
+      deleting: 'wird gelöscht',
+      deleted: 'gelöscht',
+      succeeded: 'erfolgreich',
+    } as Record<string, string>,
   },
   en: {
     buildStatus: 'Build status',
@@ -89,6 +104,7 @@ const COPY = {
       canceling: 'canceling',
       deleting: 'deleting',
     } as Record<string, string>,
+    raw: {} as Record<string, string>,
   },
 };
 
@@ -120,7 +136,8 @@ export default function WorkspaceStatusBadge({
 }) {
   const language = useUiLanguage();
   const category = categorizeStatus(status, transition);
-  const title = [status ? `${COPY[language].buildStatus}: ${status}` : null, detail].filter(Boolean).join(' · ');
+  const title = [status ? `${COPY[language].buildStatus}: ${COPY[language].raw[status.toLowerCase()] ?? status}` : null, detail]
+    .filter(Boolean).join(' · ');
   return (
     <Badge color={categoryColor[category]} pill>
       <span className={`h-1.5 w-1.5 rounded-full mr-1.5 ${categoryDots[category]}`} />

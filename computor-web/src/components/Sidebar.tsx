@@ -362,58 +362,82 @@ function SidebarShell({
   t: (typeof COPY)[UiLanguage];
   children: React.ReactNode;
 }) {
+  // On phones the expanded sidebar overlays the page instead of squeezing it
+  // into a ~130 px column: a w-16 placeholder keeps the icon rail's slot in
+  // the flex row, the open panel floats above the content and the top bar
+  // (z-40) with a scrim, and following a link or tapping the scrim closes it
+  // again.
+  const closeOnPhone = (e: React.MouseEvent) => {
+    if (
+      !collapsed &&
+      (e.target as HTMLElement).closest('a') &&
+      window.matchMedia('(max-width: 767px)').matches
+    ) {
+      setCollapsed(true);
+    }
+  };
   return (
-    <aside
-      className={`${
-        collapsed ? 'w-16' : 'w-64'
-      } bg-surface border-r border-rule transition-all duration-300 flex flex-col print:hidden`}
-    >
-      {/* Header */}
-      <div className="h-16 flex items-center justify-between px-4 border-b border-rule">
-        {!collapsed && (
-          <Link href="/dashboard" className="flex-1 min-w-0 hover:bg-canvas rounded px-2 py-1 -mx-2 -my-1 transition-colors cursor-pointer">
-            <p className="text-sm font-semibold text-fg truncate">
-              {user?.givenName} {user?.familyName}
-            </p>
-          </Link>
-        )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-1 rounded-lg hover:bg-sunken transition-colors"
-          title={collapsed ? t.expand : t.collapse}
-          aria-label={collapsed ? t.expand : t.collapse}
-        >
-          <svg
-            className={`h-5 w-5 text-muted transition-transform ${collapsed ? 'rotate-180' : ''}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
+    <div className={`shrink-0 flex print:hidden ${collapsed ? '' : 'max-md:w-16'}`}>
+      {!collapsed && (
+        <div
+          className="fixed inset-0 z-[45] bg-black/50 md:hidden"
+          onClick={() => setCollapsed(true)}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        onClick={closeOnPhone}
+        className={`${
+          collapsed ? 'w-16' : 'w-64 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:shadow-xl'
+        } bg-surface border-r border-rule transition-all duration-300 flex flex-col`}
+      >
+        {/* Header */}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-rule">
+          {!collapsed && (
+            <Link href="/dashboard" className="flex-1 min-w-0 hover:bg-canvas rounded px-2 py-1 -mx-2 -my-1 transition-colors cursor-pointer">
+              <p className="text-sm font-semibold text-fg truncate">
+                {user?.givenName} {user?.familyName}
+              </p>
+            </Link>
+          )}
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="p-1 rounded-lg hover:bg-sunken transition-colors"
+            title={collapsed ? t.expand : t.collapse}
+            aria-label={collapsed ? t.expand : t.collapse}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-      </div>
+            <svg
+              className={`h-5 w-5 text-muted transition-transform ${collapsed ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        </div>
 
-      <nav className="flex-1 p-2 space-y-1 overflow-y-auto scroll-slim">{children}</nav>
+        <nav className="flex-1 p-2 space-y-1 overflow-y-auto scroll-slim">{children}</nav>
 
-      <HelpLinks collapsed={collapsed} t={t} showMyReports={showMyReports} />
+        <HelpLinks collapsed={collapsed} t={t} showMyReports={showMyReports} />
 
-      {/* Footer - Logo & Version */}
-      <div className="p-4 border-t border-rule">
-        {!collapsed ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-center space-x-2">
-              <Image src="/computor_logo.png" alt="Computor" width={24} height={24} className="h-6 w-6" />
-              <span className="text-sm font-semibold text-body">Computor</span>
+        {/* Footer - Logo & Version */}
+        <div className="p-4 border-t border-rule">
+          {!collapsed ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-center space-x-2">
+                <Image src="/computor_logo.png" alt="Computor" width={24} height={24} className="h-6 w-6" />
+                <span className="text-sm font-semibold text-body">Computor</span>
+              </div>
+              <p className="text-xs text-muted text-center" title={t.version}>{APP_VERSION}</p>
             </div>
-            <p className="text-xs text-muted text-center" title={t.version}>{APP_VERSION}</p>
-          </div>
-        ) : (
-          <div className="flex justify-center">
-            <Image src="/computor_logo.png" alt="Computor" width={32} height={32} className="h-8 w-8" />
-          </div>
-        )}
-      </div>
-    </aside>
+          ) : (
+            <div className="flex justify-center">
+              <Image src="/computor_logo.png" alt="Computor" width={32} height={32} className="h-8 w-8" />
+            </div>
+          )}
+        </div>
+      </aside>
+    </div>
   );
 }

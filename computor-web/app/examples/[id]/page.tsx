@@ -109,7 +109,7 @@ export default function ExampleDetailPage() {
               {versions.length === 0 ? (
                 <div className="text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">No versions.</div>
               ) : (
-                <div className="bg-surface border border-rule rounded-lg divide-y">
+                <div className="bg-surface border border-rule rounded-lg divide-y divide-rule">
                   {versions.map((v) => (
                     <div key={v.id} className="flex items-center justify-between px-4 py-3">
                       <div className="font-mono text-sm text-fg">v{v.version_tag}</div>

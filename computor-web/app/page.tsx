@@ -11,6 +11,7 @@ import LanguageSwitch from '@/src/components/LanguageSwitch';
 import LegalLinks from '@/src/components/LegalLinks';
 import NetideeNotice from '@/src/components/NetideeNotice';
 import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
+import { applyDocumentLanguage } from '@/src/utils/documentLanguage';
 
 const mention = (name: string) => <code className="bg-accent-wash text-accent-text px-1 rounded text-xs">{name}</code>;
 
@@ -73,7 +74,7 @@ export default function Home() {
   const language = useBrowserLanguage();
   const t = COPY[language];
   useEffect(() => {
-    document.documentElement.lang = language;
+    applyDocumentLanguage(language);
   }, [language]);
   const gettingStartedUrl = '/learn';
 

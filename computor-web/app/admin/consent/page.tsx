@@ -254,7 +254,7 @@ export default function PrivacyNoticesPage() {
                 {t.none}
               </div>
             ) : (
-              <div className="border border-rule rounded-lg divide-y">
+              <div className="border border-rule rounded-lg divide-y divide-rule">
                 {versions.map((v) => {
                   const scheduled = new Date(v.effective_from).getTime() > now;
                   const isCurrent = v.version === currentVersion;

@@ -125,7 +125,7 @@ export default function ExampleRepositoryDetailPage() {
                   {t.noExamples}{uploadable ? t.noExamplesUpload : ''}
                 </div>
               ) : (
-                <div className="bg-surface border border-rule rounded-lg divide-y">
+                <div className="bg-surface border border-rule rounded-lg divide-y divide-rule">
                   {examples.map((ex) => (
                     <Link key={ex.id} href={`/examples/${ex.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-canvas">
                       <div className="min-w-0">

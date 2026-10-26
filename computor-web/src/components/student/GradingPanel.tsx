@@ -27,7 +27,10 @@ const COPY = {
     notGraded: 'Noch nicht bewertet.',
     staffWaiting: 'Die Abgabe wartet auf eine Prüfung.',
     staffNothing: 'Es wurde noch nichts abgegeben.',
-    studentWaiting: 'Deine Abgabe wartet darauf, dass ein Tutor sie prüft.',
+    studentWaiting: 'Deine Abgabe wartet darauf, dass eine Tutorin oder ein Tutor sie prüft.',
+    submittedTitle: 'Abgegeben.',
+    studentReceived:
+      'In diesem Kurs gibt es keine Tutorinnen und Tutoren, die Abgaben prüfen. Als Rückmeldung bekommst du die Testergebnisse.',
     studentNothing: 'Reiche deine Arbeit ein, um sie bewerten zu lassen.',
     staleStaff: 'Diese Bewertung gehört zu einer früheren Abgabe. Die letzte Abgabe wurde noch nicht bewertet.',
     staleStudent: 'Diese Bewertung gehört zu einer früheren Abgabe. Deine letzte Abgabe wurde noch nicht bewertet.',
@@ -41,6 +44,9 @@ const COPY = {
     staffWaiting: 'The submission is waiting for a review.',
     staffNothing: 'Nothing has been submitted yet.',
     studentWaiting: 'Your submission is waiting for a tutor to look at it.',
+    submittedTitle: 'Submitted.',
+    studentReceived:
+      'This course has no tutors who review submissions. The test results are your feedback.',
     studentNothing: 'Submit your work to have it graded.',
     staleStaff: 'This grade was given on an earlier submission. The most recent submission has not been graded yet.',
     staleStudent: 'This grade was given on an earlier submission. Your most recent submission has not been graded yet.',
@@ -138,11 +144,17 @@ export default function GradingPanel({
   group,
   submitted,
   audience = 'student',
+  hasTutors = true,
 }: {
   group: SubmissionGroupStudentGet | null | undefined;
   submitted?: boolean | null;
   /** Wording only: the student reads "your submission", staff read "the submission". */
   audience?: 'student' | 'staff';
+  /**
+   * Wording only: false for a course without tutors (one the learner joined
+   * through the catalog), where nobody is going to review the submission.
+   */
+  hasTutors?: boolean;
 }) {
   const language = useUiLanguage();
   const t = COPY[language];
@@ -157,14 +169,16 @@ export default function GradingPanel({
     return (
       <EmptyState
         compact
-        title={submitted ? t.notReviewed : t.notGraded}
+        title={submitted ? (staff || hasTutors ? t.notReviewed : t.submittedTitle) : t.notGraded}
         description={
           staff
             ? submitted
               ? t.staffWaiting
               : t.staffNothing
             : submitted
-              ? t.studentWaiting
+              ? hasTutors
+                ? t.studentWaiting
+                : t.studentReceived
               : t.studentNothing
         }
       />
