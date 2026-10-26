@@ -99,8 +99,8 @@ export default function LegalPage({
 
       <footer className="border-t border-rule bg-surface">
         <div className="container mx-auto px-4 py-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted">
-          <LegalLinks />
-          <NetideeNotice />
+          <LegalLinks language={lang === 'en' ? 'en' : 'de'} />
+          <NetideeNotice language={lang === 'en' ? 'en' : 'de'} />
         </div>
       </footer>
     </div>

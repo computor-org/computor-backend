@@ -347,7 +347,12 @@ class Checks:
         require(len(self.users('full-signup')) == 1, 'Valid proof failed to create user')
         self.no_mail()
         browser.submit('kc-terms-form', accept='Accept')
-        browser.visit(self.mail_link())
+        link = self.mail_link()
+        from setup_abuse import VERIFY_EMAIL_LIFESPAN
+        key = urllib.parse.parse_qs(urllib.parse.urlsplit(link).query)['key'][0]
+        claims = json.loads(base64.urlsafe_b64decode(key.split('.')[1] + '=' * (-len(key.split('.')[1]) % 4)))
+        require(claims['exp'] - claims['iat'] == VERIFY_EMAIL_LIFESPAN, 'Verification link lifespan is not the configured one')
+        browser.visit(link)
         password = 'Live-Abuse-' + secrets.token_urlsafe(18) + '-9!'
         browser.submit('kc-passwd-update-form', **{'password-new': password, 'password-confirm': password})
         require(browser.page[2], 'Full signup did not reach OAuth code')
@@ -361,7 +366,7 @@ class Checks:
         self.signup('replayed', 'replayed@example.invalid', browser, payload)
         require(not self.users('replayed'), 'Replayed registration proof accepted')
         self.no_mail()
-        self.ok('valid proof, terms, captured verification email, password setup, original address, replay rejection')
+        self.ok('valid proof, terms, captured verification email with a day-long link, password setup, original address, replay rejection')
         browser = self.browser('auth')
         require(Forms(browser.page[1]).challenge is None, 'Normal login contains proof challenge')
         browser.submit('kc-form-login', username='full-signup', password=password)

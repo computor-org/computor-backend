@@ -36,9 +36,12 @@ test('anonymous reading uses only static files even when the API is unavailable'
   await expect(image).toHaveAttribute('src', `/learning/media/${COURSE}/${MATH}/run_interactively.png`);
   await expect(image).toBeVisible();
   expect(await image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
-  await page.getByRole('button', { name: 'Deutsch', exact: true }).click();
+  // One language switch: the header's DE/EN also picks the content language.
+  await expect(page.getByRole('button', { name: /^(Deutsch|English)$/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'DE', exact: true }).click();
   await expect(page.getByText(/Dies ist die erste Aufgabe/)).toBeVisible();
-  await page.getByRole('button', { name: 'English', exact: true }).click();
+  await expect(page.getByRole('button', { name: /^(Deutsch|English)$/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'EN', exact: true }).click();
   await expect(page.getByText(/This is the first task/)).toBeVisible();
   await page.getByRole('navigation', { name: 'Exercise navigation' }).getByRole('link').last().click();
   await expect(page).toHaveURL(/week_1\.basis1$/);
@@ -59,7 +62,7 @@ test('all three courses have native reading content', async ({ page }) => {
 for (const exercise of [MATH, 'week_1.basis1']) {
   test(`equations and inline code render from the real ${exercise} descriptions`, async ({ page }, testInfo) => {
     await page.goto(`/learn/${COURSE}/content/${exercise}`);
-    for (const language of ['English', 'Deutsch']) {
+    for (const language of ['EN', 'DE']) {
       await page.getByRole('button', { name: language, exact: true }).click();
       const article = page.locator('article');
       await expect(article.locator('.katex-display .mtable').first()).toBeVisible();

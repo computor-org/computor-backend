@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import PublicCourseCatalog from '@/src/components/courses/PublicCourseCatalog';
 import { CODESPACES_URL, COMPUTOR_EXTENSION_URL } from '@/src/components/courses/LearningOptions';
+import LanguageSwitch from '@/src/components/LanguageSwitch';
 import LegalLinks from '@/src/components/LegalLinks';
 import NetideeNotice from '@/src/components/NetideeNotice';
 import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
@@ -34,6 +35,8 @@ const COPY = {
     heroScope: 'Offene Kurse zu Python und Data Science, von den ersten Schritten bis zu Datenanalyse und Differentialgleichungen.',
     toCourses: 'Kurse ohne Anmeldung entdecken →',
     allCourses: 'Alle Kurse',
+    createAccount: 'Konto erstellen',
+    toCatalog: 'Kurs beitreten',
     steps: [
       ['book', 'Kurse lesen', <>Ohne Konto lesbar. Beginne mit den Grundlagen, Woche 1.</>],
       ['code', 'Im Browser üben', <>Mit Konto startest du die Kursumgebung im Browser, ohne Installation. Dort bearbeitest du die Aufgaben, testest sie und reichst sie ein.</>],
@@ -51,6 +54,8 @@ const COPY = {
     heroScope: 'Open courses on Python and data science, from first steps to data analysis and differential equations.',
     toCourses: 'Explore courses without an account →',
     allCourses: 'All courses',
+    createAccount: 'Create an account',
+    toCatalog: 'Join a course',
     steps: [
       ['book', 'Read the courses', <>Readable without an account. Start with the basics, week 1.</>],
       ['code', 'Practise in the browser', <>With an account you start the course environment in the browser, no installation needed. There you edit, test and submit the tasks.</>],
@@ -87,41 +92,46 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-accent-wash via-canvas to-accent-wash">
       {/* Header */}
       <header className="border-b bg-surface/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center space-x-3">
             <Image src="/computor_logo.png" alt="Computor" width={40} height={40} className="h-10 w-10" />
-            <h1 className="text-2xl font-bold text-fg">Computor</h1>
+            {/* On phones the hero names Computor right below; the header keeps the
+                logo so the language switch and sign-in fit beside it. */}
+            <h1 className="sr-only sm:not-sr-only text-2xl font-bold text-fg">Computor</h1>
           </div>
-          {user ? (
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/dashboard"
-                className="px-4 py-2 text-accent-text hover:text-accent-text transition-colors font-medium"
-              >
-                Dashboard
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 bg-surface text-danger-text border-2 border-danger rounded-lg hover:bg-danger-wash transition-colors font-medium"
-              >
-                {t.signOut}
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center space-x-3">
-              <Link
-                href="/login"
-                className="px-4 py-2 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-colors font-medium"
-              >
-                {t.signIn}
-              </Link>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <LanguageSwitch />
+            {user ? (
+              <div className="flex items-center gap-2 sm:gap-4">
+                <Link
+                  href="/dashboard"
+                  className="px-2 sm:px-4 py-2 text-accent-text hover:text-accent-text transition-colors font-medium"
+                >
+                  Dashboard
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="px-3 sm:px-4 py-2 bg-surface text-danger-text border-2 border-danger rounded-lg hover:bg-danger-wash transition-colors font-medium"
+                >
+                  {t.signOut}
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-3">
+                <Link
+                  href="/login"
+                  className="px-4 py-2 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-colors font-medium"
+                >
+                  {t.signIn}
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
       {/* Hero Section */}
-      <main className="container mx-auto px-4 pt-10 pb-28">
+      <main className="container mx-auto px-4 pt-10 pb-10 md:pb-28">
         <div className="max-w-5xl mx-auto text-center space-y-8">
           <div className="space-y-3">
             <h2 className="text-4xl md:text-5xl font-bold text-fg">
@@ -148,6 +158,14 @@ export default function Home() {
                 <h3 className="text-xl font-bold text-fg mb-2">{title}</h3>
                 <p className="text-muted">{body}</p>
                 {icon === 'book' && <div className="mt-3"><PublicCourseCatalog fallbackLabel={t.allCourses} /></div>}
+                {icon === 'code' && (
+                  <Link
+                    href={user ? '/courses/catalog' : '/login?action=register&next=%2Fcourses%2Fcatalog'}
+                    className="mt-4 inline-block px-4 py-2 bg-accent-wash rounded-lg text-accent-text font-medium hover:underline"
+                  >
+                    {user ? t.toCatalog : t.createAccount}
+                  </Link>
+                )}
               </div>
             ))}
           </div>
@@ -162,18 +180,19 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="fixed bottom-0 inset-x-0 z-40 border-t bg-surface">
+      {/* Footer: pinned on wide screens, where the page fits one screen; on
+          phones it would cover a fifth of the viewport, so it follows the content. */}
+      <footer className="md:fixed md:bottom-0 md:inset-x-0 md:z-40 border-t bg-surface">
         <div className="container mx-auto px-4 py-4">
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-center text-muted">
             <p>&copy; 2026 Computor. {t.footer}</p>
-            <LegalLinks className="text-sm" />
+            <LegalLinks className="text-sm" language={language} />
             {user && (
               <Link href="/problem" className="text-sm hover:text-accent-text hover:underline underline-offset-2">
                 {t.report}
               </Link>
             )}
-            <NetideeNotice />
+            <NetideeNotice language={language} />
           </div>
         </div>
       </footer>

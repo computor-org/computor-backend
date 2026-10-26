@@ -12,6 +12,11 @@ from setup_identity_providers import _request, get_admin_token
 REGISTRATION = 'computor-registration-protected'
 RESET = 'computor-reset-protected'
 PROTECTED_ATTRIBUTES = ('computor.selfRegistered', 'computor.selfRegisteredAt', 'computor.lastLogin')
+# Lifetime of the address-verification link in seconds. Keycloak's default for
+# user-generated action tokens is 5 minutes, which a new learner who opens the
+# mail later cannot meet (issues#478); a day leaves room for a delayed mail.
+VERIFY_EMAIL_LIFESPAN = 86400
+VERIFY_EMAIL_LIFESPAN_ATTRIBUTE = 'actionTokenGeneratedByUserLifespan.verify-email'
 
 
 def canonical_gmail(address):
@@ -139,11 +144,22 @@ def configure(base, realm, token, secret, apply=True, backup=None, cost=10000, t
     listeners = list(settings.get('eventsListeners') or [])
     if 'computor-registration-activity' not in listeners:
         listeners.append('computor-registration-activity')
+    # A realm PUT replaces the whole attribute map, and the client and offline
+    # session timeouts among others live there, so the lifespan is merged
+    # into the attributes the realm already has instead of sent alone.
+    attributes = {**(settings.get('attributes') or {}),
+                  VERIFY_EMAIL_LIFESPAN_ATTRIBUTE: str(VERIFY_EMAIL_LIFESPAN)}
     kc.request('PUT', '', {'registrationFlow': REGISTRATION, 'resetCredentialsFlow': RESET,
-                          'eventsListeners': listeners})
+                          'eventsListeners': listeners, 'attributes': attributes})
     stored = kc.request('GET', '')
     if stored.get('registrationFlow') != REGISTRATION or stored.get('resetCredentialsFlow') != RESET:
         raise RuntimeError('Protected flow bindings did not persist')
+    stored_attributes = stored.get('attributes') or {}
+    if stored_attributes.get(VERIFY_EMAIL_LIFESPAN_ATTRIBUTE) != str(VERIFY_EMAIL_LIFESPAN):
+        raise RuntimeError('Verification link lifespan did not persist')
+    lost = sorted(key for key, value in attributes.items() if stored_attributes.get(key) != value)
+    if lost:
+        raise RuntimeError('Realm attributes did not survive the update: ' + ', '.join(lost))
     return result
 
 
