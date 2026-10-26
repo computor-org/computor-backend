@@ -1,6 +1,8 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import { usePermissions } from '@/src/hooks/usePermissions';
+import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import ReactMarkdown from 'react-markdown';
 import { mathMarkdownPlugins } from '@/src/components/markdownMath';
 import { formatUsage } from '@/src/utils/limits';
@@ -129,6 +131,9 @@ export default function AssignmentDetailPage() {
   const params = useParams();
   const courseId = params.id as string;
   const assignmentId = params.assignmentId as string;
+  const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
+  const isOrdinaryLearner = !isAdmin && !isOrganizationManager &&
+    courseHasAtLeast(courseId, '_student') && !courseHasAtLeast(courseId, '_tutor');
 
   const { data, loading, error } = useResource(async () => {
     const assignment = await studentsClient.studentGetCourseContentEndpointStudentsCourseContentsCourseContentIdGet(
@@ -176,6 +181,11 @@ export default function AssignmentDetailPage() {
   const description = readme
     ? (readmeHeading ? withoutLeadingHeading(readme.markdown) : readme.markdown)
     : assignment?.description || assignment?.deployment?.example_version?.description;
+  // What VS Code can open: a released assignment, or a unit with authored text.
+  const openable = assignment?.course_id === courseId && assignment.visible_effective !== false && (
+    assignment.course_content_kind_id === 'unit'
+      ? Boolean(assignment.description?.trim() || assignment.has_deployment || assignment.deployment)
+      : Boolean(assignment.has_deployment || assignment.deployment));
   const repository = group?.repository ?? null;
   const members = group?.members ?? [];
 
@@ -186,6 +196,10 @@ export default function AssignmentDetailPage() {
         title={name}
         loading={loading}
         error={error || (!loading && !assignment ? t.notFound : null)}
+        // The task stays on this page, as on main; one button opens it in VS Code.
+        actions={isOrdinaryLearner && openable ? (
+          <CourseWorkspaceLaunchButtons courseId={courseId} courseContentId={assignmentId} compact single />
+        ) : undefined}
         subtitle={
           assignment && (
             <div className="flex flex-wrap items-center gap-2">
