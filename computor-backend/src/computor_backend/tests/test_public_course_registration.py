@@ -230,6 +230,8 @@ def test_catalog_row_carries_no_course_internals():
     assert set(CoursePublicList.model_fields) == {
         "id",
         "title",
+        # The ordering key shared with the anonymous catalog (course-order).
+        "position",
         "description",
         "path",
         "language_code",

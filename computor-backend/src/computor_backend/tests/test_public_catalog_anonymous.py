@@ -136,6 +136,8 @@ def test_anonymous_request_gets_200_and_only_listable_courses(world, client):
         "title": listed.title,
         "description": "Intro",
         "language_code": "de",
+        # The public ordering key (course-order); null keeps title order.
+        "position": None,
     }
 
 
@@ -167,7 +169,7 @@ def test_response_carries_no_member_or_internal_data(world, client):
 
     assert response.status_code == 200
     (row,) = _ours(response, world["suffix"])
-    assert set(row) == {"id", "title", "description", "language_code"}
+    assert set(row) == {"id", "title", "description", "language_code", "position"}
     body = response.text
     for secret in ("Secret", user.email, str(user.id), str(group.id),
                    str(world["org"].id), "anoncat_"):
