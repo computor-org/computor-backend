@@ -81,6 +81,7 @@ async function setup(
     }
     if (path.endsWith('/user')) return json(route, user);
     if (path.startsWith('/messages')) return json(route, []);
+    if (path === '/students/course-contents') return json(route, []);
 
     if (path === '/coder/health') return json(route, { healthy: true, version: '2.29.4' });
     if (path === '/coder/templates') {
@@ -206,6 +207,8 @@ test('a maintainer can still name a workspace, without leaving the page', async 
 });
 
 // --- course pages ------------------------------------------------------------
+// A learner opens a course's workspace from its assignments page, which is
+// where the course page sends them (issues#408).
 
 test('a course does not offer a type the server does not have', async ({ page }) => {
   const provisioned = await setup(page, {
@@ -225,7 +228,7 @@ test('a course does not offer a type the server does not have', async ({ page })
     ],
   });
 
-  await page.goto(`/courses/${COURSE_ID}`);
+  await page.goto(`/courses/${COURSE_ID}/student/assignments`);
 
   const bash = card(page, 'Terminal');
   await expect(bash).toBeVisible();
@@ -251,7 +254,7 @@ test('a course shows the build a student is waiting on', async ({ page }) => {
     ],
   });
 
-  await page.goto(`/courses/${COURSE_ID}`);
+  await page.goto(`/courses/${COURSE_ID}/student/assignments`);
 
   const matlab = card(page, 'MATLAB');
   await expect(matlab).toBeDisabled();
