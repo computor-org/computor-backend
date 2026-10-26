@@ -183,7 +183,7 @@ class TestWelcomeMail:
         assert "https://example.test " in body and "//example.test/" not in body
         # One step, in the labels the web interface shows.
         assert ("im Kurskatalog" if german else "in the course catalog") in body
-        assert ("„In VS Code öffnen“" if german else '"Open in VS Code"') in body
+        assert ("öffne ihn dort in VS Code" if german else 'open it in VS Code from there') in body
 
     def test_sender_must_be_a_team_address(self):
         from computor_backend.support.welcome import build_welcome
