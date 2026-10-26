@@ -48,9 +48,10 @@ VERSION = "1.6"
 SENDER = "contact@computor.at"
 MIN_NOTICE_DAYS = 30
 _LOCK_KEY = 0x7465726D  # "term": one notice run at a time
+# Version 1.0, which most existing accounts accepted (the changes page links all).
 OLD_VERSION_URL = (
     "https://github.com/computor-org/computor-backend/blob/"
-    "54ea77021304f1bd77ef4bf7c5712b5edfb6843f/computor-web/content/legal/nutzungsbedingungen_de.md"
+    "54ea77021304f1bd77ef4bf7c5712b5edfb6843f/computor-web/content/legal/{}"
 )
 
 _DE = """Hallo {name_de},
@@ -60,7 +61,7 @@ ab {date_de} gelten für computor.at die Nutzungsbedingungen in Version 1.6. Das
 - Lernhilfen einschließlich KI (Lena) als zusätzliche Leistung; in manchen Kursen werden Fragen automatisch Lena zugeordnet.
 - Mehr erlaubt: Netzwerkdienste und Sicherheitsübungen, wenn dein Kurs sie vorsieht.
 - Unverändert: 30 Tage Vorankündigung per E-Mail; Änderungen zu deinem Nachteil gelten nur mit deiner Zustimmung.
-Was sich ändert: {url}/terms/changes · bisherige Fassung: {old} · Datenschutzerklärung 1.6: {url}/privacy
+Was sich ändert: {url}/terms/changes · bisherige Fassung: {old_de} · Datenschutzerklärung 1.6: {url}/privacy
 Du musst nichts tun. Wenn du nicht einverstanden bist, kannst du jederzeit kündigen und die Löschung deines Kontos verlangen (privacy@computor.at). Fragen? Antworte einfach auf diese Mail.
 """
 
@@ -71,7 +72,7 @@ from {date_en}, version 1.6 of the computor.at Terms of Use applies. The main po
 - Learning aids including AI (Lena) as an additional service; in some courses questions are routed to Lena automatically.
 - More allowed: network services and security exercises where your course provides them.
 - Unchanged: 30 days' notice by email; changes to your disadvantage apply only with your consent.
-What changes: {url}/terms/en/changes · previous version: {old} · Privacy notice 1.6: {url}/privacy/en
+What changes: {url}/terms/en/changes · previous version: {old_en} · Privacy notice 1.6: {url}/privacy/en
 You do not need to do anything. If you disagree, you may terminate at any time and request deletion of your account (privacy@computor.at). Questions? Just reply to this email.
 """
 
@@ -95,7 +96,9 @@ def build_notice(*, given_name: str, to: str, effective_from: date, site_url: st
     name = " ".join((given_name or "").split())
     url = site_url.rstrip("/")
     fields = {
-        "name_de": name or "zusammen", "name_en": name or "there", "url": url, "old": OLD_VERSION_URL,
+        "name_de": name or "zusammen", "name_en": name or "there", "url": url,
+        "old_de": OLD_VERSION_URL.format("nutzungsbedingungen_de.md"),
+        "old_en": OLD_VERSION_URL.format("terms_en.md"),
         "date_de": format_date(effective_from, "de"), "date_en": format_date(effective_from, "en"),
     }
     msg = EmailMessage(policy=SMTP_POLICY)

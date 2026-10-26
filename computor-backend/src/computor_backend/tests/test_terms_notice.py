@@ -31,10 +31,11 @@ def test_notice_is_german_first_then_english_with_date_and_links():
     de, en = body.split("\n---\n")
     assert de.startswith("Hallo Anna,") and "ab 07.12.2026 gelten" in de
     assert en.lstrip().startswith("Hello Anna,") and "from 7 December 2026" in en
-    for part, changes, privacy in ((de, "/terms/changes", "/privacy\n"), (en, "/terms/en/changes", "/privacy/en\n")):
+    for part, changes, privacy, old in ((de, "/terms/changes", "/privacy\n", "nutzungsbedingungen_de.md"),
+                                        (en, "/terms/en/changes", "/privacy/en\n", "terms_en.md")):
         assert f"https://computor.at{changes}" in part
         assert f"https://computor.at{privacy}" in part
-        assert terms_notice.OLD_VERSION_URL in part
+        assert terms_notice.OLD_VERSION_URL.format(old) in part
         assert "privacy@computor.at" in part
         lines = [line for line in part.strip().splitlines() if line]
         assert len(lines) <= 9, lines  # greeting + at most 8 lines
