@@ -90,13 +90,15 @@ async function setup(
     userId?: string;
     profileLanguage?: string | null;
     courseRoles?: string[];
+    /** False: no cached session, as after the login expired in an idle tab. */
+    signedIn?: boolean;
   } = {},
 ) {
   const next = typeof source === 'function' ? source : undefined;
   const sequence = typeof source === 'function' ? [] : source;
   const systemRoles = options.systemRoles ?? ['_workspace_user'];
   const user = { ...USER, id: options.userId ?? USER.id, profile: { language_code: options.profileLanguage ?? null }, user_roles: systemRoles.map((role_id) => ({ role_id })) };
-  await page.addInitScript(({ user, systemRoles }) => {
+  if (options.signedIn !== false) await page.addInitScript(({ user, systemRoles }) => {
     sessionStorage.setItem('auth_user', JSON.stringify({
       id: user.id, username: user.username, email: user.email,
       givenName: user.given_name, familyName: user.family_name,
