@@ -655,7 +655,7 @@ test('a lecturer-provisioned workspace stays listed apart from the personal one'
     courseWorkspaces: true,
     workspaces: [COURSE_WORKSPACE, { ...COURSE_WORKSPACE, id: 'w-scratch', name: 'lecturer-scratch' }],
   });
-  await page.goto(`/courses/${COURSE_A}`);
+  await page.goto(`/courses/${COURSE_A}/student/assignments`);
   await expect(page.getByRole('button', { name: 'Open in VS Code' })).toHaveCount(1);
   await expect(page.getByText('Other workspaces')).toBeVisible();
   await expect(page.getByText('lecturer-scratch')).toBeVisible();
@@ -804,7 +804,7 @@ test('the dashboard reopens a running workspace in the course it was last opened
     details({ status: 'running', ready: true, name: 'vscode' }),
   ], { courseWorkspaces: true });
 
-  await page.goto(`/courses/${COURSE_B}`);
+  await page.goto(`/courses/${COURSE_B}/student/assignments`);
   const coursePopup = page.waitForEvent('popup');
   await page.getByRole('button', { name: 'Open in VS Code' }).click();
   const courseTab = await coursePopup;
@@ -879,7 +879,7 @@ test.describe('in German', () => {
 
   test('the course page says what Stop does in its tooltip, not in a paragraph', async ({ page }) => {
     await setup(page, [details({ status: 'running', ready: true, name: 'vscode' })], { courseWorkspaces: true });
-    await page.goto(`/courses/${COURSE_A}`);
+    await page.goto(`/courses/${COURSE_A}/student/assignments`);
     await expect(page.getByRole('button', { name: 'Stoppen', exact: true }))
       .toHaveAttribute('title', 'Beendet VS Code. Deine Dateien bleiben erhalten.');
     await expect(page.getByText(/Wenn du fertig bist|Deine Dateien bleiben erhalten/)).toHaveCount(0);
@@ -1057,7 +1057,7 @@ test.describe('German mobile workspace action', () => {
     const { contexts, provisions } = await setup(page, [details({ status: 'running', ready: true, name: 'vscode' })], {
       courseWorkspaces: true, workspaces: [], allowProvision: true,
     });
-    await page.goto(`/courses/${COURSE_A}`);
+    await page.goto(`/courses/${COURSE_A}/student/assignments`);
     const button = page.getByRole('button', { name: /VS Code.*Arbeitsumgebung einrichten/s });
     await expect(button).toBeVisible();
     const collapseSidebar = page.getByRole('button', { name: 'Seitenleiste einklappen', exact: true });
