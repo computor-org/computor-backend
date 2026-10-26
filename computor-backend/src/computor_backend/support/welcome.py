@@ -21,14 +21,14 @@ SUBJECT = {"de": "Willkommen bei computor.at", "en": "Welcome to computor.at"}
 
 _DE = """Hallo {name},
 
-deine Registrierung ist abgeschlossen. Melde dich unter {url} an, tritt im Kurskatalog einem Kurs bei und klicke auf „In VS Code öffnen“.
+deine Registrierung ist abgeschlossen. Melde dich unter {url} an, tritt im Kurskatalog einem Kurs bei und öffne ihn dort in VS Code.
 
 Bei Fragen antworte einfach auf diese Nachricht.
 """
 
 _EN = """Hello {name},
 
-your registration is complete. Sign in at {url} and join a course in the course catalog, then click "Open in VS Code".
+your registration is complete. Sign in at {url} and join a course in the course catalog, then open it in VS Code from there.
 
 If you have questions, just reply to this message.
 """
