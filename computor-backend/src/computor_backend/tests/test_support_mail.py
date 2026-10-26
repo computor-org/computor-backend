@@ -181,7 +181,9 @@ class TestWelcomeMail:
         assert ("Hello Ada," not in body) if german else ("Hallo Ada," not in body)
         assert msg["Subject"] == ("Willkommen bei computor.at" if german else "Welcome to computor.at")
         assert "https://example.test " in body and "//example.test/" not in body
-        assert ("Kurs beitreten" if german else "Join course") in body
+        # One step, in the labels the web interface shows.
+        assert ("im Kurskatalog" if german else "in the course catalog") in body
+        assert ("„In VS Code öffnen“" if german else '"Open in VS Code"') in body
 
     def test_sender_must_be_a_team_address(self):
         from computor_backend.support.welcome import build_welcome
