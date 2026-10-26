@@ -58,10 +58,12 @@ test('the course welcome item renders as Markdown in the reader language and is 
   await expect(welcome.getByText(/How to reach your first submission/)).toBeVisible();
   await expect(welcome.getByRole('link', { name: 'public course page' })).toHaveAttribute('href', /\/learn\/python-beginner$/);
   await expect(welcome.getByText(/lang:|\[public course page\]/)).toHaveCount(0);
-  await welcome.getByRole('button', { name: 'Deutsch', exact: true }).click();
+  // The header's DE/EN switch picks the content language; the card has no second one.
+  await expect(welcome.getByRole('button', { name: /^(Deutsch|English)$/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'DE', exact: true }).click();
   await expect(welcome.getByText(/So kommst du zur ersten Abgabe/)).toBeVisible();
   await expect(welcome.getByRole('link', { name: /Mathematische Konstanten/ })).toBeVisible();
-  await welcome.getByRole('button', { name: 'English', exact: true }).click();
+  await page.getByRole('button', { name: 'EN', exact: true }).click();
   await expect(welcome.getByRole('link', { name: /Start with Mathematical Constants/ })).toBeVisible();
 });
 
@@ -183,7 +185,7 @@ test('reference definitions survive title removal and math titles render through
   await expect(page.locator('article a[href*="operators/lambda"]')).toHaveCount(1);
   await expect(page.getByRole('navigation', { name: 'Course outline' }).locator('.katex').first()).toBeVisible();
   await expect(page.locator('article')).not.toContainText('$\\pi$');
-  await page.getByRole('button', { name: 'Deutsch', exact: true }).click();
+  await page.getByRole('button', { name: 'DE', exact: true }).click();
   await expect(page.locator('article h2').first()).toContainText('Approximation von');
   await page.goto('/learn/python-advanced/content/week_3.pi_series');
   await expect(page.getByRole('navigation', { name: 'Aufgabennavigation' }).locator('.katex').first()).toBeVisible();
