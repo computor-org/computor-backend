@@ -1,6 +1,6 @@
 # Privacy Notice computor.at
 
-Version 1.5, dated 25 October 2026. The German version is authoritative.
+Version 1.6, dated 26 October 2026. The German version is authoritative.
 
 Computor is a free TU Graz learning service. Public material needs no account.
 For accounts, courses, submissions, workspaces, communication and learning help,
@@ -40,7 +40,7 @@ account when we learn of it.
 | Hosted workspaces | Files, running processes, start/stop times; for the programming environment on our servers. Home files remain when it is stopped. | Technical operations access; content access where necessary for operation, recovery, support or security. |
 | Course messages | Messages with revision history and timestamps; for communication and support. | The relevant audience, not every course participant by default. |
 | Lena | Questions, selected text, assignment/thread context and answers; for learning assistance described below. | Only you for button requests; the thread's audience for messages. |
-| Support and reports | Email, contact details, descriptions, chosen attachments and technical details such as application, version, page or command; for handling and replying. | Support staff; requests and attachments are not published automatically. A reviewed summary without personal data may appear in the public GitHub issue tracker. |
+| Support and reports | Email, contact details, descriptions, chosen attachments and technical details such as application, version, page or command; for handling and replying, supported by software and local AI models as described below. | Support staff; requests and attachments are not published automatically. A reviewed summary without personal data may appear in the public GitHub issue tracker. |
 | Access and security | IP, time, requested resource, size, status, browser/OS and referring page, account or workspace identifiers where applicable, login events, administrative actions and diagnostics; for fault/attack detection, availability and secure operation. | Technical operations and security roles, limited to their role and the stated operational and security purposes. |
 
 Technical server access serves operation, troubleshooting and abuse prevention
@@ -63,6 +63,15 @@ AI provider, additional content logs or model training on your data. Bounded
 memory and disk caches reuse computations; learners cannot access them. Entries
 are replaced for capacity or cleared, without a fixed time expiry. Numeric size,
 status and timing measurements contain no questions, submitted text or answers.
+
+**Support:** Incoming support emails and reports are read in automatically,
+cleaned and assigned to a request. Local AI models may summarise and classify a
+request and suggest a draft reply. A member of the support team reviews and
+sends every reply; the AI does not decide on accounts, suspensions, submissions
+or grades. The models run on TU Graz machines in Austria and on our servers at
+Hetzner in Germany (section 3), without an external AI provider and without
+training models on your data. Summaries, classifications and drafts belong to
+the request and follow its deletion period (section 4).
 
 ## 3. Locations and additional ways of working
 
