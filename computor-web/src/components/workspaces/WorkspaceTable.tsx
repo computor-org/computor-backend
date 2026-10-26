@@ -5,6 +5,7 @@ import type { CoderWorkspace } from '@/src/types/workspaces';
 import { Table, Thead, Tbody, Tr, Th, Td } from '@/src/components/ui/Table';
 import Button from '@/src/components/ui/Button';
 import WorkspaceStatusBadge, { categorizeStatus } from './WorkspaceStatusBadge';
+import { workspaceVersionLabel } from './versionDate';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const COPY = {
@@ -81,6 +82,7 @@ function WorkspaceRow({
   const owner = workspace.owner_name || '';
   const transition = workspace.latest_build_transition;
   const category = categorizeStatus(workspace.latest_build_status, transition);
+  const version = workspaceVersionLabel(workspace.template_version_created_at, language);
 
   const runAction = async (action: 'start' | 'stop', fn: (o: string, n: string) => Promise<void>) => {
     if (!owner) return;
@@ -106,7 +108,7 @@ function WorkspaceRow({
           with no stages to report, and the chip already names it ("stopping") —
           a bar beside it drew a second, vaguer copy of the same word.
         */}
-        <WorkspaceStatusBadge status={workspace.latest_build_status} transition={transition} />
+        <WorkspaceStatusBadge status={workspace.latest_build_status} transition={transition} detail={version} />
       </Td>
       <Td className="text-sm text-muted whitespace-nowrap">
         {workspace.created_at ? new Date(workspace.created_at).toLocaleDateString(language === 'de' ? 'de-AT' : undefined) : '—'}

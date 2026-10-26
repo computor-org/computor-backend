@@ -67,7 +67,7 @@ const COPY = {
     } as Record<StatusCategory, string>,
     inFlight: {
       starting: 'startet',
-      stopping: 'stoppt',
+      stopping: 'wird gestoppt',
       pending: 'ausstehend',
       canceling: 'wird abgebrochen',
       deleting: 'wird gelöscht',
@@ -100,25 +100,31 @@ function statusLabel(
   const t = COPY[language];
   const s = (status || '').toLowerCase();
   // In-flight statuses already read well; they are the transition itself.
-  if (s in t.inFlight) return t.inFlight[s];
-  return t.categories[categorizeStatus(status, transition)];
+  const label = s in t.inFlight ? t.inFlight[s] : t.categories[categorizeStatus(status, transition)];
+  // Only the first letter: CSS `capitalize` would turn "wird gestoppt" into
+  // "Wird Gestoppt".
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 /** Live workspace status as a shared Badge pill with a state dot. */
 export default function WorkspaceStatusBadge({
   status,
   transition,
+  detail,
 }: {
   status?: WorkspaceBuildStatus | string | null;
   /** The build's transition ('start' | 'stop' | 'delete') — pass it when known. */
   transition?: string | null;
+  /** Extra tooltip line, e.g. the workspace's "Version vom …". */
+  detail?: string | null;
 }) {
   const language = useUiLanguage();
   const category = categorizeStatus(status, transition);
+  const title = [status ? `${COPY[language].buildStatus}: ${status}` : null, detail].filter(Boolean).join(' · ');
   return (
-    <Badge color={categoryColor[category]} pill className="capitalize" >
+    <Badge color={categoryColor[category]} pill>
       <span className={`h-1.5 w-1.5 rounded-full mr-1.5 ${categoryDots[category]}`} />
-      <span title={status ? `${COPY[language].buildStatus}: ${status}` : undefined}>
+      <span title={title || undefined}>
         {statusLabel(status, transition, language)}
       </span>
     </Badge>

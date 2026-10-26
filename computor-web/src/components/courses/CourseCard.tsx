@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { ReactNode } from 'react';
+import { ReactNode, type Ref } from 'react';
 import Badge from '@/src/components/Badge';
-import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
+import CourseWorkspaceLaunchButtons, { type CourseWorkspaceLauncher } from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import { displayName } from '@/src/utils/displayName';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { localizedRoleLabel } from '@/src/utils/courseRoles';
@@ -29,6 +29,7 @@ export default function CourseCard({
   badge,
   footer,
   selected = false,
+  workspaceLauncherRef,
 }: {
   course: { id: string; title?: string | null; path?: string | null; language_code?: string | null; description?: string | null };
   /** Course role, when the viewer has one. Also gates the workspace launchers. */
@@ -40,6 +41,7 @@ export default function CourseCard({
   footer?: ReactNode;
   /** Marks the course the visitor came to join (catalog `?join=`). */
   selected?: boolean;
+  workspaceLauncherRef?: Ref<CourseWorkspaceLauncher>;
 }) {
   const language = useUiLanguage();
   const t = COPY[language];
@@ -88,7 +90,7 @@ export default function CourseCard({
 
       {/* Template icon launchers; hides itself when the course offers no
           workspaces. Members only — the fetch would 403 without a role. */}
-      {role && <CourseWorkspaceLaunchButtons courseId={course.id} compact className="mb-4" />}
+      {role && <CourseWorkspaceLaunchButtons ref={workspaceLauncherRef} courseId={course.id} compact className="mb-4" />}
 
       {footer && (
         <div className="flex items-center justify-end pt-4 border-t border-rule mt-auto gap-3">
@@ -99,7 +101,7 @@ export default function CourseCard({
   );
 }
 
-/** The "View Course →" footer used by the course list. */
+/** The "View Course →" footer used by the dashboard and the course list. */
 export function ViewCourseLink({ courseId }: { courseId: string }) {
   const t = COPY[useUiLanguage()];
   return (
