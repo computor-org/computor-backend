@@ -45,7 +45,6 @@ const COPY = {
     usageTitle: 'Testläufe und Abgaben im Verhältnis zu deinem Kontingent',
     testsSuffix: 'T',
     submissionsSuffix: 'A',
-    usageLegend: 'T = Testläufe, A = Abgaben (verbraucht / Kontingent)',
     latestResult: 'Letztes Testergebnis',
     grade: 'Bewertung',
     open: 'Öffnen',
@@ -69,7 +68,6 @@ const COPY = {
     usageTitle: 'Test runs and submissions used, against your budget',
     testsSuffix: 'T',
     submissionsSuffix: 'S',
-    usageLegend: 'T = test runs, S = submissions (used / budget)',
     latestResult: 'Latest test result',
     grade: 'Grade',
     open: 'Open',
@@ -182,8 +180,6 @@ export default function StudentCourseContentsPage() {
                     {t.expandAll}
                   </Button>
                 </Toolbar>}
-
-                <p className="text-xs text-muted" data-testid="usage-legend">{t.usageLegend}</p>
 
                 <TreeRows>
                   {rows.map(({ key, item, depth, label, expanded, hasChildren, toggle, childCount }) => {
