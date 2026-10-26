@@ -100,13 +100,13 @@ test('on a desktop the sidebar starts expanded', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Collapse sidebar' })).toBeVisible();
 });
 
-for (const [locale, joinLabel, continueLabel, openLabel] of [
-  ['en-US', 'Join course', 'Continue', 'Open course'],
-  ['de-DE', 'Kurs beitreten', 'Weiterlernen', 'Kurs öffnen'],
+for (const [locale, joinLabel, openLabel] of [
+  ['en-US', 'Join course', 'Open course'],
+  ['de-DE', 'Kurs beitreten', 'Kurs öffnen'],
 ] as const) {
   test.describe(`catalog learner continuation (${locale})`, () => {
     test.use({ locale });
-    test('confirmed enrollment opens assignments before refreshed student scopes arrive', async ({ page }) => {
+    test('confirmed enrollment opens the course overview before refreshed student scopes arrive', async ({ page }) => {
       const enrolled = await setup(page);
       await page.goto('/courses/catalog?join=python.beginner');
       await expect(page).toHaveURL(/\/courses\/catalog\?join=python\.beginner$/);
@@ -115,7 +115,7 @@ for (const [locale, joinLabel, continueLabel, openLabel] of [
       await expect(dialog.getByText(/Data Science mit Python – Grundlagen/)).toBeVisible();
       await expect(page.locator('[aria-current="true"]')).toContainText('Data Science mit Python – Grundlagen');
       await dialog.getByRole('button', { name: joinLabel }).click();
-      await expect(page).toHaveURL(/\/courses\/c-beginner\/student\/assignments$/);
+      await expect(page).toHaveURL(/\/courses\/c-beginner$/);
       expect(enrolled).toEqual(['c-beginner']);
     });
     test('an exact exercise survives enrollment consent', async ({ page }) => {
@@ -158,7 +158,7 @@ for (const [locale, joinLabel, continueLabel, openLabel] of [
       await page.getByRole('dialog').getByRole('button', { name: locale === 'de-DE' ? 'Abbrechen' : 'Cancel' }).click();
       await page.locator('#course-c-intermediate').getByRole('button', { name: joinLabel }).click();
       await page.getByRole('dialog').getByRole('button', { name: joinLabel }).click();
-      await expect(page).toHaveURL(/\/courses\/c-intermediate\/student\/assignments$/);
+      await expect(page).toHaveURL(/\/courses\/c-intermediate$/);
       expect(enrolled).toEqual(['c-intermediate']);
     });
     test('ambiguous course paths cannot choose an exercise destination', async ({ page }) => {
@@ -170,16 +170,16 @@ for (const [locale, joinLabel, continueLabel, openLabel] of [
       await expect(page.getByRole('dialog')).toHaveCount(0);
       expect(enrolled).toEqual([]);
     });
-    test('an enrolled learner join link opens assignments', async ({ page }) => {
+    test('an enrolled learner join link opens the course overview', async ({ page }) => {
       const enrolled = await setup(page);
       await page.goto('/courses/catalog?join=python.advanced');
-      await expect(page).toHaveURL(/\/courses\/c-advanced\/student\/assignments$/);
+      await expect(page).toHaveURL(/\/courses\/c-advanced$/);
       expect(enrolled).toEqual([]);
     });
-    test('learner footer continues to assignments and catalog titles stay plain', async ({ page }) => {
+    test('learner footer opens the course overview and catalog titles stay plain', async ({ page }) => {
       await setup(page);
       await page.goto('/courses/catalog');
-      await expect(page.getByRole('link', { name: continueLabel, exact: true })).toHaveAttribute('href', '/courses/c-advanced/student/assignments');
+      await expect(page.getByRole('link', { name: openLabel, exact: true })).toHaveAttribute('href', '/courses/c-advanced');
       await expect(page.getByRole('link', { name: COURSES[2].title, exact: true })).toHaveCount(0);
     });
     for (const staff of ['tutor', 'lecturer', 'admin', 'organization manager']) {
