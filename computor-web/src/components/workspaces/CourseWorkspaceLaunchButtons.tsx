@@ -112,6 +112,7 @@ export default function CourseWorkspaceLaunchButtons({
   autoLaunch = false,
   ref,
   compact = false,
+  single = false,
   className,
   title,
 }: {
@@ -121,6 +122,9 @@ export default function CourseWorkspaceLaunchButtons({
   autoLaunch?: boolean;
   ref?: Ref<CourseWorkspaceLauncher>;
   compact?: boolean;
+  /** With `compact`: one "In VS Code öffnen" button instead of the icon row,
+      for the assignment page, where it opens `courseContentId`. */
+  single?: boolean;
   /** Extra classes on the root, e.g. outer spacing — only rendered when the
       component itself renders, so callers don't get stray margins when it
       self-hides. */
@@ -326,6 +330,22 @@ export default function CourseWorkspaceLaunchButtons({
 
   const ownOptions = courseOptions.filter((option) => personal.has(option.name));
   const newOptions = courseOptions.filter((option) => !personal.has(option.name));
+
+  if (compact && single) {
+    const vscode = courseOptions.find((option) => option.name === 'vscode-workspace' && isUsable(option));
+    if (!vscode) return null;
+    return (
+      <Button
+        size="sm"
+        className={className}
+        onClick={() => provisionAndLaunch(vscode.name)}
+        loading={launching === vscode.name}
+        loadingLabel={t.launching}
+      >
+        {t.openIn(templateLabel(vscode))}
+      </Button>
+    );
+  }
 
   if (compact) {
     return (
