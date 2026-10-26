@@ -527,6 +527,7 @@ def ensure_stopped_workspace(learner: Api, key: str, timeout: float = 900) -> No
         learner.post("/coder/workspaces/provision", json={"template": WORKSPACE_TEMPLATE})
         log(f"{key} learner: workspace provisioned")
     started = time.monotonic()
+    retried = False
     while True:
         ws = current()
         state = (ws or {}).get("latest_build_transition"), (ws or {}).get("latest_build_status")
@@ -537,6 +538,12 @@ def ensure_stopped_workspace(learner: Api, key: str, timeout: float = 900) -> No
         if state[0] == "start" and state[1] in ("running", "succeeded"):
             learner.post(f"/coder/workspaces/{ws['owner_name']}/{ws['name']}/stop")
             log(f"{key} learner: stopping {ws['name']}")
+        elif state[1] in ("failed", "canceled") and not retried:
+            # A start that failed earlier (e.g. while the host had no DNS)
+            # leaves the persona without a usable workspace: start it once more.
+            learner.post(f"/coder/workspaces/{ws['owner_name']}/{ws['name']}/start")
+            log(f"{key} learner: {ws['name']} was {state[1]}, starting it again")
+            retried = True
         elif state[1] in ("failed", "canceled", "deleted"):
             raise RuntimeError(f"{key} learner workspace build {state}")
         if time.monotonic() - started > timeout:
