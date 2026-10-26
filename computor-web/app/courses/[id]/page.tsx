@@ -106,6 +106,11 @@ const COPY = {
     delivery: 'Bereitstellung',
     defaultBranch: 'Standard-Branch',
     studentRepos: 'Repositories der Studierenden',
+    repoModes: {
+      managed: 'Von Computor bereitgestellt',
+      external: 'Selbst gehostet',
+      download: 'Download ohne Git',
+    } as Record<string, string>,
     status: 'Status',
     locked: 'Gesperrt',
     editable: 'Bearbeitbar',
@@ -181,6 +186,11 @@ const COPY = {
     delivery: 'Delivery',
     defaultBranch: 'Default branch',
     studentRepos: 'Student repos',
+    repoModes: {
+      managed: 'Hosted by Computor',
+      external: 'Self-hosted',
+      download: 'Download without git',
+    } as Record<string, string>,
     status: 'Status',
     locked: 'Locked',
     editable: 'Editable',
@@ -643,7 +653,7 @@ export default function CoursePage() {
                   gitBinding.student_repo_modes &&
                     gitBinding.student_repo_modes.length > 0 && {
                       term: t.studentRepos,
-                      value: gitBinding.student_repo_modes.join(', '),
+                      value: gitBinding.student_repo_modes.map((m) => t.repoModes[m] ?? m).join(', '),
                     },
                   {
                     term: t.status,
