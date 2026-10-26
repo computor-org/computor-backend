@@ -400,9 +400,13 @@ test('creating a workspace opens a launch tab for the name the server chose', as
       preparing: [],
     }),
   );
+  // Hold the response until the test has seen the tab parked on the creating
+  // state. A fixed delay lost that race whenever next dev compiled the launch
+  // page more slowly than the delay.
+  let releaseProvision!: () => void;
+  const provisionReleased = new Promise<void>((resolve) => { releaseProvision = resolve; });
   await page.route(`${API_ORIGIN}/coder/workspaces/provision`, async (route) => {
-    // Hold the response so the test can see the tab parked on the creating state.
-    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    await provisionReleased;
     return json(route, {
       user: { id: 'u-me', username: 'u-me', email: USER.email },
       // A self-provisioner's requested name is discarded and re-derived server
@@ -423,6 +427,7 @@ test('creating a workspace opens a launch tab for the name the server chose', as
   // While provisioning round-trips, the tab is already the launch spinner —
   // never a blank about:blank page.
   await expect(launchTab.getByText('Creating your workspace…')).toBeVisible();
+  releaseProvision();
 
   await launchTab.waitForURL(/owner=u-me/);
   expect(launchTab.url()).toContain('name=vscode');
