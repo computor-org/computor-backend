@@ -55,7 +55,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await setup(page);
     await page.goto('/courses/catalog');
     if (viewport.width < 768) {
-      await page.getByRole('button', { name: 'Collapse sidebar' }).click();
+      // Phones start with the collapsed icon rail.
       await expect.poll(async () => (await page.getByRole('complementary').boundingBox())?.width).toBe(64);
     }
     await expect(page.getByRole('heading', { name: COURSES[0].title })).toBeVisible();
@@ -81,6 +81,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       expect(overlaps).toBe(false);
     }
     await expect(page.getByRole('button', { name: 'Join course' })).toHaveCount(2);
+    // An enrolled learner opens the course overview, as before (issues#521).
     await expect(page.getByRole('link', { name: 'Open course' })).toHaveAttribute('href', '/courses/intermediate');
   });
 
@@ -89,7 +90,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await setup(page);
     await page.goto('/courses');
     if (viewport.width < 768) {
-      await page.getByRole('button', { name: 'Collapse sidebar' }).click();
+      // Phones start with the collapsed icon rail.
       await expect.poll(async () => (await page.getByRole('complementary').boundingBox())?.width).toBe(64);
     }
     await expect(page.getByRole('heading', { name: COURSES[0].title })).toBeVisible();

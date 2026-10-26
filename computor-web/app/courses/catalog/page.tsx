@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { UserClient } from '@/src/generated/clients/UserClient';
 import { useResource } from '@/src/hooks/useResource';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { usePermissions } from '@/src/hooks/usePermissions';
 import { useNotify } from '@/src/contexts/NotificationContext';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
@@ -26,6 +27,7 @@ const userClient = new UserClient();
 const COPY = {
   de: {
     thisCourse: 'diesen Kurs',
+    invalidTarget: 'Diese Aufgabe kann nicht geöffnet werden. Öffne sie erneut über den ursprünglichen Kurs.',
     enrolled: (title: string) => `Du bist jetzt Mitglied in ${title}.`,
     enrollFailed: 'Der Beitritt zum Kurs war nicht möglich.',
     courses: 'Kurse',
@@ -35,7 +37,7 @@ const COPY = {
     emptyTitle: 'Keine Kurse offen für die Selbstanmeldung',
     emptyDescription: 'Ein Kurs erscheint hier, sobald seine Lehrenden ihn freigeben. Frage dort nach oder schau später wieder vorbei.',
     backToCourses: 'Zurück zu deinen Kursen',
-    enrolledBadge: 'Angemeldet',
+    enrolledBadge: 'Beigetreten',
     openCourse: 'Kurs öffnen',
     full: 'Voll',
     seatsLeft: (n: number) => (n === 1 ? '1 Platz frei' : `${n} Plätze frei`),
@@ -47,6 +49,7 @@ const COPY = {
   },
   en: {
     thisCourse: 'this course',
+    invalidTarget: 'This exercise cannot be opened. Open it again from its original course.',
     enrolled: (title: string) => `You are now enrolled in ${title}.`,
     enrollFailed: 'Could not enrol you in this course.',
     courses: 'Courses',
@@ -69,10 +72,13 @@ const COPY = {
   },
 };
 
-export default function CourseCatalogPage() {
+function CourseCatalog() {
   const router = useRouter();
   const notify = useNotify();
-  const { refreshPermissions } = useAuth();
+  const { refreshPermissions, isLoading } = useAuth();
+  const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
+  const courseStaff = (id: string) => isAdmin || isOrganizationManager || courseHasAtLeast(id, '_tutor');
+  const courseLearner = (id: string) => !courseStaff(id) && courseHasAtLeast(id, '_student');
   const t = COPY[useUiLanguage()];
   const { data, loading, error, reload } = useResource(
     () => coursesClient.listPublicCoursesCoursesPublicGet({}),
@@ -85,7 +91,51 @@ export default function CourseCatalogPage() {
   const [pending, setPending] = useState<CoursePublicList | null>(null);
   const [joining, setJoining] = useState(false);
 
+  // `?join=<course id or path>` comes from "Anmelden und beitreten" on a
+  // public course page (issues#521): mark that course and open its
+  // confirmation, or open the course itself when the learner is already a
+  // member. Once the dialog is closed it stays closed, also after a reload.
+  const searchParams = useSearchParams();
+  const joinValues = searchParams.getAll('join');
+  const joinParam = joinValues.length === 1 ? joinValues[0] : '';
+  const contentValues = searchParams.getAll('contentPath');
+  const hasContentTarget = contentValues.length > 0;
+  const contentPath = contentValues.length === 1 ? contentValues[0] : '';
+  const validContentPath = contentPath.trim() === contentPath
+    && /^[a-z0-9_]+(\.[a-z0-9_]+)*$/.test(contentPath);
+  const [joinDismissed, setJoinDismissed] = useState(false);
+  const joinMatches = joinParam
+    ? courses.filter(course => course.id === joinParam || course.path === joinParam)
+    : [];
+  const joinCourse = joinMatches.length === 1 ? joinMatches[0] : null;
+  const invalidTarget = hasContentTarget && (!validContentPath || !joinCourse);
+  const blockedTarget = (course: CoursePublicList) => invalidTarget
+    && course.id === joinCourse?.id && !courseStaff(course.id);
+  // Joining lands on the course overview, as before; only a requested
+  // exercise (?contentPath=) goes on to that exercise.
+  const destination = (course: CoursePublicList, learner: boolean) =>
+    learner && hasContentTarget && !invalidTarget && course.id === joinCourse?.id
+      ? `/courses/${course.id}/student/assignments?contentPath=${encodeURIComponent(contentPath)}`
+      : `/courses/${course.id}`;
+  const dialogCourse = pending
+    ?? (joinCourse && !invalidTarget && !joinCourse.enrolled && !joinCourse.full && !joinDismissed ? joinCourse : null);
+
+  const joinedLearner = joinCourse ? courseLearner(joinCourse.id) : false;
+  const joinedStaff = joinCourse ? courseStaff(joinCourse.id) : false;
+  const joinedDestination = joinCourse ? destination(joinCourse, joinedLearner) : '';
+  useEffect(() => {
+    if (!joinCourse || isLoading || (invalidTarget && !joinedStaff)) return;
+    if (joinCourse.enrolled) router.replace(joinedDestination);
+    else document.getElementById(`course-${joinCourse.id}`)?.scrollIntoView({ block: 'nearest' });
+  }, [joinCourse, router, isLoading, joinedStaff, joinedDestination, invalidTarget]);
+
+  function closeDialog() {
+    setPending(null);
+    setJoinDismissed(true);
+  }
+
   async function join(course: CoursePublicList) {
+    if (blockedTarget(course)) return;
     setJoining(true);
     try {
       await userClient.enrollInPublicCourseUserCoursesCourseIdEnrollPost({ courseId: course.id });
@@ -94,11 +144,13 @@ export default function CourseCatalogPage() {
       // sidebar and role badges would lag the redirect.
       await refreshPermissions();
       notify(t.enrolled(displayName(course, t.thisCourse)), 'success');
-      setPending(null);
-      router.push(`/courses/${course.id}`);
+      closeDialog();
+      // Enrollment is confirmed, but refreshPermissions returns no new scopes
+      // to this closure. Preserve staff destinations without a stale student gate.
+      router.push(destination(course, !courseStaff(course.id)));
     } catch (err) {
       notify(err instanceof Error ? err.message : t.enrollFailed, 'error');
-      setPending(null);
+      closeDialog();
       reload();
     } finally {
       setJoining(false);
@@ -114,7 +166,7 @@ export default function CourseCatalogPage() {
           subtitle={t.subtitle}
         />
 
-        <ErrorBanner>{error}</ErrorBanner>
+        <ErrorBanner>{error || (!loading && invalidTarget ? t.invalidTarget : null)}</ErrorBanner>
 
         {loading && (
           <ScrollArea spacing="none" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 content-start">
@@ -143,6 +195,7 @@ export default function CourseCatalogPage() {
               <CourseCard
                 key={course.id}
                 course={course}
+                selected={course.id === joinCourse?.id}
                 badge={
                   course.enrolled ? (
                     <Badge color="green" className="shrink-0">{t.enrolledBadge}</Badge>
@@ -151,8 +204,10 @@ export default function CourseCatalogPage() {
                   ) : undefined
                 }
                 footer={
-                  course.enrolled ? (
-                    <ButtonLink href={`/courses/${course.id}`} size="sm">
+                  course.enrolled ? blockedTarget(course) ? (
+                    <Button size="sm" disabled>{t.openCourse}</Button>
+                  ) : (
+                    <ButtonLink href={destination(course, courseLearner(course.id))} size="sm">
                       {t.openCourse}
                     </ButtonLink>
                   ) : (
@@ -166,7 +221,7 @@ export default function CourseCatalogPage() {
                       ) : null}
                       <Button
                         size="sm"
-                        disabled={course.full === true}
+                        disabled={course.full === true || blockedTarget(course)}
                         onClick={() => setPending(course)}
                       >
                         {t.join}
@@ -180,14 +235,23 @@ export default function CourseCatalogPage() {
         )}
 
         <ConfirmDialog
-          open={pending !== null}
+          open={dialogCourse !== null}
           title={t.confirmTitle}
-          message={t.confirmMessage(displayName(pending, t.thisCourse))}
+          message={t.confirmMessage(displayName(dialogCourse, t.thisCourse))}
           confirmLabel={joining ? t.joining : t.join}
-          onCancel={() => setPending(null)}
-          onConfirm={() => pending && join(pending)}
+          onCancel={closeDialog}
+          onConfirm={() => dialogCourse && join(dialogCourse)}
         />
       </ListPageLayout>
     </AuthenticatedLayout>
+  );
+}
+
+export default function CourseCatalogPage() {
+  // useSearchParams (for ?join=) needs a Suspense boundary.
+  return (
+    <Suspense>
+      <CourseCatalog />
+    </Suspense>
   );
 }
