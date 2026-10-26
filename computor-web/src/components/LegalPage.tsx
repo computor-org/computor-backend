@@ -82,7 +82,7 @@ export default function LegalPage({
 
       <main className="flex-1 container mx-auto px-4 py-10">
         <article lang={lang} className="max-w-3xl mx-auto">
-          <h1 className="text-3xl font-bold text-fg">{title}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-fg break-words">{title}</h1>
           {version ? <p className="mt-2 text-sm text-muted">{version}</p> : null}
           <div className="prose markdown max-w-none mt-8">
             <ReactMarkdown

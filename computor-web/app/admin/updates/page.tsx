@@ -24,6 +24,9 @@ const IN_PROGRESS_GRACE_MS = 30 * 60 * 1000;
 const shortCommit = (commit: string | null | undefined) =>
   commit ? commit.slice(0, 7) : '—';
 
+/** The backend's fixed message when SYSTEM_REPO_URL is unset (api/update.py). */
+const isRepoNotConfigured = (error: string) => error.includes('SYSTEM_REPO_URL is not configured');
+
 const COPY = {
   de: {
     phases: {
@@ -75,6 +78,9 @@ const COPY = {
     latestCommit: 'Neuester Commit:',
     checkedAt: (when: string) => `geprüft ${when}`,
     checkFailedLabel: 'Update-Prüfung fehlgeschlagen:',
+    repoNotConfigured:
+      'Es ist kein Update-Repository konfiguriert, deshalb lässt sich nicht prüfen, ob eine neue Version vorliegt. Trage SYSTEM_REPO_URL in der .env des Servers ein.',
+    technicalDetail: 'Technische Details:',
     scheduledUpdate: 'Geplantes Update',
     missedBefore: 'Das für ',
     missedAfter: ' geplante Update wurde nicht ausgeführt:',
@@ -179,6 +185,9 @@ const COPY = {
     latestCommit: 'Latest commit:',
     checkedAt: (when: string) => `checked ${when}`,
     checkFailedLabel: 'Update check failed:',
+    repoNotConfigured:
+      'No update repository is configured, so the platform cannot check for a new version. Set SYSTEM_REPO_URL in the server .env.',
+    technicalDetail: 'Technical detail:',
     scheduledUpdate: 'Scheduled Update',
     missedBefore: 'The update scheduled for ',
     missedAfter: ' did not run:',
@@ -497,8 +506,14 @@ export default function UpdatesPage() {
                   {view.remote_error && (
                     <div className="p-3 bg-danger-wash border border-danger-line rounded-lg">
                       <p className="text-sm text-danger-text">
-                        <strong>{t.checkFailedLabel}</strong> {view.remote_error}
+                        <strong>{t.checkFailedLabel}</strong>{' '}
+                        {isRepoNotConfigured(view.remote_error) ? t.repoNotConfigured : view.remote_error}
                       </p>
+                      {isRepoNotConfigured(view.remote_error) && (
+                        <p className="mt-1 text-xs text-muted">
+                          {t.technicalDetail} <code>{view.remote_error}</code>
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

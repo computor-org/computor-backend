@@ -30,6 +30,10 @@ export default defineConfig({
     url: `http://localhost:${PORT}`,
     timeout: 120_000,
     reuseExistingServer: !process.env.CI,
-    env: { NEXT_PUBLIC_API_URL: API },
+    env: {
+      NEXT_PUBLIC_API_URL: API,
+      // Unset by default; set to computor-at to also exercise the legal pages.
+      ...(process.env.NEXT_PUBLIC_LEGAL_PROFILE ? { NEXT_PUBLIC_LEGAL_PROFILE: process.env.NEXT_PUBLIC_LEGAL_PROFILE } : {}),
+    },
   },
 });

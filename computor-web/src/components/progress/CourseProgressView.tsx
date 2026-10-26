@@ -16,6 +16,7 @@ import { Table, Thead, Tbody, Th, Td } from '@/src/components/ui/Table';
 import { inputCls } from '@/src/components/ui/tokens';
 import { CourseMemberGradingsClient } from '@/src/generated/clients/CourseMemberGradingsClient';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
+import { flagTitle } from '@/src/utils/flagText';
 import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
 import { usePersistedCourseDate } from '@/src/hooks/usePersistedCourseDate';
 import { courseAnalyticsClient } from '@/src/clients/CourseAnalyticsClient';
@@ -339,7 +340,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
                 <div className="flex flex-wrap gap-2">
                   {flagCounts.map(([code, c]) => (
                     <Badge key={code} tone={c.severity === 'warning' ? 'warning' : 'info'}>
-                      {c.title}: {c.students}
+                      {flagTitle(code, c.title, language)}: {c.students}
                     </Badge>
                   ))}
                 </div>
