@@ -265,12 +265,17 @@ a:hover {
 
 /* ---- Language switcher ---------------------------------------------- */
 /*
- * The stock keycloak theme hides the locale menu in its own css/login.css and
- * reveals it on hover. This theme shadows that file (see the page-background
- * note above), so the rule was lost and the menu sat permanently open over the
- * first form field (issues#476, #478). Restore it, and also open on
- * focus-within so it works by keyboard and by tap on touch screens, which have
- * no hover.
+ * The stock keycloak theme hides the locale menu in its own css/login.css.
+ * This theme shadows that file (see the page-background note above), so the
+ * rule was lost and the menu sat permanently open over the first form field
+ * (issues#476, #478). Hide it here.
+ *
+ * Opening and closing is left to Keycloak's menu-button-links.js: it shows the
+ * menu with an inline display:block on click, Enter or arrow keys, and removes
+ * it again on Escape, a second click on the button and a click outside. A
+ * :hover or :focus-within rule must not reveal it as well: the script hands
+ * focus back to the button when it closes, so the menu stayed open
+ * (issues#488).
  */
 #kc-locale-dropdown {
   position: relative;
@@ -290,11 +295,6 @@ a:hover {
   border: 1px solid var(--ct-gray-200);
   border-radius: 8px;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-}
-
-#kc-locale-dropdown:hover ul,
-#kc-locale-dropdown:focus-within ul {
-  display: block;
 }
 
 #kc-current-locale-link {
