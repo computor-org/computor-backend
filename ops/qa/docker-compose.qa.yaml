@@ -75,6 +75,8 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
       KEYCLOAK_ADMIN_MFA: "false"
       SUPPORT_WELCOME_MAIL_ENABLED: "true"
+      # Expanded in ops/qa/lena-tutor.yaml by the startup bootstrap.
+      TUTOR_AGENT_API_TOKEN: ${TUTOR_AGENT_API_TOKEN:?}
     build:
       additional_contexts:
         computor-base: docker-image://${QA_BASE_IMAGE:?}

@@ -149,6 +149,7 @@ TOKEN_SECRET=$(python3 -c 'import base64, os; print(base64.urlsafe_b64encode(os.
 API_ADMIN_EMAIL=qa-admin@example.com
 API_ADMIN_PASSWORD=$(secret 12)
 TESTING_WORKER_TOKEN=ctp_$(secret 16)
+TUTOR_AGENT_API_TOKEN=ctp_$(secret 16)
 TEMPORAL_WORKER_REPLICAS=1
 TESTING_WORKER_REPLICAS=1
 TESTING_WORKER_CPUS=2
@@ -295,6 +296,9 @@ ensure_state() {
     mkdir -p "$QA_HOME"
     chmod 700 "$QA_HOME"
     [ -f "$ENV_FILE" ] || { log "generating $ENV_FILE"; write_env; }
+    # Stacks generated before Lena was seeded have no token for her.
+    grep -q '^TUTOR_AGENT_API_TOKEN=' "$ENV_FILE" \
+        || printf 'TUTOR_AGENT_API_TOKEN=ctp_%s\n' "$(secret 16)" >> "$ENV_FILE"
     write_personas
     merge_personal_persona
     write_credentials
@@ -347,6 +351,7 @@ stage_runtime_files() {
     log "staging bootstrap deployments"
     cp "$SRC/data/deployments/testing-worker.example.yaml" "$DATA/deployments/testing-worker.yaml"
     cp "$SRC/data/deployments/example-repository.example.yaml" "$DATA/deployments/example-repository.yaml"
+    cp "$QA_OPS_DIR/lena-tutor.yaml" "$DATA/deployments/lena-tutor.yaml"
     cp -r "$SRC/computor-backend/src/defaults/." "$DATA/shared/defaults/" 2>/dev/null || true
 
     log "seeding Coder templates"
@@ -533,6 +538,25 @@ seed_templates() {
     seed_tool templates
 }
 
+# The API creates Lena's service account at startup (lena-tutor.yaml); the
+# seed makes her a course tutor and reports her id, which the API needs as
+# TUTOR_AGENT_USER_ID to resolve @lena and route unaddressed messages.
+seed_tutor() {
+    load_env
+    local out id
+    out=$(seed_tool tutor)
+    printf '%s\n' "$out" | grep -v '^TUTOR_AGENT_USER_ID=' || true
+    id=$(printf '%s\n' "$out" | sed -n 's/^TUTOR_AGENT_USER_ID=//p')
+    [ -n "$id" ] || die "the tutor seed reported no user id"
+    if [ "${TUTOR_AGENT_USER_ID:-}" != "$id" ]; then
+        sed -i '/^TUTOR_AGENT_USER_ID=/d' "$ENV_FILE"
+        printf 'TUTOR_AGENT_USER_ID=%s\n' "$id" >> "$ENV_FILE"
+        load_env
+        qa_compose up -d uvicorn
+        wait_healthy uvicorn 600
+    fi
+}
+
 cmd_up() {
     ensure_state
     ensure_source
@@ -557,6 +581,7 @@ cmd_seed() {
     # New API tokens go to the private credentials file only.
     printf '%s\n' "$out" | grep '^QA_[A-Z_]*_API_TOKEN=' >> "$CRED_FILE" || true
     seed_content
+    seed_tutor
     seed_templates
     seed_tool returning
     touch "$QA_HOME/.seeded"
@@ -765,6 +790,7 @@ main() {
             ensure_state; load_env
             if [ "${1:-}" = templates ]; then seed_templates
             elif [ "${1:-}" = content ]; then ensure_content; seed_content
+            elif [ "${1:-}" = tutor ]; then seed_tutor
             elif [ $# -gt 0 ]; then ensure_content; seed_tool "$1"
             else cmd_seed; fi ;;
         deploy) cmd_deploy "$@" ;;

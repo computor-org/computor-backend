@@ -17,6 +17,8 @@ HTTP API for everything a person or the testing worker would do:
   templates  the vscode workspace image built and its Coder template pushed,
              and the courses' workspace settings; with a deployed VSIX the
              extension registry is held so workspaces keep that VSIX
+  tutor      Lena (service account from ops/qa/lena-tutor.yaml) as _tutor
+             in every course, with unaddressed learner messages routed to her
   returning  the returning learner and a second learner: enrolled in
              Grundlagen, real submissions graded by the testing worker (the
              reference solution, one without docstring and an empty file), the
@@ -56,6 +58,7 @@ GRUNDLAGEN_PATH = "python.beginner"
 GRUNDLAGEN_FILE = "python-beginner.yaml"
 COURSE_PATHS = ("python.beginner", "python.intermediate", "python.advanced")
 WORKSPACE_TEMPLATE = "vscode-workspace"
+LENA_SLUG = "lena-tutor"
 # Learners with progress: what each submits per assignment, graded by a real
 # test run. "correct" is the example's localTests/correctSolution, "nodoc" the
 # same without its module docstring (plot_docstr checks it, so that attempt is
@@ -366,6 +369,33 @@ def ensure_lecturer(api: Api, course_id: str, path: str) -> None:
     log(f"{path}: lecturer {email} added")
 
 
+def cmd_tutor() -> None:
+    """Lena tutors every QA course and gets unaddressed learner messages.
+
+    Her service account comes from ops/qa/lena-tutor.yaml at API startup. The
+    printed id is what qactl.sh passes to the API as TUTOR_AGENT_USER_ID.
+    """
+    api = admin_api()
+    service = find_one(api.get("/service-accounts"), slug=LENA_SLUG)
+    if service is None:
+        raise SystemExit(f"no service {LENA_SLUG}; the API applies ops/qa/lena-tutor.yaml at startup")
+    user_id = service["user_id"]
+    for path in COURSE_PATHS:
+        course = find_one(api.get("/courses", params={"path": path}), path=path)
+        if course is None:
+            continue
+        members = api.get("/course-members", params={"course_id": course["id"], "user_id": user_id})
+        if find_one(members, user_id=user_id) is None:
+            api.post("/course-members", json={"user_id": user_id, "course_id": course["id"],
+                                              "course_role_id": "_tutor"})
+            log(f"{path}: Lena added as tutor")
+        # The course list omits the routing flag; only CourseGet carries it.
+        if not api.get(f"/courses/{course['id']}").get("tutor_agent_auto_route"):
+            api.patch(f"/courses/{course['id']}", json={"tutor_agent_auto_route": True})
+            log(f"{path}: learner messages that mention nobody go to Lena")
+    print(f"TUTOR_AGENT_USER_ID={user_id}")
+
+
 def release_course(api: Api, course_id: str, path: str) -> None:
     contents = api.get("/course-contents", params={"course_id": course_id, "limit": 1000})
     ids = [c["id"] for c in contents if c.get("has_deployment")]
@@ -562,6 +592,7 @@ COMMANDS = {
     "content": cmd_content,
     "templates-build": cmd_templates_build,
     "templates": cmd_templates,
+    "tutor": cmd_tutor,
     "returning": cmd_returning,
 }
 

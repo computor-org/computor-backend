@@ -28,7 +28,7 @@ ops/qa/qactl.sh status   # containers, deployed refs, URLs, tunnel command
 ops/qa/qactl.sh tunnel   # ssh command for your laptop
 ops/qa/qactl.sh down     # stop, keep state
 ops/qa/qactl.sh reset    # wipe all state and start again from the synthetic baseline
-ops/qa/qactl.sh seed [baseline|content|templates|returning]   # re-apply all or one step
+ops/qa/qactl.sh seed [baseline|content|tutor|templates|returning]   # re-apply all or one step
 ops/qa/qactl.sh compose logs -f uvicorn
 ```
 
@@ -116,6 +116,14 @@ worktree to that commit, rebuilds and restarts the web. A later
   `QA_PERSONAL_USERNAME`, `QA_PERSONAL_EMAIL` and `QA_PERSONAL_PASSWORD`. Every
   run merges it into the personas, so `reset` recreates it.
 - The three *Data Science mit Python* courses, public in the catalog.
+- **Lena**, the `lena-tutor` service account, as `_tutor` in all three courses,
+  which route learner messages that mention nobody to her
+  (`tutor_agent_auto_route`). The seed sets `TUTOR_AGENT_USER_ID` in `qa.env`
+  to her id and recreates the API. A tutor process for QA
+  ([computor-agent](https://github.com/computor-org/computor-agent)
+  `tutor messaging`) authenticates with `TUTOR_AGENT_API_TOKEN` from `qa.env`
+  against `http://127.0.0.1:<QA_PORT>/api` and must be restarted after a reset,
+  because it discovers its courses at startup.
 
 Passwords and API tokens are generated per stack and kept in
 `QA_HOME/credentials.env` (mode 0600), never in git.
