@@ -22,6 +22,7 @@ setup_abuse = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(setup_abuse)
 
 LIFESPAN_KEY = setup_abuse.VERIFY_EMAIL_LIFESPAN_ATTRIBUTE
+MFA_RESET = "computor-reset-mfa"  # bound by ops/keycloak/setup_mfa.py
 EXISTING = {
     "clientSessionIdleTimeout": "600",
     "clientSessionMaxLifespan": "1200",
@@ -77,7 +78,8 @@ class FakeKeycloak:
                      "providerId": "registration-page-form", "requirement": "REQUIRED"},
                     {"id": "reg-abuse", "providerId": "computor-registration-abuse",
                      "requirement": "REQUIRED", "authenticationConfig": "cfg-reg"}]
-        if path == f"/authentication/flows/{setup_abuse.RESET}/executions":
+        if path in (f"/authentication/flows/{setup_abuse.RESET}/executions",
+                    "/authentication/flows/computor-reset-mfa/executions"):
             if method == "PUT":
                 return None
             return [{"id": "reset-abuse", "providerId": "computor-reset-abuse",
@@ -118,3 +120,18 @@ def test_an_attribute_lost_by_the_update_fails_the_run(monkeypatch):
     monkeypatch.setattr(setup_abuse, "Client", lambda base, realm, token: kc)
     with pytest.raises(RuntimeError, match="clientSessionIdleTimeout"):
         _configure()
+
+
+def test_a_bound_mfa_reset_flow_stays_bound(fake):
+    """setup_mfa.py's copy carries the admin TOTP step; rebinding RESET drops it."""
+    fake.realm["resetCredentialsFlow"] = MFA_RESET
+    fake.flows.append({"alias": MFA_RESET})
+    result = _configure()
+    assert fake.realm["resetCredentialsFlow"] == MFA_RESET
+    assert result["resetCredentialsFlow"] == MFA_RESET
+    assert fake.realm["registrationFlow"] == setup_abuse.REGISTRATION
+
+
+def test_without_mfa_the_protected_reset_flow_is_bound(fake):
+    _configure()
+    assert fake.realm["resetCredentialsFlow"] == setup_abuse.RESET

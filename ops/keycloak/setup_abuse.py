@@ -11,6 +11,9 @@ from setup_identity_providers import _request, get_admin_token
 
 REGISTRATION = 'computor-registration-protected'
 RESET = 'computor-reset-protected'
+# setup_mfa.py binds a copy of the reset flow with the admin TOTP step. When it
+# is bound, it is protected and kept bound instead of being replaced by RESET.
+MFA_RESET = 'computor-reset-mfa'
 PROTECTED_ATTRIBUTES = ('computor.selfRegistered', 'computor.selfRegisteredAt', 'computor.lastLogin')
 # Lifetime of the address-verification link in seconds. Keycloak's default for
 # user-generated action tokens is 5 minutes, which a new learner who opens the
@@ -62,8 +65,9 @@ def configure(base, realm, token, secret, apply=True, backup=None, cost=10000, t
         if len(users) < 100:
             break
     collisions = sum(len(ids) > 1 for ids in groups.values())
+    reset_flow = MFA_RESET if settings.get('resetCredentialsFlow') == MFA_RESET else RESET
     result = {'gmailCollisionGroups': collisions, 'registrationFlow': REGISTRATION,
-              'resetCredentialsFlow': RESET, 'applied': apply}
+              'resetCredentialsFlow': reset_flow, 'applied': apply}
     if not apply:
         return result
     providers = kc.request('GET', '/authentication/form-action-providers')
@@ -97,7 +101,7 @@ def configure(base, realm, token, secret, apply=True, backup=None, cost=10000, t
         return kc.request('GET', '/authentication/flows/' + alias + '/executions')
 
     registration = flow(REGISTRATION, settings.get('registrationFlow') or 'registration')
-    reset = flow(RESET, settings.get('resetCredentialsFlow') or 'reset credentials')
+    flow(RESET, settings.get('resetCredentialsFlow') or 'reset credentials')
     parent = next((e for e in registration if e.get('authenticationFlow') and
                    e.get('providerId') == 'registration-page-form'), None)
     if parent is None:
@@ -129,18 +133,25 @@ def configure(base, realm, token, secret, apply=True, backup=None, cost=10000, t
         return found
 
     ensure_execution(REGISTRATION, parent['displayName'], 'computor-registration-abuse')
-    replacement = ensure_execution(RESET, RESET, 'computor-reset-abuse')
-    reset_path = '/authentication/flows/' + RESET + '/executions'
-    for execution in kc.request('GET', reset_path):
-        if execution.get('providerId') == 'reset-credentials-choose-user' and execution['requirement'] != 'DISABLED':
-            kc.request('PUT', reset_path, dict(execution, requirement='DISABLED'))
-    for _ in range(len(reset) + 2):
+
+    def protect_reset(alias):
+        replacement = ensure_execution(alias, alias, 'computor-reset-abuse')
+        reset_path = '/authentication/flows/' + urllib.parse.quote(alias, safe='') + '/executions'
         executions = kc.request('GET', reset_path)
-        if executions[0]['id'] == replacement['id']:
-            break
-        kc.request('POST', '/authentication/executions/' + replacement['id'] + '/raise-priority')
-    else:
-        raise RuntimeError('Cannot place reset protection before outbound-mail executions')
+        for execution in executions:
+            if execution.get('providerId') == 'reset-credentials-choose-user' and execution['requirement'] != 'DISABLED':
+                kc.request('PUT', reset_path, dict(execution, requirement='DISABLED'))
+        for _ in range(len(executions) + 2):
+            executions = kc.request('GET', reset_path)
+            if executions[0]['id'] == replacement['id']:
+                break
+            kc.request('POST', '/authentication/executions/' + replacement['id'] + '/raise-priority')
+        else:
+            raise RuntimeError('Cannot place reset protection before outbound-mail executions in ' + alias)
+
+    protect_reset(RESET)
+    if reset_flow != RESET:
+        protect_reset(reset_flow)
     listeners = list(settings.get('eventsListeners') or [])
     if 'computor-registration-activity' not in listeners:
         listeners.append('computor-registration-activity')
@@ -149,10 +160,10 @@ def configure(base, realm, token, secret, apply=True, backup=None, cost=10000, t
     # into the attributes the realm already has instead of sent alone.
     attributes = {**(settings.get('attributes') or {}),
                   VERIFY_EMAIL_LIFESPAN_ATTRIBUTE: str(VERIFY_EMAIL_LIFESPAN)}
-    kc.request('PUT', '', {'registrationFlow': REGISTRATION, 'resetCredentialsFlow': RESET,
+    kc.request('PUT', '', {'registrationFlow': REGISTRATION, 'resetCredentialsFlow': reset_flow,
                           'eventsListeners': listeners, 'attributes': attributes})
     stored = kc.request('GET', '')
-    if stored.get('registrationFlow') != REGISTRATION or stored.get('resetCredentialsFlow') != RESET:
+    if stored.get('registrationFlow') != REGISTRATION or stored.get('resetCredentialsFlow') != reset_flow:
         raise RuntimeError('Protected flow bindings did not persist')
     stored_attributes = stored.get('attributes') or {}
     if stored_attributes.get(VERIFY_EMAIL_LIFESPAN_ATTRIBUTE) != str(VERIFY_EMAIL_LIFESPAN):
