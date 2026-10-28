@@ -59,6 +59,7 @@ GRUNDLAGEN_FILE = "python-beginner.yaml"
 COURSE_PATHS = ("python.beginner", "python.intermediate", "python.advanced")
 WORKSPACE_TEMPLATE = "vscode-workspace"
 LENA_SLUG = "lena-tutor"
+LENA_NAME = ("Lena", "(KI-Tutorin)")
 # Learners with progress: what each submits per assignment, graded by a real
 # test run. "correct" is the example's localTests/correctSolution, "nodoc" the
 # same without its module docstring (plot_docstr checks it, so that attempt is
@@ -380,6 +381,11 @@ def cmd_tutor() -> None:
     if service is None:
         raise SystemExit(f"no service {LENA_SLUG}; the API applies ops/qa/lena-tutor.yaml at startup")
     user_id = service["user_id"]
+    # The name says she is an AI wherever it appears, as on computor.at.
+    user = api.get(f"/users/{user_id}")
+    if (user.get("given_name"), user.get("family_name")) != LENA_NAME:
+        api.patch(f"/users/{user_id}", json={"given_name": LENA_NAME[0], "family_name": LENA_NAME[1]})
+        log(f"Lena is named {' '.join(LENA_NAME)}")
     for path in COURSE_PATHS:
         course = find_one(api.get("/courses", params={"path": path}), path=path)
         if course is None:
