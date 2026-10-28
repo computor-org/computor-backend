@@ -11,6 +11,7 @@ from computor_backend.model.message import Message
 from computor_backend.model.message_audit import MessageAuditLog, MessageAuditAction
 from computor_backend.permissions.principal import Principal
 from computor_backend.exceptions import ForbiddenException, NotFoundException
+from .mentions import sync_message_mentions
 
 
 def soft_delete_message(
@@ -157,6 +158,12 @@ def update_message_with_audit(
         message.content = new_content
         fields_changed.append("content")
 
+    # Reconcile mention rows in the same commit as the edited content, so a
+    # reader never sees the new text with the old mentions.
+    mentions_changed = False
+    if new_content is not None:
+        mentions_changed = sync_message_mentions(message.id, new_content, db, commit=False)
+
     # Only create audit if something changed
     if fields_changed:
         message.updated_at = datetime.now(timezone.utc)
@@ -171,6 +178,8 @@ def update_message_with_audit(
             new_content=message.content if "content" in fields_changed else None
         )
         db.add(audit)
+
+    if fields_changed or mentions_changed:
         db.commit()
         db.refresh(message)
 

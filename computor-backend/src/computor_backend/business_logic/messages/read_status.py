@@ -23,6 +23,7 @@ def mark_author_as_reader(
     message_id: UUID | str,
     author_id: UUID | str,
     db: Session,
+    commit: bool = True,
 ) -> None:
     """Stamp the message's author as having read it.
 
@@ -36,12 +37,17 @@ def mark_author_as_reader(
 
     Idempotent: a duplicate insert is silently swallowed via rollback,
     so the create path never fails because of a race with a manual
-    mark-read.
+    mark-read. With ``commit`` false the row is only added, for a caller
+    that commits it together with the new message.
     """
     from sqlalchemy.exc import IntegrityError
 
+    read = MessageRead(message_id=message_id, reader_user_id=author_id)
+    if not commit:
+        db.add(read)
+        return
     try:
-        db.add(MessageRead(message_id=message_id, reader_user_id=author_id))
+        db.add(read)
         db.commit()
     except IntegrityError:
         db.rollback()

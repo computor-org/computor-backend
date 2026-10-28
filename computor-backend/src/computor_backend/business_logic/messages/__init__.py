@@ -10,7 +10,7 @@ Layering (import DAG, no cycles):
     mentions      -> audience
     read_status   -> context, mentions, cache
     core          -> permissions, mentions, read_status
-    lifecycle     -> (standalone)
+    lifecycle     -> mentions
 """
 from .core import (
     MESSAGE_TARGET_FIELDS,
