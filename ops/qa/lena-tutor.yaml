@@ -8,7 +8,7 @@ services:
     user:
       email: lena-tutor@example.com
       given_name: Lena
-      family_name: KI-Tutorin
+      family_name: (KI-Tutorin)
     api_token:
       token: ${TUTOR_AGENT_API_TOKEN}
       name: Lena tutor token
