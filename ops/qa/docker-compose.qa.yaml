@@ -78,12 +78,15 @@ services:
       # Expanded in ops/qa/lena-tutor.yaml by the startup bootstrap.
       TUTOR_AGENT_API_TOKEN: ${TUTOR_AGENT_API_TOKEN:?}
     build:
+      network: host  # see qactl.sh build_images
       additional_contexts:
         computor-base: docker-image://${QA_BASE_IMAGE:?}
     cpus: 2
     mem_limit: 3g
 
   frontend:
+    build:
+      network: host  # see qactl.sh build_images
     cpus: 1
     mem_limit: 1g
 
@@ -121,6 +124,7 @@ services:
 
   temporal-worker:
     build:
+      network: host  # see qactl.sh build_images
       additional_contexts:
         computor-base: docker-image://${QA_BASE_IMAGE:?}
     cpus: 2
@@ -156,6 +160,7 @@ services:
   # Limits come from TESTING_WORKER_CPUS / _MEM_LIMIT in the generated env.
   temporal-worker-testing:
     build:
+      network: host  # see qactl.sh build_images
       additional_contexts:
         computor-base: docker-image://${QA_BASE_IMAGE:?}
         computor-testing-runtimes: docker-image://${QA_TESTING_RUNTIMES_IMAGE:?}
@@ -200,6 +205,7 @@ services:
 
   temporal-worker-coder:
     build:
+      network: host  # see qactl.sh build_images
       additional_contexts:
         computor-base: docker-image://${QA_BASE_IMAGE:?}
         computor-coder-runtime: docker-image://${QA_CODER_RUNTIME_IMAGE:?}
