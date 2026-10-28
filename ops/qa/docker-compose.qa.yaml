@@ -188,6 +188,9 @@ services:
     container_name: ${CONTAINER_NAME_PREFIX:?}forgejo-keycloak-setup
 
   coder:
+    # Terraform fetches providers. Docker's resolver forwards to the host's
+    # upstreams as of container start, which a VPN can make unreachable.
+    dns: [9.9.9.9, 1.1.1.1]
     cpus: 2
     mem_limit: 2g
 
