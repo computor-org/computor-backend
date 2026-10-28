@@ -1,0 +1,14 @@
+# Lena, the course-message tutor, as a bootstrap service like the testing
+# worker (data/deployments/testing-worker.example.yaml). qactl.sh stages this
+# file; the token is TUTOR_AGENT_API_TOKEN from qa.env, which the tutor uses.
+services:
+  - slug: lena-tutor
+    service_type_path: agent
+    description: Course-message tutor Lena (QA)
+    user:
+      email: lena-tutor@example.com
+      given_name: Lena
+      family_name: KI-Tutorin
+    api_token:
+      token: ${TUTOR_AGENT_API_TOKEN}
+      name: Lena tutor token
