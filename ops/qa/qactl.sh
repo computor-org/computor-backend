@@ -416,7 +416,9 @@ build_images() {
     built=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     export GIT_COMMIT="$commit"
     log "building qa images from backend $commit"
-    (cd "$SRC" && BUILDX_BUILDER=default docker build -q -f docker/base/Dockerfile -t "$QA_BASE_IMAGE" \
+    # Host network for build steps: on a host whose VPN resolver is not
+    # reachable from Docker bridges, bridged RUN steps cannot resolve names.
+    (cd "$SRC" && BUILDX_BUILDER=default docker build -q --network host -f docker/base/Dockerfile -t "$QA_BASE_IMAGE" \
         --build-arg GIT_COMMIT="$commit" --build-arg GIT_BRANCH="$branch" \
         --build-arg BUILD_TIME="$built" .)
     # Content-addressed like computor.sh: rebuilt only when their inputs move.
