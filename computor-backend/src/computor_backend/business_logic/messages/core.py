@@ -220,8 +220,8 @@ def create_message_with_author(
 
     # Gate @mentions against the message's audience before persistence — you
     # cannot mention a user who could not see the message. The relation rows
-    # are written post-persist via ``sync_message_mentions`` (the message
-    # needs an id first).
+    # are written via ``sync_message_mentions`` once the message is flushed
+    # (it needs an id first), in the same commit as the message.
     message_like = _transient_message_for_targets(model_dump, permissions.user_id)
     model_dump['content'] = resolve_message_mentions(message_like, model_dump.get('content'), db)
     # Courses with ``tutor_agent_auto_route`` address unmentioned student

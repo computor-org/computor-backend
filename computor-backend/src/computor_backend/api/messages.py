@@ -90,14 +90,19 @@ async def create_message(
     class _Create(MessageCreate):
         author_id: str
     entity = _Create(**model_dump)
-    message = await create_db(permissions, db, entity, MessageInterface.model, MessageInterface.get)
+    # The author's read mark and the @mention rows (already gated in
+    # create_message_with_author) commit together with the message: a reader
+    # filtering on mentions_me must never see the message without them.
+    def _add_read_mark_and_mentions(db_message, session):
+        # Authors trivially "see" their own message, so the inbox doesn't
+        # show their own posts as unread.
+        mark_author_as_reader(db_message.id, permissions.user_id, session, commit=False)
+        sync_message_mentions(db_message.id, model_dump['content'], session, commit=False)
 
-    # Authors trivially "see" their own message — record the read state
-    # immediately so the inbox doesn't show their own posts as unread.
-    mark_author_as_reader(message.id, permissions.user_id, db)
-
-    # Persist @mention relations (already gated in create_message_with_author).
-    sync_message_mentions(message.id, model_dump['content'], db)
+    message = await create_db(
+        permissions, db, entity, MessageInterface.model, MessageInterface.get,
+        before_commit=_add_read_mark_and_mentions,
+    )
 
     # Create audit log entry using repository
     message_repo = MessageRepository(db, cache)
@@ -287,10 +292,6 @@ async def update_message(
         new_title=new_title,
         new_content=payload.content
     )
-
-    # Reconcile mention relations to match the edited content.
-    if payload.content is not None:
-        sync_message_mentions(id, payload.content, db)
 
     # Convert to MessageGet
     message_get = get_message_with_read_status(id, MessageInterface.get.model_validate(message), permissions, db)

@@ -111,9 +111,13 @@ def validate_message_mentions(message_like, content: Optional[str], db: Session)
     return mentioned
 
 
-def sync_message_mentions(message_id, content: Optional[str], db: Session) -> None:
+def sync_message_mentions(
+    message_id, content: Optional[str], db: Session, commit: bool = True
+) -> bool:
     """Reconcile ``message_mention`` rows for a message to match the mentions
-    currently in its content (add new, drop removed). Commits on change."""
+    currently in its content (add new, drop removed). Commits on change
+    unless ``commit`` is false, so a caller can commit them together with the
+    message. Returns whether anything changed."""
     desired = set(extract_mention_user_ids(content))
     existing_rows = db.query(MessageMention).filter(
         MessageMention.message_id == message_id
@@ -130,8 +134,9 @@ def sync_message_mentions(message_id, content: Optional[str], db: Session) -> No
             db.delete(row)
             changed = True
 
-    if changed:
+    if changed and commit:
         db.commit()
+    return changed
 
 
 def _mentionable_query(message_like, db: Session):

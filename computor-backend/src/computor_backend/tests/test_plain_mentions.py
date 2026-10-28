@@ -176,11 +176,12 @@ async def test_create_and_edit_api_persist_the_resolved_mention_content(audience
     monkeypatch.setattr(core, "_check_submission_group_write_permission", lambda *args: None)
     principal = Principal(user_id=HUMAN)
 
-    async def create(_principal, _db, entity, *_interfaces):
+    async def create(_principal, _db, entity, *_interfaces, before_commit):
+        before_commit(SimpleNamespace(id=message_id), _db)
         return MessageGet(id=message_id, author_id=HUMAN, content=entity.content,
                           submission_group_id=group, level=0)
     monkeypatch.setattr(api, "create_db", create)
-    monkeypatch.setattr(api, "mark_author_as_reader", lambda *args: None)
+    monkeypatch.setattr(api, "mark_author_as_reader", lambda *args, **kwargs: None)
     repository = MagicMock()
     repository.get_by_id_optional.return_value = None
     monkeypatch.setattr(api, "MessageRepository", lambda *args: repository)
@@ -196,9 +197,120 @@ async def test_create_and_edit_api_persist_the_resolved_mention_content(audience
     assert sync.call_args.args[1] == created.content
 
     monkeypatch.setattr(api, "get_id_db", AsyncMock(return_value=created))
-    def update(**kwargs):
-        return created.model_copy(update={"content": kwargs["new_content"]})
+    update = MagicMock(side_effect=lambda **kwargs: created.model_copy(update={"content": kwargs["new_content"]}))
     monkeypatch.setattr(api, "update_message_with_audit", update)
     edited = await api.update_message(message_id, MessageUpdate(content="@luna edited"), principal, audience_db)
     assert edited.content == f"{TOKEN} edited"
-    assert sync.call_args.args[1] == edited.content
+    assert update.call_args.kwargs["new_content"] == edited.content
+
+
+@pytest.fixture
+def message_db(tmp_path, monkeypatch):
+    """File-backed SQLite, so a second connection sees exactly what was committed."""
+    from uuid import uuid4
+
+    from sqlalchemy import event
+
+    from computor_backend.model.message import Message, MessageMention, MessageRead
+    from computor_backend.model.message_audit import MessageAuditLog
+
+    models = [Message, MessageRead, MessageMention, MessageAuditLog]
+    engine = create_engine(f"sqlite:///{tmp_path / 'messages.db'}", connect_args={"check_same_thread": False})
+    with engine.begin() as connection:
+        for model in models:
+            columns = ", ".join(
+                f'"{c.name}" TEXT' + (" PRIMARY KEY" if c.name == "id" else "")
+                + (" DEFAULT CURRENT_TIMESTAMP" if c.name == "created_at" else "")
+                for c in model.__table__.columns
+            )
+            connection.execute(text(f'CREATE TABLE "{model.__tablename__}" ({columns})'))
+        columns = ", ".join(f'"{c.name}" TEXT' for c in User.__table__.columns)
+        connection.execute(text(f'CREATE TABLE "user" ({columns})'))
+        connection.execute(text('INSERT INTO "user" (id, given_name, family_name) VALUES (:id, \'Lena\', \'Human\')'),
+                           {"id": HUMAN})
+
+    # SQLite stands in for PostgreSQL's uuid_generate_v4() server default.
+    def assign_id(_mapper, _connection, target):
+        target.id = target.id or str(uuid4())
+    for model in models:
+        event.listen(model, "before_insert", assign_id)
+    monkeypatch.setattr(mentions.settings, "TUTOR_AGENT_USER_ID", TUTOR)
+    with Session(engine) as db:
+        yield engine, db
+    for model in models:
+        event.remove(model, "before_insert", assign_id)
+    engine.dispose()
+
+
+def _committed_states(engine, db):
+    """Record, at every commit of ``db``, what any other reader can see."""
+    from sqlalchemy import event
+
+    states = []
+
+    def snapshot(_session):
+        with engine.connect() as reader:
+            states.append({
+                "messages": dict(reader.execute(text("SELECT id, content FROM message")).all()),
+                "mentions": set(reader.execute(text("SELECT message_id, mentioned_user_id FROM message_mention")).all()),
+                "reads": set(reader.execute(text("SELECT message_id, reader_user_id FROM message_read")).all()),
+            })
+    event.listen(db, "after_commit", snapshot)
+    return states
+
+
+def _mentions_of(state, message_id):
+    return {user for mid, user in state["mentions"] if mid == message_id}
+
+
+@pytest.mark.asyncio
+async def test_new_message_is_never_visible_without_its_mentions_and_read_mark(message_db, monkeypatch):
+    from computor_backend.api import messages as api
+    from computor_backend.business_logic import crud
+
+    engine, db = message_db
+    group = "22222222-2222-2222-2222-222222222222"
+    content = f"{TOKEN} can you explain this?"
+    monkeypatch.setattr(api, "create_message_with_author", lambda *_args: {
+        "content": content, "submission_group_id": group, "author_id": HUMAN, "level": 0})
+    monkeypatch.setattr(crud, "set_db_user", lambda *_args: None)
+    handler = MagicMock()
+    handler.can_perform_action.return_value = True
+    monkeypatch.setattr(crud.permission_registry, "get_handler", lambda _model: handler)
+    repository = MagicMock()
+    repository.get_by_id_optional.return_value = None
+    monkeypatch.setattr(api, "MessageRepository", lambda *args: repository)
+    monkeypatch.setattr(api, "get_message_with_read_status", lambda _id, message, *_args: message)
+    monkeypatch.setattr(api.ws_broadcast, "message_created", AsyncMock())
+    states = _committed_states(engine, db)
+
+    created = await api.create_message(
+        Principal(user_id=HUMAN), MessageCreate(content=content, submission_group_id=group), db, MagicMock())
+
+    message_id = str(created.id)
+    visible = [state for state in states if message_id in state["messages"]]
+    assert visible
+    for state in visible:
+        assert _mentions_of(state, message_id) == {TUTOR}
+        assert (message_id, HUMAN) in state["reads"]
+
+
+def test_edited_content_is_never_visible_with_stale_mentions(message_db):
+    from computor_backend.business_logic.messages import lifecycle
+
+    engine, db = message_db
+    message_id = "44444444-4444-4444-4444-444444444444"
+    db.execute(text("INSERT INTO message (id, author_id, content) VALUES (:id, :author, :content)"),
+               {"id": message_id, "author": HUMAN, "content": f"@[Max Human]({OTHER}) hi"})
+    db.execute(text("INSERT INTO message_mention (id, message_id, mentioned_user_id) VALUES (:id, :id, :user)"),
+               {"id": message_id, "user": OTHER})
+    db.commit()
+    states = _committed_states(engine, db)
+
+    lifecycle.update_message_with_audit(
+        message_id=message_id, principal=Principal(user_id=HUMAN), db=db, new_content=f"{TOKEN} hi")
+
+    assert states
+    for state in states:
+        expected = set(mentions.extract_mention_user_ids(state["messages"][message_id]))
+        assert _mentions_of(state, message_id) == expected

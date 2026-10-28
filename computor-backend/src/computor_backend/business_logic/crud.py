@@ -49,6 +49,7 @@ async def create_entity(
     db_type: Any,
     response_type: BaseModel,
     post_create: Optional[Callable] = None,
+    before_commit: Optional[Callable[[Any, Session], None]] = None,
 ) -> BaseModel:
     """
     Create a new database entity with permission checks and validation.
@@ -60,6 +61,8 @@ async def create_entity(
         db_type: SQLAlchemy model class
         response_type: Pydantic response model class
         post_create: Optional async callback after creation
+        before_commit: Optional callback that adds dependent rows to the
+            flushed entity's transaction, so they commit together with it
 
     Returns:
         Created entity as response_type instance
@@ -109,6 +112,9 @@ async def create_entity(
             db_item = db_type(**model_dump)
 
             db.add(db_item)
+            if before_commit is not None:
+                db.flush()
+                before_commit(db_item, db)
             db.commit()
             db.refresh(db_item)
             return db_item
