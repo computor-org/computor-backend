@@ -13,6 +13,27 @@ export type AuthProviderKind = 'sso' | 'basic';
 const USER_KEY = 'auth_user';
 const VIEWS_KEY = 'auth_views';
 const PROVIDER_KEY = 'auth_provider';
+// Shared by all tabs (sessionStorage is not), so a new tab knows whether asking
+// the backend is worth it; anonymous visitors of public pages make no API call.
+const SIGNED_IN_HINT_KEY = 'computor.signedIn';
+
+/** Whether this browser signed in and has not been seen signed out since. */
+export function hasSignedInHint(): boolean {
+  try {
+    return localStorage.getItem(SIGNED_IN_HINT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function setSignedInHint(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(SIGNED_IN_HINT_KEY, '1');
+    else localStorage.removeItem(SIGNED_IN_HINT_KEY);
+  } catch {
+    // Storage blocked: new tabs then start signed out, as before.
+  }
+}
 
 export interface StoredSession {
   user: AuthUser;
@@ -54,6 +75,7 @@ export function saveStoredSession(
     sessionStorage.setItem(USER_KEY, JSON.stringify(user));
     sessionStorage.setItem(VIEWS_KEY, JSON.stringify(views));
     sessionStorage.setItem(PROVIDER_KEY, kind);
+    setSignedInHint(true);
   } catch (error) {
     console.error('Failed to save auth session to storage:', error);
   }
@@ -65,6 +87,7 @@ export function clearStoredSession(): void {
   sessionStorage.removeItem(USER_KEY);
   sessionStorage.removeItem(VIEWS_KEY);
   sessionStorage.removeItem(PROVIDER_KEY);
+  setSignedInHint(false);
 }
 
 /**

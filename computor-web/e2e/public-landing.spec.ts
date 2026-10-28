@@ -89,3 +89,38 @@ test('plain sign-in does not ask for the registration form', async ({ page }) =>
   const login = new URL(calls.find((url) => url.includes('/auth/keycloak/login'))!);
   expect(login.searchParams.has('action')).toBe(false);
 });
+
+test.describe('signed-in visitor', () => {
+  // A new tab: the session cookies are valid and an earlier tab signed in, but
+  // no user is cached in this tab's sessionStorage.
+  async function signedInApi(page: Page) {
+    await page.addInitScript(() => localStorage.setItem('computor.signedIn', '1'));
+    await page.route(`${API_ORIGIN}/**`, (route) => {
+      const path = new URL(route.request().url()).pathname;
+      const body = path === '/user'
+        ? { id: 'u-1', username: 'learner', email: 'learner@example.org', given_name: 'Lea', family_name: 'Rner' }
+        : path === '/user/scopes' ? { is_admin: false } : [];
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    });
+  }
+
+  test('opening the site goes to the dashboard', async ({ page }) => {
+    await signedInApi(page);
+    await page.goto('/');
+    await expect(page).toHaveURL(/\/dashboard$/);
+  });
+
+  test('the logo link from the course reader keeps the public page', async ({ page }) => {
+    await signedInApi(page);
+    await page.addInitScript(() => {
+      sessionStorage.setItem('auth_user', JSON.stringify({ id: 'u-1', username: 'learner', email: 'learner@example.org', givenName: 'Lea', familyName: 'Rner', role: 'user' }));
+      sessionStorage.setItem('auth_provider', 'sso');
+    });
+    await page.goto('/learn');
+    await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+    await page.getByRole('link', { name: /^Computor/ }).click();
+    await expect(page.getByRole('heading', { name: /Learn programming with/ })).toBeVisible();
+    await page.waitForTimeout(500);
+    await expect(page).toHaveURL(/:\d+\/$/);
+  });
+});

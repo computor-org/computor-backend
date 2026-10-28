@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/src/contexts/AuthContext';
 import PublicCourseCatalog from '@/src/components/courses/PublicCourseCatalog';
@@ -70,7 +70,8 @@ const COPY = {
 
 export default function Home() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated, isLoading, restoreSession } = useAuth();
+  const restoreTried = useRef(false);
   const language = useBrowserLanguage();
   const t = COPY[language];
   useEffect(() => {
@@ -78,9 +79,21 @@ export default function Home() {
   }, [language]);
   const gettingStartedUrl = '/learn';
 
-  // `/` is the public landing page and stays viewable when signed in (the header
-  // shows Dashboard + Sign Out for authenticated users) — no auto-redirect, so a
-  // signed-in user can switch back to this view.
+  // Opening the site signed in goes to the dashboard, also in a new tab, which
+  // has no cached user yet. A link to `/` from inside the app (the logo in
+  // /learn and on the legal pages) keeps the public page viewable when signed
+  // in: the document was then loaded at another path.
+  useEffect(() => {
+    if (isLoading) return;
+    const entry = performance.getEntriesByType('navigation')[0];
+    if (!entry || new URL(entry.name).pathname !== '/') return;
+    if (isAuthenticated) {
+      router.replace('/dashboard');
+    } else if (!restoreTried.current) {
+      restoreTried.current = true;
+      void restoreSession();
+    }
+  }, [isLoading, isAuthenticated, restoreSession, router]);
 
   const handleLogout = async () => {
     await logout();

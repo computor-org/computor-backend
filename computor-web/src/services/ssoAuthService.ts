@@ -174,16 +174,15 @@ export class SSOAuthService implements ISSOAuthProvider {
    * the cookies have already expired. Without this check the UI keeps showing a
    * logged-in state (the "Sign Out" button) for a session that is actually dead.
    *
+   * With no cached user (a new tab: sessionStorage is per tab, the cookies are
+   * not) a valid session is restored from the cookies.
+   *
    * Returns:
    *  - 'valid'       session is good (cached user refreshed from the backend)
    *  - 'invalid'     backend rejected us (401/403) — session cleared
    *  - 'unreachable' backend could not be reached (e.g. off VPN) — session kept
    */
   async validateSession(): Promise<'valid' | 'invalid' | 'unreachable'> {
-    if (!this.currentUser) {
-      return 'invalid';
-    }
-
     let response: Response;
     try {
       // apiFetch transparently refreshes the access token on a 401 and retries,
