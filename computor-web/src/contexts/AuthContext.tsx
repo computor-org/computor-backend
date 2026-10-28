@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { AuthUser, AuthResponse } from '@/src/types/auth';
 import { UserScopes } from '@/src/generated/types/users';
 import { ssoAuthService } from '@/src/services/authInstances';
+import { hasSignedInHint } from '@/src/services/authStorage';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 // Side-effect import: wires the auth providers into the shared `apiClient`
 // singleton (used by all generated clients) so a 401 there refreshes the token
@@ -29,6 +30,11 @@ interface AuthContextType {
    * public course is the one that exists today.
    */
   refreshPermissions: () => Promise<void>;
+  /**
+   * Adopt a session this tab has not cached: sessionStorage is per tab, the
+   * session cookies are shared, so a new tab starts out looking signed out.
+   */
+  restoreSession: () => Promise<void>;
   /** Apply a saved profile language to the interface without a reload. */
   setProfileLanguage: (language: string | null) => void;
 }
@@ -205,6 +211,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [user, refreshSession]);
 
+  const restoreSession = useCallback(async () => {
+    if (!hasSignedInHint()) return;
+    if ((await ssoAuthService.validateSession()) !== 'valid' || !ssoAuthService.getCurrentUser()) return;
+    setUser(ssoAuthService.getCurrentUser());
+    setViews(ssoAuthService.getCurrentViews());
+    await loadPermissions();
+  }, [loadPermissions]);
+
   const setProfileLanguage = useCallback((language: string | null) => {
     const updated = ssoAuthService.setCachedLanguage(language);
     if (updated) setUser(updated);
@@ -220,6 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     refreshSession,
     refreshPermissions: loadPermissions,
+    restoreSession,
     setProfileLanguage,
   };
 
