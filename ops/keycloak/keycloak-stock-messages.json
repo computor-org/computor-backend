@@ -1,5 +1,5 @@
 {
- "keycloak": "26.7.4",
+ "keycloak": "26.8.1-1",
  "templates": {
   "footer.ftl": {
    "imports": [],
