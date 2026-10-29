@@ -7,7 +7,7 @@ This compares each ``courses/*.yaml`` (a ``HierarchicalCourseConfig``) with the
 course of the same path and reports every difference; ``--apply`` writes the
 ones that are metadata only:
 
-- course title, description and position,
+- course title and description (this release has no course order),
 - content type titles and colours, and missing content types,
 - content titles, descriptions and positions,
 - missing units (non-submittable contents),
@@ -87,9 +87,8 @@ def sync_course(db: Session, config: Dict[str, Any], apply: bool) -> CourseDrift
                     setattr(entity, attr, value)
 
     course_fields = {"title": config.get("name")}
-    for key in ("description", "position"):
-        if key in config:
-            course_fields[key] = config[key]
+    if "description" in config:
+        course_fields["description"] = config["description"]
     update(course, "course", course_fields)
 
     kinds = {k.id: k for k in db.query(CourseContentKind).all()}

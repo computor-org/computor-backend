@@ -123,7 +123,7 @@ def test_check_reports_drift_without_writing(db, deployed):
     assert deployed.title == "Data Science – Grundlagen"
     assert "welcome" not in _contents(db, deployed)
     assert _contents(db, deployed)["start"].archived_at is None
-    assert len(drift.fixable) == 6  # title, position, welcome type, welcome unit, Kirchhoff, start
+    assert len(drift.fixable) == 5  # title, welcome type, welcome unit, Kirchhoff, start
     assert "unit start dropped from the course file" in drift.fixable
     assert sorted(drift.blocking) == [
         "week_1.dropped is deployed but not in the course file",
@@ -141,7 +141,6 @@ def test_apply_writes_metadata_and_leaves_assignments_to_a_release(db, deployed)
     contents = _contents(db, deployed)
 
     assert deployed.title == "Data Science I – Grundlagen"
-    assert deployed.position == 10
     assert contents["week_1.kirchhoff"].title == "Kirchhoff"
     welcome = contents["welcome"]
     assert (welcome.title, welcome.description, welcome.position) == ("Willkommen", "Hallo", 0.0)
