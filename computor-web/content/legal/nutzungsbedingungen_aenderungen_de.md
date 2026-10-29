@@ -4,19 +4,20 @@ Nutzungsbedingungen Version 1.7, Stand 29.10.2026
 
 [Version 1.7](/terms) gilt für neue Konten ab ihrer Veröffentlichung. Für ein
 bestehendes Konto gilt sie erst, wenn Sie ihr bei der Anmeldung ausdrücklich
-zustimmen; bis dahin gilt die bisherige Fassung. Gegenüber Version 1.6 ändert
-sich Folgendes:
+zustimmen; bis dahin gilt die bisherige Fassung. Stimmen Sie nicht zu, können
+wir den Vertrag nach der bisherigen Fassung mit 30 Tagen Frist kündigen.
+Gegenüber Version 1.6 ändert sich Folgendes:
 
 - **Änderungen der Nutzungsbedingungen:** Änderungen, die ausschließlich zu
   Ihrem Vorteil sind oder die das Gesetz zwingend vorschreibt, gelten ab ihrer
   Veröffentlichung statt nach 30 Tagen. Alle anderen Änderungen gelten nur mit
   Ihrer ausdrücklichen Zustimmung, also auch solche, die Sie nur geringfügig
-  schlechter stellen (Abschnitt 8).
-- **Einschränkungen der Plattform:** Wesentliche Einschränkungen kündigen wir
-  mit angemessener Frist von mindestens 14 statt 30 Tagen an; für eine
-  Einstellung, eine Kündigung durch uns und die Löschung inaktiver Konten
-  bleibt es bei 30 Tagen. Dass ein Kurs endet oder sich ändert, entscheiden die
-  Lehrenden; es ist keine Änderung der Plattform (Abschnitt 5).
+  schlechter stellen. Stimmen Sie nicht zu, können wir den Vertrag mit 30 Tagen
+  Frist kündigen; bis dahin nutzen Sie die Plattform zur bisherigen Fassung
+  weiter (Abschnitt 8).
+- **Kurse:** Dass ein Kurs endet oder sich ändert, entscheiden die Lehrenden;
+  es ist keine Änderung der Plattform, die wir 30 Tage im Voraus ankündigen
+  (Abschnitt 5).
 - **Moderation:** Bei akuter Gefahr und bei offensichtlichem Missbrauch können
   automatische Werkzeuge vorläufige Maßnahmen treffen, die auf Ihren Antrag ein
   Mensch überprüft. Über Beschwerden entscheidet ein Mensch; die Prüfung durch

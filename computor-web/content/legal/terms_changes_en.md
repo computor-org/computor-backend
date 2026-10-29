@@ -4,16 +4,18 @@ Terms of Use version 1.7, dated 29 October 2026
 
 [Version 1.7](/terms/en) applies to new accounts from its publication. It
 applies to an existing account only once you expressly accept it at sign-in;
-until then the previous version applies. Compared with version 1.6:
+until then the previous version applies. If you do not agree, we may terminate
+the contract under the previous version with 30 days' notice. Compared with
+version 1.6:
 
 - **Changes to these terms:** changes made exclusively to your benefit or
   required by mandatory law apply from publication instead of after 30 days.
   All other changes, including ones that put you only slightly in a worse
-  position, apply only with your express consent (section 8).
-- **Platform restrictions:** substantial restrictions are announced with
-  reasonable notice of at least 14 instead of 30 days; closure, termination by
-  us and deletion of inactive accounts keep 30 days. Teachers decide when a
-  course ends or changes; that is not a change of the platform (section 5).
+  position, apply only with your express consent. If you do not agree, we may
+  terminate the contract with 30 days' notice; until then you keep using the
+  platform under the previous version (section 8).
+- **Courses:** teachers decide when a course ends or changes; that is not a
+  change of the platform that we announce 30 days in advance (section 5).
 - **Moderation:** in acute danger or obvious abuse, automated tools may take
   provisional measures, which a human reviews on your request. A human decides
   on appeals; review by an uninvolved person is dropped (section 4).

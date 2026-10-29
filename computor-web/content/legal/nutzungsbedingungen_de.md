@@ -4,7 +4,8 @@ Version 1.7, Stand 29.10.2026
 
 Für neue Nutzungsverträge gilt diese Fassung ab ihrer Veröffentlichung. Einen
 bestehenden Nutzungsvertrag erfasst sie erst, wenn Sie ihr bei der Anmeldung
-ausdrücklich zustimmen; bis dahin gilt die frühere Fassung.
+ausdrücklich zustimmen; bis dahin gilt die frühere Fassung. Stimmen Sie nicht
+zu, können wir den Vertrag nach der früheren Fassung mit 30 Tagen Frist kündigen.
 [Was sich ändert](/terms/changes) · Frühere Fassungen:
 [1.0](https://github.com/computor-org/computor-backend/blob/54ea77021304f1bd77ef4bf7c5712b5edfb6843f/computor-web/content/legal/nutzungsbedingungen_de.md),
 [1.1](https://github.com/computor-org/computor-backend/blob/93a7c2cde0d11186b2dbcd167ebabc851c882496/computor-web/content/legal/nutzungsbedingungen_de.md),
@@ -136,18 +137,16 @@ Wir können die Plattform ändern und weiterentwickeln, soweit dies für Sie
 zumutbar ist, insbesondere wenn die Änderung geringfügig und sachlich
 gerechtfertigt ist, etwa durch die technische Weiterentwicklung, durch
 Erfordernisse der Sicherheit, durch rechtliche Vorgaben oder weil sich die
-Mittel für den Betrieb geändert haben. Wesentliche Einschränkungen der
-Plattform aus diesen Gründen, etwa den Wegfall des Workspace-Angebots, kündigen
-wir mit angemessener Frist, mindestens jedoch 14 Tage im Voraus, per E-Mail
-unter Angabe der Gründe an; eine geplante Einstellung kündigen wir mindestens
-30 Tage im Voraus an. In dieser Zeit können Sie Ihre Daten herunterladen oder
+Mittel für den Betrieb geändert haben. Wesentliche Einschränkungen der Plattform
+aus diesen Gründen, etwa den Wegfall des Workspace-Angebots, und eine geplante
+Einstellung kündigen wir mindestens 30 Tage im Voraus per E-Mail unter Angabe
+der Gründe an; in dieser Zeit können Sie Ihre Daten herunterladen oder
 anfordern. Kurse richten die jeweiligen Lehrenden ein und beenden sie; dass ein
 Kurs endet oder sich ändert, ist keine Änderung der Plattform im Sinne dieses
-Abschnitts. Besteht eine
-akute Gefahr für die Sicherheit der Plattform, ihrer Nutzer*innen oder Dritter
-oder verlangen zwingende rechtliche Vorgaben dies, können wir Funktionen sofort
-einschränken; über den Grund und die voraussichtliche Dauer informieren wir Sie
-dann so bald wie möglich.
+Abschnitts. Besteht eine akute Gefahr für die Sicherheit der Plattform, ihrer
+Nutzer*innen oder Dritter oder verlangen zwingende rechtliche Vorgaben dies,
+können wir Funktionen sofort einschränken; über den Grund und die
+voraussichtliche Dauer informieren wir Sie dann so bald wie möglich.
 
 Sie können den Nutzungsvertrag jederzeit beenden und unter privacy@computor.at
 die Löschung Ihres Kontos verlangen. Wir können den Nutzungsvertrag aus
@@ -196,16 +195,21 @@ sachlich zuständige Gericht in Graz zuständig.
 Wir können diese Nutzungsbedingungen ändern, wenn sich die Plattform, die
 Rechtslage oder die Bedingungen für ihren Betrieb ändern. Jede neue Fassung
 stellen wir mit einer Übersicht der Änderungen bereit. Änderungen, die
-ausschließlich zu Ihrem Vorteil sind (etwa zusätzliche Leistungen) oder die
-das Gesetz zwingend vorschreibt, gelten ab ihrer Veröffentlichung; wir
-informieren Sie darüber per E-Mail oder bei der Anmeldung. Alle anderen
-Änderungen gelten nur, wenn Sie ihnen ausdrücklich zustimmen; um diese
-Zustimmung bitten wir Sie bei der Anmeldung. Die bloße weitere Nutzung gilt
-nicht als Zustimmung. Stimmen Sie nicht zu, gilt für Sie die bisherige Fassung
-weiter; wir können den Vertrag in diesem Fall nach Abschnitt 5 kündigen.
-Aktualisierungen der Datenschutzerklärung dienen Ihrer Information und
-erfordern keine Zustimmung; bevor wir Daten für einen neuen Zweck verarbeiten,
-informieren wir Sie darüber (Art. 13 Abs. 3 DSGVO).
+ausschließlich zu Ihrem Vorteil sind (etwa zusätzliche Leistungen) oder die das
+Gesetz zwingend vorschreibt, gelten ab ihrer Veröffentlichung; wir informieren
+Sie darüber per E-Mail oder bei der Anmeldung. Alle anderen Änderungen gelten
+nur, wenn Sie ihnen ausdrücklich zustimmen; die bloße weitere Nutzung gilt nicht
+als Zustimmung. Solche Änderungen teilen wir Ihnen per E-Mail mit und können den
+Vertrag zugleich nach Abschnitt 5 mit einer Frist von 30 Tagen für den Fall
+kündigen, dass Sie der neuen Fassung bis zum Ende dieser Frist nicht zustimmen.
+Bis dahin gilt für Sie die bisherige Fassung, Sie können die Plattform wie
+bisher nutzen und Ihre Daten herunterladen oder unter privacy@computor.at
+anfordern. Nach Ablauf der Frist bitten wir Sie bei der Anmeldung um Ihre
+Zustimmung; stimmen Sie zu, bleibt Ihr Konto mit der neuen Fassung bestehen,
+andernfalls ist der Vertrag beendet und eine Anmeldung nicht mehr möglich.
+Aktualisierungen der Datenschutzerklärung dienen Ihrer Information und erfordern
+keine Zustimmung; bevor wir Daten für einen neuen Zweck verarbeiten, informieren
+wir Sie darüber (Art. 13 Abs. 3 DSGVO).
 
 Allgemeine Anfragen und Beschwerden: contact@computor.at; rechtswidrige Inhalte:
 abuse@computor.at; Datenschutz: privacy@computor.at oder datenschutz@tugraz.at;

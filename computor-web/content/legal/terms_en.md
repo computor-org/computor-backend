@@ -4,7 +4,8 @@ Version 1.7, dated 29 October 2026
 
 This version applies to new usage contracts from its publication. It applies to
 an existing usage contract only once you expressly accept it at sign-in; until
-then the earlier version applies. [What changes](/terms/en/changes) · Earlier versions:
+then the earlier version applies. If you do not agree, we may terminate the
+contract under the earlier version with 30 days' notice. [What changes](/terms/en/changes) · Earlier versions:
 [1.0](https://github.com/computor-org/computor-backend/blob/54ea77021304f1bd77ef4bf7c5712b5edfb6843f/computor-web/content/legal/terms_en.md),
 [1.1](https://github.com/computor-org/computor-backend/blob/93a7c2cde0d11186b2dbcd167ebabc851c882496/computor-web/content/legal/terms_en.md),
 [1.2](https://github.com/computor-org/computor-backend/blob/f166ccf38e58c03e6e0c9c6d68448f5127ed28a4/computor-web/content/legal/terms_en.md),
@@ -114,14 +115,13 @@ We may change and develop the platform where this is reasonable for you, in
 particular because the change is minor and objectively justified, for example by
 technical development, security, legal requirements or changed operating means.
 We announce substantial restrictions of the platform made for these reasons,
-such as dropping the workspace service, by email with reasonable notice of at
-least 14 days and with reasons, and a planned closure at least 30 days in advance.
-During that time you can download or request your data. Courses are set up and
-ended by their teachers; a course ending or changing is not a change of the
-platform under this section. If there is acute danger to the security of the platform,
-its users or third parties, or a binding legal requirement, we may restrict
-features immediately and inform you as soon as possible of the reason and the
-expected duration.
+such as dropping the workspace service, and a planned closure at least 30 days
+in advance by email, with reasons; during that time you can download or request
+your data. Courses are set up and ended by their teachers; a course ending or
+changing is not a change of the platform under this section. If there is acute
+danger to the security of the platform, its users or third parties, or a binding
+legal requirement, we may restrict features immediately and inform you as soon
+as possible of the reason and the expected duration.
 
 You may end the usage contract at any time and request account deletion at
 privacy@computor.at. We may terminate for objective reasons, such as closure of
@@ -163,12 +163,17 @@ We may change these terms if the platform, the law or the conditions for its
 operation change. We publish each new version with an overview of the changes.
 Changes made exclusively to your benefit (such as additional services) or
 required by mandatory law apply from publication; we inform you by email or at
-sign-in. All other changes apply only if you expressly agree to them; we ask
-for this at sign-in. Merely continuing to use the platform is not agreement.
-Without your agreement the previous version continues to apply to you; we may
-then terminate the contract under section 5. Updates of the Privacy notice
-inform you and need no consent; before we process data for a new purpose, we
-inform you (Art. 13(3) GDPR).
+sign-in. All other changes apply only if you expressly agree to them; merely
+continuing to use the platform is not agreement. We notify you of such changes
+by email and may at the same time terminate the contract under section 5 with 30
+days' notice, effective if you have not accepted the new version by the end of
+that period. Until then the previous version applies to you, you can use the
+platform as before, and you can download your data or request it at
+privacy@computor.at. After the period we ask for your agreement at sign-in; if
+you agree, your account continues under the new version, otherwise the contract
+has ended and you can no longer sign in. Updates of the Privacy notice inform
+you and need no consent; before we process data for a new purpose, we inform you
+(Art. 13(3) GDPR).
 
 General enquiries and appeals: contact@computor.at; illegal content:
 abuse@computor.at; privacy: privacy@computor.at or datenschutz@tugraz.at;
