@@ -90,6 +90,22 @@ updates:
       web-runtime:
         dependency-type: production
         exclude-patterns: ["next", "@next/*", "sharp"]
+    ignore:
+      # TypeScript 7 has no JavaScript compiler API; typescript-eslint (via eslint-config-next) crashes on it.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # eslint-config-next pulls eslint-plugin-react, which supports ESLint <= 9; wait for Next to support ESLint 10.
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+      # Node type definitions follow the Node major of the web image (Node 20 on this branch).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # js-yaml 5 changes load() (YAML 1.2 core schema, throws on empty input) and the resolution forces it on transitive users; move it with a code change.
+      - dependency-name: js-yaml
+        update-types: ["version-update:semver-major"]
+      # 16.4 turns on React Compiler hook rules that fail ~110 existing lines; adopt them with their own code change (main keeps 16.3.8 too).
+      - dependency-name: eslint-config-next
+        versions: [">=16.4.0"]
 
   # Base-image tags. Covers every tracked Dockerfile: the deployed stack
   # (/docker/*), the Coder workspace images, and the per-language test runners.
@@ -127,6 +143,16 @@ updates:
     groups:
       docker-base-images:
         patterns: ["*"]
+    ignore:
+      # The Python of the backend images changes only as its own tested change (main moved to 3.12 in #407).
+      - dependency-name: python
+        versions: [">=3.11"]
+      # A Node major changes the web runtime and the VSIX builders; do it as its own tested change on an LTS line.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+      # Non-LTS Ubuntu releases and LTS jumps change the workspace OS; do it as its own tested template change.
+      - dependency-name: ubuntu
+        update-types: ["version-update:semver-major"]
 
   # Service images referenced from compose files (deployed stack + integration
   # tests). Pins themselves live in the compose files; this only proposes bumps.
@@ -143,6 +169,16 @@ updates:
     groups:
       compose-images:
         patterns: ["*"]
+    ignore:
+      # Needs a planned data migration (dump/restore); do it as its own change with a QA rehearsal.
+      - dependency-name: postgres
+        update-types: ["version-update:semver-major"]
+      # Needs a planned data migration (Forgejo major upgrade with backup); do it as its own change with a QA rehearsal.
+      - dependency-name: codeberg.org/forgejo/forgejo
+        update-types: ["version-update:semver-major"]
+      # Needs a planned data migration (registry v3 storage and config); do it as its own change with a QA rehearsal.
+      - dependency-name: registry
+        update-types: ["version-update:semver-major"]
 
   # Coder workspace templates: Terraform providers (coder/coder, kreuzwerker/
   # docker). Provider bumps are proposed only after the cooldown; the
