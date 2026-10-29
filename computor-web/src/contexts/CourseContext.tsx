@@ -4,6 +4,8 @@ import { createContext, useCallback, useContext, useMemo, type ReactNode } from 
 import { usePathname } from 'next/navigation';
 import { useResource } from '@/src/hooks/useResource';
 import { displayName } from '@/src/utils/displayName';
+import { localized } from '@/src/utils/locale';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import type { CourseGet } from 'types/generated';
 
@@ -67,7 +69,11 @@ export function CourseProvider({ children }: { children: ReactNode }) {
 
   // A stale course from the previously-visited course must never leak into the
   // next one's header, so gate the value on the id the route currently names.
-  const course = courseId && data?.id === courseId ? data : null;
+  const language = useUiLanguage();
+  const course = useMemo(
+    () => (courseId && data?.id === courseId ? localized(data, language) : null),
+    [courseId, data, language],
+  );
 
   const value = useMemo<CourseContextValue>(
     () => ({

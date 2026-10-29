@@ -128,7 +128,7 @@ export default function AssignmentDetailPage() {
   const { data, loading, error } = useResource(async () => {
     const [assignment, selfEnrollment] = await Promise.all([
       studentsClient.studentGetCourseContentEndpointStudentsCourseContentsCourseContentIdGet(
-        { courseContentId: assignmentId },
+        { courseContentId: assignmentId, localize: language },
       ),
       // A course joined through the catalog has no tutors (issues#458), so the
       // grading panel must not promise that one will look at the submission.
@@ -151,7 +151,7 @@ export default function AssignmentDetailPage() {
       submissionsClient.listSubmissionArtifactsSubmissionsArtifactsGet({ submissionGroupId }),
     ]);
     return { assignment, selfEnrollment, results, artifacts };
-  }, [assignmentId, courseId, isOrdinaryLearner]);
+  }, [assignmentId, courseId, isOrdinaryLearner, language]);
   // The released README in the reading language, the same language as the
   // interface (computor-org/issues#552); the stored title and the example's
   // meta description are only the fallback.

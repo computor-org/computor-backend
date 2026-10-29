@@ -104,10 +104,10 @@ export default function StudentCourseContentsPage() {
     courseHasAtLeast(courseId, '_student') && !courseHasAtLeast(courseId, '_tutor');
 
   const { data, loading, error } = useResource(async () => {
-    const response = await apiFetch(`${API_BASE_URL}/students/course-contents?course_id=${courseId}`);
+    const response = await apiFetch(`${API_BASE_URL}/students/course-contents?course_id=${courseId}&localize=${language}`);
     if (!response.ok) throw new Error(t.fetchFailed);
     return (await response.json()) as CourseContentStudentList[];
-  }, [courseId], { refreshOnFocus: true });
+  }, [courseId, language], { refreshOnFocus: true });
   const courseContents = useMemo(() => data ?? [], [data]);
 
   const progress = useMemo(() => courseProgress(courseContents), [courseContents]);

@@ -29,7 +29,7 @@ import CourseProgressCard from '@/src/components/student/CourseProgress';
 import { displayName } from '@/src/utils/displayName';
 import { localizedRoleLabel } from '@/src/utils/courseRoles';
 import type { PersonalCloneCredentialGet } from 'types/generated';
-import { localeFor, languageName } from '@/src/utils/locale';
+import { localeFor, languageName, localized } from '@/src/utils/locale';
 
 const coursesClient = new CoursesClient();
 const courseFamiliesClient = new CourseFamiliesClient();
@@ -281,7 +281,7 @@ export default function CoursePage() {
     },
     [courseId, canManageMembers, isMember],
   );
-  const course = data?.course ?? null;
+  const course = data?.course ? localized(data.course, language) : null;
   const organization = data?.organization ?? null;
   const courseFamily = data?.courseFamily ?? null;
   const gitBinding = data?.gitBinding ?? null;

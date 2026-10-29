@@ -12,8 +12,12 @@ import { descriptionInLanguage } from '../src/components/student/studentDescript
 
 const API_ORIGIN = 'http://localhost:8000';
 const COURSE_ID = '20000000-0000-4000-8000-000000000002';
+// The /courses endpoints send the per-language maps but take no ?localize=.
 const COURSE = {
   id: COURSE_ID, title: 'Data Science mit Python – Grundlagen', path: 'dsp.basics',
+  description: 'Python-Grundlagen für die Datenanalyse.',
+  title_i18n: { en: 'Data Science with Python – Basics' },
+  description_i18n: { en: 'Python basics for data analysis.' },
   course_family_id: 'f-1', organization_id: 'o-1', language_code: 'de',
 };
 const WELCOME = [
@@ -25,8 +29,15 @@ const WELCOME = [
 ].join('\n');
 const CONTENTS = [
   { id: 'welcome', path: 'welcome', position: 0, title: 'Willkommen', course_content_kind_id: 'unit', description: WELCOME },
-  { id: 'constants', path: 'week1.constants', position: 1, title: 'Mathematische Konstanten', course_content_kind_id: 'assignment', has_deployment: true },
+  { id: 'constants', path: 'week1.constants', position: 1, title: 'Mathematische Konstanten', course_content_kind_id: 'assignment', has_deployment: true,
+    title_i18n: { en: 'Mathematical Constants' } },
 ];
+
+/** What /students/* return for `?localize=`, as the backend's localize_dto does. */
+function localizedContent<T extends { title: string; title_i18n?: Record<string, string> }>(item: T, url: string): T {
+  const language = new URL(url).searchParams.get('localize');
+  return { ...item, title: (language && item.title_i18n?.[language]) || item.title };
+}
 
 // --- the server render ------------------------------------------------------------------
 
@@ -93,14 +104,15 @@ async function signIn(page: Page, profileLanguage: string | null, { accountUrl }
   }, profileLanguage);
   await page.route(`${API_ORIGIN}/**`, (route) => {
     const path = new URL(route.request().url()).pathname;
-    if (path === '/students/course-contents') return json(route, CONTENTS.map((item) => ({ ...item, course_id: COURSE_ID, visible_effective: true })));
+    const url = route.request().url();
+    if (path === '/students/course-contents') return json(route, CONTENTS.map((item) => ({ ...localizedContent(item, url), course_id: COURSE_ID, visible_effective: true })));
     if (path === '/students/course-contents/constants/description') {
       return route.fulfill({ status: 200, contentType: 'application/zip', body: archive });
     }
     if (path.endsWith('/description')) return json(route, { detail: 'Not found' }, 404);
     if (path.startsWith('/students/course-contents/')) {
       const item = CONTENTS.find((entry) => entry.id === path.split('/')[3]);
-      return item ? json(route, { ...item, course_id: COURSE_ID, visible_effective: true }) : json(route, { detail: 'Not found' }, 404);
+      return item ? json(route, { ...localizedContent(item, url), course_id: COURSE_ID, visible_effective: true }) : json(route, { detail: 'Not found' }, 404);
     }
     if (path === `/courses/${COURSE_ID}`) return json(route, COURSE);
     if (path === '/courses') return json(route, [COURSE]);
@@ -148,6 +160,46 @@ test.describe('English browser, no profile language, German course', () => {
     await page.goto('/courses');
     await expect(page.getByText('German', { exact: true })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('de', { exact: true })).toHaveCount(0);
+  });
+});
+
+// The assignment list, the progress card and the course cards and header kept
+// the stored German title under an English interface.
+test.describe('titles and descriptions in the reading language (computor-org/issues#552)', () => {
+  test.describe('English reader', () => {
+    test.use({ locale: 'en-US' });
+
+    test('the assignment list and progress card name the English title', async ({ page }) => {
+      await signIn(page, null);
+      await page.goto(`/courses/${COURSE_ID}/student/assignments`);
+      await expect(page.getByText('Mathematical Constants').first()).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('Mathematische Konstanten')).toHaveCount(0);
+      await page.goto(`/courses/${COURSE_ID}`);
+      await expect(page.getByTestId('course-progress')).toContainText('Mathematical Constants', { timeout: 15_000 });
+    });
+
+    test('the course card and course page use the English title and description', async ({ page }) => {
+      await signIn(page, null);
+      await page.goto('/courses');
+      await expect(page.getByRole('heading', { name: 'Data Science with Python – Basics' })).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('Python basics for data analysis.')).toBeVisible();
+      await page.goto(`/courses/${COURSE_ID}`);
+      await expect(page.getByRole('heading', { name: 'Data Science with Python – Basics', level: 1 })).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('Python basics for data analysis.')).toBeVisible();
+      await expect(page.getByText(/Grundlagen/)).toHaveCount(0);
+    });
+  });
+
+  test.describe('German reader', () => {
+    test.use({ locale: 'de-AT' });
+
+    test('keeps the German source text', async ({ page }) => {
+      await signIn(page, null);
+      await page.goto(`/courses/${COURSE_ID}/student/assignments`);
+      await expect(page.getByText('Mathematische Konstanten').first()).toBeVisible({ timeout: 15_000 });
+      await page.goto('/courses');
+      await expect(page.getByRole('heading', { name: 'Data Science mit Python – Grundlagen' })).toBeVisible({ timeout: 15_000 });
+    });
   });
 });
 

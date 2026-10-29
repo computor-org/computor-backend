@@ -56,3 +56,30 @@ export function formatNumber(
 ): string {
   return value.toLocaleString(localeFor(language), options);
 }
+
+/** A title and description with the per-language maps the API sends beside them. */
+export interface LocalizableText {
+  title?: string | null;
+  description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
+}
+
+function textIn(map: Record<string, string> | null | undefined, language: UiLanguage, source?: string | null) {
+  const value = map?.[language];
+  // A blank entry is a missing translation, as in the backend's localized_text.
+  return typeof value === 'string' && value.trim() ? value : source;
+}
+
+/**
+ * `entity` with its title and description in the reading language, else the
+ * source text. For the /courses endpoints, which take no `?localize=` but send
+ * the maps; mirrors the backend's `localize_dto`.
+ */
+export function localized<T extends LocalizableText>(entity: T, language: UiLanguage): T {
+  return {
+    ...entity,
+    title: textIn(entity.title_i18n, language, entity.title),
+    description: textIn(entity.description_i18n, language, entity.description),
+  };
+}

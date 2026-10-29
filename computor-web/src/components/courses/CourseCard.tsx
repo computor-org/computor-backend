@@ -7,7 +7,7 @@ import CourseWorkspaceLaunchButtons, { type CourseWorkspaceLauncher } from '@/sr
 import { displayName } from '@/src/utils/displayName';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { localizedRoleLabel } from '@/src/utils/courseRoles';
-import { languageName } from '@/src/utils/locale';
+import { languageName, localized, type LocalizableText } from '@/src/utils/locale';
 
 const COPY = {
   de: { untitled: 'Kurs ohne Titel', view: 'Kurs ansehen' },
@@ -32,7 +32,7 @@ export default function CourseCard({
   selected = false,
   workspaceLauncherRef,
 }: {
-  course: { id: string; title?: string | null; path?: string | null; language_code?: string | null; description?: string | null };
+  course: LocalizableText & { id: string; path?: string | null; language_code?: string | null };
   /** Course role, when the viewer has one. Also gates the workspace launchers. */
   role?: string | null;
   /** Where the title links. Omit to render the title as plain text (catalog). */
@@ -46,18 +46,19 @@ export default function CourseCard({
 }) {
   const language = useUiLanguage();
   const t = COPY[language];
+  const { title, description } = localized(course, language);
   const body = (
     <>
       <div className="flex flex-col items-start mb-4 gap-2 min-w-0">
         <h3 className="text-lg font-semibold text-fg line-clamp-2">
-          {displayName(course, t.untitled)}
+          {displayName({ title, path: course.path }, t.untitled)}
         </h3>
         {badge ?? (role && <Badge color="blue" className="shrink-0">{localizedRoleLabel(role, language)}</Badge>)}
       </div>
 
       <div className="space-y-2 mb-4 flex-grow">
-        {course.description && (
-          <p className="text-sm leading-6 text-muted line-clamp-3">{course.description}</p>
+        {description && (
+          <p className="text-sm leading-6 text-muted line-clamp-3">{description}</p>
         )}
         {course.language_code && (
           <div className="flex items-center text-sm text-muted">
