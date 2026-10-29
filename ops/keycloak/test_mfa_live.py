@@ -364,6 +364,11 @@ class Checks:
         require(self.record('password + OTP login', staff), f'No MFA evidence after OTP login: {self.evidence}')
         self.ok('role holder must enter a valid OTP exactly once; ID token amr carries the evidence')
 
+        # Keycloak drops the reference once completion + maxAge has passed. A
+        # re-authentication within the login second cannot tell maxAge 0 from
+        # a valid one, and maxAge 0 cost administrators their rights minutes
+        # after signing in (computor.at, 2026-10-29).
+        time.sleep(3)
         browser.visit(self.authorize_url())
         again = self.tokens(browser)
         require(self.record('SSO cookie re-authentication', again), 'MFA evidence lost on cookie SSO')

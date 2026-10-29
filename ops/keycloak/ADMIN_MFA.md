@@ -17,6 +17,13 @@ sign-in.
   `computor-reset-mfa`, so role holders enter their OTP to finish an e-mail
   password reset, and it adds `amr`/`acr` mappers to the `computor-backend`
   client.
+- The OTP steps record `otp` for `amr` with `default.reference.maxAge` set to
+  the realm's longest SSO session lifespan (`amrMaxAge` in the script's
+  output), so the code is entered once per Keycloak session and survives
+  SSO-cookie logins and token refreshes. Keycloak masks the value when it is
+  read back; the config's alias ends in `-amr<maxAge>` to show what was
+  written. Until 2026-10-29 it was `0`: the evidence lasted the login second,
+  and administrators got `AUTHZ_007` a few minutes after signing in.
 - Both flows are copies of the flows bound before. The script edits the
   copies while they are unbound and binds them together only after reading
   them back complete; the description of each copy records the flow it came

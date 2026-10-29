@@ -23,11 +23,15 @@ What it reconciles, idempotently:
   anyone enrol a new authenticator.
 * both copies are edited while unbound, record the flow they were copied from
   (for --rollback) and are bound together only once both are complete. An
-  interrupted run is resumed by the next one; the bound flows are never edited.
+  interrupted run is resumed by the next one; the bound flows are never edited,
+  except for the amr maxAge of an OTP step (one in-place PUT, see
+  FlowEditor.configure_execution).
 * the CONFIGURE_TOTP required action is enabled.
 * ``amr`` and ``acr`` protocol mappers on the backend client, so the ID token
   carries evidence of the second factor. The backend withholds elevated roles
-  from SSO sessions whose ID token lacks ``otp`` in ``amr``.
+  from SSO sessions whose ID token lacks ``otp`` in ``amr``. The OTP steps keep
+  that evidence for the realm's longest SSO session lifespan, so it survives
+  SSO-cookie logins and token refreshes of the session the code was entered in.
 
 Stdlib only, like setup_identity_providers.py.
 """
@@ -53,9 +57,30 @@ ADMIN_GROUP = 'administrators'
 # session, the ``default.reference.value`` of that execution's config, and
 # nothing for executions without one (verified against 26.7.4: plain OTP logins
 # yield ``"amr": []``). The role-gated OTP executions therefore carry ``otp``.
-AMR_OTP = {'default.reference.value': 'otp', 'default.reference.maxAge': '0'}
+#
+# It emits a reference only until completion time + ``default.reference.maxAge``
+# has passed (AmrUtils.isAmrValid; a missing value counts as 0). A maxAge of 0
+# kept the code valid for the second it was entered: the next SSO-cookie login
+# or refresh-token grant dropped it, and administrators lost their rights
+# minutes after signing in (AUTHZ_007 on computor.at, 2026-10-29). The evidence
+# has to last as long as the session it was entered for, so maxAge is the
+# realm's longest SSO session lifespan.
+DEFAULT_SSO_MAX_LIFESPAN = 36000  # Keycloak's default ssoSessionMaxLifespan (10 h)
+
+
+def amr_max_age(settings):
+    """Seconds an entered code stays in ``amr``: the realm's longest SSO session lifespan."""
+    spans = [settings.get('ssoSessionMaxLifespan'), settings.get('ssoSessionMaxLifespanRememberMe')]
+    return max([int(span) for span in spans if span] or [DEFAULT_SSO_MAX_LIFESPAN])
+
+
+def amr_otp(max_age):
+    return {'default.reference.value': 'otp', 'default.reference.maxAge': str(max_age)}
+
+
 # Keycloak 26.7 masks these values when a config is read back (GET returns
-# MASKED for both), so they can be written but not compared.
+# MASKED for both), so they can be written but not compared. The config's alias
+# records the maxAge it was written with instead (FlowEditor.config_alias).
 MASKED = '**********'
 MAPPERS = (
     ('amr', 'oidc-amr-mapper',
@@ -150,8 +175,9 @@ RESET_GATE = Gate(RESET_SUBFLOW, 'auth-otp-form', ('reset-otp',))
 
 
 class FlowEditor:
-    def __init__(self, kc, alias):
+    def __init__(self, kc, alias, amr_max_age=DEFAULT_SSO_MAX_LIFESPAN):
         self.kc, self.alias = kc, alias
+        self.amr = amr_otp(amr_max_age)
 
     def executions(self):
         return self.kc.request('GET', '/authentication/flows/' + _q(self.alias) + '/executions')
@@ -161,27 +187,40 @@ class FlowEditor:
             self.kc.request('PUT', '/authentication/flows/' + _q(self.alias) + '/executions',
                             dict(execution, requirement=requirement))
 
-    def config_alias(self, execution):
-        return f'{self.alias}-{execution["providerId"]}-{execution["id"][:8]}'
+    def config_alias(self, execution, config=None):
+        """Alias of the config this script writes for ``execution``.
+
+        An amr config's alias ends in its maxAge, so a config written with
+        another maxAge (0 before 2026-10-29, or an older session lifespan)
+        reads as foreign and is rewritten once.
+        """
+        alias = f'{self.alias}-{execution["providerId"]}-{execution["id"][:8]}'
+        max_age = (config or {}).get('default.reference.maxAge')
+        return alias if max_age is None else f'{alias}-amr{max_age}'
 
     def configure_execution(self, execution, config):
         """Give ``execution`` the values in ``config`` (create or merge its config).
 
         A masked value cannot be compared. It is trusted only in a config this
         script created (its alias; the POST sets alias and values at once) and
-        rewritten otherwise.
+        rewritten otherwise. A rewritten amr config takes our alias, so the
+        next run trusts it. In a bound flow that is one in-place PUT: it changes
+        how long the evidence lasts, never who is asked for a code.
         """
+        alias = self.config_alias(execution, config)
         if not execution.get('authenticationConfig'):
             self.kc.request('POST', '/authentication/executions/' + execution['id'] + '/config',
-                            {'alias': self.config_alias(execution), 'config': dict(config)})
+                            {'alias': alias, 'config': dict(config)})
             return
         path = '/authentication/config/' + execution['authenticationConfig']
         current = self.kc.request('GET', path)
         values = current.get('config', {})
-        ours = current.get('alias') == self.config_alias(execution)
+        ours = current.get('alias') == alias
         if any(values.get(k) != v and not (ours and values.get(k) == MASKED) for k, v in config.items()):
-            self.kc.request('PUT', path, dict(current, config={
-                **{k: v for k, v in values.items() if v != MASKED}, **config}))
+            update = dict(current, config={**{k: v for k, v in values.items() if v != MASKED}, **config})
+            if 'default.reference.maxAge' in config:
+                update['alias'] = alias
+            self.kc.request('PUT', path, update)
 
     def add_execution(self, parent_alias, provider, requirement, config=None):
         before = {e['id'] for e in self.executions()}
@@ -260,10 +299,10 @@ class FlowEditor:
             self.configure_execution(condition, {'condUserRole': ROLE, 'negate': 'false'})
         factor = next((k for k in kids if k.get('providerId') == gate.factor), None)
         if factor is None:
-            self.add_execution(subflow['displayName'], gate.factor, 'REQUIRED', AMR_OTP)
+            self.add_execution(subflow['displayName'], gate.factor, 'REQUIRED', self.amr)
         else:
             self.set_requirement(factor, 'REQUIRED')
-            self.configure_execution(factor, AMR_OTP)
+            self.configure_execution(factor, self.amr)
 
     def problems(self, gate):
         """What keeps the flow from enforcing the gate; empty when it is complete."""
@@ -285,9 +324,13 @@ class FlowEditor:
         if factor is None or not factor.get('authenticationConfig'):
             found.append(f'{self.alias}: {subflow["displayName"]!r} lacks a configured {gate.factor}')
         else:
-            config = self.kc.request('GET', '/authentication/config/' + factor['authenticationConfig']).get('config', {})
-            if any(config.get(k) not in (v, MASKED) for k, v in AMR_OTP.items()):
+            current = self.kc.request('GET', '/authentication/config/' + factor['authenticationConfig'])
+            config = current.get('config', {})
+            if any(config.get(k) not in (v, MASKED) for k, v in self.amr.items()):
                 found.append(f'{self.alias}: {gate.factor} does not emit amr "otp"')
+            elif MASKED in config.values() and current.get('alias') != self.config_alias(factor, self.amr):
+                found.append(f'{self.alias}: {gate.factor} amr "otp" was not written for '
+                             f'maxAge {self.amr["default.reference.maxAge"]}')
         return found
 
 
@@ -389,9 +432,10 @@ def configure(base, realm, token, client_id='computor-backend', apply=True):
     """
     kc = Client(base, realm, token)
     settings = kc.request('GET', '')
+    max_age = amr_max_age(settings)
     plan = {'role': ROLE, 'browserFlow': settings.get('browserFlow'),
             'resetCredentialsFlow': settings.get('resetCredentialsFlow'), 'client': client_id,
-            'applied': apply}
+            'amrMaxAge': max_age, 'applied': apply}
     if not apply:
         return plan
     role = ensure_role(kc)
@@ -400,7 +444,7 @@ def configure(base, realm, token, client_id='computor-backend', apply=True):
 
     browser, _ = prepare_copy(kc, settings, 'browserFlow', 'browser', BROWSER_FLOW)
     reset, _ = prepare_copy(kc, settings, 'resetCredentialsFlow', 'reset credentials', RESET_FLOW)
-    gates = ((FlowEditor(kc, browser), BROWSER_GATE), (FlowEditor(kc, reset), RESET_GATE))
+    gates = ((FlowEditor(kc, browser, max_age), BROWSER_GATE), (FlowEditor(kc, reset, max_age), RESET_GATE))
     for editor, gate in gates:
         editor.ensure_mfa(gate)
     ensure_client_mappers(kc, client_id)
