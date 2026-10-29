@@ -452,16 +452,18 @@ test('the assignment page shows the task and never opens VS Code by itself', asy
   expect(page.url()).toMatch(new RegExp(`/student/assignments/${FIRST}$`));
 });
 
-test('German failure on the assignment page is bounded and never exposes raw API text', async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'dark' });
-  await page.addInitScript(() => localStorage.setItem('computor.language', 'de'));
-  await signIn(page, { contents: EXACT_CONTENTS, workspace: true });
-  await page.context().route(`${API_ORIGIN}/coder/workspaces`, (route) => json(route, { detail: '/private/tester.py: secret internal failure' }, 500));
-  await page.goto(`/courses/${COURSE_ID}/student/assignments/${FIRST}`);
-  await page.getByRole('button', { name: 'In VS Code öffnen', exact: true }).click();
-  await expect(page.getByText('Deine Auswahl konnte in deiner Arbeitsumgebung nicht geöffnet werden. Versuch es noch einmal.', { exact: true })).toBeVisible();
-  await expect(page.locator('body')).not.toContainText('/private/tester.py');
-  expect(page.context().pages()).toHaveLength(1);
+test.describe('German browser', () => {
+  test.use({ locale: 'de-DE' });
+  test('German failure on the assignment page is bounded and never exposes raw API text', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await signIn(page, { contents: EXACT_CONTENTS, workspace: true });
+    await page.context().route(`${API_ORIGIN}/coder/workspaces`, (route) => json(route, { detail: '/private/tester.py: secret internal failure' }, 500));
+    await page.goto(`/courses/${COURSE_ID}/student/assignments/${FIRST}`);
+    await page.getByRole('button', { name: 'In VS Code öffnen', exact: true }).click();
+    await expect(page.getByText('Deine Auswahl konnte in deiner Arbeitsumgebung nicht geöffnet werden. Versuch es noch einmal.', { exact: true })).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('/private/tester.py');
+    expect(page.context().pages()).toHaveLength(1);
+  });
 });
 
 test('an explicit public content path resolves its exact UUID instead of the next exercise', async ({ page }) => {
@@ -542,26 +544,28 @@ test('an authored unit-only course still mounts one launcher and opens its intro
   expect(targets).toEqual([{ course_id: COURSE_ID, course_content_id: WELCOME, ui_language: 'en' }]);
 });
 for (const language of ['de', 'en'] as const) {
-  test(`an untouched course opens its introduction while an explicit exercise stays exact (${language})`, async ({ page }) => {
-    await page.addInitScript((language) => localStorage.setItem('computor.language', language), language);
-    await signIn(page, { contents: EXACT_CONTENTS.map((item) => ({ ...item, result: null })), workspace: true });
-    const targets = recordTargets(page);
-    await page.goto(`/courses/${COURSE_ID}/student/assignments`);
-    const openLabel = language === 'de' ? 'In VS Code öffnen' : 'Open in VS Code';
-    for (const [open, expected] of [
-      [async () => {}, { course_id: COURSE_ID, ui_language: language }],
-      [async () => {
-        await page.getByRole('link', { name: 'First exercise', exact: true }).first().click();
-        await expect(page).toHaveURL(`/courses/${COURSE_ID}/student/assignments/${FIRST}`);
-      }, { course_id: COURSE_ID, course_content_id: FIRST, ui_language: language }],
-    ] as const) {
-      await open();
-      const popupReady = page.waitForEvent('popup');
-      await page.getByRole('button', { name: openLabel, exact: true }).click();
-      const editor = await popupReady;
-      await expect(editor).toHaveURL(EDITOR);
-      expect(targets.at(-1)).toEqual(expected);
-      await editor.close();
-    }
+  test.describe(`${language} browser`, () => {
+    test.use({ locale: language === 'de' ? 'de-DE' : 'en-US' });
+    test(`an untouched course opens its introduction while an explicit exercise stays exact (${language})`, async ({ page }) => {
+      await signIn(page, { contents: EXACT_CONTENTS.map((item) => ({ ...item, result: null })), workspace: true });
+      const targets = recordTargets(page);
+      await page.goto(`/courses/${COURSE_ID}/student/assignments`);
+      const openLabel = language === 'de' ? 'In VS Code öffnen' : 'Open in VS Code';
+      for (const [open, expected] of [
+        [async () => {}, { course_id: COURSE_ID, ui_language: language }],
+        [async () => {
+          await page.getByRole('link', { name: 'First exercise', exact: true }).first().click();
+          await expect(page).toHaveURL(`/courses/${COURSE_ID}/student/assignments/${FIRST}`);
+        }, { course_id: COURSE_ID, course_content_id: FIRST, ui_language: language }],
+      ] as const) {
+        await open();
+        const popupReady = page.waitForEvent('popup');
+        await page.getByRole('button', { name: openLabel, exact: true }).click();
+        const editor = await popupReady;
+        await expect(editor).toHaveURL(EDITOR);
+        expect(targets.at(-1)).toEqual(expected);
+        await editor.close();
+      }
+    });
   });
 }

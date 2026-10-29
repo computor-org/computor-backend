@@ -229,6 +229,8 @@ export interface UserGet {
   profile?: ProfileGet | null;
   /** User's global roles */
   user_roles?: UserRoleGet[];
+  /** Reading language ('de' or 'en') resolved from the profile language and the request's Accept-Language */
+  effective_language?: string | null;
   /** Whether the user is currently banned from authenticating. */
   banned: boolean;
 }

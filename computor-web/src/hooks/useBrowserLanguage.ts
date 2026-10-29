@@ -16,12 +16,16 @@ function storedLanguage(): UiLanguage | null {
   }
 }
 
+function navigatorLanguage(): UiLanguage {
+  const preferred = (navigator.languages?.[0] ?? navigator.language ?? '').toLowerCase();
+  return preferred.startsWith('de') ? 'de' : 'en';
+}
+
 export function getUiLanguage(initialPreference?: UiLanguage): UiLanguage {
   const stored = storedLanguage();
   if (stored) return stored;
   if (initialPreference) return initialPreference;
-  const preferred = (navigator.languages?.[0] ?? navigator.language ?? '').toLowerCase();
-  return preferred.startsWith('de') ? 'de' : 'en';
+  return navigatorLanguage();
 }
 
 function subscribe(onChange: () => void) {
@@ -44,6 +48,25 @@ export function setUiLanguage(language: UiLanguage) {
 }
 
 /**
+ * True only when the visitor explicitly chose a language on a signed-out page.
+ * Sign-in sends this as `explicit_language` so the backend stores the profile
+ * language for a real choice but leaves a new account on Automatic (computor-org/issues#534).
+ */
+export function hasExplicitUiLanguage(): boolean {
+  return typeof window !== 'undefined' && storedLanguage() !== null;
+}
+
+/** Drop the explicit choice, so the browser language rules again. */
+export function clearUiLanguage() {
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Nothing stored to drop.
+  }
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
+/**
  * The visitor's explicit choice, else German for German-language browsers and
  * English otherwise. The server render uses `fallback`; the browser value
  * applies on hydration. `preferred` supplies a request-selected language ahead
@@ -51,4 +74,9 @@ export function setUiLanguage(language: UiLanguage) {
  */
 export function useBrowserLanguage(fallback: UiLanguage = 'de', preferred?: UiLanguage): UiLanguage {
   return useSyncExternalStore(subscribe, () => getUiLanguage(preferred), () => fallback);
+}
+
+/** The browser language alone, without a choice stored on a signed-out page. */
+export function useNavigatorLanguage(fallback: UiLanguage = 'de'): UiLanguage {
+  return useSyncExternalStore(subscribe, navigatorLanguage, () => fallback);
 }

@@ -640,10 +640,11 @@ async def handle_sso_callback(
                 db.flush()
                 created_user = True
                 # The database trigger creates a profile with Automatic language.
-                # Preserve the explicit choice made before registration, without
-                # changing an existing user's preference on a later login.
-                registration_language = (state_data or {}).get("ui_locales")
-                if registration_language in ("de", "en"):
+                # ui_locales alone is browser-derived; storing it would end
+                # Automatic for every new account (computor-org/issues#534).
+                registration_state = state_data or {}
+                registration_language = registration_state.get("ui_locales")
+                if registration_state.get("explicit_language") and registration_language in ("de", "en"):
                     profile = db.query(Profile).filter(Profile.user_id == user.id).first()
                     if profile is None:
                         profile = Profile(user_id=user.id)
