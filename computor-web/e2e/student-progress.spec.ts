@@ -355,6 +355,32 @@ for (const language of ['de', 'en'] as const) {
   });
 }
 
+test.describe('An open page follows test, submission and grading (issues#554)', () => {
+  test.use({ locale: 'en-US' });
+
+  for (const destination of ['overview', 'assignments'] as const) {
+    test(`${destination}: the status changes within seconds while the page stays visible`, async ({ page }) => {
+      // Fake timers: the refresh is a timer, and the test must not wait for it in real time.
+      await page.clock.install();
+      const initial = CONTENTS.map((c) => ({ ...c, submitted: false, result: null }));
+      await signIn(page, { contents: initial });
+      await page.goto(`/courses/${COURSE_ID}${destination === 'assignments' ? '/student/assignments' : ''}`);
+      const card = page.getByTestId('course-progress');
+      await expect(card).toContainText('0 of 6 assignments submitted', { timeout: 15_000 });
+      await page.waitForLoadState('networkidle');
+
+      // A tutor grades the first assignment while the learner looks at the page; no focus or visibility event.
+      const graded = initial.map((c) => c.id === 'a-week1.constants' ? { ...c, submitted: true, status: 'corrected' } : c);
+      await page.route(`${API_ORIGIN}/students/course-contents?**`, (route) => json(route, graded));
+      await page.clock.runFor(10_000);
+
+      await expect(card).toContainText('1 of 6 assignments submitted');
+      // Woche 1 is open because it holds the next assignment.
+      if (destination === 'assignments') await expect(page.locator('span.rounded-full[title="Corrected"]')).toHaveCount(1);
+    });
+  }
+});
+
 for (const language of ['de', 'en'] as const) {
   test.describe(`Learner workspace location (${language})`, () => {
     test.use({ locale: language === 'de' ? 'de-DE' : 'en-US', viewport: { width: 390, height: 844 } });

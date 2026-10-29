@@ -13,7 +13,7 @@ import { displayName } from '@/src/utils/displayName';
 import { localizedUnitTitle } from '@/src/components/student/studentDescription';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useResource } from '@/src/hooks/useResource';
-import { courseProgress, progressPercent, type CourseProgress, type ProgressContent } from '@/src/utils/studentProgress';
+import { courseProgress, progressPercent, STUDENT_CONTENTS_REFRESH_MS, type CourseProgress, type ProgressContent } from '@/src/utils/studentProgress';
 import type { UiLanguage } from '@/src/hooks/useBrowserLanguage';
 
 const COPY = {
@@ -119,7 +119,7 @@ export default function CourseProgressCard({ courseId, language }: { courseId: s
     const response = await apiFetch(`${API_BASE_URL}/students/course-contents?course_id=${courseId}&localize=${language}`);
     if (!response.ok) return null;
     return (await response.json()) as ProgressContent[];
-  }, [courseId, language], { refreshOnFocus: true });
+  }, [courseId, language], { refreshOnFocus: true, refetchInterval: STUDENT_CONTENTS_REFRESH_MS });
   // Quietly absent while loading or on failure: the card is a shortcut, and the
   // assignment list stays the authority.
   if (!Array.isArray(data)) return null;

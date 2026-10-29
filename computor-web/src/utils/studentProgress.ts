@@ -15,6 +15,16 @@
 import { buildTree, parentPath, type TreeNode } from './ltree';
 import { displayName } from './displayName';
 
+/**
+ * How often an open, visible learner page re-reads its course contents, so a
+ * test result, submission or grading shows up without a manual refresh
+ * (issues#554). The backend announces these changes over its WebSocket, but the
+ * browser cannot open an authenticated socket: `/ws` takes the bearer token as a
+ * query parameter and the web keeps tokens in HttpOnly cookies. The listing is
+ * served from the backend's per-user cache, which writes invalidate.
+ */
+export const STUDENT_CONTENTS_REFRESH_MS = 10_000;
+
 export interface ProgressContent {
   id: string;
   path: string;
