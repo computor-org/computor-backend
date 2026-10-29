@@ -3,7 +3,7 @@
  * Endpoint: /course-contents
  */
 
-import type { CourseContentCreate, CourseContentGet, CourseContentList, CourseContentMoveRequest, CourseContentUpdate, DeploymentSummary, DeploymentWithHistory } from 'types/generated';
+import type { CourseContentCreate, CourseContentGet, CourseContentList, CourseContentMoveRequest, CourseContentUpdate, DeploymentSummary, DeploymentWithHistory, DescriptionDraftAvailability, DescriptionDraftClaim, DescriptionDraftCompletion, DescriptionDraftJob, DescriptionDraftRequest, DescriptionDraftStatus } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -74,6 +74,37 @@ export class CourseContentsClient extends BaseEndpointClient {
   }
 
   /**
+   * Get Description Draft Availability
+   */
+  async getDescriptionDraftAvailabilityCourseContentsDescriptionDraftsAvailabilityGet({ userId }: { userId?: string | null }): Promise<DescriptionDraftAvailability> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.get<DescriptionDraftAvailability>(this.buildPath('description-drafts', 'availability'), { params: queryParams });
+  }
+
+  /**
+   * Claim Description Draft
+   */
+  async claimDescriptionDraftCourseContentsDescriptionDraftsWorkerClaimPost(): Promise<DescriptionDraftClaim> {
+    return this.client.post<DescriptionDraftClaim>(this.buildPath('description-drafts', 'worker', 'claim'));
+  }
+
+  /**
+   * Complete Description Draft
+   */
+  async completeDescriptionDraftCourseContentsDescriptionDraftsWorkerCompleteJobIdPost({ jobId, body }: { jobId: string; body: DescriptionDraftCompletion }): Promise<void> {
+    return this.client.post<void>(this.buildPath('description-drafts', 'worker', 'complete', jobId), body);
+  }
+
+  /**
+   * Get Description Draft
+   */
+  async getDescriptionDraftCourseContentsDescriptionDraftsJobIdGet({ jobId }: { jobId: string }): Promise<DescriptionDraftStatus> {
+    return this.client.get<DescriptionDraftStatus>(this.buildPath('description-drafts', jobId));
+  }
+
+  /**
    * Get Content Deployment
    * Get deployment information for specific course content.
    * Returns deployment record with full history if exists.
@@ -83,6 +114,16 @@ export class CourseContentsClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.get<DeploymentWithHistory | null>(this.buildPath(contentId, 'deployment'), { params: queryParams });
+  }
+
+  /**
+   * Request Description Draft
+   */
+  async requestDescriptionDraftCourseContentsContentIdDescriptionDraftPost({ contentId, userId, body }: { contentId: string; userId?: string | null; body: DescriptionDraftRequest }): Promise<DescriptionDraftJob> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.post<DescriptionDraftJob>(this.buildPath(contentId, 'description-draft'), body, { params: queryParams });
   }
 
   /**

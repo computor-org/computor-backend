@@ -101,6 +101,11 @@
 | `createCourseContentsCourseContentsPost` | POST | `/course-contents` | `CourseContentCreate` | `CourseContentGet` |
 | `getCourseDeploymentSummaryCourseContentsCoursesCourseIdDeploymentSummaryGet` | GET | `/course-contents/courses/{course_id}/deployment-summary` | — | `DeploymentSummary` |
 | `getDeploymentStatusWithWorkflowCourseContentsDeploymentContentIdGet` | GET | `/course-contents/deployment/{content_id}` | — | `Record<string, unknown> & Record<string, unknown>` |
+| `getDescriptionDraftAvailabilityCourseContentsDescriptionDraftsAvailabilityGet` | GET | `/course-contents/description-drafts/availability` | — | `DescriptionDraftAvailability` |
+| `claimDescriptionDraftCourseContentsDescriptionDraftsWorkerClaimPost` | POST | `/course-contents/description-drafts/worker/claim` | — | `DescriptionDraftClaim` |
+| `completeDescriptionDraftCourseContentsDescriptionDraftsWorkerCompleteJobIdPost` | POST | `/course-contents/description-drafts/worker/complete/{job_id}` | `DescriptionDraftCompletion` | `void` |
+| `getDescriptionDraftCourseContentsDescriptionDraftsJobIdGet` | GET | `/course-contents/description-drafts/{job_id}` | — | `DescriptionDraftStatus` |
+| `requestDescriptionDraftCourseContentsContentIdDescriptionDraftPost` | POST | `/course-contents/{content_id}/description-draft` | `DescriptionDraftRequest` | `DescriptionDraftJob` |
 | `getContentDeploymentCourseContentsContentIdDeploymentGet` | GET | `/course-contents/{content_id}/deployment` | — | `DeploymentWithHistory | null` |
 | `unassignExampleFromContentCourseContentsContentIdExampleDelete` | DELETE | `/course-contents/{content_id}/example` | — | `Record<string, unknown> & Record<string, string>` |
 | `moveCourseContentCourseContentsContentIdMovePatch` | PATCH | `/course-contents/{content_id}/move` | `CourseContentMoveRequest` | `CourseContentGet` |

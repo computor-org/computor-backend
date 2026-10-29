@@ -1575,6 +1575,89 @@ export interface CourseContentTypeQuery {
   course_content_kind_id?: string | null;
 }
 
+/**
+ * Whether a Lena worker that writes description drafts is running.
+ */
+export interface DescriptionDraftAvailability {
+  enabled: boolean;
+}
+
+/**
+ * A lecturer's request for a draft description of a unit.
+ */
+export interface DescriptionDraftRequest {
+  instruction?: string | null;
+  languages?: string[] | null;
+}
+
+/**
+ * The accepted request.
+ */
+export interface DescriptionDraftJob {
+  id: string;
+  state: "queued" | "running" | "done" | "failed";
+}
+
+/**
+ * One draft description in one language.
+ */
+export interface DescriptionDraft {
+  language: string;
+  description: string;
+}
+
+/**
+ * State of a draft job, and the drafts once it is done.
+ */
+export interface DescriptionDraftStatus {
+  id: string;
+  state: "queued" | "running" | "done" | "failed";
+  drafts?: DescriptionDraft[] | null;
+  error?: "too_long" | "invalid_output" | "model_error" | null;
+}
+
+/**
+ * What the worker sees of one assignment in the unit.
+ */
+export interface DescriptionDraftAssignment {
+  title: string;
+  content_type?: string | null;
+  text?: string;
+  text_language?: string | null;
+}
+
+/**
+ * Everything the worker gets for one job. No student or lecturer data.
+ */
+export interface DescriptionDraftInput {
+  unit_title: string;
+  unit_description?: string | null;
+  course_title?: string | null;
+  languages: string[];
+  instruction?: string | null;
+  assignments: DescriptionDraftAssignment[];
+}
+
+/**
+ * Answer to a worker's claim: a job, or nothing to do.
+ */
+export interface DescriptionDraftClaim {
+  state: "idle" | "claimed";
+  id?: string | null;
+  lease?: string | null;
+  request?: DescriptionDraftInput | null;
+}
+
+/**
+ * The worker's result for a claimed job.
+ */
+export interface DescriptionDraftCompletion {
+  lease: string;
+  state: "done" | "failed";
+  drafts?: DescriptionDraft[];
+  error?: "too_long" | "invalid_output" | "model_error" | null;
+}
+
 export interface TutorCourseMemberCourseContent {
   id: string;
   path: string;
