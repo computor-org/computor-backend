@@ -5,6 +5,26 @@ export const CHOSEN_LANGUAGE_COOKIE = 'computor_language';
 /** The signed-in reading language, so the server renders a signed-in page in it. */
 export const READING_LANGUAGE_COOKIE = 'computor_reading_language';
 
+/** Set by proxy.ts on a page whose text has one fixed language. */
+export const DOCUMENT_LANGUAGE_HEADER = 'x-computor-document-language';
+
+/**
+ * Legal texts with a fixed language: their pages say so in <html lang>
+ * whatever the reader's language. Keep in step with the matcher in proxy.ts.
+ */
+const FIXED_LANGUAGE_PATHS: Record<string, ReadingLanguage> = {
+  '/privacy': 'de',
+  '/privacy/en': 'en',
+  '/terms': 'de',
+  '/terms/en': 'en',
+  '/terms/changes': 'de',
+  '/terms/en/changes': 'en',
+};
+
+export function fixedDocumentLanguage(pathname: string): ReadingLanguage | null {
+  return FIXED_LANGUAGE_PATHS[pathname.replace(/\/+$/, '') || '/'] ?? null;
+}
+
 /** What the server can know about the reader's language from one request. */
 export interface RequestLanguage {
   chosen: ReadingLanguage | null;

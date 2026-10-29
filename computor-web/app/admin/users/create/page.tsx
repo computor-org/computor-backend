@@ -29,6 +29,9 @@ const COPY = {
     email: 'E-Mail',
     givenName: 'Vorname',
     familyName: 'Nachname',
+    emailExample: 'erika.musterfrau@example.com',
+    givenNameExample: 'Erika',
+    familyNameExample: 'Musterfrau',
     systemRoles: 'Systemrollen',
     rolesHint: 'Leer lassen für einen normalen Benutzer. Weise Rollen nur bei Bedarf zu.',
   },
@@ -43,6 +46,9 @@ const COPY = {
     email: 'Email',
     givenName: 'Given name',
     familyName: 'Family name',
+    emailExample: 'john@example.com',
+    givenNameExample: 'John',
+    familyNameExample: 'Doe',
     systemRoles: 'System roles',
     rolesHint: 'Leave empty for a plain user. Assign roles only as needed.',
   },
@@ -103,14 +109,14 @@ export default function UserCreatePage() {
         onSubmit={save}
       >
         <Field label={t.email} required>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="john@example.com" className={inputCls} />
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t.emailExample} className={inputCls} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={t.givenName}>
-            <input value={givenName} onChange={(e) => setGivenName(e.target.value)} placeholder="John" className={inputCls} />
+            <input value={givenName} onChange={(e) => setGivenName(e.target.value)} placeholder={t.givenNameExample} className={inputCls} />
           </Field>
           <Field label={t.familyName}>
-            <input value={familyName} onChange={(e) => setFamilyName(e.target.value)} placeholder="Doe" className={inputCls} />
+            <input value={familyName} onChange={(e) => setFamilyName(e.target.value)} placeholder={t.familyNameExample} className={inputCls} />
           </Field>
         </div>
         <Field label={t.systemRoles} hint={t.rolesHint}>

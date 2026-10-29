@@ -48,6 +48,7 @@ const COPY = {
     backToCourse: 'Zurück zum Kurs',
     pageTitle: 'Kurs bearbeiten',
     general: 'Allgemein',
+    git: 'Git-Anbindung',
     courseOrder: 'Kursreihenfolge',
     courseOrderHint: 'Kleinere Zahlen stehen zuerst. Ohne Zahl folgt der Kurs nach den geordneten Kursen, alphabetisch nach Titel.',
     languageCode: 'Sprachcode',
@@ -98,6 +99,7 @@ const COPY = {
     backToCourse: 'Back to course',
     pageTitle: 'Edit course',
     general: 'General',
+    git: 'Git',
     courseOrder: 'Course order',
     courseOrderHint: 'Lower numbers come first. Leave empty to list the course after ordered courses, alphabetically by title.',
     languageCode: 'Language code',
@@ -462,7 +464,7 @@ export default function CourseEditPage() {
 
               {/* Git */}
               <SectionCard
-                title="Git"
+                title={t.git}
                 action={
                   gitLocked ? (
                     <Badge color="gray" className="inline-flex items-center gap-1">

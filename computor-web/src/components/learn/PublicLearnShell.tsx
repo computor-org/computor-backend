@@ -12,8 +12,8 @@ import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
 import { applyDocumentLanguage } from '@/src/utils/documentLanguage';
 
 const COPY = {
-  de: { courses: 'Kurse', signIn: 'Anmelden', signOut: 'Abmelden', report: 'Problem melden' },
-  en: { courses: 'Courses', signIn: 'Sign in', signOut: 'Sign out', report: 'Report a problem' },
+  de: { courses: 'Kurse', dashboard: 'Übersicht', signIn: 'Anmelden', signOut: 'Abmelden', report: 'Problem melden' },
+  en: { courses: 'Courses', dashboard: 'Dashboard', signIn: 'Sign in', signOut: 'Sign out', report: 'Report a problem' },
 };
 
 export default function PublicLearnShell({
@@ -54,7 +54,7 @@ export default function PublicLearnShell({
             <Link href="/learn" className="text-accent-text hover:underline">{t.courses}</Link>
             {user ? (
               <>
-                <Link href="/dashboard" className="text-accent-text hover:underline">Dashboard</Link>
+                <Link href="/dashboard" className="text-accent-text hover:underline">{t.dashboard}</Link>
                 <button type="button" onClick={signOut} className="text-muted hover:text-fg">
                   {t.signOut}
                 </button>

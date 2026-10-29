@@ -28,6 +28,11 @@ const COPY = {
     description:
       'Legt ein nicht-menschliches Benutzerkonto an, das sich mit einem API-Token authentifiziert. Das Token erzeugst du im nächsten Schritt.',
     submit: 'Erstellen',
+    slug: 'Kennung (Slug)',
+    email: 'E-Mail',
+    slugExample: 'beispiel.exec.py',
+    nameExample: 'Beispiel-Python-Runner',
+    emailExample: 'beispiel-runner@computor.local',
     slugHint:
       'Kleinbuchstaben, Ziffern, Punkte und Bindestriche. Bei einem Testdienst muss er mit properties.executionBackend.slug in der meta.yaml deiner Beispiele übereinstimmen – diese Zeichenkette bindet eine Aufgabe an diesen Dienst. Er ist nur ein Bezeichner und wählt nicht den Test-Runner aus.',
     name: 'Name',
@@ -51,6 +56,11 @@ const COPY = {
     description:
       'Creates a non-human user that authenticates with an API token. Mint the token on the next screen.',
     submit: 'Create',
+    slug: 'Slug',
+    email: 'Email',
+    slugExample: 'acme.exec.py',
+    nameExample: 'Acme Python Runner',
+    emailExample: 'acme-runner@computor.local',
     slugHint:
       "Lowercase letters, digits, dots and hyphens. For a testing service this must match properties.executionBackend.slug in your examples' meta.yaml — that string is what binds an assignment to this service. It is an identifier only; it does not select the test runner.",
     name: 'Name',
@@ -135,14 +145,14 @@ export default function ServiceCreatePage() {
         onSubmit={save}
       >
         <Field
-          label="Slug"
+          label={t.slug}
           required
           hint={t.slugHint}
         >
-          <input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="acme.exec.py" className={inputCls} />
+          <input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder={t.slugExample} className={inputCls} />
         </Field>
         <Field label={t.name} required>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Acme Python Runner" className={inputCls} />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t.nameExample} className={inputCls} />
         </Field>
         <Field label={t.description_}>
           <input value={description} onChange={(e) => setDescription(e.target.value)} className={inputCls} />
@@ -155,8 +165,8 @@ export default function ServiceCreatePage() {
             ))}
           </select>
         </Field>
-        <Field label="Email" hint={t.emailHint}>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="acme-runner@computor.local" className={inputCls} />
+        <Field label={t.email} hint={t.emailHint}>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t.emailExample} className={inputCls} />
         </Field>
 
         {isTesting && (

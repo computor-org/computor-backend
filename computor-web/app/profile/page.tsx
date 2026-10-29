@@ -28,6 +28,7 @@ const COPY = {
     loadFailed: 'Profil konnte nicht geladen werden',
     saveFailed: 'Speichern fehlgeschlagen',
     breadcrumb: 'Mein Profil',
+    nicknameExample: 'emusterfrau',
     title: 'Mein Profil',
     subtitle: 'Deine Identität und dein öffentliches Profil in Computor.',
     saved: 'Gespeichert',
@@ -56,6 +57,7 @@ const COPY = {
     loadFailed: 'Failed to load profile',
     saveFailed: 'Save failed',
     breadcrumb: 'My profile',
+    nicknameExample: 'jdoe',
     title: 'My profile',
     subtitle: 'Your identity and public profile across Computor.',
     saved: 'Saved',
@@ -268,7 +270,7 @@ export default function ProfilePage() {
                   <input className={readOnlyInputCls} value={user.email ?? ''} disabled />
                 </Field>
                 <Field label={t.nickname} hint={t.nicknameHint}>
-                  <input className={inputCls} value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="jdoe" />
+                  <input className={inputCls} value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder={t.nicknameExample} />
                 </Field>
                 <Field label={t.bio}>
                   <textarea className={inputCls} rows={3} value={bio} onChange={(e) => setBio(e.target.value)} />

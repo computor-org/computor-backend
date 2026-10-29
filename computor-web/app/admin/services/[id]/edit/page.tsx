@@ -26,6 +26,7 @@ const COPY = {
     description:
       'Slug und Diensttyp sind unveränderlich – beide sind Verknüpfungsschlüssel, auf die andere Datensätze bereits verweisen.',
     submit: 'Speichern',
+    slug: 'Kennung (Slug)',
     slugHint: 'Unveränderlich: Beispiele binden sich über die meta.yaml an diese Zeichenkette.',
     serviceType: 'Diensttyp',
     serviceTypeHint: 'Unveränderlich: Er bestimmt die Standard-Token-Berechtigungen und die Zuweisungsregeln.',
@@ -46,6 +47,7 @@ const COPY = {
     title: 'Edit service account',
     description: 'Slug and service type are immutable — both are join keys other records already point at.',
     submit: 'Save',
+    slug: 'Slug',
     slugHint: 'Immutable: examples bind to this string via meta.yaml.',
     serviceType: 'Service type',
     serviceTypeHint: 'Immutable: it determines default token scopes and dispatch rules.',
@@ -141,7 +143,7 @@ export default function ServiceEditPage() {
         onCancel={() => router.push(`/admin/services/${serviceId}`)}
         onSubmit={save}
       >
-        <Field label="Slug" hint={t.slugHint}>
+        <Field label={t.slug} hint={t.slugHint}>
           <input value={service?.slug ?? ''} disabled className={readOnlyInputCls} />
         </Field>
         <Field label={t.serviceType} hint={t.serviceTypeHint}>

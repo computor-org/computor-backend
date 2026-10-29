@@ -11,8 +11,11 @@ import { APP_TITLES } from "@/src/utils/documentLanguage";
 import { RequestLanguageProvider } from "@/src/contexts/RequestLanguageContext";
 import {
   CHOSEN_LANGUAGE_COOKIE,
+  cookieLanguage,
+  DOCUMENT_LANGUAGE_HEADER,
   READING_LANGUAGE_COOKIE,
   requestLanguage,
+  type ReadingLanguage,
   type RequestLanguage,
 } from "@/src/utils/requestLanguage";
 
@@ -40,13 +43,18 @@ async function readRequestLanguage(): Promise<RequestLanguage> {
   );
 }
 
-/** The language the server renders in; pages correct <html lang> on hydration where they differ. */
-function documentLanguage(request: RequestLanguage) {
-  return request.reading ?? request.chosen ?? request.browser;
+/** The language of the page's text where the route fixes it (proxy.ts), else none. */
+async function fixedLanguage(): Promise<ReadingLanguage | null> {
+  return cookieLanguage((await headers()).get(DOCUMENT_LANGUAGE_HEADER));
+}
+
+/** The language the server renders in; other pages correct <html lang> on hydration where they differ. */
+function documentLanguage(request: RequestLanguage, fixed: ReadingLanguage | null) {
+  return fixed ?? request.reading ?? request.chosen ?? request.browser;
 }
 
 export async function generateMetadata(): Promise<Metadata> {
-  const language = documentLanguage(await readRequestLanguage());
+  const language = documentLanguage(await readRequestLanguage(), await fixedLanguage());
   return { title: APP_TITLES[language], description: DESCRIPTIONS[language] };
 }
 
@@ -55,9 +63,9 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const request = await readRequestLanguage();
+  const [request, fixed] = await Promise.all([readRequestLanguage(), fixedLanguage()]);
   return (
-    <html lang={documentLanguage(request)} suppressHydrationWarning>
+    <html lang={documentLanguage(request, fixed)} suppressHydrationWarning>
       <head>
         {/* Before first paint — see THEME_INIT_SCRIPT for why this is inline. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
