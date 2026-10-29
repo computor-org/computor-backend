@@ -3,7 +3,7 @@ import logging
 import uuid as uuid_module
 from uuid import UUID
 from typing import Annotated, Optional
-from fastapi import APIRouter, Depends, Query, File, UploadFile, Form
+from fastapi import APIRouter, Depends, Query, File, UploadFile, Form, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -579,6 +579,7 @@ async def create_tutor_test(
     course_content_id: UUID | str,
     file: UploadFile = File(..., description="ZIP file containing tutor's code"),
     config: Optional[str] = Form(None, description="Optional JSON configuration"),
+    http_request: Request = None,
     permissions: Annotated[Principal, Depends(get_current_principal)] = None,
     db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
@@ -608,6 +609,8 @@ async def create_tutor_test(
 
     **Response**: Returns test_id for polling status via GET /tutors/tests/{test_id}
     """
+
+    from computor_backend.business_logic.testing_service import resolve_test_language
 
     # Check permissions
     course_content, course = await _check_tutor_permission_for_course_content(
@@ -706,7 +709,11 @@ async def create_tutor_test(
                 "course_content_id": str(course_content_id),
                 "user_id": str(user_id),
                 "store_graphics_artifacts": test_config.store_graphics_artifacts,
-                "language": course.language_code or None,
+                "language": resolve_test_language(
+                    user_id,
+                    http_request.headers.get("Accept-Language") if http_request else None,
+                    db,
+                ),
             },
         },
         queue=task_queue,

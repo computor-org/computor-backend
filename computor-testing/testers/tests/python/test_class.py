@@ -89,7 +89,7 @@ def _read_tokens(file_path: str, root=None):
         data = read_untrusted_bytes(file_path, root=root)
         return list(tokenize.tokenize(io.BytesIO(data).readline))
     except (tokenize.TokenError, SyntaxError, IndentationError) as e:
-        pytest.fail(f"Could not tokenize student file: {e}")
+        pytest.fail(tr("could_not_tokenize", error=e))
 
 
 def _count_single_token(file_path: str, name: str, occurance_type=None,
@@ -326,7 +326,7 @@ def _execute_subprocess(
             errors = result.get("errors", ["Unknown error"])
             _solution[where] = {
                 "status": StatusEnum.failed,
-                "errormsg": f"Execution failed: {'; '.join(str(e) for e in errors)}",
+                "errormsg": tr("execution_failed", errors='; '.join(str(e) for e in errors)),
                 "namespace": result.get("variables", {}),
                 "variables": result.get("variables", {}),
                 "errors": errors,
@@ -336,14 +336,14 @@ def _execute_subprocess(
             }
     except PyExecutionError as e:
         _solution[where] = {
-            "status": StatusEnum.failed, "errormsg": f"Python execution error: {e}",
+            "status": StatusEnum.failed, "errormsg": tr("language_execution_error", language="Python", error=e),
             "namespace": {}, "variables": {}, "errors": [str(e)],
             "traceback": {}, "exectime": 0,
             "std": {"stdout": None, "stderr": None},
         }
     except Exception as e:
         _solution[where] = {
-            "status": StatusEnum.crashed, "errormsg": f"Unexpected error: {e}",
+            "status": StatusEnum.crashed, "errormsg": tr("unexpected_error", error=e),
             "namespace": {}, "variables": {}, "errors": [str(e)],
             "traceback": {}, "exectime": 0,
             "std": {"stdout": None, "stderr": None},
@@ -371,7 +371,7 @@ class TestComputorPython:
                 sol_student = get_solution(monkeymodule, pytestconfig, idx_main, Solution.student)
                 sol_reference = get_solution(monkeymodule, pytestconfig, idx_main, Solution.reference)
             except Exception as e:
-                pytest.fail(f"Getting solution failed: {e}")
+                pytest.fail(tr("getting_solution_failed", error=e))
 
             check_solution_status(sol_student)
 
@@ -401,7 +401,7 @@ class TestComputorPython:
                     try:
                         val_reference = eval(sub.evalString, solution_reference)
                     except Exception:
-                        pytest.skip(f"Evaluation of `{sub.evalString}` not possible")
+                        pytest.skip(tr("evaluation_not_possible", expression=sub.evalString))
                 elif testtype == TypeEnum.stdout:
                     val_reference = sol_reference["std"]["stdout"]
                 elif sub.name in solution_reference:
@@ -414,10 +414,7 @@ class TestComputorPython:
                         # authoring error, not a student outcome — fail loudly
                         # instead of silently reducing the grade (#232).
                         pytest.fail(
-                            f"BROKEN EXAMPLE: variable `{sub.name}` is missing "
-                            f"from the reference namespace — fix the example's "
-                            f"test.yaml or reference solution, this is not a "
-                            f"student error"
+                            tr("broken_example", name=sub.name)
                         )
 
             compare_variable_by_qualification(

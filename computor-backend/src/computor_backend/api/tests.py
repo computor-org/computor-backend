@@ -5,7 +5,7 @@ This module handles test execution for submission artifacts.
 from typing import Annotated, Optional
 import logging
 import uuid
-from fastapi import Depends, APIRouter
+from fastapi import Depends, APIRouter, Request
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -113,6 +113,7 @@ async def check_user_rate_limit(user_id: str, cache) -> bool:
 @tests_router.post("", response_model=ResultList)
 async def create_test_run(
     test_create: TestCreate,
+    http_request: Request,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db, scope="function"),
     cache = Depends(get_redis_client),
@@ -256,7 +257,7 @@ async def create_test_run(
     # slug (self-healing). Lets a content/example exist before the service is
     # registered — testing works the moment the matching service appears.
     from computor_backend.business_logic.testing_service import (
-        resolve_course_language,
+        resolve_test_language,
         resolve_testing_service,
     )
 
@@ -313,7 +314,9 @@ async def create_test_run(
         "example_version_id": str(deployment.example_version_id),
         "artifact_id": str(artifact.id),
         "version_identifier": version_identifier,
-        "language": resolve_course_language(course_content, db),
+        "language": resolve_test_language(
+            user_id, http_request.headers.get("Accept-Language"), db
+        ),
     }
 
     # Generate workflow ID

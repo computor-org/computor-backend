@@ -27,6 +27,7 @@ from ctcore.models import (
     read_ca_file,
 )
 from ctcore.helpers import get_property_as_list
+from ctcore.i18n import tr, tr_summary
 from ctcore.security import validate_path_in_root, validate_filename, PathValidationError
 
 from ..conftest_base import (
@@ -338,12 +339,12 @@ def pytest_sessionfinish(session: pytest.Session):
         elif sub_skipped > 0:
             skipped += 1
             main.result = ResultEnum.skipped
-            result_message = "Tests skipped"
+            result_message = tr("tests_skipped")
         else:
             failed += 1
             main.result = ResultEnum.failed
             result_message = test_main.failureMessage
-        main.resultMessage = result_message
+        main.resultMessage = tr_summary(result_message)
 
     report.summary.passed = passed
     report.summary.skipped = skipped
@@ -356,18 +357,18 @@ def pytest_sessionfinish(session: pytest.Session):
 
     if total == 0:
         report.result = ResultEnum.skipped
-        result_message = "No Tests specified"
+        result_message = tr("no_tests_specified")
     elif passed == total:
         report.result = ResultEnum.passed
         result_message = testsuite.properties.successMessage
     elif skipped == total:
         report.result = ResultEnum.skipped
-        result_message = "Tests skipped"
+        result_message = tr("tests_skipped")
     else:
         report.result = ResultEnum.failed
         result_message = testsuite.properties.failureMessage
 
-    report.resultMessage = result_message
+    report.resultMessage = tr_summary(result_message)
     report.environment = environment
     report.duration = duration
     report.executionDuration = time_s

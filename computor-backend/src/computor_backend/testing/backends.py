@@ -16,6 +16,7 @@ import Pyro5.api
 import Pyro5.errors
 
 from computor_backend.tasks.worker_settings import get_worker_settings
+from computor_backend.testing.messages import runner_text
 
 logger = logging.getLogger(__name__)
 
@@ -235,8 +236,10 @@ class MatlabTestingBackend(TestingBackend):
                     "passed": 0,
                     "failed": 1,
                     "total": 1,
-                    "error": f"Execution timeout: Test exceeded {result.get('timeout_seconds', timeout_seconds)} seconds. "
-                             "This usually indicates an infinite loop in the code.",
+                    "error": runner_text(
+                        "matlab_timeout", test_job_config.get("language"),
+                        seconds=result.get('timeout_seconds', timeout_seconds),
+                    ),
                     "details": result.get("details", {}),
                     "timeout": True
                 }
@@ -396,7 +399,10 @@ class ComputorTestingBackend(TestingBackend):
                 "passed": 0,
                 "failed": 1,
                 "total": 1,
-                "error": f"Test execution timed out after {backend_properties.get('timeout_seconds', 300)} seconds",
+                "error": runner_text(
+                    "timed_out", test_job_config.get("language"),
+                    seconds=backend_properties.get('timeout_seconds', 300),
+                ),
                 "details": {"timeout": True}
             }
         except Exception as e:
@@ -547,6 +553,6 @@ async def execute_tests_with_backend(
             "passed": 0,
             "failed": 1,
             "total": 1,
-            "error": f"Backend error: {e}",
+            "error": runner_text("backend_error", test_job_config.get("language"), error=e),
             "details": {"service_slug": service_slug, "error": str(e)}
         }
