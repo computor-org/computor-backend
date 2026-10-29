@@ -87,6 +87,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_workspace_language_packs.py
           computor-backend/src/computor_backend/tests/test_keycloak_locale_attribute.py
           ops/keycloak/test_locale.py
+          computor-backend/src/computor_backend/tests/test_ws_profile_submission_events.py
       - name: Approved extension pin matches its GitHub release
         run: python3 ops/coder/pin-extension.py --check
 

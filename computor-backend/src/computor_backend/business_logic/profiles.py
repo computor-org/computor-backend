@@ -29,6 +29,7 @@ from computor_backend.business_logic._owned_crud import (
     apply_update,
     delete_owned,
 )
+from computor_backend.websocket import publish_user_profile_updated
 
 # General-claim resource gating "manage all profiles". Kept distinct from the
 # student-profile resource on purpose (see ownership.py).
@@ -141,13 +142,19 @@ def update_profile(
         resource=_RESOURCE,
         not_found_detail="Profile not found",
     )
-    return apply_update(
+    profile = apply_update(
         db=db,
         obj=profile,
         update_data=update_data,
         error_detail="Failed to update profile",
         log_context="Error updating profile",
     )
+    # apply_update has committed at this point; a rolled-back update never
+    # reaches the publish. Only a stored language change concerns the
+    # language-aware clients (issue #554).
+    if "language_code" in update_data:
+        publish_user_profile_updated(str(profile.user_id), profile.language_code)
+    return profile
 
 
 def delete_profile(
