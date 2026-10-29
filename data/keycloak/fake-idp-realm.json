@@ -36,5 +36,8 @@
         { "type": "password", "value": "test1234", "temporary": false }
       ]
     }
-  ]
+  ],
+  "internationalizationEnabled": true,
+  "supportedLocales": ["de", "en"],
+  "defaultLocale": "de"
 }

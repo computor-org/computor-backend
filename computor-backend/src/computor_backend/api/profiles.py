@@ -19,6 +19,7 @@ from computor_backend.business_logic.profiles import (
     create_profile,
     update_profile,
     delete_profile,
+    sync_keycloak_locale,
 )
 
 profile_router = APIRouter()
@@ -68,6 +69,9 @@ async def update_profile_endpoint(
 
     update_data = data.model_dump(exclude_unset=True)
     profile = update_profile(id, update_data, permissions, db)
+    if "language_code" in update_data:
+        # Keycloak reads its page language from the user attribute (issues#555).
+        await sync_keycloak_locale(db, profile.user_id, profile.language_code)
     return ProfileGet.model_validate(profile, from_attributes=True)
 
 @profile_router.delete("/{id}", status_code=204)

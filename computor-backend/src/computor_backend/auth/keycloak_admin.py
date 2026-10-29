@@ -278,6 +278,32 @@ class KeycloakAdminClient:
                 logger.error(f"Failed to update user: {response.status_code} - {response.text}")
                 response.raise_for_status()
     
+    async def set_user_locale(self, user_id: str, locale: Optional[str]) -> None:
+        """Set or clear the ``locale`` user attribute (issues#555).
+
+        Keycloak picks the language of its own pages (OTP, update-password,
+        info) from this attribute once the user is identified; ``None`` removes
+        it so the browser decides again. Logs failures instead of raising — a
+        failed sync must never fail the profile save that triggered it.
+        """
+        try:
+            user = await self.get_user(user_id)
+            if user is None:
+                logger.warning("Keycloak user %s not found; locale not synced", user_id)
+                return
+            attributes = dict(user.get("attributes") or {})
+            wanted = [locale] if locale else None
+            if attributes.get("locale") == wanted:
+                return
+            if wanted:
+                attributes["locale"] = wanted
+            else:
+                attributes.pop("locale", None)
+            user["attributes"] = attributes
+            await self.update_user(user_id, user)
+        except Exception:
+            logger.warning("Failed to sync locale %r to Keycloak user %s", locale, user_id, exc_info=True)
+
     async def set_user_password(self, user_id: str, password: str, temporary: bool = False) -> None:
         """Set user password in Keycloak."""
         token = await self._get_admin_token()
