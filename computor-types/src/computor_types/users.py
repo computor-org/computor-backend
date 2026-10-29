@@ -67,6 +67,7 @@ class UserGet(BaseEntityGet):
     student_profiles: List[StudentProfileGet] = Field(default=[], description="Associated student profiles")
     profile: Optional['ProfileGet'] = Field(None, description="User profile")
     user_roles: List[UserRoleGet] = Field(default=[], description="User's global roles")
+    effective_language: Optional[str] = Field(None, description="Reading language ('de' or 'en') resolved from the profile language and the request's Accept-Language")
 
     @computed_field
     @property

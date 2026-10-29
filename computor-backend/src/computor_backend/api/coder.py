@@ -12,7 +12,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from computor_backend.coder.client import CoderClient, get_coder_client
@@ -128,6 +128,7 @@ from computor_backend.business_logic.api_tokens import assert_token_not_mfa_rest
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.redis_cache import get_cache, get_redis_client
+from computor_backend.utils.reading_language import resolve_effective_language
 from computor_backend.business_logic.workspace_launch_context import (
     get_workspace_launch_context as read_workspace_launch_context,
     populate_last_courses,
@@ -852,16 +853,27 @@ async def post_workspace_launch_context(
     username: str,
     workspace_name: str,
     request: WorkspaceLaunchContextRequest,
+    http_request: Request,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
     db: Annotated[Session, Depends(get_db, scope="function")],
+    cache=Depends(get_cache),
     redis=Depends(get_redis_client),
 ) -> WorkspaceLaunchContext:
+    ui_language = request.ui_language
+    if ui_language is None:
+        # Same resolution as GET /user so the workspace opens in the reading
+        # language the backend already committed to for this learner.
+        user = get_user_by_id(db, cache, str(permissions.user_id))
+        ui_language = resolve_effective_language(
+            user.profile.language_code if user.profile else None,
+            http_request.headers.get("Accept-Language"),
+        )
     try:
         return await set_workspace_launch_context(
             username, workspace_name, request.course_id, permissions, db, client, redis,
-            ui_language=request.ui_language,
+            ui_language=ui_language,
             course_content_id=request.course_content_id,
         )
     except ComputorException:
