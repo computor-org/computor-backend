@@ -1,6 +1,6 @@
 # Barrierefreiheitserklärung computor.at / Accessibility statement
 
-Version 1.1, gültig ab 25.10.2026
+Version 1.2, Stand 29.10.2026
 
 Stand/Prüfmethode: Selbstbewertung, 30.09.2026
 
@@ -59,8 +59,8 @@ können Barrieren auch über „Problem melden“ in der Web-App mitteilen.
 Bei nicht zufriedenstellenden Antworten aus oben genannter Kontaktmöglichkeit
 können Sie sich mittels Beschwerde an die Beschwerdestelle der Österreichischen
 Forschungsförderungsgesellschaft mbH (FFG) wenden. Die FFG nimmt über das
-Kontaktformular der Beschwerdestelle Beschwerden auf elektronischem Weg
-entgegen.
+[Kontaktformular der Beschwerdestelle](https://www.digitalbarrierefrei.at/de/beschwerde-einreichen)
+Beschwerden auf elektronischem Weg entgegen.
 
 Die Beschwerden werden von der FFG dahingehend geprüft, ob sie sich auf
 Verstöße gegen die Vorgaben des Web-Zugänglichkeits-Gesetzes, insbesondere
@@ -125,8 +125,9 @@ of the page in question. Signed-in users can also report barriers through
 
 If the response received via the contact above is not satisfactory, you may
 file a complaint with the Austrian Research Promotion Agency (FFG). The FFG
-accepts complaints online via the electronic contact form of its complaints
-office (Beschwerdestelle).
+accepts complaints online via the
+[electronic contact form of its complaints office](https://www.digitalbarrierefrei.at/en/submit-a-complaint)
+(Beschwerdestelle).
 
 The FFG will examine whether the complaint relates to violations of the Web
 Accessibility Act, in particular a failure to comply with the accessibility
