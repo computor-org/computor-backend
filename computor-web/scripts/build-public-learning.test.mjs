@@ -124,6 +124,16 @@ test('translated titles and descriptions reach the catalog, the outline and the 
   assert(!('description_i18n' in course.materials['week_1.first']));
 });
 
+test('a unit description with translations is Markdown in each language', t => {
+  const f = fixture(t);
+  f.manifest.contents[0].description = 'Erste **Schritte**.';
+  f.manifest.contents[0].description_i18n = { de: 'Erste **Schritte**.', en: 'First **steps**.' };
+  f.manifests(f.manifest);
+  buildPublicLearning(f.source, f.output, revision);
+  const course = JSON.parse(fs.readFileSync(path.join(f.output, 'courses/python-beginner.json')));
+  assert.deepEqual(course.materials.week_1.markdown_variants, { de: 'Erste **Schritte**.', en: 'First **steps**.' });
+});
+
 test('an unmarked item description is Markdown in the course language', () => {
   assert.deepEqual(descriptionVariants('  Nur **deutsch**.\n', 'de'), { de: 'Nur **deutsch**.' });
   assert.deepEqual(descriptionVariants('Common\n<!-- lang: en -->\nEnglish\n<!-- lang: xx -->\nskip', 'de'),

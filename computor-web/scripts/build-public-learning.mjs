@@ -96,9 +96,11 @@ export function buildPublicLearning(source, destination, revision) {
         let i18n = translations(node);
         const variants = {};
         const media = new Set();
-        if (!node.example_identifier && description?.trim()) {
+        if (!node.example_identifier && (description?.trim() || i18n.description_i18n)) {
           // Rendered as Markdown in the reader's language, like an exercise.
-          Object.assign(variants, descriptionVariants(description, 'de'));
+          if (description?.trim()) Object.assign(variants, descriptionVariants(description, 'de'));
+          // An explicit translation wins over the stored text, as in the backend import.
+          Object.assign(variants, i18n.description_i18n);
           description = Object.values(variants)[0] ?? null;
         }
         if (node.example_identifier) {
