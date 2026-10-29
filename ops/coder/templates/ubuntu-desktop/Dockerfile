@@ -1,5 +1,5 @@
 # Ubuntu XFCE desktop workspace served in the browser via KasmVNC.
-FROM ubuntu:24.04@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3
+FROM ubuntu:24.10@sha256:cdf755952ed117f6126ff4e65810bf93767d4c38f5c7185b50ec1f1078b464cc
 
 ENV DEBIAN_FRONTEND=noninteractive
 
