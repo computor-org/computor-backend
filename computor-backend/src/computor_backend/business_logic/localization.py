@@ -55,3 +55,13 @@ def localize_dto(dto: Any, lang: Optional[str]) -> Any:
     title, description = localize(dto, lang)
     # A copy: cached DTOs are shared between requests and readers.
     return dto.model_copy(update={"title": title, "description": description})
+
+
+def localize_as(obj: Any, dto_cls: Any, lang: Optional[str]) -> Any:
+    """``obj`` as ``dto_cls`` resolved for ``lang``; unchanged without ``lang``."""
+    if not lang or obj is None:
+        return obj
+    # Staff views hand back ORM rows or cached dicts as well as DTOs.
+    if not isinstance(obj, dto_cls):
+        obj = dto_cls.model_validate(obj, from_attributes=True)
+    return localize_dto(obj, lang)
