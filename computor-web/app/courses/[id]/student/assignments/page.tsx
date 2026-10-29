@@ -22,7 +22,7 @@ import GradingStatusBadge, { isGradingVerdict } from '@/src/components/student/g
 import Toolbar from '@/src/components/ui/Toolbar';
 import TreeRow, { TreeRows } from '@/src/components/ui/TreeRow';
 import { formatUsageCompact } from '@/src/utils/limits';
-import { courseProgress } from '@/src/utils/studentProgress';
+import { courseProgress, STUDENT_CONTENTS_REFRESH_MS } from '@/src/utils/studentProgress';
 import { CourseProgressSummary } from '@/src/components/student/CourseProgress';
 import {
   ASSIGNMENT_STATES, ASSIGNMENT_STATE_COLOR, assignmentState, assignmentStateLabel, unitState,
@@ -109,7 +109,7 @@ export default function StudentCourseContentsPage() {
     const response = await apiFetch(`${API_BASE_URL}/students/course-contents?course_id=${courseId}&localize=${language}`);
     if (!response.ok) throw new Error(t.fetchFailed);
     return (await response.json()) as CourseContentStudentList[];
-  }, [courseId, language], { refreshOnFocus: true });
+  }, [courseId, language], { refreshOnFocus: true, refetchInterval: STUDENT_CONTENTS_REFRESH_MS });
   const courseContents = useMemo(() => data ?? [], [data]);
 
   const progress = useMemo(() => courseProgress(courseContents), [courseContents]);

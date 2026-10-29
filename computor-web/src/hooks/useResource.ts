@@ -76,12 +76,13 @@ export function useResource<T>(
     const handleVisibility = () => {
       if (!document.hidden) run(true);
     };
-    document.addEventListener('visibilitychange', handleVisibility);
+    // refreshOnFocus already refreshes on return, once per burst of events.
+    if (!refreshOnFocus) document.addEventListener('visibilitychange', handleVisibility);
     return () => {
       clearInterval(id);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [authLoading, isAuthenticated, enabled, refetchInterval, run]);
+  }, [authLoading, isAuthenticated, enabled, refetchInterval, refreshOnFocus, run]);
 
   // Opt in when work can finish in another tab or application. This does not poll.
   useEffect(() => {
