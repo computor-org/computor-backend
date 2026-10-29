@@ -225,7 +225,7 @@ test.describe('German learner', () => {
 
     await expect(page.getByTestId('course-progress')).toContainText('Weiter mit: Woche 3 › Beta-Absorption', { timeout: 15_000 });
     await expect(page.getByText('2/2 eingereicht')).toHaveCount(2);
-    await expect(page.getByText('2 Elemente', { exact: true })).toBeVisible();
+    await expect(page.getByText('2 Aufgaben', { exact: true })).toBeVisible();
     // Only the "Weiter mit" line points at it; the row has no second marker.
     await expect(page.getByText('Weiter hier', { exact: true })).toHaveCount(0);
   });

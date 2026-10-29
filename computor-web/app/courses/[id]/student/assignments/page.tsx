@@ -40,6 +40,7 @@ const COPY = {
     emptyDescription: 'Aufgaben erscheinen hier, sobald deine Lehrenden sie veröffentlichen.',
     collapseAll: 'Alle einklappen',
     expandAll: 'Alle ausklappen',
+    assignments: (n: number) => (n === 1 ? '1 Aufgabe' : `${n} Aufgaben`),
     items: (n: number) => (n === 1 ? '1 Element' : `${n} Elemente`),
     unitProgress: (s: number, n: number) => `${s}/${n} eingereicht`,
     unitProgressTitle: (s: number, n: number) => `${s} von ${n} Aufgaben dieser Einheit eingereicht`,
@@ -64,6 +65,7 @@ const COPY = {
     emptyDescription: 'Assignments will appear here once they are published by your instructor.',
     collapseAll: 'Collapse all',
     expandAll: 'Expand all',
+    assignments: (n: number) => `${n} ${n === 1 ? 'assignment' : 'assignments'}`,
     items: (n: number) => `${n} ${n === 1 ? 'item' : 'items'}`,
     unitProgress: (s: number, n: number) => `${s}/${n} submitted`,
     unitProgressTitle: (s: number, n: number) => `${s} of ${n} assignments in this unit submitted`,
@@ -239,7 +241,8 @@ export default function StudentCourseContentsPage() {
                             </Badge>
                           ) : (
                             <Badge tone="muted" className="shrink-0">
-                              {t.items(unit?.total ?? childCount)}
+                              {/* A unit with no assignment below it has no progress entry, so its children are counted instead. */}
+                              {unit ? t.assignments(unit.total) : t.items(childCount)}
                             </Badge>
                           )
                         )}
