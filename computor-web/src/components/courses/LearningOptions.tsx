@@ -9,6 +9,7 @@ export const COMPUTOR_EXTENSION_URL = 'https://marketplace.visualstudio.com/item
 
 const COPY = {
   de: {
+    options: 'Lernmöglichkeiten',
     full: 'Alle Arbeitsumgebungen im Browser sind belegt. Weiterarbeiten mit:',
     choose: 'Wo möchtest du arbeiten?',
     hosted: 'Im Browser arbeiten',
@@ -16,6 +17,7 @@ const COPY = {
     note: 'Codespaces nutzt dein GitHub-Kontingent. Zum Einreichen und für Fragen an Lena melde dich an.',
   },
   en: {
+    options: 'Learning options',
     full: 'Hosted workspaces are full. Keep working:',
     choose: 'Choose where to work',
     hosted: 'Hosted workspace',
@@ -28,7 +30,7 @@ export default function LearningOptions({ capacity = false, language }: { capaci
   const browserLanguage = useBrowserLanguage();
   const t = COPY[language ?? browserLanguage];
   return (
-    <aside aria-label="Learning options" className="rounded-lg border border-rule bg-surface p-5 text-left">
+    <aside aria-label={t.options} className="rounded-lg border border-rule bg-surface p-5 text-left">
       <h3 className="text-lg font-semibold text-fg">
         {capacity ? t.full : t.choose}
       </h3>

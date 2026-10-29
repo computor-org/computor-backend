@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Fragment } from 'react';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 export interface Crumb {
   label: string;
@@ -17,8 +18,9 @@ export interface Crumb {
  * The last item is the current page (not a link).
  */
 export default function Breadcrumbs({ items }: { items: Crumb[] }) {
+  const language = useUiLanguage();
   return (
-    <nav aria-label="Breadcrumb" className="mb-4">
+    <nav aria-label={language === 'de' ? 'Navigationspfad' : 'Breadcrumb'} className="mb-4">
       <ol className="flex flex-wrap items-center gap-1.5 text-sm text-muted">
         {items.map((item, i) => {
           const last = i === items.length - 1;

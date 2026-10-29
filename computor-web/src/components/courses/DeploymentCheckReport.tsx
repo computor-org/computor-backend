@@ -4,6 +4,43 @@ import type { ReactNode } from 'react';
 import type { CourseDeployResult, CourseDeployWarning } from '@/src/generated/types/common';
 import Button from '../ui/Button';
 import Spinner from '../ui/Spinner';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+
+const COPY = {
+  de: {
+    clear: 'Datei entfernen',
+    waiting: 'Wähle oben eine Kursfamilie, dann wird die Datei automatisch geprüft.',
+    checking: 'Datei wird geprüft …',
+    unusable: 'Diese Datei lässt sich nicht verwenden.',
+    recheck: 'Erneut prüfen',
+    counts: (types: number, units: number, assignments: number, examples: number) =>
+      `${types} Inhaltstypen · ${units} Einheiten · ${assignments} Aufgaben · ${examples} Beispiele`,
+    errors: (n: number) => n === 1
+      ? 'Ein Problem blockiert diese Datei. Behebe es und lade sie erneut hoch:'
+      : `${n} Probleme blockieren diese Datei. Behebe sie und lade sie erneut hoch:`,
+    warnings: (n: number, created: boolean) => (n === 1
+      ? 'Eine Angabe fehlt oder ist unvollständig'
+      : `${n} Angaben fehlen oder sind unvollständig`) + (created ? ':' : '. Der Kurs kann trotzdem angelegt werden:'),
+    ready: 'Alles in Ordnung, der Kurs kann angelegt werden.',
+    created: (withIssues: boolean) => withIssues ? 'Kurs angelegt, mit den oben genannten Mängeln.' : 'Kurs angelegt.',
+    open: 'Kurs öffnen',
+  },
+  en: {
+    clear: 'Clear file',
+    waiting: 'Select a course family above — the file is then checked automatically.',
+    checking: 'Checking the file…',
+    unusable: 'This file can’t be used.',
+    recheck: 'Check again',
+    counts: (types: number, units: number, assignments: number, examples: number) =>
+      `${types} content types · ${units} units · ${assignments} assignments · ${examples} examples`,
+    errors: (n: number) => `${n === 1 ? '1 problem blocks' : `${n} problems block`} this file — fix it and upload it again:`,
+    warnings: (n: number, created: boolean) =>
+      `${n === 1 ? '1 thing is' : `${n} things are`} missing or incomplete${created ? ':' : ' — the course can still be created:'}`,
+    ready: 'Everything checks out — ready to create.',
+    created: (withIssues: boolean) => `Course created${withIssues ? ' with the issues above.' : '.'}`,
+    open: 'Open course',
+  },
+};
 
 /**
  * Where the automatic check of an uploaded `course_deployment.yaml` stands.
@@ -45,11 +82,12 @@ export default function DeploymentCheckReport({
   onRecheck?: () => void;
   onOpenCourse?: () => void;
 }) {
+  const t = COPY[useUiLanguage()];
   return (
     <div className="mt-2">
       <div>
         <Button variant="ghost" size="xs" onClick={onClear}>
-          Clear file
+          {t.clear}
         </Button>
       </div>
       <Verdict
@@ -79,10 +117,11 @@ function Verdict({
   onRecheck?: () => void;
   onOpenCourse?: () => void;
 }): ReactNode {
+  const t = COPY[useUiLanguage()];
   if (status === 'waiting') {
     return (
       <div className={`${BOX} ${NEUTRAL} text-muted`}>
-        Select a course family above — the file is then checked automatically.
+        {t.waiting}
       </div>
     );
   }
@@ -90,8 +129,8 @@ function Verdict({
   if (status === 'checking') {
     return (
       <div className={`${BOX} ${NEUTRAL} flex items-center gap-2 text-muted`}>
-        <Spinner size="sm" label="Checking the file" />
-        Checking the file…
+        <Spinner size="sm" label={t.checking} />
+        {t.checking}
       </div>
     );
   }
@@ -99,12 +138,12 @@ function Verdict({
   if (status === 'failed') {
     return (
       <div className={`${BOX} border-danger-line bg-danger-wash text-danger-text`}>
-        <div className="font-medium">This file can’t be used.</div>
+        <div className="font-medium">{t.unusable}</div>
         <div>{failure}</div>
         {onRecheck && (
           <div className="pt-1">
             <Button variant="ghost" size="xs" onClick={onRecheck}>
-              Check again
+              {t.recheck}
             </Button>
           </div>
         )}
@@ -130,16 +169,12 @@ function Verdict({
         <span className="font-mono text-muted">({result.course_path})</span>
       </div>
       <div className="text-muted">
-        {s.content_types ?? 0} content types · {s.units ?? 0} units · {s.assignments ?? 0} assignments ·{' '}
-        {s.examples_assigned ?? 0} examples
+        {t.counts(s.content_types ?? 0, s.units ?? 0, s.assignments ?? 0, s.examples_assigned ?? 0)}
       </div>
 
       {errors.length > 0 && (
         <div className="pt-1 text-danger-text">
-          <div className="font-medium">
-            {errors.length === 1 ? '1 problem blocks' : `${errors.length} problems block`} this file
-            — fix it and upload it again:
-          </div>
+          <div className="font-medium">{t.errors(errors.length)}</div>
           <ul className="list-disc pl-4">
             {errors.map((e, i) => (
               <li key={i}>{e}</li>
@@ -150,10 +185,7 @@ function Verdict({
 
       {warnings.length > 0 && (
         <div className="pt-1 text-warn-text">
-          <div className="font-medium">
-            {warnings.length === 1 ? '1 thing is' : `${warnings.length} things are`} missing or
-            incomplete{createdCourseId ? ':' : ' — the course can still be created:'}
-          </div>
+          <div className="font-medium">{t.warnings(warnings.length, Boolean(createdCourseId))}</div>
           <ul className="list-disc pl-4">
             {warnings.map((w, i) => (
               <li key={i}>{warningText(w)}</li>
@@ -163,14 +195,14 @@ function Verdict({
       )}
 
       {errors.length === 0 && warnings.length === 0 && !createdCourseId && (
-        <div className="text-success-text">Everything checks out — ready to create.</div>
+        <div className="text-success-text">{t.ready}</div>
       )}
 
       {createdCourseId && (
         <div className="flex items-center gap-2 pt-1 text-success-text">
-          <span>Course created{warnings.length > 0 ? ' with the issues above.' : '.'}</span>
+          <span>{t.created(warnings.length > 0)}</span>
           <Button variant="ghost" size="xs" onClick={onOpenCourse}>
-            Open course
+            {t.open}
           </Button>
         </div>
       )}

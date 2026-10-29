@@ -92,7 +92,17 @@ const DE: Record<string, string> = {
   "Submissions": "Abgaben",
   "archived contents hidden.": "archivierte Inhalte ausgeblendet.",
   "Upload": "Hochladen",
-  "Could not load assignments.": "Die Aufgaben konnten nicht geladen werden."
+  "Could not load assignments.": "Die Aufgaben konnten nicht geladen werden.",
+  "Delete": "Löschen",
+  "Directory": "Verzeichnis",
+  "Description": "Beschreibung",
+  "Tags": "Schlagwörter",
+  "Versions": "Versionen",
+  "No versions.": "Keine Versionen.",
+  "View repository": "Repository ansehen",
+  "Upload new version": "Neue Version hochladen",
+  "Example": "Beispiel",
+  "This permanently deletes the example and all its versions.": "Damit werden das Beispiel und alle seine Versionen endgültig gelöscht.",
 };
 
 export function useLecturerCopy() {
