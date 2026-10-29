@@ -69,6 +69,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_compose_testing_bounds.py
           computor-backend/src/computor_backend/tests/test_workspace_launch_context.py
           computor-backend/src/computor_backend/tests/test_reading_language.py
+          computor-backend/src/computor_backend/tests/test_localized_titles.py
           computor-backend/src/computor_backend/tests/test_student_description_download.py
           computor-backend/src/computor_backend/tests/test_forgejo_image_pin.py
           computor-backend/src/computor_backend/tests/test_forgejo_clone_token_persistence.py
@@ -168,6 +169,8 @@ jobs:
           computor-backend/src/computor_backend/tests/test_admin_mfa_db.py
           computor-backend/src/computor_backend/tests/test_course_analytics_db.py
           computor-backend/src/computor_backend/tests/test_support_tickets_db.py
+          computor-backend/src/computor_backend/tests/test_course_deploy_i18n.py
+          computor-backend/src/computor_backend/tests/test_sync_course_metadata.py
 
   grading-isolation:
     # Required jobs run in the merge queue, not on pull request events.

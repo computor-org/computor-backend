@@ -22,9 +22,11 @@ from sqlalchemy_utils import Ltree
 from computor_backend.model.course import (
     Course,
     CourseContent,
+    CourseContentKind,
     CourseContentType,
     CourseFamily,
 )
+from computor_backend.model.language import Language
 from computor_backend.model.organization import Organization
 from computor_backend.scripts.sync_course_metadata import sync_course
 
@@ -58,6 +60,15 @@ def db():
 @pytest.fixture
 def deployed(db):
     """A course as the first release left it: old name, one week, one assignment."""
+    # The CI schema comes from create_all, without the migrations' seed rows.
+    for kind, submittable in (("unit", False), ("assignment", True)):
+        if db.get(CourseContentKind, kind) is None:
+            db.add(CourseContentKind(id=kind, title=kind.title(), has_ascendants=True,
+                                     has_descendants=not submittable, submittable=submittable))
+    for code, name in (("de", "German"), ("en", "English")):
+        if db.get(Language, code) is None:
+            db.add(Language(code=code, name=name))
+    db.flush()
     suffix = uuid.uuid4().hex[:10]
     org = Organization(title="Sync Org", organization_type="organization",
                        path=Ltree(f"sync_{suffix}"), properties={})
@@ -158,3 +169,48 @@ def test_apply_writes_metadata_and_leaves_assignments_to_a_release(db, deployed)
     again = sync_course(db, _config(deployed), apply=False)
     assert again.fixable == []
     assert len(again.blocking) == 4
+
+
+@pytest.mark.integration
+def test_a_file_without_maps_leaves_stored_maps_alone(db, deployed):
+    deployed.title_i18n = {"en": "Data Science – Foundations"}
+    deployed.language_code = "de"
+    db.flush()
+
+    drift = sync_course(db, _config(deployed), apply=True)
+    db.flush()
+    db.refresh(deployed)
+
+    assert not [line for line in drift.fixable if "i18n" in line or "language_code" in line]
+    assert deployed.title_i18n == {"en": "Data Science – Foundations"}
+    assert deployed.language_code == "de"
+
+
+@pytest.mark.integration
+def test_maps_and_language_code_drift_like_the_titles(db, deployed):
+    deployed.language_code = "en"
+    db.flush()
+    config = _config(deployed)
+    config["language_code"] = "de"
+    config["title_i18n"] = {"en": "Data Science I – Foundations"}
+    config["content_types"][1]["title_i18n"] = {"en": "Week"}
+    config["contents"][0]["title_i18n"] = {"en": "Welcome"}
+    config["contents"][1]["description_i18n"] = {"en": "First steps"}
+
+    check = sync_course(db, config, apply=False)
+    assert "course language_code: 'en' -> 'de'" in check.fixable
+    assert "course title_i18n: None -> {'en': 'Data Science I – Foundations'}" in check.fixable
+    assert "content type weekly title_i18n: None -> {'en': 'Week'}" in check.fixable
+    assert "week_1 description_i18n: None -> {'en': 'First steps'}" in check.fixable
+
+    sync_course(db, config, apply=True)
+    db.flush()
+    db.refresh(deployed)
+    contents = _contents(db, deployed)
+
+    assert deployed.language_code == "de"
+    assert deployed.title_i18n == {"en": "Data Science I – Foundations"}
+    assert db.get(CourseContentType, contents["week_1"].course_content_type_id).title_i18n == {"en": "Week"}
+    assert contents["welcome"].title_i18n == {"en": "Welcome"}  # a new unit gets its map
+    assert contents["week_1"].description_i18n == {"en": "First steps"}
+    assert sync_course(db, config, apply=False).fixable == []

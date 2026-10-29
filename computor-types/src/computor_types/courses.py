@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator, ConfigDict
-from typing import Optional
+from typing import Dict, Optional
 from datetime import datetime
 
 
@@ -29,6 +29,10 @@ class CourseCreate(BaseModel):
     id: Optional[str] = None
     title: Optional[str] = None
     description: Optional[str] = None
+    # Other languages for the two fields above, {"de": ..., "en": ...}; the
+    # plain fields stay the source text and the fallback (issue #550).
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     path: str
     course_family_id: str
     language_code: Optional[str] = None
@@ -112,6 +116,8 @@ class CourseList(BaseModel):
     id: str
     title: Optional[str] = None
     description: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
     path: str
@@ -148,6 +154,8 @@ class CourseUpdate(BaseModel):
     position: Optional[float] = Field(default=None, allow_inf_nan=False)
     title: Optional[str] = None
     description: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     language_code: Optional[str] = None
     # Course-wide defaults for the per-assignment test/submission budgets.
     # None means "no default"; a course content value overrides these, and a
@@ -216,6 +224,8 @@ class CoursePublicList(BaseModel):
     id: str
     title: Optional[str] = None
     description: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     # Kept so the web `displayName()` helper can fall back to the slug for a
     # course whose title was never set, as it does for every other course view.
     path: str
@@ -263,6 +273,8 @@ class CoursePublicCatalogEntry(BaseModel):
     id: str
     title: Optional[str] = None
     description: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     language_code: Optional[str] = None
     # TODO(#415): add seats_left / full once course capacity (PR #242) lands.
 

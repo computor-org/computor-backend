@@ -236,6 +236,10 @@ class CourseContentTypeConfig(BaseDeployment):
     slug: str = Field(description="Unique identifier for the content type")
     title: Optional[str] = Field(None, description="Display title for the content type")
     description: Optional[str] = Field(None, description="Description of the content type")
+    # Other languages, keyed by language code ("de", "en"); title stays the
+    # source text and the fallback (issue #550).
+    title_i18n: Optional[Dict[str, str]] = Field(None, description="Title per language code")
+    description_i18n: Optional[Dict[str, str]] = Field(None, description="Description per language code")
     color: Optional[str] = Field("green", description="Display color (hex, rgb, hsl, or named color)")
     properties: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Additional properties")
     kind: str = Field(description="ID of the course content kind (e.g., 'assignment', 'unit')")
@@ -269,6 +273,8 @@ class CourseContentConfig(BaseDeployment):
     title: Optional[str] = Field(default=None, description="Title of the course content (defaults from example if submittable)")
     path: Optional[str] = Field(default=None, description="Hierarchical path using dots (optional; generated when omitted)")
     description: Optional[str] = Field(None, description="Description of the content")
+    title_i18n: Optional[Dict[str, str]] = Field(None, description="Title per language code, e.g. {'de': 'Woche 1', 'en': 'Week 1'}")
+    description_i18n: Optional[Dict[str, str]] = Field(None, description="Description per language code")
     content_type: str = Field(description="Slug of the course content type (must match a defined content_type)")
     position: Optional[float] = Field(None, description="Position for ordering (defaults to auto-increment)")
     max_group_size: Optional[int] = Field(None, description="Maximum group size for submissions")
@@ -364,6 +370,11 @@ class CourseConfig(BaseDeployment):
     name: str = Field(description="Course display name")
     path: str = Field(description="Course path/slug")
     description: Optional[str] = Field(None, description="Course description")
+    title_i18n: Optional[Dict[str, str]] = Field(None, description="Course title per language code, e.g. {'de': 'Grundlagen', 'en': 'Foundations'}")
+    description_i18n: Optional[Dict[str, str]] = Field(None, description="Course description per language code")
+    # The language the course text is written in; fills course.language_code.
+    # Not ServiceConfig.language, which is a programming language (#550).
+    language_code: Optional[str] = Field(None, pattern="^[a-z]{2}$", description="Two-letter language code of the course content")
     projects: Optional[CourseProjects] = Field(None, description="Course project structure")
 
     # New service-based architecture

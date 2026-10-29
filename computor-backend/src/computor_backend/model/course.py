@@ -153,6 +153,10 @@ class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     properties = Column(JSONB)
     title = Column(String(255))
     description = Column(String(4096))
+    # Other languages for the two strings above, {"de": ..., "en": ...}; those
+    # stay the source text and the fallback (issue #550).
+    title_i18n = Column(JSONB)
+    description_i18n = Column(JSONB)
     path = Column(LtreeType, nullable=False)
     course_family_id = Column(ForeignKey('course_family.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     organization_id = Column(ForeignKey('organization.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
@@ -221,6 +225,8 @@ class CourseContentType(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     properties = Column(JSONB)
     title = Column(String(255))
     description = Column(String(4096))
+    title_i18n = Column(JSONB)
+    description_i18n = Column(JSONB)
     slug = Column(String(255), nullable=False)
     color = Column(String(255))
     course_content_kind_id = Column(ForeignKey('course_content_kind.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
@@ -266,6 +272,8 @@ class CourseContent(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     archived_at = Column(DateTime(timezone=True))
     title = Column(String(255))
     description = Column(String(4096))
+    title_i18n = Column(JSONB)
+    description_i18n = Column(JSONB)
     path = Column(LtreeType, nullable=False)
     course_id = Column(ForeignKey('course.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
     course_content_type_id = Column(ForeignKey('course_content_type.id', ondelete='RESTRICT', onupdate='RESTRICT'), nullable=False)

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict, field_validator
-from typing import Optional
+from typing import Dict, Optional
 
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 from computor_types.course_content_kind import CourseContentKindGet, CourseContentKindList
@@ -27,6 +27,10 @@ class CourseContentTypeCreate(BaseModel):
     slug: str
     title: Optional[str] = None
     description: Optional[str] = None
+    # Other languages for the two fields above, keyed by language code; the
+    # plain fields stay the source text and the fallback (issue #550).
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     color: Optional[str] = 'green'
     properties: Optional[dict] = None
     course_id: str
@@ -45,6 +49,8 @@ class CourseContentTypeGet(BaseEntityGet):
     slug: str
     title: Optional[str] = None
     description: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     color: str
     properties: Optional[dict] = None
     course_id: str
@@ -58,6 +64,8 @@ class CourseContentTypeList(BaseModel):
     id: str
     slug: str
     title: Optional[str] = None
+    # No ``description`` on this DTO, so only the title has a translation map.
+    title_i18n: Optional[Dict[str, str]] = None
     color: str
     course_id: str
     course_content_kind_id: str
@@ -71,6 +79,8 @@ class CourseContentTypeUpdate(BaseModel):
     title: Optional[str] = None
     color: Optional[str] = None
     description: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     properties: Optional[dict] = None
 
     model_config = ConfigDict(from_attributes=True)

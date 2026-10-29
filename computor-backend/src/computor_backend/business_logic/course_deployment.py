@@ -51,6 +51,7 @@ from computor_backend.model.course import (
     CourseFamily,
 )
 from computor_backend.model.example import Example
+from computor_backend.model.language import Language
 from computor_backend.model.organization import Organization
 from computor_backend.model.service import Service
 from computor_backend.permissions.handlers import permission_registry
@@ -165,6 +166,11 @@ def deploy_course_from_config(
         if existing:
             errors.append(f"A course with path '{config.path}' already exists in this family")
 
+    # course.language_code is a foreign key; an unknown code would fail the
+    # apply only after the course row was written.
+    if config.language_code and not db.query(Language).filter(Language.code == config.language_code).first():
+        errors.append(f"Unknown course language_code '{config.language_code}'")
+
     # --- resolve service slugs (for testing_service_id on assignments)
     service_ids: Dict[str, str] = {}
     for svc in (config.services or []):
@@ -269,6 +275,8 @@ def deploy_course_from_config(
                 content = CourseContent(
                     title=c.title or _humanize(c.path),
                     description=c.description,
+                    title_i18n=c.title_i18n or None,
+                    description_i18n=c.description_i18n or None,
                     path=Ltree(full),
                     course_id=ct_row.course_id,
                     course_content_type_id=ct_row.id,
@@ -352,6 +360,8 @@ def deploy_course_from_config(
         title=config.name,
         position=config.position,
         description=config.description or "",
+        title_i18n=config.title_i18n or None,
+        description_i18n=config.description_i18n or None,
         path=Ltree(config.path),
         course_family_id=family.id,
         organization_id=family.organization_id,
@@ -359,6 +369,8 @@ def deploy_course_from_config(
         created_by=permissions.user_id,
         updated_by=permissions.user_id,
     )
+    if config.language_code:
+        course.language_code = config.language_code
     db.add(course)
     db.flush()
 
@@ -377,6 +389,8 @@ def deploy_course_from_config(
             slug=ct.slug,
             title=ct.title,
             description=ct.description,
+            title_i18n=ct.title_i18n or None,
+            description_i18n=ct.description_i18n or None,
             color=ct.color or "green",
             properties=dict(ct.properties) if ct.properties else {},
             course_id=course.id,

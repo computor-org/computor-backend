@@ -34,6 +34,10 @@ class CourseContentCreate(BaseModel):
     """DTO for creating course content."""
     title: Optional[str] = None
     description: Optional[str] = None
+    # Other languages for the two fields above, keyed by language code; the
+    # plain fields stay the source text and the fallback (issue #550).
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     path: str
     course_id: str
     course_content_type_id: str
@@ -63,6 +67,8 @@ class CourseContentGet(BaseEntityGet):
     archived_at: Optional[datetime] = None
     title: Optional[str] = None
     description: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     path: str
     course_id: str
     course_content_type_id: str
@@ -112,6 +118,8 @@ class CourseContentList(BaseModel):
     id: str
     title: Optional[str] = None
     description: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     path: str
     course_id: str
     course_content_type_id: str
@@ -173,6 +181,8 @@ class CourseContentUpdate(BaseModel):
     """
     title: Optional[str] = None
     description: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     course_content_type_id: Optional[str] = None
     properties: Optional[CourseContentProperties] = None
     position: Optional[float] = None

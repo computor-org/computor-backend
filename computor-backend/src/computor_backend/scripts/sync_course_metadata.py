@@ -7,9 +7,11 @@ This compares each ``courses/*.yaml`` (a ``HierarchicalCourseConfig``) with the
 course of the same path and reports every difference; ``--apply`` writes the
 ones that are metadata only:
 
-- course title, description and position,
+- course title, description, position and language_code,
 - content type titles and colours, and missing content types,
 - content titles, descriptions and positions,
+- the per-language ``title_i18n`` / ``description_i18n`` maps of all three,
+  where the file has them,
 - missing units (non-submittable contents),
 - units the file no longer has (archived and hidden), unless an assignment is
   still deployed beneath them.
@@ -36,6 +38,7 @@ import yaml
 from sqlalchemy.orm import Session
 from sqlalchemy_utils import Ltree
 
+from computor_backend.business_logic.localization import i18n_map
 from computor_backend.model.course import (
     Course,
     CourseContent,
@@ -65,6 +68,14 @@ def _differs(current: Any, wanted: Any) -> bool:
     return current != wanted
 
 
+_I18N_KEYS = ("title_i18n", "description_i18n")
+
+
+def _i18n_fields(item: Dict[str, Any]) -> Dict[str, Any]:
+    # Only keys the file has: a file without maps leaves stored maps alone.
+    return {key: i18n_map(item[key]) for key in _I18N_KEYS if key in item}
+
+
 def sync_course(db: Session, config: Dict[str, Any], apply: bool) -> CourseDrift:
     """Compare (and with ``apply`` fix) one course; flushes but does not commit."""
     drift = CourseDrift(path=str(config["path"]))
@@ -87,9 +98,10 @@ def sync_course(db: Session, config: Dict[str, Any], apply: bool) -> CourseDrift
                     setattr(entity, attr, value)
 
     course_fields = {"title": config.get("name")}
-    for key in ("description", "position"):
+    for key in ("description", "position", "language_code"):
         if key in config:
             course_fields[key] = config[key]
+    course_fields.update(_i18n_fields(config))
     update(course, "course", course_fields)
 
     kinds = {k.id: k for k in db.query(CourseContentKind).all()}
@@ -100,7 +112,8 @@ def sync_course(db: Session, config: Dict[str, Any], apply: bool) -> CourseDrift
     for ct in config.get("content_types") or []:
         key = (ct["slug"], ct["kind"])
         if key in types:
-            update(types[key], f"content type {ct['slug']}", {"title": ct.get("title"), "color": ct.get("color")})
+            update(types[key], f"content type {ct['slug']}",
+                   {"title": ct.get("title"), "color": ct.get("color"), **_i18n_fields(ct)})
             continue
         drift.fixable.append(f"content type {ct['slug']} ({ct['kind']}) missing")
         if apply:
@@ -108,6 +121,7 @@ def sync_course(db: Session, config: Dict[str, Any], apply: bool) -> CourseDrift
                 slug=ct["slug"],
                 title=ct.get("title"),
                 color=ct.get("color"),
+                **_i18n_fields(ct),
                 properties=dict(ct.get("properties") or {}),
                 course_content_kind_id=ct["kind"],
                 course_id=course.id,
@@ -136,6 +150,7 @@ def sync_course(db: Session, config: Dict[str, Any], apply: bool) -> CourseDrift
         for key in ("description", "position"):
             if key in item:
                 fields[key] = item[key]
+        fields.update(_i18n_fields(item))
         row = contents.get(full)
         if row is None:
             if kind is None or kinds[kind].submittable:
@@ -149,6 +164,8 @@ def sync_course(db: Session, config: Dict[str, Any], apply: bool) -> CourseDrift
                 db.add(CourseContent(
                     title=fields["title"],
                     description=fields.get("description"),
+                    title_i18n=fields.get("title_i18n"),
+                    description_i18n=fields.get("description_i18n"),
                     path=Ltree(full),
                     course_id=course.id,
                     course_content_type_id=ct_row.id,
