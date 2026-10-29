@@ -365,6 +365,8 @@ export interface CourseContentPropertiesGet {
 export interface CourseContentCreate {
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   path: string;
   course_id: string;
   course_content_type_id: string;
@@ -390,6 +392,8 @@ export interface CourseContentGet {
   archived_at?: string | null;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   path: string;
   course_id: string;
   course_content_type_id: string;
@@ -419,6 +423,8 @@ export interface CourseContentList {
   id: string;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   path: string;
   course_id: string;
   course_content_type_id: string;
@@ -464,6 +470,8 @@ export interface CourseContentMoveRequest {
 export interface CourseContentUpdate {
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   course_content_type_id?: string | null;
   properties?: CourseContentProperties | null;
   position?: number | null;
@@ -684,6 +692,8 @@ export interface CourseContentStudentGet {
   archived_at?: string | null;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   path: string;
   course_id: string;
   course_content_type_id: string;
@@ -714,6 +724,8 @@ export interface CourseContentStudentList {
   id: string;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   path: string;
   course_id: string;
   course_content_type_id: string;
@@ -1026,6 +1038,8 @@ export interface CourseStudentGet {
   id: string;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   course_family_id?: string | null;
   organization_id?: string | null;
   course_content_types: CourseContentTypeGet[];
@@ -1037,6 +1051,8 @@ export interface CourseStudentList {
   id: string;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   course_family_id?: string | null;
   organization_id?: string | null;
   path: string;
@@ -1313,6 +1329,8 @@ export interface CourseCreate {
   id?: string | null;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   path: string;
   course_family_id: string;
   language_code?: string | null;
@@ -1330,6 +1348,8 @@ export interface CourseGet {
   id: string;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   path: string;
   course_family_id: string;
   language_code?: string | null;
@@ -1356,6 +1376,8 @@ export interface CourseList {
   id: string;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   course_family_id?: string | null;
   organization_id?: string | null;
   path: string;
@@ -1372,6 +1394,8 @@ export interface CourseUpdate {
   position?: number | null;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   language_code?: string | null;
   max_test_runs?: number | null;
   max_submissions?: number | null;
@@ -1416,6 +1440,8 @@ export interface CoursePublicList {
   id: string;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   path: string;
   language_code?: string | null;
   organization_title?: string | null;
@@ -1449,6 +1475,8 @@ export interface CoursePublicCatalogEntry {
   id: string;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   language_code?: string | null;
 }
 
@@ -1521,6 +1549,8 @@ export interface CourseContentTypeCreate {
   slug: string;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   color?: string | null;
   properties?: any | null;
   course_id: string;
@@ -1538,6 +1568,8 @@ export interface CourseContentTypeGet {
   slug: string;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   color: string;
   properties?: any | null;
   course_id: string;
@@ -1549,6 +1581,7 @@ export interface CourseContentTypeList {
   id: string;
   slug: string;
   title?: string | null;
+  title_i18n?: Record<string, string> | null;
   color: string;
   course_id: string;
   course_content_kind_id: string;
@@ -1560,6 +1593,8 @@ export interface CourseContentTypeUpdate {
   title?: string | null;
   color?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   properties?: any | null;
 }
 

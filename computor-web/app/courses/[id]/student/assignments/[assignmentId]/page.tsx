@@ -26,6 +26,7 @@ import GradingStatusBadge from '@/src/components/student/gradingStatus';
 import TestRunHistory from '@/src/components/student/TestRunHistory';
 import PublicLunaPanel from '@/src/components/student/PublicLunaPanel';
 import { displayName } from '@/src/utils/displayName';
+import { localizedText } from '@/src/utils/localizedText';
 import {
   descriptionHeading,
   descriptionInLanguage,
@@ -128,7 +129,7 @@ export default function AssignmentDetailPage() {
   const { data, loading, error } = useResource(async () => {
     const [assignment, selfEnrollment] = await Promise.all([
       studentsClient.studentGetCourseContentEndpointStudentsCourseContentsCourseContentIdGet(
-        { courseContentId: assignmentId },
+        { courseContentId: assignmentId, localize: language },
       ),
       // A course joined through the catalog has no tutors (issues#458), so the
       // grading panel must not promise that one will look at the submission.
@@ -151,7 +152,7 @@ export default function AssignmentDetailPage() {
       submissionsClient.listSubmissionArtifactsSubmissionsArtifactsGet({ submissionGroupId }),
     ]);
     return { assignment, selfEnrollment, results, artifacts };
-  }, [assignmentId, courseId, isOrdinaryLearner]);
+  }, [assignmentId, courseId, isOrdinaryLearner, language]);
   // The released README in the reading language, the same language as the
   // interface (computor-org/issues#552); the stored title and the example's
   // meta description are only the fallback.
@@ -178,9 +179,16 @@ export default function AssignmentDetailPage() {
   // example version that was deployed onto them.
   // The page title already shows the README heading, so it is not repeated.
   // A unit's own text may hold one section per language (welcome unit).
+  const exampleVersion = assignment?.deployment?.example_version;
   const description = readme
     ? (readmeHeading ? withoutLeadingHeading(readme.markdown) : readme.markdown)
-    : descriptionInLanguage(assignment?.description, language) || assignment?.deployment?.example_version?.description;
+    : descriptionInLanguage(assignment?.description, language) || localizedText(
+      exampleVersion?.description_i18n,
+      language,
+      // meta.yaml descriptions are English whatever `language` they declare
+      // (computor-org/issues#479), so other readers get only a translation.
+      language === 'en' ? exampleVersion?.description : null,
+    );
   // What VS Code can open: a released assignment, or a unit with authored text.
   const openable = assignment?.course_id === courseId && assignment.visible_effective !== false && (
     assignment.course_content_kind_id === 'unit'

@@ -27,6 +27,7 @@ import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWork
 import SelfEnrollmentHelp from '@/src/components/courses/SelfEnrollmentHelp';
 import CourseProgressCard from '@/src/components/student/CourseProgress';
 import { displayName } from '@/src/utils/displayName';
+import { localized } from '@/src/utils/localizedText';
 import { localizedRoleLabel } from '@/src/utils/courseRoles';
 import type { PersonalCloneCredentialGet } from 'types/generated';
 import { localeFor, languageName } from '@/src/utils/locale';
@@ -281,7 +282,8 @@ export default function CoursePage() {
     },
     [courseId, canManageMembers, isMember],
   );
-  const course = data?.course ?? null;
+  // Display only; the course edit page loads its own copy with the source text.
+  const course = localized(data?.course ?? null, language);
   const organization = data?.organization ?? null;
   const courseFamily = data?.courseFamily ?? null;
   const gitBinding = data?.gitBinding ?? null;

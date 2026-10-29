@@ -10,6 +10,7 @@ import ProgressTrack from '@/src/components/ui/ProgressTrack';
 import { ButtonLink } from '@/src/components/ui/Button';
 import { formatScore } from '@/src/components/ui/Score';
 import { displayName } from '@/src/utils/displayName';
+import { localizedUnitTitle } from '@/src/components/student/studentDescription';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useResource } from '@/src/hooks/useResource';
 import { courseProgress, progressPercent, type CourseProgress, type ProgressContent } from '@/src/utils/studentProgress';
@@ -80,7 +81,7 @@ export function CourseProgressSummary<T extends ProgressContent>({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="min-w-0 text-sm">
             <span className="text-muted">{progress.started ? t.continueWith : t.startWith}: </span>
-            {next.trail.length > 0 && <span className="text-muted">{next.trail.join(' › ')} › </span>}
+            {next.trail.length > 0 && <span className="text-muted">{next.trail.map((unit) => localizedUnitTitle(unit, language)).join(' › ')} › </span>}
             {/* The title opens the task page, as on main; VS Code opens from there. */}
             <Link href={`${assignmentsHref}/${next.item.id}`} className="font-medium text-fg hover:underline">
               {displayName(next.item)}
@@ -115,10 +116,10 @@ export default function CourseProgressCard({ courseId, language }: { courseId: s
   const isOrdinaryLearner = !isAdmin && !isOrganizationManager &&
     courseHasAtLeast(courseId, '_student') && !courseHasAtLeast(courseId, '_tutor');
   const { data } = useResource(async () => {
-    const response = await apiFetch(`${API_BASE_URL}/students/course-contents?course_id=${courseId}`);
+    const response = await apiFetch(`${API_BASE_URL}/students/course-contents?course_id=${courseId}&localize=${language}`);
     if (!response.ok) return null;
     return (await response.json()) as ProgressContent[];
-  }, [courseId], { refreshOnFocus: true });
+  }, [courseId, language], { refreshOnFocus: true });
   // Quietly absent while loading or on failure: the card is a shortcut, and the
   // assignment list stays the authority.
   if (!Array.isArray(data)) return null;

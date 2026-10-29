@@ -23,6 +23,7 @@ import { usePermissions } from '@/src/hooks/usePermissions';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { useResource } from '@/src/hooks/useResource';
 import { displayName } from '@/src/utils/displayName';
+import { localized } from '@/src/utils/localizedText';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { StudentsClient } from '@/src/generated/clients/StudentsClient';
 import { MessagesClient } from '@/src/generated/clients/MessagesClient';
@@ -124,7 +125,8 @@ export default function DashboardPage() {
     else window.location.assign(`/courses/${courseId}/student/assignments/${contentId}`);
     return true;
   };
-  const t = COPY[useUiLanguage()];
+  const language = useUiLanguage();
+  const t = COPY[language];
 
   const { data, loading, error } = useResource(async () => {
     const courses = await coursesClient.listCoursesCoursesGet({});
@@ -159,6 +161,7 @@ export default function DashboardPage() {
         .studentListCourseContentsEndpointStudentsCourseContentsGet({
           limit: 500,
           status: DEFAULT_REASONS.join(','),
+          localize: language,
         })
         .catch(() => []),
       messagesClient
@@ -181,7 +184,7 @@ export default function DashboardPage() {
       contents,
       announcements,
     };
-  }, []);
+  }, [language]);
 
   // The launch/editor runs in another tab, so its lifecycle changes must not
   // leave the mounted dashboard showing the pre-launch snapshot. Only poll
@@ -210,7 +213,7 @@ export default function DashboardPage() {
   }, [isAuthenticated, mayListWorkspaces, refreshWorkspaces]);
 
   const courses = data?.courses ?? [];
-  const courseTitles = new Map(courses.map((c) => [c.id, displayName(c, t.untitledCourse)]));
+  const courseTitles = new Map(courses.map((c) => [c.id, displayName(localized(c, language), t.untitledCourse)]));
   const attention = selectNeedsAttention(Array.isArray(data?.contents) ? data.contents : [], courseTitles, DEFAULT_REASONS, t.course);
   const workspaces = workspaceData ?? [];
   const announcements = data?.announcements ?? [];

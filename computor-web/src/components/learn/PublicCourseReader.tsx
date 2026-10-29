@@ -13,6 +13,7 @@ import EmptyState from '@/src/components/EmptyState';
 import PublicLearnShell from '@/src/components/learn/PublicLearnShell';
 import PublicMarkdown, { PublicMarkdownTitle } from '@/src/components/learn/PublicMarkdown';
 import { localizedTitle } from '@/src/components/learn/localize';
+import { localized } from '@/src/utils/localizedText';
 import { setUiLanguage, useBrowserLanguage, type UiLanguage } from '@/src/hooks/useBrowserLanguage';
 import type {
   PublicLearningContent,
@@ -192,6 +193,7 @@ export default function PublicCourseReader({
   const uiLanguage = useBrowserLanguage();
   const t = COPY[uiLanguage];
   const outline = loaded?.courseId === courseId ? loaded.outline : null;
+  const shownCourse = localized(outline, uiLanguage);
   const outlineLoading = loaded?.courseId !== courseId;
   const errorCode = loaded?.courseId === courseId ? loaded.error : null;
   const error = errorCode === 'not-found' ? t.notFound : errorCode ? t.loadFailed : null;
@@ -277,9 +279,9 @@ export default function PublicCourseReader({
               <div className="text-sm text-muted">
                 <Link href="/learn" className="text-accent-text hover:underline">{t.courses}</Link>
                 <span className="mx-2">/</span>
-                <span>{outline.title}</span>
+                <span>{shownCourse?.title}</span>
               </div>
-              <h1 className="mt-2 text-3xl font-bold text-fg">{outline.title}</h1>
+              <h1 className="mt-2 text-3xl font-bold text-fg">{shownCourse?.title}</h1>
               <p className="mt-2 text-sm text-muted">
                 {t.counts(outline.unit_count, outline.exercise_count)}
                 {outline.language_code ? ` · ${languageName(outline.language_code, uiLanguage)}` : ''}
@@ -320,8 +322,8 @@ export default function PublicCourseReader({
                       <div className="mt-4">
                         <PublicMarkdown assetBaseUrl={content.asset_base_url} mediaFiles={content.media_files} markdown={content.markdown} />
                       </div>
-                    ) : outline.description ? (
-                      <div className="mt-4 whitespace-pre-wrap text-body leading-7">{outline.description}</div>
+                    ) : shownCourse?.description ? (
+                      <div className="mt-4 whitespace-pre-wrap text-body leading-7">{shownCourse.description}</div>
                     ) : (
                       <p className="mt-4 text-muted">{t.noWelcome}</p>
                     )}

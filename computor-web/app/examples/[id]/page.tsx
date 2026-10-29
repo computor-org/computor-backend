@@ -18,6 +18,7 @@ import type { ExampleVersionList } from 'types/generated';
 import { useLecturerCopy } from '@/src/hooks/useLecturerCopy';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { formatDate } from '@/src/utils/locale';
+import { localized, localizedText } from '@/src/utils/localizedText';
 
 const examplesClient = new ExamplesClient();
 
@@ -38,7 +39,7 @@ export default function ExampleDetailPage() {
     [exampleId],
     { enabled: canViewExamples },
   );
-  const example = data?.example ?? null;
+  const example = localized(data?.example ?? null, language);
   const versions = data?.versions ?? [];
 
   async function doDelete() {
@@ -118,7 +119,7 @@ export default function ExampleDetailPage() {
                   {versions.map((v) => (
                     <div key={v.id} className="flex items-center justify-between px-4 py-3">
                       <div className="font-mono text-sm text-fg">v{v.version_tag}</div>
-                      <div className="text-sm text-muted truncate flex-1 px-4">{v.title || ''}</div>
+                      <div className="text-sm text-muted truncate flex-1 px-4">{localizedText(v.title_i18n, language, v.title) || ''}</div>
                       <div className="text-xs text-subtle">{formatDate(v.created_at, language, '')}</div>
                     </div>
                   ))}

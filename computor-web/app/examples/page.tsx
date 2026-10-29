@@ -14,12 +14,15 @@ import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
 import type { ExampleRepositoryList } from 'types/generated';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { localizedText } from '@/src/utils/localizedText';
 
 const examplesClient = new ExamplesClient();
 const exampleRepositoriesClient = new ExampleRepositoriesClient();
 
 export default function ExamplesPage() {
   const t = useLecturerCopy();
+  const language = useUiLanguage();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { canViewExamples, canManageExamples } = usePermissions();
   const [repoFilter, setRepoFilter] = useState('');
@@ -85,7 +88,7 @@ export default function ExamplesPage() {
             {visible.map((ex) => (
               <Link key={ex.id} href={`/examples/${ex.id}`} className="flex items-center justify-between bg-surface border border-rule rounded-lg p-4 hover:border-accent-line hover:shadow-sm transition-all">
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-fg truncate">{ex.title || ex.directory}</div>
+                  <div className="text-sm font-medium text-fg truncate">{localizedText(ex.title_i18n, language, ex.title) || ex.directory}</div>
                   <div className="text-xs text-subtle font-mono truncate">{ex.identifier}</div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
