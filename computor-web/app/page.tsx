@@ -59,7 +59,7 @@ const COPY = {
     toCatalog: 'Join a course',
     steps: [
       ['book', 'Read the courses', <>Readable without an account. Start with the basics, week 1.</>],
-      ['code', 'Practise in the browser', <>With an account you start the course environment in the browser, no installation needed. There you edit, test and submit the tasks.</>],
+      ['code', 'Practice in the browser', <>With an account you start the course environment in the browser, no installation needed. There you edit, test and submit the tasks.</>],
       ['chat', 'Ask Lena', <>Lena, the AI tutor, gives hints instead of complete solutions. Mention {mention('@lena')} in the messages of a task.</>],
     ],
     local: 'Prefer to work locally?',

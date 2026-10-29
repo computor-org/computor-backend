@@ -20,17 +20,79 @@ import { fileInputCls, inputCls } from '@/src/components/ui/tokens';
 import type { CourseFamilyList, CourseGitBindingUpsert } from '@/src/generated/types/courses';
 import type { CourseDeployResult, GitServerGet } from '@/src/generated/types/common';
 import { displayName } from '@/src/utils/displayName';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { COURSE_FORM_COPY, STUDENT_REPO_MODES } from '@/src/components/courses/courseFormCopy';
 
 const coursesClient = new CoursesClient();
 const courseFamiliesClient = new CourseFamiliesClient();
 const gitServersClient = new GitServersClient();
 const systemClient = new SystemClient();
 
-const ALL_MODES = ['managed', 'external', 'download'];
-const MODE_LABELS: Record<string, string> = {
-  managed: 'Managed — we host it',
-  external: 'External — student-hosted (any provider)',
-  download: 'Download — no git',
+const COPY = {
+  de: {
+    loadFailed: 'Kursfamilien und Git-Server konnten nicht geladen werden.',
+    checkFailed: 'Die Datei konnte nicht geprüft werden.',
+    readFailed: 'Die Datei konnte nicht gelesen werden.',
+    gitFailed: 'Der Kurs wurde angelegt, aber die Git-Einrichtung ist fehlgeschlagen: ',
+    deployFailed: 'Bereitstellung fehlgeschlagen',
+    createFailed: 'Anlegen fehlgeschlagen',
+    forbidden: 'Du darfst keine Kurse anlegen.',
+    courses: 'Kurse',
+    newCrumb: 'Neu',
+    pageTitle: 'Neuer Kurs',
+    pageDescription: 'Ein Kurs ist ein Durchgang einer Lehrveranstaltung in einem Semester: Hier schreiben sich Studierende ein, erhalten ihre Repositories und geben ihre Arbeiten ab. Er gehört zu einer Kursfamilie, der Lehrveranstaltung.',
+    created: 'Angelegt ✓',
+    createFromFile: 'Aus Datei anlegen',
+    create: 'Anlegen',
+    family: 'Kursfamilie',
+    familyHint: 'Die Lehrveranstaltung, zu der dieser Kurs gehört. Fehlt sie, lege sie zuerst unter „Kursfamilien“ an.',
+    selectFamily: 'Kursfamilie wählen …',
+    untitledFamily: 'Kursfamilie ohne Titel',
+    importFile: 'Aus Datei importieren (optional)',
+    importHint: 'Lade eine course_deployment.yaml hoch, um den Kurs mit seinen Inhaltstypen und dem vollständigen Inhaltsbaum anzulegen. Pfad und Titel stammen aus der Datei, die automatisch geprüft wird.',
+    path: 'Pfad (Kurzname)',
+    pathHint: 'Kleingeschriebene, URL-taugliche Kennung, eindeutig innerhalb der Kursfamilie. Später nur schwer zu ändern.',
+    titleHint: 'Anzeigename dieses Durchgangs, z. B. „Algorithmen – Wintersemester 2026“.',
+    titlePlaceholder: 'Algorithmen – Wintersemester 2026',
+    gitFromFile: <>Git wird über den <code className="font-mono">git:</code>-Block der hochgeladenen Datei eingerichtet. Fehlt er, bleibt der Kurs ohne Git; du kannst es später auf der Bearbeitungsseite des Kurses einrichten.</>,
+    setUpGit: 'Git jetzt einrichten',
+    deliveryHint: 'Wie Studierende die Aufgaben erhalten: als Fork oder Klon eines Vorlagen-Repositorys (Git) oder als Archiv zum Herunterladen.',
+    deliveryGit: 'Git (Vorlage forken oder klonen)',
+    deliveryDownload: 'Download (Archiv)',
+    deployNow: 'Aufgaben jetzt bereitstellen: Sie werden nach dem Anlegen des Kurses in das Vorlagen-Repository übertragen.',
+  },
+  en: {
+    loadFailed: 'Failed to load course families and git servers.',
+    checkFailed: 'The file could not be checked.',
+    readFailed: 'Could not read the file',
+    gitFailed: 'Course created, but git setup failed: ',
+    deployFailed: 'Deploy failed',
+    createFailed: 'Create failed',
+    forbidden: 'You do not have permission to create courses.',
+    courses: 'Courses',
+    newCrumb: 'New',
+    pageTitle: 'New course',
+    pageDescription: 'A course is one run of a lecture in a single term — students enroll here, get their repositories, and submit their work. It belongs to a course family (the lecture).',
+    created: 'Created ✓',
+    createFromFile: 'Create from file',
+    create: 'Create',
+    family: 'Course family',
+    familyHint: 'The lecture this course runs. Add it under Course Families first if it\'s missing.',
+    selectFamily: 'Select a course family…',
+    untitledFamily: 'Untitled Course Family',
+    importFile: 'Import from file (optional)',
+    importHint: 'Upload a course_deployment.yaml to create the course with its content types and full content tree. Identity (path/title) comes from the file, and it is checked automatically.',
+    path: 'Path (slug)',
+    pathHint: 'Lowercase, URL-safe identifier, unique within the course family. Hard to change later.',
+    titleHint: 'Display name for this run, e.g. \'Algorithms — Winter 2026\'.',
+    titlePlaceholder: 'Algorithms — Winter 2026',
+    gitFromFile: <>Git is configured by the uploaded file&apos;s <code className="font-mono">git:</code> block (or left unbound if it has none — you can set it later on the course&apos;s edit page).</>,
+    setUpGit: 'Set up git now',
+    deliveryHint: 'How students get assignments: fork/clone a template repo (git), or download an archive.',
+    deliveryGit: 'Git (fork/clone template)',
+    deliveryDownload: 'Download (archive)',
+    deployNow: 'Deploy assignments now — push them into the template repo once the course is created',
+  },
 };
 
 /**
@@ -50,6 +112,9 @@ function CreateInner() {
   const familyIdParam = useSearchParam('familyId');
   const { isAuthenticated, isLoading: authLoading, refreshPermissions } = useAuth();
   const { canManageHierarchy: canConfigureGit, canCreateCourse } = usePermissions();
+  const language = useUiLanguage();
+  const t = COPY[language];
+  const f = COURSE_FORM_COPY[language];
 
   const [families, setFamilies] = useState<CourseFamilyList[]>([]);
   const [servers, setServers] = useState<GitServerGet[]>([]);
@@ -112,7 +177,7 @@ function CreateInner() {
         setGitEnabled(!!def);
       }
     })().catch((e) => {
-      setError(e instanceof Error ? e.message : 'Failed to load course families and git servers.');
+      setError(e instanceof Error ? e.message : t.loadFailed);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAuthenticated, canConfigureGit]);
@@ -136,7 +201,7 @@ function CreateInner() {
           setCheck({
             key: checkKey,
             result: null,
-            failure: e instanceof Error ? e.message : 'The file could not be checked.',
+            failure: e instanceof Error ? e.message : t.checkFailed,
           });
         }
       }
@@ -165,7 +230,7 @@ function CreateInner() {
       setFileName(file.name);
       setFileText(text);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not read the file');
+      setError(e instanceof Error ? e.message : t.readFailed);
     }
   }
 
@@ -186,7 +251,7 @@ function CreateInner() {
       try {
         await coursesClient.upsertCourseGitBindingEndpointCoursesCourseIdGitPut({ courseId, body });
       } catch (e) {
-        throw new Error('Course created, but git setup failed: ' + (e instanceof Error ? e.message : ''));
+        throw new Error(t.gitFailed + (e instanceof Error ? e.message : ''));
       }
     }
   }
@@ -224,7 +289,7 @@ function CreateInner() {
           courseFamilyId: familyId,
           body: { yaml: fileText, validate_only: false },
         })) as unknown as CourseDeployResult;
-        if (!res.course_id) throw new Error(res.errors?.join('; ') || 'Deploy failed');
+        if (!res.course_id) throw new Error(res.errors?.join('; ') || t.deployFailed);
         // The deployment file has no field for this course setting; apply the
         // form's choice to the course the file just created.
         if (autoRoute) {
@@ -276,12 +341,12 @@ function CreateInner() {
     } catch (e) {
       setSaving(false);
       setConfirmOpen(false);
-      setError(e instanceof Error ? e.message : 'Create failed');
+      setError(e instanceof Error ? e.message : t.createFailed);
     }
   }
 
   if (!authLoading && isAuthenticated && !canCreateCourse()) {
-    return <Forbidden message="You do not have permission to create courses." />;
+    return <Forbidden message={t.forbidden} />;
   }
 
   // A file is only submittable once its automatic check came back clean of
@@ -292,28 +357,28 @@ function CreateInner() {
   return (
     <AuthenticatedLayout>
       <FormPanel
-        breadcrumbs={[{ label: 'Courses', href: '/courses' }, { label: 'New' }]}
-        title="New course"
-        description="A course is one run of a lecture in a single term — students enroll here, get their repositories, and submit their work. It belongs to a course family (the lecture)."
+        breadcrumbs={[{ label: t.courses, href: '/courses' }, { label: t.newCrumb }]}
+        title={t.pageTitle}
+        description={t.pageDescription}
         error={error}
         submitting={saving}
         disabled={!familyId || !!createdCourseId || (hasFile ? blocked : !path.trim())}
-        submitLabel={createdCourseId ? 'Created ✓' : hasFile ? 'Create from file' : 'Create'}
+        submitLabel={createdCourseId ? t.created : hasFile ? t.createFromFile : t.create}
         onCancel={() => router.push('/courses')}
         onSubmit={onSubmit}
       >
-        <Field label="Course family" required hint="The lecture this course runs. Add it under Course Families first if it's missing.">
+        <Field label={t.family} required hint={t.familyHint}>
           <select value={familyId} onChange={(e) => setFamilyId(e.target.value)} className={inputCls}>
-            <option value="">Select a course family…</option>
-            {families.map((f) => (
-              <option key={f.id} value={f.id}>{displayName(f, 'Untitled Course Family')}</option>
+            <option value="">{t.selectFamily}</option>
+            {families.map((family) => (
+              <option key={family.id} value={family.id}>{displayName(family, t.untitledFamily)}</option>
             ))}
           </select>
         </Field>
 
         <Field
-          label="Import from file (optional)"
-          hint="Upload a course_deployment.yaml to create the course with its content types and full content tree. Identity (path/title) comes from the file, and it is checked automatically."
+          label={t.importFile}
+          hint={t.importHint}
         >
           <input
             type="file"
@@ -336,27 +401,26 @@ function CreateInner() {
 
         {!hasFile && (
           <>
-            <Field label="Path (slug)" required hint="Lowercase, URL-safe identifier, unique within the course family. Hard to change later.">
+            <Field label={t.path} required hint={t.pathHint}>
               <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="algorithms-2026w" className={inputCls} />
             </Field>
-            <Field label="Title" hint="Display name for this run, e.g. 'Algorithms — Winter 2026'.">
-              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Algorithms — Winter 2026" className={inputCls} />
+            <Field label={f.title} hint={t.titleHint}>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t.titlePlaceholder} className={inputCls} />
             </Field>
-            <Field label="Description">
+            <Field label={f.description}>
               <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={inputCls} />
             </Field>
           </>
         )}
 
-        <Field label="AI tutor">
+        <Field label={f.aiTutor}>
           <TutorAgentAutoRouteField value={autoRoute} onChange={setAutoRoute} />
         </Field>
 
         {hasFile && canConfigureGit && (
           <div className="border-t border-rule pt-4">
             <p className="text-xs text-muted">
-              Git is configured by the uploaded file&apos;s <code className="font-mono">git:</code> block
-              (or left unbound if it has none — you can set it later on the course&apos;s edit page).
+              {t.gitFromFile}
             </p>
           </div>
         )}
@@ -365,44 +429,44 @@ function CreateInner() {
           <div className="border-t border-rule pt-4 space-y-3">
             <label className="flex items-center gap-2 text-sm font-medium text-body">
               <input type="checkbox" checked={gitEnabled} onChange={(e) => setGitEnabled(e.target.checked)} />
-              Set up git now
+              {t.setUpGit}
             </label>
             {gitEnabled && (
               <>
-                <Field label="Git server">
+                <Field label={f.gitServer}>
                   <select value={serverId} onChange={(e) => setServerId(e.target.value)} className={inputCls}>
                     {servers.map((s) => (
                       <option key={s.id} value={s.id}>{s.name || s.base_url} ({s.type})</option>
                     ))}
                   </select>
                 </Field>
-                <Field label="Delivery" hint="How students get assignments: fork/clone a template repo (git), or download an archive.">
+                <Field label={f.delivery} hint={t.deliveryHint}>
                   <select value={delivery} onChange={(e) => setDelivery(e.target.value as 'git' | 'download')} className={inputCls}>
-                    <option value="git">Git (fork/clone template)</option>
-                    <option value="download">Download (archive)</option>
+                    <option value="git">{t.deliveryGit}</option>
+                    <option value="download">{t.deliveryDownload}</option>
                   </select>
                 </Field>
                 {selectedServer?.type === 'gitlab' && (
                   <>
-                    <Field label="GitLab parent group id" hint="The course's own GitLab group is created under this parent group.">
+                    <Field label={f.parentGroup} hint={f.parentGroupHint}>
                       <input value={parentGroupId} onChange={(e) => setParentGroupId(e.target.value)} placeholder="12345" className={inputCls} />
                     </Field>
-                    <Field label="GitLab group token" hint="A group access token scoped to the parent group — stored encrypted on this course, never shown again.">
+                    <Field label={f.groupToken} hint={f.groupTokenHint}>
                       <input type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder="glpat-…" className={inputCls} />
                     </Field>
                   </>
                 )}
-                <Field label="Student-repo modes">
+                <Field label={f.repoModes}>
                   <div className="flex flex-wrap gap-3">
-                    {ALL_MODES.map((m) => (
+                    {STUDENT_REPO_MODES.map((m) => (
                       <label key={m} className="flex items-center gap-1.5 text-sm text-body">
                         <input type="checkbox" checked={modes.includes(m)} onChange={() => toggleMode(m)} />
-                        {MODE_LABELS[m] ?? m}
+                        {f.modes[m] ?? m}
                       </label>
                     ))}
                   </div>
                 </Field>
-                <p className="text-xs text-subtle">For a managed server (Forgejo or GitLab) the course template repo is created automatically.</p>
+                <p className="text-xs text-subtle">{f.managedTemplate}</p>
               </>
             )}
           </div>
@@ -411,7 +475,7 @@ function CreateInner() {
         {canConfigureGit && (
           <label className="flex items-center gap-2 border-t border-rule pt-4 text-sm text-body">
             <input type="checkbox" checked={deployNow} onChange={(e) => setDeployNow(e.target.checked)} />
-            Deploy assignments now — push them into the template repo once the course is created
+            {t.deployNow}
           </label>
         )}
       </FormPanel>
