@@ -14,7 +14,7 @@ support network, can execute them.
 """
 import logging
 from datetime import timedelta
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from temporalio import activity, workflow
 from temporalio.common import RetryPolicy
@@ -41,7 +41,7 @@ def support_deliver_reply(message_id: str) -> Dict[str, str]:
 
 
 @activity.defn(name="support_send_welcome")
-def support_send_welcome(user_id: str, language: str = "en") -> Dict[str, str]:
+def support_send_welcome(user_id: str, language: Optional[str] = None) -> Dict[str, str]:
     from computor_backend.support.welcome import send_welcome
     return send_welcome(user_id, language=language)
 
@@ -141,7 +141,7 @@ class SupportWelcomeMailWorkflow(BaseWorkflow):
             return missing
         result = await workflow.execute_activity(
             support_send_welcome,
-            args=[parameters["user_id"], parameters.get("language", "en")],
+            args=[parameters["user_id"], parameters.get("language")],
             schedule_to_start_timeout=timedelta(hours=1),
             start_to_close_timeout=timedelta(minutes=5),
             retry_policy=RetryPolicy(maximum_attempts=1),
