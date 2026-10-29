@@ -10,7 +10,7 @@ import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import { PageLoading } from '@/src/components/ListPageLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
-import { inputCls } from '@/src/components/ui/tokens';
+import { inputCls, readOnlyInputCls } from '@/src/components/ui/tokens';
 import { GitServersClient } from '@/src/generated/clients/GitServersClient';
 import type { GitServerUpdate } from '@/src/generated/types/common';
 
@@ -119,7 +119,7 @@ export default function GitServerEditPage() {
             <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
           </Field>
           <Field label={t.typeUrl}>
-            <input value={`${server?.type ?? ''} · ${server?.base_url ?? ''}`} readOnly className={`${inputCls} bg-canvas text-muted`} />
+            <input value={`${server?.type ?? ''} · ${server?.base_url ?? ''}`} readOnly className={readOnlyInputCls} />
           </Field>
           <label className="flex items-center gap-2 text-sm text-body">
             <input type="checkbox" checked={managed} onChange={(e) => setManaged(e.target.checked)} />

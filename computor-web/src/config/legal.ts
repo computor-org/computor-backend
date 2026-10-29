@@ -54,7 +54,9 @@ const LINKS: Record<LegalProfile, LegalLink[]> = {
 export const LEGAL_LINKS: LegalLink[] = LINKS[LEGAL_PROFILE];
 
 const ENGLISH: Record<string, { label: string; href?: string }> = {
-  Impressum: { label: 'Imprint' },
+  // The bilingual pages lead with the section being read, so the English footer
+  // names the English one even when the page opened in German.
+  Impressum: { label: 'Imprint', href: '/impressum#english' },
   Datenschutz: { label: 'Privacy', href: '/privacy/en' },
   Nutzungsbedingungen: { label: 'Terms', href: '/terms/en' },
   Barrierefreiheit: { label: 'Accessibility' },

@@ -251,6 +251,23 @@ body {
 }
 
 /*
+ * Option lists.
+ *
+ * The list a <select> opens is painted by the operating system, so the `bg-*`
+ * class on the control stops at its border and the open list keeps the OS's own
+ * light ground under the page's text colours. Naming the same surface and ink
+ * here is what makes the popup follow the theme; `color-scheme` alone does not
+ * recolour option text on every platform.
+ *
+ * Unlayered, so it outranks Tailwind's preflight, and safe as a bare element
+ * selector because no <option> in the app carries a class of its own.
+ */
+select option {
+  background-color: var(--c-surface);
+  color: var(--c-fg);
+}
+
+/*
  * Rendered markdown — assignment descriptions, the consent document.
  *
  * @tailwindcss/typography ships fixed grey scales (`prose-gray`, `prose-slate`)
