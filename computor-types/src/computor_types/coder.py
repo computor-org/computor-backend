@@ -60,7 +60,10 @@ class WorkspaceLaunchContext(BaseModel):
 
     course_id: UUID
     course_content_id: Optional[UUID] = None
-    ui_language: Optional[Literal["de", "en"]] = None
+    ui_language: Optional[Literal["de", "en"]] = Field(
+        None,
+        description="Reading language resolved by the backend from the profile and Accept-Language, unless the request set one explicitly",
+    )
     request_id: UUID
     expires_at: datetime
 

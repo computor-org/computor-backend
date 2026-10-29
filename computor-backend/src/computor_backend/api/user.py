@@ -27,8 +27,9 @@ from computor_backend.permissions.auth import (
     parse_authorization_header,
 )
 from computor_backend.permissions.principal import Principal
+from computor_backend.utils.reading_language import resolve_effective_language
 import httpx
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from starlette.concurrency import run_in_threadpool
 
 from computor_backend.exceptions import RateLimitException, ServiceUnavailableException
@@ -69,11 +70,19 @@ user_router = APIRouter()
 
 @user_router.get("", response_model=UserGet)
 def get_current_user_endpoint(
+    http_request: Request,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db, scope="function")
 ):
     """Get the current authenticated user."""
-    return get_current_user(permissions.user_id, db)
+    user = get_current_user(permissions.user_id, db)
+    result = UserGet.model_validate(user)
+    # Resolved once here so every client renders in the same reading language.
+    result.effective_language = resolve_effective_language(
+        user.profile.language_code if user.profile else None,
+        http_request.headers.get("Accept-Language"),
+    )
+    return result
 
 @user_router.get(
     "/referral-invites",
