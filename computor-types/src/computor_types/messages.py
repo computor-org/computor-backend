@@ -274,6 +274,11 @@ class MessageGet(BaseEntityGet):
     is_author: bool = Field(False, description="True if the requesting user is the message author")
     is_deleted: bool = Field(False, description="True if the message has been soft-deleted")
     deleted_by: Optional[str] = Field(None, description="Who deleted the message (author/moderator/admin)")
+    reading_language: Optional[str] = Field(
+        None,
+        description="Author's reading language ('de' or 'en') when posting: profile "
+                    "language, else the request's Accept-Language. Null for older messages.",
+    )
     context: Optional[MessageContext] = Field(
         None, description="Resolved human-readable placement (course/content/group names)"
     )
@@ -330,6 +335,11 @@ class MessageList(BaseEntityList):
     is_author: bool = Field(False, description="True if the requesting user is the message author")
     is_deleted: bool = Field(False, description="True if the message has been soft-deleted")
     deleted_by: Optional[str] = Field(None, description="Who deleted the message (author/moderator/admin)")
+    reading_language: Optional[str] = Field(
+        None,
+        description="Author's reading language ('de' or 'en') when posting: profile "
+                    "language, else the request's Accept-Language. Null for older messages.",
+    )
     context: Optional[MessageContext] = Field(
         None, description="Resolved human-readable placement (course/content/group names)"
     )

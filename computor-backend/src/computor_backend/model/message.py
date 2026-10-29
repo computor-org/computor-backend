@@ -68,6 +68,9 @@ class Message(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     # Content
     title = Column(String(255), nullable=True)
     content = Column(Text, nullable=False)
+    # The author's reading language ('de'/'en') when posting, so the tutor
+    # can read the assignment in it (issues#556). NULL for older messages.
+    reading_language = Column(String(2), nullable=True)
 
     # Targets (all nullable; if ALL are NULL = global message visible to all users)
     # Hierarchy: organization > course_family > course > course_content/course_group > submission_group > course_member > user
