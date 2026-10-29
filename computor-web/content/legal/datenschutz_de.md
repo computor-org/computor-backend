@@ -1,6 +1,6 @@
 # Datenschutzerklärung computor.at
 
-Version 1.6, Stand 26.10.2026
+Version 1.7, Stand 29.10.2026
 
 Computor ist ein kostenloses Lernangebot der TU Graz. Öffentliche Materialien
 können Sie ohne Konto lesen. Für Ihr Konto, Kurse, Abgaben, die Arbeitsumgebung,
@@ -113,13 +113,12 @@ Einwilligung dafür.
 | Daten | Frist oder Löschregel |
 |---|---|
 | Konto, Kursdaten, Abgaben, Repositories, Ergebnisse, Home-Dateien und Kursnachrichten | Bis zur Kontolöschung; die Löschung wird in den beteiligten Diensten bearbeitet. Weder der Austritt aus einem Kurs noch das Archivieren ist bereits eine Löschung. |
-| Lena-Schaltflächen-Anfrage | Höchstens 15 Minuten; nach Fertigstellung entfernt. |
-| Lena-Schaltflächen-Antwort | 24 Stunden, nur für die anfragende Person abrufbar. |
+| Lena-Schaltflächen-Anfrage und -Antwort | Höchstens 24 Stunden; die Antwort ist nur für die anfragende Person abrufbar. |
 | Lena-Antworten im Verlauf und Inferenz-Caches | Verlauf wie Kursnachrichten; Caches nach der in Abschnitt 2 beschriebenen Kapazitätsregel. |
-| Web- und Scanner-Zugriffslogs | Tägliche Rotation mit 14 Archivdateien, auch für leere Logs; keine feste Grenze von 14 Kalendertagen. |
-| Diagnose- und technische Sicherheitsaufzeichnungen | Je nach Dienst größenabhängige Rotation (häufig fünf Dateien zu je 10 MB) oder keine automatische Alterslöschung; keine einheitliche Frist. |
-| Anmelde- und Verwaltungsereignisse im Anmeldedienst | Anmeldeereignisse 30 Tage, detaillierte Verwaltungsereignisse 90 Tage; unabhängig von Diagnoseprotokollen. |
-| Technische Angriffssperren | Scanner-Sperrhistorie 35 Tage; zugehörige Logdateien mit vier wöchentlichen Archivrotationen nichtleerer Dateien. |
+| Web- und Scanner-Zugriffslogs | Höchstens acht Wochen. |
+| Diagnose- und technische Sicherheitsaufzeichnungen | Je nach Dienst größenabhängige Rotation, bei der ältere Einträge überschrieben werden, oder keine automatische Alterslöschung; eine einheitliche Frist gibt es nicht. |
+| Anmelde- und Verwaltungsereignisse im Anmeldedienst | Höchstens 90 Tage, unabhängig von Diagnoseprotokollen. |
+| Technische Angriffssperren | Sperrhistorie höchstens acht Wochen; zugehörige Logdateien werden wöchentlich rotiert und nach vier Rotationen gelöscht. |
 | Support und Meldungen | Bis zur Erledigung, danach höchstens drei Jahre zur Nachvollziehbarkeit und Abwehr von Ansprüchen. |
 
 Nachweise, die für einen konkreten Sicherheitsvorfall oder eine rechtliche
@@ -135,7 +134,8 @@ aus einem konkreten rechtlichen Grund bleiben, nennen wir Ihnen Grund und
 Aufbewahrungsfrist und beschränken sie auf diesen Zweck.
 
 **Sicherungskopien:** Sicherungskopien personenbezogener Plattformdaten bewahren
-wir höchstens 30 Tage auf.
+wir höchstens 90 Tage auf, damit der Betrieb auch nach später erkannten Fehlern
+oder Angriffen wiederhergestellt werden kann (Art. 32 Abs. 1 lit. c DSGVO).
 
 ## 5. Cookies und Sicherheit
 
@@ -160,10 +160,10 @@ Sie Sicherheitslücken vertraulich an security@computor.at.
 Nach Maßgabe der gesetzlichen Voraussetzungen haben Sie das Recht auf Auskunft,
 Berichtigung, Löschung, Einschränkung der Verarbeitung und Datenübertragbarkeit.
 Gegen eine Verarbeitung im öffentlichen Interesse können Sie aus Gründen Ihrer
-besonderen Situation widersprechen (Art. 21 DSGVO). Einen Export Ihrer Daten
-können Sie unabhängig von den engeren Voraussetzungen des gesetzlichen Rechts
-auf Datenübertragbarkeit anfordern; wird das Angebot eingeschränkt oder beendet,
-gilt zusätzlich die Exportzusage der Nutzungsbedingungen.
+besonderen Situation widersprechen (Art. 21 DSGVO). Mit dem Auskunftsrecht
+erhalten Sie eine Kopie Ihrer Daten (Art. 15 Abs. 3 DSGVO); wird das Angebot
+eingeschränkt oder eingestellt, gilt zusätzlich die Regelung der
+Nutzungsbedingungen zum Herunterladen Ihrer Daten.
 
 Schreiben Sie an privacy@computor.at oder datenschutz@tugraz.at, möglichst von
 Ihrer hinterlegten Adresse, damit wir Sie zuverlässig zuordnen können. Wir
@@ -173,7 +173,6 @@ Beschwerde können Sie bei der Österreichischen Datenschutzbehörde, Barichgass
 40–42, 1030 Wien, dsb@dsb.gv.at, [dsb.gv.at](https://www.dsb.gv.at), einlegen.
 
 Die aktuelle Fassung dieser Erklärung finden Sie unter
-https://computor.at/privacy. Wir halten sie auf dem neuesten Stand und
-informieren Sie über wesentliche Änderungen der Verarbeitung. Bevor wir Daten
-für einen neuen Zweck verwenden, erhalten Sie die dafür erforderlichen
-Informationen. Vertragsänderungen richten sich nach den Nutzungsbedingungen.
+https://computor.at/privacy. Wir halten sie auf dem neuesten Stand. Bevor wir
+Daten für einen neuen Zweck verwenden, erhalten Sie die dafür erforderlichen
+Informationen (Art. 13 Abs. 3 DSGVO). Vertragsänderungen richten sich nach den Nutzungsbedingungen.

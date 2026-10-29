@@ -1,6 +1,6 @@
 # Inhalte melden / Report content
 
-Version 1.1, gültig ab 25.10.2026
+Version 1.2, Stand 29.10.2026
 
 ## Deutsch
 
@@ -28,8 +28,8 @@ Bitte geben Sie an:
 ### Was dann passiert
 
 - Wir bestätigen den Eingang Ihrer Meldung per E-Mail.
-- Ein Mensch prüft die Meldung zeitnah, sorgfältig, objektiv und ohne
-  Willkür. Wir entscheiden nicht allein mit automatisierten Mitteln.
+- Wir prüfen die Meldung zeitnah, sorgfältig, objektiv und ohne Willkür.
+  Setzen wir dabei automatisierte Mittel ein, teilen wir Ihnen dies mit.
 - Wir teilen Ihnen unsere Entscheidung und die möglichen Rechtsbehelfe mit.
 - Entfernen oder sperren wir Inhalte oder sperren wir ein Konto, informieren
   wir die betroffene Person und begründen dies. Sie kann innerhalb von sechs
@@ -88,8 +88,8 @@ Please include:
 ### What happens next
 
 - We confirm receipt of your report by email.
-- A human reviews the report in a timely, diligent, objective and
-  non-arbitrary manner. We do not decide by automated means alone.
+- We review the report in a timely, diligent, objective and non-arbitrary
+  manner. If we use automated means, we tell you.
 - We tell you our decision and the available means of redress.
 - If we remove or disable content or suspend an account, we inform the person
   concerned and give reasons. They can appeal within six months to

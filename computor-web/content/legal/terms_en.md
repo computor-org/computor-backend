@@ -1,15 +1,15 @@
 # Terms of Use computor.at
 
-Version 1.6, valid from {{TERMS_EFFECTIVE_FROM}}
+Version 1.7, dated 29 October 2026
 
-This version applies to new usage contracts from its publication. For existing
-contracts under an earlier version it replaces that version from
-{{TERMS_EFFECTIVE_FROM}}, after notice under its change rule (section 11 of
-versions 1.0 to 1.3). [What changes](/terms/en/changes) · Earlier versions:
+This version applies to new usage contracts from its publication. It applies to
+an existing usage contract only once you expressly accept it at sign-in; until
+then the earlier version applies. [What changes](/terms/en/changes) · Earlier versions:
 [1.0](https://github.com/computor-org/computor-backend/blob/54ea77021304f1bd77ef4bf7c5712b5edfb6843f/computor-web/content/legal/terms_en.md),
 [1.1](https://github.com/computor-org/computor-backend/blob/93a7c2cde0d11186b2dbcd167ebabc851c882496/computor-web/content/legal/terms_en.md),
 [1.2](https://github.com/computor-org/computor-backend/blob/f166ccf38e58c03e6e0c9c6d68448f5127ed28a4/computor-web/content/legal/terms_en.md),
-[1.5](https://github.com/computor-org/computor-backend/blob/bcbe73611c806a67c7183efb7a717a9a386b5233/computor-web/content/legal/terms_en.md).
+[1.5](https://github.com/computor-org/computor-backend/blob/bcbe73611c806a67c7183efb7a717a9a386b5233/computor-web/content/legal/terms_en.md),
+[1.6](https://github.com/computor-org/computor-backend/blob/d7939109498abcfd08a72f82a3eaf9482137018a/computor-web/content/legal/terms_en.md).
 The German version is authoritative.
 
 ## 1. Provider, account and free service
@@ -43,8 +43,8 @@ External services you choose have their own terms and possible charges; they do
 not replace the free service.
 
 Computing time, memory, network access, course places and the number and
-running time of workspaces are limited. Workspaces stop after about one hour
-without activity; their files remain. Capacity limits may temporarily prevent
+running time of workspaces are limited. Workspaces stop after a period without
+activity; their files remain. Capacity limits may temporarily prevent
 access; there is no entitlement to a particular course place. We operate with
 the care customary for a university learning service and announce maintenance
 on the platform in advance where possible, but cannot promise uninterrupted
@@ -53,10 +53,10 @@ or downloads.
 
 Tests and points are learning aids, not an examination certificate or proof of
 competence. If a course uses results for assessment, the teacher decides under
-the applicable rules. The AI learning aid Lena currently answers through a
-button and course messages, including automatic routing in configured courses.
-It does not execute code or decide grades. The Privacy notice explains its
-context, audience and storage. Check AI answers because they may be wrong;
+the applicable rules. AI learning aids such as Lena answer in the platform
+features provided for them; in configured courses messages may also be routed
+to them automatically. They do not decide grades. The Privacy notice explains
+their context, audience and storage. Check AI answers because they may be wrong;
 availability and request limits depend on capacity.
 
 ## 3. Acceptable use and your content
@@ -75,8 +75,8 @@ assessed exercises where the course prohibits it.
 
 Security research needs prior agreement through security@computor.at. Report
 vulnerabilities confidentially without accessing other people's data or
-disrupting operations; we take no legal action over such a report made in good
-faith. There is no general monitoring of content. We log usage-related
+disrupting operations. We are under no obligation to monitor content generally
+(Art. 8 DSA). We log usage-related
 technical access and security events where necessary for secure operation; the
 Privacy notice explains the data, purposes, authorised access and retention.
 
@@ -96,15 +96,15 @@ is open source. Third-party material is marked and may be under other licences.
 
 We act on specific reports of legal or usage breaches; use [Report content](/report) for illegal content. Measures
 depend on severity: a warning, removing or disabling content, stopping a workspace,
-temporary account suspension or termination. Automated tools flag anomalies;
-a human decides on measures against you. A workspace may stop automatically
-where there is acute danger.
+temporary account suspension or termination. As a rule, a human decides on
+measures against you. Where there is acute danger or obvious abuse, such as mass
+registrations, spam, attacks or resource abuse, automated tools may take
+provisional measures; on your request a human reviews such a measure.
 
 We explain by email the measure, facts, rules concerned, use of reports or
 automated detection, and remedies, unless law or an authority prohibits this
-(Art. 17 DSA). You may appeal to contact@computor.at within six months. Where
-possible, a person not involved in the original decision reviews the appeal; we
-give you a reasoned outcome. You may go to court at any time. If we suspect a
+(Art. 17 DSA). You may appeal to contact@computor.at within six months. A
+human decides on the appeal; we give you a reasoned outcome. You may go to court at any time. If we suspect a
 criminal offence threatening people's life or safety, we promptly inform the
 competent authorities (Art. 18 DSA).
 
@@ -113,10 +113,12 @@ competent authorities (Art. 18 DSA).
 We may change and develop the platform where this is reasonable for you, in
 particular because the change is minor and objectively justified, for example by
 technical development, security, legal requirements or changed operating means.
-We announce substantial restrictions (such as dropping a course you are enrolled
-in, or the workspace service) and a planned closure at least 30 days in advance
-by email and on the platform, with reasons; during that time you can download
-or request your data. If there is acute danger to the security of the platform,
+We announce substantial restrictions of the platform made for these reasons,
+such as dropping the workspace service, by email with reasonable notice of at
+least 14 days and with reasons, and a planned closure at least 30 days in advance.
+During that time you can download or request your data. Courses are set up and
+ended by their teachers; a course ending or changing is not a change of the
+platform under this section. If there is acute danger to the security of the platform,
 its users or third parties, or a binding legal requirement, we may restrict
 features immediately and inform you as soon as possible of the reason and the
 expected duration.
@@ -158,16 +160,15 @@ subject-matter jurisdiction is competent.
 ## 8. Changes to these terms and contact
 
 We may change these terms if the platform, the law or the conditions for its
-operation change. We inform you at least 30 days before the changes take effect,
-by email and with a notice at sign-in, provide the new version and highlight the
-changes. Changes that do not put you in a worse position (such as
-clarifications, additional services or adjustments required by mandatory law)
-apply from the announced date. Changes that put you in a materially worse
-position apply only if you expressly agree to them; we ask for this at sign-in.
-Merely continuing to use the platform is not agreement. Without your agreement
-the previous version continues to apply to you; we may then terminate the
-contract under section 5. Updates of the Privacy notice inform you and need no
-consent; we inform you of new processing before it starts.
+operation change. We publish each new version with an overview of the changes.
+Changes made exclusively to your benefit (such as additional services) or
+required by mandatory law apply from publication; we inform you by email or at
+sign-in. All other changes apply only if you expressly agree to them; we ask
+for this at sign-in. Merely continuing to use the platform is not agreement.
+Without your agreement the previous version continues to apply to you; we may
+then terminate the contract under section 5. Updates of the Privacy notice
+inform you and need no consent; before we process data for a new purpose, we
+inform you (Art. 13(3) GDPR).
 
 General enquiries and appeals: contact@computor.at; illegal content:
 abuse@computor.at; privacy: privacy@computor.at or datenschutz@tugraz.at;

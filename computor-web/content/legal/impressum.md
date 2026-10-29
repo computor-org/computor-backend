@@ -70,8 +70,8 @@ anderen Lizenzen unterliegen. Jede Verwertung außerhalb dieser Lizenzen und
 außerhalb der Grenzen des Urheberrechts bedarf der vorherigen Zustimmung der
 jeweiligen Urheberin bzw. des jeweiligen Urhebers.
 
-Code und sonstige Inhalte, die Nutzer*innen erstellen, bleiben deren Eigentum
-(siehe [Nutzungsbedingungen](/terms)).
+Die Rechte an Code und sonstigen Inhalten, die Nutzer*innen erstellen,
+verbleiben bei ihnen (siehe [Nutzungsbedingungen](/terms)).
 
 ### Haftung für Inhalte und Links
 
@@ -161,7 +161,7 @@ Third-party material is marked and may be subject to other licences. Any use
 beyond these licences and beyond the limits of copyright requires the prior
 consent of the relevant author.
 
-Code and other content created by users remains theirs (see [Terms of Use](/terms)).
+Users keep the rights to code and other content they create (see [Terms of Use](/terms)).
 
 ### Liability for content and links
 
