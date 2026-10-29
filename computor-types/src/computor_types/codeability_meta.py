@@ -9,7 +9,7 @@ Examples are course-agnostic and can be assigned to multiple courses through
 the CourseContent model which links examples to specific course contexts.
 """
 
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_yaml import to_yaml_str
 
@@ -216,6 +216,16 @@ class CodeAbilityMeta(CodeAbilityBase):
     description: Optional[str] = Field(
         None,
         description="Detailed description of the content"
+    )
+    # Other languages for title and description; those stay the source text
+    # and the fallback (issue #550).
+    title_i18n: Optional[Dict[str, str]] = Field(
+        None,
+        description="Title per language code, e.g. {'de': 'Wurfparabel', 'en': 'Projectile motion'}"
+    )
+    description_i18n: Optional[Dict[str, str]] = Field(
+        None,
+        description="Description per language code, same keys as title_i18n"
     )
     language: Optional[str] = Field(
         "en",

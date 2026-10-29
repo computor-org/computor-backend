@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from computor_backend.database import get_db
 from computor_backend.services.storage_service import get_storage_service
 from computor_backend.business_logic.student_description import get_student_description
+from computor_backend.business_logic.localization import LocalizeParam
 
 from computor_backend.permissions.principal import Principal
 from computor_backend.permissions.auth import get_current_principal
@@ -48,48 +49,56 @@ async def student_get_course_content_description_endpoint(
 async def student_get_course_content_endpoint(
     course_content_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    cache: Cache = Depends(get_cache)
+    cache: Cache = Depends(get_cache),
+    localize: LocalizeParam = None,
 ):
     return await get_student_course_content(
         course_content_id=course_content_id,
         user_id=permissions.get_user_id_or_throw(),
         permissions=permissions,
         cache=cache,
+        lang=localize,
     )
 
 @student_router.get("/course-contents", response_model=list[CourseContentStudentList])
 async def student_list_course_contents_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: CourseContentStudentQuery = Depends(),
-    cache: Cache = Depends(get_cache)
+    cache: Cache = Depends(get_cache),
+    localize: LocalizeParam = None,
 ):
     return await list_student_course_contents(
         user_id=permissions.get_user_id_or_throw(),
         params=params,
         permissions=permissions,
         cache=cache,
+        lang=localize,
     )
 
 @student_router.get("/courses", response_model=list[CourseStudentList])
 def student_list_courses_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: CourseStudentQuery = Depends(),
-    cache: Cache = Depends(get_cache)
+    cache: Cache = Depends(get_cache),
+    localize: LocalizeParam = None,
 ):
     return list_student_courses(
         permissions=permissions,
         params=params,
         cache=cache,
+        lang=localize,
     )
 
 @student_router.get("/courses/{course_id}", response_model=CourseStudentGet)
 def student_get_course_endpoint(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    cache: Cache = Depends(get_cache)
+    cache: Cache = Depends(get_cache),
+    localize: LocalizeParam = None,
 ):
     return get_student_course(
         course_id=course_id,
         permissions=permissions,
         cache=cache,
+        lang=localize,
     )

@@ -73,11 +73,12 @@ def world(db):
     db.flush()
     counter = {"n": 0}
 
-    def course(title, *, public=True, visible=None, archived=False, description=None):
+    def course(title, *, public=True, visible=None, archived=False, description=None, **extra):
         counter["n"] += 1
         c = Course(
             title=f"{title} {suffix}",
             description=description,
+            **extra,
             language_code="de",
             path=Ltree(f"anoncat_{suffix}.family.c{counter['n']}"),
             course_family_id=family.id,
@@ -135,10 +136,27 @@ def test_anonymous_request_gets_200_and_only_listable_courses(world, client):
         "id": str(listed.id),
         "title": listed.title,
         "description": "Intro",
+        # Per-language maps (issues#550); null for a course without them.
+        "title_i18n": None,
+        "description_i18n": None,
         "language_code": "de",
         # The public ordering key (course-order); null keeps title order.
         "position": None,
     }
+
+
+def test_localize_returns_the_reading_language_and_keeps_the_maps(world, client):
+    course = world["course"]("Grundlagen", description="Einstieg",
+                             title_i18n={"en": f"Foundations {world['suffix']}"},
+                             description_i18n={"en": ""})
+
+    (english,) = _ours(client.get("/public/courses?localize=en"), world["suffix"])
+    (plain,) = _ours(client.get("/public/courses"), world["suffix"])
+
+    assert english["title"] == f"Foundations {world['suffix']}"
+    assert english["description"] == "Einstieg"  # empty entry: source text
+    assert plain["title"] == course.title
+    assert plain["title_i18n"] == {"en": f"Foundations {world['suffix']}"}
 
 
 def test_courses_of_an_archived_organization_are_excluded(world, client):
@@ -169,7 +187,8 @@ def test_response_carries_no_member_or_internal_data(world, client):
 
     assert response.status_code == 200
     (row,) = _ours(response, world["suffix"])
-    assert set(row) == {"id", "title", "description", "language_code", "position"}
+    assert set(row) == {"id", "title", "description", "title_i18n", "description_i18n",
+                        "language_code", "position"}
     body = response.text
     for secret in ("Secret", user.email, str(user.id), str(group.id),
                    str(world["org"].id), "anoncat_"):

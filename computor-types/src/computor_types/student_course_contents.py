@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, field_validator, ConfigDict, Field
-from typing import Literal, Optional, List, TYPE_CHECKING
+from typing import Dict, Literal, Optional, List, TYPE_CHECKING
 
 from computor_types.course_content_types import CourseContentTypeGet, CourseContentTypeList
 from computor_types.gitlab import GitLabConfigGet
@@ -94,6 +94,10 @@ class CourseContentStudentGet(BaseEntityGet):
     archived_at: Optional[datetime] = None
     title: Optional[str] = None
     description: Optional[str] = None
+    # Always returned; ?localize=<de|en> also resolves title and description
+    # from them (issue #550).
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     path: str
     course_id: str
     course_content_type_id: str
@@ -150,6 +154,8 @@ class CourseContentStudentList(BaseModel):
     id: str
     title: Optional[str] = None
     description: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     path: str
     course_id: str
     course_content_type_id: str

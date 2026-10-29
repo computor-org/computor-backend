@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 from pydantic import ValidationError
-from sqlalchemy import Boolean, Column, DateTime, Float, MetaData, String, Table, create_engine
+from sqlalchemy import Boolean, Column, DateTime, Float, JSON, MetaData, String, Table, create_engine
 from sqlalchemy.orm import Session
 
 from computor_backend.interfaces.course import CourseInterface, custom_permissions_course
@@ -24,6 +24,7 @@ def ordered_courses():
     table = Table('course', MetaData(), Column('id', String, primary_key=True),
                   Column('title', String), Column('position', Float),
                   Column('description', String), Column('language_code', String), Column('path', String),
+                  Column('title_i18n', JSON), Column('description_i18n', JSON),
                   Column('organization_id', String, default='org'),
                   Column('public', Boolean, default=True), Column('visible', Boolean),
                   Column('archived_at', DateTime))
