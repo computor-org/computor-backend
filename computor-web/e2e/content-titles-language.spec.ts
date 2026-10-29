@@ -200,11 +200,15 @@ async function servePublicLearning(page: Page) {
   await page.route('**/learning/courses/python-beginner.json', (route) => json(route, PUBLIC_OUTLINE));
 }
 
-test('the course reader names outline items by their translation first', () => {
+test('the course reader names outline items by their heading, else by their translation', () => {
   const outline = PUBLIC_OUTLINE as unknown as PublicLearningCourseOutline;
   expect(localizedTitle(outline, 'week_1.loops', 'Schleifen', 'en')).toBe('Loops');
   expect(localizedTitle(outline, 'week_1', 'Grundlagen', 'en')).toBe('Basics');
   expect(localizedTitle(outline, 'week_1.loops', 'Schleifen', 'de')).toBe('Schleifen');
+  // The heading keeps its TeX for the reader to typeset; the metadata title is plain text.
+  const withHeading = structuredClone(outline);
+  withHeading.materials['week_1.loops'].markdown_variants = { en: '# Approximation of $\\pi$\n\nText' };
+  expect(localizedTitle(withHeading, 'week_1.loops', 'Schleifen', 'en')).toBe('Approximation of $\\pi$');
 });
 
 test.describe('signed out, English browser', () => {

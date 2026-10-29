@@ -75,7 +75,9 @@ test('anonymous reading uses only static files even when the API is unavailable'
 });
 
 test('the beginner course opens with its description and has no Willkommen item (issues#546)', async ({ page }) => {
-  const { description } = JSON.parse(fs.readFileSync(OUTLINE_FILE, 'utf8'));
+  const outline = JSON.parse(fs.readFileSync(OUTLINE_FILE, 'utf8'));
+  // The reader shows the English description to this English browser.
+  const description: string = outline.description_i18n?.en ?? outline.description;
   await page.goto(`/learn/${COURSE}`);
   await expect(page.getByText('3 weeks · ', { exact: false })).toBeVisible();
   const intro = page.locator('article section').first();
@@ -157,7 +159,7 @@ test('landing shows static courses, one sign-in link and no pilot or invite clai
   await page.goto('/');
   await expect(page.getByRole('link', { name: /^(Anmelden|Sign in)$/ })).toHaveCount(1);
   await expect(page.getByText(/Pilotbetrieb|join with an invite link|Teilnahme mit Einladungslink/)).toHaveCount(0);
-  await page.getByRole('link', { name: /Data Science mit Python I – Grundlagen/ }).click();
+  await page.getByRole('link', { name: /Data Science (mit|with) Python I – (Grundlagen|Fundamentals)/ }).click();
   await expect(page).toHaveURL(/\/learn\/python-beginner$/);
   await expect(page.getByRole('heading', { name: 'Welcome', exact: true })).toBeVisible();
   expect(calls).toEqual([]);
