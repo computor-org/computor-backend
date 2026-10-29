@@ -263,7 +263,7 @@ def _patched(executor=None):
 async def test_submit_without_result_dispatches_the_test(db, graph):
     queue_patch, executor_patch, executor = _patched()
     with queue_patch, executor_patch:
-        result = await dispatch_submission_test(graph["artifact"], db)
+        result = await dispatch_submission_test(graph["artifact"], db, "de-AT,en;q=0.5")
 
     assert result is not None
     assert result.submission_artifact_id == graph["artifact"].id
@@ -274,6 +274,8 @@ async def test_submit_without_result_dispatches_the_test(db, graph):
     submission = executor.submit_task.await_args.args[0]
     assert submission.queue == "testing-python"
     assert submission.parameters["test_job"]["artifact_id"] == str(graph["artifact"].id)
+    # The submitter's reading language, for the runner's messages.
+    assert submission.parameters["test_job"]["language"] == "de"
 
 
 @pytest.mark.asyncio

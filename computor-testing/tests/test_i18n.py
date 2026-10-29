@@ -71,3 +71,44 @@ def test_unknown_language_gives_english_failure(monkeypatch):
     en = _fail_text(monkeypatch, "en", 9, [2, 5], "`for`")
     assert _fail_text(monkeypatch, "zz", 9, [2, 5], "`for`") == en
     assert en == "`for` found 9 times, expected 2-5"
+
+
+def _assertion_text(monkeypatch, language, actual, expected):
+    from testers.tests.test_base import compare_values
+
+    monkeypatch.setenv(ENV_VAR, language)
+    with pytest.raises(AssertionError) as exc:
+        compare_values(actual, expected, name="x")
+    return str(exc.value)
+
+
+def test_value_comparison_reads_german(monkeypatch):
+    de = _assertion_text(monkeypatch, "de", 3.0, 5.5)
+    assert de.splitlines()[:3] == [
+        "Die Variable `x` weicht vom erwarteten Wert ab:",
+        "  erwartet: 5.5",
+        "  tatsächlich: 3",
+    ]
+    assert "expected" not in de and "actual" not in de
+
+
+def test_array_and_string_comparisons_read_german(monkeypatch):
+    import numpy as np
+
+    array = _assertion_text(monkeypatch, "de", np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 5.5]))
+    assert "abweichende Elemente (insgesamt 1):" in array
+    assert "tatsächlich=3" in array and "erwartet=5.5" in array
+    text = _assertion_text(monkeypatch, "de", "hallo", "hello")
+    assert "erste Abweichung an Index 1:" in text
+
+
+def test_default_summaries_follow_the_language_but_lecturer_text_stays(monkeypatch):
+    from ctcore.i18n import tr_summary
+
+    monkeypatch.setenv(ENV_VAR, "de")
+    assert tr_summary("Congratulations! All tests passed") == "Glückwunsch! Alle Tests bestanden"
+    assert tr_summary("Some or all tests failed") == "Einige oder alle Tests sind fehlgeschlagen"
+    assert tr_summary("Gut gemacht, Lisa!") == "Gut gemacht, Lisa!"
+    assert tr_summary(None) is None
+    monkeypatch.setenv(ENV_VAR, "en")
+    assert tr_summary("Some or all tests failed") == "Some or all tests failed"

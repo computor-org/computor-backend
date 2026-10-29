@@ -278,6 +278,7 @@ async def upload_submission_artifact(
     db: Session,
     storage_service: StorageService,
     cache: Optional[Cache] = None,
+    accept_language: Optional[str] = None,
 ) -> SubmissionUploadResponseModel:
     """Upload a submission file and create artifact record."""
 
@@ -564,7 +565,7 @@ async def upload_submission_artifact(
             dispatch_submission_test,
         )
 
-        await dispatch_submission_test(created_artifact, db)
+        await dispatch_submission_test(created_artifact, db, accept_language)
 
     return SubmissionUploadResponseModel(
         artifacts=[created_artifact.id],

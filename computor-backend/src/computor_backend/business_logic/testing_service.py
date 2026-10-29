@@ -21,10 +21,12 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from computor_backend.model.course import Course, CourseContent
+from computor_backend.model.auth import Profile
+from computor_backend.model.course import CourseContent
 from computor_backend.model.deployment import CourseContentDeployment
 from computor_backend.model.example import ExampleVersion
 from computor_backend.model.service import Service
+from computor_backend.utils.reading_language import resolve_effective_language
 
 logger = logging.getLogger(__name__)
 
@@ -184,15 +186,17 @@ def resolve_testing_service(course_content: CourseContent, db: Session) -> Optio
     return service
 
 
-def resolve_course_language(course_content: CourseContent, db: Session) -> Optional[str]:
-    """Language code of the course that owns ``course_content`` (``None`` if unset).
+def resolve_test_language(
+    user_id: Optional[str], accept_language: Optional[str], db: Session
+) -> str:
+    """Reading language ("de" or "en") of the person who starts a test run.
 
-    The testing worker hands it to the runner so learner-facing messages are
-    written in the course language. It never influences the grading outcome.
+    Resolved while the request is at hand and stored in the job, so the
+    runner, which has no request, writes its messages in that language. It
+    never influences the grading outcome.
     """
-    code = (
-        db.query(Course.language_code)
-        .filter(Course.id == course_content.course_id)
-        .scalar()
+    profile_language = (
+        db.query(Profile.language_code).filter(Profile.user_id == user_id).scalar()
+        if user_id else None
     )
-    return code or None
+    return resolve_effective_language(profile_language, accept_language)

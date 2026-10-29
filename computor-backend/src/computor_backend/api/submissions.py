@@ -189,6 +189,7 @@ async def upload_submission(
         db=db,
         storage_service=storage_service,
         cache=cache,
+        accept_language=request.headers.get("Accept-Language"),
     )
 
 # ===============================
@@ -456,6 +457,7 @@ async def get_submission_artifact(
 async def update_submission_artifact(
     artifact_id: str,
     update_data: SubmissionArtifactUpdate,
+    http_request: Request,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
@@ -478,7 +480,9 @@ async def update_submission_artifact(
             dispatch_submission_test,
         )
 
-        await dispatch_submission_test(artifact, db)
+        await dispatch_submission_test(
+            artifact, db, http_request.headers.get("Accept-Language")
+        )
 
     return get_artifact_with_details(artifact)
 
