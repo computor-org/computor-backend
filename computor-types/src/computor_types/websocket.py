@@ -18,7 +18,7 @@ Namespaces:
 """
 
 from pydantic import BaseModel, Field
-from typing import Literal, Optional, Any, Union
+from typing import Any, Dict, Literal, Optional, Union
 from datetime import datetime
 
 
@@ -206,6 +206,10 @@ class WSMaintenanceActivated(WSEventBase):
     active: bool = True
     message: str = Field(..., description="Maintenance message for users")
     activated_at: str = Field(..., description="ISO8601 timestamp of activation")
+    message_i18n: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="The message in German and English; clients show the reader's language, else `message`",
+    )
 
 
 class WSMaintenanceDeactivated(WSEventBase):
@@ -213,6 +217,10 @@ class WSMaintenanceDeactivated(WSEventBase):
     type: Literal["maintenance:deactivated"] = "maintenance:deactivated"
     active: bool = False
     message: str = Field(default="Maintenance complete. Full service has been restored.")
+    message_i18n: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="The message in German and English; clients show the reader's language, else `message`",
+    )
 
 
 class WSMaintenanceScheduled(WSEventBase):
@@ -220,12 +228,20 @@ class WSMaintenanceScheduled(WSEventBase):
     type: Literal["maintenance:scheduled"] = "maintenance:scheduled"
     scheduled_at: str = Field(..., description="ISO8601 datetime of planned maintenance")
     message: str = Field(..., description="Schedule message for users")
+    message_i18n: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="The message in German and English; clients show the reader's language, else `message`",
+    )
 
 
 class WSMaintenanceCancelled(WSEventBase):
     """Scheduled maintenance has been cancelled."""
     type: Literal["maintenance:cancelled"] = "maintenance:cancelled"
     message: str = Field(default="Scheduled maintenance has been cancelled.")
+    message_i18n: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="The message in German and English; clients show the reader's language, else `message`",
+    )
 
 
 class WSMaintenanceReminder(WSEventBase):
@@ -234,6 +250,10 @@ class WSMaintenanceReminder(WSEventBase):
     minutes_remaining: int = Field(..., description="Minutes until maintenance begins")
     scheduled_at: str = Field(..., description="ISO8601 datetime of planned maintenance")
     message: str = Field(..., description="Maintenance message for users")
+    message_i18n: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="The message in German and English; clients show the reader's language, else `message`",
+    )
 
 
 # =============================================================================

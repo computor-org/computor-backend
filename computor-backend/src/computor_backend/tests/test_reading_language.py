@@ -23,6 +23,9 @@ from computor_backend.utils.reading_language import resolve_effective_language
     # A profile language outside de/en is not a choice; fall back to header.
     ("fr", "de-DE", "de"),
     ("fr", None, "de"),
+    ("fr", "en-US", "en"),
+    # Case and spaces do not make a stored code a different language.
+    (" DE ", "en-US", "de"),
 ])
 def test_resolve_effective_language(profile_language, accept_language, expected):
     assert resolve_effective_language(profile_language, accept_language) == expected

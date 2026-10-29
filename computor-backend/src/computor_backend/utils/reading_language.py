@@ -28,8 +28,10 @@ def resolve_effective_language(
     Pure: no I/O, no session state. ``profile_language`` is the stored
     ``profile.language_code`` (null when the user never chose one).
     """
-    if profile_language in SUPPORTED_LANGUAGES:
-        return profile_language
+    # Same reading as the web's profileUiLanguage: any other code is "not set".
+    profile = (profile_language or "").strip().lower()
+    if profile in SUPPORTED_LANGUAGES:
+        return profile
 
     if not accept_language or not accept_language.strip():
         return DEFAULT_LANGUAGE

@@ -5,9 +5,10 @@ Allows admins to schedule, activate, deactivate maintenance mode
 and query current maintenance status.
 """
 
+import json
 import logging
 from datetime import datetime, timezone
-from typing import Annotated
+from typing import Annotated, Dict, Optional
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -19,7 +20,13 @@ from computor_backend.permissions.core import check_admin
 from computor_backend.permissions.principal import Principal
 from computor_backend.exceptions import ForbiddenException, BadRequestException
 from computor_backend.redis_cache import get_redis_client
-from computor_types.maintenance import MaintenanceStatusGet, MaintenanceActivate, MaintenanceSchedule
+from computor_types.maintenance import (
+    DEFAULT_TEXTS,
+    MaintenanceActivate,
+    MaintenanceSchedule,
+    MaintenanceStatusGet,
+    stored_message_i18n,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +34,22 @@ maintenance_router = APIRouter()
 
 REDIS_KEY_STATE = "maintenance:state"
 REDIS_KEY_SCHEDULE = "maintenance:schedule"
+
+
+def request_message_i18n(request, default_key: str) -> Optional[Dict[str, str]]:
+    """Both languages for a request: its own pair, the built-in pair when the
+    admin wrote no message, else none (free text is in one language only)."""
+    if request.message_i18n:
+        return request.message_i18n
+    if "message" not in request.model_fields_set:
+        return dict(DEFAULT_TEXTS[default_key])
+    return None
+
+
+def _with_i18n(data: dict, message_i18n: Optional[Dict[str, str]]) -> dict:
+    if message_i18n:
+        data["message_i18n"] = message_i18n
+    return data
 
 
 # --- Endpoints ---
@@ -50,6 +73,7 @@ async def get_maintenance_status(
     return MaintenanceStatusGet(
         active=state.get("active") == "1" if state else False,
         message=state.get("message", "") if state else "",
+        message_i18n=stored_message_i18n(state.get("message_i18n")) if state else None,
         activated_at=state.get("activated_at") if state else None,
         activated_by=state.get("activated_by") if state else None,
         activated_by_name=state.get("activated_by_name") if state else None,
@@ -81,12 +105,15 @@ async def activate_maintenance(
     user = db.query(User).filter(User.id == permissions.user_id).first()
     display_name = f"{user.given_name} {user.family_name}" if user and user.given_name else permissions.user_id
 
+    message_i18n = request_message_i18n(request, "activated")
+    await redis.delete(REDIS_KEY_STATE)
     await redis.hset(REDIS_KEY_STATE, mapping={
         "active": "1",
         "message": request.message,
         "activated_at": now,
         "activated_by": permissions.user_id,
         "activated_by_name": display_name,
+        **({"message_i18n": json.dumps(message_i18n)} if message_i18n else {}),
     })
 
     # Clear any schedule since we're activating now
@@ -95,11 +122,11 @@ async def activate_maintenance(
     logger.warning(f"Maintenance mode ACTIVATED by {permissions.user_id}: {request.message}")
 
     if request.notify_websocket:
-        await _broadcast_maintenance_event("maintenance:activated", {
+        await _broadcast_maintenance_event("maintenance:activated", _with_i18n({
             "active": True,
             "message": request.message,
             "activated_at": now,
-        })
+        }, message_i18n))
 
     return {
         "status": "activated",
@@ -129,7 +156,8 @@ async def deactivate_maintenance(
 
     await _broadcast_maintenance_event("maintenance:deactivated", {
         "active": False,
-        "message": "Maintenance complete. Full service has been restored.",
+        "message": DEFAULT_TEXTS["deactivated"]["en"],
+        "message_i18n": dict(DEFAULT_TEXTS["deactivated"]),
     })
 
     return {"status": "deactivated"}
@@ -171,21 +199,24 @@ async def schedule_maintenance(
     user = db.query(User).filter(User.id == permissions.user_id).first()
     display_name = f"{user.given_name} {user.family_name}" if user and user.given_name else permissions.user_id
 
+    message_i18n = request_message_i18n(request, "scheduled")
+    await redis.delete(REDIS_KEY_SCHEDULE)
     await redis.hset(REDIS_KEY_SCHEDULE, mapping={
         "scheduled_at": request.scheduled_at,
         "message": request.message,
         "scheduled_by": permissions.user_id,
         "scheduled_by_name": display_name,
         "created_at": now,
+        **({"message_i18n": json.dumps(message_i18n)} if message_i18n else {}),
     })
 
     logger.info(f"Maintenance SCHEDULED for {request.scheduled_at} by {permissions.user_id}")
 
     if request.notify_websocket:
-        await _broadcast_maintenance_event("maintenance:scheduled", {
+        await _broadcast_maintenance_event("maintenance:scheduled", _with_i18n({
             "scheduled_at": request.scheduled_at,
             "message": request.message,
-        })
+        }, message_i18n))
 
     return {
         "status": "scheduled",
@@ -208,7 +239,8 @@ async def cancel_scheduled_maintenance(
     logger.info(f"Scheduled maintenance CANCELLED by {permissions.user_id}")
 
     await _broadcast_maintenance_event("maintenance:cancelled", {
-        "message": "Scheduled maintenance has been cancelled.",
+        "message": DEFAULT_TEXTS["cancelled"]["en"],
+        "message_i18n": dict(DEFAULT_TEXTS["cancelled"]),
     })
 
     return {"status": "cancelled"}

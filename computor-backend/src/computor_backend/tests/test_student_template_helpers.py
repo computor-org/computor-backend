@@ -84,3 +84,39 @@ class TestFailedEvents:
     def test_collect_skips_non_failed(self):
         contents = [self._content("d1", status="deployed")]
         assert collect_failed_events(contents, []) == []
+
+
+class TestMainReadme:
+    """The template README is shared by all learners: German first, then English."""
+
+    @staticmethod
+    def _content(path, title, title_i18n=None, identifier=None):
+        deployment = None
+        if identifier:
+            deployment = SimpleNamespace(example_version=SimpleNamespace(
+                example=SimpleNamespace(identifier=identifier), version_tag="v1"))
+        return SimpleNamespace(path=path, title=title, title_i18n=title_i18n, deployment=deployment)
+
+    def test_both_languages_with_translated_titles(self):
+        from computor_backend.tasks.student_template.readme import render_main_readme
+
+        course = SimpleNamespace(title="Datenanalyse", title_i18n={"en": "Data Analysis"})
+        unit = self._content("week1", "Woche 1", {"en": "Week 1"})
+        task = self._content("week1.loops", "Schleifen", {"en": "Loops"}, identifier="loops")
+        text = render_main_readme(course, [task], {"week1": unit, "week1.loops": task})
+
+        german, english = text.split("\n---\n")
+        assert german.startswith("# Datenanalyse – Aufgabenvorlage")
+        assert "| Woche 1 / Schleifen | [`loops/`](./loops) | Schleifen | v1 |" in german
+        assert "Reiche jede Aufgabe" in german
+        assert english.lstrip().startswith("# Data Analysis – Student Template")
+        assert "| Week 1 / Loops | [`loops/`](./loops) | Loops | v1 |" in english
+
+    def test_missing_translation_keeps_the_source_title(self):
+        from computor_backend.tasks.student_template.readme import render_main_readme
+
+        course = SimpleNamespace(title="Python", title_i18n=None)
+        text = render_main_readme(course, [], {})
+        assert "*Es sind noch keine Aufgaben veröffentlicht.*" in text
+        assert "*No assignments deployed yet.*" in text
+        assert text.index("# Python – Aufgabenvorlage") < text.index("# Python – Student Template")

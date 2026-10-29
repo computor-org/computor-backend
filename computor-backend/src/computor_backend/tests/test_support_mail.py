@@ -185,6 +185,32 @@ class TestWelcomeMail:
         assert ("im Kurskatalog" if german else "in the course catalog") in body
         assert ("öffne ihn dort in VS Code" if german else 'open it in VS Code from there') in body
 
+    @pytest.mark.parametrize("language", [None, ""])
+    def test_no_known_language_reads_german(self, language):
+        from computor_backend.support.welcome import build_welcome
+
+        msg = build_welcome(self._settings(), given_name="Ada", to="ada@example.org", language=language)
+        assert msg["Subject"] == "Willkommen bei computor.at"
+        assert msg.get_content().startswith("Hallo Ada,")
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("ui_locales, expected", [(None, "de"), ("", "de"), ("en", "en"), ("fr", "en")])
+    async def test_queued_welcome_language_follows_the_reading_rule(self, monkeypatch, ui_locales, expected):
+        from computor_backend import tasks as tasks_pkg
+        from computor_backend.business_logic import auth as auth_bl
+        from computor_backend.support import config as support_config
+
+        submitted = []
+
+        class _Executor:
+            async def submit_task(self, submission):
+                submitted.append(submission.parameters["language"])
+
+        monkeypatch.setattr(tasks_pkg, "get_task_executor", lambda: _Executor())
+        monkeypatch.setattr(support_config, "get_support_settings", lambda: self._settings())
+        await auth_bl._queue_welcome_mail("user-1", ui_locales)
+        assert submitted == [expected]
+
     def test_sender_must_be_a_team_address(self):
         from computor_backend.support.welcome import build_welcome
 

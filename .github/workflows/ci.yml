@@ -71,6 +71,8 @@ jobs:
           computor-backend/src/computor_backend/tests/test_compose_testing_bounds.py
           computor-backend/src/computor_backend/tests/test_workspace_launch_context.py
           computor-backend/src/computor_backend/tests/test_reading_language.py
+          computor-backend/src/computor_backend/tests/test_maintenance_language.py
+          computor-backend/src/computor_backend/tests/test_student_template_helpers.py
           computor-backend/src/computor_backend/tests/test_localized_titles.py
           computor-backend/src/computor_backend/tests/test_message_reading_language.py
           computor-backend/src/computor_backend/tests/test_student_description_download.py
