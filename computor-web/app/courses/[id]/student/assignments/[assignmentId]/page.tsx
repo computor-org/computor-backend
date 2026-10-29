@@ -28,14 +28,13 @@ import PublicLunaPanel from '@/src/components/student/PublicLunaPanel';
 import { displayName } from '@/src/utils/displayName';
 import {
   descriptionHeading,
+  descriptionInLanguage,
   fetchStudentDescription,
   localizedUnitTitle,
   plainHeading,
-  resolveContentLanguage,
   withoutLeadingHeading,
 } from '@/src/components/student/studentDescription';
 import { UserClient } from '@/src/generated/clients/UserClient';
-import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { StudentsClient } from '@/src/generated/clients/StudentsClient';
 import { ResultsClient } from '@/src/generated/clients/ResultsClient';
 import { SubmissionsClient } from '@/src/generated/clients/SubmissionsClient';
@@ -44,7 +43,6 @@ const studentsClient = new StudentsClient();
 const resultsClient = new ResultsClient();
 const submissionsClient = new SubmissionsClient();
 const userClient = new UserClient();
-const coursesClient = new CoursesClient();
 
 const COPY = {
   de: {
@@ -109,14 +107,6 @@ const COPY = {
   },
 };
 
-/** Profile language if the learner chose one, else the course's, else English. */
-async function contentLanguage(courseId: string): Promise<string> {
-  const user = await userClient.getCurrentUserEndpointUserGet({}).catch(() => null);
-  if (user?.profile?.language_code) return resolveContentLanguage(user.profile.language_code);
-  const course = await coursesClient.getCoursesCoursesIdGet({ id: courseId }).catch(() => null);
-  return resolveContentLanguage(null, course?.language_code);
-}
-
 /**
  * One assignment, as the student sees it.
  *
@@ -146,13 +136,9 @@ export default function AssignmentDetailPage() {
         ? userClient.getOwnSelfEnrollmentUserCoursesCourseIdSelfEnrollmentGet({ courseId }).catch(() => null)
         : Promise.resolve(null),
     ]);
-    // The released README in the reading language; the stored title and the
-    // example's meta description are only the fallback.
-    const language = await contentLanguage(courseId);
-    const readme = await fetchStudentDescription(assignmentId, language).catch(() => null);
     const submissionGroupId = assignment.submission_group?.id;
     // Nothing has been attempted yet — there is no group to hang runs off.
-    if (!submissionGroupId) return { assignment, selfEnrollment, language, readme, results: [], artifacts: [] };
+    if (!submissionGroupId) return { assignment, selfEnrollment, results: [], artifacts: [] };
 
     // The artifacts are only here to say which runs were official submissions;
     // a Result carries the artifact id but not its `submit` flag.
@@ -164,14 +150,20 @@ export default function AssignmentDetailPage() {
       }),
       submissionsClient.listSubmissionArtifactsSubmissionsArtifactsGet({ submissionGroupId }),
     ]);
-    return { assignment, selfEnrollment, language, readme, results, artifacts };
+    return { assignment, selfEnrollment, results, artifacts };
   }, [assignmentId, courseId, isOrdinaryLearner]);
+  // The released README in the reading language, the same language as the
+  // interface (computor-org/issues#552); the stored title and the example's
+  // meta description are only the fallback.
+  const { data: readme, loading: readmeLoading } = useResource(
+    () => fetchStudentDescription(assignmentId, language).catch(() => null),
+    [assignmentId, language],
+  );
 
   const assignment = data?.assignment ?? null;
   const group = assignment?.submission_group ?? null;
-  const readme = data?.readme ?? null;
   const readmeHeading = descriptionHeading(readme?.markdown);
-  const name = readmeHeading ? plainHeading(readmeHeading) : localizedUnitTitle(displayName(assignment, t.assignment), data?.language ?? 'en');
+  const name = readmeHeading ? plainHeading(readmeHeading) : localizedUnitTitle(displayName(assignment, t.assignment), language);
   const crumbs = useCourseCrumbs(
     courseId,
     { label: t.assignments, href: `/courses/${courseId}/student/assignments` },
@@ -185,9 +177,10 @@ export default function AssignmentDetailPage() {
   // Assignments carry no description of their own — the text belongs to the
   // example version that was deployed onto them.
   // The page title already shows the README heading, so it is not repeated.
+  // A unit's own text may hold one section per language (welcome unit).
   const description = readme
     ? (readmeHeading ? withoutLeadingHeading(readme.markdown) : readme.markdown)
-    : assignment?.description || assignment?.deployment?.example_version?.description;
+    : descriptionInLanguage(assignment?.description, language) || assignment?.deployment?.example_version?.description;
   // What VS Code can open: a released assignment, or a unit with authored text.
   const openable = assignment?.course_id === courseId && assignment.visible_effective !== false && (
     assignment.course_content_kind_id === 'unit'
@@ -201,7 +194,7 @@ export default function AssignmentDetailPage() {
       <DetailPanel
         breadcrumbs={crumbs}
         title={name}
-        loading={loading}
+        loading={loading || readmeLoading}
         error={error || (!loading && !assignment ? t.notFound : null)}
         // The task stays on this page, as on main; one button opens it in VS Code.
         actions={isOrdinaryLearner && openable ? (

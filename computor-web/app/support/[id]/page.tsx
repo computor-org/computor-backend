@@ -28,6 +28,7 @@ import {
   type TicketUpdate,
 } from '@/src/clients/SupportClient';
 import { STATUS_TONE, userLabel } from '@/src/utils/support';
+import { localeFor } from '@/src/utils/locale';
 
 type ComposerMode = 'reply' | 'note';
 
@@ -213,7 +214,7 @@ export default function SupportTicketPage() {
 
   const assignedToMe = !!user && ticket.assignee?.id === user.id;
   const events = ticket.events ?? [];
-  const locale = language === 'de' ? 'de-AT' : undefined;
+  const locale = localeFor(language);
   const inApp = ticket.channel !== 'mail';
 
   return (
@@ -427,7 +428,7 @@ function MessageCard({
             {t.delivery[m.delivery_state] ?? m.delivery_state}
           </Badge>
         )}
-        <span className="ml-auto text-xs text-muted">{formatDateTime(m.created_at, language === 'de' ? 'de-AT' : undefined)}</span>
+        <span className="ml-auto text-xs text-muted">{formatDateTime(m.created_at, localeFor(language))}</span>
       </header>
       {isTeam && !inApp && !internal && m.to.length > 0 && <p className="mb-2 text-xs text-muted">{t.to}: {m.to.join(', ')}</p>}
       {isTeam && !inApp && outgoing && m.delivery_state === 'failed' && (

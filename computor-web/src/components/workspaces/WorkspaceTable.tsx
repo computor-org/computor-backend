@@ -7,6 +7,7 @@ import Button from '@/src/components/ui/Button';
 import WorkspaceStatusBadge, { categorizeStatus } from './WorkspaceStatusBadge';
 import { workspaceVersionLabel } from './versionDate';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { localeFor } from '@/src/utils/locale';
 
 const COPY = {
   de: {
@@ -111,7 +112,7 @@ function WorkspaceRow({
         <WorkspaceStatusBadge status={workspace.latest_build_status} transition={transition} detail={version} />
       </Td>
       <Td className="text-sm text-muted whitespace-nowrap">
-        {workspace.created_at ? new Date(workspace.created_at).toLocaleDateString(language === 'de' ? 'de-AT' : undefined) : '—'}
+        {workspace.created_at ? new Date(workspace.created_at).toLocaleDateString(localeFor(language)) : '—'}
       </Td>
       <Td>
         <div className="flex items-center justify-end gap-1.5">

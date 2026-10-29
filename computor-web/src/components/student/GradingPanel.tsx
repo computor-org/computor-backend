@@ -12,6 +12,7 @@ import type {
   SubmissionGroupGradingList,
   SubmissionGroupStudentGet,
 } from 'types/generated';
+import { localeFor } from '@/src/utils/locale';
 
 /**
  * What a human said about this student's work.
@@ -64,7 +65,7 @@ function gradedAt(g: SubmissionGroupGradingList): string {
 function formatWhen(value: string | null | undefined, language: UiLanguage): string {
   if (!value) return '—';
   const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(language === 'de' ? 'de-AT' : undefined);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(localeFor(language));
 }
 
 /** Grader name plus their role, e.g. "Ada Lovelace · Tutor". */

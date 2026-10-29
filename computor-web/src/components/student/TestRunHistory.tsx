@@ -7,6 +7,7 @@ import EmptyState from '@/src/components/EmptyState';
 import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
 import type { Tone } from '@/src/components/ui/tones';
 import type { ResultList, SubmissionArtifactList, TaskStatus } from 'types/generated';
+import { localeFor } from '@/src/utils/locale';
 
 /**
  * Every test run on this assignment, newest first.
@@ -69,7 +70,7 @@ export function statusTone(status: TaskStatus | null | undefined): Tone {
 function formatWhen(value: string | null | undefined, language: UiLanguage): string {
   if (!value) return '—';
   const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(language === 'de' ? 'de-AT' : undefined);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(localeFor(language));
 }
 
 /**

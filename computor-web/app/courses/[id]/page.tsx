@@ -29,6 +29,7 @@ import CourseProgressCard from '@/src/components/student/CourseProgress';
 import { displayName } from '@/src/utils/displayName';
 import { localizedRoleLabel } from '@/src/utils/courseRoles';
 import type { PersonalCloneCredentialGet } from 'types/generated';
+import { localeFor, languageName } from '@/src/utils/locale';
 
 const coursesClient = new CoursesClient();
 const courseFamiliesClient = new CourseFamiliesClient();
@@ -411,7 +412,7 @@ export default function CoursePage() {
     items.filter(Boolean) as Fact[];
 
   const isArchived = Boolean(course.archived_at);
-  const dateLocale = language === 'de' ? 'de-AT' : undefined;
+  const dateLocale = localeFor(language);
 
   return (
     <AuthenticatedLayout>
@@ -469,7 +470,7 @@ export default function CoursePage() {
               courseFamily && { term: t.courseFamily, value: displayName(courseFamily, t.untitledShort) },
               course.language_code && {
                 term: t.language,
-                value: <span className="uppercase">{course.language_code}</span>,
+                value: languageName(course.language_code, language),
               },
               canManageMembers &&
                 course.created_at && {

@@ -19,6 +19,7 @@ import type {
   PublicLearningContentSummary,
   PublicLearningCourseOutline,
 } from '@/src/types/publicLearning';
+import { languageName } from '@/src/utils/locale';
 
 const LANGUAGE_LABEL: Record<string, string> = {
   de: 'Deutsch',
@@ -281,7 +282,7 @@ export default function PublicCourseReader({
               <h1 className="mt-2 text-3xl font-bold text-fg">{outline.title}</h1>
               <p className="mt-2 text-sm text-muted">
                 {t.counts(outline.unit_count, outline.exercise_count)}
-                {outline.language_code ? ` · ${outline.language_code.toUpperCase()}` : ''}
+                {outline.language_code ? ` · ${languageName(outline.language_code, uiLanguage)}` : ''}
               </p>
             </div>
 

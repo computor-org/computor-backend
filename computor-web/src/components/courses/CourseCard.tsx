@@ -7,6 +7,7 @@ import CourseWorkspaceLaunchButtons, { type CourseWorkspaceLauncher } from '@/sr
 import { displayName } from '@/src/utils/displayName';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { localizedRoleLabel } from '@/src/utils/courseRoles';
+import { languageName } from '@/src/utils/locale';
 
 const COPY = {
   de: { untitled: 'Kurs ohne Titel', view: 'Kurs ansehen' },
@@ -63,7 +64,7 @@ export default function CourseCard({
             <svg className="h-4 w-4 mr-2 text-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
             </svg>
-            <span className="uppercase">{course.language_code}</span>
+            <span>{languageName(course.language_code, language)}</span>
           </div>
         )}
       </div>
