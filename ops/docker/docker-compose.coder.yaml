@@ -10,7 +10,7 @@ services:
   # `socket-proxy`, so dev and prod are wired identically and the ingress never
   # needs the raw socket.
   coder-socket-proxy:
-    image: tecnativa/docker-socket-proxy:0.3.0@sha256:9e4b9e7517a6b660f2cc903a19b257b1852d5b3344794e3ea334ff00ae677ac2
+    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-socket-proxy
     networks:
       - computor-network
@@ -45,7 +45,7 @@ services:
   # to the public domain, and the public domain never has to resolve inside
   # a workspace.
   workspace-ingress:
-    image: traefik:v3.7.13@sha256:24841fe2de7304c149343d877d2923b4c8800a38ba015dea9174c23b20e344a0
+    image: traefik:v3.7.15@sha256:0f6150202bc1fed72a7bd2107460eaa510e5b8a905f3fdb5b84f2c8619c33368
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}workspace-ingress
     restart: unless-stopped
     security_opt:
@@ -130,7 +130,7 @@ services:
     # Pinned by version + digest: >= 2.36.4 is required (GHSA-vx42-ghc9-gw65).
     # Keep in lockstep with CODER_VERSION in docker/coder-runtime/Dockerfile.
     # Never downgrade: Coder DB migrations are forward-only.
-    image: ghcr.io/coder/coder:v2.37.3@sha256:a48f82c2c437e032ce3f6970b4e937a7900cad3c76956956955099465b45e542
+    image: ghcr.io/coder/coder:v2.38.4@sha256:e5f4489f3fac3ee6d975552d989458b50882e78f0560d4f91253053f3797a019
     # Also on BOTH isolated workspace networks so workspace agents can reach
     # coder:7080 (CODER_ACCESS_URL) without workspaces touching
     # computor-network. The offline one is not optional: an agent that cannot
