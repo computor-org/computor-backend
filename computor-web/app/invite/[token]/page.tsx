@@ -8,6 +8,7 @@ import type { InviteLinkPublic } from 'types/generated';
 import { OnboardingClient } from '@/src/clients/OnboardingClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { localeFor } from '@/src/utils/locale';
 
 const invitesClient = new InvitesClient();
 const onboarding = new OnboardingClient();
@@ -37,7 +38,6 @@ const COPY = {
     password: 'Passwort *',
     confirm: 'Passwort bestätigen *',
     creating: 'Konto wird erstellt …',
-    dateLocale: 'de-AT' as string | undefined,
   },
   en: {
     invalidLink: 'Invalid or expired invite link',
@@ -63,14 +63,14 @@ const COPY = {
     password: 'Password *',
     confirm: 'Confirm password *',
     creating: 'Creating account…',
-    dateLocale: undefined as string | undefined,
   },
 };
 
 export default function InvitePage() {
   const { token } = useParams<{ token: string }>();
   const { loginWithSSO } = useAuth();
-  const t = COPY[useUiLanguage()];
+  const language = useUiLanguage();
+  const t = COPY[language];
 
   const [invite, setInvite] = useState<InviteLinkPublic | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -127,7 +127,7 @@ export default function InvitePage() {
   };
 
   const formatDate = (iso: string) =>
-    new Date(iso).toLocaleDateString(t.dateLocale, { year: 'numeric', month: 'long', day: 'numeric' });
+    new Date(iso).toLocaleDateString(localeFor(language), { year: 'numeric', month: 'long', day: 'numeric' });
 
   if (loading) {
     return (

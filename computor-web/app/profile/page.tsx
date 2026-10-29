@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { UsersClient } from '@/src/generated/clients/UsersClient';
 import { UserClient } from '@/src/generated/clients/UserClient';
+import { AuthenticationClient } from '@/src/generated/clients/AuthenticationClient';
+import { accountConsoleFrom } from '@/src/utils/accountConsole';
 import { ProfilesClient } from '@/src/generated/clients/ProfilesClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
@@ -14,6 +16,7 @@ import { Field } from '@/src/components/FormPanel';
 import { inputCls, readOnlyInputCls } from '@/src/components/ui/tokens';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type { UserGet } from 'types/generated';
+import { localeFor } from '@/src/utils/locale';
 
 const usersClient = new UsersClient();
 const profilesClient = new ProfilesClient();
@@ -35,13 +38,14 @@ const COPY = {
     firstName: 'Vorname',
     lastName: 'Nachname',
     email: 'E-Mail',
-    emailHint: 'Die E-Mail-Adresse wird von deinem Login-Anbieter verwaltet. Ändere sie in den Einstellungen unter Konto und Sicherheit.',
+    emailHint: 'Die E-Mail-Adresse verwaltet dein Login-Anbieter. Ändern kannst du sie in seiner Kontoverwaltung, die du in den Einstellungen unter „Konto und Sicherheit“ öffnest.',
+    emailHintNoConsole: 'Die E-Mail-Adresse verwaltet dein Login-Anbieter; hier lässt sie sich nicht ändern.',
     nickname: 'Spitzname',
     nicknameHint: 'Ein kurzer öffentlicher Name (Buchstaben, Ziffern, - und _).',
     bio: 'Über mich',
     website: 'Website',
     language: 'Sprache',
-    languageHint: 'Automatisch bedeutet: Die Oberfläche folgt deinem Browser und jeder Kurs wird in seiner eigenen Sprache gelesen.',
+    languageHint: 'Automatisch bedeutet: Oberfläche und Aufgabentexte folgen deinem Browser. Fehlt ein Text in dieser Sprache, erscheint die vorhandene Fassung.',
     languageAuto: 'Automatisch (Browser)',
     avatarImage: 'Avatar-Bild-URL',
     avatarImageHint: 'HTTPS-Bild, ersetzt die farbigen Initialen.',
@@ -62,13 +66,14 @@ const COPY = {
     firstName: 'First name',
     lastName: 'Last name',
     email: 'Email',
-    emailHint: 'Email is managed by your login provider — change it under Account & Security in Settings.',
+    emailHint: 'Email is managed by your login provider. Change it in its account console, which you open under “Account & Security” in Settings.',
+    emailHintNoConsole: 'Email is managed by your login provider and cannot be changed here.',
     nickname: 'Nickname',
     nicknameHint: 'A short public handle (letters, numbers, - and _).',
     bio: 'Bio',
     website: 'Website',
     language: 'Language',
-    languageHint: 'Automatic means the interface follows your browser and each course is read in its own language.',
+    languageHint: 'Automatic means the interface and the assignment texts follow your browser. Where a text has no version in that language, the existing one is shown.',
     languageAuto: 'Automatic (browser)',
     avatarImage: 'Avatar image URL',
     avatarImageHint: 'HTTPS image; overrides the colored initials.',
@@ -83,6 +88,7 @@ function roleLabel(role: string): string {
 
 
 const userClient = new UserClient();
+const authenticationClient = new AuthenticationClient();
 export default function ProfilePage() {
   const { user: authUser, isAuthenticated, isLoading: authLoading, setProfileLanguage } = useAuth();
   const language = useUiLanguage();
@@ -91,6 +97,7 @@ export default function ProfilePage() {
   const [user, setUser] = useState<UserGet | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasAccountConsole, setHasAccountConsole] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -122,8 +129,15 @@ export default function ProfilePage() {
     let cancelled = false;
     (async () => {
       try {
-        const u = await userClient.getCurrentUserEndpointUserGet({});
-        if (!cancelled) hydrate(u);
+        const [u, providers] = await Promise.all([
+          userClient.getCurrentUserEndpointUserGet({}),
+          // The help names the Settings section only where Settings shows it.
+          authenticationClient.listProvidersAuthProvidersGet().catch(() => null),
+        ]);
+        if (!cancelled) {
+          hydrate(u);
+          setHasAccountConsole(accountConsoleFrom(providers) !== null);
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : t.loadFailed);
       } finally {
@@ -225,7 +239,7 @@ export default function ProfilePage() {
                   ))}
                   {user.created_at && (
                     <span className="px-2 py-0.5 text-xs rounded bg-sunken text-muted">
-                      {t.joined(new Date(user.created_at).toLocaleDateString(language === 'de' ? 'de-AT' : undefined))}
+                      {t.joined(new Date(user.created_at).toLocaleDateString(localeFor(language)))}
                     </span>
                   )}
                 </div>
@@ -250,7 +264,7 @@ export default function ProfilePage() {
                     <input className={inputCls} value={familyName} onChange={(e) => setFamilyName(e.target.value)} />
                   </Field>
                 </div>
-                <Field label={t.email} hint={t.emailHint}>
+                <Field label={t.email} hint={hasAccountConsole ? t.emailHint : t.emailHintNoConsole}>
                   <input className={readOnlyInputCls} value={user.email ?? ''} disabled />
                 </Field>
                 <Field label={t.nickname} hint={t.nicknameHint}>

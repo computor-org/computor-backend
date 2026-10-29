@@ -9,6 +9,7 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import Badge from '@/src/components/Badge';
 import { MessagesClient } from '@/src/generated/clients/MessagesClient';
 import type { MessageList } from 'types/generated';
+import { localeFor } from '@/src/utils/locale';
 
 const messagesClient = new MessagesClient();
 
@@ -20,7 +21,6 @@ const COPY = {
     empty: 'Keine Mitteilungen.',
     new: 'neu',
     system: 'System',
-    locale: 'de-AT' as string | undefined,
   },
   en: {
     title: 'Notifications',
@@ -29,7 +29,6 @@ const COPY = {
     empty: 'No notifications.',
     new: 'new',
     system: 'System',
-    locale: undefined as string | undefined,
   },
 };
 
@@ -50,7 +49,8 @@ function fmtWhen(s: string | null | undefined, locale: string | undefined): stri
 }
 
 export default function NotificationsPage() {
-  const t = COPY[useUiLanguage()];
+  const language = useUiLanguage();
+  const t = COPY[language];
   const { data, loading, error } = useResource(async () => {
     const items = await messagesClient.listMessagesMessagesGet({ scope: 'global', limit: 100 });
     items.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
@@ -102,7 +102,7 @@ export default function NotificationsPage() {
                     {isNew && <Badge color="blue" className="shrink-0 mt-0.5">{t.new}</Badge>}
                   </div>
                   <div className="mt-2 text-xs text-subtle">
-                    {authorName(m, t.system)} · {fmtWhen(m.created_at, t.locale)}
+                    {authorName(m, t.system)} · {fmtWhen(m.created_at, localeFor(language))}
                   </div>
                 </div>
               );

@@ -5,6 +5,7 @@ import WorkspaceStatusBadge from './WorkspaceStatusBadge';
 import { workspaceStage } from './workspaceStage';
 import type { WorkspaceDetails } from '@/src/types/workspaces';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { localeFor } from '@/src/utils/locale';
 
 const COPY = {
   de: {
@@ -117,7 +118,7 @@ export default function WorkspaceDetailsModal({
               {ws.created_at && (
                 <tr>
                   <td className="py-2 font-medium text-muted pr-4">{t.created}</td>
-                  <td className="py-2 text-fg">{new Date(ws.created_at).toLocaleString(language === 'de' ? 'de-AT' : undefined)}</td>
+                  <td className="py-2 text-fg">{new Date(ws.created_at).toLocaleString(localeFor(language))}</td>
                 </tr>
               )}
             </tbody>

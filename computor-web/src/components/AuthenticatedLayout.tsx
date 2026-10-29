@@ -15,6 +15,7 @@ import type { ConsentStatusGet as ConsentStatus } from 'types/generated';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { loginPathFor } from '@/src/utils/safeRedirect';
 import { applyDocumentLanguage } from '@/src/utils/documentLanguage';
+import { READING_LANGUAGE_COOKIE, writeLanguageCookie } from '@/src/utils/requestLanguage';
 
 // Consent bootstrap check runs once per authenticated session per page load;
 // mid-session changes (withdrawal, policy version bump) are caught by the 403
@@ -27,10 +28,14 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
   const { isAuthenticated, isLoading } = useAuth();
   const language = useUiLanguage();
 
-  // The root layout renders lang="en"; the signed-in interface follows the user.
+  // The signed-in interface follows the user; the cookie lets the server
+  // render the next page in the same language.
   useEffect(() => {
     applyDocumentLanguage(language);
   }, [language]);
+  useEffect(() => {
+    if (isAuthenticated) writeLanguageCookie(READING_LANGUAGE_COOKIE, language);
+  }, [isAuthenticated, language]);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {

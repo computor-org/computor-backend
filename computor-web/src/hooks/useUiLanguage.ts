@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useRequestLanguage } from '@/src/contexts/RequestLanguageContext';
 import { useBrowserLanguage, useNavigatorLanguage, type UiLanguage } from './useBrowserLanguage';
 
 export type { UiLanguage };
@@ -18,12 +19,15 @@ export function profileUiLanguage(language?: string | null): UiLanguage | null {
  * browser language. A choice stored on a signed-out page applies only while
  * signed out, so "Automatic" follows the browser (computor-org/issues#534).
  * An auth callback may provide its request-selected language for the server
- * render and browser fallback.
+ * render and browser fallback. While the session is still being restored, the
+ * signed-in language the server saw in its cookie holds, so a signed-in page
+ * renders in it from the first paint.
  */
 export function useUiLanguage(initialLanguage?: UiLanguage): UiLanguage {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+  const request = useRequestLanguage();
   const browserLanguage = useBrowserLanguage(initialLanguage, initialLanguage);
   const navigatorLanguage = useNavigatorLanguage(initialLanguage);
-  if (!user) return browserLanguage;
+  if (!user) return isLoading && request.reading && !initialLanguage ? request.reading : browserLanguage;
   return profileUiLanguage(user.language) ?? user.effectiveLanguage ?? navigatorLanguage;
 }

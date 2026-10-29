@@ -14,7 +14,7 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import ThemePicker from '@/src/components/ThemePicker';
 import { inputCls } from '@/src/components/ui/tokens';
-import type { ApiTokenGet, ApiTokenCreateResponse, AccountList, ProviderInfo } from 'types/generated';
+import type { ApiTokenGet, ApiTokenCreateResponse, AccountList } from 'types/generated';
 import type { ConsentStatusGet, InstanceStatusGet } from '@/src/generated/types/common';
 import { ConsentClient } from '@/src/generated/clients/ConsentClient';
 import { InstanceStatusClient } from '@/src/generated/clients/InstanceStatusClient';
@@ -22,23 +22,14 @@ import { AuthenticationClient } from '@/src/generated/clients/AuthenticationClie
 import DescriptionList from '@/src/components/DescriptionList';
 import { WEB_COMMIT, duration, shortCommit } from '@/src/utils/instanceStatus';
 import { LEGAL_LINKS, englishLegalLink } from '@/src/config/legal';
+import { localeFor } from '@/src/utils/locale';
+import { accountConsoleFrom } from '@/src/utils/accountConsole';
 
 const tokensClient = new TokensClient();
 const accountsClient = new AccountsClient();
 const instanceStatusClient = new InstanceStatusClient();
 
 const authenticationClient = new AuthenticationClient();
-
-/**
- * The login provider's account console, where users add or replace an
- * authenticator app (issues#485). The API names it from the address sign-in
- * already uses; a build-time NEXT_PUBLIC_KEYCLOAK_URL reached no deployment.
- */
-function accountConsoleFrom(providers: unknown): string | null {
-  if (!Array.isArray(providers)) return null;
-  const url = (providers as ProviderInfo[]).find((p) => p.account_url)?.account_url;
-  return url && /^https?:\/\//.test(url) ? url : null;
-}
 
 // The accounts list endpoint returns AccountList, which already carries `builtin`.
 type AccountRow = AccountList;
@@ -64,13 +55,13 @@ function Section({ title, description, children, actions }: {
 }
 
 function fmtDate(s: string | null | undefined, language: UiLanguage): string {
-  return s ? new Date(s).toLocaleDateString(language === 'de' ? 'de-AT' : undefined) : '—';
+  return s ? new Date(s).toLocaleDateString(localeFor(language)) : '—';
 }
 
 function stamp(value: string | null | undefined, language: UiLanguage): string | null {
   if (!value) return null;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleString(language === 'de' ? 'de-AT' : undefined);
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleString(localeFor(language));
 }
 
 /** Lifetimes offered for a new API token, in days; empty means no expiry. */
@@ -88,7 +79,7 @@ const COPY = {
     appearance: 'Darstellung',
     appearanceDesc: 'So sieht Computor auf diesem Gerät aus. Wird nicht zwischen Geräten synchronisiert.',
     accountSecurity: 'Konto und Sicherheit',
-    accountSecurityDesc: 'Passwort, E-Mail, Zwei-Faktor-Authentifizierung und aktive Sitzungen verwaltet dein Login-Anbieter.',
+    accountSecurityDesc: 'In der Kontoverwaltung deines Login-Anbieters änderst du dein Passwort und deine E-Mail-Adresse, richtest die Zwei-Faktor-Authentifizierung ein und meldest andere Geräte ab.',
     openConsole: 'Kontoverwaltung öffnen',
     apiTokens: 'API-Tokens',
     apiTokensDesc: 'Persönliche Zugriffstokens für die CLI, die VS-Code-Erweiterung und Skripte. Behandle sie wie Passwörter.',
@@ -156,7 +147,7 @@ const COPY = {
     appearance: 'Appearance',
     appearanceDesc: 'How Computor looks on this device. Not synced across devices.',
     accountSecurity: 'Account & Security',
-    accountSecurityDesc: 'Password, email, two-factor authentication and active sessions are managed by your login provider.',
+    accountSecurityDesc: 'In your login provider’s account console you change your password and email, set up two-factor authentication and sign out other devices.',
     openConsole: 'Open account console',
     apiTokens: 'API tokens',
     apiTokensDesc: 'Personal access tokens for the CLI, VS Code extension and scripts. Treat them like passwords.',
@@ -567,7 +558,7 @@ export default function SettingsPage() {
                       <span className="font-mono">{consentStatus.required_version}</span>
                     </p>
                     {consentStatus.has_consented && consentStatus.granted_at ? (
-                      <p>{t.consentGiven(new Date(consentStatus.granted_at).toLocaleString(language === 'de' ? 'de-AT' : undefined))}</p>
+                      <p>{t.consentGiven(new Date(consentStatus.granted_at).toLocaleString(localeFor(language)))}</p>
                     ) : (
                       <p className="text-warn-text">{t.notConsented}</p>
                     )}

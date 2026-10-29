@@ -1,7 +1,7 @@
 /**
- * The site title in each interface language. The root layout serves the German
- * one (German first, like the server render of the public pages); the pages
- * switch it together with <html lang> once they know the visitor's language.
+ * The site title in each interface language. The root layout serves the one
+ * of the request's language; the pages switch it together with <html lang>
+ * where the visitor's language turns out different.
  */
 export const APP_TITLES = {
   de: 'Computor – Lernplattform für Programmierung',

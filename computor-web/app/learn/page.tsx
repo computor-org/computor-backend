@@ -7,6 +7,7 @@ import PublicLearnShell from '@/src/components/learn/PublicLearnShell';
 import { CODESPACES_URL, COMPUTOR_EXTENSION_URL } from '@/src/components/courses/LearningOptions';
 import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
 import type { PublicCourseCatalogEntry } from '@/src/types/publicLearning';
+import { languageName } from '@/src/utils/locale';
 
 const COPY = {
   de: {
@@ -44,7 +45,8 @@ const COPY = {
 };
 
 export default function LearnPage() {
-  const t = COPY[useBrowserLanguage()];
+  const language = useBrowserLanguage();
+  const t = COPY[language];
   const [courses, setCourses] = useState<PublicCourseCatalogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -107,7 +109,7 @@ export default function LearnPage() {
                 <article key={course.id} className="flex min-h-64 flex-col rounded-xl border border-rule bg-surface p-6">
                   <div className="flex-1">
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-                      {course.language_code ? course.language_code.toUpperCase() : t.course}
+                      {course.language_code ? languageName(course.language_code, language) : t.course}
                     </p>
                     <h3 className="mt-2 text-xl font-semibold text-fg">
                       {course.title || t.untitled}
