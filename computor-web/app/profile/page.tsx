@@ -11,7 +11,7 @@ import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Avatar, { rgbIntToHex } from '@/src/components/Avatar';
 import { Field } from '@/src/components/FormPanel';
-import { inputCls } from '@/src/components/ui/tokens';
+import { inputCls, readOnlyInputCls } from '@/src/components/ui/tokens';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type { UserGet } from 'types/generated';
 
@@ -251,7 +251,7 @@ export default function ProfilePage() {
                   </Field>
                 </div>
                 <Field label={t.email} hint={t.emailHint}>
-                  <input className={`${inputCls} bg-canvas text-muted`} value={user.email ?? ''} disabled />
+                  <input className={readOnlyInputCls} value={user.email ?? ''} disabled />
                 </Field>
                 <Field label={t.nickname} hint={t.nicknameHint}>
                   <input className={inputCls} value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="jdoe" />

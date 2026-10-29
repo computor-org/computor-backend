@@ -1,13 +1,15 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import type { ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import BilingualLegalText from '@/src/components/BilingualLegalText';
+import DocumentLanguage from '@/src/components/DocumentLanguage';
 import LegalLinks from '@/src/components/LegalLinks';
 import NetideeNotice from '@/src/components/NetideeNotice';
+import { legalMarkdownComponents } from '@/src/components/legalMarkdown';
 import { HAS_OWN_LEGAL_PAGES } from '@/src/config/legal';
-import { loadLegalDoc, type LegalDocName } from '@/src/utils/legalContent';
+import { loadLegalDoc, splitBilingual, type BilingualText, type LegalDocName } from '@/src/utils/legalContent';
 
 export interface LanguageSwitch {
   label: string;
@@ -16,39 +18,32 @@ export interface LanguageSwitch {
   current: boolean;
 }
 
-function textOf(node: ReactNode): string {
-  if (typeof node === 'string' || typeof node === 'number') return String(node);
-  if (Array.isArray(node)) return node.map(textOf).join('');
-  return '';
-}
-
-function slug(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
 /**
  * A static legal page (Impressum, Datenschutz, …) rendered from
  * content/legal/*.md at build time. Server component, no client state, so it
  * reads without JavaScript. 404 unless this build uses the computor-at legal
  * profile: other deployments link elsewhere or show no legal pages at all.
+ *
+ * `lang` says what language the text is in; `titles` that the page holds both
+ * languages and names itself in whichever one is being read — the only thing the
+ * server cannot know, so that part arrives with the browser.
  */
 export default function LegalPage({
   doc,
   lang,
   languages,
+  titles,
 }: {
   doc: LegalDocName;
   /** Language of the text, or undefined for a page holding DE and EN. */
   lang?: string;
   languages?: LanguageSwitch[];
+  /** Set on a bilingual page: its title in each reading language. */
+  titles?: BilingualText;
 }) {
   if (!HAS_OWN_LEGAL_PAGES) notFound();
   const { title, version, body } = loadLegalDoc(doc);
+  const reading = lang === 'en' ? 'en' : 'de';
 
   return (
     <div className="min-h-screen bg-canvas flex flex-col">
@@ -84,30 +79,25 @@ export default function LegalPage({
         <article lang={lang} className="max-w-3xl mx-auto">
           <h1 className="text-2xl sm:text-3xl font-bold text-fg break-words">{title}</h1>
           {version ? <p className="mt-2 text-sm text-muted">{version}</p> : null}
-          <div className="prose markdown max-w-none mt-8">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                h2: ({ children }) => <h2 id={slug(textOf(children))}>{children}</h2>,
-                // Wide tables (the privacy notice's processing overview) scroll
-                // inside their own box instead of widening the page on phones.
-                table: ({ children }) => (
-                  <div className="overflow-x-auto">
-                    <table>{children}</table>
-                  </div>
-                ),
-              }}
-            >
-              {body}
-            </ReactMarkdown>
-          </div>
+          {titles ? (
+            <BilingualLegalText sections={splitBilingual(body)} titles={titles} />
+          ) : (
+            <>
+              <DocumentLanguage language={reading} />
+              <div className="prose markdown max-w-none mt-8">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={legalMarkdownComponents}>
+                  {body}
+                </ReactMarkdown>
+              </div>
+            </>
+          )}
         </article>
       </main>
 
       <footer className="border-t border-rule bg-surface">
         <div className="container mx-auto px-4 py-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted">
-          <LegalLinks language={lang === 'en' ? 'en' : 'de'} />
-          <NetideeNotice language={lang === 'en' ? 'en' : 'de'} />
+          <LegalLinks language={reading} />
+          <NetideeNotice language={reading} />
         </div>
       </footer>
     </div>

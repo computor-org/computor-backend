@@ -10,7 +10,7 @@ import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import { PageLoading } from '@/src/components/ListPageLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
-import { inputCls } from '@/src/components/ui/tokens';
+import { inputCls, readOnlyInputCls } from '@/src/components/ui/tokens';
 import type { OrganizationGet, OrganizationType } from '@/src/generated/types/organizations';
 import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
 
@@ -134,7 +134,7 @@ export default function OrganizationEditPage() {
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className={inputCls} />
           </Field>
           <Field label={t.path} hint={t.pathHint}>
-            <input value={org?.path || ''} readOnly className={`${inputCls} bg-canvas text-muted`} />
+            <input value={org?.path || ''} readOnly className={readOnlyInputCls} />
           </Field>
         </FormPanel>
       )}

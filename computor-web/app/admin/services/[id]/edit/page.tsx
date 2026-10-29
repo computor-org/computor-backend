@@ -8,7 +8,7 @@ import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
-import { inputCls } from '@/src/components/ui/tokens';
+import { inputCls, readOnlyInputCls } from '@/src/components/ui/tokens';
 import { ServicesClient } from '@/src/generated/clients/ServicesClient';
 import { TESTING_LANGUAGES, configLanguage, configTaskQueue } from '@/src/utils/services';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
@@ -142,10 +142,10 @@ export default function ServiceEditPage() {
         onSubmit={save}
       >
         <Field label="Slug" hint={t.slugHint}>
-          <input value={service?.slug ?? ''} disabled className={`${inputCls} bg-canvas text-muted`} />
+          <input value={service?.slug ?? ''} disabled className={readOnlyInputCls} />
         </Field>
         <Field label={t.serviceType} hint={t.serviceTypeHint}>
-          <input value={service?.service_type_path ?? ''} disabled className={`${inputCls} bg-canvas text-muted`} />
+          <input value={service?.service_type_path ?? ''} disabled className={readOnlyInputCls} />
         </Field>
         <Field label={t.name} required>
           <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
