@@ -301,20 +301,24 @@ maintenance_paths() {
 
 ensure_maintenance_page() {
     maintenance_paths
-    mkdir -p "$MAINTENANCE_PAGE_DIR"
+    mkdir -p "$MAINTENANCE_PAGE_DIR" || return 1
     # Compare, not just test for existence: a page staged by an older checkout
     # would otherwise be served forever after the source changed.
     if ! cmp -s "${OPS_DIR}/maintenance/maintenance.html" "$MAINTENANCE_PAGE_DIR/index.html"; then
         cp "${OPS_DIR}/maintenance/maintenance.html" "$MAINTENANCE_PAGE_DIR/index.html" \
             && log "  ${GREEN}Staged maintenance page${NC}" \
-            || warn "  Could not stage maintenance page (missing ${OPS_DIR}/maintenance/maintenance.html)"
+            || { warn "  Could not stage maintenance page (missing ${OPS_DIR}/maintenance/maintenance.html)"; return 1; }
     fi
 }
 
 activate_traefik_maintenance() {
+    local pending
     maintenance_paths
-    mkdir -p "$TRAEFIK_DYNAMIC_DIR"
-    cat > "$MAINTENANCE_CONFIG" << 'YAMLEOF'
+    mkdir -p "$TRAEFIK_DYNAMIC_DIR" || return 1
+    # Traefik watches this directory: never truncate its live route during a
+    # recovery retry. It ignores the temporary file's non-YAML extension.
+    pending=$(mktemp "${TRAEFIK_DYNAMIC_DIR}/.maintenance.XXXXXX.tmp") || return 1
+    cat > "$pending" << 'YAMLEOF' || { rm -f "$pending"; return 1; }
 http:
   routers:
     maintenance-catchall:
@@ -329,7 +333,7 @@ http:
   middlewares:
     maintenance-rewrite:
       replacePath:
-        path: "/_maintenance/index.html"
+        path: "/_maintenance/"
 
   services:
     maintenance-page:
@@ -337,6 +341,7 @@ http:
         servers:
           - url: "http://static-server:8080"
 YAMLEOF
+    mv -f "$pending" "$MAINTENANCE_CONFIG" || { rm -f "$pending"; return 1; }
     log "  ${GREEN}Traefik maintenance route activated${NC}"
 }
 
