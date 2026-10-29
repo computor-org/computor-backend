@@ -9,7 +9,7 @@ import json
 import logging
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -307,6 +307,67 @@ def _computor_user_for_coder_name(db: Session, username: str):
     except Exception:
         logger.warning(f"Could not resolve Coder username '{username}' to a user")
         return None
+
+
+# A token that expires within this window is renewed on start: a started
+# workspace can run for a working day without another build.
+_AUTO_LOGIN_RENEW_MARGIN = timedelta(days=1)
+
+
+def _auto_login_token_valid(db: Session, token: str) -> bool:
+    """Whether ``token`` is an active API token that outlives the renewal margin."""
+    from computor_backend.model.service import ApiToken
+    from computor_backend.utils.api_token import hash_api_token, validate_token_format
+
+    if not token or not validate_token_format(token):
+        return False
+    row = (
+        db.query(ApiToken)
+        .filter(ApiToken.token_hash == hash_api_token(token), ApiToken.revoked_at.is_(None))
+        .first()
+    )
+    if row is None:
+        return False
+    return row.expires_at is None or row.expires_at > datetime.now(timezone.utc) + _AUTO_LOGIN_RENEW_MARGIN
+
+
+async def _auto_login_token_params(
+    db: Session,
+    client: CoderClient,
+    permissions: Principal,
+    username: str,
+    workspace,
+    ttl_days: int | None,
+) -> dict | None:
+    """Rich-parameter override with a fresh auto-login token, or None.
+
+    Coder carries ``computor_auth_token`` forward on every start, so a token
+    that was revoked (the admin-MFA rollout revoked the elevated ones,
+    issues#485), has expired or is about to, stayed in the workspace and the
+    extension inside could not sign in. Only provisioning used to mint a new
+    one; a start does now, under the same second-factor rule.
+
+    None when the build has no such parameter or it cannot be read (the old
+    behaviour), when the owner is not a Computor user, or when the carried
+    token is still good.
+    """
+    owner = _computor_user_for_coder_name(db, username)
+    if owner is None or not workspace.latest_build_id:
+        return None
+    params = await client.get_build_params(workspace.latest_build_id)
+    if "computor_auth_token" not in params:
+        return None
+    if _auto_login_token_valid(db, params["computor_auth_token"]):
+        return None
+    assert_token_not_mfa_restricted(permissions, owner.id)
+    token = mint_workspace_token(
+        db, get_cache(), str(owner.id), str(permissions.user_id),
+        workspace_name=workspace.name, ttl_days=ttl_days,
+    )
+    if not token:
+        return None
+    logger.info(f"Workspace {username}/{workspace.name}: auto-login token renewed on start")
+    return {"computor_auth_token": token}
 
 
 def _resolve_workspace_owners(db: Session, workspaces: list[CoderWorkspace]) -> None:
@@ -901,6 +962,13 @@ async def start_workspace(
         # one — the build parameters are what the container and the ingress are
         # rendered from, and Coder carries them forward untouched.
         overrides = _current_app_credential_params(db, username)
+        # Before the reservation: a refusal (AUTHZ_007) must not leave one behind.
+        token_params = await _auto_login_token_params(
+            db, client, permissions, username, details.workspace,
+            _settings.workspace_token_ttl_days,
+        )
+        if token_params:
+            overrides = {**(overrides or {}), **token_params}
         await client.ensure_user_active(username)
         await reserve_public_container(client, username, workspace_name)
         success = await client.start_workspace(
