@@ -21,7 +21,7 @@ im [Impressum](/impressum). Das Lernangebot wird von netidee gefördert und ist
 kostenlos.
 
 Diese Nutzungsbedingungen gelten für registrierte Nutzer*innen. Indem Sie sie
-bei Ihrer ersten Anmeldung annehmen, schließen Sie mit uns einen unentgeltlichen
+bei Ihrer ersten Anmeldung annehmen, schließen Sie einen unentgeltlichen
 Nutzungsvertrag auf unbestimmte Zeit ab. Öffentliche Lernmaterialien können Sie
 ohne Konto lesen. Bei Lehrveranstaltungen der TU Graz gehen im Fall eines
 Widerspruchs die Studienvorschriften und die Anforderungen des jeweiligen Kurses
