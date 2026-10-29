@@ -465,5 +465,8 @@
   ],
   "users": [],
   "loginTheme": "computor",
-  "emailTheme": "computor"
+  "emailTheme": "computor",
+  "internationalizationEnabled": true,
+  "supportedLocales": ["de", "en"],
+  "defaultLocale": "de"
 }
