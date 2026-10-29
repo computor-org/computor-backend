@@ -150,9 +150,9 @@ updates:
       # A Node major changes the web runtime and the VSIX builders; do it as its own tested change on an LTS line.
       - dependency-name: node
         update-types: ["version-update:semver-major"]
-      # Non-LTS Ubuntu releases and LTS jumps change the workspace OS; do it as its own tested template change.
+      # Non-LTS Ubuntu releases (24.10, 25.x) and LTS jumps change the workspace OS; do it as its own tested template change.
       - dependency-name: ubuntu
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   # Service images referenced from compose files (deployed stack + integration
   # tests). Pins themselves live in the compose files; this only proposes bumps.
@@ -174,7 +174,7 @@ updates:
       - dependency-name: postgres
         update-types: ["version-update:semver-major"]
       # Needs a planned data migration (Forgejo major upgrade with backup); do it as its own change with a QA rehearsal.
-      - dependency-name: codeberg.org/forgejo/forgejo
+      - dependency-name: forgejo/forgejo
         update-types: ["version-update:semver-major"]
       # Needs a planned data migration (registry v3 storage and config); do it as its own change with a QA rehearsal.
       - dependency-name: registry
