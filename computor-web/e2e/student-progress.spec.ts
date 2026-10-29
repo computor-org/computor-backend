@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
 import { assignmentsInCourseOrder, courseProgress, progressPercent } from '../src/utils/studentProgress';
+import { assignmentState, unitState } from '../src/utils/assignmentStatus';
 
 /**
  * A learner's own progress and the "Weiter mit" pointer (issues#408, #525):
@@ -96,6 +97,20 @@ test('nothing left to do means no pointer, and the bar reaches 100 only then', (
   expect(progressPercent(done)).toBe(100);
   expect(progressPercent({ submitted: 199, total: 200 })).toBe(99);
   expect(progressPercent({ submitted: 0, total: 0 })).toBe(0);
+});
+
+test('the row dot shows the verdict, else whether the work is submitted (issues#554)', () => {
+  expect(assignmentState({ submitted: false, status: null })).toBe('open');
+  expect(assignmentState({ submitted: false, status: 'not_reviewed' })).toBe('open');
+  expect(assignmentState({ submitted: true, status: 'not_reviewed' })).toBe('submitted');
+  expect(assignmentState({ submitted: true, status: 'corrected' })).toBe('corrected');
+  expect(assignmentState({ submitted: true, status: 'improvement_possible' })).toBe('improvement_possible');
+  expect(assignmentState({ submitted: true, status: 'correction_possible' })).toBe('improvement_possible');
+  expect(assignmentState({ submitted: true, status: 'correction_necessary' })).toBe('correction_necessary');
+  // "Woche 1" with 4 of 7 submitted is not done.
+  expect(unitState({ submitted: 4, total: 7 })).toBe('open');
+  expect(unitState({ submitted: 2, total: 2 })).toBe('submitted');
+  expect(unitState({ submitted: 0, total: 0 })).toBe('open');
 });
 
 // --- the screens ----------------------------------------------------------------------
@@ -246,6 +261,34 @@ test.describe('English learner', () => {
     await expect(card.getByRole('link', { name: 'Read task', exact: true })).toHaveCount(0);
   });
 });
+
+for (const language of ['de', 'en'] as const) {
+  test.describe(`Assignment status dots (${language})`, () => {
+    test.use({ locale: language === 'de' ? 'de-DE' : 'en-US' });
+
+    test('each dot carries its state and the legend names every state', async ({ page }) => {
+      const contents = CONTENTS.map((c) => c.id === 'a-week3.beta' ? { ...c, submitted: true, status: 'corrected' } : c);
+      await signIn(page, { contents });
+      await page.goto(`/courses/${COURSE_ID}/student/assignments`);
+
+      const legend = page.getByTestId('status-legend');
+      await expect(legend).toBeVisible({ timeout: 15_000 });
+      const labels = language === 'de'
+        ? ['Offen', 'Eingereicht', 'Korrigiert', 'Verbesserung möglich', 'Korrektur nötig']
+        : ['Open', 'Submitted', 'Corrected', 'Improvement possible', 'Correction necessary'];
+      await expect(legend.getByRole('listitem')).toHaveText(labels);
+
+      const [open, submitted, corrected] = labels;
+      const dot = (title: string) => page.locator(`span.rounded-full[title="${title}"]`);
+      // Woche 1 and 2 fully submitted; Woche 3 still has the review open.
+      await expect(dot(submitted)).toHaveCount(2);
+      await expect(dot(open)).toHaveCount(2);
+      await expect(dot(corrected)).toHaveCount(1);
+      await expect(dot(corrected)).toHaveCSS('background-color', 'rgb(87, 204, 93)');
+      await expect(dot(submitted).first()).toHaveCSS('background-color', 'rgb(192, 132, 252)');
+    });
+  });
+}
 
 test('a tutor sees no learner progress and the page does not ask for it', async ({ page }) => {
   const requested = await signIn(page, { roles: ['_tutor'] });
