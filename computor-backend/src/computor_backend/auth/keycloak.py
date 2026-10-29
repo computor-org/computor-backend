@@ -216,7 +216,19 @@ class KeycloakAuthPlugin(AuthenticationPlugin):
         
         # Build URL with properly percent-encoded query parameters
         return f"{auth_endpoint}?{urlencode(params)}"
-    
+
+    def get_account_url(self) -> Optional[str]:
+        """Keycloak's account console, from the same public base as the login URL.
+
+        Users add or replace an authenticator app there (issues#485). The web
+        app reads it at runtime: its build inputs never carried the address.
+        """
+        public_base = os.environ.get("KEYCLOAK_PUBLIC_URL", "").rstrip("/")
+        if public_base:
+            return f"{public_base}/realms/{self.keycloak_config.realm}/account/"
+        issuer = (self._oidc_config or {}).get("issuer")
+        return f"{issuer.rstrip('/')}/account/" if issuer else None
+
     async def handle_callback(self, code: str, state: Optional[str] = None, redirect_uri: Optional[str] = None) -> AuthResult:
         """
         Handle OAuth callback from Keycloak.

@@ -153,12 +153,14 @@ async def list_providers() -> List[ProviderInfo]:
     for plugin_name in registry.get_enabled_plugins():
         metadata = registry.get_plugin_metadata(plugin_name)
         if metadata:
+            plugin = registry.get_plugin(plugin_name)
             providers.append(ProviderInfo(
                 name=plugin_name,
                 display_name=metadata.provider_name,
                 type=metadata.provider_type.value,
                 enabled=True,
-                login_url=f"/auth/{plugin_name}/login"
+                login_url=f"/auth/{plugin_name}/login",
+                account_url=plugin.get_account_url() if plugin else None,
             ))
     
     return providers
