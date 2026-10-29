@@ -14,10 +14,11 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import ThemePicker from '@/src/components/ThemePicker';
 import { inputCls } from '@/src/components/ui/tokens';
-import type { ApiTokenGet, ApiTokenCreateResponse, AccountList } from 'types/generated';
+import type { ApiTokenGet, ApiTokenCreateResponse, AccountList, ProviderInfo } from 'types/generated';
 import type { ConsentStatusGet, InstanceStatusGet } from '@/src/generated/types/common';
 import { ConsentClient } from '@/src/generated/clients/ConsentClient';
 import { InstanceStatusClient } from '@/src/generated/clients/InstanceStatusClient';
+import { AuthenticationClient } from '@/src/generated/clients/AuthenticationClient';
 import DescriptionList from '@/src/components/DescriptionList';
 import { WEB_COMMIT, duration, shortCommit } from '@/src/utils/instanceStatus';
 import { LEGAL_LINKS, englishLegalLink } from '@/src/config/legal';
@@ -26,9 +27,18 @@ const tokensClient = new TokensClient();
 const accountsClient = new AccountsClient();
 const instanceStatusClient = new InstanceStatusClient();
 
-const KC_URL = process.env.NEXT_PUBLIC_KEYCLOAK_URL;
-const KC_REALM = process.env.NEXT_PUBLIC_KEYCLOAK_REALM || 'computor';
-const accountConsoleUrl = KC_URL ? `${KC_URL.replace(/\/$/, '')}/realms/${KC_REALM}/account/` : null;
+const authenticationClient = new AuthenticationClient();
+
+/**
+ * The login provider's account console, where users add or replace an
+ * authenticator app (issues#485). The API names it from the address sign-in
+ * already uses; a build-time NEXT_PUBLIC_KEYCLOAK_URL reached no deployment.
+ */
+function accountConsoleFrom(providers: unknown): string | null {
+  if (!Array.isArray(providers)) return null;
+  const url = (providers as ProviderInfo[]).find((p) => p.account_url)?.account_url;
+  return url && /^https?:\/\//.test(url) ? url : null;
+}
 
 // The accounts list endpoint returns AccountList, which already carries `builtin`.
 type AccountRow = AccountList;
@@ -223,6 +233,7 @@ export default function SettingsPage() {
   // About this instance. Fetched once per visit and never polled: nobody sits on
   // Settings watching for a restart — System → Status is the page that does.
   const [instanceStatus, setInstanceStatus] = useState<InstanceStatusGet | null>(null);
+  const [accountConsoleUrl, setAccountConsoleUrl] = useState<string | null>(null);
 
   // Consent / privacy
   const publishedPrivacy = LEGAL_LINKS.find((link) => link.label === 'Datenschutz');
@@ -247,17 +258,19 @@ export default function SettingsPage() {
   async function load() {
     if (!authUser) return;
     try {
-      const [tk, ac, status] = await Promise.all([
+      const [tk, ac, status, providers] = await Promise.all([
         tokensClient.listTokensEndpointApiTokensGet({}),
         accountsClient.listAccountsAccountsGet({ userId: authUser.id }).catch(() => [] as AccountRow[]),
         // Swallowed on purpose: the About section is the least of what this page
         // is for, and an old deployment that predates the endpoint should not
         // cost the user their tokens list.
         instanceStatusClient.getInstanceStatusInstanceStatusGet().catch(() => null),
+        authenticationClient.listProvidersAuthProvidersGet().catch(() => null),
       ]);
       setTokens(tk);
       setAccounts(ac);
       setInstanceStatus(status);
+      setAccountConsoleUrl(accountConsoleFrom(providers));
     } catch (e) {
       setError(e instanceof Error ? e.message : t.loadFailed);
     } finally {
@@ -344,7 +357,7 @@ export default function SettingsPage() {
               <ThemePicker />
             </Section>
 
-            {/* Account & Security — only shown when the account console is configured */}
+            {/* Account & Security — only shown when the API names an account console */}
             {accountConsoleUrl && (
               <Section title={t.accountSecurity} description={t.accountSecurityDesc}>
                 <a

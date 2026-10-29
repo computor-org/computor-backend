@@ -153,7 +153,14 @@ class AuthenticationPlugin(ABC):
             Login URL
         """
         pass
-    
+
+    def get_account_url(self) -> Optional[str]:
+        """
+        Page where users manage their own credentials at this provider
+        (password, second factor, sessions), or None if it has none.
+        """
+        return None
+
     @abstractmethod
     async def handle_callback(self, code: str, state: Optional[str] = None, redirect_uri: Optional[str] = None) -> AuthResult:
         """
