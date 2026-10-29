@@ -2,9 +2,10 @@
 
 ``deploy-course`` only creates courses, so the ordered course names of
 data-science-python #7 never reached computor.at. ``sync_course_metadata``
-reports such drift and, with ``apply``, writes the metadata part of it; an
-assignment that is missing or an item the file dropped stays a reported
-difference for a full release.
+reports such drift and, with ``apply``, writes the metadata part of it, down
+to archiving a unit the file dropped (computor-org/issues#546); an assignment
+that is missing or that the file dropped stays a reported difference for a
+full release.
 
 Runs against a live Postgres inside a rolled-back transaction, like
 ``test_course_content_type_change.py``. Skips when Postgres is unreachable.
@@ -76,9 +77,12 @@ def deployed(db):
                              course_content_kind_id="assignment", course_id=course.id)
     db.add_all([weekly, task])
     db.flush()
-    for path, ct, title in [("week_1", weekly, "Woche 1"),
+    for path, ct, title in [("start", weekly, "Start"),
+                            ("week_1", weekly, "Woche 1"),
                             ("week_1.kirchhoff", task, "Kirchoff"),
-                            ("week_1.dropped", task, "Gone from the file")]:
+                            ("week_1.dropped", task, "Gone from the file"),
+                            ("week_9", weekly, "Woche 9"),
+                            ("week_9.old", task, "Gone with its week")]:
         db.add(CourseContent(title=title, path=Ltree(path), course_id=course.id,
                              course_content_type_id=ct.id, position=1.0, max_group_size=1))
     db.flush()
@@ -118,10 +122,14 @@ def test_check_reports_drift_without_writing(db, deployed):
 
     assert deployed.title == "Data Science – Grundlagen"
     assert "welcome" not in _contents(db, deployed)
-    assert len(drift.fixable) == 5  # title, position, welcome type, welcome unit, Kirchhoff
+    assert _contents(db, deployed)["start"].archived_at is None
+    assert len(drift.fixable) == 6  # title, position, welcome type, welcome unit, Kirchhoff, start
+    assert "unit start dropped from the course file" in drift.fixable
     assert sorted(drift.blocking) == [
         "week_1.dropped is deployed but not in the course file",
         "week_1.new_task missing; needs a release with its example",
+        "week_9 is deployed but not in the course file",
+        "week_9.old is deployed but not in the course file",
     ]
 
 
@@ -142,7 +150,11 @@ def test_apply_writes_metadata_and_leaves_assignments_to_a_release(db, deployed)
     assert welcome_type.properties == {}
     assert "week_1.new_task" not in contents
     assert "week_1.dropped" in contents
+    # Dropped from the file: archived for the sync, hidden for the student tree.
+    assert contents["start"].archived_at is not None and contents["start"].visible is False
+    # A unit with an assignment beneath it waits for a release, like the assignment.
+    assert contents["week_9"].archived_at is None and contents["week_9"].visible is None
 
     again = sync_course(db, _config(deployed), apply=False)
     assert again.fixable == []
-    assert len(again.blocking) == 2
+    assert len(again.blocking) == 4
