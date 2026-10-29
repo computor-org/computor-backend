@@ -10,11 +10,14 @@ ones that are metadata only:
 - course title, description and position,
 - content type titles and colours, and missing content types,
 - content titles, descriptions and positions,
-- missing units (non-submittable contents).
+- missing units (non-submittable contents),
+- units the file no longer has (archived and hidden), unless an assignment is
+  still deployed beneath them.
 
-A missing assignment, a changed content type or an item the file no longer has
-needs a release with examples and is only reported. The exit status is 1 while
-any difference remains, so ``--check`` (the default) works as a release gate.
+A missing assignment, a changed content type or an assignment the file no
+longer has needs a release with examples and is only reported. The exit status
+is 1 while any difference remains, so ``--check`` (the default) works as a
+release gate.
 
 Usage (database from the POSTGRES_* environment variables):
     python -m computor_backend.scripts.sync_course_metadata COURSES_DIR
@@ -25,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -156,8 +160,20 @@ def sync_course(db: Session, config: Dict[str, Any], apply: bool) -> CourseDrift
         if ct_row is not None and row.course_content_type_id != ct_row.id:
             drift.blocking.append(f"{full} has another content type than {item.get('content_type')}")
         update(row, full, fields)
-    for full in sorted(set(contents) - wanted_paths):
-        drift.blocking.append(f"{full} is deployed but not in the course file")
+    dropped = sorted(set(contents) - wanted_paths)
+    for full in dropped:
+        row = contents[full]
+        # A dropped unit with no assignment left beneath it is metadata: it is
+        # archived and hidden, as the student tree does not filter archived rows.
+        if row.is_submittable or any(
+            contents[p].is_submittable for p in dropped if p.startswith(f"{full}.")
+        ):
+            drift.blocking.append(f"{full} is deployed but not in the course file")
+            continue
+        drift.fixable.append(f"unit {full} dropped from the course file")
+        if apply:
+            row.archived_at = datetime.now(timezone.utc)
+            row.visible = False
     return drift
 
 
