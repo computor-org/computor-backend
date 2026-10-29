@@ -138,7 +138,7 @@ class TestStorageService:
     @pytest.mark.asyncio
     async def test_download_file_not_found(self, storage_service, mock_minio_client):
         """Test download of non-existent file"""
-        error = S3Error('NoSuchKey', 'The specified key does not exist.', 
+        error = S3Error(code='NoSuchKey', message='The specified key does not exist.', 
                         resource='test/file.txt', request_id='test', 
                         host_id='test', response='test')
         mock_minio_client.get_object.side_effect = error
@@ -332,7 +332,7 @@ class TestStorageServiceErrors:
     @pytest.mark.asyncio
     async def test_service_unavailable_on_s3_error(self, storage_service, mock_minio_client):
         """Test that S3 errors are converted to ServiceUnavailableException"""
-        error = S3Error('InternalError', 'Internal Server Error', 
+        error = S3Error(code='InternalError', message='Internal Server Error', 
                         resource='test', request_id='test', 
                         host_id='test', response='test')
         mock_minio_client.list_buckets.side_effect = error
@@ -343,7 +343,7 @@ class TestStorageServiceErrors:
     @pytest.mark.asyncio
     async def test_not_found_bucket(self, storage_service, mock_minio_client):
         """Test NotFoundException for missing buckets"""
-        error = S3Error('NoSuchBucket', 'The specified bucket does not exist.', 
+        error = S3Error(code='NoSuchBucket', message='The specified bucket does not exist.', 
                         resource='missing-bucket', request_id='test', 
                         host_id='test', response='test')
         mock_minio_client.list_objects.side_effect = error
