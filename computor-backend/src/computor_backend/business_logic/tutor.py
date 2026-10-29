@@ -9,6 +9,7 @@ from sqlalchemy.orm.attributes import set_committed_value
 
 from computor_backend.business_logic.submission_limits import resolve_limits
 from computor_backend.business_logic.submissions import announce_submission_group_updated
+from computor_backend.business_logic.localization import localize_as
 from computor_backend.exceptions import BadRequestException, ForbiddenException, NotFoundException
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.principal import Principal, allowed_course_role_ids
@@ -31,7 +32,11 @@ from computor_backend.model.auth import User
 from computor_backend.model.course import Course, CourseMember, SubmissionGroup, SubmissionGroupMember
 from computor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
 from computor_types.student_courses import CourseStudentQuery
-from computor_types.student_course_contents import CourseContentStudentQuery
+from computor_types.student_course_contents import (
+    CourseContentStudentGet,
+    CourseContentStudentList,
+    CourseContentStudentQuery,
+)
 from computor_types.course_members import CourseMemberQuery
 from computor_backend.interfaces.course_member import CourseMemberInterface
 from computor_types.tutor_courses import CourseTutorGet, CourseTutorList
@@ -70,13 +75,15 @@ async def get_tutor_course_content(
     course_content_id: UUID | str,
     permissions: Principal,
     cache: Optional[Cache] = None,
+    lang: Optional[str] = None,
 ):
     """Get course content for a course member as a tutor with caching via repository."""
     repo = TutorViewRepository(cache=cache, user_id=permissions.get_user_id_or_throw())
     try:
-        return await repo.get_course_content(course_member_id, course_content_id, permissions)
+        dto = await repo.get_course_content(course_member_id, course_content_id, permissions)
     finally:
         repo.close()
+    return localize_as(dto, CourseContentStudentGet, lang)
 
 
 async def list_tutor_course_contents(
@@ -84,13 +91,15 @@ async def list_tutor_course_contents(
     permissions: Principal,
     params: CourseContentStudentQuery,
     cache: Optional[Cache] = None,
+    lang: Optional[str] = None,
 ):
     """List course contents for a course member as a tutor with caching via repository."""
     repo = TutorViewRepository(cache=cache, user_id=permissions.get_user_id_or_throw())
     try:
-        return await repo.list_course_contents(course_member_id, permissions, params)
+        rows = await repo.list_course_contents(course_member_id, permissions, params)
     finally:
         repo.close()
+    return [localize_as(row, CourseContentStudentList, lang) for row in rows]
 
 
 async def update_tutor_course_content_grade(
@@ -249,26 +258,30 @@ def get_tutor_course(
     course_id: UUID | str,
     permissions: Principal,
     cache: Optional[Cache] = None,
+    lang: Optional[str] = None,
 ) -> CourseTutorGet:
     """Get a course for tutors with caching via repository."""
     repo = TutorViewRepository(cache=cache, user_id=permissions.get_user_id_or_throw())
     try:
-        return repo.get_course(course_id, permissions)
+        dto = repo.get_course(course_id, permissions)
     finally:
         repo.close()
+    return localize_as(dto, CourseTutorGet, lang)
 
 
 def list_tutor_courses(
     permissions: Principal,
     params: CourseStudentQuery,
     cache: Optional[Cache] = None,
+    lang: Optional[str] = None,
 ) -> List[CourseTutorList]:
     """List courses for tutors with caching via repository."""
     repo = TutorViewRepository(cache=cache, user_id=permissions.get_user_id_or_throw())
     try:
-        return repo.list_courses(permissions, params)
+        rows = repo.list_courses(permissions, params)
     finally:
         repo.close()
+    return [localize_as(row, CourseTutorList, lang) for row in rows]
 
 
 def get_tutor_course_member(

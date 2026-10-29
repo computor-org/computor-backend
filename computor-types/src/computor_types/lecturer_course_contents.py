@@ -1,7 +1,7 @@
 """Pydantic DTOs for lecturer course content operations."""
 from datetime import datetime
 from pydantic import BaseModel, field_validator, ConfigDict, Field
-from typing import Optional, TYPE_CHECKING
+from typing import Dict, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .deployment import CourseContentDeploymentGet, CourseContentDeploymentList
@@ -25,6 +25,10 @@ class CourseContentLecturerGet(BaseModel):
     archived_at: Optional[datetime] = None
     title: Optional[str] = None
     description: Optional[str] = None
+    # Always returned; ?localize=<de|en> also resolves title and description
+    # from them (issue #550).
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     path: str
     course_id: str
     course_content_type_id: str
@@ -65,6 +69,8 @@ class CourseContentLecturerList(BaseModel):
     id: str
     title: Optional[str] = None
     description: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     path: str
     course_id: str
     course_content_type_id: str

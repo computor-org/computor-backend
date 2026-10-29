@@ -283,3 +283,98 @@ async def test_student_view_mapper_carries_the_maps():
 
     assert (dto.title, dto.title_i18n, dto.description_i18n) == ("Woche 1", {"en": "Week 1"}, {"en": "Basics"})
     assert dto.course_content_type.title_i18n == {"en": "Week"}
+
+
+# --- Lecturer and tutor views, through the real routes ---------------------
+
+_CONTENT_ROW = dict(
+    id="cc-1", title="Woche 1", description="Grundlagen", path="week_1", course_id="c-1",
+    course_content_type_id="ct-1", course_content_kind_id="unit", position=1.0,
+    title_i18n={"de": "Woche 1", "en": "Week 1"}, description_i18n={"en": "Basics"},
+    repository={"url": None, "full_path": None},
+)
+
+
+class _FakeLecturerRepo:
+    """Builds rows the way ``LecturerViewRepository`` does: from the ORM ``__dict__``."""
+
+    def __init__(self, cache=None, user_id=None):
+        pass
+
+    def list_course_contents(self, permissions, params):
+        from computor_types.lecturer_course_contents import CourseContentLecturerList
+        return [CourseContentLecturerList.model_validate(dict(_CONTENT_ROW))]
+
+    def get_course_content(self, course_content_id, permissions):
+        from computor_types.lecturer_course_contents import CourseContentLecturerGet
+        return CourseContentLecturerGet.model_validate(dict(_CONTENT_ROW))
+
+    def close(self):
+        pass
+
+
+_COURSE = SimpleNamespace(
+    id="c-1", title="Grundlagen", description="Einstieg", position=1.0,
+    title_i18n={"en": "Foundations"}, description_i18n={"en": "Getting started"},
+    course_family_id="f-1", organization_id="o-1", path="ds", properties={},
+)
+
+
+@pytest.fixture
+def staff_client(monkeypatch):
+    from computor_backend.business_logic import lecturer as lecturer_bl
+    from computor_backend.permissions.auth import get_current_principal
+    from computor_backend.permissions.principal import Principal
+    from computor_backend.redis_cache import get_cache
+    from computor_backend.repositories.tutor_view import TutorViewRepository
+    from computor_backend.server import app
+
+    monkeypatch.setattr(lecturer_bl, "LecturerViewRepository", _FakeLecturerRepo)
+    # The real tutor row builders, fed one course instead of a permission query.
+    monkeypatch.setattr(TutorViewRepository, "_list_cached_course_dtos",
+                        lambda self, permissions, params, *, row_builder, **kw: [row_builder(_COURSE)])
+    monkeypatch.setattr(TutorViewRepository, "_get_cached_course_dto",
+                        lambda self, course_id, permissions, *, builder, **kw: builder(_COURSE)[0])
+    app.dependency_overrides[get_current_principal] = lambda: Principal(user_id="u-1")
+    app.dependency_overrides[get_cache] = lambda: None
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.pop(get_current_principal, None)
+        app.dependency_overrides.pop(get_cache, None)
+
+
+@pytest.mark.parametrize("url", ["/lecturers/course-contents", "/lecturers/course-contents/cc-1"])
+def test_lecturer_contents_carry_the_maps(staff_client, url):
+    body = staff_client.get(url).json()
+    row = body[0] if isinstance(body, list) else body
+    assert (row["title"], row["description"]) == ("Woche 1", "Grundlagen")
+    assert row["title_i18n"] == {"de": "Woche 1", "en": "Week 1"}
+    assert row["description_i18n"] == {"en": "Basics"}
+
+    body = staff_client.get(url + "?localize=en").json()
+    row = body[0] if isinstance(body, list) else body
+    assert (row["title"], row["description"]) == ("Week 1", "Basics")
+
+
+@pytest.mark.parametrize("url", ["/tutors/courses", "/tutors/courses/c-1"])
+def test_tutor_courses_carry_the_maps(staff_client, url):
+    body = staff_client.get(url).json()
+    course = body[0] if isinstance(body, list) else body
+    assert (course["title"], course["description"]) == ("Grundlagen", "Einstieg")
+    assert course["title_i18n"] == {"en": "Foundations"}
+    assert course["description_i18n"] == {"en": "Getting started"}
+
+    body = staff_client.get(url + "?localize=en").json()
+    course = body[0] if isinstance(body, list) else body
+    assert (course["title"], course["description"]) == ("Foundations", "Getting started")
+
+
+def test_localize_as_accepts_a_cached_dict():
+    # Tutor content views return the cached dict as is on a cache hit.
+    from computor_backend.business_logic.localization import localize_as
+
+    cached = _row().model_dump()
+    localized = localize_as(cached, CourseContentStudentList, "en")
+    assert (localized.title, localized.description) == ("Week 1", "Basics")
+    assert localize_as(cached, CourseContentStudentList, None) is cached

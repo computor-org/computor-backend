@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator, ConfigDict
-from typing import Optional
+from typing import Dict, Optional
 
 from computor_types.base import EntityInterface, ListQuery
 
@@ -16,6 +16,10 @@ class CourseTutorGet(BaseModel):
     id: str
     title: Optional[str] = None
     description: Optional[str] = None
+    # Always returned; ?localize=<de|en> also resolves title and description
+    # from them (issue #550).
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
     path: str
@@ -34,6 +38,8 @@ class CourseTutorList(BaseModel):
     id: str
     title: Optional[str] = None
     description: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     course_family_id: Optional[str] = None
     organization_id: Optional[str] = None
     path: str
