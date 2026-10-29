@@ -2149,6 +2149,8 @@ export interface MaintenanceStatusGet {
   scheduled_at?: string | null;
   scheduled_by?: string | null;
   scheduled_by_name?: string | null;
+  /** The message in German and English ({'de': ..., 'en': ...}); clients show the reader's language and fall back to `message` */
+  message_i18n?: Record<string, string> | null;
 }
 
 /**
@@ -2157,6 +2159,8 @@ export interface MaintenanceStatusGet {
 export interface MaintenanceActivate {
   /** Message shown to users */
   message?: string;
+  /** The message in German and English ({'de': ..., 'en': ...}); clients show the reader's language and fall back to `message` */
+  message_i18n?: Record<string, string> | null;
   /** Broadcast maintenance notification via WebSocket */
   notify_websocket?: boolean;
 }
@@ -2169,6 +2173,8 @@ export interface MaintenanceSchedule {
   scheduled_at: string;
   /** Message shown to users */
   message?: string;
+  /** The message in German and English ({'de': ..., 'en': ...}); clients show the reader's language and fall back to `message` */
+  message_i18n?: Record<string, string> | null;
   /** Broadcast schedule notification via WebSocket */
   notify_websocket?: boolean;
 }

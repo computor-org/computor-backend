@@ -86,6 +86,8 @@ export interface CourseContentLecturerList {
   id: string;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   path: string;
   course_id: string;
   course_content_type_id: string;

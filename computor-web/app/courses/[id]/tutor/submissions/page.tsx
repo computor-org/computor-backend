@@ -75,7 +75,7 @@ export default function TutorSubmissionsPage() {
   const [opening, setOpening] = useState<string | null>(null);
   const [openError, setOpenError] = useState<string | null>(null);
 
-  const titles = useResource(() => contentTitles(courseId), [courseId]);
+  const titles = useResource(() => contentTitles(courseId, language), [courseId, language]);
   const { data, loading, error } = useResource(
     () =>
       tutorsClient.tutorListSubmissionGroupsEndpointTutorsSubmissionGroupsGet({

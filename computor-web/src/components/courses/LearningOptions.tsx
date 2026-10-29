@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useBrowserLanguage, type UiLanguage } from '@/src/hooks/useBrowserLanguage';
+import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
 
 export const PUBLIC_COURSES_URL = 'https://github.com/computor-org/data-science-python';
 export const CODESPACES_URL = 'https://codespaces.new/computor-org/data-science-python?quickstart=1';
@@ -27,8 +27,8 @@ const COPY = {
 };
 
 export default function LearningOptions({ capacity = false, language }: { capacity?: boolean; language?: UiLanguage }) {
-  const browserLanguage = useBrowserLanguage();
-  const t = COPY[language ?? browserLanguage];
+  const readingLanguage = useUiLanguage();
+  const t = COPY[language ?? readingLanguage];
   return (
     <aside aria-label={t.options} className="rounded-lg border border-rule bg-surface p-5 text-left">
       <h3 className="text-lg font-semibold text-fg">

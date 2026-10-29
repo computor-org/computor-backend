@@ -14,7 +14,7 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import Avatar, { rgbIntToHex } from '@/src/components/Avatar';
 import { Field } from '@/src/components/FormPanel';
 import { inputCls, readOnlyInputCls } from '@/src/components/ui/tokens';
-import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { profileUiLanguage, useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type { UserGet } from 'types/generated';
 import { localeFor } from '@/src/utils/locale';
 
@@ -121,7 +121,8 @@ export default function ProfilePage() {
     setNickname(p?.nickname ?? '');
     setBio(p?.bio ?? '');
     setUrl(p?.url ?? '');
-    setLanguageCode(p?.language_code ?? '');
+    // A legacy code other than de/en counts as Automatic, as everywhere else.
+    setLanguageCode(profileUiLanguage(p?.language_code) ?? '');
     setAvatarImage(p?.avatar_image ?? '');
     setAvatarColor(rgbIntToHex(p?.avatar_color) ?? DEFAULT_AVATAR_HEX);
   }
@@ -284,9 +285,6 @@ export default function ProfilePage() {
                       <option value="">{t.languageAuto}</option>
                       <option value="de">Deutsch</option>
                       <option value="en">English</option>
-                      {languageCode !== '' && languageCode !== 'de' && languageCode !== 'en' && (
-                        <option value={languageCode}>{languageCode}</option>
-                      )}
                     </select>
                   </Field>
                 </div>

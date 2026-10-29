@@ -19,7 +19,9 @@ function storedLanguage(): UiLanguage | null {
 }
 
 function navigatorLanguage(): UiLanguage {
-  const preferred = (navigator.languages?.[0] ?? navigator.language ?? '').toLowerCase();
+  const preferred = (navigator.languages?.[0] ?? navigator.language ?? '').trim().toLowerCase();
+  // No browser language reads German, as on the server (requestLanguage.ts).
+  if (!preferred) return 'de';
   return preferred.startsWith('de') ? 'de' : 'en';
 }
 

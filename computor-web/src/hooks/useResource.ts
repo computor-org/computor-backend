@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type DependencyList } from 'react';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 interface UseResourceResult<T> {
   data: T | null;
@@ -35,6 +36,7 @@ export function useResource<T>(
   opts: { enabled?: boolean; refetchInterval?: number; refreshOnFocus?: boolean } = {},
 ): UseResourceResult<T> {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const fallbackError = useUiLanguage() === 'de' ? 'Ein Fehler ist aufgetreten.' : 'An error occurred';
   const enabled = opts.enabled ?? true;
   const refetchInterval = opts.refetchInterval;
   const refreshOnFocus = opts.refreshOnFocus ?? false;
@@ -51,7 +53,7 @@ export function useResource<T>(
     try {
       setData(await fetcher());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'An error occurred');
+      setError(e instanceof Error ? e.message : fallbackError);
     } finally {
       if (!silent) setLoading(false);
     }

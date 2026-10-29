@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type { PublicCourseCatalogEntry } from '@/src/types/publicLearning';
-import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { localizedText } from '@/src/utils/localizedText';
 
 /**
@@ -15,7 +15,7 @@ import { localizedText } from '@/src/utils/localizedText';
  */
 export default function PublicCourseCatalog({ fallbackLabel }: { fallbackLabel: string }) {
   const [courses, setCourses] = useState<PublicCourseCatalogEntry[]>([]);
-  const language = useBrowserLanguage();
+  const language = useUiLanguage();
 
   useEffect(() => {
     let cancelled = false;

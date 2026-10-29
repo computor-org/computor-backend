@@ -8,7 +8,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import LanguageSwitch from '@/src/components/LanguageSwitch';
 import LegalLinks from '@/src/components/LegalLinks';
 import NetideeNotice from '@/src/components/NetideeNotice';
-import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { applyDocumentLanguage } from '@/src/utils/documentLanguage';
 
 const COPY = {
@@ -26,7 +26,7 @@ export default function PublicLearnShell({
 }) {
   const router = useRouter();
   const { user, logout } = useAuth();
-  const language = useBrowserLanguage();
+  const language = useUiLanguage();
   const t = COPY[language];
   useEffect(() => {
     applyDocumentLanguage(language);
@@ -50,7 +50,8 @@ export default function PublicLearnShell({
             </span>
           </Link>
           <div className="flex items-center gap-3 text-sm">
-            <LanguageSwitch />
+            {/* Signed in, the profile sets the language. */}
+            {!user && <LanguageSwitch />}
             <Link href="/learn" className="text-accent-text hover:underline">{t.courses}</Link>
             {user ? (
               <>

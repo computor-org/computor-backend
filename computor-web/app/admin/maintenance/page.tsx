@@ -183,7 +183,14 @@ export default function MaintenancePage() {
     setShowActivateConfirm(false);
     setActivating(true);
     try {
-      await maintenanceClient.activate(activateMessage);
+      // The untouched default goes out in both languages; own text in one.
+      await maintenanceClient.activate(
+        activateMessage,
+        true,
+        activateEdit === null
+          ? { de: COPY.de.defaultActivateMessage, en: COPY.en.defaultActivateMessage }
+          : undefined,
+      );
       notify(t.activated, 'success');
       await fetchStatus();
     } catch (err) {
@@ -214,7 +221,14 @@ export default function MaintenancePage() {
     setScheduling(true);
     try {
       const isoDate = new Date(scheduleDate).toISOString();
-      await maintenanceClient.schedule(isoDate, scheduleMessage);
+      await maintenanceClient.schedule(
+        isoDate,
+        scheduleMessage,
+        true,
+        scheduleEdit === null
+          ? { de: COPY.de.defaultScheduleMessage, en: COPY.en.defaultScheduleMessage }
+          : undefined,
+      );
       notify(t.scheduled, 'success');
       setScheduleDate('');
       await fetchStatus();

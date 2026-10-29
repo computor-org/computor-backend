@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useNotify } from '@/src/contexts/NotificationContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type { CascadeDeleteResult } from 'types/generated';
 
 /**
@@ -25,6 +26,7 @@ export function useCascadeDelete(
   afterDelete: () => Promise<void> | void,
 ) {
   const notify = useNotify();
+  const language = useUiLanguage();
   const [preview, setPreview] = useState<CascadeDeleteResult | null>(null);
   const [opening, setOpening] = useState(false);
 
@@ -33,7 +35,12 @@ export function useCascadeDelete(
     try {
       setPreview(await previewFn());
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Could not prepare the delete', 'error');
+      notify(
+        e instanceof Error
+          ? e.message
+          : language === 'de' ? 'Das Löschen konnte nicht vorbereitet werden.' : 'Could not prepare the delete',
+        'error',
+      );
     } finally {
       setOpening(false);
     }
