@@ -2,15 +2,10 @@
 #
 # IMPORTANT — how this interacts with security alerts:
 #   * Dependabot *alerts* (the Security tab) are always computed against the
-#     DEFAULT branch (`main`) and are not configurable here. A fix merged into a
-#     release branch therefore leaves its alerts open until that branch reaches
-#     `main`. That is expected, not a misconfiguration.
-#   * Setting `target-branch` (below) opts an ecosystem out of automated
-#     *security* PRs and gives us scheduled *version* PRs against the branch we
-#     actually develop on instead. Day-to-day work targets `release/2026.10`
-#     (never `main`), so version PRs are only useful there.
-#
-# When the release branch rolls over, update every `target-branch` below.
+#     DEFAULT branch (`main`) and are not configurable here.
+#   * Development happens on `main`, so no entry sets `target-branch`: version
+#     and security PRs both target `main`. Setting `target-branch` would opt an
+#     ecosystem out of automated *security* PRs.
 #
 # Supply-chain policy (cooldown):
 #   * Every entry sets `cooldown`, so a freshly published release is not
@@ -28,7 +23,6 @@ updates:
   # updates pyproject.toml and uv.lock together.
   - package-ecosystem: uv
     directory: /computor-backend
-    target-branch: release/2026.10
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
@@ -52,7 +46,6 @@ updates:
       - /computor-client
       - /computor-testing
       - /integration-tests
-    target-branch: release/2026.10
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
@@ -71,7 +64,6 @@ updates:
 
   - package-ecosystem: npm
     directory: /computor-web
-    target-branch: release/2026.10
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
@@ -134,7 +126,6 @@ updates:
       - /ops/coder/templates/pi
       - /computor-testing
       - /computor-testing/docker
-    target-branch: release/2026.10
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
@@ -160,7 +151,6 @@ updates:
     directories:
       - /ops/docker
       - /integration-tests
-    target-branch: release/2026.10
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
@@ -192,7 +182,6 @@ updates:
       - /ops/coder/templates/pi
       - /ops/coder/templates/ubuntu-desktop
       - /ops/coder/templates/vscode
-    target-branch: release/2026.10
     schedule:
       interval: weekly
     open-pull-requests-limit: 2
@@ -206,7 +195,6 @@ updates:
   # and the trailing version comment together.
   - package-ecosystem: github-actions
     directory: /
-    target-branch: release/2026.10
     schedule:
       interval: weekly
     open-pull-requests-limit: 2
