@@ -24,6 +24,9 @@ import TreeRow, { TreeRows } from '@/src/components/ui/TreeRow';
 import { formatUsageCompact } from '@/src/utils/limits';
 import { courseProgress } from '@/src/utils/studentProgress';
 import { CourseProgressSummary } from '@/src/components/student/CourseProgress';
+import {
+  ASSIGNMENT_STATES, ASSIGNMENT_STATE_COLOR, assignmentState, assignmentStateLabel, unitState,
+} from '@/src/utils/assignmentStatus';
 import type { CourseContentStudentList } from 'types/generated';
 
 const COPY = {
@@ -50,6 +53,7 @@ const COPY = {
     open: 'Öffnen',
     results: 'Ergebnisse',
     targetUnavailable: 'Dieser Inhalt ist in diesem Kurs nicht verfügbar.',
+    legend: 'Legende',
   },
   en: {
     title: 'Assignments',
@@ -73,6 +77,7 @@ const COPY = {
     open: 'Open',
     results: 'Results',
     targetUnavailable: 'This content is not available in this course.',
+    legend: 'Legend',
   },
 };
 
@@ -181,6 +186,15 @@ export default function StudentCourseContentsPage() {
                   </Button>
                 </Toolbar>}
 
+                <ul aria-label={t.legend} data-testid="status-legend" className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-subtle">
+                  {ASSIGNMENT_STATES.map((state) => (
+                    <li key={state} className="flex items-center gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: ASSIGNMENT_STATE_COLOR[state] }} aria-hidden="true" />
+                      {assignmentStateLabel(state, language)}
+                    </li>
+                  ))}
+                </ul>
+
                 <TreeRows>
                   {rows.map(({ key, item, depth, label, expanded, hasChildren, toggle, childCount }) => {
                     const isAssignment = item?.course_content_kind_id === 'assignment';
@@ -189,6 +203,7 @@ export default function StudentCourseContentsPage() {
                     const hasResults = item && (item.result != null || item.submitted ||
                       item.submission_group?.grading != null || isGradingVerdict(item.status) || (item.unread_message_count ?? 0) > 0 ||
                       (item.result_count ?? 0) > 0 || (item.submission_count ?? 0) > 0);
+                    const state = hasChildren ? unitState(unit) : isAssignment ? assignmentState(item) : undefined;
 
                     return (
                       <TreeRow
@@ -197,8 +212,8 @@ export default function StudentCourseContentsPage() {
                         expandable={hasChildren}
                         expanded={expanded}
                         onToggle={toggle}
-                        markerColor={item?.color}
-                        markerTitle={item?.course_content_type?.slug}
+                        markerColor={state && ASSIGNMENT_STATE_COLOR[state]}
+                        markerTitle={state && assignmentStateLabel(state, language)}
                         label={isOrdinaryLearner && hasChildren ? (
                           <button
                             type="button"
