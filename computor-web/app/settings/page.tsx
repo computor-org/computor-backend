@@ -624,7 +624,7 @@ export default function SettingsPage() {
                     {
                       term: t.onlineSince,
                       value: onlineSince
-                        ? `${onlineSince} · ${t.up} ${duration(instanceStatus.uptime_seconds)}`
+                        ? `${onlineSince} · ${t.up} ${duration(instanceStatus.uptime_seconds, language)}`
                         : '—',
                     },
                     { term: t.version, value: instanceStatus.branch },

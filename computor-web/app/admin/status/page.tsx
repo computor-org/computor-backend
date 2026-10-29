@@ -134,7 +134,7 @@ export default function InstanceStatusPage() {
                 items={[
                   {
                     term: t.lastRestart,
-                    value: started ? `${started} · ${t.up} ${duration(data.uptime_seconds)}` : '—',
+                    value: started ? `${started} · ${t.up} ${duration(data.uptime_seconds, language)}` : '—',
                   },
                   {
                     term: t.builtAt,

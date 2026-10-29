@@ -14,7 +14,8 @@ import PublicLearnShell from '@/src/components/learn/PublicLearnShell';
 import PublicMarkdown, { PublicMarkdownTitle } from '@/src/components/learn/PublicMarkdown';
 import { localizedTitle } from '@/src/components/learn/localize';
 import { localized } from '@/src/utils/localizedText';
-import { setUiLanguage, useBrowserLanguage, type UiLanguage } from '@/src/hooks/useBrowserLanguage';
+import { setUiLanguage, type UiLanguage } from '@/src/hooks/useBrowserLanguage';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type {
   PublicLearningContent,
   PublicLearningContentSummary,
@@ -190,7 +191,7 @@ export default function PublicCourseReader({
   const [loaded, setLoaded] = useState<{
     courseId: string; outline: PublicLearningCourseOutline | null; error: string | null;
   } | null>(null);
-  const uiLanguage = useBrowserLanguage();
+  const uiLanguage = useUiLanguage();
   const t = COPY[uiLanguage];
   const outline = loaded?.courseId === courseId ? loaded.outline : null;
   const shownCourse = localized(outline, uiLanguage);

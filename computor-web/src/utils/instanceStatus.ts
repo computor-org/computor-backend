@@ -9,14 +9,20 @@
 // arg); unset under `next dev`. The same constant the sidebar footer shows.
 export const WEB_COMMIT = process.env.NEXT_PUBLIC_GIT_COMMIT;
 
-/** "1d 6h", "18m" — coarse on purpose, this is read at a glance. */
-export function duration(seconds: number): string {
+const UNITS = {
+  de: { d: ' T', h: ' Std.', m: ' Min.' },
+  en: { d: 'd', h: 'h', m: 'm' },
+};
+
+/** "1d 6h" or "1 T 6 Std.", "18m" — coarse on purpose, this is read at a glance. */
+export function duration(seconds: number, language: 'de' | 'en' = 'en'): string {
+  const u = UNITS[language];
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
+  if (d > 0) return `${d}${u.d} ${h}${u.h}`;
+  if (h > 0) return `${h}${u.h} ${m}${u.m}`;
+  return `${m}${u.m}`;
 }
 
 /**

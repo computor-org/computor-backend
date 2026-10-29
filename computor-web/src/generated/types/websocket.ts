@@ -245,6 +245,8 @@ export interface WSMaintenanceActivated {
   message: string;
   /** ISO8601 timestamp of activation */
   activated_at: string;
+  /** The message in German and English; clients show the reader's language, else `message` */
+  message_i18n?: Record<string, string> | null;
 }
 
 /**
@@ -254,6 +256,8 @@ export interface WSMaintenanceDeactivated {
   type?: "maintenance:deactivated";
   active?: boolean;
   message?: string;
+  /** The message in German and English; clients show the reader's language, else `message` */
+  message_i18n?: Record<string, string> | null;
 }
 
 /**
@@ -265,6 +269,8 @@ export interface WSMaintenanceScheduled {
   scheduled_at: string;
   /** Schedule message for users */
   message: string;
+  /** The message in German and English; clients show the reader's language, else `message` */
+  message_i18n?: Record<string, string> | null;
 }
 
 /**
@@ -273,6 +279,8 @@ export interface WSMaintenanceScheduled {
 export interface WSMaintenanceCancelled {
   type?: "maintenance:cancelled";
   message?: string;
+  /** The message in German and English; clients show the reader's language, else `message` */
+  message_i18n?: Record<string, string> | null;
 }
 
 /**
@@ -286,6 +294,8 @@ export interface WSMaintenanceReminder {
   scheduled_at: string;
   /** Maintenance message for users */
   message: string;
+  /** The message in German and English; clients show the reader's language, else `message` */
+  message_i18n?: Record<string, string> | null;
 }
 
 /**

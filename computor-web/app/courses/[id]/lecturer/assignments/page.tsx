@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useLecturerCopy } from '@/src/hooks/useLecturerCopy';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { localizedText } from '@/src/utils/localizedText';
 import { LecturersClient } from '@/src/generated/clients/LecturersClient';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
 import { useResource } from '@/src/hooks/useResource';
@@ -25,6 +27,8 @@ import type { CourseContentLecturerList, CourseContentTypeList } from 'types/gen
 
 export default function LecturerContentPage() {
   const t = useLecturerCopy();
+  // Display only: the edit form keeps the source title it saves back.
+  const language = useUiLanguage();
   const courseId = useParams().id as string;
   const crumbs = useCourseCrumbs(courseId, t("Assignments"));
 
@@ -148,7 +152,7 @@ export default function LecturerContentPage() {
   };
 
   // One tree, one indent, one expand model — shared with the student view.
-  const { rows, setAllExpanded } = useContentTree(active, {});
+  const { rows, setAllExpanded } = useContentTree(active, { language });
 
   // A unit's nested submittable contents that have an example assigned (only those
   // can be released).
@@ -244,7 +248,7 @@ export default function LecturerContentPage() {
                       expanded={expanded}
                       onToggle={toggle}
                       markerColor={type?.color}
-                      markerTitle={type?.title || type?.slug || 'content'}
+                      markerTitle={(type && localizedText(type.title_i18n, language, type.title)) || type?.slug || 'content'}
                       label={label}
                       hidden={hidden}
                     >
@@ -261,7 +265,7 @@ export default function LecturerContentPage() {
                       )}
                       {type && (
                         <Badge tone="muted" className="shrink-0">
-                          {type.title || type.slug}
+                          {localizedText(type.title_i18n, language, type.title) || type.slug}
                         </Badge>
                       )}
                       {c.is_submittable && (c.max_test_runs != null || c.max_submissions != null) && (

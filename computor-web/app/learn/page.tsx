@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import EmptyState from '@/src/components/EmptyState';
 import PublicLearnShell from '@/src/components/learn/PublicLearnShell';
 import { CODESPACES_URL, COMPUTOR_EXTENSION_URL } from '@/src/components/courses/LearningOptions';
-import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type { PublicCourseCatalogEntry } from '@/src/types/publicLearning';
 import { languageName } from '@/src/utils/locale';
 import { localized } from '@/src/utils/localizedText';
@@ -13,6 +13,7 @@ import { localized } from '@/src/utils/localizedText';
 const COPY = {
   de: {
     kicker: 'Offene Lernmaterialien',
+    heading: 'Data Science mit Python',
     lead: 'Alle Kurse und Aufgaben sind ohne Konto lesbar.',
     courses: 'Kurse',
     loading: 'Kurse werden geladen…',
@@ -29,6 +30,7 @@ const COPY = {
   },
   en: {
     kicker: 'Open learning material',
+    heading: 'Data Science with Python',
     lead: 'All courses and exercises are readable without an account.',
     courses: 'Courses',
     loading: 'Loading courses…',
@@ -46,7 +48,7 @@ const COPY = {
 };
 
 export default function LearnPage() {
-  const language = useBrowserLanguage();
+  const language = useUiLanguage();
   const t = COPY[language];
   const [courses, setCourses] = useState<PublicCourseCatalogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,7 +81,7 @@ export default function LearnPage() {
           <p className="text-sm font-semibold uppercase tracking-wide text-accent-text">
             {t.kicker}
           </p>
-          <h1 className="mt-2 text-4xl font-bold text-fg">Data Science mit Python</h1>
+          <h1 className="mt-2 text-4xl font-bold text-fg">{t.heading}</h1>
           <p className="mt-4 text-lg leading-8 text-muted">
             {t.lead}
           </p>

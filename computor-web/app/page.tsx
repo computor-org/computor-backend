@@ -10,7 +10,7 @@ import { CODESPACES_URL, COMPUTOR_EXTENSION_URL } from '@/src/components/courses
 import LanguageSwitch from '@/src/components/LanguageSwitch';
 import LegalLinks from '@/src/components/LegalLinks';
 import NetideeNotice from '@/src/components/NetideeNotice';
-import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { applyDocumentLanguage } from '@/src/utils/documentLanguage';
 
 const mention = (name: string) => <code className="bg-accent-wash text-accent-text px-1 rounded text-xs">{name}</code>;
@@ -30,6 +30,7 @@ const Icon = ({ name, className }: { name: keyof typeof ICON_PATHS; className: s
 const COPY = {
   de: {
     signIn: 'Anmelden',
+    dashboard: 'Übersicht',
     signOut: 'Abmelden',
     heroTitle: 'Programmieren lernen mit',
     heroLead: 'Programmieren Schritt für Schritt.',
@@ -49,6 +50,7 @@ const COPY = {
   },
   en: {
     signIn: 'Sign in',
+    dashboard: 'Dashboard',
     signOut: 'Sign out',
     heroTitle: 'Learn programming with',
     heroLead: 'Programming step by step.',
@@ -72,7 +74,7 @@ export default function Home() {
   const router = useRouter();
   const { user, logout, isAuthenticated, isLoading, restoreSession } = useAuth();
   const restoreTried = useRef(false);
-  const language = useBrowserLanguage();
+  const language = useUiLanguage();
   const t = COPY[language];
   useEffect(() => {
     applyDocumentLanguage(language);
@@ -114,14 +116,15 @@ export default function Home() {
             <h1 className="sr-only sm:not-sr-only text-2xl font-bold text-fg">Computor</h1>
           </div>
           <div className="flex items-center gap-3">
-            <LanguageSwitch />
+            {/* Signed in, the profile sets the language. */}
+            {!user && <LanguageSwitch />}
             {user ? (
               <div className="flex items-center gap-2 sm:gap-4">
                 <Link
                   href="/dashboard"
                   className="px-2 sm:px-4 py-2 text-accent-text hover:text-accent-text transition-colors font-medium"
                 >
-                  Dashboard
+                  {t.dashboard}
                 </Link>
                 <button
                   onClick={handleLogout}

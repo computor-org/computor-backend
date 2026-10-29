@@ -4,7 +4,7 @@ import { Fragment, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { legalMarkdownComponents } from '@/src/components/legalMarkdown';
-import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type { BilingualText } from '@/src/utils/legalContent';
 import { applyDocumentLanguage } from '@/src/utils/documentLanguage';
 
@@ -26,7 +26,7 @@ export default function BilingualLegalText({
   /** What the tab calls the page in each reading language. */
   titles: BilingualText;
 }) {
-  const language = useBrowserLanguage();
+  const language = useUiLanguage();
   const { de: titleDe, en: titleEn } = titles;
   useEffect(() => applyDocumentLanguage(language, { de: titleDe, en: titleEn }), [language, titleDe, titleEn]);
 

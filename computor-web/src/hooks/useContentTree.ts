@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { buildTree, depthOf, parentPath, type TreeNode } from '@/src/utils/ltree';
 import { displayName } from '@/src/utils/displayName';
 import { localizedUnitTitle } from '@/src/components/student/studentDescription';
+import { localizedText } from '@/src/utils/localizedText';
 
 /**
  * The course content hierarchy, as data.
@@ -63,8 +64,9 @@ export interface UseContentTreeOptions {
   /** Open these groups by default; explicit user toggles still win. */
   defaultExpandedPaths?: readonly string[];
   /**
-   * The reading language, for a learner's tree: a "Week N"/"Woche N" unit
-   * without a translated title still follows it. Omit to show stored titles.
+   * The reading language: titles come from `title_i18n` where it has an
+   * entry, and a "Week N"/"Woche N" unit without one still follows it. Omit
+   * to show stored titles.
    */
   language?: string;
 }
@@ -72,7 +74,7 @@ export interface UseContentTreeOptions {
 /** A path we invented; it has no row in `items`. */
 type MaybeSynthetic<T> = { path: string; position?: number | null; __item: T | null };
 
-export function useContentTree<T extends { path: string; position?: number | null; title?: string | null }>(
+export function useContentTree<T extends { path: string; position?: number | null; title?: string | null; title_i18n?: Record<string, string> | null }>(
   items: T[],
   { synthesiseContainers = false, collapseBelowDepth, defaultExpandedPaths, language }: UseContentTreeOptions = {},
 ) {
@@ -120,7 +122,10 @@ export function useContentTree<T extends { path: string; position?: number | nul
     const walk = (nodes: TreeNode<MaybeSynthetic<T>>[]): void => {
       for (const node of nodes) {
         const expanded = isExpanded(node.path);
-        const label = displayName(node.__item ?? { path: node.path });
+        const item = node.__item;
+        const label = displayName(
+          item && language ? { ...item, title: localizedText(item.title_i18n, language, item.title) } : item ?? { path: node.path },
+        );
         out.push({
           key: node.path,
           path: node.path,

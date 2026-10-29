@@ -5,6 +5,7 @@ import { useAuth } from '@/src/contexts/AuthContext';
 import { MaintenanceClient, MaintenanceStatus } from '@/src/clients/MaintenanceClient';
 import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
 import { formatDateTime } from '@/src/utils/locale';
+import { localizedText } from '@/src/utils/localizedText';
 
 const maintenanceClient = new MaintenanceClient();
 
@@ -97,6 +98,7 @@ export default function MaintenanceBanner() {
   }, [status?.scheduled_at]);
 
   if (!status) return null;
+  const message = localizedText(status.message_i18n, language, status.message);
 
   // Active maintenance — amber banner, not dismissible
   if (status.active) {
@@ -108,7 +110,7 @@ export default function MaintenanceBanner() {
           </svg>
           <p className="text-sm text-warn-text">
             <span className="font-medium">{t.active}</span>
-            {status.message && <> — {status.message}</>}
+            {message && <> — {message}</>}
           </p>
         </div>
       </div>

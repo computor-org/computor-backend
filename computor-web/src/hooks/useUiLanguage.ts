@@ -6,11 +6,13 @@ import { useBrowserLanguage, useNavigatorLanguage, type UiLanguage } from './use
 
 export type { UiLanguage };
 
-/** The interface language a profile language selects: German for 'de', English for any other. */
+/**
+ * The interface language a profile language selects. Any code but 'de' or
+ * 'en' counts as not set, as on the server (utils/reading_language.py).
+ */
 export function profileUiLanguage(language?: string | null): UiLanguage | null {
   const code = language?.trim().toLowerCase();
-  if (!code) return null;
-  return code === 'de' ? 'de' : 'en';
+  return code === 'de' || code === 'en' ? code : null;
 }
 
 /**
