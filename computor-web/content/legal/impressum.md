@@ -17,7 +17,7 @@ E-Mail: info@tugraz.at
 Die Technische Universität Graz ist eine juristische Person des öffentlichen
 Rechts (§ 4 Universitätsgesetz 2002), vertreten durch das Rektorat.
 
-Umsatzsteuer-Identifikations-Nummer (UID): ATU 574 77 929
+Umsatzsteuer-Identifikationsnummer (UID): ATU 574 77 929
 
 Aufsichtsbehörde der Technischen Universität Graz:\
 Bundesministerium für Frauen, Wissenschaft und Forschung, https://bmfwf.gv.at
@@ -53,8 +53,8 @@ finanziell unterstützt und ermöglicht (Projekt 8012).
 ### Datenschutz
 
 Informationen zur Verarbeitung personenbezogener Daten finden Sie in der
-[Datenschutzerklärung](/privacy). Mehr zum Datenschutz an der TU Graz finden
-Sie auf https://datenschutz.tugraz.at.
+[Datenschutzerklärung](/privacy). Mehr zum Datenschutz an der TU Graz finden Sie
+unter https://datenschutz.tugraz.at.
 
 ### Copyright und Lizenzen
 
@@ -77,18 +77,18 @@ Code und sonstige Inhalte, die Nutzer*innen erstellen, bleiben deren Eigentum
 
 Alle Inhalte von computor.at wurden mit Sorgfalt und nach bestem Gewissen
 erstellt. Eine Gewähr für die Aktualität, Vollständigkeit und Richtigkeit
-sämtlicher Seiten kann jedoch nicht übernommen werden. Ein umgehendes Entfernen
-von Inhalten erfolgt ab dem Zeitpunkt der Kenntnis einer konkreten
-Rechtsverletzung. Für die Nutzung der Plattform durch registrierte
-Nutzer*innen gelten die Haftungsregeln der [Nutzungsbedingungen](/terms).
+sämtlicher Seiten kann jedoch nicht übernommen werden. Sobald eine konkrete
+Rechtsverletzung bekannt wird, werden die betreffenden Inhalte umgehend
+entfernt. Für die Nutzung der Plattform durch registrierte Nutzer*innen gelten
+die Haftungsregeln der [Nutzungsbedingungen](/terms).
 
-computor.at enthält Verweise auf Web-Auftritte Dritter, auf deren Inhalt die
-TU Graz keinen Einfluss hat und für welche die TU Graz aus diesem Grund keine
-Gewähr übernimmt. Für die Inhalte und Richtigkeit dieser Informationen ist
-die/der jeweilige Informationsanbieter/in des Web-Auftritts verantwortlich.
-Als der Verweis auf den Web-Auftritt des Dritten eingerichtet wurde, waren
-keine Rechtsverstöße erkennbar. Wird der TU Graz eine Rechtsverletzung zur
-Kenntnis gebracht, wird der jeweilige Verweis umgehend entfernt.
+computor.at enthält Verweise auf Web-Auftritte Dritter, auf deren Inhalt die TU
+Graz keinen Einfluss hat und für welche die TU Graz aus diesem Grund keine
+Gewähr übernimmt. Für Inhalt und Richtigkeit dieser Informationen sind die
+jeweiligen Anbieter*innen des Web-Auftritts verantwortlich. Als der Verweis auf
+den Web-Auftritt des Dritten eingerichtet wurde, waren keine Rechtsverstöße
+erkennbar. Wird der TU Graz eine Rechtsverletzung zur Kenntnis gebracht, wird
+der jeweilige Verweis umgehend entfernt.
 
 Die TU Graz weist darauf hin, dass die Übertragung von Daten im Internet
 (etwa per E-Mail) Sicherheitslücken aufweisen kann. Der Verwendung

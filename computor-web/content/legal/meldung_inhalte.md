@@ -10,7 +10,7 @@ Wenn Sie auf computor.at Inhalte finden, die Sie für
 rechtswidrig oder für einen Verstoß gegen unsere
 [Nutzungsbedingungen](/terms) halten, melden Sie diese bitte per E-Mail an
 **abuse@computor.at**. Meldungen kann jede Person und jede Stelle einreichen;
-ein Konto auf computor.at ist nicht nötig.
+ein Konto auf computor.at ist dafür nicht erforderlich.
 
 Bitte geben Sie an:
 
@@ -32,16 +32,16 @@ Bitte geben Sie an:
   Willkür. Wir entscheiden nicht allein mit automatisierten Mitteln.
 - Wir teilen Ihnen unsere Entscheidung und die möglichen Rechtsbehelfe mit.
 - Entfernen oder sperren wir Inhalte oder sperren wir ein Konto, informieren
-  wir die betroffene Person mit Begründung. Sie kann innerhalb von sechs
-  Monaten bei contact@computor.at Einspruch erheben. Das gilt ebenso für Sie,
+  wir die betroffene Person und begründen dies. Sie kann innerhalb von sechs
+  Monaten bei contact@computor.at Beschwerde einlegen. Dasselbe gilt für Sie,
   wenn Sie mit unserer Entscheidung über Ihre Meldung nicht einverstanden sind.
 - Der Rechtsweg steht allen Beteiligten jederzeit offen.
 - Erfahren wir von einem Verdacht auf eine Straftat, die eine Gefahr für das
   Leben oder die Sicherheit von Personen darstellt, informieren wir
   unverzüglich die Polizei bzw. die zuständigen Behörden.
 
-Wer wiederholt offensichtlich unbegründete Meldungen einreicht, dessen
-Meldungen können wir nach vorheriger Warnung für eine angemessene Zeit
+Reicht eine Person wiederholt offensichtlich unbegründete Meldungen ein, können
+wir ihre Meldungen nach vorheriger Warnung für einen angemessenen Zeitraum
 nachrangig oder nicht mehr bearbeiten.
 
 Bei akuter Gefahr für Leben oder Sicherheit wenden Sie sich bitte zuerst an
@@ -104,8 +104,8 @@ If someone repeatedly submits manifestly unfounded reports, we may, after a
 prior warning, deprioritise or stop processing their reports for a reasonable
 period.
 
-In case of immediate danger to life or safety, please contact the police
-first (112).
+In case of immediate danger to life or safety, please contact the police (133)
+or the European emergency number (112) first.
 
 ### Copyright notices from the United States
 

@@ -39,9 +39,9 @@ teilweise oder nicht barrierefrei:
 ### Erstellung der Erklärung zur Barrierefreiheit
 
 Diese Erklärung wurde am 30. September 2026 erstellt. Sie wurde auf Grundlage
-einer von der TU Graz (Institut für Theoretische Physik – Computational
-Physics) durchgeführten Selbstbewertung erstellt. Wir überprüfen sie bei
-wesentlichen Änderungen der Plattform, mindestens einmal jährlich.
+einer von der TU Graz (Institut für Theoretische Physik – Computational Physics)
+durchgeführten Selbstbewertung erstellt. Wir überprüfen sie bei wesentlichen
+Änderungen der Plattform, mindestens jedoch einmal jährlich.
 
 ### Feedback und Kontaktangaben
 
