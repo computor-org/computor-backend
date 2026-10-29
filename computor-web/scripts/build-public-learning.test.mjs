@@ -105,6 +105,25 @@ test('a welcome item renders its description in the reader language and is not c
   assert.equal(catalog[0].unit_count, 1);
 });
 
+test('translated titles and descriptions reach the catalog, the outline and the materials', t => {
+  const f = fixture(t);
+  f.manifest.title_i18n = { en: 'Public course in English', fr: 'ignored' };
+  f.manifest.description_i18n = { en: 'In English', de: ' ' };
+  f.manifest.contents[0].title_i18n = { de: 'Woche 1', en: 'Week 1' };
+  f.manifests(f.manifest);
+  fs.writeFileSync(path.join(f.example, 'meta.yaml'), JSON.stringify({ title: 'First exercise', language: 'de',
+    title_i18n: { de: 'Erste Aufgabe', en: 'First exercise' } }));
+  buildPublicLearning(f.source, f.output, revision);
+  const catalog = JSON.parse(fs.readFileSync(path.join(f.output, 'catalog.json')));
+  assert.deepEqual(catalog[0].title_i18n, { en: 'Public course in English' });
+  assert.deepEqual(catalog[0].description_i18n, { en: 'In English' });
+  const course = JSON.parse(fs.readFileSync(path.join(f.output, 'courses/python-beginner.json')));
+  assert.deepEqual(course.title_i18n, { en: 'Public course in English' });
+  assert.deepEqual(course.contents[0].title_i18n, { de: 'Woche 1', en: 'Week 1' });
+  assert.deepEqual(course.materials['week_1.first'].title_i18n, { de: 'Erste Aufgabe', en: 'First exercise' });
+  assert(!('description_i18n' in course.materials['week_1.first']));
+});
+
 test('an unmarked item description is Markdown in the course language', () => {
   assert.deepEqual(descriptionVariants('  Nur **deutsch**.\n', 'de'), { de: 'Nur **deutsch**.' });
   assert.deepEqual(descriptionVariants('Common\n<!-- lang: en -->\nEnglish\n<!-- lang: xx -->\nskip', 'de'),

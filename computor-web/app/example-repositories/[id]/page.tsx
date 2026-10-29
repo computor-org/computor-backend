@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ExampleRepositoriesClient } from '@/src/generated/clients/ExampleRepositoriesClient';
 import { ExamplesClient } from '@/src/generated/clients/ExamplesClient';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { localizedText } from '@/src/utils/localizedText';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { useResource } from '@/src/hooks/useResource';
 import { usePermissions } from '@/src/hooks/usePermissions';
@@ -129,7 +130,7 @@ export default function ExampleRepositoryDetailPage() {
                   {examples.map((ex) => (
                     <Link key={ex.id} href={`/examples/${ex.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-canvas">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-fg truncate">{ex.title || ex.directory}</div>
+                        <div className="text-sm font-medium text-fg truncate">{localizedText(ex.title_i18n, language, ex.title) || ex.directory}</div>
                         <div className="text-xs text-subtle font-mono truncate">{ex.identifier}</div>
                       </div>
                       <span className="text-faint">›</span>

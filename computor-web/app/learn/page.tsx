@@ -8,6 +8,7 @@ import { CODESPACES_URL, COMPUTOR_EXTENSION_URL } from '@/src/components/courses
 import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
 import type { PublicCourseCatalogEntry } from '@/src/types/publicLearning';
 import { languageName } from '@/src/utils/locale';
+import { localized } from '@/src/utils/localizedText';
 
 const COPY = {
   de: {
@@ -103,7 +104,8 @@ export default function LearnPage() {
             </div>
           ) : (
             <div className="mt-5 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {courses.map(course => {
+              {courses.map(entry => {
+                const course = localized(entry, language);
                 const outline = course;
                 return (
                 <article key={course.id} className="flex min-h-64 flex-col rounded-xl border border-rule bg-surface p-6">

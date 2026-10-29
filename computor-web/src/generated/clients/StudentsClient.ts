@@ -15,7 +15,7 @@ export class StudentsClient extends BaseEndpointClient {
   /**
    * Student List Course Contents Endpoint
    */
-  async studentListCourseContentsEndpointStudentsCourseContentsGet({ ascendants, courseContentTypeId, courseId, descendants, directory, id, limit, nlevel, path, project, providerUrl, skip, status, title }: { ascendants?: string | null; courseContentTypeId?: string | null; courseId?: string | null; descendants?: string | null; directory?: string | null; id?: string | null; limit?: number | null; nlevel?: number | null; path?: string | null; project?: string | null; providerUrl?: string | null; skip?: number | null; status?: string | null; title?: string | null }): Promise<CourseContentStudentList[]> {
+  async studentListCourseContentsEndpointStudentsCourseContentsGet({ ascendants, courseContentTypeId, courseId, descendants, directory, id, limit, localize, nlevel, path, project, providerUrl, skip, status, title }: { ascendants?: string | null; courseContentTypeId?: string | null; courseId?: string | null; descendants?: string | null; directory?: string | null; id?: string | null; limit?: number | null; localize?: string | null; nlevel?: number | null; path?: string | null; project?: string | null; providerUrl?: string | null; skip?: number | null; status?: string | null; title?: string | null }): Promise<CourseContentStudentList[]> {
     const queryParams: Record<string, unknown> = {
       ascendants,
       course_content_type_id: courseContentTypeId,
@@ -24,6 +24,7 @@ export class StudentsClient extends BaseEndpointClient {
       directory,
       id,
       limit,
+      localize,
       nlevel,
       path,
       project,
@@ -38,19 +39,23 @@ export class StudentsClient extends BaseEndpointClient {
   /**
    * Student Get Course Content Endpoint
    */
-  async studentGetCourseContentEndpointStudentsCourseContentsCourseContentIdGet({ courseContentId }: { courseContentId: string | string }): Promise<CourseContentStudentGet> {
-    return this.client.get<CourseContentStudentGet>(this.buildPath('course-contents', courseContentId));
+  async studentGetCourseContentEndpointStudentsCourseContentsCourseContentIdGet({ courseContentId, localize }: { courseContentId: string | string; localize?: string | null }): Promise<CourseContentStudentGet> {
+    const queryParams: Record<string, unknown> = {
+      localize,
+    };
+    return this.client.get<CourseContentStudentGet>(this.buildPath('course-contents', courseContentId), { params: queryParams });
   }
 
   /**
    * Student List Courses Endpoint
    */
-  async studentListCoursesEndpointStudentsCoursesGet({ courseFamilyId, description, id, limit, organizationId, path, skip, title }: { courseFamilyId?: string | null; description?: string | null; id?: string | null; limit?: number | null; organizationId?: string | null; path?: string | null; skip?: number | null; title?: string | null }): Promise<CourseStudentList[]> {
+  async studentListCoursesEndpointStudentsCoursesGet({ courseFamilyId, description, id, limit, localize, organizationId, path, skip, title }: { courseFamilyId?: string | null; description?: string | null; id?: string | null; limit?: number | null; localize?: string | null; organizationId?: string | null; path?: string | null; skip?: number | null; title?: string | null }): Promise<CourseStudentList[]> {
     const queryParams: Record<string, unknown> = {
       course_family_id: courseFamilyId,
       description,
       id,
       limit,
+      localize,
       organization_id: organizationId,
       path,
       skip,
@@ -62,7 +67,10 @@ export class StudentsClient extends BaseEndpointClient {
   /**
    * Student Get Course Endpoint
    */
-  async studentGetCourseEndpointStudentsCoursesCourseIdGet({ courseId }: { courseId: string | string }): Promise<CourseStudentGet> {
-    return this.client.get<CourseStudentGet>(this.buildPath('courses', courseId));
+  async studentGetCourseEndpointStudentsCoursesCourseIdGet({ courseId, localize }: { courseId: string | string; localize?: string | null }): Promise<CourseStudentGet> {
+    const queryParams: Record<string, unknown> = {
+      localize,
+    };
+    return this.client.get<CourseStudentGet>(this.buildPath('courses', courseId), { params: queryParams });
   }
 }

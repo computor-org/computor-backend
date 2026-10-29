@@ -256,7 +256,8 @@ test.describe('English learner', () => {
     const card = page.getByTestId('course-progress');
     await expect(page.getByRole('heading', { name: 'Your progress' })).toBeVisible({ timeout: 15_000 });
     await expect(card.getByText('4 of 6 assignments submitted')).toBeVisible();
-    await expect(card).toContainText('Continue with: Woche 3 › Beta-Absorption (last tested: 0%)');
+    // The stored "Woche 3" follows the English reader (computor-org/issues#538).
+    await expect(card).toContainText('Continue with: Week 3 › Beta-Absorption (last tested: 0%)');
     await expect(card.getByRole('link', { name: 'Beta-Absorption', exact: true })).toBeVisible();
     await expect(card.getByRole('link', { name: 'Read task', exact: true })).toHaveCount(0);
   });
@@ -338,7 +339,7 @@ for (const language of ['de', 'en'] as const) {
 
         await expect(card).toContainText(language === 'de' ? '1 von 6 Aufgaben eingereicht' : '1 of 6 assignments submitted');
         await expect(card.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '17');
-        await expect(card).toContainText(language === 'de' ? 'Weiter mit: Woche 1 › Listen' : 'Continue with: Woche 1 › Listen');
+        await expect(card).toContainText(language === 'de' ? 'Weiter mit: Woche 1 › Listen' : 'Continue with: Week 1 › Listen');
         await expect(card.getByRole('link', { name: 'Listen', exact: true })).toBeVisible();
         expect(await mountedCard?.evaluate((node) => node === document.querySelector('[data-testid="course-progress"]'))).toBe(true);
         expect(new URL(page.url()).pathname).toBe(path);

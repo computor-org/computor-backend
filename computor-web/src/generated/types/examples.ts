@@ -87,6 +87,8 @@ export interface ExampleCreate {
   identifier: string;
   title: string;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   category?: string | null;
   tags?: string[];
 }
@@ -101,6 +103,8 @@ export interface ExampleGet {
   identifier: string;
   title: string;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   category?: string | null;
   tags?: string[];
   created_at: string;
@@ -125,6 +129,7 @@ export interface ExampleList {
   directory: string;
   identifier: string;
   title: string;
+  title_i18n?: Record<string, string> | null;
   category?: string | null;
   tags?: string[];
   example_repository_id: string;
@@ -137,6 +142,8 @@ export interface ExampleUpdate {
   identifier?: string | null;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   category?: string | null;
   tags?: string[] | null;
 }
@@ -178,6 +185,8 @@ export interface ExampleVersionGet {
   storage_path: string;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   language?: string | null;
   license?: string | null;
   /** Full meta.yaml properties.executionBackend (slug + version + settings) */
@@ -199,6 +208,8 @@ export interface ExampleVersionList {
   version_number: number;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   testing_service_id?: string | null;
   created_at: string;
 }

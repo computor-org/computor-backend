@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { buildTree, depthOf, parentPath, type TreeNode } from '@/src/utils/ltree';
 import { displayName } from '@/src/utils/displayName';
+import { localizedUnitTitle } from '@/src/components/student/studentDescription';
 
 /**
  * The course content hierarchy, as data.
@@ -61,6 +62,11 @@ export interface UseContentTreeOptions {
   collapseBelowDepth?: number;
   /** Open these groups by default; explicit user toggles still win. */
   defaultExpandedPaths?: readonly string[];
+  /**
+   * The reading language, for a learner's tree: a "Week N"/"Woche N" unit
+   * without a translated title still follows it. Omit to show stored titles.
+   */
+  language?: string;
 }
 
 /** A path we invented; it has no row in `items`. */
@@ -68,7 +74,7 @@ type MaybeSynthetic<T> = { path: string; position?: number | null; __item: T | n
 
 export function useContentTree<T extends { path: string; position?: number | null; title?: string | null }>(
   items: T[],
-  { synthesiseContainers = false, collapseBelowDepth, defaultExpandedPaths }: UseContentTreeOptions = {},
+  { synthesiseContainers = false, collapseBelowDepth, defaultExpandedPaths, language }: UseContentTreeOptions = {},
 ) {
   // Only paths the user has *explicitly* toggled. Everything else answers to
   // collapseBelowDepth, so a reload that brings new content in does not silently
@@ -114,12 +120,13 @@ export function useContentTree<T extends { path: string; position?: number | nul
     const walk = (nodes: TreeNode<MaybeSynthetic<T>>[]): void => {
       for (const node of nodes) {
         const expanded = isExpanded(node.path);
+        const label = displayName(node.__item ?? { path: node.path });
         out.push({
           key: node.path,
           path: node.path,
           depth: node.depth,
           item: node.__item,
-          label: displayName(node.__item ?? { path: node.path }),
+          label: language ? localizedUnitTitle(label, language) : label,
           hasChildren: node.children.length > 0,
           expanded,
           toggle: () => toggle(node.path),
@@ -132,7 +139,7 @@ export function useContentTree<T extends { path: string; position?: number | nul
 
     walk(roots);
     return out;
-  }, [roots, isExpanded, toggle]);
+  }, [roots, isExpanded, toggle, language]);
 
   const setAllExpanded = useCallback(
     (expanded: boolean) => {

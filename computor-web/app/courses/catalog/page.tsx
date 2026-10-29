@@ -19,6 +19,7 @@ import ConfirmDialog from '@/src/components/ConfirmDialog';
 import CourseCard, { CourseCardSkeleton } from '@/src/components/courses/CourseCard';
 import Button, { ButtonLink } from '@/src/components/ui/Button';
 import { displayName } from '@/src/utils/displayName';
+import { localized } from '@/src/utils/localizedText';
 import type { CoursePublicList } from 'types/generated';
 
 const coursesClient = new CoursesClient();
@@ -79,7 +80,8 @@ function CourseCatalog() {
   const { isAdmin, isOrganizationManager, courseHasAtLeast } = usePermissions();
   const courseStaff = (id: string) => isAdmin || isOrganizationManager || courseHasAtLeast(id, '_tutor');
   const courseLearner = (id: string) => !courseStaff(id) && courseHasAtLeast(id, '_student');
-  const t = COPY[useUiLanguage()];
+  const language = useUiLanguage();
+  const t = COPY[language];
   const { data, loading, error, reload } = useResource(
     () => coursesClient.listPublicCoursesCoursesPublicGet({}),
     [],
@@ -143,7 +145,7 @@ function CourseCatalog() {
       // re-pulling scopes now returns the new _student role. Without it the
       // sidebar and role badges would lag the redirect.
       await refreshPermissions();
-      notify(t.enrolled(displayName(course, t.thisCourse)), 'success');
+      notify(t.enrolled(displayName(localized(course, language), t.thisCourse)), 'success');
       closeDialog();
       // Enrollment is confirmed, but refreshPermissions returns no new scopes
       // to this closure. Preserve staff destinations without a stale student gate.
@@ -237,7 +239,7 @@ function CourseCatalog() {
         <ConfirmDialog
           open={dialogCourse !== null}
           title={t.confirmTitle}
-          message={t.confirmMessage(displayName(dialogCourse, t.thisCourse))}
+          message={t.confirmMessage(displayName(localized(dialogCourse, language), t.thisCourse))}
           confirmLabel={joining ? t.joining : t.join}
           onCancel={closeDialog}
           onConfirm={() => dialogCourse && join(dialogCourse)}

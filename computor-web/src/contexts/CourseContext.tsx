@@ -4,6 +4,8 @@ import { createContext, useCallback, useContext, useMemo, type ReactNode } from 
 import { usePathname } from 'next/navigation';
 import { useResource } from '@/src/hooks/useResource';
 import { displayName } from '@/src/utils/displayName';
+import { localized } from '@/src/utils/localizedText';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import type { CourseGet } from 'types/generated';
 
@@ -68,16 +70,17 @@ export function CourseProvider({ children }: { children: ReactNode }) {
   // A stale course from the previously-visited course must never leak into the
   // next one's header, so gate the value on the id the route currently names.
   const course = courseId && data?.id === courseId ? data : null;
+  const language = useUiLanguage();
 
   const value = useMemo<CourseContextValue>(
     () => ({
       courseId,
       course,
       loading: courseId != null && loading,
-      courseName: displayName(course, 'Course'),
+      courseName: displayName(localized(course, language), 'Course'),
       reload,
     }),
-    [courseId, course, loading, reload],
+    [courseId, course, loading, reload, language],
   );
 
   return <CourseContext.Provider value={value}>{children}</CourseContext.Provider>;
@@ -97,8 +100,9 @@ export function useCourse(): CourseContextValue {
  */
 export function useCourseName(courseId?: string, fallback = 'Course'): string {
   const { course } = useCourse();
+  const language = useUiLanguage();
   const match = courseId == null || course?.id === courseId;
-  return match ? displayName(course, fallback) : fallback;
+  return match ? displayName(localized(course, language), fallback) : fallback;
 }
 
 /** Stable no-op-safe reload, for a page that mutates the course. */
