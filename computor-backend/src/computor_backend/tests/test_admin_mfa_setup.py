@@ -46,7 +46,8 @@ class FakeKeycloak:
     def __init__(self, legacy=False):
         self.ids = itertools.count(1)
         self.flows, self.execs, self.configs = {}, {}, {}
-        self.realm = {"browserFlow": "browser", "resetCredentialsFlow": "reset credentials"}
+        self.realm = {"browserFlow": "browser", "resetCredentialsFlow": "reset credentials",
+                      "ssoSessionMaxLifespan": 36000, "ssoSessionMaxLifespanRememberMe": 0}
         self.roles, self.group_roles = {}, []
         self.totp_action = {"alias": "CONFIGURE_TOTP", "enabled": False}
         self.mappers = []
@@ -238,6 +239,7 @@ class FakeKeycloak:
                 return 200, shown
             owner = next(e for e in self.execs.values() if e["config"] == parts[2])
             self._touch(owner["parent"])
+            config["alias"] = body["alias"]  # Keycloak takes the alias of a PUT as well
             config["config"] = dict(body["config"])
             return 204, None
         if sub == "executions":
@@ -420,6 +422,48 @@ def test_configure_enforces_and_is_idempotent(monkeypatch, legacy):
     assert fake.writes == writes, "a re-run of a configured realm must only read"
 
 
+def _otp_configs(fake):
+    """(alias, maxAge) of every config that records the amr reference ``otp``."""
+    return sorted((c["alias"], c["config"].get("default.reference.maxAge")) for c in fake.configs.values()
+                  if c["config"].get("default.reference.value") == "otp")
+
+
+@pytest.mark.parametrize("lifespans, max_age", [
+    ({}, "36000"),
+    ({"ssoSessionMaxLifespan": 36000, "ssoSessionMaxLifespanRememberMe": 0}, "36000"),
+    ({"ssoSessionMaxLifespan": 36000, "ssoSessionMaxLifespanRememberMe": 2592000}, "2592000"),
+], ids=["keycloak-default", "no-remember-me-lifespan", "remember-me-longer"])
+def test_otp_evidence_lasts_the_longest_sso_session(monkeypatch, lifespans, max_age):
+    """With maxAge 0, amr "otp" lasted the second the code was entered (AUTHZ_007, 2026-10-29)."""
+    fake = FakeKeycloak()
+    for key in ("ssoSessionMaxLifespan", "ssoSessionMaxLifespanRememberMe"):
+        fake.realm.pop(key)
+    fake.realm.update(lifespans)
+    _install(monkeypatch, fake)
+    assert _configure()["amrMaxAge"] == int(max_age)
+    configs = _otp_configs(fake)
+    assert len(configs) == 2, configs
+    assert all(age == max_age and alias.endswith("-amr" + max_age) for alias, age in configs), configs
+
+
+def test_realm_configured_with_max_age_zero_is_repaired_once(monkeypatch, legacy):
+    """A realm set up before the fix gets the maxAge in place: one PUT per OTP step, then reads only."""
+    fake, _ = _reference(monkeypatch, legacy)
+    configured = fake.shape()
+    for config in fake.configs.values():
+        if config["config"].get("default.reference.value") == "otp":
+            config["config"]["default.reference.maxAge"] = "0"
+            config["alias"] = config["alias"].rsplit("-amr", 1)[0]
+    writes, fake.bound_edits = fake.writes, []
+    _configure()
+    assert fake.writes - writes == 2
+    assert sorted(fake.bound_edits) == sorted([setup_mfa.BROWSER_FLOW, setup_mfa.RESET_FLOW])
+    assert fake.shape() == configured and fake.behaviour() == CONFIGURED
+    writes = fake.writes
+    _configure()
+    assert fake.writes == writes, "a re-run of a repaired realm must only read"
+
+
 def _call_count(monkeypatch, legacy, action):
     fake = FakeKeycloak(legacy)
     _install(monkeypatch, fake)
@@ -506,7 +550,7 @@ def test_rollback_strips_in_place_edits_of_earlier_revisions(monkeypatch):
     sub = fake._flow(setup_mfa.RESET_SUBFLOW, top=False)
     fake._exec(reset["id"], "CONDITIONAL", subflow=sub)
     fake._exec(sub, "REQUIRED", "conditional-user-role", config={"condUserRole": ROLE, "negate": "false"})
-    fake._exec(sub, "REQUIRED", "auth-otp-form", config=setup_mfa.AMR_OTP)
+    fake._exec(sub, "REQUIRED", "auth-otp-form", config=setup_mfa.amr_otp(0))
     result = _rollback()
     assert result["strippedExecutions"] == {"legacy reset": 2}
     assert fake.shape() == original_shape

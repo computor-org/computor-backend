@@ -11,7 +11,9 @@ against Keycloak 26.7.4 (ops/keycloak/test_mfa_live.py): the mapper lists the
 session and nothing for executions without one, so setup_mfa.py gives the
 role-gated OTP executions the reference ``otp``. A password+OTP login yields
 ``["otp"]``, which survives SSO-cookie re-authentication and refresh-token
-grants of that session. The login that enrols an authenticator through the
+grants of that session as long as the execution's ``default.reference.maxAge``
+covers it: setup_mfa.py sets the realm's longest SSO session lifespan. With 0
+the evidence lasted only the second of the login. The login that enrols an authenticator through the
 CONFIGURE_TOTP required action yields ``[]``: the user signs in once more with
 the new code. ``acr`` is not used: without an ACR-to-LoA map it only says
 whether the login was interactive (``1``) or by cookie (``0``).
