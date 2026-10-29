@@ -990,12 +990,14 @@ test.describe('launch interface language', () => {
       expect(launchRequests).toEqual([{ course_id: COURSE_A, ui_language: profileLanguage ?? 'de' }]);
     });
   }
-  test('an explicit browser interface choice wins over browser locale for Automatic', async ({ page }) => {
+  // Asserted 'en' before: a choice stored on a signed-out page pinned the
+  // signed-in app, so "Automatic" did not follow the browser (computor-org/issues#534).
+  test('a choice stored on a signed-out page does not override the browser for Automatic', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('computor.language', 'en'));
     const { launchRequests } = await setup(page, [details({ status: 'running', ready: true })]);
     await page.goto(`/workspaces/launch?owner=u-me&name=code&courseId=${COURSE_A}`);
     await page.waitForURL(WORKSPACE_URL);
-    expect(launchRequests).toEqual([{ course_id: COURSE_A, ui_language: 'en' }]);
+    expect(launchRequests).toEqual([{ course_id: COURSE_A, ui_language: 'de' }]);
   });
 });
 

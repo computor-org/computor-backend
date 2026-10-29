@@ -389,3 +389,20 @@ async def test_login_passes_explicit_language_to_identity_provider(language, act
     assert query["ui_locales"] == [language]
     stored = json.loads(redis.data[f"sso_state:{query['state'][0]}"])
     assert stored["ui_locales"] == language
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("explicit", [None, "1"])
+async def test_login_keeps_the_explicit_language_flag_ours(explicit):
+    """``explicit_language`` says what the backend may store; Keycloak never sees it."""
+    redis = _Redis()
+    with patch.object(auth, "get_plugin_registry", return_value=_registry()), \
+         patch("computor_backend.redis_cache.get_redis_client", AsyncMock(return_value=redis)):
+        response = await auth.initiate_login(
+            "keycloak", "/auth/success", _request(), ui_locales="de", explicit_language=explicit,
+        )
+    query = parse_qs(urlsplit(response.headers["location"]).query)
+    assert query["ui_locales"] == ["de"]
+    assert "explicit_language" not in query
+    stored = json.loads(redis.data[f"sso_state:{query['state'][0]}"])
+    assert stored["explicit_language"] == explicit

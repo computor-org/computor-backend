@@ -37,6 +37,8 @@ export interface AuthUser {
   systemRoles: string[];
   /** Profile language the user chose (ISO 639-1); empty means none chosen. */
   language?: string | null;
+  /** Reading language GET /user resolved from the profile and Accept-Language. */
+  effectiveLanguage?: 'de' | 'en' | null;
   /** When the account was created (ISO timestamp); decides the terms notice. */
   createdAt?: string | null;
 }

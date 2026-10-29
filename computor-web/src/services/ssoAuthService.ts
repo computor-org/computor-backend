@@ -1,4 +1,8 @@
-import { getUiLanguage, setUiLanguage } from '@/src/hooks/useBrowserLanguage';
+import {
+  clearUiLanguage,
+  getUiLanguage,
+  hasExplicitUiLanguage,
+} from '@/src/hooks/useBrowserLanguage';
 import { AuthResponse, AuthUser } from '@/src/types/auth';
 import { ISSOAuthProvider } from '@/src/interfaces/IAuthProvider';
 import { UserGet } from '@/src/generated/types/users';
@@ -32,10 +36,9 @@ export class SSOAuthService implements ISSOAuthProvider {
   }
 
   private saveSession(user: AuthUser, views: string[]): void {
+    // The profile language stays out of the signed-out preference, or
+    // "Automatic" would keep it (computor-org/issues#534).
     saveStoredSession('sso', user, views);
-    if (user.language?.trim()) {
-      setUiLanguage(user.language.trim().toLowerCase() === 'de' ? 'de' : 'en');
-    }
     this.currentUser = user;
     this.currentViews = views;
   }
@@ -54,10 +57,15 @@ export class SSOAuthService implements ISSOAuthProvider {
     return this.currentUser;
   }
 
-  /** Record a profile language change in the cached user. */
+  /**
+   * Record a profile language change in the cached user. Automatic also drops
+   * any signed-out choice, so nothing keeps pinning the interface.
+   */
   setCachedLanguage(language: string | null): AuthUser | null {
     if (!this.currentUser) return null;
-    this.saveSession({ ...this.currentUser, language }, this.currentViews);
+    // The resolved language is stale until the next GET /user.
+    this.saveSession({ ...this.currentUser, language, effectiveLanguage: null }, this.currentViews);
+    if (!language) clearUiLanguage();
     return this.currentUser;
   }
 
@@ -86,6 +94,10 @@ export class SSOAuthService implements ISSOAuthProvider {
     const params = new URLSearchParams({
       ...extraParams,
       ui_locales: language,
+      // Marks a choice the visitor made on a signed-out page, as opposed to the
+      // browser-derived ui_locales: only this one becomes the profile language
+      // when the login creates the account (computor-org/issues#534).
+      ...(hasExplicitUiLanguage() ? { explicit_language: '1' } : {}),
       redirect_uri: frontendCallbackUrl
     });
 
@@ -162,6 +174,9 @@ export class SSOAuthService implements ISSOAuthProvider {
       role: determineRole(roleIds, views),
       systemRoles: roleIds,
       language: userInfo.profile?.language_code || null,
+      effectiveLanguage: userInfo.effective_language === 'de' || userInfo.effective_language === 'en'
+        ? userInfo.effective_language
+        : null,
       createdAt: userInfo.created_at || null,
     };
   }

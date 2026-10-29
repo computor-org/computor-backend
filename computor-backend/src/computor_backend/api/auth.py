@@ -182,6 +182,10 @@ async def initiate_login(
         pattern="^(de|en)$",
         description="Explicit interface language for the identity provider",
     )] = None,
+    explicit_language: Annotated[Optional[str], Query(
+        pattern="^1$",
+        description="Set by the web app only when the visitor chose a language on a signed-out page",
+    )] = None,
     idp_hint: Annotated[Optional[str], Query(
         pattern="^[A-Za-z0-9_-]{1,64}$",
         description="Keycloak identity provider alias to go straight to (kc_idp_hint)",
@@ -230,6 +234,9 @@ async def initiate_login(
         "timestamp": str(request.headers.get("date", "")),
         "invite_code": invite,
         "ui_locales": ui_locales,
+        # Server-side state only (Keycloak has no such parameter); a first
+        # login stores a profile language only with it.
+        "explicit_language": explicit_language,
     }
     await redis_client.set(
         f"sso_state:{state}",
