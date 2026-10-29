@@ -15,9 +15,32 @@ import logging
 from computor_backend.exceptions.exceptions import ComputorException, BadRequestException, InternalServerException
 from computor_backend.settings import settings
 from computor_backend.public_luna_privacy import is_public_luna_scope
+from computor_backend.exceptions.localization import localize_message, localize_title, request_language
 
 
 logger = logging.getLogger(__name__)
+
+
+def _localize(request: Request, response_data: dict, error_code) -> dict:
+    """Put ``message`` in the reader's language; keep the English beside it."""
+    from computor_backend.exceptions.error_registry import get_error_definition
+
+    english = response_data.get("message")
+    if not isinstance(english, str):
+        return response_data
+    definition = get_error_definition(error_code) if error_code else None
+    language = request_language(request)
+    response_data["message"] = localize_message(
+        english, error_code, definition.message.plain if definition else None, language
+    )
+    response_data["message_en"] = english
+    title = localize_title(
+        definition.title if definition and definition.code != "UNKNOWN" else None,
+        error_code, language,
+    )
+    if title:
+        response_data["title"] = title
+    return response_data
 
 
 async def computor_exception_handler(request: Request, exc: ComputorException) -> JSONResponse:
@@ -71,6 +94,8 @@ async def computor_exception_handler(request: Request, exc: ComputorException) -
         # Valid codes follow pattern: AUTH_001, VAL_001, etc.
         if error_response.error_code and "_" in error_response.error_code and error_response.error_code.split("_")[0].isupper():
             response_data["error_code"] = error_response.error_code
+
+        response_data = _localize(request, response_data, error_response.error_code)
 
     # NEVER include debug info by default (security risk)
     # Only include if explicitly enabled AND in development mode
@@ -141,6 +166,8 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     # Only include error_code if it's a valid code
     if error_response.error_code and "_" in error_response.error_code and error_response.error_code.split("_")[0].isupper():
         response_data["error_code"] = error_response.error_code
+
+    response_data = _localize(request, response_data, error_response.error_code)
 
     # Include validation errors in details for client to fix
     if errors:
@@ -264,6 +291,8 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
     # Only include error_code if it's a valid code
     if error_response.error_code and "_" in error_response.error_code and error_response.error_code.split("_")[0].isupper():
         response_data["error_code"] = error_response.error_code
+
+    response_data = _localize(request, response_data, error_response.error_code)
 
     # NEVER include debug info (security risk)
 

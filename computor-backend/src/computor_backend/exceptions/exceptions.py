@@ -146,6 +146,9 @@ class ComputorException(HTTPException):
         # Initialize parent HTTPException
         # The actual status_code and detail will be set by subclasses
         super().__init__(status_code=500, detail=detail, headers=headers)
+        # Starlette fills a missing detail with the phrase of status 500
+        # ("Internal Server Error"), which would replace the registry message.
+        self.detail = detail
 
     def to_error_response(self, include_debug: bool = False) -> ErrorResponse:
         """
