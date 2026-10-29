@@ -150,7 +150,9 @@ def _request(withheld):
     if withheld:
         state.mfa_withheld_roles = withheld
     return SimpleNamespace(state=state, method="GET", url=SimpleNamespace(path="/x"),
-                           scope={"type": "http", "path": "/x"}, client=None, headers={})
+                           scope={"type": "http", "path": "/x"}, client=None,
+                           # A request without the header reads German; these assert English text.
+                           headers={"Accept-Language": "en"})
 
 
 @pytest.mark.asyncio

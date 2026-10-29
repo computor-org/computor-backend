@@ -8,6 +8,7 @@ import logging
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from computor_backend.exceptions.localization import localize_message, scope_language
 from computor_backend.storage_config import MAX_UPLOAD_SIZE, format_bytes
 
 logger = logging.getLogger(__name__)
@@ -31,14 +32,18 @@ class UploadSizeLimiterMiddleware:
         # Add buffer for form metadata (1MB)
         self.max_total_size = max_size + (1 * 1024 * 1024)
 
-    def _too_large(self, received: int, limit: int) -> JSONResponse:
+    def _too_large(self, received: int, limit: int, scope: Scope) -> JSONResponse:
+        english = (
+            f"Request body too large. Maximum allowed size is {format_bytes(limit)} "
+            f"(received {format_bytes(received)})"
+        )
         return JSONResponse(
             status_code=413,  # Payload Too Large
             content={
-                "detail": {
-                    "error": f"Request body too large. Maximum allowed size is {format_bytes(limit)} "
-                            f"(received {format_bytes(received)})"
-                }
+                "detail": {"error": english},
+                # Clients show `message`; `detail` stays for old callers.
+                "message": localize_message(english, None, None, scope_language(scope)),
+                "message_en": english,
             }
         )
 
@@ -68,7 +73,7 @@ class UploadSizeLimiterMiddleware:
         content_length = dict(scope.get("headers", [])).get(b"content-length")
         if content_length and content_length.isdigit() and int(content_length) > limit:
             self._log(scope, int(content_length), limit)
-            await self._too_large(int(content_length), limit)(scope, receive, send)
+            await self._too_large(int(content_length), limit, scope)(scope, receive, send)
             return
 
         # The header can be absent (chunked transfer) or wrong, so also count
@@ -91,7 +96,7 @@ class UploadSizeLimiterMiddleware:
                     self._log(scope, received, limit)
                     rejected = True
                     if not response_started:
-                        await self._too_large(received, limit)(scope, receive, send)
+                        await self._too_large(received, limit, scope)(scope, receive, send)
                     return {"type": "http.disconnect"}
             return message
 

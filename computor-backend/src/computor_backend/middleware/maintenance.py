@@ -15,6 +15,8 @@ from typing import Optional, Tuple
 from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.responses import JSONResponse
 
+from computor_backend.exceptions.localization import localize_message, scope_language
+
 logger = logging.getLogger(__name__)
 
 REDIS_KEY_STATE = "maintenance:state"
@@ -34,6 +36,7 @@ EXEMPT_PATHS_EXACT = (
 
 # Read-only HTTP methods that pass through during maintenance
 READONLY_METHODS = ("GET", "HEAD", "OPTIONS")
+MAINTENANCE_DEFAULT = "The system is currently under maintenance. Read-only access is available."
 
 
 class MaintenanceMiddleware:
@@ -97,7 +100,9 @@ class MaintenanceMiddleware:
             content={
                 "error_code": "MAINT_001",
                 "detail": "Service is under maintenance",
-                "message": message or "The system is currently under maintenance. Read-only access is available.",
+                "message": message or localize_message(
+                    MAINTENANCE_DEFAULT, "MAINT_001", None, scope_language(scope)
+                ),
                 "maintenance": True,
             },
             headers={

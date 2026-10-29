@@ -559,9 +559,12 @@ def parse_authorization_header(request: Request) -> Optional[SSOAuthCredentials 
 
 
 def _note_withheld_roles(request: Optional[Request], principal: Principal) -> Principal:
-    """Let the 403 handler explain withheld roles (exceptions/error_handlers.py)."""
+    """Note what the error handlers need about the caller (exceptions/error_handlers.py)."""
     if request is not None and principal.withheld_roles:
         request.state.mfa_withheld_roles = list(principal.withheld_roles)
+    if request is not None and principal.user_id:
+        # Error responses are written in this user's profile language.
+        request.state.user_id = principal.user_id
     return principal
 
 

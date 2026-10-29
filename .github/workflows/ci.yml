@@ -52,6 +52,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_keycloak_token_verification.py
           computor-backend/src/computor_backend/tests/test_keycloak_logout.py
           computor-backend/src/computor_backend/tests/test_admin_mfa.py
+          computor-backend/src/computor_backend/tests/test_error_localization.py
           computor-backend/src/computor_backend/tests/test_admin_mfa_setup.py
           computor-backend/src/computor_backend/tests/test_keycloak_abuse_setup.py
           computor-backend/src/computor_backend/tests/test_log_redaction.py
