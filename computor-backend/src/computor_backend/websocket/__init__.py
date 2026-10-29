@@ -11,6 +11,8 @@ Current features:
 - Messaging: real-time message events, typing indicators, read receipts
 - Deployments: deployment status change, assignment, and unassignment events
 - Course: course content mutation events
+- Profile: per-user profile change events on the auto-subscribed user inbox
+- Submissions: submission-group status, result and grading events
 """
 
 from computor_backend.websocket.connection_manager import ConnectionManager, manager, ws_metrics
@@ -21,6 +23,8 @@ from computor_backend.websocket.event_publisher import (
     publish_deployment_unassigned,
     publish_course_content_updated,
     publish_course_updated,
+    publish_user_profile_updated,
+    publish_submission_group_updated,
 )
 
 __all__ = [
@@ -35,4 +39,6 @@ __all__ = [
     "publish_deployment_unassigned",
     "publish_course_content_updated",
     "publish_course_updated",
+    "publish_user_profile_updated",
+    "publish_submission_group_updated",
 ]

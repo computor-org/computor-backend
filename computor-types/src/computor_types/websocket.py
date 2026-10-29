@@ -13,6 +13,8 @@ Namespaces:
 - maintenance: Maintenance mode notifications (activated, deactivated, scheduled, cancelled)
 - deployment: Deployment state change notifications (status_changed, assigned, unassigned)
 - course: Course-level mutation notifications (content_updated)
+- user: Per-user notifications on the auto-subscribed ``user:<id>`` inbox (profile_updated)
+- submission_group: Submission status, test result and grading changes (updated), sent to the group's members only
 """
 
 from pydantic import BaseModel, Field
@@ -309,6 +311,48 @@ class WSCourseUpdated(WSEventBase):
 
 
 # =============================================================================
+# User Events (Server -> Client)
+# =============================================================================
+
+class WSUserProfileUpdated(WSEventBase):
+    """The user's own profile changed.
+
+    Rides the ``user:{user_id}`` inbox channel every connection auto-subscribes
+    to, so no extra subscription is needed. Sent when a stored profile field
+    such as the reading language changes, so open clients (web tabs, the VS
+    Code extension) can pick it up without a manual refresh.
+    """
+    type: Literal["user:profile_updated"] = "user:profile_updated"
+    channel: str = Field(..., description="Channel (user:{user_id})")
+    user_id: str = Field(..., description="ID of the user whose profile changed")
+    language_code: Optional[str] = Field(None, description="New profile reading language (ISO 639-1), null for automatic")
+    timestamp: str = Field(..., description="ISO8601 timestamp of the event")
+
+
+# =============================================================================
+# Submission Group Events (Server -> Client)
+# =============================================================================
+
+class WSSubmissionGroupUpdated(WSEventBase):
+    """A submission group's status, test result or grading changed.
+
+    Sent on ``submission_group:{submission_group_id}`` and on the
+    auto-subscribed ``user:{user_id}`` inbox of every group member, never on
+    the course channel, since it carries the grading. Only the field that
+    changed is non-null; the ids tell the client which assignment to refetch.
+    """
+    type: Literal["submission_group:updated"] = "submission_group:updated"
+    channel: str = Field(..., description="Channel (submission_group:{submission_group_id} or user:{user_id})")
+    course_id: str = Field(..., description="ID of the course")
+    course_content_id: str = Field(..., description="ID of the course content")
+    submission_group_id: str = Field(..., description="ID of the submission group")
+    status: Optional[str] = Field(None, description="New submission status slug (submitted, not_submitted), null when unchanged")
+    result: Optional[str] = Field(None, description="New test-result status slug (finished, failed, ...), null when unchanged")
+    grading: Optional[float] = Field(None, description="New grading value (0.0-1.0), null when unchanged")
+    timestamp: str = Field(..., description="ISO8601 timestamp of the event")
+
+
+# =============================================================================
 # Union Types for Parsing
 # =============================================================================
 
@@ -348,6 +392,8 @@ ServerEvent = Union[
     WSDeploymentUnassigned,
     WSCourseContentUpdated,
     WSCourseUpdated,
+    WSUserProfileUpdated,
+    WSSubmissionGroupUpdated,
 ]
 
 

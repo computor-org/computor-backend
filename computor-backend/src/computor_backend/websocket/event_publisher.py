@@ -295,3 +295,70 @@ def publish_course_updated(
         "change_type": change_type,
         "timestamp": _now_iso(),
     })
+
+
+def publish_user_profile_updated(
+    user_id: str,
+    language_code: Optional[str] = None,
+) -> None:
+    """
+    Broadcast that a user's own profile changed (issue #554).
+
+    Call AFTER db.commit() succeeds. Rides the ``user:<id>`` inbox channel
+    every connection auto-subscribes to (see connection_manager), so open
+    clients pick up a reading-language change without a manual refresh.
+
+    Args:
+        user_id: User UUID string
+        language_code: New profile reading language (ISO 639-1), None for automatic
+    """
+    channel = f"user:{user_id}"
+    _publish_event(channel, "user:profile_updated", {
+        "channel": channel,
+        "user_id": user_id,
+        "language_code": language_code,
+        "timestamp": _now_iso(),
+    })
+
+
+def publish_submission_group_updated(
+    course_id: str,
+    course_content_id: str,
+    submission_group_id: str,
+    user_ids: list[str],
+    status: Optional[str] = None,
+    result: Optional[str] = None,
+    grading: Optional[float] = None,
+) -> None:
+    """
+    Broadcast that a submission group's status, test result or grading changed.
+
+    Call AFTER db.commit() succeeds; the writing repository has already
+    invalidated the affected caches by then.
+
+    Sent on the ``submission_group:<id>`` scope channel and on the
+    ``user:<id>`` inbox of every group member. Not on ``course:<id>``: every
+    course member may subscribe there, and the payload carries the grading.
+
+    Args:
+        course_id: Course UUID string
+        course_content_id: CourseContent UUID string
+        submission_group_id: SubmissionGroup UUID string
+        user_ids: User UUID strings of the group's members
+        status: New submission status ("submitted", "not_submitted"), None if unchanged
+        result: New test-result status ("finished", "failed", ...), None if unchanged
+        grading: New grading value (0.0-1.0), None if unchanged
+    """
+    channels = [f"submission_group:{submission_group_id}"]
+    channels += [f"user:{user_id}" for user_id in user_ids]
+    for channel in channels:
+        _publish_event(channel, "submission_group:updated", {
+            "channel": channel,
+            "course_id": course_id,
+            "course_content_id": course_content_id,
+            "submission_group_id": submission_group_id,
+            "status": status,
+            "result": result,
+            "grading": grading,
+            "timestamp": _now_iso(),
+        })

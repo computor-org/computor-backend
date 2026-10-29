@@ -27,13 +27,14 @@ from computor_types.results import (
     ResultQuery,
 )
 from computor_backend.interfaces.result import ResultInterface
-from computor_types.tasks import TaskStatus
+from computor_types.tasks import TaskStatus, map_int_to_task_status
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.repositories.result import ResultRepository
 
 # Import business logic
 from computor_backend.business_logic.results import get_result_status
+from computor_backend.business_logic.submissions import announce_submission_group_updated
 
 result_router = APIRouter(prefix="/results", tags=["results"])
 
@@ -149,6 +150,12 @@ async def update_result(
     # Use repository for cache-aware update (triggers invalidation)
     # Pass the entity directly to avoid re-querying
     result = result_repo.update_entity(db_result, updates)
+
+    if updates.get('status') is not None and result.submission_group_id:
+        announce_submission_group_updated(
+            db, result.submission_group_id,
+            result=map_int_to_task_status(result.status).value,
+        )
 
     # Fetch result_json from MinIO for response
     from computor_backend.services.result_storage import retrieve_result_json

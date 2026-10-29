@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, contains_eager, joinedload, selectinload
 from sqlalchemy.orm.attributes import set_committed_value
 
 from computor_backend.business_logic.submission_limits import resolve_limits
+from computor_backend.business_logic.submissions import announce_submission_group_updated
 from computor_backend.exceptions import BadRequestException, ForbiddenException, NotFoundException
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.principal import Principal, allowed_course_role_ids
@@ -202,6 +203,7 @@ async def update_tutor_course_content_grade(
         submission_grade_repo.create(new_grading)
 
         logger.info(f"Created grade for artifact {artifact_to_grade.id} by grader {grader_cm.id}")
+        announce_submission_group_updated(db, submission_group.id, grading=grade)
 
         # CRITICAL: Invalidate student view cache so students see the new grade
         if cache:
