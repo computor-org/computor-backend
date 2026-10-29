@@ -28,7 +28,7 @@ services:
   # Docker-provider command flags and socket access live in dev/prod overlays:
   # dev mounts the socket directly; prod proxies it via tecnativa/docker-socket-proxy.
   traefik:
-    image: traefik:v3.7.13@sha256:24841fe2de7304c149343d877d2923b4c8800a38ba015dea9174c23b20e344a0
+    image: traefik:v3.7.15@sha256:0f6150202bc1fed72a7bd2107460eaa510e5b8a905f3fdb5b84f2c8619c33368
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
@@ -52,7 +52,7 @@ services:
 
   # PostgreSQL with multiple databases support
   postgres:
-    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
+    image: postgres:18.4@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
@@ -119,7 +119,7 @@ services:
 
   # Temporal PostgreSQL database
   temporal-postgres:
-    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
+    image: postgres:18.4@sha256:a02db8cac496f15b094798a38254f14d6e00741f709360e5e00bb6668ea31636
     security_opt:
       - "no-new-privileges:true"
     logging:
@@ -189,7 +189,7 @@ services:
   # /data once (top level last, so an interrupted run is simply repeated) and
   # is a no-op afterwards. Same pinned image, run as root, only for chown.
   minio-init:
-    image: cgr.dev/chainguard/minio:latest@sha256:71674988a1c7ddd5724928633199152b11e4ddefd6c6ce2d60772ff4a8f22ca9
+    image: cgr.dev/chainguard/minio:latest@sha256:0dab2f9fee1c1139ae8753b5e35bb4461af2a276cfe0923a2504c75a6170bc64
     security_opt:
       - "no-new-privileges:true"
     network_mode: none
@@ -223,7 +223,7 @@ services:
     # github.com/chainguard-images/images. Runs as uid 65532 (see minio-init);
     # entrypoint is the minio binary, so `command` is unchanged. `mc` ships in
     # the image, so the `mc ready local` healthcheck keeps working.
-    image: cgr.dev/chainguard/minio:latest@sha256:71674988a1c7ddd5724928633199152b11e4ddefd6c6ce2d60772ff4a8f22ca9
+    image: cgr.dev/chainguard/minio:latest@sha256:0dab2f9fee1c1139ae8753b5e35bb4461af2a276cfe0923a2504c75a6170bc64
     security_opt:
       - "no-new-privileges:true"
     logging:
