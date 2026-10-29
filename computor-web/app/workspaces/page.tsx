@@ -41,7 +41,7 @@ const COPY = {
     checking: 'Coder wird geprüft …',
     healthy: 'Coder läuft',
     unreachable: 'Coder nicht erreichbar',
-    runningOfTotal: (running: number, total: number) => `${running} laufen / ${total} gesamt`,
+    runningOfTotal: (running: number, total: number) => `${running} aktiv / ${total} gesamt`,
     stillWorking: (n: number) =>
       n === 1 ? '1 Arbeitsumgebung ist noch in Arbeit' : `${n} Arbeitsumgebungen sind noch in Arbeit`,
     createHeading: 'Arbeitsumgebung erstellen',

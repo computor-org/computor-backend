@@ -9,13 +9,6 @@
 // arg); unset under `next dev`. The same constant the sidebar footer shows.
 export const WEB_COMMIT = process.env.NEXT_PUBLIC_GIT_COMMIT;
 
-/** A timestamp in the viewer's locale, or null when there isn't one to show. */
-export function stamp(value?: string | null): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleString();
-}
-
 /** "1d 6h", "18m" — coarse on purpose, this is read at a glance. */
 export function duration(seconds: number): string {
   const d = Math.floor(seconds / 86400);
