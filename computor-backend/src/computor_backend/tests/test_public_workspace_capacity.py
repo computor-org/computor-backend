@@ -228,3 +228,22 @@ async def test_real_postgres_serializes_and_persists_reservations(monkeypatch):
         with admin.begin() as conn:
             conn.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
         admin.dispose()
+
+
+@pytest.mark.asyncio
+async def test_reservation_of_a_deleted_workspace_is_released(public):
+    """Deleted after its start was reserved: no build can follow (computor.at, 2026-10-29)."""
+    coder = coder_with_fleet([workspace("alice", "vscode", "b1", WorkspaceBuildStatus.STOPPED)])
+    await capacity.reserve_public_container(coder, "alice", "vscode")
+    assert public.rows == {("alice", "vscode"): "b1"}
+
+    # Started, stopped and deleted without another admission call in between:
+    # the workspace left the inventory before any call saw a newer build.
+    coder.workspaces = []
+    await capacity.reserve_public_container(coder, "alice", "vscode")
+    assert public.rows == {("alice", "vscode"): "-"}
+
+    # A new workspace's reservation stays while Coder may still create it.
+    with pytest.raises(RateLimitException):
+        await capacity.reserve_public_container(coder, "bob", "vscode")
+    assert public.rows == {("alice", "vscode"): "-"}
