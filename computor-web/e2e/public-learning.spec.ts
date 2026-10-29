@@ -15,6 +15,30 @@ async function blockApi(page: Page, calls: string[]) {
   }
 }
 
+const OUTLINE_FILE = 'public/learning/courses/python-beginner.json';
+
+/**
+ * No public course has a welcome item since the beginner course dropped its
+ * Willkommen (issues#546), but the reader still supports one. Tests of that
+ * behaviour add it to the fixture outline, shaped as the build emitted it.
+ */
+function outlineWithWelcome() {
+  const outline = JSON.parse(fs.readFileSync(OUTLINE_FILE, 'utf8'));
+  const item = { id: 'welcome', title: 'Willkommen', description: null, path: 'welcome', parent_path: null,
+    depth: 0, position: 0, kind: 'unit', type_title: 'Einstieg', is_submittable: false };
+  outline.contents.unshift(item);
+  outline.materials.welcome = {
+    id: 'welcome', course_id: COURSE, title: 'Willkommen', description: null, path: 'welcome', kind: 'unit',
+    is_submittable: false, asset_base_url: `/learning/media/${COURSE}/welcome/`, media_files: [],
+    markdown_variants: {
+      de: 'So kommst du zur ersten Abgabe: Öffne Woche 1. Alles steht auch auf der [öffentlichen Kursseite](https://computor.at/learn/python-beginner).',
+      en: 'How to reach your first submission: open week 1. Everything is also on the [public course page](https://computor.at/learn/python-beginner).',
+    },
+  };
+  outline.welcome_content_id = 'welcome';
+  return outline;
+}
+
 test('anonymous reading uses only static files even when the API is unavailable', async ({ page }) => {
   const apiRequests: string[] = [];
   const mutations: string[] = [];
@@ -50,14 +74,31 @@ test('anonymous reading uses only static files even when the API is unavailable'
   expect(mutations).toEqual([]);
 });
 
-test('the course welcome item renders as Markdown in the reader language and is not a week', async ({ page }) => {
+test('the beginner course opens with its description and has no Willkommen item (issues#546)', async ({ page }) => {
+  const { description } = JSON.parse(fs.readFileSync(OUTLINE_FILE, 'utf8'));
+  await page.goto(`/learn/${COURSE}`);
+  await expect(page.getByText('3 weeks · ', { exact: false })).toBeVisible();
+  const intro = page.locator('article section').first();
+  await expect(intro.getByRole('heading', { name: 'Welcome', exact: true })).toBeVisible();
+  await expect(intro.getByText(description.split('\n')[0].trim(), { exact: false })).toBeVisible();
+  await expect(intro.getByRole('link', { name: /Start with Mathematical Constants/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Willkommen' })).toHaveCount(0);
+});
+
+test('a course welcome item renders as Markdown in the reader language and is not a week', async ({ page }) => {
+  const outline = outlineWithWelcome();
+  await page.route('**/learning/courses/python-beginner.json', route => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify(outline),
+  }));
   await page.goto(`/learn/${COURSE}`);
   await expect(page.getByText('3 weeks · ', { exact: false })).toBeVisible();
   const welcome = page.locator('article section').first();
   await expect(welcome.getByRole('heading', { name: 'Welcome', exact: true })).toBeVisible();
   await expect(welcome.getByText(/How to reach your first submission/)).toBeVisible();
   await expect(welcome.getByRole('link', { name: 'public course page' })).toHaveAttribute('href', /\/learn\/python-beginner$/);
-  await expect(welcome.getByText(/lang:|\[public course page\]/)).toHaveCount(0);
+  await expect(welcome.getByText(/\[public course page\]/)).toHaveCount(0);
+  // Not a week: the outline offers it as Welcome, never under its unit title.
+  await expect(page.getByRole('link', { name: 'Willkommen' })).toHaveCount(0);
   // The header's DE/EN switch picks the content language; the card has no second one.
   await expect(welcome.getByRole('button', { name: /^(Deutsch|English)$/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'DE', exact: true }).click();
@@ -223,7 +264,9 @@ test('long inline equations stay inside the mobile reader without clipping their
 for (const scenario of [
   { name: 'learner exercise', staff: false, contentId: MATH },
   { name: 'staff exercise', staff: true, contentId: MATH },
-  { name: 'welcome', staff: false, contentId: 'welcome' },
+  // No 'welcome' content URL: reader pages are static (dynamicParams = false)
+  // and no public course has a welcome item since issues#546. The course root
+  // scenario still hands off from the fixture's welcome item.
   { name: 'unit material', staff: false, contentId: 'week_1' },
   { name: 'week container', staff: false, contentId: 'week_1', container: true },
   { name: 'course root', staff: false, contentId: undefined },
@@ -234,7 +277,7 @@ for (const scenario of [
     const { staff, contentId } = scenario;
     const marker = 'Reader content must stay hidden during handoff';
     const readerUrl = contentId ? `/learn/${COURSE}/content/${contentId}` : `/learn/${COURSE}`;
-    const outline = JSON.parse(fs.readFileSync('public/learning/courses/python-beginner.json', 'utf8'));
+    const outline = outlineWithWelcome();
     outline.course_path = 'authoritative.unrelated_course';
     const selected = contentId ?? 'welcome';
     outline.contents.find((item: { id: string }) => item.id === selected).path = 'unit_exact.item_7';
@@ -319,7 +362,7 @@ test('guest exercise reading retains Markdown and an invalid authenticated hando
 
 for (const contentId of [undefined, MATH]) {
   test(`guest ${contentId ? 'exercise' : 'course root'} sign-in links preserve the authoritative course target`, async ({ page }) => {
-    const outline = JSON.parse(fs.readFileSync('public/learning/courses/python-beginner.json', 'utf8'));
+    const outline = outlineWithWelcome();
     outline.course_path = 'authoritative.unrelated_course';
     outline.contents.find((item: { id: string }) => item.id === MATH).path = 'unit_exact.item_7';
     outline.materials[MATH].path = 'unit_exact.item_7';
