@@ -2,23 +2,24 @@
 
 Terms of Use version 1.7, dated 29 October 2026
 
-[Version 1.7](/terms/en) applies to new accounts from its publication. It
-applies to an existing account only once you expressly accept it at sign-in;
-until then the previous version applies. If you do not agree, we may terminate
-the contract under the previous version with 30 days' notice. Compared with
-version 1.6:
+[Version 1.7](/terms/en) applies to new usage contracts from its publication.
+It applies to an existing usage contract only once you expressly agree to it;
+until then the previous version applies to you. If you do not agree within the
+period stated in section 8, your contract may end. Compared with version 1.6:
 
 - **Changes to these terms:** changes made exclusively to your benefit or
   required by mandatory law apply from publication instead of after 30 days.
   All other changes, including ones that put you only slightly in a worse
-  position, apply only with your express consent. If you do not agree, we may
-  terminate the contract with 30 days' notice; until then you keep using the
-  platform under the previous version (section 8).
+  position, apply only with your express agreement. You agree by replying to
+  our email or by writing to contact@computor.at. If you do not agree within
+  30 days, the contract ends; until then you keep using the platform under the
+  previous version. Section 8 says what then happens to your account and data.
 - **Courses:** teachers decide when a course ends or changes; that is not a
   change of the platform that we announce 30 days in advance (section 5).
 - **Moderation:** in acute danger or obvious abuse, automated tools may take
-  provisional measures, which a human reviews on your request. A human decides
-  on appeals; review by an uninvolved person is dropped (section 4).
+  provisional measures, which a human reviews on your request; that request
+  also counts as an appeal. A human decides on appeals; review by an uninvolved
+  person is dropped (section 4).
 - **More general service description:** the idle time before a workspace stops
   and the features in which AI learning aids answer are no longer fixed in the
   contract (section 2).
