@@ -22,8 +22,11 @@ import GradingStatusBadge, { isGradingVerdict } from '@/src/components/student/g
 import Toolbar from '@/src/components/ui/Toolbar';
 import TreeRow, { TreeRows } from '@/src/components/ui/TreeRow';
 import { formatUsageCompact } from '@/src/utils/limits';
-import { courseProgress } from '@/src/utils/studentProgress';
+import { courseProgress, STUDENT_CONTENTS_REFRESH_MS } from '@/src/utils/studentProgress';
 import { CourseProgressSummary } from '@/src/components/student/CourseProgress';
+import {
+  ASSIGNMENT_STATES, ASSIGNMENT_STATE_COLOR, assignmentState, assignmentStateLabel, unitState,
+} from '@/src/utils/assignmentStatus';
 import type { CourseContentStudentList } from 'types/generated';
 
 const COPY = {
@@ -31,18 +34,19 @@ const COPY = {
     title: 'Aufgaben',
     workspaces: 'Arbeitsumgebungen',
     fetchFailed: 'Kursinhalte konnten nicht geladen werden',
-    subtitle: (units: number, assignments: number) =>
-      `${units} ${units === 1 ? 'Einheit' : 'Einheiten'} · ${assignments} ${assignments === 1 ? 'Aufgabe' : 'Aufgaben'}`,
+    subtitle: (units: number, assignments: number, weekly: boolean) =>
+      `${units} ${weekly ? (units === 1 ? 'Woche' : 'Wochen') : (units === 1 ? 'Einheit' : 'Einheiten')} · ${assignments} ${assignments === 1 ? 'Aufgabe' : 'Aufgaben'}`,
     emptyTitle: 'Noch keine Aufgaben',
     emptyDescription: 'Aufgaben erscheinen hier, sobald deine Lehrenden sie veröffentlichen.',
     collapseAll: 'Alle einklappen',
     expandAll: 'Alle ausklappen',
+    assignments: (n: number) => (n === 1 ? '1 Aufgabe' : `${n} Aufgaben`),
     items: (n: number) => (n === 1 ? '1 Element' : `${n} Elemente`),
     unitProgress: (s: number, n: number) => `${s}/${n} eingereicht`,
-    unitProgressTitle: (s: number, n: number) => `${s} von ${n} Aufgaben dieser Einheit eingereicht`,
+    unitProgressTitle: (s: number, n: number, weekly: boolean) => `${s} von ${n} Aufgaben ${weekly ? 'dieser Woche' : 'dieser Einheit'} eingereicht`,
     submitted: 'Eingereicht',
     notSubmitted: 'Nicht eingereicht',
-    usageTitle: 'Testläufe und Abgaben im Verhältnis zu deinem Kontingent',
+    usageTitle: 'T: Testläufe, A: Abgaben, jeweils verbraucht im Verhältnis zum Kontingent',
     testsSuffix: 'T',
     submissionsSuffix: 'A',
     latestResult: 'Letztes Testergebnis',
@@ -50,22 +54,25 @@ const COPY = {
     open: 'Öffnen',
     results: 'Ergebnisse',
     targetUnavailable: 'Dieser Inhalt ist in diesem Kurs nicht verfügbar.',
+    legend: 'Legende',
   },
   en: {
     title: 'Assignments',
     workspaces: 'Workspaces',
     fetchFailed: 'Failed to fetch course contents',
-    subtitle: (units: number, assignments: number) => `${units} units · ${assignments} assignments`,
+    subtitle: (units: number, assignments: number, weekly: boolean) =>
+      `${units} ${weekly ? (units === 1 ? 'week' : 'weeks') : (units === 1 ? 'unit' : 'units')} · ${assignments} ${assignments === 1 ? 'assignment' : 'assignments'}`,
     emptyTitle: 'No assignments yet',
     emptyDescription: 'Assignments will appear here once they are published by your instructor.',
     collapseAll: 'Collapse all',
     expandAll: 'Expand all',
+    assignments: (n: number) => `${n} ${n === 1 ? 'assignment' : 'assignments'}`,
     items: (n: number) => `${n} ${n === 1 ? 'item' : 'items'}`,
     unitProgress: (s: number, n: number) => `${s}/${n} submitted`,
-    unitProgressTitle: (s: number, n: number) => `${s} of ${n} assignments in this unit submitted`,
+    unitProgressTitle: (s: number, n: number, weekly: boolean) => `${s} of ${n} assignments in this ${weekly ? 'week' : 'unit'} submitted`,
     submitted: 'Submitted',
     notSubmitted: 'Not submitted',
-    usageTitle: 'Test runs and submissions used, against your budget',
+    usageTitle: 'T: test runs, S: submissions, each used against the budget',
     testsSuffix: 'T',
     submissionsSuffix: 'S',
     latestResult: 'Latest test result',
@@ -73,6 +80,7 @@ const COPY = {
     open: 'Open',
     results: 'Results',
     targetUnavailable: 'This content is not available in this course.',
+    legend: 'Legend',
   },
 };
 
@@ -99,10 +107,10 @@ export default function StudentCourseContentsPage() {
     courseHasAtLeast(courseId, '_student') && !courseHasAtLeast(courseId, '_tutor');
 
   const { data, loading, error } = useResource(async () => {
-    const response = await apiFetch(`${API_BASE_URL}/students/course-contents?course_id=${courseId}`);
+    const response = await apiFetch(`${API_BASE_URL}/students/course-contents?course_id=${courseId}&localize=${language}`);
     if (!response.ok) throw new Error(t.fetchFailed);
     return (await response.json()) as CourseContentStudentList[];
-  }, [courseId], { refreshOnFocus: true });
+  }, [courseId, language], { refreshOnFocus: true, refetchInterval: STUDENT_CONTENTS_REFRESH_MS });
   const courseContents = useMemo(() => data ?? [], [data]);
 
   const progress = useMemo(() => courseProgress(courseContents), [courseContents]);
@@ -117,6 +125,7 @@ export default function StudentCourseContentsPage() {
   // Staff keep the existing full tree and its expand/collapse controls.
   const { rows, setAllExpanded } = useContentTree(courseContents, {
     synthesiseContainers: true,
+    language,
     ...(isOrdinaryLearner ? { collapseBelowDepth: 0, defaultExpandedPaths: nextGroups } : {}),
   });
   const workspaceAction = isOrdinaryLearner ? (
@@ -131,7 +140,10 @@ export default function StudentCourseContentsPage() {
   const requestedTarget = requestedTargets.length === 1 ? requestedTargets[0] : null;
   const hasRequestedTarget = isOrdinaryLearner && requestedPaths.length > 0;
 
-  const units = courseContents.filter((c) => c.course_content_kind_id === 'unit').length;
+  const unitRows = courseContents.filter((c) => c.course_content_kind_id === 'unit');
+  const units = unitRows.length;
+  // A course whose units are all weeks says so, as /learn does for the same course.
+  const weekly = units > 0 && unitRows.every((c) => c.course_content_type?.slug === 'weekly');
   const assignments = courseContents.filter((c) => c.course_content_kind_id === 'assignment').length;
 
   return (
@@ -140,7 +152,7 @@ export default function StudentCourseContentsPage() {
         <PageHeader
           breadcrumbs={crumbs}
           title={t.title}
-          subtitle={loading ? undefined : t.subtitle(units, assignments)}
+          subtitle={loading ? undefined : t.subtitle(units, assignments, weekly)}
         />
 
         <ErrorBanner>{error}</ErrorBanner>
@@ -181,6 +193,15 @@ export default function StudentCourseContentsPage() {
                   </Button>
                 </Toolbar>}
 
+                <ul aria-label={t.legend} data-testid="status-legend" className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-subtle">
+                  {ASSIGNMENT_STATES.map((state) => (
+                    <li key={state} className="flex items-center gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: ASSIGNMENT_STATE_COLOR[state] }} aria-hidden="true" />
+                      {assignmentStateLabel(state, language)}
+                    </li>
+                  ))}
+                </ul>
+
                 <TreeRows>
                   {rows.map(({ key, item, depth, label, expanded, hasChildren, toggle, childCount }) => {
                     const isAssignment = item?.course_content_kind_id === 'assignment';
@@ -189,6 +210,7 @@ export default function StudentCourseContentsPage() {
                     const hasResults = item && (item.result != null || item.submitted ||
                       item.submission_group?.grading != null || isGradingVerdict(item.status) || (item.unread_message_count ?? 0) > 0 ||
                       (item.result_count ?? 0) > 0 || (item.submission_count ?? 0) > 0);
+                    const state = hasChildren ? unitState(unit) : isAssignment ? assignmentState(item) : undefined;
 
                     return (
                       <TreeRow
@@ -197,8 +219,8 @@ export default function StudentCourseContentsPage() {
                         expandable={hasChildren}
                         expanded={expanded}
                         onToggle={toggle}
-                        markerColor={item?.color}
-                        markerTitle={item?.course_content_type?.slug}
+                        markerColor={state && ASSIGNMENT_STATE_COLOR[state]}
+                        markerTitle={state && assignmentStateLabel(state, language)}
                         label={isOrdinaryLearner && hasChildren ? (
                           <button
                             type="button"
@@ -218,13 +240,14 @@ export default function StudentCourseContentsPage() {
                             <Badge
                               tone={unit.submitted === unit.total ? 'success' : 'muted'}
                               className="shrink-0 tabular-nums"
-                              title={t.unitProgressTitle(unit.submitted, unit.total)}
+                              title={t.unitProgressTitle(unit.submitted, unit.total, weekly)}
                             >
                               {t.unitProgress(unit.submitted, unit.total)}
                             </Badge>
                           ) : (
                             <Badge tone="muted" className="shrink-0">
-                              {t.items(unit?.total ?? childCount)}
+                              {/* A unit with no assignment below it has no progress entry, so its children are counted instead. */}
+                              {unit ? t.assignments(unit.total) : t.items(childCount)}
                             </Badge>
                           )
                         )}

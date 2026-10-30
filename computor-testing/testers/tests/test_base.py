@@ -143,20 +143,21 @@ def _format_array_diff(
     Caller has already verified that ``np.allclose`` (numeric) or
     ``np.array_equal`` (non-numeric) returned False — this only formats.
     """
-    lines = [f"Variable `{name}` differs from expected:"]
+    act, exp = tr("label_actual"), tr("label_expected")
+    lines = [tr("differs", name=name)]
 
     # Shape / dtype
     if actual.shape == expected.shape:
-        lines.append(f"  shape: {actual.shape}")
+        lines.append(f"  {tr('label_shape')}: {actual.shape}")
     else:
-        lines.append(f"  shape: actual={actual.shape}  expected={expected.shape}")
+        lines.append(f"  {tr('label_shape')}: {act}={actual.shape}  {exp}={expected.shape}")
     if actual.dtype == expected.dtype:
-        lines.append(f"  dtype: {actual.dtype}")
+        lines.append(f"  {tr('label_dtype')}: {actual.dtype}")
     else:
-        lines.append(f"  dtype: actual={actual.dtype}  expected={expected.dtype}")
+        lines.append(f"  {tr('label_dtype')}: {act}={actual.dtype}  {exp}={expected.dtype}")
 
     if rel_tol is not None or abs_tol is not None:
-        lines.append(f"  tolerances: rel={rel_tol!r}  abs={abs_tol!r}")
+        lines.append(f"  {tr('label_tolerances')}: rel={rel_tol!r}  abs={abs_tol!r}")
 
     # Only compute element-wise diff when shapes match — otherwise indices
     # are not comparable.
@@ -182,11 +183,11 @@ def _format_array_diff(
             nan_disagree = actual_nan ^ expected_nan
             if np.any(nan_disagree):
                 idxs = list(zip(*np.where(nan_disagree)))[:_MAX_DIFF_SAMPLES]
-                lines.append(f"  NaN disagreement at {len(idxs)}+ positions:")
+                lines.append("  " + tr("nan_disagreement", count=len(idxs)))
                 for idx in idxs:
                     a_val = "NaN" if actual_nan[idx] else _format_scalar(actual_f[idx])
                     e_val = "NaN" if expected_nan[idx] else _format_scalar(expected_f[idx])
-                    lines.append(f"    {idx}: actual={a_val:<14} expected={e_val}")
+                    lines.append(f"    {idx}: {act}={a_val:<14} {exp}={e_val}")
 
             # Where both are finite, compute diffs. If finite values
             # already agree (max diff is 0) we omit these lines —
@@ -201,7 +202,7 @@ def _format_array_diff(
                         int(finite_abs.argmax()), finite_abs.shape
                     )
                     lines.append(
-                        f"  max abs diff: {max_abs:.6g} at index {max_abs_idx}"
+                        "  " + tr("max_abs_diff", value=f"{max_abs:.6g}", index=max_abs_idx)
                     )
 
                     # Relative diff is only meaningful where expected is non-zero.
@@ -215,7 +216,7 @@ def _format_array_diff(
                         max_rel = float(rel.max())
                         max_rel_idx = np.unravel_index(int(rel.argmax()), rel.shape)
                         lines.append(
-                            f"  max rel diff: {max_rel:.6g} at index {max_rel_idx}"
+                            "  " + tr("max_rel_diff", value=f"{max_rel:.6g}", index=max_rel_idx)
                         )
 
             # Mismatching positions sample (numeric closeness)
@@ -230,14 +231,14 @@ def _format_array_diff(
             mismatch_idxs = list(zip(*np.where(mismatch_mask)))
             if mismatch_idxs:
                 shown = mismatch_idxs[:_MAX_DIFF_SAMPLES]
-                lines.append(f"  mismatching elements ({len(mismatch_idxs)} total):")
+                lines.append("  " + tr("mismatching_elements", count=len(mismatch_idxs)))
                 for idx in shown:
                     a_val = _format_scalar(actual_f[idx])
                     e_val = _format_scalar(expected_f[idx])
-                    lines.append(f"    {idx}: actual={a_val:<14} expected={e_val}")
+                    lines.append(f"    {idx}: {act}={a_val:<14} {exp}={e_val}")
                 if len(mismatch_idxs) > len(shown):
                     lines.append(
-                        f"    ... and {len(mismatch_idxs) - len(shown)} more"
+                        "    " + tr("and_more", count=len(mismatch_idxs) - len(shown))
                     )
     else:
         # Non-numeric: show first few unequal element pairs.
@@ -246,14 +247,14 @@ def _format_array_diff(
         shown = ne_idxs[:_MAX_DIFF_SAMPLES]
         if shown:
             lines.append(
-                f"  unequal elements ({len(ne_idxs)} total):"
+                "  " + tr("unequal_elements", count=len(ne_idxs))
             )
             for idx in shown:
                 lines.append(
-                    f"    {idx}: actual={actual[idx]!r:<20} expected={expected[idx]!r}"
+                    f"    {idx}: {act}={actual[idx]!r:<20} {exp}={expected[idx]!r}"
                 )
             if len(ne_idxs) > len(shown):
-                lines.append(f"    ... and {len(ne_idxs) - len(shown)} more")
+                lines.append("    " + tr("and_more", count=len(ne_idxs) - len(shown)))
 
     return "\n".join(lines)
 
@@ -266,17 +267,17 @@ def _format_scalar_diff(
     abs_tol: Optional[float],
 ) -> str:
     """Build a multi-line diff message for two scalars known to differ."""
-    lines = [f"Variable `{name}` differs from expected:"]
-    lines.append(f"  expected: {_format_scalar(expected)}")
-    lines.append(f"  actual:   {_format_scalar(actual)}")
+    lines = [tr("differs", name=name)]
+    lines.append(f"  {tr('label_expected')}: {_format_scalar(expected)}")
+    lines.append(f"  {tr('label_actual')}: {_format_scalar(actual)}")
     try:
         abs_diff = abs(actual - expected)
-        lines.append(f"  abs diff: {_format_scalar(float(abs_diff))}")
+        lines.append(f"  {tr('label_abs_diff')}: {_format_scalar(float(abs_diff))}")
         if expected != 0:
             rel_diff = abs_diff / abs(expected)
-            lines.append(f"  rel diff: {_format_scalar(float(rel_diff))}")
+            lines.append(f"  {tr('label_rel_diff')}: {_format_scalar(float(rel_diff))}")
         if rel_tol is not None or abs_tol is not None:
-            lines.append(f"  tolerances: rel={rel_tol!r}  abs={abs_tol!r}")
+            lines.append(f"  {tr('label_tolerances')}: rel={rel_tol!r}  abs={abs_tol!r}")
     except Exception:  # noqa: BLE001 — never let formatting raise
         pass
     return "\n".join(lines)
@@ -288,7 +289,7 @@ def _clip(s: str, max_len: int = _MAX_STR_LEN) -> str:
     if len(s) <= max_len:
         return s
     head = max_len - 16  # leave room for the "... <N more chars>" tail
-    return s[:head] + f"...<{len(s) - head} more chars>"
+    return s[:head] + tr("more_chars", count=len(s) - head)
 
 
 def _first_diff_index(a: str, b: str) -> Optional[int]:
@@ -309,10 +310,11 @@ def _format_pattern_diff(
     name: str,
 ) -> str:
     """Build a multi-line diff message for the matches/contains/regex paths."""
-    lines = [f"Variable `{name}` failed `{qualification}` check:"]
-    lines.append(f"  pattern: {_clip(pattern)!r}")
-    lines.append(f"  actual:  {_clip(actual_str)!r}")
-    lines.append(f"  lengths: actual={len(actual_str)}  pattern={len(pattern)}")
+    act, pat = tr("label_actual"), tr("label_pattern")
+    lines = [tr("failed_check", name=name, check=qualification)]
+    lines.append(f"  {pat}: {_clip(pattern)!r}")
+    lines.append(f"  {act}: {_clip(actual_str)!r}")
+    lines.append(f"  {tr('label_lengths')}: {act}={len(actual_str)}  {pat}={len(pattern)}")
     if qualification == "matches":
         idx = _first_diff_index(actual_str, pattern)
         if idx is not None:
@@ -320,9 +322,9 @@ def _format_pattern_diff(
             ctx_end_a = min(idx + 8, len(actual_str))
             ctx_end_p = min(idx + 8, len(pattern))
             lines.append(
-                f"  first diff at index {idx}: "
-                f"actual={actual_str[ctx_start:ctx_end_a]!r:<24} "
-                f"pattern={pattern[ctx_start:ctx_end_p]!r}"
+                f"  {tr('first_diff', index=idx)} "
+                f"{act}={actual_str[ctx_start:ctx_end_a]!r:<24} "
+                f"{pat}={pattern[ctx_start:ctx_end_p]!r}"
             )
     return "\n".join(lines)
 
@@ -342,11 +344,11 @@ def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value"):
     abs_tol = abs_tol if abs_tol is not None else 1e-12
 
     if expected is None:
-        assert actual is None, f"Expected None for '{name}', got {type(actual)}"
+        assert actual is None, tr("expected_none", name=name, actual=type(actual))
         return
 
     if actual is None:
-        raise AssertionError(f"Variable '{name}' is None, expected {type(expected)}")
+        raise AssertionError(tr("is_none", name=name, expected=type(expected)))
 
     # Handle numpy arrays
     if isinstance(expected, np.ndarray) or isinstance(actual, np.ndarray):
@@ -354,11 +356,7 @@ def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value"):
         expected = np.asarray(expected)
 
         if actual.shape != expected.shape:
-            msg = (
-                f"Variable `{name}` has wrong shape:\n"
-                f"  expected: {expected.shape}\n"
-                f"  actual:   {actual.shape}"
-            )
+            msg = tr("shape_wrong", name=name, expected=expected.shape, actual=actual.shape)
             hint = _shape_hint(actual.shape, expected.shape)
             if hint:
                 msg += "\n" + hint
@@ -380,7 +378,7 @@ def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value"):
     if isinstance(expected, (int, float)):
         if not isinstance(actual, (int, float)):
             raise AssertionError(
-                f"Type mismatch for '{name}': {type(actual)} vs {type(expected)}"
+                tr("type_mismatch", name=name, actual=type(actual), expected=type(expected))
             )
 
         # NaN handling
@@ -389,11 +387,11 @@ def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value"):
         if actual_nan or expected_nan:
             if actual_nan and expected_nan:
                 return
-            raise AssertionError(
-                f"NaN mismatch for '{name}': "
-                f"actual={'NaN' if actual_nan else actual}, "
-                f"expected={'NaN' if expected_nan else expected}"
-            )
+            raise AssertionError(tr(
+                "nan_mismatch", name=name,
+                actual='NaN' if actual_nan else actual,
+                expected='NaN' if expected_nan else expected,
+            ))
 
         if abs(expected) > 0:
             rel_diff = abs(actual - expected) / abs(expected)
@@ -412,7 +410,7 @@ def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value"):
     if isinstance(expected, complex):
         if not isinstance(actual, complex):
             raise AssertionError(
-                f"Type mismatch for '{name}': {type(actual)} vs {type(expected)}"
+                tr("type_mismatch", name=name, actual=type(actual), expected=type(expected))
             )
         if not (abs(actual.real - expected.real) <= abs_tol and
                 abs(actual.imag - expected.imag) <= abs_tol):
@@ -426,20 +424,21 @@ def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value"):
         if actual != expected:
             actual_str = str(actual)
             idx = _first_diff_index(actual_str, expected)
+            act, exp = tr("label_actual"), tr("label_expected")
             msg = (
-                f"Variable `{name}` differs from expected:\n"
-                f"  expected: {_clip(expected)!r}\n"
-                f"  actual:   {_clip(actual_str)!r}\n"
-                f"  lengths:  actual={len(actual_str)}  expected={len(expected)}"
+                f"{tr('differs', name=name)}\n"
+                f"  {exp}: {_clip(expected)!r}\n"
+                f"  {act}: {_clip(actual_str)!r}\n"
+                f"  {tr('label_lengths')}: {act}={len(actual_str)}  {exp}={len(expected)}"
             )
             if idx is not None:
                 ctx_start = max(idx - 8, 0)
                 ctx_end_a = min(idx + 8, len(actual_str))
                 ctx_end_e = min(idx + 8, len(expected))
                 msg += (
-                    f"\n  first diff at index {idx}: "
-                    f"actual={actual_str[ctx_start:ctx_end_a]!r}  "
-                    f"expected={expected[ctx_start:ctx_end_e]!r}"
+                    f"\n  {tr('first_diff', index=idx)} "
+                    f"{act}={actual_str[ctx_start:ctx_end_a]!r}  "
+                    f"{exp}={expected[ctx_start:ctx_end_e]!r}"
                 )
             raise AssertionError(msg)
         return
@@ -448,16 +447,14 @@ def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value"):
     if isinstance(expected, (list, tuple)):
         if not isinstance(actual, (list, tuple)):
             raise AssertionError(
-                f"Variable `{name}` has wrong type:\n"
-                f"  expected: {type(expected).__name__} (list/tuple)\n"
-                f"  actual:   {type(actual).__name__}"
+                f"{tr('wrong_type', name=name)}\n"
+                f"  {tr('label_expected')}: {type(expected).__name__} (list/tuple)\n"
+                f"  {tr('label_actual')}: {type(actual).__name__}"
             )
 
         if len(actual) != len(expected):
             raise AssertionError(
-                f"Variable `{name}` has wrong length:\n"
-                f"  expected: {len(expected)}\n"
-                f"  actual:   {len(actual)}"
+                tr("length_wrong", name=name, expected=len(expected), actual=len(actual))
             )
 
         for i, (a, e) in enumerate(zip(actual, expected)):
@@ -468,9 +465,9 @@ def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value"):
     if isinstance(expected, dict):
         if not isinstance(actual, dict):
             raise AssertionError(
-                f"Variable `{name}` has wrong type:\n"
-                f"  expected: dict\n"
-                f"  actual:   {type(actual).__name__}"
+                f"{tr('wrong_type', name=name)}\n"
+                f"  {tr('label_expected')}: dict\n"
+                f"  {tr('label_actual')}: {type(actual).__name__}"
             )
 
         actual_keys = set(actual.keys())
@@ -478,11 +475,11 @@ def compare_values(actual, expected, rel_tol=None, abs_tol=None, name="value"):
         if actual_keys != expected_keys:
             missing = expected_keys - actual_keys
             extra = actual_keys - expected_keys
-            msg = [f"Variable `{name}` has wrong keys:"]
+            msg = [tr("wrong_keys", name=name)]
             if missing:
-                msg.append(f"  missing: {sorted(missing)!r}")
+                msg.append(f"  {tr('label_missing')}: {sorted(missing)!r}")
             if extra:
-                msg.append(f"  extra:   {sorted(extra)!r}")
+                msg.append(f"  {tr('label_extra')}: {sorted(extra)!r}")
             raise AssertionError("\n".join(msg))
 
         for key in expected:
@@ -527,13 +524,13 @@ def check_success_dependencies(
     for dependency in success_dependencies:
         _idx = resolve(testsuite, dependency)
         if _idx is None:
-            return True, f"Success-Dependency `{success_dependencies}` not valid", StatusEnum.failed
+            return True, tr("dependency_invalid", dependency=dependency), StatusEnum.failed
 
         total = report.tests[_idx].summary.total
         for sub_idx in range(total):
             result = report.tests[_idx].tests[sub_idx].result
             if result != ResultEnum.passed:
-                return True, f"Success-Dependency `{success_dependencies}` not satisfied", StatusEnum.skipped
+                return True, tr("dependency_not_satisfied", dependency=dependency), StatusEnum.skipped
 
     return False, "", StatusEnum.scheduled
 
@@ -560,7 +557,7 @@ def check_setup_code_dependency(
 
     _idx = resolve(testsuite, setup_code_dependency)
     if _idx is None:
-        return True, f"SetupCode-Dependency `{setup_code_dependency}` not valid", StatusEnum.failed, setup_code
+        return True, tr("setup_dependency_invalid", dependency=setup_code_dependency), StatusEnum.failed, setup_code
 
     dep_idx = str(_idx)
     if dep_idx in solutions and where in solutions[dep_idx]:
@@ -742,9 +739,9 @@ def check_error(solution: dict, pattern: Optional[str] = None):
             found = any(safe_regex_search(pattern, str(e)) for e in errors)
         except RegexTimeoutError:
             pytest.fail(tr("pattern_timed_out", pattern=pattern))
-        assert found, f"Expected error matching `{pattern}` not found"
+        assert found, tr("expected_error_not_found", pattern=pattern)
     else:
-        assert len(errors) > 0, "Expected an error but none occurred"
+        assert len(errors) > 0, tr("expected_error_none")
 
 
 def check_warning(solution: dict, pattern: Optional[str] = None):
@@ -756,9 +753,9 @@ def check_warning(solution: dict, pattern: Optional[str] = None):
             found = any(safe_regex_search(pattern, str(w)) for w in warnings)
         except RegexTimeoutError:
             pytest.fail(tr("pattern_timed_out", pattern=pattern))
-        assert found, f"Expected warning matching `{pattern}` not found"
+        assert found, tr("expected_warning_not_found", pattern=pattern)
     else:
-        assert len(warnings) > 0, "Expected a warning but none occurred"
+        assert len(warnings) > 0, tr("expected_warning_none")
 
 
 def check_stdout(
@@ -789,17 +786,15 @@ def check_stdout(
             if not expected and "std" in ref_solution:
                 expected = ref_solution["std"].get("stdout", "") or ""
         if stdout.strip() != expected.strip():
-            pytest.fail(
-                f"Output mismatch:\n  Actual: {stdout[:200]}\n  Expected: {expected[:200]}"
-            )
+            pytest.fail(tr("output_mismatch", actual=stdout[:200], expected=expected[:200]))
     elif qualification == QualificationEnum.contains:
-        assert pattern in stdout, f"Output does not contain '{pattern}'"
+        assert pattern in stdout, tr("output_not_contains", pattern=pattern)
     elif qualification in (QualificationEnum.matches, QualificationEnum.regexp):
         try:
             match = safe_regex_search(pattern, stdout)
         except RegexTimeoutError:
             pytest.fail(tr("pattern_timed_out", pattern=pattern))
-        assert match, f"Output does not match pattern '{pattern}'"
+        assert match, tr("output_not_matches", pattern=pattern)
 
 
 def compare_variable_by_qualification(
@@ -829,11 +824,7 @@ def compare_variable_by_qualification(
             # A variable missing from the REFERENCE is a lecturer authoring
             # error, not a student outcome — fail loudly instead of skipping,
             # which used to silently reduce the student's grade (#232).
-            pytest.fail(
-                f"BROKEN EXAMPLE: variable `{name}` is missing from the "
-                f"reference namespace — fix the example's test.yaml or "
-                f"reference solution, this is not a student error"
-            )
+            pytest.fail(tr("broken_example", name=name))
             return
 
         # Type check
@@ -898,15 +889,15 @@ def compare_variable_by_qualification(
         actual_count = actual_str.count(pattern)
         if actual_count != count_requirement:
             raise AssertionError(
-                f"Variable `{name}` failed `count` check:\n"
-                f"  pattern:  {_clip(pattern)!r}\n"
-                f"  expected: {count_requirement} occurrence(s)\n"
-                f"  actual:   {actual_count} occurrence(s)\n"
-                f"  in:       {_clip(actual_str)!r}"
+                f"{tr('failed_check', name=name, check='count')}\n"
+                f"  {tr('label_pattern')}: {_clip(pattern)!r}\n"
+                f"  {tr('label_expected')}: {tr('occurrences', count=count_requirement)}\n"
+                f"  {tr('label_actual')}: {tr('occurrences', count=actual_count)}\n"
+                f"  {tr('label_in')}: {_clip(actual_str)!r}"
             )
 
     else:
-        pytest.skip(f"Unsupported qualification: {qualification}")
+        pytest.skip(tr("unsupported_qualification", qualification=qualification))
 
 
 def _types_compatible(type1: type, type2: type) -> bool:
@@ -1057,13 +1048,13 @@ class BaseSolutionManager(ABC):
         for dependency in success_dependencies:
             dep_idx = main_idx_by_dependency(self.testsuite, dependency)
             if dep_idx is None:
-                return True, f"Success-Dependency `{dependency}` not valid", StatusEnum.failed
+                return True, tr("dependency_invalid", dependency=dependency), StatusEnum.failed
 
             total = self.report.tests[dep_idx].summary.total
             for sub_idx in range(total):
                 result = self.report.tests[dep_idx].tests[sub_idx].result
                 if result != ResultEnum.passed:
-                    return True, f"Success-Dependency `{dependency}` not satisfied", StatusEnum.skipped
+                    return True, tr("dependency_not_satisfied", dependency=dependency), StatusEnum.skipped
 
         return False, "", StatusEnum.scheduled
 
@@ -1189,7 +1180,7 @@ class BaseTestClass(ABC):
         matches = globlib.glob(student_path)
 
         if not matches:
-            pytest.fail(f"File '{file_pattern}' not found")
+            pytest.fail(tr("file_not_found_short", file=file_pattern))
 
         # Check for empty files if allowEmpty is False (default)
         allow_empty = getattr(sub, 'allowEmpty', False)
@@ -1204,19 +1195,19 @@ class BaseTestClass(ABC):
 
     def _test_structural(self, context: Dict[str, Any]):
         """Handle structural test type - override in subclass for language-specific logic."""
-        pytest.skip("Structural tests not implemented for this language")
+        pytest.skip(tr("structural_not_implemented"))
 
     def _test_error(self, context: Dict[str, Any]):
         """Handle error test type - override in subclass for language-specific logic."""
-        pytest.skip("Error tests not implemented for this language")
+        pytest.skip(tr("error_not_implemented"))
 
     def _test_warning(self, context: Dict[str, Any]):
         """Handle warning test type - override in subclass for language-specific logic."""
-        pytest.skip("Warning tests not implemented for this language")
+        pytest.skip(tr("warning_not_implemented"))
 
     def _test_linting(self, context: Dict[str, Any]):
         """Handle linting test type - override in subclass for language-specific logic."""
-        pytest.skip("Linting tests not implemented for this language")
+        pytest.skip(tr("linting_not_implemented"))
 
     @abstractmethod
     def _test_language_specific(self, context: Dict[str, Any]):
@@ -1288,7 +1279,7 @@ class CompiledTestClass(BaseTestClass):
             student_sol = solution_manager.get_solution(idx_main, Solution.student)
             ref_sol = solution_manager.get_solution(idx_main, Solution.reference)
         except Exception as e:
-            pytest.fail(f"Getting solution failed: {e}")
+            pytest.fail(tr("getting_solution_failed", error=e))
 
         if student_sol["status"] == StatusEnum.skipped:
             pytest.skip(student_sol["errormsg"])
@@ -1361,12 +1352,12 @@ class CompiledTestClass(BaseTestClass):
         try:
             student_sol = solution_manager.get_solution(idx_main, Solution.student)
         except Exception as e:
-            pytest.fail(f"Getting solution failed: {e}")
+            pytest.fail(tr("getting_solution_failed", error=e))
 
         if student_sol["status"] == StatusEnum.skipped:
             pytest.skip(student_sol["errormsg"])
         elif student_sol["status"] == StatusEnum.timedout:
-            pytest.fail("Execution timed out")
+            pytest.fail(tr("execution_timed_out_plain"))
 
         actual_code = student_sol["exit_code"]
         expected_code = getattr(sub, 'expectedExitCode', 0)
@@ -1378,7 +1369,7 @@ class CompiledTestClass(BaseTestClass):
 
         result = match_exit_code(actual_code, expected_code)
         if not result.success:
-            pytest.fail(f"Exit code mismatch: got {actual_code}, expected {expected_code}")
+            pytest.fail(tr("exit_code_mismatch", actual=actual_code, expected=expected_code))
 
     def _test_compile(self, context: Dict[str, Any]):
         """Handle compile test type."""
@@ -1391,7 +1382,7 @@ class CompiledTestClass(BaseTestClass):
         try:
             student_sol = solution_manager.get_solution(idx_main, Solution.student)
         except Exception as e:
-            pytest.fail(f"Getting solution failed: {e}")
+            pytest.fail(tr("getting_solution_failed", error=e))
 
         comp = student_sol.get("compilation")
 
@@ -1401,21 +1392,21 @@ class CompiledTestClass(BaseTestClass):
             expect_success = bool(value)
 
         if comp is None:
-            pytest.fail("Compilation result not available")
+            pytest.fail(tr("compilation_unavailable"))
 
         if expect_success:
             if not comp.success:
-                pytest.fail(f"Compilation should succeed but failed:\n{comp.stderr}")
+                pytest.fail(tr("compilation_failed", stderr=comp.stderr))
         else:
             if comp.success:
-                pytest.fail("Compilation should fail but succeeded")
+                pytest.fail(tr("compilation_should_fail"))
 
         # Check for specific error/warning patterns
         if pattern:
             combined = comp.stdout + comp.stderr
             try:
                 if not safe_regex_search(pattern, combined):
-                    pytest.fail(f"Expected pattern not found in compiler output: {pattern}")
+                    pytest.fail(tr("compiler_pattern_not_found", pattern=pattern))
             except RegexTimeoutError:
                 pytest.fail(tr("pattern_timed_out", pattern=pattern))
 
@@ -1429,7 +1420,7 @@ class CompiledTestClass(BaseTestClass):
         try:
             student_sol = solution_manager.get_solution(idx_main, Solution.student)
         except Exception as e:
-            pytest.fail(f"Getting solution failed: {e}")
+            pytest.fail(tr("getting_solution_failed", error=e))
 
         # Check for errors
         has_error = (
@@ -1438,14 +1429,14 @@ class CompiledTestClass(BaseTestClass):
         )
 
         if not has_error:
-            pytest.fail("Expected an error but execution succeeded")
+            pytest.fail(tr("expected_error_but_succeeded"))
 
         # Check error pattern if specified
         if pattern:
             error_output = student_sol["stderr"] + student_sol["errormsg"]
             try:
                 if not safe_regex_search(pattern, error_output):
-                    pytest.fail(f"Expected error matching `{pattern}` not found")
+                    pytest.fail(tr("expected_error_not_found", pattern=pattern))
             except RegexTimeoutError:
                 pytest.fail(tr("pattern_timed_out", pattern=pattern))
 
@@ -1459,14 +1450,14 @@ class CompiledTestClass(BaseTestClass):
         try:
             student_sol = solution_manager.get_solution(idx_main, Solution.student)
         except Exception as e:
-            pytest.fail(f"Getting solution failed: {e}")
+            pytest.fail(tr("getting_solution_failed", error=e))
 
         comp = student_sol.get("compilation")
         if not comp:
-            pytest.skip("No compilation result available")
+            pytest.skip(tr("compilation_unavailable"))
 
         if not comp.warnings:
-            pytest.fail("Expected warnings but none found")
+            pytest.fail(tr("expected_warning_none"))
 
         if pattern:
             try:
@@ -1474,7 +1465,7 @@ class CompiledTestClass(BaseTestClass):
             except RegexTimeoutError:
                 pytest.fail(tr("pattern_timed_out", pattern=pattern))
             if not found:
-                pytest.fail(f"Expected warning matching `{pattern}` not found")
+                pytest.fail(tr("expected_warning_not_found", pattern=pattern))
 
     def _test_runtime(self, context: Dict[str, Any]):
         """Handle runtime test type."""
@@ -1486,19 +1477,19 @@ class CompiledTestClass(BaseTestClass):
         try:
             student_sol = solution_manager.get_solution(idx_main, Solution.student)
         except Exception as e:
-            pytest.fail(f"Getting solution failed: {e}")
+            pytest.fail(tr("getting_solution_failed", error=e))
 
         exec_result = student_sol.get("execution")
         if not exec_result:
-            pytest.fail("No execution result available")
+            pytest.fail(tr("execution_result_unavailable"))
 
         # Check execution time limit
         if value is not None:
             max_time = float(value)
             if exec_result.duration > max_time:
-                pytest.fail(
-                    f"Execution took {exec_result.duration:.3f}s, limit is {max_time}s"
-                )
+                pytest.fail(tr(
+                    "execution_too_slow", duration=f"{exec_result.duration:.3f}", limit=max_time
+                ))
 
 
 # =============================================================================
@@ -1569,13 +1560,17 @@ class InterpretedSolutionManager(BaseSolutionManager):
             if not script_path:
                 return self._create_error_solution(
                     StatusEnum.failed,
-                    f"No {self.language_name} script found in {_dir}",
+                    tr("script_not_found_in", language=self.language_name),
                 )
 
         if not os.path.exists(script_path):
             return self._create_error_solution(
                 StatusEnum.failed,
-                f"{self.language_name} script not found: {script_path}",
+                tr(
+                    "script_not_found",
+                    language=self.language_name,
+                    file=os.path.relpath(script_path, _dir),
+                ),
             )
 
         # Collect variables to extract
@@ -1615,7 +1610,7 @@ class InterpretedSolutionManager(BaseSolutionManager):
                 errors = result.get("errors", ["Unknown error"])
                 return {
                     "status": StatusEnum.failed,
-                    "errormsg": f"Execution failed: {'; '.join(str(e) for e in errors)}",
+                    "errormsg": tr("execution_failed", errors='; '.join(str(e) for e in errors)),
                     "variables": result.get("variables", {}),
                     "errors": errors,
                     "exectime": exec_time,
@@ -1624,7 +1619,7 @@ class InterpretedSolutionManager(BaseSolutionManager):
         except self.execution_error_class as e:
             return {
                 "status": StatusEnum.failed,
-                "errormsg": f"{self.language_name} execution error: {e}",
+                "errormsg": tr("language_execution_error", language=self.language_name, error=e),
                 "variables": {},
                 "errors": [str(e)],
                 "exectime": 0,
@@ -1632,7 +1627,7 @@ class InterpretedSolutionManager(BaseSolutionManager):
         except Exception as e:
             return {
                 "status": StatusEnum.crashed,
-                "errormsg": f"Unexpected error: {e}",
+                "errormsg": tr("unexpected_error", error=e),
                 "variables": {},
                 "errors": [str(e)],
                 "exectime": 0,
@@ -1659,7 +1654,7 @@ class InterpretedTestClass(BaseTestClass):
             student_sol = solution_manager.get_solution(idx_main, Solution.student)
             ref_sol = solution_manager.get_solution(idx_main, Solution.reference)
         except Exception as e:
-            pytest.fail(f"Getting solution failed: {e}")
+            pytest.fail(tr("getting_solution_failed", error=e))
 
         check_solution_status(student_sol)
         return student_sol, ref_sol
@@ -1696,7 +1691,7 @@ class InterpretedTestClass(BaseTestClass):
         elif testtype == TypeEnum.stdout:
             self._test_stdout(context)
         else:
-            pytest.skip(f"Test type `{testtype}` not implemented")
+            pytest.skip(tr("test_type_not_implemented", type=testtype))
 
     def _test_variable(self, context: Dict[str, Any]):
         """Handle variable/graphics test type using shared comparison."""
@@ -1707,7 +1702,7 @@ class InterpretedTestClass(BaseTestClass):
         reference_vars = ref_sol.get("variables", {})
 
         if sub.name not in student_vars:
-            pytest.fail(f"Variable '{sub.name}' not found in student solution")
+            pytest.fail(tr("variable_not_found_short", name=sub.name))
 
         compare_variable_by_qualification(
             val_student=student_vars[sub.name],
@@ -1743,6 +1738,6 @@ class InterpretedTestClass(BaseTestClass):
         try:
             sol = solution_manager.get_solution(idx_main, Solution.student)
         except Exception as e:
-            pytest.fail(f"Getting solution failed: {e}")
+            pytest.fail(tr("getting_solution_failed", error=e))
         check_solution_status(sol)
         return sol

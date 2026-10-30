@@ -153,12 +153,14 @@ async def list_providers() -> List[ProviderInfo]:
     for plugin_name in registry.get_enabled_plugins():
         metadata = registry.get_plugin_metadata(plugin_name)
         if metadata:
+            plugin = registry.get_plugin(plugin_name)
             providers.append(ProviderInfo(
                 name=plugin_name,
                 display_name=metadata.provider_name,
                 type=metadata.provider_type.value,
                 enabled=True,
-                login_url=f"/auth/{plugin_name}/login"
+                login_url=f"/auth/{plugin_name}/login",
+                account_url=plugin.get_account_url() if plugin else None,
             ))
     
     return providers
@@ -179,6 +181,10 @@ async def initiate_login(
     ui_locales: Annotated[Optional[str], Query(
         pattern="^(de|en)$",
         description="Explicit interface language for the identity provider",
+    )] = None,
+    explicit_language: Annotated[Optional[str], Query(
+        pattern="^1$",
+        description="Set by the web app only when the visitor chose a language on a signed-out page",
     )] = None,
     idp_hint: Annotated[Optional[str], Query(
         pattern="^[A-Za-z0-9_-]{1,64}$",
@@ -228,6 +234,9 @@ async def initiate_login(
         "timestamp": str(request.headers.get("date", "")),
         "invite_code": invite,
         "ui_locales": ui_locales,
+        # Server-side state only (Keycloak has no such parameter); a first
+        # login stores a profile language only with it.
+        "explicit_language": explicit_language,
     }
     await redis_client.set(
         f"sso_state:{state}",

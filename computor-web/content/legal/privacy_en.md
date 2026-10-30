@@ -1,6 +1,6 @@
 # Privacy Notice computor.at
 
-Version 1.6, dated 26 October 2026. The German version is authoritative.
+Version 1.7, dated 29 October 2026. The German version is authoritative.
 
 Computor is a free TU Graz learning service. Public material needs no account.
 For accounts, courses, submissions, workspaces, communication and learning help,
@@ -97,13 +97,12 @@ introduction as required by law; this notice is not blanket consent for them.
 | Data | Period or deletion rule |
 |---|---|
 | Account, course data, submissions, repositories, results, home files and course messages | Until account deletion, handled across the services involved. Leaving a course or archiving an account is not deletion. |
-| Lena button request | At most 15 minutes, removed on completion. |
-| Lena button answer | 24 hours, retrievable only by the requester. |
+| Lena button request and answer | At most 24 hours; the answer is retrievable only by the requester. |
 | Lena thread answers and inference caches | Threads follow course-message retention; caches follow the capacity rule in section 2. |
-| Web and scanner access logs | Daily rotation with 14 archived files, including empty log files; this is not a fixed 14-calendar-day limit. |
-| Diagnostics and technical security records | Depending on the service, size-based rotation (often five files of 10 MB each) or no automatic age deletion; no uniform period. |
-| Sign-in service login and administrator events | Login events 30 days, detailed administrator events 90 days, separately from diagnostic logs. |
-| Technical attack blocking | Scanner ban history 35 days; related log files keep four weekly archived rotations of nonempty files. |
+| Web and scanner access logs | At most eight weeks. |
+| Diagnostics and technical security records | Depending on the service, size-based rotation that overwrites older entries, or no automatic age deletion; no uniform period. |
+| Sign-in service login and administrator events | At most 90 days, separately from diagnostic logs. |
+| Technical attack blocking | Ban history at most eight weeks; related log files rotate weekly and are deleted after four rotations. |
 | Support and reports | Until closure, then at most three years for traceability and defence of claims. |
 
 Evidence needed for a specific security incident or legal obligation is
@@ -117,7 +116,8 @@ for a concrete legal reason, we explain the reason and period and restrict them
 to that purpose.
 
 **Backups:** We retain backup copies of personal platform data for no longer
-than 30 days.
+than 90 days, so that operation can be restored after errors or attacks
+detected later (Art. 32(1)(c) GDPR).
 
 ## 5. Cookies and security
 
@@ -141,9 +141,9 @@ limits. Report vulnerabilities confidentially to security@computor.at.
 Subject to the applicable legal conditions, you have rights of access,
 rectification, erasure, restriction and portability. You may object to
 public-interest processing on grounds relating to your particular situation
-(Art. 21 GDPR). You may request an export separately from the narrower statutory
-portability right; the terms also promise export when services are restricted
-or discontinued.
+(Art. 21 GDPR). The right of access includes a copy of your data (Art. 15(3)
+GDPR); if services are restricted or discontinued, the terms also let you
+download your data.
 
 Write to privacy@computor.at or datenschutz@tugraz.at, preferably from your
 registered address so we can identify you securely. We normally respond within
@@ -152,7 +152,7 @@ one month and explain any legally permitted extension within that time
 Barichgasse 40–42, 1030 Vienna, dsb@dsb.gv.at,
 [dsb.gv.at](https://www.dsb.gv.at).
 
-The current notice is at https://computor.at/privacy/en. We keep it current and
-inform you of material changes to processing. Before using data for a new
-purpose, we provide the required information. Contractual changes remain
+The current notice is at https://computor.at/privacy/en. We keep it current.
+Before using data for a new purpose, we provide the required information
+(Art. 13(3) GDPR). Contractual changes remain
 governed by the Terms of Use.

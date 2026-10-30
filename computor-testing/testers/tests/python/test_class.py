@@ -13,6 +13,7 @@ import time
 import random
 import token
 import tokenize
+from typing import Optional
 import pytest
 import numpy as np
 
@@ -89,7 +90,7 @@ def _read_tokens(file_path: str, root=None):
         data = read_untrusted_bytes(file_path, root=root)
         return list(tokenize.tokenize(io.BytesIO(data).readline))
     except (tokenize.TokenError, SyntaxError, IndentationError) as e:
-        pytest.fail(f"Could not tokenize student file: {e}")
+        pytest.fail(tr("could_not_tokenize", error=e))
 
 
 def _count_single_token(file_path: str, name: str, occurance_type=None,
@@ -134,6 +135,27 @@ def _count_token_sequence(file_path: str, name: str, root=None) -> int:
         else:
             i += 1
     return count
+
+
+def _syntax_error(script_path: str, directory: str) -> Optional[dict]:
+    """The learner's script's syntax error as file, line and text, or None.
+
+    Compiling (not running) the script here names the line, which the
+    sandboxed run does not report, and lets every test that needs the script
+    refer to one message.
+    """
+    try:
+        compile(read_untrusted_text(script_path), script_path, "exec", dont_inherit=True)
+    except SyntaxError as e:
+        return {
+            "file": os.path.relpath(script_path, directory),
+            "line": e.lineno,
+            "error": e.msg,
+            "text": (e.text or "").strip(),
+        }
+    except Exception:
+        pass  # unreadable or not text: the run reports it as before
+    return None
 
 
 def get_solution(mm, pytestconfig, idx: int, where: Solution) -> dict:
@@ -203,16 +225,19 @@ def get_solution(mm, pytestconfig, idx: int, where: Solution) -> dict:
             script_path = py_files[0]
         else:
             _error_solution["status"] = StatusEnum.failed
-            _error_solution["errormsg"] = f"No Python script found in {_dir}"
-            _error_solution["errors"] = [f"No .py files in {_dir}"]
+            _error_solution["errormsg"] = tr("script_not_found_in", language="Python")
+            _error_solution["errors"] = [_error_solution["errormsg"]]
             _solution[where] = _error_solution
             return _solution[where]
 
     if not os.path.exists(script_path):
         if where == Solution.student:
             _error_solution["status"] = StatusEnum.failed
-            _error_solution["errormsg"] = f"Python script not found: {script_path}"
-            _error_solution["errors"] = [f"File not found: {script_path}"]
+            # The learner creates this file; the temporary run directory means nothing to them.
+            _error_solution["errormsg"] = tr(
+                "script_not_found", language="Python", file=os.path.relpath(script_path, _dir)
+            )
+            _error_solution["errors"] = [_error_solution["errormsg"]]
             _solution[where] = _error_solution
             return _solution[where]
         else:
@@ -222,6 +247,19 @@ def get_solution(mm, pytestconfig, idx: int, where: Solution) -> dict:
                 "traceback": {}, "exectime": 0,
                 "std": {"stdout": None, "stderr": None},
             }
+            return _solution[where]
+
+    if where == Solution.student:
+        syntax = _syntax_error(script_path, _dir)
+        if syntax:
+            message = tr("syntax_error", file=syntax["file"], line=syntax["line"], error=syntax["error"])
+            if syntax["text"]:
+                message += f"\n  {syntax['text']}"
+            _error_solution["status"] = StatusEnum.failed
+            _error_solution["errormsg"] = message
+            _error_solution["errors"] = [message]
+            _error_solution["syntax_error"] = (syntax["file"], syntax["line"])
+            _solution[where] = _error_solution
             return _solution[where]
 
     # Collect variables/expressions to extract
@@ -326,7 +364,7 @@ def _execute_subprocess(
             errors = result.get("errors", ["Unknown error"])
             _solution[where] = {
                 "status": StatusEnum.failed,
-                "errormsg": f"Execution failed: {'; '.join(str(e) for e in errors)}",
+                "errormsg": tr("execution_failed", errors='; '.join(str(e) for e in errors)),
                 "namespace": result.get("variables", {}),
                 "variables": result.get("variables", {}),
                 "errors": errors,
@@ -336,14 +374,14 @@ def _execute_subprocess(
             }
     except PyExecutionError as e:
         _solution[where] = {
-            "status": StatusEnum.failed, "errormsg": f"Python execution error: {e}",
+            "status": StatusEnum.failed, "errormsg": tr("language_execution_error", language="Python", error=e),
             "namespace": {}, "variables": {}, "errors": [str(e)],
             "traceback": {}, "exectime": 0,
             "std": {"stdout": None, "stderr": None},
         }
     except Exception as e:
         _solution[where] = {
-            "status": StatusEnum.crashed, "errormsg": f"Unexpected error: {e}",
+            "status": StatusEnum.crashed, "errormsg": tr("unexpected_error", error=e),
             "namespace": {}, "variables": {}, "errors": [str(e)],
             "traceback": {}, "exectime": 0,
             "std": {"stdout": None, "stderr": None},
@@ -371,7 +409,16 @@ class TestComputorPython:
                 sol_student = get_solution(monkeymodule, pytestconfig, idx_main, Solution.student)
                 sol_reference = get_solution(monkeymodule, pytestconfig, idx_main, Solution.reference)
             except Exception as e:
-                pytest.fail(f"Getting solution failed: {e}")
+                pytest.fail(tr("getting_solution_failed", error=e))
+
+            # One syntax error, reported in full by the first test that needs the script.
+            syntax = sol_student.get("syntax_error")
+            if syntax:
+                reported = _report.setdefault("syntax_errors_reported", set())
+                if syntax in reported:
+                    # Failed for grading, but without a "Failed:" label in front of "Not run".
+                    raise AssertionError(tr("not_run_syntax_error", file=syntax[0], line=syntax[1]))
+                reported.add(syntax)
 
             check_solution_status(sol_student)
 
@@ -401,7 +448,7 @@ class TestComputorPython:
                     try:
                         val_reference = eval(sub.evalString, solution_reference)
                     except Exception:
-                        pytest.skip(f"Evaluation of `{sub.evalString}` not possible")
+                        pytest.skip(tr("evaluation_not_possible", expression=sub.evalString))
                 elif testtype == TypeEnum.stdout:
                     val_reference = sol_reference["std"]["stdout"]
                 elif sub.name in solution_reference:
@@ -414,10 +461,7 @@ class TestComputorPython:
                         # authoring error, not a student outcome — fail loudly
                         # instead of silently reducing the grade (#232).
                         pytest.fail(
-                            f"BROKEN EXAMPLE: variable `{sub.name}` is missing "
-                            f"from the reference namespace — fix the example's "
-                            f"test.yaml or reference solution, this is not a "
-                            f"student error"
+                            tr("broken_example", name=sub.name)
                         )
 
             compare_variable_by_qualification(
@@ -441,7 +485,7 @@ class TestComputorPython:
             elif sub.name and sub.name != '-':
                 file_pattern = sub.name
             else:
-                pytest.skip("No file pattern specified for exist test")
+                pytest.skip(tr("no_file_pattern"))
 
             student_path = os.path.join(dir_student, file_pattern)
             matches = globlib.glob(student_path)
@@ -470,7 +514,7 @@ class TestComputorPython:
                 pytest.fail(tr("python_file_not_found_structural"))
 
             if sub.allowedOccuranceRange is None and sub.countRequirement is None:
-                pytest.skip("allowedOccuranceRange not set")
+                pytest.skip(tr("occurrence_range_not_set"))
 
             if sub.pattern:
                 # Student-controlled: no symlinks/FIFOs, size-capped (#237).
@@ -531,4 +575,4 @@ class TestComputorPython:
             check_warning(sol_student, sub.pattern)
 
         else:
-            pytest.skip(f"Unknown test type: {testtype}")
+            pytest.skip(tr("test_type_not_implemented", type=testtype))

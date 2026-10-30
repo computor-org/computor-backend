@@ -1,5 +1,18 @@
 'use client';
 
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+
+const COPY = {
+  de: {
+    label: 'Kurs für die Selbstanmeldung im Katalog anbieten',
+    detail: 'Alle angemeldeten Konten, nicht nur deine Studierenden, sehen den Kurs im Kurskatalog und können ihm selbst als Studierende beitreten. Die Kursinhalte bleiben verborgen, bis sie beitreten. Schaltest du das ab, sind keine neuen Anmeldungen mehr möglich; wer schon beigetreten ist, bleibt im Kurs.',
+  },
+  en: {
+    label: 'List this course for self-registration',
+    detail: 'Every signed-in user — not only your students — sees it in the course catalog and can join themselves as a student. Course content stays hidden until they join. Turning this off stops new registrations but keeps everyone who already joined.',
+  },
+};
+
 /**
  * The self-registration switch for a course (issue #213).
  *
@@ -20,6 +33,7 @@ export default function PublicCourseField({
   onChange: (next: boolean) => void;
   disabled?: boolean;
 }) {
+  const t = COPY[useUiLanguage()];
   return (
     <label className="flex items-start gap-3 text-sm text-body">
       <input
@@ -30,14 +44,8 @@ export default function PublicCourseField({
         className="mt-0.5 h-4 w-4 rounded border-rule-strong text-accent-text focus:ring-accent-line disabled:opacity-50"
       />
       <span>
-        <span className="block font-medium text-fg">
-          List this course for self-registration
-        </span>
-        <span className="block text-xs text-muted">
-          Every signed-in user — not only your students — sees it in the course catalog and can
-          join themselves as a student. Course content stays hidden until they join. Turning this
-          off stops new registrations but keeps everyone who already joined.
-        </span>
+        <span className="block font-medium text-fg">{t.label}</span>
+        <span className="block text-xs text-muted">{t.detail}</span>
       </span>
     </label>
   );

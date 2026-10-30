@@ -313,7 +313,7 @@ async def test_poll_discards_context_when_course_access_is_revoked(context, chan
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("change", ["invalid-json", "missing-course", "expired", "too-far-future"])
+@pytest.mark.parametrize("change", ["invalid-json", "content-without-course", "expired", "too-far-future"])
 async def test_poll_discards_invalid_or_expired_context(context, change):
     await _set(context)
     key = next(iter(context.redis.values))
@@ -321,8 +321,11 @@ async def test_poll_discards_invalid_or_expired_context(context, change):
     if change == "invalid-json":
         context.redis.values[key] = "{broken"
     else:
-        if change == "missing-course":
+        if change == "content-without-course":
+            # A context without a course is a language-only launch; one that
+            # still names course content has lost its course.
             value.pop("course_id")
+            value["course_content_id"] = str(COURSE_B)
         elif change == "expired":
             value["expires_at"] = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
         else:
@@ -379,6 +382,61 @@ async def test_launch_interface_language_round_trips_without_changing_course(con
     assert result.ui_language == language
     assert (await _get(context)).ui_language == language
     assert (await _get(context)).course_id == COURSE_A
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", ["de", "en"])
+async def test_launch_without_course_carries_only_the_reading_language(context, language):
+    # Opening a workspace from the list names no course; its language must
+    # still reach the workspace, or the editor guesses one of its own.
+    from computor_types.coder import WorkspaceLaunchContextRequest
+
+    request = WorkspaceLaunchContextRequest(ui_language=language)
+    result = await launch.set_workspace_launch_context(
+        OWNER, "vscode", request.course_id, context.permissions, context.db,
+        context.client, context.redis, ui_language=request.ui_language,
+    )
+    restored = await _get(context)
+    assert result.course_id is None and result.ui_language == language
+    assert restored == result
+    context.membership.assert_not_called()
+    assert f"workspace-last-course:{USER_ID}:workspace-1" not in context.redis.values
+
+
+@pytest.mark.asyncio
+async def test_launch_without_course_keeps_the_last_course(context):
+    await _set(context, COURSE_A)
+    await launch.set_workspace_launch_context(
+        OWNER, "vscode", None, context.permissions, context.db,
+        context.client, context.redis, ui_language="en",
+    )
+    last_key = f"workspace-last-course:{USER_ID}:workspace-1"
+    assert context.redis.values[last_key] == str(COURSE_A)
+
+
+@pytest.mark.asyncio
+async def test_launch_without_course_rejects_course_content(context):
+    from computor_types.coder import WorkspaceLaunchContextRequest
+    from pydantic import ValidationError
+    from computor_backend.exceptions import BadRequestException
+
+    with pytest.raises(ValidationError):
+        WorkspaceLaunchContextRequest(course_content_id=COURSE_B, ui_language="de")
+    with pytest.raises(BadRequestException):
+        await launch.set_workspace_launch_context(
+            OWNER, "vscode", None, context.permissions, context.db,
+            context.client, context.redis, course_content_id=COURSE_B,
+        )
+
+
+@pytest.mark.asyncio
+async def test_launch_without_course_still_needs_the_own_workspace(context):
+    context.workspace.owner_name = encode_coder_username(OTHER_ID)
+    with pytest.raises(ForbiddenException):
+        await launch.set_workspace_launch_context(
+            OWNER, "vscode", None, context.permissions, context.db,
+            context.client, context.redis, ui_language="de",
+        )
 
 
 @pytest.mark.asyncio

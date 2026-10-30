@@ -25,6 +25,22 @@ export function descriptionVariants(text, language) {
 }
 const MAX_MEDIA = 8 * 1024 * 1024;
 
+/**
+ * The `title_i18n`/`description_i18n` maps of a course file or meta.yaml entry,
+ * only when present, so the reader can show the visitor's language.
+ */
+export function translations(source) {
+  const out = {};
+  for (const key of ['title_i18n', 'description_i18n']) {
+    const map = source?.[key];
+    if (!map || typeof map !== 'object' || Array.isArray(map)) continue;
+    const entries = Object.entries(map)
+      .filter(([language, text]) => ['de', 'en'].includes(language) && typeof text === 'string' && text.trim());
+    if (entries.length) out[key] = Object.fromEntries(entries);
+  }
+  return out;
+}
+
 function readInside(root, relative, limit) {
   const file = path.resolve(root, relative);
   const real = fs.realpathSync(file);
@@ -77,11 +93,14 @@ export function buildPublicLearning(source, destination, revision) {
         const assignment = type.kind === 'assignment';
         let title = node.title ?? (type.kind === 'unit' ? `Week ${node.position}` : node.path.replaceAll('_', ' '));
         let description = node.description ?? null;
+        let i18n = translations(node);
         const variants = {};
         const media = new Set();
-        if (!node.example_identifier && description?.trim()) {
+        if (!node.example_identifier && (description?.trim() || i18n.description_i18n)) {
           // Rendered as Markdown in the reader's language, like an exercise.
-          Object.assign(variants, descriptionVariants(description, 'de'));
+          if (description?.trim()) Object.assign(variants, descriptionVariants(description, 'de'));
+          // An explicit translation wins over the stored text, as in the backend import.
+          Object.assign(variants, i18n.description_i18n);
           description = Object.values(variants)[0] ?? null;
         }
         if (node.example_identifier) {
@@ -90,6 +109,7 @@ export function buildPublicLearning(source, destination, revision) {
           const meta = readYaml(source, `${example}/meta.yaml`);
           title = meta.title;
           description = meta.description ?? null;
+          i18n = translations(meta);
           for (const file of fs.readdirSync(path.join(source, example, 'content')).sort()) {
             const match = /^(?:index|README)(?:_(de|en))?\.md$/i.exec(file);
             if (!match) continue;
@@ -117,10 +137,10 @@ export function buildPublicLearning(source, destination, revision) {
             }
           }
         }
-        contents.push({ id, title, description, path: id, parent_path: ancestors.join('.') || null,
+        contents.push({ id, title, description, ...i18n, path: id, parent_path: ancestors.join('.') || null,
           depth: ancestors.length, position: Number(node.position ?? 0), kind: type.kind,
           type_title: type.title, is_submittable: assignment });
-        materials[id] = { id, course_id: slug, title, description, path: id, kind: type.kind,
+        materials[id] = { id, course_id: slug, title, description, ...i18n, path: id, kind: type.kind,
           is_submittable: assignment, markdown_variants: variants,
           asset_base_url: `/learning/media/${slug}/${id}/`, media_files: [...media].sort() };
         visit(node.contents ?? [], parts);
@@ -128,7 +148,7 @@ export function buildPublicLearning(source, destination, revision) {
     }
     visit(manifest.contents);
     const welcome = contents.find(c => ['welcome', 'start_here', 'introduction'].includes(c.id));
-    const course = { id: slug, title: manifest.name, description: manifest.description, position, course_path: manifest.path,
+    const course = { id: slug, title: manifest.name, description: manifest.description, ...translations(manifest), position, course_path: manifest.path,
       language_code: 'de', contents, materials, welcome_content_id: welcome?.id ?? null,
       first_exercise_id: contents.find(c => c.is_submittable)?.id ?? null,
       exercise_count: contents.filter(c => c.is_submittable).length,
@@ -136,7 +156,7 @@ export function buildPublicLearning(source, destination, revision) {
       source_commit: revision };
     fs.mkdirSync(path.join(destination, 'courses'), { recursive: true });
     fs.writeFileSync(path.join(destination, 'courses', `${slug}.json`), JSON.stringify(course));
-    catalog.push({ id: slug, title: course.title, description: course.description, position, course_path: course.course_path,
+    catalog.push({ id: slug, title: course.title, description: course.description, ...translations(manifest), position, course_path: course.course_path,
       language_code: 'de', exercise_count: course.exercise_count, unit_count: course.unit_count });
   }
   catalog.sort((a, b) => {

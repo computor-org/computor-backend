@@ -59,7 +59,7 @@ async function setup(page: Page, initial: number | null = 20) {
   await page.goto(`/courses/${COURSE.id}/edit`);
   const order = page.getByLabel(/^(Course order|Kursreihenfolge)$/);
   await expect(order).toHaveValue(initial === null ? '' : String(initial), { timeout: 15_000 });
-  return { order, patches, save: page.getByRole('button', { name: 'Save', exact: true }).first() };
+  return { order, patches, save: page.getByRole('button', { name: /^(Save|Speichern)$/ }).first() };
 }
 
 for (const locale of ['en-US', 'de-AT']) {

@@ -12,6 +12,8 @@ from email.utils import format_datetime, formataddr, make_msgid
 from datetime import datetime, timezone
 from typing import Dict
 
+from computor_backend.utils.reading_language import resolve_effective_language
+
 from . import mailbox
 from .config import SupportSettings, get_support_settings
 
@@ -34,9 +36,9 @@ If you have questions, just reply to this message.
 """
 
 
-def build_welcome(settings: SupportSettings, *, given_name: str, to: str, language: str = "en") -> EmailMessage:
-    """Use the registration language, with English as the fallback."""
-    language = language if language in SUBJECT else "en"
+def build_welcome(settings: SupportSettings, *, given_name: str, to: str, language: str | None = None) -> EmailMessage:
+    """Use the registration language: German when none is known, English for any other."""
+    language = resolve_effective_language(None, language)
     sender = settings.welcome_from.strip().lower()
     if sender not in settings.team_address_list:
         raise ValueError(f"sender {sender!r} is not a team address")
@@ -54,7 +56,7 @@ def build_welcome(settings: SupportSettings, *, given_name: str, to: str, langua
     return msg
 
 
-def send_welcome(user_id: str, settings: SupportSettings | None = None, *, language: str = "en") -> Dict[str, str]:
+def send_welcome(user_id: str, settings: SupportSettings | None = None, *, language: str | None = None) -> Dict[str, str]:
     """Send the welcome mail to one user. Name and address are read from the
     database, so no personal data travels through the workflow parameters."""
     from computor_backend.database import get_db_session

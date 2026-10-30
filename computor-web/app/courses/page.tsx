@@ -21,7 +21,7 @@ const coursesClient = new CoursesClient();
 const COPY = {
   de: {
     courses: 'Kurse',
-    loadingSubtitle: 'Alle Kurse durchsuchen, auf die du Zugriff hast',
+    loadingSubtitle: 'Alle Kurse, auf die du Zugriff hast',
     subtitle: (n: number) => (n === 1 ? '1 Kurs, auf den du Zugriff hast' : `${n} Kurse, auf die du Zugriff hast`),
     showArchived: 'Archivierte anzeigen',
     showArchivedLabel: 'Archivierte Kurse anzeigen',
@@ -34,8 +34,8 @@ const COPY = {
   },
   en: {
     courses: 'Courses',
-    loadingSubtitle: 'Browse and access all courses where you have permissions',
-    subtitle: (n: number) => `${n} ${n === 1 ? 'course' : 'courses'} where you have permissions`,
+    loadingSubtitle: 'All courses you have access to',
+    subtitle: (n: number) => `${n} ${n === 1 ? 'course' : 'courses'} you have access to`,
     showArchived: 'Show archived',
     showArchivedLabel: 'Show archived courses',
     browseCatalog: 'Browse catalog',

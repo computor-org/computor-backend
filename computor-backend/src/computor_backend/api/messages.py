@@ -2,7 +2,7 @@ import logging
 from typing import Annotated, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status, Query
+from fastapi import APIRouter, Depends, Request, Response, status, Query
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,9 @@ from computor_backend.interfaces.message import MessageInterface
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.repositories import MessageRepository
+from computor_backend.model.auth import Profile
 from computor_backend.model.message import Message
+from computor_backend.utils.reading_language import resolve_effective_language
 from computor_backend.exceptions import BadRequestException, PermissionDeniedAsNotFound
 
 # Import business logic
@@ -82,13 +84,26 @@ async def create_message(
     payload: MessageCreate,
     db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
+    http_request: Request = None,
 ):
     """Create a new message with enforced author and defaults."""
     model_dump = create_message_with_author(payload, permissions, db)
+    # Resolved like GET /user so the tutor can read the assignment in the
+    # language the author is reading (issues#556).
+    profile_language = (
+        db.query(Profile.language_code)
+        .filter(Profile.user_id == permissions.user_id)
+        .scalar()
+    )
+    model_dump['reading_language'] = resolve_effective_language(
+        profile_language,
+        http_request.headers.get("Accept-Language") if http_request else None,
+    )
 
     # Use create_db so permission handler validates
     class _Create(MessageCreate):
         author_id: str
+        reading_language: Optional[str] = None
     entity = _Create(**model_dump)
     # The author's read mark and the @mention rows (already gated in
     # create_message_with_author) commit together with the message: a reader

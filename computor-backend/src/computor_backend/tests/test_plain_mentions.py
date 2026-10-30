@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from computor_backend.business_logic.messages import mentions
 from computor_backend.business_logic.messages.mention_text import resolve_plain_mentions
 from computor_backend.exceptions import BadRequestException
-from computor_backend.model.auth import User
+from computor_backend.model.auth import Profile, User
 from computor_backend.business_logic.messages import core
 from computor_backend.permissions.principal import Principal
 from computor_types.messages import MessageCreate, MessageGet, MessageUpdate
@@ -59,6 +59,12 @@ def test_unknown_and_substring_tokens_stay_plain():
     assert resolve_plain_mentions(content, lookup) == content
 
 
+def _create_profile_table(connection):
+    # Message create reads the author's profile language.
+    columns = ", ".join(f'"{c.name}" TEXT' for c in Profile.__table__.columns)
+    connection.execute(text(f'CREATE TABLE "profile" ({columns})'))
+
+
 @pytest.fixture
 def audience_db(monkeypatch):
     """Real SQL lookups over synthetic users, with a controlled audience boundary.
@@ -70,6 +76,7 @@ def audience_db(monkeypatch):
     columns = ", ".join(f'"{c.name}" TEXT' for c in User.__table__.columns)
     with engine.begin() as connection:
         connection.execute(text(f'CREATE TABLE "user" ({columns})'))
+        _create_profile_table(connection)
         for uid, given, family in [(TUTOR, "Luna", "Tutor"), (HUMAN, "Lena", "Human"), (OTHER, "Max", "Human")]:
             connection.execute(text('INSERT INTO "user" (id, given_name, family_name) VALUES (:id, :given, :family)'),
                                {"id": uid, "given": given, "family": family})
@@ -226,6 +233,7 @@ def message_db(tmp_path, monkeypatch):
             connection.execute(text(f'CREATE TABLE "{model.__tablename__}" ({columns})'))
         columns = ", ".join(f'"{c.name}" TEXT' for c in User.__table__.columns)
         connection.execute(text(f'CREATE TABLE "user" ({columns})'))
+        _create_profile_table(connection)
         connection.execute(text('INSERT INTO "user" (id, given_name, family_name) VALUES (:id, \'Lena\', \'Human\')'),
                            {"id": HUMAN})
 

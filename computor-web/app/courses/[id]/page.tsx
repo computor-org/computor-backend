@@ -27,8 +27,11 @@ import CourseWorkspaceLaunchButtons from '@/src/components/workspaces/CourseWork
 import SelfEnrollmentHelp from '@/src/components/courses/SelfEnrollmentHelp';
 import CourseProgressCard from '@/src/components/student/CourseProgress';
 import { displayName } from '@/src/utils/displayName';
+import { localized } from '@/src/utils/localizedText';
 import { localizedRoleLabel } from '@/src/utils/courseRoles';
 import type { PersonalCloneCredentialGet } from 'types/generated';
+import { localeFor, languageName } from '@/src/utils/locale';
+import { deliveryLabel, lockReasonText } from '@/src/utils/courseGit';
 
 const coursesClient = new CoursesClient();
 const courseFamiliesClient = new CourseFamiliesClient();
@@ -280,9 +283,10 @@ export default function CoursePage() {
     },
     [courseId, canManageMembers, isMember],
   );
-  const course = data?.course ?? null;
+  // Display only; the course edit page loads its own copy with the source text.
+  const course = localized(data?.course ?? null, language);
   const organization = data?.organization ?? null;
-  const courseFamily = data?.courseFamily ?? null;
+  const courseFamily = localized(data?.courseFamily ?? null, language);
   const gitBinding = data?.gitBinding ?? null;
   const myRepo = data?.myRepo ?? null;
   const gitDescriptor = data?.gitDescriptor ?? null;
@@ -411,7 +415,7 @@ export default function CoursePage() {
     items.filter(Boolean) as Fact[];
 
   const isArchived = Boolean(course.archived_at);
-  const dateLocale = language === 'de' ? 'de-AT' : undefined;
+  const dateLocale = localeFor(language);
 
   return (
     <AuthenticatedLayout>
@@ -469,7 +473,7 @@ export default function CoursePage() {
               courseFamily && { term: t.courseFamily, value: displayName(courseFamily, t.untitledShort) },
               course.language_code && {
                 term: t.language,
-                value: <span className="uppercase">{course.language_code}</span>,
+                value: languageName(course.language_code, language),
               },
               canManageMembers &&
                 course.created_at && {
@@ -644,7 +648,7 @@ export default function CoursePage() {
             {gitBinding ? (
               <DescriptionList
                 items={facts([
-                  { term: t.delivery, value: gitBinding.delivery },
+                  { term: t.delivery, value: deliveryLabel(gitBinding.delivery, language) },
                   gitBinding.default_branch && {
                     term: t.defaultBranch,
                     value: gitBinding.default_branch,
@@ -658,7 +662,7 @@ export default function CoursePage() {
                   {
                     term: t.status,
                     value: gitBinding.locked ? (
-                      <Badge tone="warning" title={gitBinding.lock_reason ?? undefined}>
+                      <Badge tone="warning" title={lockReasonText(gitBinding.lock_reason, language) ?? undefined}>
                         {t.locked}
                       </Badge>
                     ) : (

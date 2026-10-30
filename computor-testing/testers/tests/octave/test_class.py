@@ -128,7 +128,7 @@ def get_solution(pytestconfig, idx_main: int, where: Solution) -> Dict[str, Any]
             _idx = main_idx_by_dependency(testsuite, dependency)
             if _idx is None:
                 error = True
-                errormsg = f"Success-Dependency `{success_dependencies}` not valid"
+                errormsg = tr("dependency_invalid", dependency=dependency)
                 status = StatusEnum.failed
             else:
                 total = report.tests[_idx].summary.total
@@ -136,7 +136,7 @@ def get_solution(pytestconfig, idx_main: int, where: Solution) -> Dict[str, Any]
                     result = report.tests[_idx].tests[sub_idx].result
                     if result != ResultEnum.passed:
                         error = True
-                        errormsg = f"Success-Dependency `{success_dependencies}` not satisfied"
+                        errormsg = tr("dependency_not_satisfied", dependency=dependency)
                         status = StatusEnum.skipped
                         break
             if error:
@@ -147,14 +147,14 @@ def get_solution(pytestconfig, idx_main: int, where: Solution) -> Dict[str, Any]
             _idx = main_idx_by_dependency(testsuite, setup_code_dependency)
             if _idx is None:
                 error = True
-                errormsg = f"Setup-Code-Dependency `{setup_code_dependency}` not valid"
+                errormsg = tr("setup_dependency_invalid", dependency=setup_code_dependency)
                 status = StatusEnum.failed
             else:
                 try:
                     _solution["namespace"] = solutions[str(_idx)][where]["namespace"].copy()
                 except Exception:
                     error = True
-                    errormsg = f"Setup-Code-Dependency `{setup_code_dependency}` not found"
+                    errormsg = tr("setup_dependency_not_found", dependency=setup_code_dependency)
                     status = StatusEnum.failed
 
         if not error:
@@ -165,7 +165,7 @@ def get_solution(pytestconfig, idx_main: int, where: Solution) -> Dict[str, Any]
                 if not os.path.exists(os.path.join(_dir, entry_point)):
                     if where == Solution.student:
                         error = True
-                        errormsg = f"entryPoint {entry_point} not found"
+                        errormsg = tr("entry_point_not_found", file=entry_point)
                         status = StatusEnum.failed
 
             if not error:
@@ -181,10 +181,10 @@ def get_solution(pytestconfig, idx_main: int, where: Solution) -> Dict[str, Any]
 
                 if not success:
                     if "timed out" in executor.error.lower():
-                        errormsg = f"Maximum execution time of {timeout} seconds exceeded"
+                        errormsg = tr("max_execution_time", seconds=timeout)
                         status = StatusEnum.timedout
                     else:
-                        errormsg = f"Execution failed: {executor.error}"
+                        errormsg = tr("execution_failed", errors=executor.error)
                         status = StatusEnum.crashed
                     error = True
                 else:
@@ -225,7 +225,7 @@ class TestComputorOctave:
                 sol_student = get_solution(pytestconfig, idx_main, Solution.student)
                 sol_reference = get_solution(pytestconfig, idx_main, Solution.reference)
             except Exception as e:
-                pytest.fail(f"Getting solution failed: {e}")
+                pytest.fail(tr("getting_solution_failed", error=e))
 
             check_solution_status(sol_student)
 
@@ -233,7 +233,7 @@ class TestComputorOctave:
             solution_reference = sol_reference["namespace"]
 
             if sub.name not in solution_student:
-                raise KeyError(f"Variable `{sub.name}` not found in student namespace")
+                pytest.fail(tr("variable_not_found", name=sub.name))
 
             val_student = solution_student[sub.name]
 
@@ -243,7 +243,7 @@ class TestComputorOctave:
                 if sub.evalString is not None:
                     val_reference = solution_reference.get(sub.name)
                     if val_reference is None:
-                        pytest.skip(f"Evaluation of `{sub.evalString}` not possible")
+                        pytest.skip(tr("evaluation_not_possible", expression=sub.evalString))
                 elif sub.name in solution_reference:
                     val_reference = solution_reference[sub.name]
 
@@ -293,7 +293,7 @@ class TestComputorOctave:
             if not exists_s:
                 pytest.fail(tr("file_not_found", file=file_pattern))
             if not exists_r:
-                pytest.fail(f"File '{file_pattern}' not found in reference directory")
+                pytest.fail(tr("file_not_found_reference", file=file_pattern))
 
             allow_empty = getattr(sub, 'allowEmpty', False)
             if not allow_empty:
@@ -314,4 +314,4 @@ class TestComputorOctave:
                 )
 
         else:
-            pytest.skip(reason=f"Test type `{testtype}` not implemented")
+            pytest.skip(reason=tr("test_type_not_implemented", type=testtype))

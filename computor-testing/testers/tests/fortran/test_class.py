@@ -27,6 +27,7 @@ from ctexec.safe_io import read_untrusted_text
 from .conftest import report_key, Solution
 from testers.executors.fortran import FortranExecutor, analyze_source, FORTRAN_DEFAULTS
 from ctcore.helpers import get_property_as_list
+from ctcore.i18n import tr
 from ctcore.stdio import (
     compare_outputs,
     match_exit_code,
@@ -103,7 +104,7 @@ def get_solution(pytestconfig, idx: int, where: Solution) -> dict:
         _idx = main_idx_by_dependency(testsuite, dependency)
         if _idx is None:
             error = True
-            errormsg = f"Success-Dependency `{success_dependencies}` not valid"
+            errormsg = tr("dependency_invalid", dependency=dependency)
             status = StatusEnum.failed
         else:
             total = report.tests[_idx].summary.total
@@ -111,7 +112,7 @@ def get_solution(pytestconfig, idx: int, where: Solution) -> dict:
                 result = report.tests[_idx].tests[sub_idx].result
                 if result != ResultEnum.passed:
                     error = True
-                    errormsg = f"Success-Dependency `{success_dependencies}` not satisfied"
+                    errormsg = tr("dependency_not_satisfied", dependency=dependency)
                     status = StatusEnum.skipped
                     break
         if error:

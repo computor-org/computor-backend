@@ -36,6 +36,10 @@ class ProviderInfo(BaseModel):
     type: str = Field(..., description="Authentication type")
     enabled: bool = Field(..., description="Whether provider is enabled")
     login_url: Optional[str] = Field(None, description="Login URL if applicable")
+    account_url: Optional[str] = Field(
+        None,
+        description="Where users manage their own password, second factor and sessions, if the provider has such a page",
+    )
 
 
 class LoginRequest(BaseModel):

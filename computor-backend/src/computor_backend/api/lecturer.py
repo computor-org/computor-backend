@@ -52,6 +52,7 @@ from computor_backend.business_logic.lecturer_gitlab_sync import (
     sync_course_member_gitlab_permissions,
 )
 from computor_backend.websocket.broadcast import ws_broadcast
+from computor_backend.business_logic.localization import LocalizeParam
 
 lecturer_router = APIRouter()
 
@@ -59,37 +60,41 @@ lecturer_router = APIRouter()
 def lecturer_get_courses_endpoint(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    cache: Cache = Depends(get_cache)
+    cache: Cache = Depends(get_cache),
+    localize: LocalizeParam = None,
 ):
     """Get a specific course for lecturers."""
-    return get_lecturer_course(course_id, permissions, cache)
+    return get_lecturer_course(course_id, permissions, cache, lang=localize)
 
 @lecturer_router.get("/courses", response_model=list[CourseList])
 def lecturer_list_courses_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: CourseQuery = Depends(),
-    cache: Cache = Depends(get_cache)
+    cache: Cache = Depends(get_cache),
+    localize: LocalizeParam = None,
 ):
     """List courses accessible to lecturers."""
-    return list_lecturer_courses(permissions, params, cache)
+    return list_lecturer_courses(permissions, params, cache, lang=localize)
 
 @lecturer_router.get("/course-contents/{course_content_id}", response_model=CourseContentLecturerGet)
 def lecturer_get_course_contents_endpoint(
     course_content_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    cache: Cache = Depends(get_cache)
+    cache: Cache = Depends(get_cache),
+    localize: LocalizeParam = None,
 ):
     """Get a specific course content with course repository information."""
-    return get_lecturer_course_content(course_content_id, permissions, cache)
+    return get_lecturer_course_content(course_content_id, permissions, cache, lang=localize)
 
 @lecturer_router.get("/course-contents", response_model=list[CourseContentLecturerList])
 def lecturer_list_course_contents_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: CourseContentLecturerQuery = Depends(),
-    cache: Cache = Depends(get_cache)
+    cache: Cache = Depends(get_cache),
+    localize: LocalizeParam = None,
 ):
     """List course contents with course repository information."""
-    return list_lecturer_course_contents(permissions, params, cache)
+    return list_lecturer_course_contents(permissions, params, cache, lang=localize)
 
 
 # ============================================================================

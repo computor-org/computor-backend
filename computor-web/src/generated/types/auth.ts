@@ -85,6 +85,8 @@ export interface ProviderInfo {
   enabled: boolean;
   /** Login URL if applicable */
   login_url?: string | null;
+  /** Where users manage their own password, second factor and sessions, if the provider has such a page */
+  account_url?: string | null;
 }
 
 /**

@@ -36,6 +36,8 @@ class ProbeResult(ProbeBase):
     __tablename__ = "public_grading_probe_result"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     status = Column(Integer, nullable=False, default=4)
+    # The result PATCH announces the group's new test state (issues#554).
+    submission_group_id = Column(UUID(as_uuid=True), nullable=True)
 
 
 @pytest.fixture

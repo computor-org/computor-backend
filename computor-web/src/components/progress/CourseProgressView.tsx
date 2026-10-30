@@ -23,6 +23,7 @@ import { courseAnalyticsClient } from '@/src/clients/CourseAnalyticsClient';
 import Badge from '@/src/components/Badge';
 import { FlagChips, FlagRules } from './FlagList';
 import type { CourseFlagsGet, CourseMemberGradingsList, FlagReason } from 'types/generated';
+import { useCourseTitles } from '@/src/hooks/useCourseTitles';
 
 // Charts pull in recharts (~large) — load them only when this view renders
 // instead of shipping the library in the shared bundle.
@@ -148,6 +149,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
   const language = useUiLanguage();
   const t = COPY[language];
   const crumbs = useCourseCrumbs(courseId, t.title);
+  const { typeTitle } = useCourseTitles(courseId);
   const [students, setStudents] = useState<CourseMemberGradingsList[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -308,7 +310,7 @@ export default function CourseProgressView({ courseId }: { courseId: string }) {
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <ProgressDistributionChart students={students} />
-              <ContentTypeChart students={students} />
+              <ContentTypeChart students={students} typeTitle={typeTitle} />
             </div>
 
             {/* Flags ("Auffälligkeiten"): transparent rules, each with its reason */}

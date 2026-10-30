@@ -15,8 +15,8 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           enable-cache: true
       - run: uv lock --project computor-backend --check
@@ -52,6 +52,8 @@ jobs:
           computor-backend/src/computor_backend/tests/test_keycloak_token_verification.py
           computor-backend/src/computor_backend/tests/test_keycloak_logout.py
           computor-backend/src/computor_backend/tests/test_admin_mfa.py
+          computor-backend/src/computor_backend/tests/test_error_localization.py
+          computor-backend/src/computor_backend/tests/test_student_testing_language.py
           computor-backend/src/computor_backend/tests/test_admin_mfa_setup.py
           computor-backend/src/computor_backend/tests/test_keycloak_abuse_setup.py
           computor-backend/src/computor_backend/tests/test_log_redaction.py
@@ -68,6 +70,11 @@ jobs:
           computor-backend/src/computor_backend/tests/test_harness_bounds.py
           computor-backend/src/computor_backend/tests/test_compose_testing_bounds.py
           computor-backend/src/computor_backend/tests/test_workspace_launch_context.py
+          computor-backend/src/computor_backend/tests/test_reading_language.py
+          computor-backend/src/computor_backend/tests/test_maintenance_language.py
+          computor-backend/src/computor_backend/tests/test_student_template_helpers.py
+          computor-backend/src/computor_backend/tests/test_localized_titles.py
+          computor-backend/src/computor_backend/tests/test_message_reading_language.py
           computor-backend/src/computor_backend/tests/test_student_description_download.py
           computor-backend/src/computor_backend/tests/test_forgejo_image_pin.py
           computor-backend/src/computor_backend/tests/test_forgejo_clone_token_persistence.py
@@ -83,6 +90,9 @@ jobs:
           computor-backend/src/computor_backend/tests/test_approved_extension.py
           computor-backend/src/computor_backend/tests/test_workspace_extension_sync.py
           computor-backend/src/computor_backend/tests/test_workspace_language_packs.py
+          computor-backend/src/computor_backend/tests/test_keycloak_locale_attribute.py
+          ops/keycloak/test_locale.py
+          computor-backend/src/computor_backend/tests/test_ws_profile_submission_events.py
       - name: Approved extension pin matches its GitHub release
         run: python3 ops/coder/pin-extension.py --check
 
@@ -94,7 +104,7 @@ jobs:
     # daemon (container create/exec, pull, foreign image names -> 403).
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: bash ops/tests/test_coder_worker_socket_proxy.sh
 
   workspace-git-clone:
@@ -104,8 +114,8 @@ jobs:
     # workspace-facing computor-git route (computor-org/issues#433).
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           enable-cache: true
       - run: uv sync --project computor-backend --python 3.12 --locked
@@ -119,7 +129,7 @@ jobs:
     # foreign images -> 403.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: bash ops/tests/test_coder_provisioner_socket_proxy.sh
 
   public-course-contract:
@@ -148,8 +158,8 @@ jobs:
       CODER_ADMIN_PASSWORD: synthetic-test-password
       PUBLIC_TESTING_TEST_DATABASE_URL: postgresql://computor_plan:synthetic-test-password@localhost:5432/computor_plan_test
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
       - run: uv sync --project computor-backend --python 3.12 --locked --extra dev
       - run: uv run --project computor-backend python -m computor_backend.tests.bootstrap_public_catalog_db
       - run: >-
@@ -157,6 +167,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_public_learning.py
           computor-backend/src/computor_backend/tests/test_public_catalog_anonymous.py
           computor-backend/src/computor_backend/tests/test_public_course_registration.py
+          computor-backend/src/computor_backend/tests/test_first_login_language.py
           computor-backend/src/computor_backend/tests/test_course_public_flag_authz.py
           computor-backend/src/computor_backend/tests/test_public_luna_access.py
           computor-backend/src/computor_backend/tests/test_course_content_description_drafts.py
@@ -165,6 +176,9 @@ jobs:
           computor-backend/src/computor_backend/tests/test_admin_mfa_db.py
           computor-backend/src/computor_backend/tests/test_course_analytics_db.py
           computor-backend/src/computor_backend/tests/test_support_tickets_db.py
+          computor-backend/src/computor_backend/tests/test_course_deploy_i18n.py
+          computor-backend/src/computor_backend/tests/test_sync_course_metadata.py
+          computor-backend/src/computor_backend/tests/test_sync_example_versions.py
 
   grading-isolation:
     # Required jobs run in the merge queue, not on pull request events.
@@ -174,8 +188,8 @@ jobs:
     # tree kill, output caps and safe file reads run everywhere.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv venv --python 3.12 .venv-grading
@@ -190,6 +204,9 @@ jobs:
           ../.venv-grading/bin/python -m pytest -q -rs
           tests/test_job_isolation.py tests/test_sandbox_launch.py
           tests/test_env_filter.py
+      - name: Runner message tests
+        working-directory: computor-testing
+        run: ../.venv-grading/bin/python -m pytest -q tests/test_i18n.py
 
   web:
     # Required jobs run in the merge queue, not on pull request events.
@@ -199,8 +216,8 @@ jobs:
       run:
         working-directory: computor-web
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: yarn
@@ -211,14 +228,14 @@ jobs:
       - run: yarn test:public-learning
       - run: yarn build
       - run: npx playwright install --with-deps chromium
-      - run: yarn test:e2e e2e/public-learning.spec.ts e2e/course-card-layout.spec.ts e2e/workspace-launch.spec.ts e2e/teacher-dashboard.spec.ts e2e/support-tickets.spec.ts e2e/student-description-language.spec.ts e2e/self-enrollment-help.spec.ts e2e/public-landing.spec.ts e2e/student-progress.spec.ts --workers=2
+      - run: yarn test:e2e e2e/public-learning.spec.ts e2e/course-card-layout.spec.ts e2e/workspace-launch.spec.ts e2e/teacher-dashboard.spec.ts e2e/support-tickets.spec.ts e2e/student-description-language.spec.ts e2e/self-enrollment-help.spec.ts e2e/public-landing.spec.ts e2e/student-progress.spec.ts e2e/reading-language-pages.spec.ts e2e/test-feedback-language.spec.ts --workers=2
 
   keycloak-abuse:
     # Required jobs run in the merge queue, not on pull request events.
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Build and test Keycloak provider
         run: ops/keycloak/build_abuse.sh /tmp/computor-keycloak-providers
       - name: Pull isolated Keycloak/Postgres test images
@@ -235,8 +252,8 @@ jobs:
     # e-mail reset, backend role sync and the backend's amr evidence check.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
       - run: uv sync --project computor-backend --python 3.12 --locked --extra dev
       - run: docker pull quay.io/keycloak/keycloak:26.7.4
       - env:

@@ -29,6 +29,7 @@ from computor_backend.permissions.principal import Principal
 from computor_backend.model.auth import User, Account, Profile
 from computor_backend.model.organization import Organization
 from computor_backend.redis_cache import get_redis_client
+from computor_backend.utils.reading_language import resolve_effective_language
 from computor_backend.plugins.registry import get_plugin_registry
 from computor_backend.plugins import AuthStatus
 from computor_backend.auth.keycloak_admin import KeycloakAdminClient, KeycloakUser
@@ -421,7 +422,7 @@ def _sso_identity_properties(user_info, auth_result) -> Dict[str, Any]:
     }
 
 
-async def _queue_welcome_mail(user_id: str, language: str = "en") -> None:
+async def _queue_welcome_mail(user_id: str, language: Optional[str] = None) -> None:
     """Queue the welcome mail (issues#185). Best effort: a mail problem never
     fails a login. The workflow ID is per user and duplicates are rejected, so
     the mail goes out at most once."""
@@ -436,7 +437,8 @@ async def _queue_welcome_mail(user_id: str, language: str = "en") -> None:
 
         await get_task_executor().submit_task(TaskSubmission(
             task_name="support_welcome_mail",
-            parameters={"user_id": user_id, "language": language if language in ("de", "en") else "en"},
+            # No language known reads German, any other reads English.
+            parameters={"user_id": user_id, "language": resolve_effective_language(None, language)},
             queue=SUPPORT_TASK_QUEUE,
             workflow_id=f"support-welcome-{user_id}",
         ))
@@ -640,10 +642,11 @@ async def handle_sso_callback(
                 db.flush()
                 created_user = True
                 # The database trigger creates a profile with Automatic language.
-                # Preserve the explicit choice made before registration, without
-                # changing an existing user's preference on a later login.
-                registration_language = (state_data or {}).get("ui_locales")
-                if registration_language in ("de", "en"):
+                # ui_locales alone is browser-derived; storing it would end
+                # Automatic for every new account (computor-org/issues#534).
+                registration_state = state_data or {}
+                registration_language = registration_state.get("ui_locales")
+                if registration_state.get("explicit_language") and registration_language in ("de", "en"):
                     profile = db.query(Profile).filter(Profile.user_id == user.id).first()
                     if profile is None:
                         profile = Profile(user_id=user.id)
@@ -773,7 +776,7 @@ async def handle_sso_callback(
         # Registration is complete here: the address is verified (admission
         # refused it otherwise) and the first login has created the user.
         if user_primitives["email"]:
-            await _queue_welcome_mail(user_primitives["id"], (state_data or {}).get("ui_locales", "en"))
+            await _queue_welcome_mail(user_primitives["id"], (state_data or {}).get("ui_locales"))
 
     # Elevated users must hold Keycloak's computor-mfa-required role (#485).
     from computor_backend.business_logic.admin_mfa import sync_on_login

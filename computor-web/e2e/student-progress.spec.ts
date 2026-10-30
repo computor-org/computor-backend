@@ -1,5 +1,7 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
 import { assignmentsInCourseOrder, courseProgress, progressPercent } from '../src/utils/studentProgress';
+import { assignmentState, unitState } from '../src/utils/assignmentStatus';
+import { formatScore } from '../src/components/ui/Score';
 
 /**
  * A learner's own progress and the "Weiter mit" pointer (issues#408, #525):
@@ -29,6 +31,7 @@ type Row = {
   position: number;
   title: string | null;
   course_content_kind_id: 'unit' | 'assignment';
+  course_content_type?: { id: string; slug: string; title: string; title_i18n?: Record<string, string> };
   submitted?: boolean;
   description?: string;
   course_id?: string;
@@ -43,6 +46,7 @@ type Row = {
 
 const unit = (path: string, position: number, title: string): Row => ({
   id: `u-${path}`, path, position, title, course_content_kind_id: 'unit',
+  course_content_type: { id: 'ct-weekly', slug: 'weekly', title: 'Woche', title_i18n: { en: 'Week' } },
 });
 const assignment = (path: string, position: number, title: string, submitted: boolean, result?: number): Row => ({
   id: `a-${path}`, path, position, title, course_content_kind_id: 'assignment', submitted,
@@ -63,6 +67,13 @@ const CONTENTS: Row[] = [
 ];
 
 // --- the rules, without a browser ---------------------------------------------------
+
+test('a score has one format per language, in lists and on the detail page', () => {
+  expect(formatScore(1, 0, 'de')).toBe(formatScore(1, 1, 'de'));
+  expect(formatScore(1, 1, 'de')).toMatch(/^100\s%$/);
+  expect(formatScore(1, 1, 'en')).toBe('100%');
+  expect(formatScore(0.545, 1, 'de')).toMatch(/^54,5\s%$/);
+});
 
 test('assignments follow the course tree: unit position, then assignment position', () => {
   expect(assignmentsInCourseOrder(CONTENTS).map((a) => a.title)).toEqual([
@@ -96,6 +107,20 @@ test('nothing left to do means no pointer, and the bar reaches 100 only then', (
   expect(progressPercent(done)).toBe(100);
   expect(progressPercent({ submitted: 199, total: 200 })).toBe(99);
   expect(progressPercent({ submitted: 0, total: 0 })).toBe(0);
+});
+
+test('the row dot shows the verdict, else whether the work is submitted (issues#554)', () => {
+  expect(assignmentState({ submitted: false, status: null })).toBe('open');
+  expect(assignmentState({ submitted: false, status: 'not_reviewed' })).toBe('open');
+  expect(assignmentState({ submitted: true, status: 'not_reviewed' })).toBe('submitted');
+  expect(assignmentState({ submitted: true, status: 'corrected' })).toBe('corrected');
+  expect(assignmentState({ submitted: true, status: 'improvement_possible' })).toBe('improvement_possible');
+  expect(assignmentState({ submitted: true, status: 'correction_possible' })).toBe('improvement_possible');
+  expect(assignmentState({ submitted: true, status: 'correction_necessary' })).toBe('correction_necessary');
+  // "Woche 1" with 4 of 7 submitted is not done.
+  expect(unitState({ submitted: 4, total: 7 })).toBe('open');
+  expect(unitState({ submitted: 2, total: 2 })).toBe('submitted');
+  expect(unitState({ submitted: 0, total: 0 })).toBe('open');
 });
 
 // --- the screens ----------------------------------------------------------------------
@@ -152,7 +177,7 @@ async function signIn(page: Page, { contents = CONTENTS, roles = ['_student'], s
     if (path === `/courses/${COURSE_ID}`) return json(route, COURSE);
     if (path === '/courses') return json(route, [COURSE]);
     if (path === '/organizations/o-1') return json(route, { id: 'o-1', title: 'TU Graz' });
-    if (path === '/course-families/f-1') return json(route, { id: 'f-1', title: 'Data Science mit Python' });
+    if (path === '/course-families/f-1') return json(route, { id: 'f-1', title: 'Data Science mit Python', title_i18n: { en: 'Data Science with Python' } });
     if (path.startsWith('/user/views')) return json(route, ['student']);
     if (path === '/user/scopes') return json(route, { is_admin: false, course: { [COURSE_ID]: roles } });
     if (path === '/user') {
@@ -166,6 +191,12 @@ async function signIn(page: Page, { contents = CONTENTS, roles = ['_student'], s
 
 test.describe('German learner', () => {
   test.use({ locale: 'de-AT' });
+
+  test('the assignment list counts weeks, as /learn does', async ({ page }) => {
+    await signIn(page);
+    await page.goto(`/courses/${COURSE_ID}/student/assignments`);
+    await expect(page.getByText('3 Wochen · 6 Aufgaben')).toBeVisible({ timeout: 15_000 });
+  });
 
   test('the course page shows the bar and links to where the learner left off', async ({ page }) => {
     await signIn(page);
@@ -210,7 +241,7 @@ test.describe('German learner', () => {
 
     await expect(page.getByTestId('course-progress')).toContainText('Weiter mit: Woche 3 › Beta-Absorption', { timeout: 15_000 });
     await expect(page.getByText('2/2 eingereicht')).toHaveCount(2);
-    await expect(page.getByText('2 Elemente', { exact: true })).toBeVisible();
+    await expect(page.getByText('2 Aufgaben', { exact: true })).toBeVisible();
     // Only the "Weiter mit" line points at it; the row has no second marker.
     await expect(page.getByText('Weiter hier', { exact: true })).toHaveCount(0);
   });
@@ -241,11 +272,48 @@ test.describe('English learner', () => {
     const card = page.getByTestId('course-progress');
     await expect(page.getByRole('heading', { name: 'Your progress' })).toBeVisible({ timeout: 15_000 });
     await expect(card.getByText('4 of 6 assignments submitted')).toBeVisible();
-    await expect(card).toContainText('Continue with: Woche 3 › Beta-Absorption (last tested: 0%)');
+    // The stored "Woche 3" follows the English reader (computor-org/issues#538).
+    await expect(card).toContainText('Continue with: Week 3 › Beta-Absorption (last tested: 0%)');
     await expect(card.getByRole('link', { name: 'Beta-Absorption', exact: true })).toBeVisible();
     await expect(card.getByRole('link', { name: 'Read task', exact: true })).toHaveCount(0);
   });
+
+  test('the course family is named in English, in the breadcrumb and the details', async ({ page }) => {
+    await signIn(page);
+    await page.goto(`/courses/${COURSE_ID}`);
+    await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Data Science with Python' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Data Science with Python', { exact: true })).toHaveCount(2);
+    await expect(page.getByText('Data Science mit Python', { exact: true })).toHaveCount(0);
+  });
 });
+
+for (const language of ['de', 'en'] as const) {
+  test.describe(`Assignment status dots (${language})`, () => {
+    test.use({ locale: language === 'de' ? 'de-DE' : 'en-US' });
+
+    test('each dot carries its state and the legend names every state', async ({ page }) => {
+      const contents = CONTENTS.map((c) => c.id === 'a-week3.beta' ? { ...c, submitted: true, status: 'corrected' } : c);
+      await signIn(page, { contents });
+      await page.goto(`/courses/${COURSE_ID}/student/assignments`);
+
+      const legend = page.getByTestId('status-legend');
+      await expect(legend).toBeVisible({ timeout: 15_000 });
+      const labels = language === 'de'
+        ? ['Offen', 'Eingereicht', 'Korrigiert', 'Verbesserung möglich', 'Korrektur nötig']
+        : ['Open', 'Submitted', 'Corrected', 'Improvement possible', 'Correction necessary'];
+      await expect(legend.getByRole('listitem')).toHaveText(labels);
+
+      const [open, submitted, corrected] = labels;
+      const dot = (title: string) => page.locator(`span.rounded-full[title="${title}"]`);
+      // Woche 1 and 2 fully submitted; Woche 3 still has the review open.
+      await expect(dot(submitted)).toHaveCount(2);
+      await expect(dot(open)).toHaveCount(2);
+      await expect(dot(corrected)).toHaveCount(1);
+      await expect(dot(corrected)).toHaveCSS('background-color', 'rgb(87, 204, 93)');
+      await expect(dot(submitted).first()).toHaveCSS('background-color', 'rgb(192, 132, 252)');
+    });
+  });
+}
 
 test('a tutor sees no learner progress and the page does not ask for it', async ({ page }) => {
   const requested = await signIn(page, { roles: ['_tutor'] });
@@ -295,7 +363,7 @@ for (const language of ['de', 'en'] as const) {
 
         await expect(card).toContainText(language === 'de' ? '1 von 6 Aufgaben eingereicht' : '1 of 6 assignments submitted');
         await expect(card.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '17');
-        await expect(card).toContainText(language === 'de' ? 'Weiter mit: Woche 1 › Listen' : 'Continue with: Woche 1 › Listen');
+        await expect(card).toContainText(language === 'de' ? 'Weiter mit: Woche 1 › Listen' : 'Continue with: Week 1 › Listen');
         await expect(card.getByRole('link', { name: 'Listen', exact: true })).toBeVisible();
         expect(await mountedCard?.evaluate((node) => node === document.querySelector('[data-testid="course-progress"]'))).toBe(true);
         expect(new URL(page.url()).pathname).toBe(path);
@@ -310,6 +378,32 @@ for (const language of ['de', 'en'] as const) {
     }
   });
 }
+
+test.describe('An open page follows test, submission and grading (issues#554)', () => {
+  test.use({ locale: 'en-US' });
+
+  for (const destination of ['overview', 'assignments'] as const) {
+    test(`${destination}: the status changes within seconds while the page stays visible`, async ({ page }) => {
+      // Fake timers: the refresh is a timer, and the test must not wait for it in real time.
+      await page.clock.install();
+      const initial = CONTENTS.map((c) => ({ ...c, submitted: false, result: null }));
+      await signIn(page, { contents: initial });
+      await page.goto(`/courses/${COURSE_ID}${destination === 'assignments' ? '/student/assignments' : ''}`);
+      const card = page.getByTestId('course-progress');
+      await expect(card).toContainText('0 of 6 assignments submitted', { timeout: 15_000 });
+      await page.waitForLoadState('networkidle');
+
+      // A tutor grades the first assignment while the learner looks at the page; no focus or visibility event.
+      const graded = initial.map((c) => c.id === 'a-week1.constants' ? { ...c, submitted: true, status: 'corrected' } : c);
+      await page.route(`${API_ORIGIN}/students/course-contents?**`, (route) => json(route, graded));
+      await page.clock.runFor(10_000);
+
+      await expect(card).toContainText('1 of 6 assignments submitted');
+      // Woche 1 is open because it holds the next assignment.
+      if (destination === 'assignments') await expect(page.locator('span.rounded-full[title="Corrected"]')).toHaveCount(1);
+    });
+  }
+});
 
 for (const language of ['de', 'en'] as const) {
   test.describe(`Learner workspace location (${language})`, () => {
@@ -444,7 +538,7 @@ test('the assignment page shows the task and never opens VS Code by itself', asy
   await page.goto(`/courses/${COURSE_ID}/student/assignments/${FIRST}`);
   await expect(page.getByRole('heading', { name: 'Description', exact: true })).toBeVisible();
   await expect(page.getByText('Exercise instructions', { exact: true })).toBeVisible();
-  await expect(page.getByText('0.0%', { exact: true })).toBeVisible();
+  await expect(page.getByText('0%', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open in VS Code', exact: true })).toHaveCount(1);
   await page.waitForLoadState('networkidle');
   expect(requested).not.toContain('/coder/workspaces/provision');
@@ -452,16 +546,18 @@ test('the assignment page shows the task and never opens VS Code by itself', asy
   expect(page.url()).toMatch(new RegExp(`/student/assignments/${FIRST}$`));
 });
 
-test('German failure on the assignment page is bounded and never exposes raw API text', async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'dark' });
-  await page.addInitScript(() => localStorage.setItem('computor.language', 'de'));
-  await signIn(page, { contents: EXACT_CONTENTS, workspace: true });
-  await page.context().route(`${API_ORIGIN}/coder/workspaces`, (route) => json(route, { detail: '/private/tester.py: secret internal failure' }, 500));
-  await page.goto(`/courses/${COURSE_ID}/student/assignments/${FIRST}`);
-  await page.getByRole('button', { name: 'In VS Code öffnen', exact: true }).click();
-  await expect(page.getByText('Deine Auswahl konnte in deiner Arbeitsumgebung nicht geöffnet werden. Versuch es noch einmal.', { exact: true })).toBeVisible();
-  await expect(page.locator('body')).not.toContainText('/private/tester.py');
-  expect(page.context().pages()).toHaveLength(1);
+test.describe('German browser', () => {
+  test.use({ locale: 'de-DE' });
+  test('German failure on the assignment page is bounded and never exposes raw API text', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await signIn(page, { contents: EXACT_CONTENTS, workspace: true });
+    await page.context().route(`${API_ORIGIN}/coder/workspaces`, (route) => json(route, { detail: '/private/tester.py: secret internal failure' }, 500));
+    await page.goto(`/courses/${COURSE_ID}/student/assignments/${FIRST}`);
+    await page.getByRole('button', { name: 'In VS Code öffnen', exact: true }).click();
+    await expect(page.getByText('Deine Auswahl konnte in deiner Arbeitsumgebung nicht geöffnet werden. Versuch es noch einmal.', { exact: true })).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('/private/tester.py');
+    expect(page.context().pages()).toHaveLength(1);
+  });
 });
 
 test('an explicit public content path resolves its exact UUID instead of the next exercise', async ({ page }) => {
@@ -522,7 +618,7 @@ for (const staff of [
     await page.goto(`/courses/${COURSE_ID}/student/assignments/${FIRST}`);
     await expect(page.getByRole('heading', { name: 'Description', exact: true })).toBeVisible();
     await expect(page.getByText('Exercise instructions', { exact: true })).toBeVisible();
-    await expect(page.getByText('0.0%', { exact: true })).toBeVisible();
+    await expect(page.getByText('0%', { exact: true })).toBeVisible();
     expect(requested.some((path) => path.endsWith('/launch-context'))).toBe(false);
   });
 }
@@ -542,26 +638,28 @@ test('an authored unit-only course still mounts one launcher and opens its intro
   expect(targets).toEqual([{ course_id: COURSE_ID, course_content_id: WELCOME, ui_language: 'en' }]);
 });
 for (const language of ['de', 'en'] as const) {
-  test(`an untouched course opens its introduction while an explicit exercise stays exact (${language})`, async ({ page }) => {
-    await page.addInitScript((language) => localStorage.setItem('computor.language', language), language);
-    await signIn(page, { contents: EXACT_CONTENTS.map((item) => ({ ...item, result: null })), workspace: true });
-    const targets = recordTargets(page);
-    await page.goto(`/courses/${COURSE_ID}/student/assignments`);
-    const openLabel = language === 'de' ? 'In VS Code öffnen' : 'Open in VS Code';
-    for (const [open, expected] of [
-      [async () => {}, { course_id: COURSE_ID, ui_language: language }],
-      [async () => {
-        await page.getByRole('link', { name: 'First exercise', exact: true }).first().click();
-        await expect(page).toHaveURL(`/courses/${COURSE_ID}/student/assignments/${FIRST}`);
-      }, { course_id: COURSE_ID, course_content_id: FIRST, ui_language: language }],
-    ] as const) {
-      await open();
-      const popupReady = page.waitForEvent('popup');
-      await page.getByRole('button', { name: openLabel, exact: true }).click();
-      const editor = await popupReady;
-      await expect(editor).toHaveURL(EDITOR);
-      expect(targets.at(-1)).toEqual(expected);
-      await editor.close();
-    }
+  test.describe(`${language} browser`, () => {
+    test.use({ locale: language === 'de' ? 'de-DE' : 'en-US' });
+    test(`an untouched course opens its introduction while an explicit exercise stays exact (${language})`, async ({ page }) => {
+      await signIn(page, { contents: EXACT_CONTENTS.map((item) => ({ ...item, result: null })), workspace: true });
+      const targets = recordTargets(page);
+      await page.goto(`/courses/${COURSE_ID}/student/assignments`);
+      const openLabel = language === 'de' ? 'In VS Code öffnen' : 'Open in VS Code';
+      for (const [open, expected] of [
+        [async () => {}, { course_id: COURSE_ID, ui_language: language }],
+        [async () => {
+          await page.getByRole('link', { name: 'First exercise', exact: true }).first().click();
+          await expect(page).toHaveURL(`/courses/${COURSE_ID}/student/assignments/${FIRST}`);
+        }, { course_id: COURSE_ID, course_content_id: FIRST, ui_language: language }],
+      ] as const) {
+        await open();
+        const popupReady = page.waitForEvent('popup');
+        await page.getByRole('button', { name: openLabel, exact: true }).click();
+        const editor = await popupReady;
+        await expect(editor).toHaveURL(EDITOR);
+        expect(targets.at(-1)).toEqual(expected);
+        await editor.close();
+      }
+    });
   });
 }

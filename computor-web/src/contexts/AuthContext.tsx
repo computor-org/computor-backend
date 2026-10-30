@@ -6,6 +6,7 @@ import { UserScopes } from '@/src/generated/types/users';
 import { ssoAuthService } from '@/src/services/authInstances';
 import { hasSignedInHint } from '@/src/services/authStorage';
 import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
+import { READING_LANGUAGE_COOKIE, writeLanguageCookie } from '@/src/utils/requestLanguage';
 // Side-effect import: wires the auth providers into the shared `apiClient`
 // singleton (used by all generated clients) so a 401 there refreshes the token
 // and clears the cached session on failure instead of bailing out blindly.
@@ -210,6 +211,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearInterval(refreshInterval);
     };
   }, [user, refreshSession]);
+
+  // Signed out: the next server render follows the browser again.
+  useEffect(() => {
+    if (!isLoading && !user) writeLanguageCookie(READING_LANGUAGE_COOKIE, null);
+  }, [isLoading, user]);
 
   const restoreSession = useCallback(async () => {
     if (!hasSignedInHint()) return;

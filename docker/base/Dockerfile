@@ -25,7 +25,7 @@
 # runtime image). The 7-day cooldown lives in computor-backend/pyproject.toml
 # ([tool.uv] exclude-newer), with the refresh procedure next to it.
 # ---------------------------------------------------------------------------
-FROM ghcr.io/astral-sh/uv:0.12.17@sha256:10787c682e4184e4f290de1171fd4703dc63de99221f10fe1c99002ce7fa9acc AS uv
+FROM ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 AS uv
 
 FROM python:3.12.15-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704 AS lock-export
 COPY --from=uv /uv /usr/local/bin/uv

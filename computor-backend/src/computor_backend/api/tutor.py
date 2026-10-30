@@ -3,7 +3,7 @@ import logging
 import uuid as uuid_module
 from uuid import UUID
 from typing import Annotated, Optional
-from fastapi import APIRouter, Depends, Query, File, UploadFile, Form
+from fastapi import APIRouter, Depends, Query, File, UploadFile, Form, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,7 @@ from computor_backend.permissions.auth import get_current_principal
 from computor_backend.exceptions import NotFoundException, ForbiddenException, NotImplementedException, BadRequestException
 from computor_backend.permissions.core import check_course_permissions
 from computor_backend.services.storage_service import get_storage_service
+from computor_backend.business_logic.localization import LocalizeParam
 from computor_backend.model.course import CourseMember
 from computor_backend.repositories import (
     CourseRepository,
@@ -69,20 +70,22 @@ async def tutor_get_course_contents_endpoint(
     course_content_id: UUID | str,
     course_member_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    cache: Cache = Depends(get_cache)
+    cache: Cache = Depends(get_cache),
+    localize: LocalizeParam = None,
 ):
     """Get course content for a course member as a tutor."""
-    return await get_tutor_course_content(course_member_id, course_content_id, permissions, cache)
+    return await get_tutor_course_content(course_member_id, course_content_id, permissions, cache, lang=localize)
 
 @tutor_router.get("/course-members/{course_member_id}/course-contents", response_model=list[CourseContentStudentList])
 async def tutor_list_course_contents_endpoint(
     course_member_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: CourseContentStudentQuery = Depends(),
-    cache: Cache = Depends(get_cache)
+    cache: Cache = Depends(get_cache),
+    localize: LocalizeParam = None,
 ):
     """List course contents for a course member as a tutor."""
-    return await list_tutor_course_contents(course_member_id, permissions, params, cache)
+    return await list_tutor_course_contents(course_member_id, permissions, params, cache, lang=localize)
 
 @tutor_router.patch("/course-members/{course_member_id}/course-contents/{course_content_id}", response_model=TutorGradeResponse)
 async def tutor_update_course_contents_endpoint(
@@ -110,19 +113,21 @@ async def tutor_update_course_contents_endpoint(
 def tutor_get_courses_endpoint(
     course_id: UUID | str,
     permissions: Annotated[Principal, Depends(get_current_principal)],
-    cache: Cache = Depends(get_cache)
+    cache: Cache = Depends(get_cache),
+    localize: LocalizeParam = None,
 ):
     """Get a course for tutors."""
-    return get_tutor_course(course_id, permissions, cache)
+    return get_tutor_course(course_id, permissions, cache, lang=localize)
 
 @tutor_router.get("/courses", response_model=list[CourseTutorList])
 def tutor_list_courses_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     params: CourseStudentQuery = Depends(),
-    cache: Cache = Depends(get_cache)
+    cache: Cache = Depends(get_cache),
+    localize: LocalizeParam = None,
 ):
     """List courses for tutors."""
-    return list_tutor_courses(permissions, params, cache)
+    return list_tutor_courses(permissions, params, cache, lang=localize)
 
 @tutor_router.get("/course-members/{course_member_id}", response_model=TutorCourseMemberGet)
 def tutor_get_course_members_endpoint(
@@ -574,6 +579,7 @@ async def create_tutor_test(
     course_content_id: UUID | str,
     file: UploadFile = File(..., description="ZIP file containing tutor's code"),
     config: Optional[str] = Form(None, description="Optional JSON configuration"),
+    http_request: Request = None,
     permissions: Annotated[Principal, Depends(get_current_principal)] = None,
     db: Session = Depends(get_db, scope="function"),
     cache: Cache = Depends(get_cache),
@@ -603,6 +609,8 @@ async def create_tutor_test(
 
     **Response**: Returns test_id for polling status via GET /tutors/tests/{test_id}
     """
+
+    from computor_backend.business_logic.testing_service import resolve_test_language
 
     # Check permissions
     course_content, course = await _check_tutor_permission_for_course_content(
@@ -701,7 +709,11 @@ async def create_tutor_test(
                 "course_content_id": str(course_content_id),
                 "user_id": str(user_id),
                 "store_graphics_artifacts": test_config.store_graphics_artifacts,
-                "language": course.language_code or None,
+                "language": resolve_test_language(
+                    user_id,
+                    http_request.headers.get("Accept-Language") if http_request else None,
+                    db,
+                ),
             },
         },
         queue=task_queue,

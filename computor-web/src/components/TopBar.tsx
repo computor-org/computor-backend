@@ -9,6 +9,7 @@ import { useCourse } from '@/src/contexts/CourseContext';
 import { MessagesClient } from '@/src/generated/clients/MessagesClient';
 import Avatar from './Avatar';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { localized } from '@/src/utils/localizedText';
 
 const COPY = {
   de: {
@@ -32,14 +33,15 @@ const COPY = {
 const messagesClient = new MessagesClient();
 
 export default function TopBar() {
-  const t = COPY[useUiLanguage()];
+  const language = useUiLanguage();
+  const t = COPY[language];
   const router = useRouter();
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { courseId: currentCourseId, course } = useCourse();
-  const courseTitle = course ? course.title || t.untitled : null;
+  const courseTitle = course ? localized(course, language).title || t.untitled : null;
   const [avatar, setAvatar] = useState<{ color: number | null; image: string | null }>({ color: null, image: null });
   const [unreadCount, setUnreadCount] = useState(0);
 

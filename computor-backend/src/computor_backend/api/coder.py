@@ -9,10 +9,10 @@ import json
 import logging
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from computor_backend.coder.client import CoderClient, get_coder_client
@@ -128,6 +128,7 @@ from computor_backend.business_logic.api_tokens import assert_token_not_mfa_rest
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.redis_cache import get_cache, get_redis_client
+from computor_backend.utils.reading_language import resolve_effective_language
 from computor_backend.business_logic.workspace_launch_context import (
     get_workspace_launch_context as read_workspace_launch_context,
     populate_last_courses,
@@ -307,6 +308,67 @@ def _computor_user_for_coder_name(db: Session, username: str):
     except Exception:
         logger.warning(f"Could not resolve Coder username '{username}' to a user")
         return None
+
+
+# A token that expires within this window is renewed on start: a started
+# workspace can run for a working day without another build.
+_AUTO_LOGIN_RENEW_MARGIN = timedelta(days=1)
+
+
+def _auto_login_token_valid(db: Session, token: str) -> bool:
+    """Whether ``token`` is an active API token that outlives the renewal margin."""
+    from computor_backend.model.service import ApiToken
+    from computor_backend.utils.api_token import hash_api_token, validate_token_format
+
+    if not token or not validate_token_format(token):
+        return False
+    row = (
+        db.query(ApiToken)
+        .filter(ApiToken.token_hash == hash_api_token(token), ApiToken.revoked_at.is_(None))
+        .first()
+    )
+    if row is None:
+        return False
+    return row.expires_at is None or row.expires_at > datetime.now(timezone.utc) + _AUTO_LOGIN_RENEW_MARGIN
+
+
+async def _auto_login_token_params(
+    db: Session,
+    client: CoderClient,
+    permissions: Principal,
+    username: str,
+    workspace,
+    ttl_days: int | None,
+) -> dict | None:
+    """Rich-parameter override with a fresh auto-login token, or None.
+
+    Coder carries ``computor_auth_token`` forward on every start, so a token
+    that was revoked (the admin-MFA rollout revoked the elevated ones,
+    issues#485), has expired or is about to, stayed in the workspace and the
+    extension inside could not sign in. Only provisioning used to mint a new
+    one; a start does now, under the same second-factor rule.
+
+    None when the build has no such parameter or it cannot be read (the old
+    behaviour), when the owner is not a Computor user, or when the carried
+    token is still good.
+    """
+    owner = _computor_user_for_coder_name(db, username)
+    if owner is None or not workspace.latest_build_id:
+        return None
+    params = await client.get_build_params(workspace.latest_build_id)
+    if "computor_auth_token" not in params:
+        return None
+    if _auto_login_token_valid(db, params["computor_auth_token"]):
+        return None
+    assert_token_not_mfa_restricted(permissions, owner.id)
+    token = mint_workspace_token(
+        db, get_cache(), str(owner.id), str(permissions.user_id),
+        workspace_name=workspace.name, ttl_days=ttl_days,
+    )
+    if not token:
+        return None
+    logger.info(f"Workspace {username}/{workspace.name}: auto-login token renewed on start")
+    return {"computor_auth_token": token}
 
 
 def _resolve_workspace_owners(db: Session, workspaces: list[CoderWorkspace]) -> None:
@@ -785,22 +847,33 @@ async def workspace_exists(
 @router.post(
     "/workspaces/{username}/{workspace_name}/launch-context",
     response_model=WorkspaceLaunchContext,
-    summary="Select the course to open in your workspace",
+    summary="Select the course and reading language for your workspace",
 )
 async def post_workspace_launch_context(
     username: str,
     workspace_name: str,
     request: WorkspaceLaunchContextRequest,
+    http_request: Request,
     permissions: Annotated[Principal, Depends(get_current_principal)],
     _settings: Annotated[CoderSettings, Depends(require_coder_enabled)],
     client: Annotated[CoderClient, Depends(get_coder_client)],
     db: Annotated[Session, Depends(get_db, scope="function")],
+    cache=Depends(get_cache),
     redis=Depends(get_redis_client),
 ) -> WorkspaceLaunchContext:
+    ui_language = request.ui_language
+    if ui_language is None:
+        # Same resolution as GET /user so the workspace opens in the reading
+        # language the backend already committed to for this learner.
+        user = get_user_by_id(db, cache, str(permissions.user_id))
+        ui_language = resolve_effective_language(
+            user.profile.language_code if user.profile else None,
+            http_request.headers.get("Accept-Language"),
+        )
     try:
         return await set_workspace_launch_context(
             username, workspace_name, request.course_id, permissions, db, client, redis,
-            ui_language=request.ui_language,
+            ui_language=ui_language,
             course_content_id=request.course_content_id,
         )
     except ComputorException:
@@ -901,6 +974,13 @@ async def start_workspace(
         # one — the build parameters are what the container and the ingress are
         # rendered from, and Coder carries them forward untouched.
         overrides = _current_app_credential_params(db, username)
+        # Before the reservation: a refusal (AUTHZ_007) must not leave one behind.
+        token_params = await _auto_login_token_params(
+            db, client, permissions, username, details.workspace,
+            _settings.workspace_token_ttl_days,
+        )
+        if token_params:
+            overrides = {**(overrides or {}), **token_params}
         await client.ensure_user_active(username)
         await reserve_public_container(client, username, workspace_name)
         success = await client.start_workspace(

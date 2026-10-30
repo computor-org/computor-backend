@@ -75,7 +75,15 @@ def login_as(monkeypatch):
     monkeypatch.setattr(auth_bl, "login_idle_seconds", lambda db: 60)
     monkeypatch.setattr(auth_bl, "_provision_git_server_account", _noop)
 
-    async def _run(db, *, email: str, email_verified, sub: str | None = None, language: str | None = None):
+    async def _run(
+        db,
+        *,
+        email: str,
+        email_verified,
+        sub: str | None = None,
+        language: str | None = None,
+        explicit: bool = False,
+    ):
         attributes = {} if email_verified is None else {"email_verified": email_verified}
         result = AuthResult(
             status=AuthStatus.SUCCESS,
@@ -103,11 +111,14 @@ def login_as(monkeypatch):
             ),
         )
         monkeypatch.setattr(auth_bl, "get_plugin_registry", lambda: registry)
+        state_data = {"ui_locales": language} if language else {}
+        if explicit:
+            state_data["explicit_language"] = "1"
         return await auth_bl.handle_sso_callback(
             provider="keycloak",
             code="code",
             state="state",
-            state_data={"ui_locales": language} if language else {},
+            state_data=state_data,
             callback_url="http://test/callback",
             db=db,
         )
@@ -461,7 +472,12 @@ def registration_languages(db):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("language", ["de", "en"])
 async def test_registration_persists_explicit_profile_language(db, login_as, registration_languages, language):
-    result = await login_as(db, email=_email(), email_verified=True, language=language)
+    """Only a choice marked explicit at login becomes the profile language.
+
+    Before, any ``ui_locales`` was stored, which is the browser-derived language
+    and left no new account on Automatic (computor-org/issues#534).
+    """
+    result = await login_as(db, email=_email(), email_verified=True, language=language, explicit=True)
 
     profile = db.query(Profile).filter(Profile.user_id == result["user_id"]).one()
     assert profile.language_code == language
@@ -470,7 +486,7 @@ async def test_registration_persists_explicit_profile_language(db, login_as, reg
 @pytest.mark.asyncio
 @pytest.mark.parametrize("language", [None, "fr", "invalid"])
 async def test_registration_does_not_persist_an_unsupported_profile_language(db, login_as, language):
-    result = await login_as(db, email=_email(), email_verified=True, language=language)
+    result = await login_as(db, email=_email(), email_verified=True, language=language, explicit=True)
 
     profile = db.query(Profile).filter(Profile.user_id == result["user_id"]).first()
     assert profile is None or profile.language_code is None

@@ -6,7 +6,6 @@ import {
   pickDescriptionFile,
   plainHeading,
   readStudentDescription,
-  resolveContentLanguage,
   withoutLeadingHeading,
 } from '../src/components/student/studentDescription';
 
@@ -16,19 +15,13 @@ async function archive(files: Record<string, string>): Promise<ArrayBuffer> {
   return zip.generateAsync({ type: 'arraybuffer' });
 }
 
-test('the course language decides when the learner chose none', () => {
-  expect(resolveContentLanguage(null, 'de')).toBe('de');
-  expect(resolveContentLanguage('en', 'de')).toBe('en');
-  expect(resolveContentLanguage(undefined, undefined)).toBe('en');
-});
-
-test('a German course shows the German README, not the English one', async () => {
+test('a German reader gets the German README, not the English one', async () => {
   const zip = await archive({
     'index_en.md': '# Mathematical Constants\n\nThis is the first task.',
     'index_de.md': '[NumPy]: <https://numpy.org/>\n\n# Mathematische Konstanten\n\nDies ist die erste Aufgabe.',
     'mediaFiles/plot.png': 'png',
   });
-  const description = await readStudentDescription(zip, resolveContentLanguage(null, 'de'));
+  const description = await readStudentDescription(zip, 'de');
   expect(descriptionHeading(description?.markdown)).toBe('Mathematische Konstanten');
   expect(withoutLeadingHeading(description!.markdown)).not.toContain('Mathematische Konstanten');
   expect(withoutLeadingHeading(description!.markdown)).toContain('Dies ist die erste Aufgabe.');

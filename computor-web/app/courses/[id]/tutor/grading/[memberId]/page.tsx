@@ -18,6 +18,7 @@ import { memberName, tutorsClient } from '@/src/components/tutor/tutorData';
 import { useResource } from '@/src/hooks/useResource';
 import { useCourseCrumbs } from '@/src/hooks/useCourseCrumbs';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { localizedText } from '@/src/utils/localizedText';
 import type { CourseContentStudentList, TutorGradeCreate } from 'types/generated';
 
 const COPY = {
@@ -47,8 +48,8 @@ const COPY = {
     noAssignments: 'No assignments.',
     toReview: 'to review',
     submissions: (n: number) => `${n} submission${n === 1 ? '' : 's'}`,
-    runs: (n: number) => `${n} runs`,
-    testRuns: (n: number) => `${n} test runs`,
+    runs: (n: number) => `${n} ${n === 1 ? 'test run' : 'test runs'}`,
+    testRuns: (n: number) => `${n} ${n === 1 ? 'test run' : 'test runs'}`,
     choose: 'Choose an assignment on the left.',
     latestResult: 'Latest test result:',
     gradeLatest: 'Grade the latest submission',
@@ -161,7 +162,7 @@ export default function TutorStudentGradingPage() {
                         className={`w-full text-left px-4 py-2.5 hover:bg-accent-wash/50 ${selected === c.id ? 'bg-accent-wash' : ''}`}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium text-fg truncate">{c.title || c.path}</span>
+                          <span className="text-sm font-medium text-fg truncate">{localizedText(c.title_i18n, language, c.title) || c.path}</span>
                           {(c.unreviewed_count ?? 0) > 0 && <Badge tone="warning">{t.toReview}</Badge>}
                         </div>
                         <div className="flex items-center gap-2 mt-1">
@@ -188,7 +189,7 @@ export default function TutorStudentGradingPage() {
               ) : item ? (
                 <>
                   <Panel className="space-y-2">
-                    <h3 className="text-sm font-semibold text-fg">{item.title || item.path}</h3>
+                    <h3 className="text-sm font-semibold text-fg">{localizedText(item.title_i18n, language, item.title) || item.path}</h3>
                     <p className="text-sm text-muted">
                       {t.latestResult} <Score value={item.result?.result ?? null} decimals={1} /> ·{' '}
                       {t.submissions(item.submission_count)} ·{' '}

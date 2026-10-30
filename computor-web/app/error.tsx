@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 const COPY = {
   de: {
@@ -31,8 +31,8 @@ export default function ErrorPage({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  // Outside the auth provider's guarantees: the stored or browser language.
-  const t = COPY[useBrowserLanguage()];
+  // Inside the root layout's providers, so a signed-in reader keeps the profile language.
+  const t = COPY[useUiLanguage()];
   return (
     <div className="min-h-screen flex items-center justify-center bg-canvas p-6">
       <div className="max-w-md w-full bg-surface rounded-lg border border-rule p-8 text-center">

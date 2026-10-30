@@ -11,6 +11,7 @@ import FormPanel, { Field } from '@/src/components/FormPanel';
 import { inputCls } from '@/src/components/ui/tokens';
 import type { OrganizationType } from '@/src/generated/types/organizations';
 import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
+import { organizationTypeLabel } from '@/src/utils/organizationType';
 
 const organizationsClient = new OrganizationsClient();
 
@@ -23,6 +24,7 @@ const COPY = {
     crumb: 'Organisationen',
     crumbNew: 'Neu',
     title: 'Neue Organisation',
+    pathExample: 'musterhochschule',
     description:
       'Eine Organisation ist eine Fakultät oder ein Institut – die oberste Ebene der Hierarchie. Sie besitzt die Kursfamilien (Lehrveranstaltungen), die darunter unterrichtet werden.',
     submit: 'Erstellen',
@@ -41,6 +43,7 @@ const COPY = {
     crumb: 'Organizations',
     crumbNew: 'New',
     title: 'New organization',
+    pathExample: 'acme',
     description:
       'An organization is a faculty or institute — the top of the hierarchy. It owns the course families (lectures) taught under it.',
     submit: 'Create',
@@ -109,12 +112,12 @@ export default function OrganizationCreatePage() {
         onSubmit={save}
       >
         <Field label={t.path} required hint={t.pathHint}>
-          <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="acme" className={inputCls} />
+          <input value={path} onChange={(e) => setPath(e.target.value)} placeholder={t.pathExample} className={inputCls} />
         </Field>
         <Field label={t.type} hint={t.typeHint}>
           <select value={orgType} onChange={(e) => setOrgType(e.target.value as OrganizationType)} className={inputCls}>
-            {ORG_TYPES.map((t) => (
-              <option key={t} value={t}>{t}</option>
+            {ORG_TYPES.map((type) => (
+              <option key={type} value={type}>{organizationTypeLabel(type, language)}</option>
             ))}
           </select>
         </Field>

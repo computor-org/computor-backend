@@ -421,7 +421,7 @@ def build_testing_submission(
 
 
 async def dispatch_submission_test(
-    artifact: SubmissionArtifact, db: Session
+    artifact: SubmissionArtifact, db: Session, accept_language: Optional[str] = None
 ) -> Optional[Result]:
     """Fire the test run an official submission is entitled to.
 
@@ -439,7 +439,7 @@ async def dispatch_submission_test(
     submission's test, so no further budget is charged here.
     """
     try:
-        return await _dispatch_submission_test(artifact, db)
+        return await _dispatch_submission_test(artifact, db, accept_language)
     except RateLimitException:
         db.rollback()
         raise
@@ -452,7 +452,7 @@ async def dispatch_submission_test(
 
 
 async def _dispatch_submission_test(
-    artifact: SubmissionArtifact, db: Session
+    artifact: SubmissionArtifact, db: Session, accept_language: Optional[str] = None
 ) -> Optional[Result]:
     from computor_backend.model.course import CourseMember
     from computor_backend.model.deployment import CourseContentDeployment
@@ -505,7 +505,7 @@ async def _dispatch_submission_test(
         return None
 
     from computor_backend.business_logic.testing_service import (
-        resolve_course_language,
+        resolve_test_language,
         resolve_testing_service,
     )
 
@@ -554,7 +554,7 @@ async def _dispatch_submission_test(
         "example_version_id": str(deployment.example_version_id),
         "artifact_id": str(artifact.id),
         "version_identifier": version_identifier,
-        "language": resolve_course_language(course_content, db),
+        "language": resolve_test_language(course_member.user_id, accept_language, db),
     }
 
     result = Result(

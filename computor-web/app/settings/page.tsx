@@ -18,20 +18,28 @@ import type { ApiTokenGet, ApiTokenCreateResponse, AccountList } from 'types/gen
 import type { ConsentStatusGet, InstanceStatusGet } from '@/src/generated/types/common';
 import { ConsentClient } from '@/src/generated/clients/ConsentClient';
 import { InstanceStatusClient } from '@/src/generated/clients/InstanceStatusClient';
+import { AuthenticationClient } from '@/src/generated/clients/AuthenticationClient';
 import DescriptionList from '@/src/components/DescriptionList';
 import { WEB_COMMIT, duration, shortCommit } from '@/src/utils/instanceStatus';
 import { LEGAL_LINKS, englishLegalLink } from '@/src/config/legal';
+import { localeFor } from '@/src/utils/locale';
+import { accountConsoleFrom } from '@/src/utils/accountConsole';
+import { accountLabel } from '@/src/utils/accountLabel';
 
 const tokensClient = new TokensClient();
 const accountsClient = new AccountsClient();
 const instanceStatusClient = new InstanceStatusClient();
 
-const KC_URL = process.env.NEXT_PUBLIC_KEYCLOAK_URL;
-const KC_REALM = process.env.NEXT_PUBLIC_KEYCLOAK_REALM || 'computor';
-const accountConsoleUrl = KC_URL ? `${KC_URL.replace(/\/$/, '')}/realms/${KC_REALM}/account/` : null;
+const authenticationClient = new AuthenticationClient();
 
 // The accounts list endpoint returns AccountList, which already carries `builtin`.
 type AccountRow = AccountList;
+
+/** The token the backend makes for a workspace's own sign-in (coder/service.py). */
+const isWorkspaceToken = (name: string) => name.startsWith('workspace-auto-login');
+
+const knownVersion = (branch: string | null | undefined) =>
+  !!branch && !['head', 'unknown'].includes(branch.trim().toLowerCase());
 
 function Section({ title, description, children, actions }: {
   title: string;
@@ -54,13 +62,13 @@ function Section({ title, description, children, actions }: {
 }
 
 function fmtDate(s: string | null | undefined, language: UiLanguage): string {
-  return s ? new Date(s).toLocaleDateString(language === 'de' ? 'de-AT' : undefined) : '—';
+  return s ? new Date(s).toLocaleDateString(localeFor(language)) : '—';
 }
 
 function stamp(value: string | null | undefined, language: UiLanguage): string | null {
   if (!value) return null;
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toLocaleString(language === 'de' ? 'de-AT' : undefined);
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleString(localeFor(language));
 }
 
 /** Lifetimes offered for a new API token, in days; empty means no expiry. */
@@ -78,7 +86,7 @@ const COPY = {
     appearance: 'Darstellung',
     appearanceDesc: 'So sieht Computor auf diesem Gerät aus. Wird nicht zwischen Geräten synchronisiert.',
     accountSecurity: 'Konto und Sicherheit',
-    accountSecurityDesc: 'Passwort, E-Mail, Zwei-Faktor-Authentifizierung und aktive Sitzungen verwaltet dein Login-Anbieter.',
+    accountSecurityDesc: 'In der Kontoverwaltung deines Login-Anbieters änderst du dein Passwort und deine E-Mail-Adresse, richtest die Zwei-Faktor-Authentifizierung ein und meldest andere Geräte ab.',
     openConsole: 'Kontoverwaltung öffnen',
     apiTokens: 'API-Tokens',
     apiTokensDesc: 'Persönliche Zugriffstokens für die CLI, die VS-Code-Erweiterung und Skripte. Behandle sie wie Passwörter.',
@@ -105,12 +113,14 @@ const COPY = {
     revokeTitle: 'Token widerrufen',
     revokeMessage: (name: string) => `Wenn du „${name}“ widerrufst, wird es sofort ungültig. Alles, was es verwendet, funktioniert dann nicht mehr.`,
     revoke: 'Widerrufen',
+    workspaceToken: 'Anmeldung der Arbeitsumgebung',
+    workspaceTokenHint: 'Von Computor angelegt, damit deine Arbeitsumgebung auf deine Kurse zugreifen kann.',
     accounts: 'Konten',
     accountsDesc: 'Deine Anmelde- und Git-Server-Identitäten.',
     noAccounts: 'Noch keine Konten.',
     builtIn: 'integriert',
     unlinkTitle: 'Konto trennen',
-    unlinkMessage: (provider: string, id: string) => `${provider}-Konto „${id}“ trennen?`,
+    unlinkMessage: (provider: string, id: string) => `Konto „${id}“ (${provider}) trennen?`,
     unlink: 'Trennen',
     privacy: 'Datenschutz und Einwilligung',
     privacyDesc: 'Sieh dir die aktuelle Datenschutzerklärung an und verwalte deine Einwilligung.',
@@ -146,7 +156,7 @@ const COPY = {
     appearance: 'Appearance',
     appearanceDesc: 'How Computor looks on this device. Not synced across devices.',
     accountSecurity: 'Account & Security',
-    accountSecurityDesc: 'Password, email, two-factor authentication and active sessions are managed by your login provider.',
+    accountSecurityDesc: 'In your login provider’s account console you change your password and email, set up two-factor authentication and sign out other devices.',
     openConsole: 'Open account console',
     apiTokens: 'API tokens',
     apiTokensDesc: 'Personal access tokens for the CLI, VS Code extension and scripts. Treat them like passwords.',
@@ -165,6 +175,8 @@ const COPY = {
     createToken: 'Create token',
     loading: 'Loading…',
     noTokens: 'No active tokens.',
+    workspaceToken: 'Workspace sign-in',
+    workspaceTokenHint: 'Created by Computor so your workspace can reach your courses.',
     created: 'created',
     expiresOn: 'expires',
     noExpiry: 'no expiry',
@@ -178,7 +190,7 @@ const COPY = {
     noAccounts: 'No accounts yet.',
     builtIn: 'built-in',
     unlinkTitle: 'Unlink account',
-    unlinkMessage: (provider: string, id: string) => `Unlink ${provider} account "${id}"?`,
+    unlinkMessage: (provider: string, id: string) => `Unlink account "${id}" (${provider})?`,
     unlink: 'Unlink',
     privacy: 'Privacy & Consent',
     privacyDesc: 'Review the current privacy notice and manage your consent.',
@@ -223,6 +235,7 @@ export default function SettingsPage() {
   // About this instance. Fetched once per visit and never polled: nobody sits on
   // Settings watching for a restart — System → Status is the page that does.
   const [instanceStatus, setInstanceStatus] = useState<InstanceStatusGet | null>(null);
+  const [accountConsoleUrl, setAccountConsoleUrl] = useState<string | null>(null);
 
   // Consent / privacy
   const publishedPrivacy = LEGAL_LINKS.find((link) => link.label === 'Datenschutz');
@@ -247,17 +260,19 @@ export default function SettingsPage() {
   async function load() {
     if (!authUser) return;
     try {
-      const [tk, ac, status] = await Promise.all([
+      const [tk, ac, status, providers] = await Promise.all([
         tokensClient.listTokensEndpointApiTokensGet({}),
         accountsClient.listAccountsAccountsGet({ userId: authUser.id }).catch(() => [] as AccountRow[]),
         // Swallowed on purpose: the About section is the least of what this page
         // is for, and an old deployment that predates the endpoint should not
         // cost the user their tokens list.
         instanceStatusClient.getInstanceStatusInstanceStatusGet().catch(() => null),
+        authenticationClient.listProvidersAuthProvidersGet().catch(() => null),
       ]);
       setTokens(tk);
       setAccounts(ac);
       setInstanceStatus(status);
+      setAccountConsoleUrl(accountConsoleFrom(providers));
     } catch (e) {
       setError(e instanceof Error ? e.message : t.loadFailed);
     } finally {
@@ -344,7 +359,7 @@ export default function SettingsPage() {
               <ThemePicker />
             </Section>
 
-            {/* Account & Security — only shown when the account console is configured */}
+            {/* Account & Security — only shown when the API names an account console */}
             {accountConsoleUrl && (
               <Section title={t.accountSecurity} description={t.accountSecurityDesc}>
                 <a
@@ -447,7 +462,10 @@ export default function SettingsPage() {
                   {activeTokens.map((tok) => (
                     <div key={tok.id} className="flex items-center justify-between px-4 py-3 gap-4">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-fg truncate">{tok.name}</div>
+                        <div className="text-sm font-medium text-fg truncate">
+                          {isWorkspaceToken(tok.name) ? t.workspaceToken : tok.name}
+                        </div>
+                        {isWorkspaceToken(tok.name) && <div className="text-xs text-muted">{t.workspaceTokenHint}</div>}
                         <div className="text-xs text-muted">
                           <span className="font-mono">{tok.token_prefix}…</span> · {t.created} {fmtDate(tok.created_at, language)} ·{' '}
                           {tok.expires_at ? `${t.expiresOn} ${fmtDate(tok.expires_at, language)}` : t.noExpiry} ·{' '}
@@ -487,23 +505,23 @@ export default function SettingsPage() {
                 <div className="text-sm text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">{t.noAccounts}</div>
               ) : (
                 <div className="border border-rule rounded-lg divide-y divide-rule">
-                  {accounts.map((a) => (
+                  {accounts.map((a) => {
+                    const label = accountLabel(a, language, authUser?.email);
+                    return (
                     <div key={a.id} className="flex items-center justify-between px-4 py-3 gap-4">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-fg capitalize flex items-center gap-2">
-                          {a.type || a.provider}
-                          {a.builtin && <span className="px-2 py-0.5 text-xs font-medium rounded bg-sunken text-muted capitalize">{t.builtIn}</span>}
+                        <div className="text-sm font-medium text-fg flex items-center gap-2">
+                          {label.name}
+                          {a.builtin && <span className="px-2 py-0.5 text-xs font-medium rounded bg-sunken text-muted">{t.builtIn}</span>}
                         </div>
-                        <div className="text-xs text-muted">
-                          <span className="font-mono">{a.provider_account_id}</span> · {a.provider}
-                        </div>
+                        {label.detail && <div className="text-xs text-muted">{label.detail}</div>}
                       </div>
                       {(isAdmin || !a.builtin) && (
                         <button
                           onClick={() =>
                             setConfirm({
                               title: t.unlinkTitle,
-                              message: t.unlinkMessage(a.provider, a.provider_account_id),
+                              message: t.unlinkMessage(label.name, a.provider_account_id),
                               confirmWord: a.provider_account_id,
                               onConfirm: async () => {
                                 await accountsClient.deleteAccountsAccountsIdDelete({ id: a.id });
@@ -517,7 +535,8 @@ export default function SettingsPage() {
                         </button>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </Section>
@@ -554,7 +573,7 @@ export default function SettingsPage() {
                       <span className="font-mono">{consentStatus.required_version}</span>
                     </p>
                     {consentStatus.has_consented && consentStatus.granted_at ? (
-                      <p>{t.consentGiven(new Date(consentStatus.granted_at).toLocaleString(language === 'de' ? 'de-AT' : undefined))}</p>
+                      <p>{t.consentGiven(new Date(consentStatus.granted_at).toLocaleString(localeFor(language)))}</p>
                     ) : (
                       <p className="text-warn-text">{t.notConsented}</p>
                     )}
@@ -620,10 +639,11 @@ export default function SettingsPage() {
                     {
                       term: t.onlineSince,
                       value: onlineSince
-                        ? `${onlineSince} · ${t.up} ${duration(instanceStatus.uptime_seconds)}`
+                        ? `${onlineSince} · ${t.up} ${duration(instanceStatus.uptime_seconds, language)}`
                         : '—',
                     },
-                    { term: t.version, value: instanceStatus.branch },
+                    // A detached build reports "HEAD" and an unknown one "unknown": no version to name.
+                    ...(knownVersion(instanceStatus.branch) ? [{ term: t.version, value: instanceStatus.branch }] : []),
                     {
                       term: t.lastUpdated,
                       // No build time means no build: the API is running from a

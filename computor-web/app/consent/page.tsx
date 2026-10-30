@@ -12,6 +12,7 @@ import type {
   ConsentStatusGet as ConsentStatus,
   PolicyTextGet as PolicyText,
 } from 'types/generated';
+import { localeFor } from '@/src/utils/locale';
 
 const COPY = {
   de: {
@@ -38,7 +39,6 @@ const COPY = {
     withdrawNote: 'Du kannst deine Einwilligung jederzeit in den Einstellungen widerrufen.',
     saving: 'Wird gespeichert …',
     agree: 'Zustimmen und weiter',
-    locale: 'de-AT' as string | undefined,
   },
   en: {
     policyFailed: (status: number) => `Failed to load the privacy notice (status ${status})`,
@@ -64,7 +64,6 @@ const COPY = {
     withdrawNote: 'You can withdraw your consent at any time in Settings.',
     saving: 'Saving…',
     agree: 'Agree and continue',
-    locale: undefined as string | undefined,
   },
 };
 
@@ -74,7 +73,8 @@ const COPY = {
 export default function ConsentPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const t = COPY[useUiLanguage()];
+  const language = useUiLanguage();
+  const t = COPY[language];
 
   const [status, setStatus] = useState<ConsentStatus | null>(null);
   const [policy, setPolicy] = useState<PolicyText | null>(null);
@@ -209,7 +209,7 @@ export default function ConsentPage() {
           <div className="bg-success-wash border border-success-line rounded-lg p-4">
             <p className="text-sm text-success-text">
               {t.accepted}
-              {status.granted_at ? t.acceptedOn(new Date(status.granted_at).toLocaleString(t.locale)) : ''}.{' '}
+              {status.granted_at ? t.acceptedOn(new Date(status.granted_at).toLocaleString(localeFor(language))) : ''}.{' '}
               {t.withdrawIn}{' '}
               <a href="/settings" className="underline font-medium">{t.settings}</a>.
             </p>

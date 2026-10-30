@@ -3,6 +3,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import { buildTree, depthOf, parentPath, type TreeNode } from '@/src/utils/ltree';
 import { displayName } from '@/src/utils/displayName';
+import { localizedUnitTitle } from '@/src/components/student/studentDescription';
+import { localizedText } from '@/src/utils/localizedText';
 
 /**
  * The course content hierarchy, as data.
@@ -61,14 +63,20 @@ export interface UseContentTreeOptions {
   collapseBelowDepth?: number;
   /** Open these groups by default; explicit user toggles still win. */
   defaultExpandedPaths?: readonly string[];
+  /**
+   * The reading language: titles come from `title_i18n` where it has an
+   * entry, and a "Week N"/"Woche N" unit without one still follows it. Omit
+   * to show stored titles.
+   */
+  language?: string;
 }
 
 /** A path we invented; it has no row in `items`. */
 type MaybeSynthetic<T> = { path: string; position?: number | null; __item: T | null };
 
-export function useContentTree<T extends { path: string; position?: number | null; title?: string | null }>(
+export function useContentTree<T extends { path: string; position?: number | null; title?: string | null; title_i18n?: Record<string, string> | null }>(
   items: T[],
-  { synthesiseContainers = false, collapseBelowDepth, defaultExpandedPaths }: UseContentTreeOptions = {},
+  { synthesiseContainers = false, collapseBelowDepth, defaultExpandedPaths, language }: UseContentTreeOptions = {},
 ) {
   // Only paths the user has *explicitly* toggled. Everything else answers to
   // collapseBelowDepth, so a reload that brings new content in does not silently
@@ -114,12 +122,16 @@ export function useContentTree<T extends { path: string; position?: number | nul
     const walk = (nodes: TreeNode<MaybeSynthetic<T>>[]): void => {
       for (const node of nodes) {
         const expanded = isExpanded(node.path);
+        const item = node.__item;
+        const label = displayName(
+          item && language ? { ...item, title: localizedText(item.title_i18n, language, item.title) } : item ?? { path: node.path },
+        );
         out.push({
           key: node.path,
           path: node.path,
           depth: node.depth,
           item: node.__item,
-          label: displayName(node.__item ?? { path: node.path }),
+          label: language ? localizedUnitTitle(label, language) : label,
           hasChildren: node.children.length > 0,
           expanded,
           toggle: () => toggle(node.path),
@@ -132,7 +144,7 @@ export function useContentTree<T extends { path: string; position?: number | nul
 
     walk(roots);
     return out;
-  }, [roots, isExpanded, toggle]);
+  }, [roots, isExpanded, toggle, language]);
 
   const setAllExpanded = useCallback(
     (expanded: boolean) => {

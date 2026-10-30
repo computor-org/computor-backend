@@ -80,6 +80,10 @@ class ExampleCreate(BaseModel):
     identifier: str = Field(..., description="Hierarchical identifier with dots as separators")
     title: str
     description: Optional[str] = None
+    # Other languages for the two fields above, keyed by language code; the
+    # plain fields stay the source text and the fallback (issue #550).
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     category: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
 
@@ -109,6 +113,7 @@ class ExampleList(BaseEntityList):
     directory: str
     identifier: str
     title: str
+    title_i18n: Optional[Dict[str, str]] = None
     category: Optional[str] = None
     tags: List[str] = []
     example_repository_id: str
@@ -125,6 +130,8 @@ class ExampleUpdate(BaseModel):
     identifier: Optional[str] = None
     title: Optional[str] = None
     description: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     category: Optional[str] = None
     tags: Optional[List[str]] = None
 
@@ -157,6 +164,8 @@ class ExampleVersionGet(BaseEntityGet):
     # Promoted fields — direct column reads, no dict navigation.
     title: Optional[str] = None
     description: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     language: Optional[str] = None
     license: Optional[str] = None
     execution_backend: Optional[Dict[str, Any]] = Field(
@@ -183,6 +192,8 @@ class ExampleVersionList(BaseModel):
     version_number: int
     title: Optional[str] = None
     description: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     testing_service_id: Optional[str] = None
     created_at: datetime
 

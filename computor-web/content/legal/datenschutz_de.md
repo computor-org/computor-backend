@@ -1,45 +1,45 @@
 # Datenschutzerklärung computor.at
 
-Version 1.6, Stand 26.10.2026
+Version 1.7, Stand 29.10.2026
 
 Computor ist ein kostenloses Lernangebot der TU Graz. Öffentliche Materialien
-können Sie ohne Konto lesen. Für Konto, Kurse, Abgaben, Arbeitsumgebung,
-Kommunikation und Lernhilfe verarbeiten wir die unten genannten Daten. Es gibt
-keine Werbung, keinen Datenverkauf und kein externes Verhaltenstracking.
-In entsprechend eingerichteten Kursen werden Nachrichten auch automatisch der
-KI-Lernhilfe Lena zugeordnet. Sie können jederzeit eine Kontolöschung unter
-privacy@computor.at verlangen.
+können Sie ohne Konto lesen. Für Ihr Konto, Kurse, Abgaben, die Arbeitsumgebung,
+die Kommunikation und die Lernhilfe verarbeiten wir die nachstehend genannten
+Daten. Es gibt keine Werbung, keinen Datenverkauf und kein externes
+Verhaltenstracking. In entsprechend eingerichteten Kursen werden Nachrichten
+auch automatisch der KI-Lernhilfe Lena zugeordnet. Die Löschung Ihres Kontos
+können Sie jederzeit unter privacy@computor.at verlangen.
 
 ## 1. Verantwortliche und Rechtsgrundlagen
 
 Verantwortliche für computor.at einschließlich Anmeldung, Git-Server und
-Workspaces ist die Technische Universität Graz,
-Rechbauerstraße 12, 8010 Graz („TU Graz“, „wir“). Den Betrieb führt das Institut
-für Theoretische Physik – Computational Physics, Petersgasse 16, 8010 Graz.
-Datenschutzanliegen richten Sie an privacy@computor.at oder datenschutz@tugraz.at.
-Datenschutzbeauftragte ist x-tention Informationstechnologie GmbH,
-Friedhofstraße 57, 4600 Wels, datenschutzbeauftragter@tugraz.at.
+Workspaces ist die Technische Universität Graz, Rechbauerstraße 12, 8010 Graz
+(„TU Graz“, „wir“). Den Betrieb führt das Institut für Theoretische Physik –
+Computational Physics, Petersgasse 16, 8010 Graz. Datenschutzanliegen richten
+Sie an privacy@computor.at oder datenschutz@tugraz.at. Datenschutzbeauftragte
+ist die x-tention Informationstechnologie GmbH, Friedhofstraße 57, 4600 Wels,
+datenschutzbeauftragter@tugraz.at.
 
-Das Angebot erfüllt die gesetzlichen Aufgaben der TU Graz in Lehre,
+Das Angebot dient der Erfüllung der gesetzlichen Aufgaben der TU Graz in Lehre,
 Weiterbildung und Wissenschaftskommunikation. Die dafür erforderliche
-Verarbeitung einschließlich des sicheren Betriebs beruht auf Art. 6 Abs. 1
-lit. e DSGVO in Verbindung mit §§ 2 und 3 Universitätsgesetz 2002; Art. 32 DSGVO
+Verarbeitung einschließlich des sicheren Betriebs beruht auf Art. 6 Abs. 1 lit.
+e DSGVO in Verbindung mit §§ 2 und 3 Universitätsgesetz 2002; Art. 32 DSGVO
 verpflichtet zu angemessener Sicherheit. Gesetzlich vorgeschriebene
-Übermittlungen beruhen auf Art. 6 Abs. 1 lit. c DSGVO, insbesondere bei Meldungen
-nach Art. 16–18 DSA, soweit anwendbar. Die Annahme der Nutzungsbedingungen ist
-keine datenschutzrechtliche Einwilligung und erlaubt keine beliebige künftige
-Verarbeitung.
+Übermittlungen beruhen auf Art. 6 Abs. 1 lit. c DSGVO, insbesondere bei
+Meldungen nach Art. 16–18 DSA, soweit anwendbar. Die Annahme der
+Nutzungsbedingungen ist keine datenschutzrechtliche Einwilligung und erlaubt
+keine beliebige künftige Verarbeitung.
 
 Für ein Konto benötigen wir eine bestätigte E-Mail-Adresse und ein Passwort;
-ohne diese Angaben ist keine Anmeldung möglich. Die Mindestgrenze für Konten
-ist 14 Jahre. Erfahren wir von einem jüngeren Kontoinhaber, löschen wir das
-Konto.
+ohne diese Angaben ist keine Anmeldung möglich. Ein Konto setzt ein Mindestalter
+von 14 Jahren voraus. Erfahren wir, dass eine jüngere Person ein Konto hat,
+löschen wir es.
 
 ## 2. Daten, Zwecke und Sichtbarkeit
 
 | Bereich | Daten und Zweck | Wer die Daten sieht |
 |---|---|---|
-| Konto | E-Mail, Benutzername, angegebener Name, Passwort-Hash, interne Kennung, Annahme der Bedingungen und letzte Anmeldung; für Anmeldung und Kontonachrichten. Passwörter werden nicht im Klartext gespeichert. | Betriebsteam; Lehrende und Tutor*innen sehen Name und Benutzername ihrer Kursteilnehmenden. |
+| Konto | E-Mail, Benutzername, angegebener Name, Passwort-Hash, interne Kennung, Annahme der Nutzungsbedingungen und letzte Anmeldung; für Anmeldung und Kontonachrichten. Passwörter werden nicht im Klartext gespeichert. | Betriebsteam; Lehrende und Tutor*innen sehen Name und Benutzername ihrer Kursteilnehmenden. |
 | Kurse und Abgaben | Einschreibungen, Gruppen, Code und sonstige Abgaben, Git-Versionsgeschichte, Testergebnisse, Punkte, Feedback und Zeitstempel; für Übungen, Betreuung sowie Lernfortschritts- und Testfehlerübersichten. | Lehrende und Tutor*innen des Kurses; andere Lernende nur bei vorgesehener Gruppenarbeit. Abgaben sind nicht öffentlich. |
 | Gehostete Workspaces | Dateien, laufende Prozesse sowie Start- und Stoppzeiten; für die Programmierumgebung auf unseren Servern. Ein gestoppter Workspace behält seine Home-Dateien. | Technischer Zugang des Betriebsteams; Inhaltszugriff, soweit für Betrieb, Wiederherstellung, Support oder Sicherheit erforderlich. |
 | Kursnachrichten | Nachrichten mit Änderungsverlauf und Zeitstempeln; für Austausch und Betreuung. | Der jeweilige Empfängerkreis; nicht pauschal alle Kursteilnehmenden. |
@@ -47,31 +47,31 @@ Konto.
 | Support und Meldungen | E-Mails, Kontaktangaben, Problembeschreibung, selbst beigefügte Anhänge und technische Angaben wie Anwendung, Version, Seite oder Befehl; für Bearbeitung und Antworten, unterstützt durch Software und lokale KI-Modelle wie unten beschrieben. | Support-Team; Anfragen und Anhänge werden nicht automatisch veröffentlicht. Nach Prüfung kann eine Zusammenfassung ohne personenbezogene Angaben im öffentlichen GitHub-Fehlerverzeichnis erscheinen. |
 | Zugriff und Sicherheit | IP-Adresse, Zeit, aufgerufene Ressource, Datenmenge, Status, Browser/Betriebssystem und Herkunftsseite sowie gegebenenfalls Konto- oder Workspace-Kennungen, Anmeldeereignisse, Verwaltungsaktionen und Diagnosemeldungen; zur Fehler- und Angriffserkennung sowie für Verfügbarkeit und sicheren Betrieb. | Technischer Betrieb und Sicherheitsbetreuung, beschränkt auf ihre Rolle und die genannten Betriebs- und Sicherheitszwecke. |
 
-Technischer Serverzugang dient Betrieb, Fehlerbehebung und Missbrauchsabwehr
-durch die dafür vorgesehenen Betriebs- und Sicherheitsrollen.
-Tests und Punkte werden automatisch berechnet, entscheiden aber keine Noten.
-Eine Beurteilung bleibt bei der zuständigen Lehrperson;
-eine ausschließlich automatisierte Entscheidung mit rechtlicher oder ähnlich
+Der technische Serverzugang der dafür vorgesehenen Betriebs- und
+Sicherheitsrollen dient dem Betrieb, der Fehlerbehebung und der
+Missbrauchsabwehr. Tests und Punkte werden automatisch berechnet, entscheiden
+aber nicht über Noten. Die Beurteilung obliegt der zuständigen Lehrperson; eine
+ausschließlich automatisierte Entscheidung mit rechtlicher oder ähnlich
 erheblicher Wirkung nach Art. 22 DSGVO findet nicht statt.
 
 **Lena:** Die Schaltfläche „Lena fragen“ übermittelt Ihre Frage, ausgewählten
-Text und die sichtbare Aufgabenbeschreibung. In Kursnachrichten können Sie
-Lena mit @lena ansprechen und im Verlauf antworten. Ist die automatische
-Zuordnung aktiviert, werden auch Nachrichten von Lernenden ohne andere
-erwähnte Person Lena zugeordnet, sofern Lena verfügbar ist und zum
-Empfängerkreis gehört; dabei wird eine sichtbare Lena-Erwähnung ergänzt.
-Verarbeitet werden Nachricht und bisheriger Verlauf, bei Aufgaben zusätzlich
-die Aufgabenbeschreibung, Ihre letzte Abgabe und deren Testergebnisse.
-Die Antwort bleibt im selben Verlauf mit demselben Empfängerkreis gespeichert.
-Lena führt keinen Code aus und entscheidet keine Noten.
+Text und die sichtbare Aufgabenbeschreibung. In Kursnachrichten können Sie Lena
+mit @lena ansprechen und im Verlauf antworten. Ist die automatische Zuordnung
+aktiviert, werden auch Nachrichten von Lernenden, in denen keine andere Person
+erwähnt wird, Lena zugeordnet, sofern Lena verfügbar ist und zum Empfängerkreis
+gehört; dabei wird eine sichtbare Lena-Erwähnung ergänzt. Verarbeitet werden
+Nachricht und bisheriger Verlauf, bei Aufgaben zusätzlich die
+Aufgabenbeschreibung, Ihre letzte Abgabe und deren Testergebnisse. Die Antwort
+bleibt im selben Verlauf mit demselben Empfängerkreis gespeichert. Lena führt
+keinen Code aus und entscheidet nicht über Noten.
 
-Die derzeitige Lena-Inferenz läuft auf Rechnern der TU Graz in Österreich,
-ohne externen KI-Anbieter, zusätzliches Inhaltsprotokoll oder Modelltraining
-mit Ihren Daten. Begrenzte Speicher- und Festplatten-Caches wiederverwenden
-Berechnungen; sie sind nicht für Lernende zugänglich und werden bei
-Kapazitätsbedarf ersetzt oder geleert, ohne feste Zeitfrist. Numerische
-Größen-, Status- und Zeitmesswerte enthalten keine Fragen, übermittelten Texte
-oder Antworten.
+Die Inferenz für Lena läuft derzeit auf Rechnern der TU Graz in Österreich, ohne
+externen KI-Anbieter, ohne zusätzliche Protokollierung der Inhalte und ohne
+Modelltraining mit Ihren Daten. Begrenzte Zwischenspeicher (Caches) im
+Arbeitsspeicher und auf der Festplatte verwenden Berechnungen wieder; sie sind
+für Lernende nicht zugänglich und werden bei Kapazitätsbedarf ersetzt oder
+geleert, ohne feste Zeitfrist. Numerische Größen-, Status- und Zeitmesswerte
+enthalten keine Fragen, übermittelten Texte oder Antworten.
 
 **Support:** Eingehende Support-E-Mails und Meldungen werden automatisch
 eingelesen, bereinigt und einer Anfrage zugeordnet. Lokale KI-Modelle können
@@ -86,54 +86,56 @@ Anfrage und folgen deren Löschfrist (Abschnitt 4).
 ## 3. Verarbeitungsorte und zusätzliche Arbeitswege
 
 Die Plattformdaten werden in Deutschland und Österreich verarbeitet. Die
-Plattformdienste betreiben wir selbst. Hetzner Online GmbH,
-Industriestraße 25, 91710 Gunzenhausen, Deutschland, stellt Server, Speicher und
-Sicherungen in Nürnberg und Falkenstein als Auftragsverarbeiterin nach Art. 28
-DSGVO bereit. Die TU Graz betreibt Lernhilfe und Dienstadministration in
-Österreich. Für Wiederherstellungskopien gelten die Löschregeln in Abschnitt 4.
-E-Mail-Benachrichtigungen laufen über den TU-Graz-Mailserver. Behörden und
-Gerichte erhalten Daten nur bei gesetzlicher Pflicht oder den gesetzlich
-vorgesehenen Meldungen schwerer Straftaten. Schriftarten liefern unsere eigenen
-Server; externe Werbe-, Tracking-, Analyse-, Content-Delivery- oder KI-Dienste
-sind nicht in die derzeitigen Webseiten eingebunden.
+Plattformdienste betreiben wir selbst. Hetzner Online GmbH, Industriestraße 25,
+91710 Gunzenhausen, Deutschland, stellt Server, Speicher und Sicherungen in
+Nürnberg und Falkenstein als Auftragsverarbeiterin nach Art. 28 DSGVO bereit.
+Die TU Graz betreibt Lernhilfe und Dienstadministration in Österreich. Für
+Wiederherstellungskopien gelten die Löschregeln in Abschnitt 4.
+E-Mail-Benachrichtigungen werden über den Mailserver der TU Graz versendet.
+Behörden und Gerichte erhalten Daten nur aufgrund einer gesetzlichen Pflicht
+oder im Rahmen der gesetzlich vorgesehenen Meldungen schwerer Straftaten.
+Schriftarten werden von unseren eigenen Servern ausgeliefert; externe Werbe-,
+Tracking-, Analyse-, Content-Delivery- oder KI-Dienste sind nicht in die
+derzeitigen Webseiten eingebunden.
 
-Wir verkaufen Ihre Daten nicht und nutzen sie weder für Werbung noch
-Modelltraining.
+Wir verkaufen Ihre Daten nicht und nutzen sie weder für Werbung noch für das
+Training von Modellen.
 
-Bei gerätelokaler Nutzung sind Berechnung und lokale Speicherung von Upload,
-Synchronisierung, Abgabe und gehosteter Verarbeitung zu unterscheiden. Neue
-Verarbeitungszwecke, Empfänger oder Übermittlungen werden vor ihrer Einführung
-entsprechend den gesetzlichen Informationspflichten erläutert; diese Erklärung
-ist keine pauschale Einwilligung dafür.
+Arbeiten Sie auf Ihrem eigenen Gerät, sind die Berechnung und Speicherung dort
+vom Hochladen, Synchronisieren und Abgeben sowie von der Verarbeitung auf
+unseren Servern zu unterscheiden. Neue Verarbeitungszwecke, Empfänger oder
+Übermittlungen werden vor ihrer Einführung entsprechend den gesetzlichen
+Informationspflichten erläutert; diese Erklärung ist keine pauschale
+Einwilligung dafür.
 
 ## 4. Aufbewahrung und Löschung
 
 | Daten | Frist oder Löschregel |
 |---|---|
-| Konto, Kursdaten, Abgaben, Repositories, Ergebnisse, Home-Dateien und Kursnachrichten | Bis zur Kontolöschung; die Bearbeitung umfasst die beteiligten Dienste. Ein Kursaustritt oder Archivieren ist noch keine Löschung. |
-| Lena-Schaltflächen-Anfrage | Höchstens 15 Minuten, nach Fertigstellung entfernt. |
-| Lena-Schaltflächen-Antwort | 24 Stunden, nur für die anfragende Person abrufbar. |
+| Konto, Kursdaten, Abgaben, Repositories, Ergebnisse, Home-Dateien und Kursnachrichten | Bis zur Kontolöschung; die Löschung wird in den beteiligten Diensten bearbeitet. Weder der Austritt aus einem Kurs noch das Archivieren ist bereits eine Löschung. |
+| Lena-Schaltflächen-Anfrage und -Antwort | Höchstens 24 Stunden; die Antwort ist nur für die anfragende Person abrufbar. |
 | Lena-Antworten im Verlauf und Inferenz-Caches | Verlauf wie Kursnachrichten; Caches nach der in Abschnitt 2 beschriebenen Kapazitätsregel. |
-| Web- und Scanner-Zugriffslogs | Tägliche Rotation mit 14 Archivdateien, auch für leere Logs; keine feste Grenze von 14 Kalendertagen. |
-| Diagnose- und technische Sicherheitsaufzeichnungen | Je nach Dienst größenabhängige Rotation (häufig fünf Dateien zu je 10 MB) oder keine automatische Alterslöschung; keine einheitliche Frist. |
-| Anmelde- und Verwaltungsereignisse im Anmeldedienst | Anmeldeereignisse 30 Tage, detaillierte Verwaltungsereignisse 90 Tage; unabhängig von Diagnoseprotokollen. |
-| Technische Angriffssperren | Scanner-Sperrhistorie 35 Tage; zugehörige Logdateien mit vier wöchentlichen Archivrotationen nichtleerer Dateien. |
+| Web- und Scanner-Zugriffslogs | Höchstens acht Wochen. |
+| Diagnose- und technische Sicherheitsaufzeichnungen | Je nach Dienst größenabhängige Rotation, bei der ältere Einträge überschrieben werden, oder keine automatische Alterslöschung; eine einheitliche Frist gibt es nicht. |
+| Anmelde- und Verwaltungsereignisse im Anmeldedienst | Höchstens 90 Tage, unabhängig von Diagnoseprotokollen. |
+| Technische Angriffssperren | Sperrhistorie höchstens acht Wochen; zugehörige Logdateien werden wöchentlich rotiert und nach vier Rotationen gelöscht. |
 | Support und Meldungen | Bis zur Erledigung, danach höchstens drei Jahre zur Nachvollziehbarkeit und Abwehr von Ansprüchen. |
 
-Für einen konkreten Sicherheitsvorfall oder eine rechtliche Pflicht erforderliche
-Nachweise werden gesondert auf den jeweiligen Zweck und die dafür erforderliche
-Dauer beschränkt.
+Nachweise, die für einen konkreten Sicherheitsvorfall oder eine rechtliche
+Pflicht erforderlich sind, werden gesondert aufbewahrt und auf diesen Zweck und
+die dafür erforderliche Dauer beschränkt.
 
-Für seit 24 Monaten ungenutzte Konten kündigen wir die Löschung mit angemessener
-Frist per E-Mail an; eine Anmeldung in dieser Frist erhält das Konto. Vertraglich
-vereinbarte längere Vorwarnfristen bleiben erhalten.
-Über einen Löschantrag bearbeiten wir auch die Daten in Anmeldung, Git,
-Workspace und Dateispeicher. Müssen einzelne Daten aus einem konkreten
-rechtlichen Grund bleiben, nennen wir Ihnen Grund und Aufbewahrungsfrist und
-beschränken sie auf diesen Zweck.
+Bei Konten, die seit 24 Monaten nicht genutzt wurden, kündigen wir die Löschung
+mit angemessener Frist per E-Mail an; melden Sie sich innerhalb dieser Frist an,
+bleibt das Konto bestehen. Vertraglich vereinbarte längere Vorwarnfristen
+bleiben unberührt. Einen Löschantrag bearbeiten wir auch für die Daten im
+Anmeldedienst, in Git, im Workspace und im Dateispeicher. Müssen einzelne Daten
+aus einem konkreten rechtlichen Grund bleiben, nennen wir Ihnen Grund und
+Aufbewahrungsfrist und beschränken sie auf diesen Zweck.
 
 **Sicherungskopien:** Sicherungskopien personenbezogener Plattformdaten bewahren
-wir höchstens 30 Tage auf.
+wir höchstens 90 Tage auf, damit der Betrieb auch nach später erkannten Fehlern
+oder Angriffen wiederhergestellt werden kann (Art. 32 Abs. 1 lit. c DSGVO).
 
 ## 5. Cookies und Sicherheit
 
@@ -149,29 +151,28 @@ ein Cookie-Banner ist dafür nicht erforderlich.
 | Gewählte helle oder dunkle Darstellung | Bis Sie den lokalen Browserspeicher löschen. |
 
 Sie können die Speicherung im Browser steuern; ohne Sitzungscookies ist keine
-Anmeldung möglich. Webzugriffe sind TLS-verschlüsselt, Nutzerprogramme
-laufen in getrennten Containern mit Ressourcenlimits. Melden Sie
-Sicherheitslücken vertraulich an security@computor.at.
+Anmeldung möglich. Webzugriffe sind TLS-verschlüsselt; die Programme der
+Nutzer*innen laufen in getrennten Containern mit Ressourcenbegrenzung. Melden
+Sie Sicherheitslücken vertraulich an security@computor.at.
 
 ## 6. Ihre Rechte und Änderungen
 
-Sie haben nach den jeweiligen gesetzlichen Voraussetzungen Rechte auf Auskunft,
-Berichtigung, Löschung, Einschränkung und Datenübertragbarkeit. Gegen
-Verarbeitung im öffentlichen Interesse können Sie aus Gründen Ihrer besonderen
-Situation widersprechen (Art. 21 DSGVO). Ein Datenexport kann unabhängig von
-den engeren Voraussetzungen des gesetzlichen Übertragbarkeitsrechts angefordert
-werden; bei Einschränkung oder Ende des Angebots gilt zusätzlich die
-Exportzusage der Nutzungsbedingungen.
+Nach Maßgabe der gesetzlichen Voraussetzungen haben Sie das Recht auf Auskunft,
+Berichtigung, Löschung, Einschränkung der Verarbeitung und Datenübertragbarkeit.
+Gegen eine Verarbeitung im öffentlichen Interesse können Sie aus Gründen Ihrer
+besonderen Situation widersprechen (Art. 21 DSGVO). Mit dem Auskunftsrecht
+erhalten Sie eine Kopie Ihrer Daten (Art. 15 Abs. 3 DSGVO); wird das Angebot
+eingeschränkt oder eingestellt, gilt zusätzlich die Regelung der
+Nutzungsbedingungen zum Herunterladen Ihrer Daten.
 
 Schreiben Sie an privacy@computor.at oder datenschutz@tugraz.at, möglichst von
-Ihrer hinterlegten Adresse, damit wir Sie sicher zuordnen können. Wir antworten
-in der Regel innerhalb eines Monats; eine gesetzlich zulässige Verlängerung
-begründen wir innerhalb dieser Frist (Art. 12 Abs. 3 DSGVO). Beschwerden sind bei
-der Österreichischen Datenschutzbehörde, Barichgasse 40–42, 1030 Wien,
-dsb@dsb.gv.at, [dsb.gv.at](https://www.dsb.gv.at), möglich.
+Ihrer hinterlegten Adresse, damit wir Sie zuverlässig zuordnen können. Wir
+antworten in der Regel innerhalb eines Monats; eine gesetzlich zulässige
+Verlängerung begründen wir innerhalb dieser Frist (Art. 12 Abs. 3 DSGVO).
+Beschwerde können Sie bei der Österreichischen Datenschutzbehörde, Barichgasse
+40–42, 1030 Wien, dsb@dsb.gv.at, [dsb.gv.at](https://www.dsb.gv.at), einlegen.
 
-Die aktuelle Erklärung steht unter https://computor.at/privacy. Wir halten sie
-aktuell und informieren Sie über wesentliche Änderungen der Verarbeitung.
-Bevor wir Daten für einen neuen Zweck verwenden, erhalten Sie die dafür
-erforderlichen Informationen. Vertragsänderungen richten sich nach den
-Nutzungsbedingungen.
+Die aktuelle Fassung dieser Erklärung finden Sie unter
+https://computor.at/privacy. Wir halten sie auf dem neuesten Stand. Bevor wir
+Daten für einen neuen Zweck verwenden, erhalten Sie die dafür erforderlichen
+Informationen (Art. 13 Abs. 3 DSGVO). Vertragsänderungen richten sich nach den Nutzungsbedingungen.

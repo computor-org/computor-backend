@@ -90,7 +90,14 @@ async def reserve_public_container(client, owner_username: str, workspace_name: 
             reservations = {(row.owner_name, row.workspace_name): row.baseline_build_id for row in rows}
             for key, baseline in list(reservations.items()):
                 current = fleet.get(key)
-                if current and current[2] != baseline and (current[0] or current[1]):
+                # A workspace that already had a build when it was reserved and
+                # is now missing from the complete inventory was deleted: no
+                # build can follow. Kept, the row refused its re-creation as
+                # "already starting" and held a slot for good (computor.at,
+                # 2026-10-29). A new workspace's reservation ("-") stays, since
+                # its creation may still be queued.
+                deleted = current is None and baseline != "-"
+                if deleted or (current and current[2] != baseline and (current[0] or current[1])):
                     db.execute(text(
                         "DELETE FROM public_workspace_reservation "
                         "WHERE owner_name=:owner AND workspace_name=:workspace"

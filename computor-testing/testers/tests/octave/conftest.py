@@ -14,7 +14,6 @@ import time
 import logging
 import pytest
 from _pytest.terminal import TerminalReporter
-from _pytest._code.code import ExceptionChainRepr
 from colorama import Fore, Style
 from typing import List
 
@@ -27,6 +26,7 @@ from ctcore.models import (
     read_ca_file,
 )
 from ctcore.helpers import get_property_as_list
+from ctcore.i18n import bilingual_report, enable_bilingual, tr, tr_summary
 from ctcore.security import validate_path_in_root, validate_filename, PathValidationError
 
 from ..conftest_base import (
@@ -37,6 +37,7 @@ from ..conftest_base import (
     build_report_properties,
     get_report_header,
     add_terminal_summary,
+    learner_result_message,
 )
 
 
@@ -65,6 +66,7 @@ def pytest_configure(config: pytest.Config) -> None:
     Note: Octave tester has custom property inheritance logic that differs
     from the base implementation.
     """
+    enable_bilingual()
     now = datetime.datetime.now(timezone.utc)
     timestamp = now.isoformat()
 
@@ -236,17 +238,9 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
 
         testsub.result = _report.outcome.upper()
 
-        if _report.longrepr is not None:
-            if testsub.result == ResultEnum.skipped:
-                try:
-                    testsub.resultMessage = str(_report.longrepr[2])
-                except:
-                    testsub.resultMessage = str(_report.longrepr)
-            else:
-                longrepr: ExceptionChainRepr = _report.longrepr
-                chain = longrepr.chain[-1][1]
-                if chain is not None:
-                    testsub.resultMessage = chain.message
+        message = learner_result_message(_report)
+        if message is not None:
+            testsub.resultMessage = message
 
         testmain.timestamp = time.time()
 
@@ -338,12 +332,12 @@ def pytest_sessionfinish(session: pytest.Session):
         elif sub_skipped > 0:
             skipped += 1
             main.result = ResultEnum.skipped
-            result_message = "Tests skipped"
+            result_message = tr("tests_skipped")
         else:
             failed += 1
             main.result = ResultEnum.failed
             result_message = test_main.failureMessage
-        main.resultMessage = result_message
+        main.resultMessage = tr_summary(result_message)
 
     report.summary.passed = passed
     report.summary.skipped = skipped
@@ -356,18 +350,18 @@ def pytest_sessionfinish(session: pytest.Session):
 
     if total == 0:
         report.result = ResultEnum.skipped
-        result_message = "No Tests specified"
+        result_message = tr("no_tests_specified")
     elif passed == total:
         report.result = ResultEnum.passed
         result_message = testsuite.properties.successMessage
     elif skipped == total:
         report.result = ResultEnum.skipped
-        result_message = "Tests skipped"
+        result_message = tr("tests_skipped")
     else:
         report.result = ResultEnum.failed
         result_message = testsuite.properties.failureMessage
 
-    report.resultMessage = result_message
+    report.resultMessage = tr_summary(result_message)
     report.environment = environment
     report.duration = duration
     report.executionDuration = time_s
@@ -381,7 +375,7 @@ def pytest_sessionfinish(session: pytest.Session):
 
     with open(reportfile, "w", encoding="utf-8") as file:
         json.dump(
-            report.model_dump(exclude_none=True),
+            bilingual_report(report.model_dump(exclude_none=True)),
             file, default=str, indent=indent
         )
 

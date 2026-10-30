@@ -30,6 +30,31 @@ export interface LegalDoc {
   body: string;
 }
 
+/** The two halves of something that exists in both reading languages. */
+export interface BilingualText {
+  de: string;
+  en: string;
+}
+
+/**
+ * Split a bilingual legal text at its `## Deutsch` / `## English` headings, so
+ * the section being read can be shown first. Anything before the first heading —
+ * the document's own preamble, which is German — stays with the German section.
+ * A text without both headings comes back whole as German, so nothing is lost.
+ */
+export function splitBilingual(body: string): BilingualText {
+  const lines = body.split('\n');
+  const at = (heading: string) => lines.findIndex((line) => line.trim() === heading);
+  const de = at('## Deutsch');
+  const en = at('## English');
+  if (de === -1 || en === -1 || en < de) return { de: body, en: '' };
+  return {
+    // The rule that divided the two halves is redrawn between them in whichever order they appear.
+    de: lines.slice(0, en).join('\n').trim().replace(/\n+---$/, ''),
+    en: lines.slice(en).join('\n').trim(),
+  };
+}
+
 const CONTENT_DIR = path.join(process.cwd(), 'content', 'legal');
 
 /** English documents; every other one is German. */
@@ -65,4 +90,19 @@ export function loadLegalDoc(name: LegalDocName): LegalDoc {
     break;
   }
   return { title, version, body: lines.slice(start).join('\n').trim() + '\n' };
+}
+
+const VERSION_LINE = /^Version (\S+), (gültig ab|Stand) (\d{2})\.(\d{2})\.(\d{4})$/;
+
+/**
+ * The German "Version 1.1, gültig ab 25.10.2026" / "Version 1.2, Stand
+ * 29.10.2026" line of a bilingual text in English, with the date written as the
+ * English texts write it. A line of another shape comes back unchanged.
+ */
+export function englishVersionLine(line: string): string {
+  const match = VERSION_LINE.exec(line.trim());
+  if (!match) return line;
+  const [, version, kind, day, month, year] = match;
+  const date = formatEffectiveDate(`${year}-${month}-${day}`, 'en');
+  return `Version ${version}, ${kind === 'Stand' ? 'dated' : 'valid from'} ${date}`;
 }

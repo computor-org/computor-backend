@@ -9,7 +9,7 @@
 # Coder server's published address on the main daemon.
 services:
   ws-socket-proxy:
-    image: tecnativa/docker-socket-proxy:0.3.0@sha256:9e4b9e7517a6b660f2cc903a19b257b1852d5b3344794e3ea334ff00ae677ac2
+    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}ws-socket-proxy
     # Needs the real root to open the daemon socket. Under userns_mode host
     # the image files still belong to the remapped range, so root needs
@@ -30,7 +30,7 @@ services:
       - /run/computor-ws-docker:/var/run/workspace-docker:ro
 
   workspace-ingress:
-    image: traefik:v3.7.13@sha256:24841fe2de7304c149343d877d2923b4c8800a38ba015dea9174c23b20e344a0
+    image: traefik:v3.7.15@sha256:0f6150202bc1fed72a7bd2107460eaa510e5b8a905f3fdb5b84f2c8619c33368
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}workspace-ingress
     restart: unless-stopped
     user: "65534:65534"

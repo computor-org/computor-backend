@@ -11,6 +11,8 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: 'danger' | 'default';
+  /** True while the confirmed action runs, so it cannot be confirmed twice. */
+  busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -24,6 +26,7 @@ export default function ConfirmDialog({
   confirmLabel,
   cancelLabel,
   variant = 'default',
+  busy = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -38,7 +41,7 @@ export default function ConfirmDialog({
           <Button variant="ghost" onClick={onCancel}>
             {cancelLabel ?? (de ? 'Abbrechen' : 'Cancel')}
           </Button>
-          <Button variant={variant === 'danger' ? 'danger' : 'primary'} onClick={onConfirm}>
+          <Button variant={variant === 'danger' ? 'danger' : 'primary'} disabled={busy} onClick={onConfirm}>
             {confirmLabel ?? (de ? 'Bestätigen' : 'Confirm')}
           </Button>
         </div>

@@ -5,12 +5,15 @@ import { useEffect, useState } from 'react';
 import EmptyState from '@/src/components/EmptyState';
 import PublicLearnShell from '@/src/components/learn/PublicLearnShell';
 import { CODESPACES_URL, COMPUTOR_EXTENSION_URL } from '@/src/components/courses/LearningOptions';
-import { useBrowserLanguage } from '@/src/hooks/useBrowserLanguage';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type { PublicCourseCatalogEntry } from '@/src/types/publicLearning';
+import { languageName } from '@/src/utils/locale';
+import { localized } from '@/src/utils/localizedText';
 
 const COPY = {
   de: {
     kicker: 'Offene Lernmaterialien',
+    heading: 'Data Science mit Python',
     lead: 'Alle Kurse und Aufgaben sind ohne Konto lesbar.',
     courses: 'Kurse',
     loading: 'Kurse werden geladen…',
@@ -27,7 +30,8 @@ const COPY = {
   },
   en: {
     kicker: 'Open learning material',
-    lead: 'All courses and exercises are readable without an account.',
+    heading: 'Data Science with Python',
+    lead: 'All courses and assignments are readable without an account.',
     courses: 'Courses',
     loading: 'Loading courses…',
     unavailable: 'Courses are temporarily unavailable',
@@ -35,16 +39,17 @@ const COPY = {
     empty: 'No public courses are available right now.',
     course: 'Course',
     untitled: 'Untitled course',
-    counts: (units: number, exercises: number) => `${units} weeks · ${exercises} exercises`,
+    counts: (units: number, assignments: number) => `${units} weeks · ${assignments} assignments`,
     browse: 'Open course',
     practiseTitle: 'Ready to practise?',
-    practise: 'With an account you join a course, test and submit exercises and work in the browser.',
+    practise: 'With an account you join a course, test and submit assignments and work in the browser.',
     catalog: 'Open the course catalog',
   },
 };
 
 export default function LearnPage() {
-  const t = COPY[useBrowserLanguage()];
+  const language = useUiLanguage();
+  const t = COPY[language];
   const [courses, setCourses] = useState<PublicCourseCatalogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -76,7 +81,7 @@ export default function LearnPage() {
           <p className="text-sm font-semibold uppercase tracking-wide text-accent-text">
             {t.kicker}
           </p>
-          <h1 className="mt-2 text-4xl font-bold text-fg">Data Science mit Python</h1>
+          <h1 className="mt-2 text-4xl font-bold text-fg">{t.heading}</h1>
           <p className="mt-4 text-lg leading-8 text-muted">
             {t.lead}
           </p>
@@ -101,13 +106,14 @@ export default function LearnPage() {
             </div>
           ) : (
             <div className="mt-5 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {courses.map(course => {
+              {courses.map(entry => {
+                const course = localized(entry, language);
                 const outline = course;
                 return (
                 <article key={course.id} className="flex min-h-64 flex-col rounded-xl border border-rule bg-surface p-6">
                   <div className="flex-1">
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-                      {course.language_code ? course.language_code.toUpperCase() : t.course}
+                      {course.language_code ? languageName(course.language_code, language) : t.course}
                     </p>
                     <h3 className="mt-2 text-xl font-semibold text-fg">
                       {course.title || t.untitled}

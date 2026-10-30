@@ -15,8 +15,10 @@ import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import CascadeDeletePreview from '@/src/components/CascadeDeletePreview';
 import Button, { ButtonLink } from '@/src/components/ui/Button';
 import { displayName } from '@/src/utils/displayName';
+import { localized } from '@/src/utils/localizedText';
 import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
 import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
+import { organizationTypeLabel } from '@/src/utils/organizationType';
 
 const organizationsClient = new OrganizationsClient();
 const courseFamiliesClient = new CourseFamiliesClient();
@@ -68,7 +70,7 @@ export default function OrganizationDetailPage() {
     [orgId],
   );
   const org = data?.org ?? null;
-  const families = data?.families ?? [];
+  const families = (data?.families ?? []).map((family) => localized(family, language));
   const orgName = displayName(org, t.organization);
 
   // Preview (dry run) first, then the real delete behind the typed-path dialog.
@@ -89,7 +91,7 @@ export default function OrganizationDetailPage() {
         <PageHeader
           breadcrumbs={[{ label: t.crumb, href: '/organizations' }, { label: orgName }]}
           title={orgName}
-          subtitle={org && <span className="text-sm text-muted">{org.organization_type}</span>}
+          subtitle={org && <span className="text-sm text-muted">{organizationTypeLabel(org.organization_type, language)}</span>}
           actions={
             org ? (
               <>

@@ -5,8 +5,10 @@ import { ReactNode, type Ref } from 'react';
 import Badge from '@/src/components/Badge';
 import CourseWorkspaceLaunchButtons, { type CourseWorkspaceLauncher } from '@/src/components/workspaces/CourseWorkspaceLaunchButtons';
 import { displayName } from '@/src/utils/displayName';
+import { localized, type Translatable } from '@/src/utils/localizedText';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { localizedRoleLabel } from '@/src/utils/courseRoles';
+import { languageName } from '@/src/utils/locale';
 
 const COPY = {
   de: { untitled: 'Kurs ohne Titel', view: 'Kurs ansehen' },
@@ -31,7 +33,7 @@ export default function CourseCard({
   selected = false,
   workspaceLauncherRef,
 }: {
-  course: { id: string; title?: string | null; path?: string | null; language_code?: string | null; description?: string | null };
+  course: Translatable & { id: string; path?: string | null; language_code?: string | null };
   /** Course role, when the viewer has one. Also gates the workspace launchers. */
   role?: string | null;
   /** Where the title links. Omit to render the title as plain text (catalog). */
@@ -45,25 +47,26 @@ export default function CourseCard({
 }) {
   const language = useUiLanguage();
   const t = COPY[language];
+  const shown = localized(course, language);
   const body = (
     <>
       <div className="flex flex-col items-start mb-4 gap-2 min-w-0">
         <h3 className="text-lg font-semibold text-fg line-clamp-2">
-          {displayName(course, t.untitled)}
+          {displayName(shown, t.untitled)}
         </h3>
         {badge ?? (role && <Badge color="blue" className="shrink-0">{localizedRoleLabel(role, language)}</Badge>)}
       </div>
 
       <div className="space-y-2 mb-4 flex-grow">
-        {course.description && (
-          <p className="text-sm leading-6 text-muted line-clamp-3">{course.description}</p>
+        {shown.description && (
+          <p className="text-sm leading-6 text-muted line-clamp-3">{shown.description}</p>
         )}
         {course.language_code && (
           <div className="flex items-center text-sm text-muted">
             <svg className="h-4 w-4 mr-2 text-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
             </svg>
-            <span className="uppercase">{course.language_code}</span>
+            <span>{languageName(course.language_code, language)}</span>
           </div>
         )}
       </div>

@@ -9,16 +9,17 @@ predefined thresholds (30, 20, 10, 5, 4, 3, 2, 1 minutes before).
 import asyncio
 import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Dict, Optional
 
 from computor_backend.redis_cache import get_redis_client
+from computor_types.maintenance import DEFAULT_TEXTS, stored_message_i18n
 
 logger = logging.getLogger(__name__)
 
-# (redis key, default reminder message) — one countdown is tracked per key.
+# (redis key, default reminder texts) — one countdown is tracked per key.
 WATCHED_SCHEDULES = [
-    ("maintenance:schedule", "Scheduled maintenance is approaching."),
-    ("update:schedule", "The system will restart for a scheduled update."),
+    ("maintenance:schedule", DEFAULT_TEXTS["reminder"]),
+    ("update:schedule", DEFAULT_TEXTS["update_reminder"]),
 ]
 POLL_INTERVAL_SECONDS = 30
 REMINDER_THRESHOLDS = [30, 20, 10, 5, 4, 3, 2, 1]
@@ -73,11 +74,11 @@ class MaintenanceReminderScheduler:
     async def _check_and_broadcast(self):
         """Check each watched schedule in Redis and broadcast reminders at thresholds."""
         redis = await get_redis_client()
-        for redis_key, default_message in WATCHED_SCHEDULES:
+        for redis_key, default_texts in WATCHED_SCHEDULES:
             schedule = await redis.hgetall(redis_key)
-            await self._check_schedule(redis_key, default_message, schedule)
+            await self._check_schedule(redis_key, default_texts, schedule)
 
-    async def _check_schedule(self, redis_key: str, default_message: str, schedule: dict):
+    async def _check_schedule(self, redis_key: str, default_texts: Dict[str, str], schedule: dict):
         sent = self._sent_thresholds.setdefault(redis_key, set())
 
         if not schedule or not schedule.get("scheduled_at"):
@@ -88,7 +89,10 @@ class MaintenanceReminderScheduler:
             return
 
         scheduled_at_str = schedule["scheduled_at"]
-        message = schedule.get("message") or default_message
+        message = schedule.get("message") or default_texts["en"]
+        message_i18n = stored_message_i18n(schedule.get("message_i18n"))
+        if message_i18n is None and not schedule.get("message"):
+            message_i18n = dict(default_texts)
 
         # Detect schedule change — reset thresholds
         if scheduled_at_str != self._current_scheduled_at.get(redis_key):
@@ -124,19 +128,28 @@ class MaintenanceReminderScheduler:
                     sent.add(threshold)
                 else:
                     # Within the threshold window — broadcast
-                    await self._broadcast_reminder(threshold, scheduled_at_str, message)
+                    await self._broadcast_reminder(threshold, scheduled_at_str, message, message_i18n)
                     sent.add(threshold)
 
-    async def _broadcast_reminder(self, minutes_remaining: int, scheduled_at: str, message: str):
+    async def _broadcast_reminder(
+        self,
+        minutes_remaining: int,
+        scheduled_at: str,
+        message: str,
+        message_i18n: Optional[Dict[str, str]] = None,
+    ):
         """Broadcast a maintenance:reminder event via Redis pub/sub."""
         logger.info(f"Broadcasting maintenance reminder: {minutes_remaining} min remaining")
         try:
             from computor_backend.websocket.pubsub import pubsub
 
-            await pubsub.publish("system:maintenance", "maintenance:reminder", {
+            data = {
                 "minutes_remaining": minutes_remaining,
                 "scheduled_at": scheduled_at,
                 "message": message,
-            })
+            }
+            if message_i18n:
+                data["message_i18n"] = message_i18n
+            await pubsub.publish("system:maintenance", "maintenance:reminder", data)
         except Exception as e:
             logger.error(f"Failed to broadcast maintenance reminder: {e}")

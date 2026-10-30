@@ -7,12 +7,14 @@ their own profile, and non-owners without that capability get a 404 on
 get/update/delete.
 """
 from uuid import UUID
+import logging
 from typing import List, Tuple
 
 from sqlalchemy.orm import Session
 
+from computor_backend.auth.keycloak_admin import KeycloakAdminClient
 from computor_backend.exceptions import ForbiddenException, BadRequestException
-from computor_backend.model.auth import Profile
+from computor_backend.model.auth import Account, Profile
 from computor_backend.permissions.principal import Principal
 from computor_types.profiles import ProfileQuery
 from computor_backend.interfaces import ProfileInterface
@@ -27,10 +29,34 @@ from computor_backend.business_logic._owned_crud import (
     apply_update,
     delete_owned,
 )
+from computor_backend.websocket import publish_user_profile_updated
 
 # General-claim resource gating "manage all profiles". Kept distinct from the
 # student-profile resource on purpose (see ownership.py).
 _RESOURCE = "profile"
+
+logger = logging.getLogger(__name__)
+
+
+async def sync_keycloak_locale(db: Session, user_id, language_code: str | None) -> None:
+    """Mirror the profile reading language into Keycloak's ``locale`` attribute.
+
+    Keycloak uses that attribute for the language of its own pages (OTP,
+    update-password, info) once the user is identified; Automatic (null) removes
+    it so the browser decides again (issues#555). Failure is logged, never
+    raised — the profile save itself must not depend on Keycloak.
+    """
+    try:
+        row = (
+            db.query(Account.provider_account_id)
+            .filter(Account.provider == "keycloak", Account.user_id == user_id)
+            .first()
+        )
+        if not row:
+            return
+        await KeycloakAdminClient().set_user_locale(row[0], language_code)
+    except Exception:
+        logger.warning("Could not sync profile language of user %s to Keycloak", user_id, exc_info=True)
 
 
 def has_profile_permission(permissions: Principal) -> bool:
@@ -116,13 +142,19 @@ def update_profile(
         resource=_RESOURCE,
         not_found_detail="Profile not found",
     )
-    return apply_update(
+    profile = apply_update(
         db=db,
         obj=profile,
         update_data=update_data,
         error_detail="Failed to update profile",
         log_context="Error updating profile",
     )
+    # apply_update has committed at this point; a rolled-back update never
+    # reaches the publish. Only a stored language change concerns the
+    # language-aware clients (issue #554).
+    if "language_code" in update_data:
+        publish_user_profile_updated(str(profile.user_id), profile.language_code)
+    return profile
 
 
 def delete_profile(

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, type DependencyList } from 'react';
 import { useAuth } from '@/src/contexts/AuthContext';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 
 interface UseResourceResult<T> {
   data: T | null;
@@ -35,6 +36,7 @@ export function useResource<T>(
   opts: { enabled?: boolean; refetchInterval?: number; refreshOnFocus?: boolean } = {},
 ): UseResourceResult<T> {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const fallbackError = useUiLanguage() === 'de' ? 'Ein Fehler ist aufgetreten.' : 'An error occurred';
   const enabled = opts.enabled ?? true;
   const refetchInterval = opts.refetchInterval;
   const refreshOnFocus = opts.refreshOnFocus ?? false;
@@ -51,7 +53,7 @@ export function useResource<T>(
     try {
       setData(await fetcher());
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'An error occurred');
+      setError(e instanceof Error ? e.message : fallbackError);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -76,12 +78,13 @@ export function useResource<T>(
     const handleVisibility = () => {
       if (!document.hidden) run(true);
     };
-    document.addEventListener('visibilitychange', handleVisibility);
+    // refreshOnFocus already refreshes on return, once per burst of events.
+    if (!refreshOnFocus) document.addEventListener('visibilitychange', handleVisibility);
     return () => {
       clearInterval(id);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [authLoading, isAuthenticated, enabled, refetchInterval, run]);
+  }, [authLoading, isAuthenticated, enabled, refetchInterval, refreshOnFocus, run]);
 
   // Opt in when work can finish in another tab or application. This does not poll.
   useEffect(() => {

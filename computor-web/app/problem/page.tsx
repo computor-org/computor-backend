@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useId, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import PublicLearnShell from '@/src/components/learn/PublicLearnShell';
-import ListPageLayout, { ScrollArea, PageLoading } from '@/src/components/ListPageLayout';
+import ListPageLayout, { ScrollArea, PageActions, PageLoading } from '@/src/components/ListPageLayout';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import Button from '@/src/components/ui/Button';
@@ -122,7 +122,9 @@ export default function ProblemPage() {
   if (isLoading) return <PageLoading />;
   return isAuthenticated ? (
     <AuthenticatedLayout>
-      <ListPageLayout>
+      {/* Narrow like every other form page (FormPanel), and like the PageLoading
+          above, so the header does not jump once the auth check is done. */}
+      <ListPageLayout width="narrow">
         <ReportForm />
       </ListPageLayout>
     </AuthenticatedLayout>
@@ -163,6 +165,7 @@ function SignedOut() {
 function ReportForm() {
   const language = useUiLanguage();
   const t = COPY[language];
+  const formId = useId();
   const [mode, setMode] = useState<'loading' | 'on' | 'off'>('loading');
   const [topic, setTopic] = useState<Topic>('problem');
   const deleting = topic === 'delete-account';
@@ -289,7 +292,7 @@ function ReportForm() {
   return (
     <Header>
       <ScrollArea>
-        <form onSubmit={submit} className="max-w-2xl space-y-4">
+        <form id={formId} onSubmit={submit} className="space-y-4">
           <p className="text-sm text-muted">{t.privacy}</p>
           <ErrorBanner>{error}</ErrorBanner>
           <label className="block text-sm text-muted">
@@ -329,16 +332,19 @@ function ReportForm() {
               />
             </>
           )}
-          <Button type="submit" disabled={!description.trim()} loading={sending} loadingLabel={t.sending}>
-            {t.send}
-          </Button>
-          <p className="text-sm">
-            <Link href="/report" className="text-muted hover:underline">
-              {t.content}
-            </Link>
-          </p>
         </form>
       </ScrollArea>
+      {/* Pinned below the scroll body (issues#548): at the foot of the form the
+          button sat cut off under the scroll fade on an ordinary laptop screen,
+          with only an empty strip where it should be. */}
+      <PageActions>
+        <Button type="submit" form={formId} disabled={!description.trim()} loading={sending} loadingLabel={t.sending}>
+          {t.send}
+        </Button>
+        <Link href="/report" className="ml-auto text-sm text-muted hover:underline">
+          {t.content}
+        </Link>
+      </PageActions>
     </Header>
   );
 }

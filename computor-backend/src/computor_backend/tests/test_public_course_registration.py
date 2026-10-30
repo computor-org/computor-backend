@@ -233,6 +233,9 @@ def test_catalog_row_carries_no_course_internals():
         # The ordering key shared with the anonymous catalog (course-order).
         "position",
         "description",
+        # Translations of title and description (issues#550); public text too.
+        "title_i18n",
+        "description_i18n",
         "path",
         "language_code",
         "organization_title",

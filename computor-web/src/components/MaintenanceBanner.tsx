@@ -3,6 +3,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { MaintenanceClient, MaintenanceStatus } from '@/src/clients/MaintenanceClient';
+import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
+import { formatDateTime } from '@/src/utils/locale';
+import { localizedText } from '@/src/utils/localizedText';
 
 const maintenanceClient = new MaintenanceClient();
 
@@ -20,7 +23,25 @@ const urgencyStyles: Record<UrgencyLevel, { bg: string; border: string; icon: st
   high:   { bg: 'bg-danger-wash',   border: 'border-danger-line',   icon: 'text-danger-text',   text: 'text-danger-text',   dismiss: '' },
 };
 
-function formatCountdown(minutes: number): string {
+const COPY = {
+  de: {
+    active: 'Wartungsmodus aktiv',
+    scheduled: (when: string) => `Wartung in ${when}`,
+    dismiss: 'Ausblenden',
+  },
+  en: {
+    active: 'Maintenance Mode Active',
+    scheduled: (when: string) => `Maintenance in ${when}`,
+    dismiss: 'Dismiss',
+  },
+};
+
+function formatCountdown(minutes: number, language: UiLanguage): string {
+  if (language === 'de') {
+    if (minutes < 1) return 'weniger als einer Minute';
+    if (minutes < 2) return 'einer Minute';
+    return `${Math.floor(minutes)} Minuten`;
+  }
   if (minutes < 1) return 'less than 1 minute';
   if (minutes < 2) return '1 minute';
   return `${Math.floor(minutes)} minutes`;
@@ -28,6 +49,8 @@ function formatCountdown(minutes: number): string {
 
 export default function MaintenanceBanner() {
   const { isAuthenticated } = useAuth();
+  const language = useUiLanguage();
+  const t = COPY[language];
   const [status, setStatus] = useState<MaintenanceStatus | null>(null);
   const [scheduleDismissed, setScheduleDismissed] = useState(false);
   const [minutesRemaining, setMinutesRemaining] = useState<number | null>(null);
@@ -75,6 +98,7 @@ export default function MaintenanceBanner() {
   }, [status?.scheduled_at]);
 
   if (!status) return null;
+  const message = localizedText(status.message_i18n, language, status.message);
 
   // Active maintenance — amber banner, not dismissible
   if (status.active) {
@@ -85,8 +109,8 @@ export default function MaintenanceBanner() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
           <p className="text-sm text-warn-text">
-            <span className="font-medium">Maintenance Mode Active</span>
-            {status.message && <> — {status.message}</>}
+            <span className="font-medium">{t.active}</span>
+            {message && <> — {message}</>}
           </p>
         </div>
       </div>
@@ -110,13 +134,14 @@ export default function MaintenanceBanner() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <p className={`text-sm ${styles.text}`}>
-              <span className="font-medium">Maintenance in {formatCountdown(minutesRemaining)}</span>
-              {' '} — {new Date(status.scheduled_at).toLocaleString()}
+              <span className="font-medium">{t.scheduled(formatCountdown(minutesRemaining, language))}</span>
+              {' '} — {formatDateTime(status.scheduled_at, language)}
             </p>
           </div>
           {canDismiss && !scheduleDismissed && (
             <button
               onClick={() => setScheduleDismissed(true)}
+              aria-label={t.dismiss}
               className={`${styles.dismiss} p-1`}
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

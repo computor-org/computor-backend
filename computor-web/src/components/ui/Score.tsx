@@ -16,8 +16,9 @@ import { useUiLanguage, type UiLanguage } from '@/src/hooks/useUiLanguage';
 export const SCORE_PASS_AT = 0.5;
 
 /**
- * `54.0%` (English) or `54,0 %` (German), or an em dash when there is no score.
- * Without a language the English form is used.
+ * `54.5%` (English) or `54,5 %` (German), or an em dash when there is no score.
+ * At most `decimals` digits and no trailing zero, so a whole score reads `100 %`
+ * in a list and on the detail page alike. Without a language, English.
  */
 export function formatScore(
   value: number | null | undefined,
@@ -27,7 +28,7 @@ export function formatScore(
   if (value == null) return '—';
   return new Intl.NumberFormat(language === 'de' ? 'de-AT' : 'en-US', {
     style: 'percent',
-    minimumFractionDigits: decimals,
+    minimumFractionDigits: 0,
     maximumFractionDigits: decimals,
   }).format(value);
 }

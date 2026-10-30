@@ -478,5 +478,8 @@
       "priority": 90,
       "config": {}
     }
-  ]
+  ],
+  "internationalizationEnabled": true,
+  "supportedLocales": ["de", "en"],
+  "defaultLocale": "de"
 }

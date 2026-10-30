@@ -19,6 +19,7 @@ import { useNotify } from '@/src/contexts/NotificationContext';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { supportClient, type TicketScope, type TicketStatus } from '@/src/clients/SupportClient';
 import { STATUS_TONE, userLabel } from '@/src/utils/support';
+import { localeFor } from '@/src/utils/locale';
 
 const PAGE_SIZE = 50;
 
@@ -107,7 +108,7 @@ export default function SupportPage() {
   const notify = useNotify();
   const language = useUiLanguage();
   const t = COPY[language];
-  const locale = language === 'de' ? 'de-AT' : undefined;
+  const locale = localeFor(language);
   const canView = !!capabilities?.can_view;
 
   const [scope, setScope] = useState<TicketScope>('unassigned');

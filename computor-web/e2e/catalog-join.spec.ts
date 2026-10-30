@@ -207,3 +207,23 @@ for (const [locale, joinLabel, openLabel] of [
     });
   });
 }
+
+test('a second click while joining neither enrolls again nor repeats the message', async ({ page }) => {
+  const enrolled = await setup(page);
+  let release = () => {};
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route(`${API_ORIGIN}/user/courses/*/enroll`, async (route) => {
+    enrolled.push('held');
+    await held;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+  });
+  await page.goto('/courses/catalog?join=python.beginner');
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Join course' }).click();
+  await expect(dialog.getByRole('button', { name: 'Joining…' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Joining…' }).click({ force: true });
+  release();
+  await expect(page).toHaveURL(/\/courses\/c-beginner$/);
+  await expect(page.getByText('You are now enrolled in Data Science mit Python – Grundlagen.')).toHaveCount(1);
+  expect(enrolled).toEqual(['held']);
+});

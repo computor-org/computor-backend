@@ -5,9 +5,25 @@
  * exact same look without importing a layout module just for a class string.
  */
 
-/** Standard text-input / select / textarea styling used by every form field. */
-export const inputCls =
+/**
+ * Everything a form field looks like apart from its colours.
+ *
+ * A private base rather than a copy: Tailwind emits same-property utilities in
+ * alphabetical order, so a `bg-canvas` appended to a string that already says
+ * `bg-surface` loses the cascade and repaints the wrong field. Variants that
+ * want another surface therefore start here instead of appending.
+ */
+const fieldBaseCls =
   'w-full px-3 py-2 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent';
+
+/**
+ * Standard text-input / select / textarea styling used by every form field.
+ *
+ * The field paints its own surface and ink: Tailwind's preflight leaves
+ * `select` transparent, so without them a dark page gave the control the page's
+ * light text on nothing, and the option list the OS paints stayed white.
+ */
+export const inputCls = `${fieldBaseCls} bg-surface text-fg`;
 
 /**
  * File picker. The `file:` variants restyle the browser's own button, which no
@@ -33,4 +49,4 @@ export const rowTitleCls = 'text-fg';
 export const hiddenRowMarkCls = 'opacity-40';
 
 /** An input showing a value the user cannot change (e.g. an immutable path). */
-export const readOnlyInputCls = `${inputCls} bg-canvas text-muted`;
+export const readOnlyInputCls = `${fieldBaseCls} bg-canvas text-muted`;

@@ -15,6 +15,10 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import Forbidden from '@/src/components/Forbidden';
 import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import type { ExampleVersionList } from 'types/generated';
+import { useLecturerCopy } from '@/src/hooks/useLecturerCopy';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { formatDate } from '@/src/utils/locale';
+import { localized, localizedText } from '@/src/utils/localizedText';
 
 const examplesClient = new ExamplesClient();
 
@@ -24,6 +28,8 @@ export default function ExampleDetailPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { canViewExamples, canManageExamples } = usePermissions();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const t = useLecturerCopy();
+  const language = useUiLanguage();
 
   const { data, loading, error } = useResource(
     async () => ({
@@ -33,7 +39,7 @@ export default function ExampleDetailPage() {
     [exampleId],
     { enabled: canViewExamples },
   );
-  const example = data?.example ?? null;
+  const example = localized(data?.example ?? null, language);
   const versions = data?.versions ?? [];
 
   async function doDelete() {
@@ -42,7 +48,7 @@ export default function ExampleDetailPage() {
   }
 
   if (!authLoading && isAuthenticated && !canViewExamples) {
-    return <Forbidden message="You do not have access to examples." backLink="/examples" backText="Back" />;
+    return <Forbidden message={t("You do not have access to examples.")} backLink="/examples" backText={t("Back")} />;
   }
 
   const repoId = example?.example_repository_id;
@@ -54,14 +60,14 @@ export default function ExampleDetailPage() {
     <AuthenticatedLayout>
       <ListPageLayout>
         <PageHeader
-          breadcrumbs={[{ label: 'Examples', href: '/examples' }, { label: example?.title || example?.directory || 'Example' }]}
-          title={example?.title || example?.directory || 'Example'}
+          breadcrumbs={[{ label: t('Examples'), href: '/examples' }, { label: example?.title || example?.directory || t('Example') }]}
+          title={example?.title || example?.directory || t('Example')}
           subtitle={example && <span className="font-mono text-sm text-subtle">{example.identifier}</span>}
           actions={
             example && canManageExamples ? (
               <>
-                <Link href={uploadHref} className="px-3 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover">Upload new version</Link>
-                <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-danger-text border border-danger-line rounded-lg hover:bg-danger-wash">Delete</button>
+                <Link href={uploadHref} className="px-3 py-2 text-sm font-medium text-on-accent bg-accent rounded-lg hover:bg-accent-hover">{t('Upload new version')}</Link>
+                <button onClick={() => setConfirmDelete(true)} className="px-3 py-2 text-sm font-medium text-danger-text border border-danger-line rounded-lg hover:bg-danger-wash">{t('Delete')}</button>
               </>
             ) : undefined
           }
@@ -70,32 +76,32 @@ export default function ExampleDetailPage() {
         <ErrorBanner>{error}</ErrorBanner>
 
         {loading ? (
-          <ListLoading>Loading…</ListLoading>
+          <ListLoading>{t('Loading…')}</ListLoading>
         ) : example ? (
           <ScrollArea>
             <div className="bg-surface border border-rule rounded-lg p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               <div>
-                <dt className="text-muted">Directory</dt>
+                <dt className="text-muted">{t('Directory')}</dt>
                 <dd className="text-fg font-mono">{example.directory}</dd>
               </div>
               <div>
-                <dt className="text-muted">Repository</dt>
+                <dt className="text-muted">{t('Repository')}</dt>
                 <dd className="text-fg">
-                  {repoId ? <Link href={`/example-repositories/${repoId}`} className="text-accent-text hover:underline">View repository</Link> : '—'}
+                  {repoId ? <Link href={`/example-repositories/${repoId}`} className="text-accent-text hover:underline">{t('View repository')}</Link> : '—'}
                 </dd>
               </div>
               {example.description && (
                 <div className="sm:col-span-2">
-                  <dt className="text-muted">Description</dt>
+                  <dt className="text-muted">{t('Description')}</dt>
                   <dd className="text-fg">{example.description}</dd>
                 </div>
               )}
               {(example.tags || []).length > 0 && (
                 <div className="sm:col-span-2">
-                  <dt className="text-muted">Tags</dt>
+                  <dt className="text-muted">{t('Tags')}</dt>
                   <dd className="flex flex-wrap gap-1.5 mt-1">
-                    {(example.tags || []).map((t) => (
-                      <span key={t} className="px-2 py-0.5 text-xs bg-sunken text-muted rounded">{t}</span>
+                    {(example.tags || []).map((tag) => (
+                      <span key={tag} className="px-2 py-0.5 text-xs bg-sunken text-muted rounded">{tag}</span>
                     ))}
                   </dd>
                 </div>
@@ -104,17 +110,17 @@ export default function ExampleDetailPage() {
 
             <div>
               <h2 className="text-xl font-semibold text-fg mb-3">
-                Versions <span className="text-subtle font-normal">({versions.length})</span>
+                {t('Versions')} <span className="text-subtle font-normal">({versions.length})</span>
               </h2>
               {versions.length === 0 ? (
-                <div className="text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">No versions.</div>
+                <div className="text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">{t('No versions.')}</div>
               ) : (
                 <div className="bg-surface border border-rule rounded-lg divide-y divide-rule">
                   {versions.map((v) => (
                     <div key={v.id} className="flex items-center justify-between px-4 py-3">
                       <div className="font-mono text-sm text-fg">v{v.version_tag}</div>
-                      <div className="text-sm text-muted truncate flex-1 px-4">{v.title || ''}</div>
-                      <div className="text-xs text-subtle">{v.created_at ? new Date(v.created_at).toLocaleDateString() : ''}</div>
+                      <div className="text-sm text-muted truncate flex-1 px-4">{localizedText(v.title_i18n, language, v.title) || ''}</div>
+                      <div className="text-xs text-subtle">{formatDate(v.created_at, language, '')}</div>
                     </div>
                   ))}
                 </div>
@@ -126,8 +132,10 @@ export default function ExampleDetailPage() {
 
       {confirmDelete && example && (
         <ConfirmDeleteDialog
-          title={`Delete example “${example.title || example.directory}”?`}
-          message="This permanently deletes the example and all its versions."
+          title={language === 'de'
+            ? `Beispiel „${example.title || example.directory}“ löschen?`
+            : `Delete example “${example.title || example.directory}”?`}
+          message={t('This permanently deletes the example and all its versions.')}
           confirmWord={example.directory}
           onConfirm={doDelete}
           onClose={() => setConfirmDelete(false)}

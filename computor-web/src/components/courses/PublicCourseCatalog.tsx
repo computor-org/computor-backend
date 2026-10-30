@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type { PublicCourseCatalogEntry } from '@/src/types/publicLearning';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { localizedText } from '@/src/utils/localizedText';
 
 /**
  * Public courses as a compact link list for the landing page (issue #415).
@@ -13,6 +15,7 @@ import type { PublicCourseCatalogEntry } from '@/src/types/publicLearning';
  */
 export default function PublicCourseCatalog({ fallbackLabel }: { fallbackLabel: string }) {
   const [courses, setCourses] = useState<PublicCourseCatalogEntry[]>([]);
+  const language = useUiLanguage();
 
   useEffect(() => {
     let cancelled = false;
@@ -30,7 +33,7 @@ export default function PublicCourseCatalog({ fallbackLabel }: { fallbackLabel: 
   }, []);
 
   const links = courses.length > 0
-    ? courses.map((course) => ({ href: `/learn/${course.id}`, label: course.title }))
+    ? courses.map((course) => ({ href: `/learn/${course.id}`, label: localizedText(course.title_i18n, language, course.title) }))
     : [{ href: '/learn', label: fallbackLabel }];
 
   return (

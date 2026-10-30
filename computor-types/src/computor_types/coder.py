@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Any, Literal, Optional, Union
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from computor_types.tasks import TaskInfo
 
@@ -48,19 +48,32 @@ class WorkspaceBuildStatus(str, Enum):
 # Request schemas
 
 class WorkspaceLaunchContextRequest(BaseModel):
-    """Course navigation requested when opening an existing workspace."""
+    """Course navigation requested when opening an existing workspace.
 
-    course_id: UUID
+    Without a course, the request only carries the reader's language, so a
+    workspace opened from the workspace list reads in the browser's language.
+    """
+
+    course_id: Optional[UUID] = None
     course_content_id: Optional[UUID] = None
     ui_language: Optional[Literal["de", "en"]] = None
+
+    @model_validator(mode="after")
+    def _content_needs_course(self):
+        if self.course_content_id is not None and self.course_id is None:
+            raise ValueError("course_content_id requires course_id")
+        return self
 
 
 class WorkspaceLaunchContext(BaseModel):
     """Short-lived navigation context; does not change workspace provisioning."""
 
-    course_id: UUID
+    course_id: Optional[UUID] = None
     course_content_id: Optional[UUID] = None
-    ui_language: Optional[Literal["de", "en"]] = None
+    ui_language: Optional[Literal["de", "en"]] = Field(
+        None,
+        description="Reading language resolved by the backend from the profile and Accept-Language, unless the request set one explicitly",
+    )
     request_id: UUID
     expires_at: datetime
 

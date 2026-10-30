@@ -53,6 +53,7 @@ from computor_backend.business_logic.crud import (
     list_entities as list_db
 )
 from computor_backend.business_logic.cascade_deletion import delete_examples_by_pattern
+from computor_backend.business_logic.localization import i18n_map
 from ..exceptions import (
     NotFoundException,
     ForbiddenException,
@@ -160,6 +161,8 @@ def _split_promoted_meta(meta: dict) -> dict:
     return {
         "title": meta.get("title"),
         "description": meta.get("description"),
+        "title_i18n": i18n_map(meta.get("title_i18n")),
+        "description_i18n": i18n_map(meta.get("description_i18n")),
         "language": meta.get("language"),
         "license": meta.get("license"),
         "execution_backend": eb,
@@ -824,6 +827,8 @@ async def upload_example(
             identifier=Ltree(slug),
             title=title,
             description=description,
+            title_i18n=i18n_map(meta_data.get('title_i18n')),
+            description_i18n=i18n_map(meta_data.get('description_i18n')),
             tags=tags,
             category=category,
             created_by=permissions.user_id,
@@ -836,6 +841,8 @@ async def upload_example(
         example.identifier = Ltree(slug)
         example.title = title
         example.description = description
+        example.title_i18n = i18n_map(meta_data.get('title_i18n'))
+        example.description_i18n = i18n_map(meta_data.get('description_i18n'))
         example.tags = tags
         example.category = category
         example.updated_by = permissions.user_id

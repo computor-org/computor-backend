@@ -11,7 +11,7 @@ import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import { PageLoading } from '@/src/components/ListPageLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
-import { inputCls } from '@/src/components/ui/tokens';
+import { inputCls, readOnlyInputCls } from '@/src/components/ui/tokens';
 
 const exampleRepositoriesClient = new ExampleRepositoriesClient();
 
@@ -112,7 +112,7 @@ export default function ExampleRepositoryEditPage() {
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={inputCls} />
           </Field>
           <Field label={t.storage} hint={t.storageHint}>
-            <input value={`${repo?.source_type ?? ''} · ${repo?.source_url ?? ''}`} readOnly className={`${inputCls} bg-canvas text-muted`} />
+            <input value={`${repo?.source_type ?? ''} · ${repo?.source_url ?? ''}`} readOnly className={readOnlyInputCls} />
           </Field>
         </FormPanel>
       )}

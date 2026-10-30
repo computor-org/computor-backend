@@ -150,6 +150,8 @@ def list_public_courses(
                 title=course.title,
                 position=course.position,
                 description=course.description,
+                title_i18n=course.title_i18n,
+                description_i18n=course.description_i18n,
                 path=str(course.path),
                 language_code=course.language_code,
                 organization_title=organization_title,
@@ -177,7 +179,10 @@ def list_anonymous_catalog(db: Session) -> list[CoursePublicCatalogEntry]:
     rows = (
         _catalog_query(db)
         .filter(Course.visible.isnot(False))
-        .with_entities(Course.id, Course.title, Course.description, Course.language_code, Course.position)
+        .with_entities(
+            Course.id, Course.title, Course.description, Course.language_code, Course.position,
+            Course.title_i18n, Course.description_i18n,
+        )
         .order_by(*course_ordering())
         .limit(ANONYMOUS_CATALOG_LIMIT)
         .all()
@@ -190,9 +195,11 @@ def list_anonymous_catalog(db: Session) -> list[CoursePublicCatalogEntry]:
             title=title,
             position=position,
             description=description,
+            title_i18n=title_i18n,
+            description_i18n=description_i18n,
             language_code=language_code,
         )
-        for course_id, title, description, language_code, position in rows
+        for course_id, title, description, language_code, position, title_i18n, description_i18n in rows
     ]
 
 

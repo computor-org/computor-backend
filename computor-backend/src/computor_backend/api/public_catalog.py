@@ -27,6 +27,7 @@ import time
 from fastapi import APIRouter, Response
 
 from computor_backend.business_logic.course_registration import list_anonymous_catalog
+from computor_backend.business_logic.localization import LocalizeParam, localize_dto
 from computor_backend.database import get_db_session
 from computor_types.courses import CoursePublicCatalogEntry
 from computor_types.public_learning import PublicLearningResources
@@ -54,7 +55,10 @@ def clear_public_catalog_cache() -> None:
     response_model=list[CoursePublicCatalogEntry],
     summary="Public course catalog for visitors who are not signed in",
 )
-def list_public_catalog(response: Response) -> list[CoursePublicCatalogEntry]:
+def list_public_catalog(
+    response: Response,
+    localize: LocalizeParam = None,
+) -> list[CoursePublicCatalogEntry]:
     """Courses open for self-registration. No authentication, no member data."""
     global _cache
     # Held across the refresh on purpose: concurrent misses wait for the one
@@ -68,7 +72,8 @@ def list_public_catalog(response: Response) -> list[CoursePublicCatalogEntry]:
         fetched_at, items = _cache
     remaining = max(0, math.floor(PUBLIC_CATALOG_TTL - (now - fetched_at)))
     response.headers["Cache-Control"] = f"public, max-age={remaining}"
-    return items
+    # Localized after the cache, so the one snapshot serves every language.
+    return [localize_dto(item, localize) for item in items]
 
 
 @public_catalog_router.get("/learning", response_model=PublicLearningResources,

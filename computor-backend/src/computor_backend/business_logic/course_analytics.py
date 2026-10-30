@@ -201,9 +201,19 @@ def normalize_message(message: str | None) -> str:
     return text or "(no message)"
 
 
-def _node_message(node: dict[str, Any]) -> str | None:
+def _node_message(node: dict[str, Any], language: str | None = None) -> str | None:
+    """The node's message in ``language`` when the runner stored one, else as stored.
+
+    Newer runners store each message per language in ``<field>I18n``; older
+    results have only the text in the language of whoever started the run.
+    """
     for key in ("resultMessage", "statusMessage", "details"):
         value = node.get(key)
+        translations = node.get(f"{key}I18n")
+        if language and isinstance(translations, dict):
+            translated = translations.get(language)
+            if isinstance(translated, str) and translated.strip():
+                return translated
         if isinstance(value, str) and value.strip():
             return value
     return None
@@ -215,8 +225,16 @@ def _is_failed(node: dict[str, Any]) -> bool:
     return result == "FAILED" or status in {"FAILED", "CRASHED", "TIMEDOUT"}
 
 
-def extract_failures(report: dict[str, Any] | None) -> list[tuple[str, str]]:
-    """Failing leaves of a test report as ``(test name, raw message)``.
+def extract_failures(
+    report: dict[str, Any] | None, language: str | None = None
+) -> list[tuple[str, str]]:
+    """Failing leaves of a test report as ``(test name, raw message)``, the
+    message in ``language`` where the report has it (see ``_node_message``)."""
+    return [(name, _node_message(node, language) or "") for name, node in _failing_nodes(report)]
+
+
+def _failing_nodes(report: dict[str, Any] | None) -> list[tuple[str, dict[str, Any]]]:
+    """Failing leaves of a test report as ``(test name, node)``.
 
     A collection whose own result is FAILED but that lists no failing test
     (a crash, a timeout, a syntax error before any test ran) is reported as
@@ -225,7 +243,7 @@ def extract_failures(report: dict[str, Any] | None) -> list[tuple[str, str]]:
     """
     if not isinstance(report, dict):
         return []
-    failures: list[tuple[str, str]] = []
+    failures: list[tuple[str, dict[str, Any]]] = []
     collections = report.get("tests") or []
     for idx, main in enumerate(collections):
         if not isinstance(main, dict):
@@ -236,11 +254,11 @@ def extract_failures(report: dict[str, Any] | None) -> list[tuple[str, str]]:
         ]
         for sub_idx, sub in enumerate(failing_subs):
             sub_name = str(sub.get("name") or f"#{sub_idx + 1}")
-            failures.append((f"{main_name} / {sub_name}", _node_message(sub) or ""))
+            failures.append((f"{main_name} / {sub_name}", sub))
         if not failing_subs and _is_failed(main):
-            failures.append((main_name, _node_message(main) or ""))
+            failures.append((main_name, main))
     if not failures and not collections and _is_failed(report):
-        failures.append(("(whole test run)", _node_message(report) or ""))
+        failures.append(("(whole test run)", report))
     return failures
 
 
@@ -257,18 +275,23 @@ class ReportedRun:
     course_content_title: str | None = None
 
 
-def aggregate_typical_errors(runs: Iterable[ReportedRun], max_examples: int = 3) -> list[TypicalError]:
+def aggregate_typical_errors(
+    runs: Iterable[ReportedRun], max_examples: int = 3, language: str | None = None
+) -> list[TypicalError]:
     """Group failing tests by (assignment, test, normalized message).
 
-    A run that fails the same test twice in one report counts once. Groups
-    are ordered by affected students, then occurrences.
+    The group key uses the English text where the runner stored one, so the
+    same failure groups together whatever language each run was started in;
+    messages are shown in ``language`` where stored. A run that fails the
+    same test twice in one report counts once. Groups are ordered by
+    affected students, then occurrences.
     """
     groups: dict[tuple[str, str, str], dict[str, Any]] = {}
     for run in runs:
         seen_in_run = set()
-        for test_name, raw in extract_failures(run.report):
-            normalized = normalize_message(raw)
-            key = (run.course_content_id, test_name, normalized)
+        for test_name, node in _failing_nodes(run.report):
+            raw = _node_message(node, language) or ""
+            key = (run.course_content_id, test_name, normalize_message(_node_message(node, "en")))
             if key in seen_in_run:
                 continue
             seen_in_run.add(key)
@@ -276,6 +299,7 @@ def aggregate_typical_errors(runs: Iterable[ReportedRun], max_examples: int = 3)
                 key,
                 {
                     "title": run.course_content_title,
+                    "message": normalize_message(raw),
                     "occurrences": 0,
                     "students": set(),
                     "first": None,
@@ -300,7 +324,7 @@ def aggregate_typical_errors(runs: Iterable[ReportedRun], max_examples: int = 3)
 
     _epoch = datetime.min.replace(tzinfo=timezone.utc)
     out: list[TypicalError] = []
-    for (content_id, test_name, normalized), g in groups.items():
+    for (content_id, test_name, _), g in groups.items():
         examples = sorted(g["examples"], key=lambda e: e.created_at or _epoch, reverse=True)
         # One example per student first, so the examples show the spread.
         picked: list[TypicalErrorExample] = []
@@ -316,7 +340,7 @@ def aggregate_typical_errors(runs: Iterable[ReportedRun], max_examples: int = 3)
                 course_content_id=content_id,
                 course_content_title=g["title"],
                 test_name=test_name,
-                message=normalized,
+                message=g["message"],
                 occurrences=g["occurrences"],
                 affected_students=len(g["students"]),
                 first_seen_at=g["first"],
@@ -628,8 +652,10 @@ async def get_typical_errors(
     course_content_id: str | None = None,
     max_results: int = 300,
     fetch_report: ReportFetcher | None = None,
+    language: str | None = None,
 ) -> TypicalErrorsGet:
-    """Typical errors over the newest ``max_results`` imperfect student test runs."""
+    """Typical errors over the newest ``max_results`` imperfect student test runs,
+    with messages in ``language`` ("de"/"en") where the runs stored them."""
     _require_course_role(permissions, course_id, CourseRole.LECTURER, db)
     students = _student_rows(db, course_id)
     titles = _content_titles(db, course_id)
@@ -684,7 +710,7 @@ async def get_typical_errors(
         results_scanned=len(runs),
         results_without_report=sum(1 for r in runs if r.report is None),
         truncated=truncated,
-        errors=aggregate_typical_errors(runs),
+        errors=aggregate_typical_errors(runs, language=language),
     )
 
 

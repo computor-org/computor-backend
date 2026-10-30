@@ -245,6 +245,8 @@ export interface WSMaintenanceActivated {
   message: string;
   /** ISO8601 timestamp of activation */
   activated_at: string;
+  /** The message in German and English; clients show the reader's language, else `message` */
+  message_i18n?: Record<string, string> | null;
 }
 
 /**
@@ -254,6 +256,8 @@ export interface WSMaintenanceDeactivated {
   type?: "maintenance:deactivated";
   active?: boolean;
   message?: string;
+  /** The message in German and English; clients show the reader's language, else `message` */
+  message_i18n?: Record<string, string> | null;
 }
 
 /**
@@ -265,6 +269,8 @@ export interface WSMaintenanceScheduled {
   scheduled_at: string;
   /** Schedule message for users */
   message: string;
+  /** The message in German and English; clients show the reader's language, else `message` */
+  message_i18n?: Record<string, string> | null;
 }
 
 /**
@@ -273,6 +279,8 @@ export interface WSMaintenanceScheduled {
 export interface WSMaintenanceCancelled {
   type?: "maintenance:cancelled";
   message?: string;
+  /** The message in German and English; clients show the reader's language, else `message` */
+  message_i18n?: Record<string, string> | null;
 }
 
 /**
@@ -286,6 +294,8 @@ export interface WSMaintenanceReminder {
   scheduled_at: string;
   /** Maintenance message for users */
   message: string;
+  /** The message in German and English; clients show the reader's language, else `message` */
+  message_i18n?: Record<string, string> | null;
 }
 
 /**
@@ -394,6 +404,54 @@ export interface WSCourseUpdated {
   course_id: string;
   /** Type of change: updated, visibility_changed */
   change_type: string;
+  /** ISO8601 timestamp of the event */
+  timestamp: string;
+}
+
+/**
+ * The user's own profile changed.
+ * 
+ * Rides the ``user:{user_id}`` inbox channel every connection auto-subscribes
+ * to, so no extra subscription is needed. Sent when a stored profile field
+ * such as the reading language changes, so open clients (web tabs, the VS
+ * Code extension) can pick it up without a manual refresh.
+ */
+export interface WSUserProfileUpdated {
+  type?: "user:profile_updated";
+  /** Channel (user:{user_id}) */
+  channel: string;
+  /** ID of the user whose profile changed */
+  user_id: string;
+  /** New profile reading language (ISO 639-1), null for automatic */
+  language_code?: string | null;
+  /** ISO8601 timestamp of the event */
+  timestamp: string;
+}
+
+/**
+ * A submission group's status, test result or grading changed.
+ * 
+ * Sent on ``submission_group:{submission_group_id}`` and on the
+ * auto-subscribed ``user:{user_id}`` inbox of every group member, never on
+ * the course channel, since it carries the grading. Only the field that
+ * changed is non-null; the ids tell the client which assignment to refetch.
+ */
+export interface WSSubmissionGroupUpdated {
+  type?: "submission_group:updated";
+  /** Channel (submission_group:{submission_group_id} or user:{user_id}) */
+  channel: string;
+  /** ID of the course */
+  course_id: string;
+  /** ID of the course content */
+  course_content_id: string;
+  /** ID of the submission group */
+  submission_group_id: string;
+  /** New submission status slug (submitted, not_submitted), null when unchanged */
+  status?: string | null;
+  /** New test-result status slug (finished, failed, ...), null when unchanged */
+  result?: string | null;
+  /** New grading value (0.0-1.0), null when unchanged */
+  grading?: number | null;
   /** ISO8601 timestamp of the event */
   timestamp: string;
 }

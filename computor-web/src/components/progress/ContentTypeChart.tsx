@@ -11,9 +11,11 @@ const COPY = {
 
 interface ContentTypeChartProps {
   students: CourseMemberGradingsList[];
+  /** The type's title in the reading language; the stats carry only the source title. */
+  typeTitle?: (slug: string, fallback: string) => string;
 }
 
-export default function ContentTypeChart({ students }: ContentTypeChartProps) {
+export default function ContentTypeChart({ students, typeTitle = (_slug, fallback) => fallback }: ContentTypeChartProps) {
   const t = COPY[useUiLanguage()];
   if (students.length === 0) return null;
 
@@ -29,7 +31,7 @@ export default function ContentTypeChart({ students }: ContentTypeChartProps) {
         existing.count++;
       } else {
         typeMap.set(key, {
-          title: ct.course_content_type_title || ct.course_content_type_slug,
+          title: typeTitle(ct.course_content_type_slug, ct.course_content_type_title || ct.course_content_type_slug),
           color: ct.course_content_type_color || '#6366f1',
           totalProgress: ct.progress_percentage,
           count: 1,

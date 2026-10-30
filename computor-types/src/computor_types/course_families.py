@@ -1,5 +1,5 @@
 from pydantic import BaseModel, field_validator, ConfigDict
-from typing import Optional
+from typing import Dict, Optional
 
 
 
@@ -26,6 +26,10 @@ class CourseFamilyPropertiesGet(BaseModel):
 class CourseFamilyCreate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    # Other languages for title and description, {"de": ..., "en": ...};
+    # the plain fields stay the source text and the fallback.
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     path: str
     organization_id: str
     properties: Optional[CourseFamilyProperties] = None
@@ -34,6 +38,8 @@ class CourseFamilyGet(BaseEntityGet):
     id: str
     title: Optional[str] = None
     description: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     path: str
     organization_id: str
     properties: Optional[CourseFamilyPropertiesGet] = None
@@ -50,6 +56,8 @@ class CourseFamilyGet(BaseEntityGet):
 class CourseFamilyList(BaseModel):
     id: str
     title: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     organization_id: str
     path: str
 
@@ -63,6 +71,8 @@ class CourseFamilyList(BaseModel):
 class CourseFamilyUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    title_i18n: Optional[Dict[str, str]] = None
+    description_i18n: Optional[Dict[str, str]] = None
     path: Optional[str] = None
     organization_id: Optional[str] = None
     properties: Optional[CourseFamilyProperties] = None

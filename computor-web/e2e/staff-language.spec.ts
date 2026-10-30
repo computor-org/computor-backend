@@ -27,6 +27,12 @@ async function signInAsAdmin(page: Page, profileLanguage: string | null) {
     const path = new URL(route.request().url()).pathname;
     if (path === '/users') return json(route, USERS);
     if (path === '/git-servers') return json(route, []);
+    if (path === '/service-types') return json(route, []);
+    if (path === '/courses/c-1') return json(route, {
+      id: 'c-1', title: 'Algorithmen', path: 'algorithms', course_family_id: 'f-1', organization_id: 'o-1', language_code: 'de',
+    });
+    if (path === '/course-families') return json(route, [{ id: 'f-1', title: 'Algorithmen', organization_id: 'o-1' }]);
+    if (path === '/system/maintenance/status') return json(route, { active: true, message: null, scheduled_at: null });
     if (path.endsWith('/user/views')) return json(route, []);
     if (path.endsWith('/user/scopes')) return json(route, { is_admin: true });
     if (path.endsWith('/user')) return json(route, {
@@ -62,5 +68,44 @@ test.describe('German browser', () => {
     await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible();
     await expect(page.getByPlaceholder('Search by email or name…')).toBeVisible();
     await expect(page.getByText('Benutzer', { exact: true })).toHaveCount(0);
+  });
+
+  // Course settings, course creation and the maintenance banner were English
+  // in a German interface (computor-org/issues#552).
+  test('course settings are German', async ({ page }) => {
+    await signInAsAdmin(page, null);
+    await page.goto('/courses/c-1/edit');
+    await expect(page.getByRole('heading', { name: 'Kurs bearbeiten' })).toBeVisible();
+    await expect(page.getByLabel('Plätze für die Selbstanmeldung')).toBeVisible();
+    await expect(page.getByText('Kurs für die Selbstanmeldung im Katalog anbieten')).toBeVisible();
+    await expect(page.getByText('Wartungsmodus aktiv')).toBeVisible();
+    await expect(page.getByText(/Self-registration|Edit course|Default max|Maintenance Mode/)).toHaveCount(0);
+  });
+
+  test('creating a course is German', async ({ page }) => {
+    await signInAsAdmin(page, null);
+    await page.goto('/courses/create');
+    await expect(page.getByRole('heading', { name: 'Neuer Kurs' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: /^Kursfamilie/ })).toBeVisible();
+    await expect(page.getByText('Nachrichten von Studierenden ohne @-Erwähnung an Lena senden')).toBeVisible();
+    await expect(page.getByText(/Course family|Import from file|Send student messages/)).toHaveCount(0);
+  });
+
+  // Admin forms showed "John", "Doe" and "Acme" examples and the English
+  // labels "Slug" and "Git" inside a German interface.
+  test('admin form examples and labels are German', async ({ page }) => {
+    await signInAsAdmin(page, null);
+    await page.goto('/admin/users/create');
+    await expect(page.getByPlaceholder('Erika', { exact: true })).toBeVisible();
+    await expect(page.getByPlaceholder('Musterfrau', { exact: true })).toBeVisible();
+    await expect(page.getByPlaceholder(/^(John|Doe|john@example\.com)$/)).toHaveCount(0);
+
+    await page.goto('/admin/services/create');
+    await expect(page.getByText('Kennung (Slug)')).toBeVisible();
+    await expect(page.getByPlaceholder('Beispiel-Python-Runner')).toBeVisible();
+    await expect(page.getByPlaceholder(/Acme/)).toHaveCount(0);
+
+    await page.goto('/courses/c-1/edit');
+    await expect(page.getByRole('heading', { name: 'Git-Anbindung' })).toBeVisible();
   });
 });

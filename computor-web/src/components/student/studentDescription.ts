@@ -6,13 +6,9 @@ import { apiFetch, API_BASE_URL } from '@/src/utils/apiClient';
  *
  * The released description archive holds `README.md` plus one file per
  * translation (`README_de.md`, `README_en.md`). The reading language is the
- * learner's explicit profile language, else the course language, else English;
- * the same rule as the VS Code extension and the public reader.
+ * interface language: the profile language, else the one the backend resolved
+ * from the browser, else the browser's (computor-org/issues#552).
  */
-
-export function resolveContentLanguage(userLanguage?: string | null, courseLanguage?: string | null): string {
-  return userLanguage?.trim().toLowerCase() || courseLanguage?.trim().toLowerCase() || 'en';
-}
 
 const DESCRIPTION_FILE = /^(?:README|index)(?:_([a-z]{2}))?\.md$/i;
 
@@ -27,6 +23,26 @@ export function pickDescriptionFile(files: string[], preferred: string): string 
     ?? inLanguage('en')
     ?? candidates.find(entry => entry.language === undefined)?.file
     ?? candidates[0]?.file;
+}
+
+// A unit's text may hold one section per language, each behind a
+// "<!-- lang: xx -->" line, as scripts/build-public-learning.mjs reads it.
+const LANGUAGE_MARKER = /^<!--\s*lang:\s*([a-z]{2})\s*-->[ \t]*$/gm;
+
+/**
+ * The text before the first marker plus the section in `language`, else the
+ * first section; text without markers is returned as it is.
+ */
+export function descriptionInLanguage(text: string | null | undefined, language: string): string | undefined {
+  if (!text) return undefined;
+  const parts = text.split(LANGUAGE_MARKER);
+  if (parts.length === 1) return text;
+  const sections = new Map<string, string>();
+  for (let index = 1; index < parts.length; index += 2) {
+    if (!sections.has(parts[index])) sections.set(parts[index], parts[index + 1].trim());
+  }
+  const section = sections.get(language.toLowerCase()) ?? sections.values().next().value ?? '';
+  return `${parts[0].trim()}\n\n${section}`.trim();
 }
 
 const HEADING = /^#\s+(.+?)\s*#*\s*$/m;

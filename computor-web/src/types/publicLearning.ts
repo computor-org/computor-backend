@@ -4,6 +4,9 @@ export interface PublicCourseCatalogEntry {
   position: number | null;
   course_path: string;
   description?: string | null;
+  /** Translations keyed by language code; `title`/`description` are the source text. */
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   language_code?: string | null;
   exercise_count: number;
   unit_count: number;
@@ -13,6 +16,9 @@ export interface PublicLearningContentSummary {
   id: string;
   title: string;
   description?: string | null;
+  /** Translations keyed by language code; `title`/`description` are the source text. */
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   path: string;
   parent_path?: string | null;
   depth: number;
@@ -29,6 +35,9 @@ export interface PublicLearningCourseOutline {
   course_path: string;
   title: string;
   description?: string | null;
+  /** Translations keyed by language code; `title`/`description` are the source text. */
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   language_code?: string | null;
   contents: PublicLearningContentSummary[];
   welcome_content_id?: string | null;
@@ -44,6 +53,9 @@ export interface PublicLearningMaterial {
   course_id: string;
   title: string;
   description?: string | null;
+  /** Translations keyed by language code; `title`/`description` are the source text. */
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   path: string;
   kind: string;
   is_submittable: boolean;

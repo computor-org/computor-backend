@@ -1,6 +1,6 @@
 # Inhalte melden / Report content
 
-Version 1.1, gültig ab 25.10.2026
+Version 1.2, Stand 29.10.2026
 
 ## Deutsch
 
@@ -10,7 +10,7 @@ Wenn Sie auf computor.at Inhalte finden, die Sie für
 rechtswidrig oder für einen Verstoß gegen unsere
 [Nutzungsbedingungen](/terms) halten, melden Sie diese bitte per E-Mail an
 **abuse@computor.at**. Meldungen kann jede Person und jede Stelle einreichen;
-ein Konto auf computor.at ist nicht nötig.
+ein Konto auf computor.at ist dafür nicht erforderlich.
 
 Bitte geben Sie an:
 
@@ -28,20 +28,20 @@ Bitte geben Sie an:
 ### Was dann passiert
 
 - Wir bestätigen den Eingang Ihrer Meldung per E-Mail.
-- Ein Mensch prüft die Meldung zeitnah, sorgfältig, objektiv und ohne
-  Willkür. Wir entscheiden nicht allein mit automatisierten Mitteln.
+- Wir prüfen die Meldung zeitnah, sorgfältig, objektiv und ohne Willkür.
+  Setzen wir dabei automatisierte Mittel ein, teilen wir Ihnen dies mit.
 - Wir teilen Ihnen unsere Entscheidung und die möglichen Rechtsbehelfe mit.
 - Entfernen oder sperren wir Inhalte oder sperren wir ein Konto, informieren
-  wir die betroffene Person mit Begründung. Sie kann innerhalb von sechs
-  Monaten bei contact@computor.at Einspruch erheben. Das gilt ebenso für Sie,
+  wir die betroffene Person und begründen dies. Sie kann innerhalb von sechs
+  Monaten bei contact@computor.at Beschwerde einlegen. Dasselbe gilt für Sie,
   wenn Sie mit unserer Entscheidung über Ihre Meldung nicht einverstanden sind.
 - Der Rechtsweg steht allen Beteiligten jederzeit offen.
 - Erfahren wir von einem Verdacht auf eine Straftat, die eine Gefahr für das
   Leben oder die Sicherheit von Personen darstellt, informieren wir
   unverzüglich die Polizei bzw. die zuständigen Behörden.
 
-Wer wiederholt offensichtlich unbegründete Meldungen einreicht, dessen
-Meldungen können wir nach vorheriger Warnung für eine angemessene Zeit
+Reicht eine Person wiederholt offensichtlich unbegründete Meldungen ein, können
+wir ihre Meldungen nach vorheriger Warnung für einen angemessenen Zeitraum
 nachrangig oder nicht mehr bearbeiten.
 
 Bei akuter Gefahr für Leben oder Sicherheit wenden Sie sich bitte zuerst an
@@ -88,8 +88,8 @@ Please include:
 ### What happens next
 
 - We confirm receipt of your report by email.
-- A human reviews the report in a timely, diligent, objective and
-  non-arbitrary manner. We do not decide by automated means alone.
+- We review the report in a timely, diligent, objective and non-arbitrary
+  manner. If we use automated means, we tell you.
 - We tell you our decision and the available means of redress.
 - If we remove or disable content or suspend an account, we inform the person
   concerned and give reasons. They can appeal within six months to
@@ -104,8 +104,8 @@ If someone repeatedly submits manifestly unfounded reports, we may, after a
 prior warning, deprioritise or stop processing their reports for a reasonable
 period.
 
-In case of immediate danger to life or safety, please contact the police
-first (112).
+In case of immediate danger to life or safety, please contact the police (133)
+or the European emergency number (112) first.
 
 ### Copyright notices from the United States
 

@@ -8,7 +8,7 @@ import { usePermissions } from '@/src/hooks/usePermissions';
 import AuthenticatedLayout from '@/src/components/AuthenticatedLayout';
 import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
-import { inputCls } from '@/src/components/ui/tokens';
+import { inputCls, readOnlyInputCls } from '@/src/components/ui/tokens';
 import { ServicesClient } from '@/src/generated/clients/ServicesClient';
 import { TESTING_LANGUAGES, configLanguage, configTaskQueue } from '@/src/utils/services';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
@@ -26,6 +26,7 @@ const COPY = {
     description:
       'Slug und Diensttyp sind unveränderlich – beide sind Verknüpfungsschlüssel, auf die andere Datensätze bereits verweisen.',
     submit: 'Speichern',
+    slug: 'Kennung (Slug)',
     slugHint: 'Unveränderlich: Beispiele binden sich über die meta.yaml an diese Zeichenkette.',
     serviceType: 'Diensttyp',
     serviceTypeHint: 'Unveränderlich: Er bestimmt die Standard-Token-Berechtigungen und die Zuweisungsregeln.',
@@ -46,6 +47,7 @@ const COPY = {
     title: 'Edit service account',
     description: 'Slug and service type are immutable — both are join keys other records already point at.',
     submit: 'Save',
+    slug: 'Slug',
     slugHint: 'Immutable: examples bind to this string via meta.yaml.',
     serviceType: 'Service type',
     serviceTypeHint: 'Immutable: it determines default token scopes and dispatch rules.',
@@ -141,11 +143,11 @@ export default function ServiceEditPage() {
         onCancel={() => router.push(`/admin/services/${serviceId}`)}
         onSubmit={save}
       >
-        <Field label="Slug" hint={t.slugHint}>
-          <input value={service?.slug ?? ''} disabled className={`${inputCls} bg-canvas text-muted`} />
+        <Field label={t.slug} hint={t.slugHint}>
+          <input value={service?.slug ?? ''} disabled className={readOnlyInputCls} />
         </Field>
         <Field label={t.serviceType} hint={t.serviceTypeHint}>
-          <input value={service?.service_type_path ?? ''} disabled className={`${inputCls} bg-canvas text-muted`} />
+          <input value={service?.service_type_path ?? ''} disabled className={readOnlyInputCls} />
         </Field>
         <Field label={t.name} required>
           <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />

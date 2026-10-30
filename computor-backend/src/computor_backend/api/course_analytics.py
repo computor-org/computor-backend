@@ -15,7 +15,7 @@ from computor_types.course_analytics import (
     StudentActivityGet,
     TypicalErrorsGet,
 )
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from computor_backend.business_logic.course_analytics import (
@@ -24,6 +24,7 @@ from computor_backend.business_logic.course_analytics import (
     get_student_activity,
     get_typical_errors,
 )
+from computor_backend.business_logic.testing_service import resolve_test_language
 from computor_backend.database import get_db
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
@@ -49,15 +50,25 @@ async def course_typical_errors_endpoint(
     permissions: Annotated[Principal, Depends(get_current_principal)],
     course_content_id: str | None = Query(None, description="Limit to one assignment"),
     max_results: int = Query(300, ge=1, le=2000, description="Newest imperfect test runs to scan"),
+    language: str | None = Query(
+        None, pattern="^(de|en)$",
+        description="Language of the messages; default: the reader's language (profile, Accept-Language)",
+    ),
+    request: Request = None,
     db: Session = Depends(get_db, scope="function"),
 ) -> TypicalErrorsGet:
     """Failing tests grouped by normalized message, with affected students and examples."""
+    if language is None:
+        language = resolve_test_language(
+            permissions.user_id, request.headers.get("Accept-Language") if request else None, db
+        )
     return await get_typical_errors(
         str(course_id),
         permissions,
         db,
         course_content_id=course_content_id,
         max_results=max_results,
+        language=language,
     )
 
 

@@ -13,12 +13,15 @@ import EmptyState from '@/src/components/EmptyState';
 import PublicLearnShell from '@/src/components/learn/PublicLearnShell';
 import PublicMarkdown, { PublicMarkdownTitle } from '@/src/components/learn/PublicMarkdown';
 import { localizedTitle } from '@/src/components/learn/localize';
-import { setUiLanguage, useBrowserLanguage, type UiLanguage } from '@/src/hooks/useBrowserLanguage';
+import { localized } from '@/src/utils/localizedText';
+import { setUiLanguage, type UiLanguage } from '@/src/hooks/useBrowserLanguage';
+import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import type {
   PublicLearningContent,
   PublicLearningContentSummary,
   PublicLearningCourseOutline,
 } from '@/src/types/publicLearning';
+import { languageName } from '@/src/utils/locale';
 
 const LANGUAGE_LABEL: Record<string, string> = {
   de: 'Deutsch',
@@ -56,7 +59,7 @@ const COPY = {
   en: {
     outline: 'Course outline',
     welcomeLink: 'Welcome',
-    practiseTitle: 'Want to work on the exercises?',
+    practiseTitle: 'Want to work on the assignments?',
     catalog: 'Open the course catalog',
     signIn: 'Sign in to join',
     notFound: 'Course not found.',
@@ -64,19 +67,19 @@ const COPY = {
     loadingCourse: 'Loading course…',
     unavailable: 'Course unavailable',
     courses: 'Courses',
-    counts: (units: number, exercises: number) => `${units} weeks · ${exercises} exercises`,
+    counts: (units: number, assignments: number) => `${units} weeks · ${assignments} assignments`,
     startHere: 'Start here',
     welcome: 'Welcome',
-    noWelcome: 'Pick an exercise on the left or start with the first one.',
+    noWelcome: 'Pick an assignment on the left or start with the first one.',
     startWith: (title: ReactNode) => <>Start with {title}</>,
     loadingContent: 'Loading content…',
     contentUnavailable: 'Course content unavailable',
     itemFailed: 'This item could not be loaded.',
-    exercise: 'Exercise',
+    exercise: 'Assignment',
     material: 'Course material',
     language: 'Language',
     noDescription: 'No description is available for this item.',
-    navigation: 'Exercise navigation',
+    navigation: 'Assignment navigation',
     sourceTitle: 'Source, license and reuse',
     source: <>The course material is on{' '}<a href={PUBLIC_COURSES_URL} target="_blank" rel="noreferrer" className="text-accent-text hover:underline">GitHub</a>. Published material is under the{' '}<a href="/learning/LICENSE.txt" target="_blank" rel="noreferrer" className="text-accent-text hover:underline">MIT license</a>.</>,
   },
@@ -188,9 +191,10 @@ export default function PublicCourseReader({
   const [loaded, setLoaded] = useState<{
     courseId: string; outline: PublicLearningCourseOutline | null; error: string | null;
   } | null>(null);
-  const uiLanguage = useBrowserLanguage();
+  const uiLanguage = useUiLanguage();
   const t = COPY[uiLanguage];
   const outline = loaded?.courseId === courseId ? loaded.outline : null;
+  const shownCourse = localized(outline, uiLanguage);
   const outlineLoading = loaded?.courseId !== courseId;
   const errorCode = loaded?.courseId === courseId ? loaded.error : null;
   const error = errorCode === 'not-found' ? t.notFound : errorCode ? t.loadFailed : null;
@@ -276,12 +280,12 @@ export default function PublicCourseReader({
               <div className="text-sm text-muted">
                 <Link href="/learn" className="text-accent-text hover:underline">{t.courses}</Link>
                 <span className="mx-2">/</span>
-                <span>{outline.title}</span>
+                <span>{shownCourse?.title}</span>
               </div>
-              <h1 className="mt-2 text-3xl font-bold text-fg">{outline.title}</h1>
+              <h1 className="mt-2 text-3xl font-bold text-fg">{shownCourse?.title}</h1>
               <p className="mt-2 text-sm text-muted">
                 {t.counts(outline.unit_count, outline.exercise_count)}
-                {outline.language_code ? ` · ${outline.language_code.toUpperCase()}` : ''}
+                {outline.language_code ? ` · ${languageName(outline.language_code, uiLanguage)}` : ''}
               </p>
             </div>
 
@@ -319,8 +323,8 @@ export default function PublicCourseReader({
                       <div className="mt-4">
                         <PublicMarkdown assetBaseUrl={content.asset_base_url} mediaFiles={content.media_files} markdown={content.markdown} />
                       </div>
-                    ) : outline.description ? (
-                      <div className="mt-4 whitespace-pre-wrap text-body leading-7">{outline.description}</div>
+                    ) : shownCourse?.description ? (
+                      <div className="mt-4 whitespace-pre-wrap text-body leading-7">{shownCourse.description}</div>
                     ) : (
                       <p className="mt-4 text-muted">{t.noWelcome}</p>
                     )}

@@ -44,18 +44,69 @@ from computor_backend.business_logic.public_testing_admission import (
     require_public_result_writer,
 )
 from computor_backend.cache import Cache
+from computor_backend.database import register_post_commit
 from computor_backend.repositories.submission_artifact import SubmissionArtifactRepository
 from computor_backend.repositories.submission_grade_repo import SubmissionGradeRepository
 from computor_backend.permissions.principal import Principal
 from computor_backend.services.storage_service import StorageService
 from computor_backend.storage_security import perform_full_file_validation, sanitize_filename
 from computor_backend.storage_config import MAX_UPLOAD_SIZE, format_bytes
+from computor_backend.websocket import publish_submission_group_updated
 from computor_types.artifacts import SubmissionArtifactGet
 from computor_types.submissions import SubmissionUploadResponseModel
 
 logger = logging.getLogger(__name__)
 
 _DIR_ALLOWED_PATTERN = re.compile(r"[^A-Za-z0-9_.-]")
+
+
+def announce_submission_group_updated(
+    db: Session,
+    submission_group_id,
+    *,
+    status: Optional[str] = None,
+    result: Optional[str] = None,
+    grading: Optional[float] = None,
+) -> None:
+    """Publish ``submission_group:updated`` once this transaction commits.
+
+    Deferred so a rolled-back write never announces itself. The lookup and
+    the publish are best-effort: neither may fail the request.
+    """
+    try:
+        group = (
+            db.query(SubmissionGroup)
+            .filter(SubmissionGroup.id == submission_group_id)
+            .first()
+        )
+        if group is None:
+            return
+        user_ids = [
+            str(user_id)
+            for (user_id,) in db.query(CourseMember.user_id)
+            .join(SubmissionGroupMember, SubmissionGroupMember.course_member_id == CourseMember.id)
+            .filter(SubmissionGroupMember.submission_group_id == group.id)
+            .all()
+        ]
+        course_id = str(group.course_id)
+        course_content_id = str(group.course_content_id)
+        register_post_commit(
+            db,
+            lambda: publish_submission_group_updated(
+                course_id,
+                course_content_id,
+                str(submission_group_id),
+                user_ids,
+                status=status,
+                result=result,
+                grading=grading,
+            ),
+        )
+    except Exception:
+        logger.warning(
+            "Could not announce update of submission group %s", submission_group_id,
+            exc_info=True,
+        )
 
 
 def _sanitize_path_segment(segment: str, *, is_file: bool = False) -> str:
@@ -227,6 +278,7 @@ async def upload_submission_artifact(
     db: Session,
     storage_service: StorageService,
     cache: Optional[Cache] = None,
+    accept_language: Optional[str] = None,
 ) -> SubmissionUploadResponseModel:
     """Upload a submission file and create artifact record."""
 
@@ -505,6 +557,7 @@ async def upload_submission_artifact(
     )
 
     if submit:
+        announce_submission_group_updated(db, submission_group.id, status="submitted")
         # A direct submit skipped the editor's test-first flow; the test must
         # still run or the submission has no result to grade (#311, #271).
         # Best-effort: the submission itself stands either way.
@@ -512,7 +565,7 @@ async def upload_submission_artifact(
             dispatch_submission_test,
         )
 
-        await dispatch_submission_test(created_artifact, db)
+        await dispatch_submission_test(created_artifact, db, accept_language)
 
     return SubmissionUploadResponseModel(
         artifacts=[created_artifact.id],
@@ -691,6 +744,11 @@ def update_artifact(
     # Repository update for automatic cache invalidation
     if updates:
         artifact = SubmissionArtifactRepository(db, cache).update(str(artifact_id), updates)
+        if 'submit' in updates:
+            announce_submission_group_updated(
+                db, artifact.submission_group_id,
+                status="submitted" if artifact.submit else "not_submitted",
+            )
 
     logger.info("Updated submission artifact %s (cache invalidated)", artifact_id)
 
@@ -741,6 +799,10 @@ def create_artifact_grade(
 
     SubmissionGradeRepository(db, cache).create(grade_obj)
 
+    announce_submission_group_updated(
+        db, artifact.submission_group_id, grading=grade_obj.grade
+    )
+
     logger.info(f"Created grade {grade_obj.id} for artifact {artifact_id}")
 
     return grade_obj
@@ -784,6 +846,13 @@ def update_grade(
 
     if updates:
         SubmissionGradeRepository(db, cache).update_entity(grade_obj, updates)
+        artifact = db.query(SubmissionArtifact).filter(
+            SubmissionArtifact.id == grade_obj.artifact_id
+        ).first()
+        if artifact is not None:
+            announce_submission_group_updated(
+                db, artifact.submission_group_id, grading=grade_obj.grade
+            )
 
     return grade_obj
 
@@ -998,7 +1067,7 @@ async def create_test_result(
     )
 
     # Create the test result (use authenticated user's course member id)
-    from computor_types.tasks import map_task_status_to_int
+    from computor_types.tasks import map_int_to_task_status, map_task_status_to_int
     from computor_backend.services.result_storage import store_result_json
 
     result = Result(
@@ -1025,6 +1094,12 @@ async def create_test_result(
     # Store result_json in MinIO if provided
     if result_json is not None:
         await store_result_json(result.id, result_json)
+
+    # The commit above already happened; this fires on the request's final one.
+    announce_submission_group_updated(
+        db, artifact.submission_group_id,
+        result=map_int_to_task_status(result.status).value,
+    )
 
     logger.info(f"Created result {result.id} for artifact {artifact_id}")
 
@@ -1087,6 +1162,13 @@ async def update_test_result(
     if updates:
         from computor_backend.repositories.result import ResultRepository
         result = ResultRepository(db, cache).update(str(test_id), updates)
+
+    if 'status' in updates and result.submission_group_id:
+        from computor_types.tasks import map_int_to_task_status
+        announce_submission_group_updated(
+            db, result.submission_group_id,
+            result=map_int_to_task_status(result.status).value,
+        )
 
     logger.info("Updated test result %s (cache invalidated)", test_id)
 

@@ -19,6 +19,7 @@ import { courseAnalyticsClient } from '@/src/clients/CourseAnalyticsClient';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { formatDateTime, formatNumber } from '@/src/utils/locale';
 import { assignmentsOf } from '@/src/utils/courseAnalytics';
+import { useCourseTitles } from '@/src/hooks/useCourseTitles';
 import type { TypicalError } from 'types/generated';
 
 const SCAN_SIZES = [300, 1000, 2000];
@@ -98,11 +99,13 @@ export default function TypicalErrorsView({ courseId }: { courseId: string }) {
     const res = await courseAnalyticsClient.typicalErrors(courseId, {
       courseContentId: contentId || null,
       maxResults,
+      language,
     });
     if (!contentId) setAssignments(assignmentsOf(res.errors ?? []));
     return res;
-  }, [courseId, contentId, maxResults]);
+  }, [courseId, contentId, maxResults, language]);
 
+  const { contentTitle } = useCourseTitles(courseId);
   const errors = data?.errors ?? [];
   const keyOf = (e: TypicalError) => `${e.course_content_id}|${e.test_name}|${e.message}`;
   const largest = errors.reduce((m, e) => Math.max(m, e.affected_students), 0);
@@ -133,7 +136,7 @@ export default function TypicalErrorsView({ courseId }: { courseId: string }) {
             >
               <option value="">{t.wholeCourse}</option>
               {assignments.map((a) => (
-                <option key={a.id} value={a.id}>{a.title}</option>
+                <option key={a.id} value={a.id}>{contentTitle(a.id, a.title)}</option>
               ))}
             </select>
             <label className="text-xs font-medium text-muted ml-4" htmlFor="te-scan">{t.scan}</label>
@@ -202,7 +205,7 @@ export default function TypicalErrorsView({ courseId }: { courseId: string }) {
                               onClick={() => setOpen(isOpen ? null : k)}
                               aria-expanded={isOpen}
                             >
-                              <Td className="py-2.5 text-body">{e.course_content_title || '—'}</Td>
+                              <Td className="py-2.5 text-body">{contentTitle(e.course_content_id, e.course_content_title || '—')}</Td>
                               <Td className="py-2.5 font-medium text-fg">{e.test_name}</Td>
                               <Td className="py-2.5 font-mono text-xs text-body break-all">{e.message}</Td>
                               <Td className="py-2.5 text-right tabular-nums font-medium">{e.affected_students}</Td>
@@ -252,14 +255,18 @@ export default function TypicalErrorsView({ courseId }: { courseId: string }) {
                     Meldungen werden auf ihre erste Fehlerzeile gekürzt; Zahlen werden zu &lt;n&gt;,
                     Werte in Anführungszeichen zu &lt;str&gt; (einfache Namen wie &apos;np&apos; bleiben
                     erhalten), Dateipfade zu &lt;path&gt; und Speicheradressen zu &lt;addr&gt;. Läufe
-                    von Lehrenden und Tutoren sind nicht enthalten.
+                    von Lehrenden und Tutoren sind nicht enthalten. Dieselbe Meldung bildet eine Gruppe,
+                    in welcher Sprache der Lauf auch gestartet wurde, und erscheint in deiner Sprache;
+                    ältere Läufe zeigen ihre Meldung so, wie sie gespeichert wurde.
                   </>
                 ) : (
                   <>
                     Each failing test of a stored test report counts once per run. Messages are reduced to
                     their first error line; numbers become &lt;n&gt;, quoted values &lt;str&gt; (plain names
                     such as &apos;np&apos; are kept), file paths &lt;path&gt; and memory addresses
-                    &lt;addr&gt;. Runs by lecturers and tutors are not included.
+                    &lt;addr&gt;. Runs by lecturers and tutors are not included. The same message forms one
+                    group whatever language its run was started in and is shown in your language; older runs
+                    show their message as it was stored.
                   </>
                 )}
               </p>

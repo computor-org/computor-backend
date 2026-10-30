@@ -117,6 +117,9 @@ class Example(Base):
     # Example metadata
     title = Column(String(255), nullable=False, comment="Human-readable title of the example")
     description = Column(Text, comment="Detailed description of the example")
+    # Other languages for the two above, {"de": ..., "en": ...} (issue #550).
+    title_i18n = Column(JSONB, nullable=True, comment="meta.yaml: title_i18n")
+    description_i18n = Column(JSONB, nullable=True, comment="meta.yaml: description_i18n")
     
     # Organization and categorization
     category = Column(String(100), comment="Category for grouping examples")
@@ -222,6 +225,16 @@ class ExampleVersion(Base):
         Text,
         nullable=True,
         comment="meta.yaml: description (per-version)",
+    )
+    title_i18n = Column(
+        JSONB,
+        nullable=True,
+        comment="meta.yaml: title_i18n (per-version)",
+    )
+    description_i18n = Column(
+        JSONB,
+        nullable=True,
+        comment="meta.yaml: description_i18n (per-version)",
     )
     language = Column(
         String(16),

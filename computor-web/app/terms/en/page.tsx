@@ -9,7 +9,7 @@ export default function Page() {
       doc="terms_en"
       lang="en"
       languages={[
-        { label: 'Deutsch', href: '/terms', lang: 'de', current: false },
+        { label: 'Deutsch', href: '/terms/de', lang: 'de', current: false },
         { label: 'English', href: '/terms/en', lang: 'en', current: true },
       ]}
     />

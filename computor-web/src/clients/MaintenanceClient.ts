@@ -15,7 +15,11 @@ export interface MaintenanceStatus {
   scheduled_at: string | null;
   scheduled_by: string | null;
   scheduled_by_name: string | null;
+  /** `message` in German and English, when the admin or the server supplied both. */
+  message_i18n?: Record<string, string> | null;
 }
+
+export type MaintenanceMessageI18n = { de: string; en: string };
 
 export class MaintenanceClient extends BaseEndpointClient {
   constructor(client: APIClient = apiClient) {
@@ -26,9 +30,10 @@ export class MaintenanceClient extends BaseEndpointClient {
     return this.client.get<MaintenanceStatus>(this.buildPath('status'));
   }
 
-  async activate(message: string, notifyWebsocket = true): Promise<void> {
+  async activate(message: string, notifyWebsocket = true, messageI18n?: MaintenanceMessageI18n): Promise<void> {
     return this.client.post<void>(this.buildPath('activate'), {
       message,
+      ...(messageI18n ? { message_i18n: messageI18n } : {}),
       notify_websocket: notifyWebsocket,
     });
   }
@@ -37,10 +42,16 @@ export class MaintenanceClient extends BaseEndpointClient {
     return this.client.post<void>(this.buildPath('deactivate'));
   }
 
-  async schedule(scheduledAt: string, message: string, notifyWebsocket = true): Promise<void> {
+  async schedule(
+    scheduledAt: string,
+    message: string,
+    notifyWebsocket = true,
+    messageI18n?: MaintenanceMessageI18n,
+  ): Promise<void> {
     return this.client.post<void>(this.buildPath('schedule'), {
       scheduled_at: scheduledAt,
       message,
+      ...(messageI18n ? { message_i18n: messageI18n } : {}),
       notify_websocket: notifyWebsocket,
     });
   }
