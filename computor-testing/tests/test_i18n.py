@@ -228,3 +228,39 @@ def test_tester_report_keeps_both_languages(tmp_path, language):
     assert report["resultMessageI18n"]["de"] == "Einige oder alle Tests sind fehlgeschlagen"
     assert report["resultMessage"] == report["resultMessageI18n"][language]
     assert "\u2061" not in json.dumps(report, ensure_ascii=False)
+
+
+@pytest.mark.parametrize("language", ["de", "en"])
+def test_syntax_error_is_named_once_with_file_and_line(tmp_path, language):
+    import json
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    (tmp_path / "test.yaml").write_text(
+        "type: python\nname: Syntax\nproperties:\n  tests:\n"
+        "  - {type: variable, name: vars, entryPoint: basis2.py, tests: [{name: a}, {name: b}]}\n"
+        "  - {type: variable, name: more, entryPoint: basis2.py, tests: [{name: c}]}\n"
+    )
+    (tmp_path / "basis2.py").write_text("a = 1\nb = (2\nc = 3\n")
+    env = {**os.environ, ENV_VAR: language, "MPLBACKEND": "Agg"}
+    subprocess.run(
+        [sys.executable, "-m", "testers.cli", "python", "local", "-d", str(tmp_path), "-v", "0"],
+        cwd=Path(__file__).resolve().parents[1], env=env, capture_output=True, timeout=120,
+    )
+    report = json.loads((tmp_path / "output" / "testSummary.json").read_text())
+    subs = [sub for main in report["tests"] for sub in main["tests"]]
+    # Still failed: skipped tests would leave the grade's denominator.
+    assert [sub["result"] for sub in subs] == ["FAILED"] * 3
+    texts = [sub["resultMessageI18n"] for sub in subs]
+    assert texts[0] == {
+        "de": "Fehlgeschlagen: Dein Skript `basis2.py` kann nicht ausgeführt werden: "
+              "Syntaxfehler in Zeile 2: '(' was never closed\n  b = (2",
+        "en": "Failed: Your script `basis2.py` cannot be run: "
+              "syntax error in line 2: '(' was never closed\n  b = (2",
+    }
+    assert texts[1] == texts[2] == {
+        "de": "Nicht ausgeführt: `basis2.py` hat einen Syntaxfehler in Zeile 2",
+        "en": "Not run: `basis2.py` has a syntax error in line 2",
+    }

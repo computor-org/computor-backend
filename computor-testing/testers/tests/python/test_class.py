@@ -13,6 +13,7 @@ import time
 import random
 import token
 import tokenize
+from typing import Optional
 import pytest
 import numpy as np
 
@@ -136,6 +137,27 @@ def _count_token_sequence(file_path: str, name: str, root=None) -> int:
     return count
 
 
+def _syntax_error(script_path: str, directory: str) -> Optional[dict]:
+    """The learner's script's syntax error as file, line and text, or None.
+
+    Compiling (not running) the script here names the line, which the
+    sandboxed run does not report, and lets every test that needs the script
+    refer to one message.
+    """
+    try:
+        compile(read_untrusted_text(script_path), script_path, "exec", dont_inherit=True)
+    except SyntaxError as e:
+        return {
+            "file": os.path.relpath(script_path, directory),
+            "line": e.lineno,
+            "error": e.msg,
+            "text": (e.text or "").strip(),
+        }
+    except Exception:
+        pass  # unreadable or not text: the run reports it as before
+    return None
+
+
 def get_solution(mm, pytestconfig, idx: int, where: Solution) -> dict:
     """
     Get or compute solution for a test.
@@ -225,6 +247,19 @@ def get_solution(mm, pytestconfig, idx: int, where: Solution) -> dict:
                 "traceback": {}, "exectime": 0,
                 "std": {"stdout": None, "stderr": None},
             }
+            return _solution[where]
+
+    if where == Solution.student:
+        syntax = _syntax_error(script_path, _dir)
+        if syntax:
+            message = tr("syntax_error", file=syntax["file"], line=syntax["line"], error=syntax["error"])
+            if syntax["text"]:
+                message += f"\n  {syntax['text']}"
+            _error_solution["status"] = StatusEnum.failed
+            _error_solution["errormsg"] = message
+            _error_solution["errors"] = [message]
+            _error_solution["syntax_error"] = (syntax["file"], syntax["line"])
+            _solution[where] = _error_solution
             return _solution[where]
 
     # Collect variables/expressions to extract
@@ -375,6 +410,15 @@ class TestComputorPython:
                 sol_reference = get_solution(monkeymodule, pytestconfig, idx_main, Solution.reference)
             except Exception as e:
                 pytest.fail(tr("getting_solution_failed", error=e))
+
+            # One syntax error, reported in full by the first test that needs the script.
+            syntax = sol_student.get("syntax_error")
+            if syntax:
+                reported = _report.setdefault("syntax_errors_reported", set())
+                if syntax in reported:
+                    # Failed for grading, but without a "Failed:" label in front of "Not run".
+                    raise AssertionError(tr("not_run_syntax_error", file=syntax[0], line=syntax[1]))
+                reported.add(syntax)
 
             check_solution_status(sol_student)
 
