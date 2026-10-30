@@ -311,6 +311,14 @@ MESSAGES = {
         "en": "No execution result available",
         "de": "Es liegt kein Ergebnis der Ausführung vor",
     },
+    "syntax_error": {
+        "en": "Your script `{file}` cannot be run: syntax error in line {line}: {error}",
+        "de": "Dein Skript `{file}` kann nicht ausgeführt werden: Syntaxfehler in Zeile {line}: {error}",
+    },
+    "not_run_syntax_error": {
+        "en": "Not run: `{file}` has a syntax error in line {line}",
+        "de": "Nicht ausgeführt: `{file}` hat einen Syntaxfehler in Zeile {line}",
+    },
     "security_check_failed": {
         "en": "Security check failed: {issue}",
         "de": "Die Sicherheitsprüfung ist fehlgeschlagen: {issue}",
