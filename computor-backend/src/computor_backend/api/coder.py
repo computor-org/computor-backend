@@ -847,7 +847,7 @@ async def workspace_exists(
 @router.post(
     "/workspaces/{username}/{workspace_name}/launch-context",
     response_model=WorkspaceLaunchContext,
-    summary="Select the course to open in your workspace",
+    summary="Select the course and reading language for your workspace",
 )
 async def post_workspace_launch_context(
     username: str,

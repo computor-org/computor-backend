@@ -110,7 +110,7 @@ async function setup(
   const starts: string[] = [];
   const stops: string[] = [];
   const contexts: { course_id: string }[] = [];
-  const launchRequests: { course_id: string; ui_language?: string; course_content_id?: string }[] = [];
+  const launchRequests: { course_id?: string; ui_language?: string; course_content_id?: string }[] = [];
   const actions: string[] = [];
   const provisions: { template: string }[] = [];
   const observedWorkspaces: { id: string; name: string; build: string }[] = [];
@@ -321,7 +321,7 @@ test('opens anyway when the agent gave up on its startup script', async ({ page 
 });
 
 test('starts a stopped workspace exactly once, then opens it', async ({ page }) => {
-  const { starts, contexts } = await setup(page, [
+  const { starts, launchRequests } = await setup(page, [
     details({ status: 'stopped' }),
     details({ status: 'stopped' }),
     details({ status: 'starting' }),
@@ -333,7 +333,9 @@ test('starts a stopped workspace exactly once, then opens it', async ({ page }) 
 
   // The guard: repeated polls of a stopped workspace must not fire a build each tick.
   expect(starts).toHaveLength(1);
-  expect(contexts).toHaveLength(0); // Generic launches keep the current course.
+  // Generic launches name no course, so the workspace keeps its current one,
+  // but they still carry the reader's language.
+  expect(launchRequests).toEqual([{ ui_language: 'en' }]);
 });
 
 test('a failed workspace is retried, and its stale status is not mistaken for the retry', async ({
@@ -1001,6 +1003,30 @@ test.describe('launch interface language', () => {
   });
 });
 
+
+// Start and open from the workspace list names no course. Without the
+// language, the workspace read in its own display language instead of the
+// browser's.
+for (const [locale, language] of [['de-DE', 'de'], ['fr-FR', 'en']] as const) {
+  test.describe(`launch without a course in a ${locale} browser`, () => {
+    test.use({ locale });
+    test(`hands off ${language} for profile Automatic`, async ({ page }) => {
+      const { launchRequests } = await setup(page, [details({ status: 'running', ready: true })]);
+      await page.goto('/workspaces/launch?owner=u-me&name=code');
+      await page.waitForURL(WORKSPACE_URL);
+      expect(launchRequests).toEqual([{ ui_language: language }]);
+    });
+  });
+}
+
+test('a failed language handoff without a course still opens the workspace', async ({ page }) => {
+  const { launchRequests } = await setup(page, [details({ status: 'running', ready: true })], {
+    handoff: (route) => route.fulfill({ status: 503, contentType: 'application/json', body: '{"detail":"down"}' }),
+  });
+  await page.goto('/workspaces/launch?owner=u-me&name=code');
+  await page.waitForURL(WORKSPACE_URL);
+  expect(launchRequests).toHaveLength(1);
+});
 
 test.describe('launch interface language in an English browser', () => {
   test.use({ locale: 'en-US' });
