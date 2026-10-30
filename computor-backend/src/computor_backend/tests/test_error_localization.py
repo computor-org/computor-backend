@@ -191,3 +191,17 @@ def test_upload_limit_refusal_carries_a_german_message():
     body = json.loads(response.body)
     assert body["message"].startswith("Die Anfrage ist zu groß.")
     assert body["detail"]["error"] == body["message_en"]
+
+
+@pytest.mark.asyncio
+async def test_learner_without_a_course_reads_the_workspace_refusal_in_german(monkeypatch):
+    from computor_backend.api import coder
+
+    monkeypatch.setattr(coder, "get_member_course_template_names", lambda db, principal: [])
+    principal = SimpleNamespace(is_admin=False, permitted=lambda *args: False, user_id="u1")
+    with pytest.raises(ForbiddenException) as refused:
+        coder._check_workspace_access_or_course_member(principal, "list", db=None)
+    _, body = await _body(_request("de-DE,de;q=0.9"), refused.value)
+    assert body["message"] == (
+        "Dir fehlt die Berechtigung für Arbeitsumgebungen. Wende dich an die Administration."
+    )

@@ -478,4 +478,7 @@ DETAILS = {
     "Course is not available.": "Dieser Kurs ist nicht verfügbar.",
     "This workspace template is not enabled for the course.": "Diese Vorlage für Arbeitsumgebungen ist für den Kurs nicht freigeschaltet.",
     "Workspace was not found.": "Die Arbeitsumgebung wurde nicht gefunden.",
+    # The action name (list, start, ...) is internal and means nothing to a learner.
+    "Workspace '{action}' permission required. Contact your administrator.": "Dir fehlt die Berechtigung für Arbeitsumgebungen. Wende dich an die Administration.",
+    "You may only access your own workspaces.": "Du kannst nur auf deine eigenen Arbeitsumgebungen zugreifen.",
 }
