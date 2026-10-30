@@ -13,6 +13,8 @@ import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
 import { inputCls } from '@/src/components/ui/tokens';
 import VisibilitySelect, { type VisibilityValue } from '@/src/components/courses/VisibilitySelect';
+import LenaDescriptionDraft from '@/src/components/courses/LenaDescriptionDraft';
+import LunaAnswer from '@/src/components/student/LunaAnswer';
 import { CourseContentsClient } from '@/src/generated/clients/CourseContentsClient';
 
 const contentsClient = new CourseContentsClient();
@@ -27,6 +29,7 @@ const COPY = {
     edit: (name: string) => `${name} bearbeiten`,
     title: 'Titel',
     description: 'Beschreibung',
+    preview: 'Vorschau',
     visibility: 'Sichtbarkeit für Studierende',
     visibilityHint: 'Wenn du eine Einheit verbirgst, verbirgst du alle Aufgaben darunter. Studierende behalten in beiden Fällen ihre Dateien sowie ihre bisherigen Tests und Abgaben.',
     path: 'Pfad (hier nicht änderbar)',
@@ -50,6 +53,7 @@ const COPY = {
     edit: (name: string) => `Edit ${name}`,
     title: 'Title',
     description: 'Description',
+    preview: 'Preview',
     visibility: 'Student visibility',
     visibilityHint: 'Hiding a unit hides every assignment under it. Students keep their files and their existing tests and submissions either way.',
     path: 'Path (immutable here)',
@@ -97,6 +101,9 @@ export default function CourseContentEditPage() {
   const [title, setTitle] = useState('');
   const crumbs = useCourseCrumbs(courseId, { label: t.assignments, href: `/courses/${courseId}/lecturer/assignments` }, title || t.content);
   const [description, setDescription] = useState('');
+  // Set once a Lena draft is in the field: a draft is long markdown, so the
+  // field grows and shows it rendered until it is saved or discarded.
+  const [fromDraft, setFromDraft] = useState(false);
   const [position, setPosition] = useState('');
   const [maxGroupSize, setMaxGroupSize] = useState('');
   const [maxTestRuns, setMaxTestRuns] = useState('');
@@ -177,10 +184,27 @@ export default function CourseContentEditPage() {
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              rows={3}
+              rows={fromDraft ? 14 : 3}
               className={inputCls}
             />
           </Field>
+          {/* Outside the Field: it labels only a single child control. */}
+          {fromDraft && description.trim() && (
+            <div className="mt-2 rounded-lg border border-rule bg-canvas p-3">
+              <div className="mb-1 text-xs font-medium text-muted">{t.preview}</div>
+              <LunaAnswer answer={description} />
+            </div>
+          )}
+          {content && !content.is_submittable && (
+            <LenaDescriptionDraft
+              contentId={contentId}
+              hasDescription={!!description.trim()}
+              onUse={(draft) => {
+                setDescription(draft);
+                setFromDraft(true);
+              }}
+            />
+          )}
 
           <Field
             label={t.visibility}

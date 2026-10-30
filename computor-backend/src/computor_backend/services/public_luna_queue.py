@@ -3,6 +3,10 @@
 Only request identifiers are indexed. The bounded prompt payload lives in a
 15-minute Redis value; the inference host does not persist it. Redis failures
 must propagate so callers fail closed.
+
+The key prefix and the limits are parameters so another Lena job type
+(``description_draft_queue``) can run the same queue under its own keys; the
+defaults are the public Lena values.
 """
 
 import json
@@ -19,6 +23,9 @@ local user = ARGV[2]
 local id = ARGV[3]
 local now = tonumber(ARGV[4])
 local body = ARGV[5]
+local max_pending = tonumber(ARGV[6])
+local per_hour = tonumber(ARGV[7])
+local per_day = tonumber(ARGV[8])
 local pending = p .. ':pending'
 local active = p .. ':active'
 local lock = p .. ':user:' .. user
@@ -26,10 +33,10 @@ local hour = p .. ':hour:' .. user
 local day = p .. ':day:' .. user
 redis.call('ZREMRANGEBYSCORE', pending, '-inf', now - 900)
 if redis.call('EXISTS', lock) == 1 then return 'pending' end
-if redis.call('ZCARD', pending) >= 20 then return 'full' end
+if redis.call('ZCARD', pending) >= max_pending then return 'full' end
 redis.call('ZREMRANGEBYSCORE', hour, '-inf', now - 3600)
 redis.call('ZREMRANGEBYSCORE', day, '-inf', now - 86400)
-if redis.call('ZCARD', hour) >= 10 or redis.call('ZCARD', day) >= 30 then return 'quota' end
+if redis.call('ZCARD', hour) >= per_hour or redis.call('ZCARD', day) >= per_day then return 'quota' end
 redis.call('SET', lock, id, 'EX', 900)
 redis.call('SET', p .. ':job:' .. id, body, 'EX', 900)
 redis.call('ZADD', pending, now, id)
@@ -44,6 +51,7 @@ return 'accepted'
 _CLAIM = r"""
 local p = ARGV[1]
 local now = tonumber(ARGV[2])
+local max_active = tonumber(ARGV[3])
 local active = p .. ':active'
 local pending = p .. ':pending'
 local expired = redis.call('ZRANGEBYSCORE', active, '-inf', now)
@@ -53,7 +61,7 @@ for _, id in ipairs(expired) do
     redis.call('ZADD', pending, now, id)
   end
 end
-if redis.call('ZCARD', active) >= 4 then return nil end
+if redis.call('ZCARD', active) >= max_active then return nil end
 for i = 1, 20 do
   local ids = redis.call('ZRANGE', pending, 0, 0)
   if #ids == 0 then return nil end
@@ -78,6 +86,7 @@ local id = ARGV[2]
 local lease = ARGV[3]
 local result = ARGV[4]
 local now = tonumber(ARGV[5])
+local result_ttl = tonumber(ARGV[6])
 local job = redis.call('GET', p .. ':job:' .. id)
 if not job then return 'expired' end
 if redis.call('HGET', p .. ':claim:' .. id, 'lease') ~= lease then return 'stale' end
@@ -86,54 +95,105 @@ if not expires or tonumber(expires) <= now then return 'stale' end
 local request = cjson.decode(job)
 local response = cjson.decode(result)
 response.user_id = request.user_id
-redis.call('SET', p .. ':result:' .. id, cjson.encode(response), 'EX', 86400)
+redis.call('SET', p .. ':result:' .. id, cjson.encode(response), 'EX', result_ttl)
 redis.call('DEL', p .. ':job:' .. id, p .. ':claim:' .. id)
 redis.call('ZREM', p .. ':active', id)
 redis.call('DEL', p .. ':user:' .. request.user_id)
 return 'finished'
 """
 
+_CANCEL = r"""
+local p = ARGV[1]
+local user = ARGV[2]
+local id = ARGV[3]
+local job = redis.call('GET', p .. ':job:' .. id)
+if job then
+  if cjson.decode(job).user_id ~= user then return 'other' end
+  redis.call('DEL', p .. ':job:' .. id, p .. ':claim:' .. id)
+  redis.call('ZREM', p .. ':pending', id)
+  redis.call('ZREM', p .. ':active', id)
+  if redis.call('GET', p .. ':user:' .. user) == id then
+    redis.call('DEL', p .. ':user:' .. user)
+  end
+  return 'cancelled'
+end
+local result = redis.call('GET', p .. ':result:' .. id)
+if result then
+  if cjson.decode(result).user_id ~= user then return 'other' end
+  redis.call('DEL', p .. ':result:' .. id)
+  return 'cancelled'
+end
+return 'gone'
+"""
 
-async def admit(redis, user_id: str, payload: dict) -> tuple[str, str]:
+
+async def admit(
+    redis,
+    user_id: str,
+    payload: dict,
+    *,
+    prefix: str = PREFIX,
+    max_pending: int = 20,
+    per_hour: int = 10,
+    per_day: int = 30,
+) -> tuple[str, str]:
     job_id = str(uuid4())
     body = json.dumps({"user_id": user_id, **payload}, separators=(",", ":"))
     outcome = await redis.eval(
-        _ADMIT, 0, PREFIX, user_id, job_id, int(time.time()), body
+        _ADMIT, 0, prefix, user_id, job_id, int(time.time()), body,
+        max_pending, per_hour, per_day,
     )
     return outcome, job_id
 
 
-async def claim(redis) -> tuple[str, str, dict] | None:
-    result = await redis.eval(_CLAIM, 0, PREFIX, int(time.time()))
+async def claim(redis, *, prefix: str = PREFIX, max_active: int = 4) -> tuple[str, str, dict] | None:
+    result = await redis.eval(_CLAIM, 0, prefix, int(time.time()), max_active)
     if not result:
         return None
     job_id, lease, body = result
     return job_id, lease, json.loads(body)
 
 
-async def finish(redis, job_id: str, lease: str, result: dict) -> str:
+async def finish(
+    redis,
+    job_id: str,
+    lease: str,
+    result: dict,
+    *,
+    prefix: str = PREFIX,
+    result_ttl: int = RESULT_TTL,
+) -> str:
     return await redis.eval(
         _FINISH,
         0,
-        PREFIX,
+        prefix,
         job_id,
         lease,
         json.dumps(result, separators=(",", ":")),
         int(time.time()),
+        result_ttl,
     )
 
 
-async def status(redis, user_id: str, job_id: str) -> dict | None:
-    result = await redis.get(f"{PREFIX}:result:{job_id}")
+async def cancel(redis, user_id: str, job_id: str, *, prefix: str = PREFIX) -> str:
+    """Drop a user's job, queued, running or finished, and free their slot.
+
+    A worker still writing it gets ``expired`` from ``finish``.
+    """
+    return await redis.eval(_CANCEL, 0, prefix, user_id, job_id)
+
+
+async def status(redis, user_id: str, job_id: str, *, prefix: str = PREFIX) -> dict | None:
+    result = await redis.get(f"{prefix}:result:{job_id}")
     if result:
         data = json.loads(result)
         return data if data.get("user_id") == user_id else None
-    body = await redis.get(f"{PREFIX}:job:{job_id}")
+    body = await redis.get(f"{prefix}:job:{job_id}")
     if not body or json.loads(body).get("user_id") != user_id:
         return None
     state = (
         "running"
-        if await redis.zscore(f"{PREFIX}:active", job_id) is not None
+        if await redis.zscore(f"{prefix}:active", job_id) is not None
         else "queued"
     )
     return {"state": state}
