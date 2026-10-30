@@ -261,3 +261,29 @@ test('a course shows the build a student is waiting on', async ({ page }) => {
   // The words the administration page uses for the same run.
   await expect(matlab).toContainText('Pushing template');
 });
+
+// The service status and the default-named workspace read as words, not as
+// "Coder healthy" and the template slug "vscode".
+test('the status line and the workspace list speak plainly', async ({ page }) => {
+  await setup(page, {
+    templates: [VSCODE],
+    workspaces: [
+      {
+        id: 'w1', name: 'vscode', owner_id: 'u-me', owner_name: 'u-me',
+        template_id: 't-vscode', template_name: 'vscode-workspace', template_display_name: 'VS Code',
+        latest_build_transition: 'stop', latest_build_status: 'succeeded',
+      },
+      {
+        id: 'w2', name: 'thesis', owner_id: 'u-me', owner_name: 'u-me',
+        template_id: 't-vscode', template_name: 'vscode-workspace', template_display_name: 'VS Code',
+        latest_build_transition: 'stop', latest_build_status: 'succeeded',
+      },
+    ],
+  });
+  await page.goto('/workspaces');
+  await expect(page.getByText('Workspaces available')).toBeVisible();
+  await expect(page.getByText(/Coder/)).toHaveCount(0);
+  const rows = page.getByRole('row');
+  await expect(rows.nth(1).getByRole('cell').first()).toHaveText('VS Code');
+  await expect(rows.nth(2).getByRole('cell').first()).toHaveText('thesis');
+});

@@ -67,7 +67,7 @@ test('anonymous reading uses only static files even when the API is unavailable'
   await expect(page.getByRole('button', { name: /^(Deutsch|English)$/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'EN', exact: true }).click();
   await expect(page.getByText(/This is the first task/)).toBeVisible();
-  await page.getByRole('navigation', { name: 'Exercise navigation' }).getByRole('link').last().click();
+  await page.getByRole('navigation', { name: 'Assignment navigation' }).getByRole('link').last().click();
   await expect(page).toHaveURL(/week_1\.basis1$/);
   await expect(page.locator('article .prose')).not.toBeEmpty();
   expect(apiRequests).toEqual([]);
@@ -79,7 +79,8 @@ test('the beginner course opens with its description and has no Willkommen item 
   // The reader shows the English description to this English browser.
   const description: string = outline.description_i18n?.en ?? outline.description;
   await page.goto(`/learn/${COURSE}`);
-  await expect(page.getByText('3 weeks · ', { exact: false })).toBeVisible();
+  // Assignments, as on the signed-in course pages.
+  await expect(page.getByText(/3 weeks · \d+ assignments/)).toBeVisible();
   const intro = page.locator('article section').first();
   await expect(intro.getByRole('heading', { name: 'Welcome', exact: true })).toBeVisible();
   await expect(intro.getByText(description.split('\n')[0].trim(), { exact: false })).toBeVisible();

@@ -234,7 +234,7 @@ export default function CourseMembersPage() {
                       <td className="px-4 py-3">
                         <div className="font-medium text-fg text-sm">
                           {memberName(m)}
-                          {isSelf && <span className="ml-2 text-xs text-subtle">{t.you}</span>}
+                          {isSelf && <>{' '}<span className="ml-1 text-xs text-subtle">{t.you}</span></>}
                         </div>
                         <div className="text-xs text-muted">{m.user?.email ?? '—'}</div>
                       </td>

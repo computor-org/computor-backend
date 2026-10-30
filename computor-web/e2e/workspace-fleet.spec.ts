@@ -114,7 +114,7 @@ async function setup(
 test('ordinary workspace users do not see the raw Coder version', async ({ page }) => {
   await setup(page, { role: '_workspace_user' });
   await page.goto('/workspaces');
-  await expect(page.getByText('Coder healthy', { exact: true })).toBeVisible();
+  await expect(page.getByText('Workspaces available', { exact: true })).toBeVisible();
   await expect(page.getByText(/2\.29\.4/)).not.toBeVisible();
 });
 

@@ -24,6 +24,7 @@ import { WEB_COMMIT, duration, shortCommit } from '@/src/utils/instanceStatus';
 import { LEGAL_LINKS, englishLegalLink } from '@/src/config/legal';
 import { localeFor } from '@/src/utils/locale';
 import { accountConsoleFrom } from '@/src/utils/accountConsole';
+import { accountLabel } from '@/src/utils/accountLabel';
 
 const tokensClient = new TokensClient();
 const accountsClient = new AccountsClient();
@@ -33,6 +34,12 @@ const authenticationClient = new AuthenticationClient();
 
 // The accounts list endpoint returns AccountList, which already carries `builtin`.
 type AccountRow = AccountList;
+
+/** The token the backend makes for a workspace's own sign-in (coder/service.py). */
+const isWorkspaceToken = (name: string) => name.startsWith('workspace-auto-login');
+
+const knownVersion = (branch: string | null | undefined) =>
+  !!branch && !['head', 'unknown'].includes(branch.trim().toLowerCase());
 
 function Section({ title, description, children, actions }: {
   title: string;
@@ -106,12 +113,14 @@ const COPY = {
     revokeTitle: 'Token widerrufen',
     revokeMessage: (name: string) => `Wenn du „${name}“ widerrufst, wird es sofort ungültig. Alles, was es verwendet, funktioniert dann nicht mehr.`,
     revoke: 'Widerrufen',
+    workspaceToken: 'Anmeldung der Arbeitsumgebung',
+    workspaceTokenHint: 'Von Computor angelegt, damit deine Arbeitsumgebung auf deine Kurse zugreifen kann.',
     accounts: 'Konten',
     accountsDesc: 'Deine Anmelde- und Git-Server-Identitäten.',
     noAccounts: 'Noch keine Konten.',
     builtIn: 'integriert',
     unlinkTitle: 'Konto trennen',
-    unlinkMessage: (provider: string, id: string) => `${provider}-Konto „${id}“ trennen?`,
+    unlinkMessage: (provider: string, id: string) => `Konto „${id}“ (${provider}) trennen?`,
     unlink: 'Trennen',
     privacy: 'Datenschutz und Einwilligung',
     privacyDesc: 'Sieh dir die aktuelle Datenschutzerklärung an und verwalte deine Einwilligung.',
@@ -166,6 +175,8 @@ const COPY = {
     createToken: 'Create token',
     loading: 'Loading…',
     noTokens: 'No active tokens.',
+    workspaceToken: 'Workspace sign-in',
+    workspaceTokenHint: 'Created by Computor so your workspace can reach your courses.',
     created: 'created',
     expiresOn: 'expires',
     noExpiry: 'no expiry',
@@ -179,7 +190,7 @@ const COPY = {
     noAccounts: 'No accounts yet.',
     builtIn: 'built-in',
     unlinkTitle: 'Unlink account',
-    unlinkMessage: (provider: string, id: string) => `Unlink ${provider} account "${id}"?`,
+    unlinkMessage: (provider: string, id: string) => `Unlink account "${id}" (${provider})?`,
     unlink: 'Unlink',
     privacy: 'Privacy & Consent',
     privacyDesc: 'Review the current privacy notice and manage your consent.',
@@ -451,7 +462,10 @@ export default function SettingsPage() {
                   {activeTokens.map((tok) => (
                     <div key={tok.id} className="flex items-center justify-between px-4 py-3 gap-4">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-fg truncate">{tok.name}</div>
+                        <div className="text-sm font-medium text-fg truncate">
+                          {isWorkspaceToken(tok.name) ? t.workspaceToken : tok.name}
+                        </div>
+                        {isWorkspaceToken(tok.name) && <div className="text-xs text-muted">{t.workspaceTokenHint}</div>}
                         <div className="text-xs text-muted">
                           <span className="font-mono">{tok.token_prefix}…</span> · {t.created} {fmtDate(tok.created_at, language)} ·{' '}
                           {tok.expires_at ? `${t.expiresOn} ${fmtDate(tok.expires_at, language)}` : t.noExpiry} ·{' '}
@@ -491,23 +505,23 @@ export default function SettingsPage() {
                 <div className="text-sm text-muted border border-dashed border-rule-strong rounded-lg p-6 text-center">{t.noAccounts}</div>
               ) : (
                 <div className="border border-rule rounded-lg divide-y divide-rule">
-                  {accounts.map((a) => (
+                  {accounts.map((a) => {
+                    const label = accountLabel(a, language, authUser?.email);
+                    return (
                     <div key={a.id} className="flex items-center justify-between px-4 py-3 gap-4">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-fg capitalize flex items-center gap-2">
-                          {a.type || a.provider}
-                          {a.builtin && <span className="px-2 py-0.5 text-xs font-medium rounded bg-sunken text-muted capitalize">{t.builtIn}</span>}
+                        <div className="text-sm font-medium text-fg flex items-center gap-2">
+                          {label.name}
+                          {a.builtin && <span className="px-2 py-0.5 text-xs font-medium rounded bg-sunken text-muted">{t.builtIn}</span>}
                         </div>
-                        <div className="text-xs text-muted">
-                          <span className="font-mono">{a.provider_account_id}</span> · {a.provider}
-                        </div>
+                        {label.detail && <div className="text-xs text-muted">{label.detail}</div>}
                       </div>
                       {(isAdmin || !a.builtin) && (
                         <button
                           onClick={() =>
                             setConfirm({
                               title: t.unlinkTitle,
-                              message: t.unlinkMessage(a.provider, a.provider_account_id),
+                              message: t.unlinkMessage(label.name, a.provider_account_id),
                               confirmWord: a.provider_account_id,
                               onConfirm: async () => {
                                 await accountsClient.deleteAccountsAccountsIdDelete({ id: a.id });
@@ -521,7 +535,8 @@ export default function SettingsPage() {
                         </button>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </Section>
@@ -627,7 +642,8 @@ export default function SettingsPage() {
                         ? `${onlineSince} · ${t.up} ${duration(instanceStatus.uptime_seconds, language)}`
                         : '—',
                     },
-                    { term: t.version, value: instanceStatus.branch },
+                    // A detached build reports "HEAD" and an unknown one "unknown": no version to name.
+                    ...(knownVersion(instanceStatus.branch) ? [{ term: t.version, value: instanceStatus.branch }] : []),
                     {
                       term: t.lastUpdated,
                       // No build time means no build: the API is running from a
