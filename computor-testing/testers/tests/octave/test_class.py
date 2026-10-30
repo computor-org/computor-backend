@@ -128,7 +128,7 @@ def get_solution(pytestconfig, idx_main: int, where: Solution) -> Dict[str, Any]
             _idx = main_idx_by_dependency(testsuite, dependency)
             if _idx is None:
                 error = True
-                errormsg = tr("dependency_invalid", dependency=success_dependencies)
+                errormsg = tr("dependency_invalid", dependency=dependency)
                 status = StatusEnum.failed
             else:
                 total = report.tests[_idx].summary.total
@@ -136,7 +136,7 @@ def get_solution(pytestconfig, idx_main: int, where: Solution) -> Dict[str, Any]
                     result = report.tests[_idx].tests[sub_idx].result
                     if result != ResultEnum.passed:
                         error = True
-                        errormsg = tr("dependency_not_satisfied", dependency=success_dependencies)
+                        errormsg = tr("dependency_not_satisfied", dependency=dependency)
                         status = StatusEnum.skipped
                         break
             if error:

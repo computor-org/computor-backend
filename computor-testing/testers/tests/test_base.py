@@ -524,13 +524,13 @@ def check_success_dependencies(
     for dependency in success_dependencies:
         _idx = resolve(testsuite, dependency)
         if _idx is None:
-            return True, tr("dependency_invalid", dependency=success_dependencies), StatusEnum.failed
+            return True, tr("dependency_invalid", dependency=dependency), StatusEnum.failed
 
         total = report.tests[_idx].summary.total
         for sub_idx in range(total):
             result = report.tests[_idx].tests[sub_idx].result
             if result != ResultEnum.passed:
-                return True, tr("dependency_not_satisfied", dependency=success_dependencies), StatusEnum.skipped
+                return True, tr("dependency_not_satisfied", dependency=dependency), StatusEnum.skipped
 
     return False, "", StatusEnum.scheduled
 

@@ -192,12 +192,12 @@ MESSAGES = {
     },
     # Dependencies, execution and output tests
     "dependency_invalid": {
-        "en": "Success-Dependency `{dependency}` not valid",
-        "de": "Die Erfolgsabhängigkeit `{dependency}` ist ungültig",
+        "en": "The required test `{dependency}` does not exist",
+        "de": "Den vorausgesetzten Test `{dependency}` gibt es nicht",
     },
     "dependency_not_satisfied": {
-        "en": "Success-Dependency `{dependency}` not satisfied",
-        "de": "Die vorausgesetzten Tests `{dependency}` sind nicht bestanden",
+        "en": "The required test `{dependency}` did not pass",
+        "de": "Der vorausgesetzte Test `{dependency}` wurde nicht bestanden",
     },
     "setup_dependency_invalid": {
         "en": "SetupCode-Dependency `{dependency}` not valid",
