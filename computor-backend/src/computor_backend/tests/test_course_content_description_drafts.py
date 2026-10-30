@@ -396,3 +396,59 @@ def test_long_texts_are_shortened_to_fit():
     assert logic._shorten("abc", 10) == "abc"
     shortened = logic._shorten("x" * 100, 50)
     assert len(shortened) == 50 and shortened.endswith("[shortened]")
+
+
+def test_at_most_four_languages_and_the_course_language_stays():
+    texts = [{"en": "a", "fr": "b"}, {"de": "c", "es": "d", "it": "e", "": "f"}]
+    course = SimpleNamespace(language_code="it")
+    assert logic._draft_languages(DescriptionDraftRequest(), texts, course) == ["it", "de", "en", "es"]
+
+
+@pytest.mark.asyncio
+async def test_cancel_frees_the_lecturer_and_drops_the_job(redis):
+    lecturer, other = str(uuid.uuid4()), str(uuid.uuid4())
+    payload = {"course_content_id": "c", "request": {"languages": ["en"]}}
+    outcome, job_id = await queue.admit(redis, lecturer, payload)
+    assert outcome == "accepted"
+    assert (await queue.admit(redis, lecturer, payload))[0] == "pending"
+
+    # Someone else's cancel leaves the job alone.
+    assert await queue.cancel(redis, other, job_id) == "other"
+    assert (await queue.status(redis, lecturer, job_id))["state"] == "queued"
+
+    _, lease, _ = await queue.claim(redis)
+    assert await queue.cancel(redis, lecturer, job_id) == "cancelled"
+    assert await queue.status(redis, lecturer, job_id) is None
+    # Lena's late result is refused, and the lecturer can ask again at once.
+    assert await queue.finish(redis, job_id, lease, {"state": "failed", "error": "model_error"}) == "expired"
+    outcome, second = await queue.admit(redis, lecturer, payload)
+    assert outcome == "accepted"
+
+    # A finished draft can be dropped too, by its owner only.
+    _, lease, _ = await queue.claim(redis)
+    assert await queue.finish(redis, second, lease, {"state": "failed", "error": "model_error"}) == "finished"
+    assert await queue.cancel(redis, other, second) == "other"
+    assert await queue.cancel(redis, lecturer, second) == "cancelled"
+    assert await queue.status(redis, lecturer, second) is None
+    assert await queue.cancel(redis, lecturer, str(uuid.uuid4())) == "gone"
+
+
+@pytest.mark.asyncio
+async def test_worker_counts_as_alive_while_it_writes_a_draft(redis):
+    assert await queue.worker_alive(redis) is False
+    _, job_id = await queue.admit(redis, str(uuid.uuid4()), {"request": {"languages": ["en"]}})
+    _, lease, _ = await queue.claim(redis)
+    # A long draft: the claim's mark has expired, the lease has not.
+    await redis.delete(f"{queue.PREFIX}:worker")
+    assert await queue.worker_alive(redis) is True
+    await queue.finish(redis, job_id, lease, {"state": "failed", "error": "model_error"})
+    assert await queue.worker_alive(redis) is False
+
+
+def test_cancel_answers_the_same_for_any_job(redis):
+    app = FastAPI()
+    app.include_router(api.router, prefix="/course-contents")
+    app.dependency_overrides[get_current_principal] = lambda: Principal(user_id=str(uuid.uuid4()))
+    app.dependency_overrides[get_redis_client] = lambda: redis
+    response = TestClient(app).delete(f"/course-contents/description-drafts/{uuid.uuid4()}")
+    assert response.status_code == 204 and response.content == b""

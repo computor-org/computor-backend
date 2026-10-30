@@ -156,6 +156,26 @@ async def get_description_draft(
     )
 
 
+@router.delete(
+    "/description-drafts/{job_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def cancel_description_draft(
+    job_id: UUID,
+    principal: Annotated[Principal, Depends(get_current_principal)],
+    redis: Annotated[Redis, Depends(get_redis_client)],
+):
+    """Drop the caller's draft job so they can ask again at once.
+
+    The same answer whether the job was theirs, someone else's or already
+    gone, so it reveals nothing about other lecturers' jobs.
+    """
+    try:
+        await queue.cancel(redis, principal.user_id or "", str(job_id))
+    except RedisError:
+        raise ServiceUnavailableException(detail=_UNAVAILABLE) from None
+
+
 @router.post(
     "/description-drafts/worker/claim",
     response_model=DescriptionDraftClaim,

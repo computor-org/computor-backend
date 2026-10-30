@@ -98,6 +98,16 @@ export class CourseContentsClient extends BaseEndpointClient {
   }
 
   /**
+   * Cancel Description Draft
+   * Drop the caller's draft job so they can ask again at once.
+   * The same answer whether the job was theirs, someone else's or already
+   * gone, so it reveals nothing about other lecturers' jobs.
+   */
+  async cancelDescriptionDraftCourseContentsDescriptionDraftsJobIdDelete({ jobId }: { jobId: string }): Promise<void> {
+    return this.client.delete<void>(this.buildPath('description-drafts', jobId));
+  }
+
+  /**
    * Get Description Draft
    */
   async getDescriptionDraftCourseContentsDescriptionDraftsJobIdGet({ jobId }: { jobId: string }): Promise<DescriptionDraftStatus> {

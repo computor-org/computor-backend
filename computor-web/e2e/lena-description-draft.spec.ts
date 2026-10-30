@@ -40,7 +40,7 @@ function json(route: Route, body: unknown, status = 200) {
   return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 }
 
-async function setup(page: Page, { enabled = true } = {}) {
+async function setup(page: Page, { enabled = true, jobState = 'done', requestStatus = 202 } = {}) {
   await page.addInitScript((user) => {
     sessionStorage.setItem('auth_user', JSON.stringify(user));
     sessionStorage.setItem('auth_provider', 'sso');
@@ -50,7 +50,7 @@ async function setup(page: Page, { enabled = true } = {}) {
     role: 'admin', systemRoles: ['_admin'],
   });
 
-  const calls = { requests: [] as unknown[], patches: [] as unknown[] };
+  const calls = { requests: [] as unknown[], patches: [] as unknown[], cancels: 0 };
   await page.route(`${API_ORIGIN}/**`, async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -58,9 +58,17 @@ async function setup(page: Page, { enabled = true } = {}) {
     if (path === '/course-contents/description-drafts/availability') return json(route, { enabled });
     if (path === `/course-contents/${UNIT.id}/description-draft` && method === 'POST') {
       calls.requests.push(request.postDataJSON());
+      if (requestStatus !== 202) {
+        return json(route, { detail: 'Lena is still writing your previous draft' }, requestStatus);
+      }
       return json(route, { id: JOB_ID, state: 'queued' }, 202);
     }
+    if (path === `/course-contents/description-drafts/${JOB_ID}` && method === 'DELETE') {
+      calls.cancels += 1;
+      return route.fulfill({ status: 204 });
+    }
     if (path === `/course-contents/description-drafts/${JOB_ID}`) {
+      if (jobState !== 'done') return json(route, { id: JOB_ID, state: jobState });
       return json(route, {
         id: JOB_ID,
         state: 'done',
@@ -126,4 +134,31 @@ test('no Lena draft when no Lena worker is running', async ({ page }) => {
   await page.goto(`/courses/${COURSE_ID}/lecturer/assignments/${UNIT.id}/edit`);
   await expect(page.getByLabel('Title')).toHaveValue('Week 1', { timeout: 10_000 });
   await expect(page.getByRole('button', { name: 'Draft with Lena' })).toHaveCount(0);
+});
+
+test('a draft Lena is still writing can be cancelled', async ({ page }) => {
+  const calls = await setup(page, { jobState: 'running' });
+  await page.goto(`/courses/${COURSE_ID}/lecturer/assignments/${UNIT.id}/edit`);
+  await expect(page.getByLabel('Description')).toHaveValue('Old text', { timeout: 10_000 });
+
+  await page.getByRole('button', { name: 'Draft with Lena' }).click();
+  const drafts = page.getByTestId('lena-description-draft');
+  await expect(drafts.getByText('Lena is writing a draft from the assignments in this unit…')).toBeVisible({ timeout: 10_000 });
+
+  await drafts.getByRole('button', { name: 'Cancel' }).click();
+  await expect.poll(() => calls.cancels).toBe(1);
+  await expect(drafts.getByText('Lena is writing a draft from the assignments in this unit…')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Draft with Lena' })).toBeEnabled();
+  await expect(page.getByLabel('Description')).toHaveValue('Old text');
+});
+
+test('a refused request is explained in the reading language, not with the server text', async ({ page }) => {
+  await setup(page, { requestStatus: 429 });
+  await page.goto(`/courses/${COURSE_ID}/lecturer/assignments/${UNIT.id}/edit`);
+  await expect(page.getByLabel('Description')).toHaveValue('Old text', { timeout: 10_000 });
+
+  await page.getByRole('button', { name: 'Draft with Lena' }).click();
+  const drafts = page.getByTestId('lena-description-draft');
+  await expect(drafts.getByText('Lena is already writing a draft for you or is busy. Try again in a few minutes.')).toBeVisible();
+  await expect(drafts.getByText('Lena is still writing your previous draft')).toHaveCount(0);
 });

@@ -3,7 +3,7 @@
 The same atomic Redis queue as public Lena, under its own keys and limits: one
 pending draft per lecturer, a small hourly and daily quota, results kept for an
 hour. The worker's claims also mark it as alive, so the feature is offered only
-while a Lena worker that knows this job type is polling.
+while a Lena worker that knows this job type is polling or writing a draft.
 """
 
 import json
@@ -50,5 +50,13 @@ async def status(redis, user_id: str, job_id: str) -> dict | None:
     return await _queue.status(redis, user_id, job_id, prefix=PREFIX)
 
 
+async def cancel(redis, user_id: str, job_id: str) -> str:
+    return await _queue.cancel(redis, user_id, job_id, prefix=PREFIX)
+
+
 async def worker_alive(redis) -> bool:
-    return bool(await redis.exists(f"{PREFIX}:worker"))
+    if await redis.exists(f"{PREFIX}:worker"):
+        return True
+    # A worker writing a long draft does not claim; its unexpired lease shows
+    # it is still there.
+    return await redis.zcount(f"{PREFIX}:active", int(time.time()), "+inf") > 0

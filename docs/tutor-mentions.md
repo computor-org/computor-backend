@@ -53,6 +53,7 @@ lecturer; nothing is saved until they save it.
 | `GET /course-contents/description-drafts/availability` | anyone signed in |
 | `POST /course-contents/{id}/description-draft` | `_lecturer` or higher in the course |
 | `GET /course-contents/description-drafts/{job_id}` | the lecturer who asked |
+| `DELETE /course-contents/description-drafts/{job_id}` | the lecturer who asked |
 | `POST /course-contents/description-drafts/worker/claim` | the tutor agent only |
 | `POST /course-contents/description-drafts/worker/complete/{job_id}` | the tutor agent only |
 
@@ -64,16 +65,23 @@ assigned example version, filtered like the student description download
 (never `meta.yaml`, `test.yaml`, tests or solutions). Texts are shortened to
 fit 40,000 characters per job. No student or lecturer data is included.
 
-Languages default to every `index_<lang>.md` the assignments have, otherwise
-the course language, otherwise English. Drafts come back per language, at most
-4096 characters each (the description column's size).
+Languages default to every `index_<lang>.md` the assignments have (at most
+four, the course language first), otherwise the course language, otherwise
+English. Drafts come back per language, at most 4096 characters each (the
+description column's size).
 
 The queue is the public Lena queue under its own Redis keys
 (`description_draft:v1`): one pending draft per lecturer, 20 per hour and 60
-per day, results kept for an hour. The feature is offered (availability
-`enabled: true`) only while `TUTOR_AGENT_USER_ID` names an active user and a
-worker has claimed within the last 90 seconds, which a `computor-agent` with
-unit descriptions enabled does every few seconds.
+per day, results kept for an hour. `DELETE` drops the lecturer's job, queued,
+running or finished, and frees their pending slot at once; a worker still
+writing it gets 409 on completion. It answers 204 for any job id, so it
+reveals nothing about other lecturers' jobs.
+
+The feature is offered (availability `enabled: true`) only while
+`TUTOR_AGENT_USER_ID` names an active user and a worker is there: it has
+claimed within the last 90 seconds, which a `computor-agent` with unit
+descriptions enabled does every few seconds while idle, or it holds a draft
+job whose lease has not expired, which covers a long draft.
 
 ## Resolution rules
 

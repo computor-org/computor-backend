@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type KeyboardEvent } from 'react';
+import { ApiError } from '@/src/api/client';
 import { CourseContentsClient } from '@/src/generated/clients/CourseContentsClient';
 import type { DescriptionDraft, DescriptionDraftStatus } from '@/src/generated/types/courses';
 import Button from '@/src/components/ui/Button';
@@ -21,6 +22,7 @@ const COPY = {
     use: 'In die Beschreibung übernehmen',
     replace: 'Beschreibung durch diesen Entwurf ersetzen',
     discard: 'Verwerfen',
+    cancel: 'Abbrechen',
     language: (code: string) => ({ de: 'Deutsch', en: 'Englisch' }[code] ?? code),
     failed: {
       too_long: 'Lenas Entwurf war zu lang für eine Beschreibung. Versuche es mit einer Anweisung wie „kürzer“ erneut.',
@@ -29,6 +31,9 @@ const COPY = {
     },
     lost: 'Der Entwurf ist nicht mehr verfügbar. Frage Lena erneut.',
     requestFailed: 'Lena konnte die Anfrage nicht annehmen.',
+    busy: 'Lena schreibt gerade schon einen Entwurf für dich oder ist ausgelastet. Versuche es in ein paar Minuten erneut.',
+    unavailable: 'Lena kann gerade keine Entwürfe schreiben. Versuche es später erneut.',
+    noAssignments: 'Diese Einheit hat keine Aufgaben, aus denen Lena eine Beschreibung schreiben könnte.',
   },
   en: {
     button: 'Draft with Lena',
@@ -40,6 +45,7 @@ const COPY = {
     use: 'Use as description',
     replace: 'Replace the description with this draft',
     discard: 'Discard',
+    cancel: 'Cancel',
     language: (code: string) => ({ de: 'German', en: 'English' }[code] ?? code),
     failed: {
       too_long: "Lena's draft was too long for a description. Try again with an instruction such as \"shorter\".",
@@ -48,11 +54,26 @@ const COPY = {
     },
     lost: 'The draft is no longer available. Ask Lena again.',
     requestFailed: 'Lena could not take the request.',
+    busy: 'Lena is already writing a draft for you or is busy. Try again in a few minutes.',
+    unavailable: 'Lena cannot write drafts right now. Try again later.',
+    noAssignments: 'This unit has no assignments Lena could describe.',
   },
 };
 
 const client = new CourseContentsClient();
 const POLL_MS = 3000;
+// Polls that may fail in a row (a restart, a network blip) before the draft
+// counts as lost; a 404 means it is gone at once.
+const MAX_POLL_FAILURES = 20;
+
+/** The server's English detail is not shown; the status says enough. */
+function requestError(cause: unknown, t: (typeof COPY)['en']): string {
+  if (!(cause instanceof ApiError)) return t.requestFailed;
+  if (cause.status === 429) return t.busy;
+  if (cause.status === 503) return t.unavailable;
+  if (cause.status === 400) return t.noAssignments;
+  return t.requestFailed;
+}
 
 /**
  * Ask Lena for a draft of a unit's description, written from the unit's
@@ -93,12 +114,16 @@ export default function LenaDescriptionDraft({
   useEffect(() => {
     if (!jobId || finished) return;
     let active = true;
+    let failures = 0;
     async function refresh() {
       try {
         const current = await client.getDescriptionDraftCourseContentsDescriptionDraftsJobIdGet({ jobId: jobId as string });
+        failures = 0;
         if (active) setStatus(current);
-      } catch {
-        if (active) {
+      } catch (cause) {
+        failures += 1;
+        const gone = cause instanceof ApiError && cause.status === 404;
+        if (active && (gone || failures >= MAX_POLL_FAILURES)) {
           setError(t.lost);
           setJobId(null);
           setStatus(null);
@@ -123,7 +148,7 @@ export default function LenaDescriptionDraft({
       setJobId(job.id);
       setStatus({ id: job.id, state: job.state });
     } catch (cause) {
-      setError(cause instanceof Error && cause.message ? cause.message : t.requestFailed);
+      setError(requestError(cause, t));
     } finally {
       setRequesting(false);
     }
@@ -132,6 +157,17 @@ export default function LenaDescriptionDraft({
   function discard() {
     setJobId(null);
     setStatus(null);
+  }
+
+  // Frees the lecturer's one pending draft at once instead of after Lena's
+  // timeout; if the call fails, the server lets the job expire.
+  function cancel() {
+    if (jobId) {
+      void client
+        .cancelDescriptionDraftCourseContentsDescriptionDraftsJobIdDelete({ jobId })
+        .catch(() => undefined);
+    }
+    discard();
   }
 
   function use(draft: DescriptionDraft) {
@@ -174,6 +210,9 @@ export default function LenaDescriptionDraft({
         <div className="flex items-center gap-2 text-sm text-muted">
           <Spinner />
           <span>{status?.state === 'running' ? t.running : t.queued}</span>
+          {jobId && (
+            <Button variant="ghost" size="sm" onClick={cancel}>{t.cancel}</Button>
+          )}
         </div>
       )}
 

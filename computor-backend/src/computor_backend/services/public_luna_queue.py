@@ -102,6 +102,30 @@ redis.call('DEL', p .. ':user:' .. request.user_id)
 return 'finished'
 """
 
+_CANCEL = r"""
+local p = ARGV[1]
+local user = ARGV[2]
+local id = ARGV[3]
+local job = redis.call('GET', p .. ':job:' .. id)
+if job then
+  if cjson.decode(job).user_id ~= user then return 'other' end
+  redis.call('DEL', p .. ':job:' .. id, p .. ':claim:' .. id)
+  redis.call('ZREM', p .. ':pending', id)
+  redis.call('ZREM', p .. ':active', id)
+  if redis.call('GET', p .. ':user:' .. user) == id then
+    redis.call('DEL', p .. ':user:' .. user)
+  end
+  return 'cancelled'
+end
+local result = redis.call('GET', p .. ':result:' .. id)
+if result then
+  if cjson.decode(result).user_id ~= user then return 'other' end
+  redis.call('DEL', p .. ':result:' .. id)
+  return 'cancelled'
+end
+return 'gone'
+"""
+
 
 async def admit(
     redis,
@@ -149,6 +173,14 @@ async def finish(
         int(time.time()),
         result_ttl,
     )
+
+
+async def cancel(redis, user_id: str, job_id: str, *, prefix: str = PREFIX) -> str:
+    """Drop a user's job, queued, running or finished, and free their slot.
+
+    A worker still writing it gets ``expired`` from ``finish``.
+    """
+    return await redis.eval(_CANCEL, 0, prefix, user_id, job_id)
 
 
 async def status(redis, user_id: str, job_id: str, *, prefix: str = PREFIX) -> dict | None:

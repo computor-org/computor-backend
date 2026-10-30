@@ -104,6 +104,7 @@
 | `getDescriptionDraftAvailabilityCourseContentsDescriptionDraftsAvailabilityGet` | GET | `/course-contents/description-drafts/availability` | — | `DescriptionDraftAvailability` |
 | `claimDescriptionDraftCourseContentsDescriptionDraftsWorkerClaimPost` | POST | `/course-contents/description-drafts/worker/claim` | — | `DescriptionDraftClaim` |
 | `completeDescriptionDraftCourseContentsDescriptionDraftsWorkerCompleteJobIdPost` | POST | `/course-contents/description-drafts/worker/complete/{job_id}` | `DescriptionDraftCompletion` | `void` |
+| `cancelDescriptionDraftCourseContentsDescriptionDraftsJobIdDelete` | DELETE | `/course-contents/description-drafts/{job_id}` | — | `void` |
 | `getDescriptionDraftCourseContentsDescriptionDraftsJobIdGet` | GET | `/course-contents/description-drafts/{job_id}` | — | `DescriptionDraftStatus` |
 | `requestDescriptionDraftCourseContentsContentIdDescriptionDraftPost` | POST | `/course-contents/{content_id}/description-draft` | `DescriptionDraftRequest` | `DescriptionDraftJob` |
 | `getContentDeploymentCourseContentsContentIdDeploymentGet` | GET | `/course-contents/{content_id}/deployment` | — | `DeploymentWithHistory | null` |

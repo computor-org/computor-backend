@@ -7,6 +7,7 @@ under it, its title, content type and the student-visible assignment text
 submissions, messages, grades or names go into a job.
 """
 
+import logging
 import re
 from typing import Optional
 
@@ -25,10 +26,13 @@ from computor_backend.permissions.core import check_course_permissions
 from computor_backend.permissions.principal import Principal
 from computor_backend.repositories.example_version_repo import ExampleVersionRepository
 from computor_types.course_content_description_drafts import (
+    DESCRIPTION_DRAFT_MAX_LANGUAGES,
     DescriptionDraftAssignment,
     DescriptionDraftInput,
     DescriptionDraftRequest,
 )
+
+logger = logging.getLogger(__name__)
 
 # Bounds on what one job sends to the model.
 MAX_ASSIGNMENTS = 60
@@ -154,7 +158,12 @@ async def _assignment_texts(content: CourseContent, db: Session, storage_service
                 continue
             data = await storage_service.download_file(bucket_name=bucket, object_key=obj.object_name)
             texts[language] = data.decode("utf-8", errors="replace")
-    except Exception:
+    except Exception as e:
+        # Lena then writes from titles alone; say why in the log.
+        logger.warning(
+            "Description draft: assignment texts of %s unreadable (%s)",
+            content.id, type(e).__name__,
+        )
         return texts
     return texts
 
@@ -165,6 +174,10 @@ def _draft_languages(
     if request.languages:
         return request.languages
     found = sorted({language for by_language in texts for language in by_language if language})
+    if len(found) > DESCRIPTION_DRAFT_MAX_LANGUAGES:
+        # A job answers in at most this many languages; keep the course's own.
+        found = sorted(found, key=lambda code: code != course.language_code)
+        found = found[:DESCRIPTION_DRAFT_MAX_LANGUAGES]
     if found:
         return found
     return [course.language_code or FALLBACK_LANGUAGE]
