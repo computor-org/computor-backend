@@ -31,7 +31,7 @@ const COPY = {
   en: {
     kicker: 'Open learning material',
     heading: 'Data Science with Python',
-    lead: 'All courses and exercises are readable without an account.',
+    lead: 'All courses and assignments are readable without an account.',
     courses: 'Courses',
     loading: 'Loading courses…',
     unavailable: 'Courses are temporarily unavailable',
@@ -39,10 +39,10 @@ const COPY = {
     empty: 'No public courses are available right now.',
     course: 'Course',
     untitled: 'Untitled course',
-    counts: (units: number, exercises: number) => `${units} weeks · ${exercises} exercises`,
+    counts: (units: number, assignments: number) => `${units} weeks · ${assignments} assignments`,
     browse: 'Open course',
     practiseTitle: 'Ready to practise?',
-    practise: 'With an account you join a course, test and submit exercises and work in the browser.',
+    practise: 'With an account you join a course, test and submit assignments and work in the browser.',
     catalog: 'Open the course catalog',
   },
 };

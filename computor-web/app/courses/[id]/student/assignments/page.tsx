@@ -34,8 +34,8 @@ const COPY = {
     title: 'Aufgaben',
     workspaces: 'Arbeitsumgebungen',
     fetchFailed: 'Kursinhalte konnten nicht geladen werden',
-    subtitle: (units: number, assignments: number) =>
-      `${units} ${units === 1 ? 'Einheit' : 'Einheiten'} · ${assignments} ${assignments === 1 ? 'Aufgabe' : 'Aufgaben'}`,
+    subtitle: (units: number, assignments: number, weekly: boolean) =>
+      `${units} ${weekly ? (units === 1 ? 'Woche' : 'Wochen') : (units === 1 ? 'Einheit' : 'Einheiten')} · ${assignments} ${assignments === 1 ? 'Aufgabe' : 'Aufgaben'}`,
     emptyTitle: 'Noch keine Aufgaben',
     emptyDescription: 'Aufgaben erscheinen hier, sobald deine Lehrenden sie veröffentlichen.',
     collapseAll: 'Alle einklappen',
@@ -43,10 +43,10 @@ const COPY = {
     assignments: (n: number) => (n === 1 ? '1 Aufgabe' : `${n} Aufgaben`),
     items: (n: number) => (n === 1 ? '1 Element' : `${n} Elemente`),
     unitProgress: (s: number, n: number) => `${s}/${n} eingereicht`,
-    unitProgressTitle: (s: number, n: number) => `${s} von ${n} Aufgaben dieser Einheit eingereicht`,
+    unitProgressTitle: (s: number, n: number, weekly: boolean) => `${s} von ${n} Aufgaben ${weekly ? 'dieser Woche' : 'dieser Einheit'} eingereicht`,
     submitted: 'Eingereicht',
     notSubmitted: 'Nicht eingereicht',
-    usageTitle: 'Testläufe und Abgaben im Verhältnis zu deinem Kontingent',
+    usageTitle: 'T: Testläufe, A: Abgaben, jeweils verbraucht im Verhältnis zum Kontingent',
     testsSuffix: 'T',
     submissionsSuffix: 'A',
     latestResult: 'Letztes Testergebnis',
@@ -60,7 +60,8 @@ const COPY = {
     title: 'Assignments',
     workspaces: 'Workspaces',
     fetchFailed: 'Failed to fetch course contents',
-    subtitle: (units: number, assignments: number) => `${units} units · ${assignments} assignments`,
+    subtitle: (units: number, assignments: number, weekly: boolean) =>
+      `${units} ${weekly ? (units === 1 ? 'week' : 'weeks') : (units === 1 ? 'unit' : 'units')} · ${assignments} ${assignments === 1 ? 'assignment' : 'assignments'}`,
     emptyTitle: 'No assignments yet',
     emptyDescription: 'Assignments will appear here once they are published by your instructor.',
     collapseAll: 'Collapse all',
@@ -68,10 +69,10 @@ const COPY = {
     assignments: (n: number) => `${n} ${n === 1 ? 'assignment' : 'assignments'}`,
     items: (n: number) => `${n} ${n === 1 ? 'item' : 'items'}`,
     unitProgress: (s: number, n: number) => `${s}/${n} submitted`,
-    unitProgressTitle: (s: number, n: number) => `${s} of ${n} assignments in this unit submitted`,
+    unitProgressTitle: (s: number, n: number, weekly: boolean) => `${s} of ${n} assignments in this ${weekly ? 'week' : 'unit'} submitted`,
     submitted: 'Submitted',
     notSubmitted: 'Not submitted',
-    usageTitle: 'Test runs and submissions used, against your budget',
+    usageTitle: 'T: test runs, S: submissions, each used against the budget',
     testsSuffix: 'T',
     submissionsSuffix: 'S',
     latestResult: 'Latest test result',
@@ -139,7 +140,10 @@ export default function StudentCourseContentsPage() {
   const requestedTarget = requestedTargets.length === 1 ? requestedTargets[0] : null;
   const hasRequestedTarget = isOrdinaryLearner && requestedPaths.length > 0;
 
-  const units = courseContents.filter((c) => c.course_content_kind_id === 'unit').length;
+  const unitRows = courseContents.filter((c) => c.course_content_kind_id === 'unit');
+  const units = unitRows.length;
+  // A course whose units are all weeks says so, as /learn does for the same course.
+  const weekly = units > 0 && unitRows.every((c) => c.course_content_type?.slug === 'weekly');
   const assignments = courseContents.filter((c) => c.course_content_kind_id === 'assignment').length;
 
   return (
@@ -148,7 +152,7 @@ export default function StudentCourseContentsPage() {
         <PageHeader
           breadcrumbs={crumbs}
           title={t.title}
-          subtitle={loading ? undefined : t.subtitle(units, assignments)}
+          subtitle={loading ? undefined : t.subtitle(units, assignments, weekly)}
         />
 
         <ErrorBanner>{error}</ErrorBanner>
@@ -236,7 +240,7 @@ export default function StudentCourseContentsPage() {
                             <Badge
                               tone={unit.submitted === unit.total ? 'success' : 'muted'}
                               className="shrink-0 tabular-nums"
-                              title={t.unitProgressTitle(unit.submitted, unit.total)}
+                              title={t.unitProgressTitle(unit.submitted, unit.total, weekly)}
                             >
                               {t.unitProgress(unit.submitted, unit.total)}
                             </Badge>

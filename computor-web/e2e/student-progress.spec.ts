@@ -1,6 +1,7 @@
 import { test, expect, type Page, type Route } from '@playwright/test';
 import { assignmentsInCourseOrder, courseProgress, progressPercent } from '../src/utils/studentProgress';
 import { assignmentState, unitState } from '../src/utils/assignmentStatus';
+import { formatScore } from '../src/components/ui/Score';
 
 /**
  * A learner's own progress and the "Weiter mit" pointer (issues#408, #525):
@@ -30,6 +31,7 @@ type Row = {
   position: number;
   title: string | null;
   course_content_kind_id: 'unit' | 'assignment';
+  course_content_type?: { id: string; slug: string; title: string; title_i18n?: Record<string, string> };
   submitted?: boolean;
   description?: string;
   course_id?: string;
@@ -44,6 +46,7 @@ type Row = {
 
 const unit = (path: string, position: number, title: string): Row => ({
   id: `u-${path}`, path, position, title, course_content_kind_id: 'unit',
+  course_content_type: { id: 'ct-weekly', slug: 'weekly', title: 'Woche', title_i18n: { en: 'Week' } },
 });
 const assignment = (path: string, position: number, title: string, submitted: boolean, result?: number): Row => ({
   id: `a-${path}`, path, position, title, course_content_kind_id: 'assignment', submitted,
@@ -64,6 +67,13 @@ const CONTENTS: Row[] = [
 ];
 
 // --- the rules, without a browser ---------------------------------------------------
+
+test('a score has one format per language, in lists and on the detail page', () => {
+  expect(formatScore(1, 0, 'de')).toBe(formatScore(1, 1, 'de'));
+  expect(formatScore(1, 1, 'de')).toMatch(/^100\s%$/);
+  expect(formatScore(1, 1, 'en')).toBe('100%');
+  expect(formatScore(0.545, 1, 'de')).toMatch(/^54,5\s%$/);
+});
 
 test('assignments follow the course tree: unit position, then assignment position', () => {
   expect(assignmentsInCourseOrder(CONTENTS).map((a) => a.title)).toEqual([
@@ -181,6 +191,12 @@ async function signIn(page: Page, { contents = CONTENTS, roles = ['_student'], s
 
 test.describe('German learner', () => {
   test.use({ locale: 'de-AT' });
+
+  test('the assignment list counts weeks, as /learn does', async ({ page }) => {
+    await signIn(page);
+    await page.goto(`/courses/${COURSE_ID}/student/assignments`);
+    await expect(page.getByText('3 Wochen · 6 Aufgaben')).toBeVisible({ timeout: 15_000 });
+  });
 
   test('the course page shows the bar and links to where the learner left off', async ({ page }) => {
     await signIn(page);
@@ -514,7 +530,7 @@ test('the assignment page shows the task and never opens VS Code by itself', asy
   await page.goto(`/courses/${COURSE_ID}/student/assignments/${FIRST}`);
   await expect(page.getByRole('heading', { name: 'Description', exact: true })).toBeVisible();
   await expect(page.getByText('Exercise instructions', { exact: true })).toBeVisible();
-  await expect(page.getByText('0.0%', { exact: true })).toBeVisible();
+  await expect(page.getByText('0%', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open in VS Code', exact: true })).toHaveCount(1);
   await page.waitForLoadState('networkidle');
   expect(requested).not.toContain('/coder/workspaces/provision');
@@ -594,7 +610,7 @@ for (const staff of [
     await page.goto(`/courses/${COURSE_ID}/student/assignments/${FIRST}`);
     await expect(page.getByRole('heading', { name: 'Description', exact: true })).toBeVisible();
     await expect(page.getByText('Exercise instructions', { exact: true })).toBeVisible();
-    await expect(page.getByText('0.0%', { exact: true })).toBeVisible();
+    await expect(page.getByText('0%', { exact: true })).toBeVisible();
     expect(requested.some((path) => path.endsWith('/launch-context'))).toBe(false);
   });
 }
