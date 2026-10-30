@@ -20,7 +20,7 @@ from computor_backend.business_logic.content_visibility import is_student_visibl
 from computor_backend.coder.client import CoderClient
 from computor_backend.coder.exceptions import CoderNotFoundError
 from computor_backend.coder.naming import coder_username_matches_user
-from computor_backend.exceptions import ForbiddenException, NotFoundException
+from computor_backend.exceptions import BadRequestException, ForbiddenException, NotFoundException
 from computor_backend.model.course import Course, CourseContent
 from computor_backend.model.workspace import CourseWorkspaceTemplate
 from computor_backend.permissions.course_access import get_course_member_or_403
@@ -103,20 +103,27 @@ def _require_target(
 
 
 async def set_workspace_launch_context(
-    username: str, workspace_name: str, course_id: UUID, permissions: Principal,
+    username: str, workspace_name: str, course_id: UUID | None, permissions: Principal,
     db: Session, client: CoderClient, redis: Redis,
     ui_language: Literal["de", "en"] | None = None,
     course_content_id: UUID | None = None,
 ) -> WorkspaceLaunchContext:
-    """Replace this owner's navigation request, without starting/rebuilding."""
+    """Replace this owner's navigation request, without starting/rebuilding.
+
+    Without a course the request carries only the reading language: a
+    workspace opened from the list must still read in the browser's language.
+    """
+    if course_id is None and course_content_id is not None:
+        raise BadRequestException(detail="Course content needs its course.")
     try:
         user_id, workspace = await _owned_workspace(
             username, workspace_name, permissions, client
         )
     except CoderNotFoundError as exc:
         raise NotFoundException(detail="Workspace was not found.") from exc
-    course = _require_course(course_id, permissions, db, workspace)
-    _require_target(course_id, course_content_id, db, course)
+    if course_id is not None:
+        course = _require_course(course_id, permissions, db, workspace)
+        _require_target(course_id, course_content_id, db, course)
     context = WorkspaceLaunchContext(
         course_id=course_id,
         course_content_id=course_content_id,
@@ -129,9 +136,10 @@ async def set_workspace_launch_context(
     )
     # Unlike the request above, this survives the launch, so the dashboard can
     # reopen the workspace in the same course from any browser.
-    await redis.set(
-        _last_course_key(user_id, workspace.id), str(course_id), ex=LAST_COURSE_TTL
-    )
+    if course_id is not None:
+        await redis.set(
+            _last_course_key(user_id, workspace.id), str(course_id), ex=LAST_COURSE_TTL
+        )
     return context
 
 
@@ -174,8 +182,11 @@ async def get_workspace_launch_context(
             now < context.expires_at <= now + timedelta(seconds=LAUNCH_CONTEXT_TTL)
         ):
             raise ValueError("Expired or invalid launch context")
-        course = _require_course(context.course_id, permissions, db, workspace)
-        _require_target(context.course_id, context.course_content_id, db, course)
+        if context.course_id is not None:
+            course = _require_course(context.course_id, permissions, db, workspace)
+            _require_target(context.course_id, context.course_content_id, db, course)
+        elif context.course_content_id is not None:
+            raise ValueError("Course content without its course")
     except (ValidationError, ValueError, ForbiddenException, NotFoundException):
         await redis.delete(key)
         return None

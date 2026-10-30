@@ -84,7 +84,7 @@ export class CoderClient extends BaseEndpointClient {
   async setWorkspaceLaunchContext({ username, workspaceName, courseId, uiLanguage, courseContentId }: {
     username: string;
     workspaceName: string;
-    courseId: string;
+    courseId?: string;
     uiLanguage?: 'de' | 'en';
     courseContentId?: string;
   }): Promise<WorkspaceLaunchContext> {

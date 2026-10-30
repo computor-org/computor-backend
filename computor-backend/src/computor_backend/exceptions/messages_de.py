@@ -106,6 +106,7 @@ DETAILS = {
     "Authentication provider '{provider}' is currently unreachable. Please try again in a moment.": "Der Anmeldedienst „{provider}“ ist gerade nicht erreichbar. Versuche es gleich noch einmal.",
     "Authentication provider '{provider}' is currently unreachable": "Der Anmeldedienst „{provider}“ ist gerade nicht erreichbar.",
     "Missing state parameter": "Der Parameter state fehlt.",
+    "Course content needs its course.": "Ein Kursinhalt lässt sich nur zusammen mit seinem Kurs öffnen.",
     "Provider mismatch in state parameter": "Der Anmeldedienst passt nicht zum Parameter state.",
     "Admin access required": "Dafür sind Administratorrechte nötig.",
     "No refresh token provided": "Es wurde kein Refresh-Token übermittelt.",

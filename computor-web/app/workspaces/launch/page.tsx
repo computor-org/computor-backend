@@ -142,19 +142,23 @@ function LaunchWorkspace() {
   // grace timer must not race past a context handoff still in flight. Keeping
   // the promise also prevents StrictMode/repeated polls creating new requests.
   const handOffCourse = useCallback(async () => {
-    if (!courseId) {
-      if (courseContentId) throw new Error(tRef.current.selectionNotOpened);
-      return;
-    }
+    if (!courseId && courseContentId) throw new Error(tRef.current.selectionNotOpened);
     const key = JSON.stringify([owner, name, courseId, courseContentId, language]);
     if (contextRequest.current?.key !== key) {
       contextRequest.current = {
         key,
         promise: coderClient.setWorkspaceLaunchContext({
-          username: owner, workspaceName: name, courseId, uiLanguage: language,
+          username: owner, workspaceName: name, courseId: courseId || undefined, uiLanguage: language,
           courseContentId: courseContentId || undefined,
         }),
       };
+    }
+    // Without a course the launch still carries the reader's language, or the
+    // workspace falls back to its own display language. Losing that hint must
+    // not keep the workspace from opening.
+    if (!courseId) {
+      await contextRequest.current.promise.catch(() => undefined);
+      return;
     }
     const context = await contextRequest.current.promise.catch((error: unknown) => {
       if (courseContentId) throw new Error(tRef.current.selectionNotOpened);
