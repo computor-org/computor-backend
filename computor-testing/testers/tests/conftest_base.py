@@ -42,7 +42,7 @@ from ctcore.models import (
     read_ca_file,
 )
 from ctcore.helpers import get_property_as_list
-from ctcore.i18n import tr, tr_summary
+from ctcore.i18n import tr, tr_outcome, tr_summary
 from ctcore.security import validate_path_in_root, validate_filename, validate_absolute_path, PathValidationError
 
 logger = logging.getLogger(__name__)
@@ -885,6 +885,24 @@ def generate_test_cases(metafunc: pytest.Metafunc) -> None:
                 test_params.append((main_idx, sub_idx))
 
         metafunc.parametrize("testcases", test_params, ids=test_ids)
+
+
+def learner_result_message(report: pytest.TestReport) -> Optional[str]:
+    """Message shown to the learner for a failed or skipped test call, or None."""
+    if report.longrepr is None:
+        return None
+    if report.outcome == "skipped":
+        try:
+            message = str(report.longrepr[2])
+        except Exception:
+            message = str(report.longrepr)
+    else:
+        longrepr: ExceptionChainRepr = report.longrepr
+        chain = longrepr.chain[-1][1]
+        if chain is None:
+            return None
+        message = chain.message
+    return tr_outcome(message)
 
 
 def update_report_on_test_result(item: pytest.Item, call: pytest.CallInfo) -> None:

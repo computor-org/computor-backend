@@ -141,3 +141,30 @@ def test_missing_student_script_names_file_not_temp_path(
     solution = get_solution(monkeypatch, config, 0, Solution.student)
     assert solution["errormsg"] == expected
     assert str(tmp_path) not in repr(solution)
+
+
+pytest_plugins = ["pytester"]
+
+
+@pytest.mark.parametrize("language,failed,skipped", [
+    ("de", "Fehlgeschlagen: `x` = 3", "Übersprungen: `y`"),
+    ("en", "Failed: `x` = 3", "Skipped: `y`"),
+])
+def test_fail_and_skip_label_follows_language(pytester, monkeypatch, language, failed, skipped):
+    from testers.tests.conftest_base import learner_result_message
+
+    pytester.makepyfile("""
+        import pytest
+        def test_fail():
+            pytest.fail("`x` = 3")
+        def test_skip():
+            pytest.skip("`y`")
+    """)
+    reports = {
+        r.nodeid.split("::")[-1]: r
+        for r in pytester.inline_run().getreports("pytest_runtest_logreport")
+        if r.when == "call" or r.skipped
+    }
+    monkeypatch.setenv(ENV_VAR, language)
+    assert learner_result_message(reports["test_fail"]) == failed
+    assert learner_result_message(reports["test_skip"]) == skipped

@@ -7,7 +7,6 @@ Defines fixtures and hooks for pytester using the object-oriented approach.
 import time
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
-from _pytest._code.code import ExceptionChainRepr
 
 from ctcore.models import (
     ComputorTestSuite,
@@ -21,6 +20,7 @@ from ..conftest_base import (
     report_key,
     InterpretedTesterConfig,
     create_conftest_hooks,
+    learner_result_message,
 )
 
 
@@ -82,18 +82,9 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
                 testsub.result = ResultEnum.failed
                 testmain.summary.failed += 1
 
-            # Extract detailed error message from longrepr
-            if _report.longrepr is not None:
-                if testsub.result == ResultEnum.skipped:
-                    try:
-                        testsub.resultMessage = str(_report.longrepr[2])
-                    except:
-                        testsub.resultMessage = str(_report.longrepr)
-                else:
-                    longrepr: ExceptionChainRepr = _report.longrepr
-                    chain = longrepr.chain[-1][1]
-                    if chain is not None:
-                        testsub.resultMessage = chain.message
+            message = learner_result_message(_report)
+            if message is not None:
+                testsub.resultMessage = message
 
             testmain.timestamp = time.time()
         except (KeyError, IndexError, AttributeError):
