@@ -177,6 +177,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_support_tickets_db.py
           computor-backend/src/computor_backend/tests/test_course_deploy_i18n.py
           computor-backend/src/computor_backend/tests/test_sync_course_metadata.py
+          computor-backend/src/computor_backend/tests/test_sync_example_versions.py
 
   grading-isolation:
     # Required jobs run in the merge queue, not on pull request events.
