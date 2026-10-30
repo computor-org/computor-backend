@@ -112,3 +112,32 @@ def test_default_summaries_follow_the_language_but_lecturer_text_stays(monkeypat
     assert tr_summary(None) is None
     monkeypatch.setenv(ENV_VAR, "en")
     assert tr_summary("Some or all tests failed") == "Some or all tests failed"
+
+
+@pytest.mark.parametrize("entry_point,language,expected", [
+    ("pscript.py", "de", "Das Python-Skript `pscript.py` wurde in deiner Abgabe nicht gefunden"),
+    ("pscript.py", "en", "Python script `pscript.py` not found in your submission"),
+    (None, "de", "In deiner Abgabe wurde kein Python-Skript gefunden"),
+    (None, "en", "No Python script found in your submission"),
+])
+def test_missing_student_script_names_file_not_temp_path(
+    monkeypatch, tmp_path, entry_point, language, expected
+):
+    from types import SimpleNamespace
+    from testers.tests.python.conftest import Solution, report_key
+    from testers.tests.python.test_class import get_solution
+
+    monkeypatch.setenv(ENV_VAR, language)
+    main = SimpleNamespace(
+        entryPoint=entry_point, timeout=None, inputAnswers=None, setUpCode=None,
+        tearDownCode=None, successDependency=None, setUpCodeDependency=None, tests=[],
+    )
+    config = SimpleNamespace(stash={report_key: {
+        "testsuite": SimpleNamespace(properties=SimpleNamespace(tests=[main])),
+        "specification": SimpleNamespace(studentDirectory=str(tmp_path)),
+        "report": None,
+        "solutions": {},
+    }})
+    solution = get_solution(monkeypatch, config, 0, Solution.student)
+    assert solution["errormsg"] == expected
+    assert str(tmp_path) not in repr(solution)
