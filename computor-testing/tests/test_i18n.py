@@ -264,3 +264,21 @@ def test_syntax_error_is_named_once_with_file_and_line(tmp_path, language):
         "de": "Nicht ausgeführt: `basis2.py` hat einen Syntaxfehler in Zeile 2",
         "en": "Not run: `basis2.py` has a syntax error in line 2",
     }
+
+
+@pytest.mark.parametrize("language,expected", [
+    ("en", "The required test `gauss` did not pass"),
+    ("de", "Der vorausgesetzte Test `gauss` wurde nicht bestanden"),
+])
+def test_unmet_success_dependency_names_the_test_in_plain_words(monkeypatch, language, expected):
+    from types import SimpleNamespace
+    from ctcore.models import ResultEnum, StatusEnum
+    from testers.tests.test_base import check_success_dependencies
+
+    monkeypatch.setenv(ENV_VAR, language)
+    gauss = SimpleNamespace(name="gauss", id=None)
+    main = SimpleNamespace(name="sum", id=None, successDependency=["gauss"])
+    testsuite = SimpleNamespace(properties=SimpleNamespace(tests=[gauss, main]))
+    failed_sub = SimpleNamespace(result=ResultEnum.failed)
+    report = SimpleNamespace(tests=[SimpleNamespace(summary=SimpleNamespace(total=1), tests=[failed_sub])])
+    assert check_success_dependencies(testsuite, report, main) == (True, expected, StatusEnum.skipped)
