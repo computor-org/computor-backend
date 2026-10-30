@@ -1,6 +1,6 @@
 # Datenschutzerklärung computor.at
 
-Version 1.7, Stand 29.10.2026
+Version 1.8, Stand 30.10.2026
 
 Computor ist ein kostenloses Lernangebot der TU Graz. Öffentliche Materialien
 können Sie ohne Konto lesen. Für Ihr Konto, Kurse, Abgaben, die Arbeitsumgebung,
@@ -30,10 +30,10 @@ Meldungen nach Art. 16–18 DSA, soweit anwendbar. Die Annahme der
 Nutzungsbedingungen ist keine datenschutzrechtliche Einwilligung und erlaubt
 keine beliebige künftige Verarbeitung.
 
-Für ein Konto benötigen wir eine bestätigte E-Mail-Adresse und ein Passwort;
-ohne diese Angaben ist keine Anmeldung möglich. Ein Konto setzt ein Mindestalter
-von 14 Jahren voraus. Erfahren wir, dass eine jüngere Person ein Konto hat,
-löschen wir es.
+Für ein Konto benötigen wir eine bestätigte E-Mail-Adresse und ein Passwort,
+ohne diese Angaben ist keine Anmeldung möglich. Das Mindestalter für Konten ist
+14 Jahre. Konten von Personen, die dieses Alter nicht erreicht haben, werden
+nach Feststellung unverzüglich gelöscht.
 
 ## 2. Daten, Zwecke und Sichtbarkeit
 
@@ -49,10 +49,7 @@ löschen wir es.
 
 Der technische Serverzugang der dafür vorgesehenen Betriebs- und
 Sicherheitsrollen dient dem Betrieb, der Fehlerbehebung und der
-Missbrauchsabwehr. Tests und Punkte werden automatisch berechnet, entscheiden
-aber nicht über Noten. Die Beurteilung obliegt der zuständigen Lehrperson; eine
-ausschließlich automatisierte Entscheidung mit rechtlicher oder ähnlich
-erheblicher Wirkung nach Art. 22 DSGVO findet nicht statt.
+Missbrauchsabwehr. Tests und Punkte werden automatisch berechnet.
 
 **Lena:** Die Schaltfläche „Lena fragen“ übermittelt Ihre Frage, ausgewählten
 Text und die sichtbare Aufgabenbeschreibung. In Kursnachrichten können Sie Lena
@@ -60,24 +57,24 @@ mit @lena ansprechen und im Verlauf antworten. Ist die automatische Zuordnung
 aktiviert, werden auch Nachrichten von Lernenden, in denen keine andere Person
 erwähnt wird, Lena zugeordnet, sofern Lena verfügbar ist und zum Empfängerkreis
 gehört; dabei wird eine sichtbare Lena-Erwähnung ergänzt. Verarbeitet werden
-Nachricht und bisheriger Verlauf, bei Aufgaben zusätzlich die
+Nachricht und bisheriger Verlauf sowie bei Aufgaben die
 Aufgabenbeschreibung, Ihre letzte Abgabe und deren Testergebnisse. Die Antwort
-bleibt im selben Verlauf mit demselben Empfängerkreis gespeichert. Lena führt
-keinen Code aus und entscheidet nicht über Noten.
+bleibt im selben Verlauf mit demselben Empfängerkreis gespeichert.
 
-Die Inferenz für Lena läuft derzeit auf Rechnern der TU Graz in Österreich, ohne
-externen KI-Anbieter, ohne zusätzliche Protokollierung der Inhalte und ohne
-Modelltraining mit Ihren Daten. Begrenzte Zwischenspeicher (Caches) im
-Arbeitsspeicher und auf der Festplatte verwenden Berechnungen wieder; sie sind
-für Lernende nicht zugänglich und werden bei Kapazitätsbedarf ersetzt oder
-geleert, ohne feste Zeitfrist. Numerische Größen-, Status- und Zeitmesswerte
-enthalten keine Fragen, übermittelten Texte oder Antworten.
+Für Lena gelten die in Abschnitt 3 beschriebenen Verarbeitungsorte. Wir setzen
+keinen externen KI-Anbieter ein und verwenden Ihre Daten weder für zusätzliche
+Inhaltsprotokolle noch für Modelltraining. Bei serverseitiger Inferenz verwenden
+begrenzte Zwischenspeicher (Caches) im Arbeitsspeicher und auf der Festplatte
+Berechnungen wieder. Diese serverseitigen Caches sind für Lernende nicht
+zugänglich und werden bei Kapazitätsbedarf ersetzt oder geleert, ohne feste
+Zeitfrist. Numerische Größen-, Status- und Zeitmesswerte enthalten keine Fragen,
+übermittelten Texte oder Antworten.
 
 **Support:** Eingehende Support-E-Mails und Meldungen werden automatisch
 eingelesen, bereinigt und einer Anfrage zugeordnet. Lokale KI-Modelle können
 eine Anfrage zusammenfassen, einordnen und einen Antwortentwurf vorschlagen.
 Jede Antwort prüft und versendet eine Person aus dem Support-Team; die KI
-entscheidet nicht über Konto, Sperren, Abgaben oder Noten. Die Modelle laufen
+entscheidet nicht über Konto, Sperren oder Abgaben. Die Modelle laufen
 auf Rechnern der TU Graz in Österreich und auf unseren Servern bei Hetzner in
 Deutschland (Abschnitt 3), ohne externen KI-Anbieter und ohne Modelltraining
 mit Ihren Daten. Zusammenfassungen, Einordnungen und Entwürfe gehören zur
@@ -85,11 +82,16 @@ Anfrage und folgen deren Löschfrist (Abschnitt 4).
 
 ## 3. Verarbeitungsorte und zusätzliche Arbeitswege
 
-Die Plattformdaten werden in Deutschland und Österreich verarbeitet. Die
-Plattformdienste betreiben wir selbst. Hetzner Online GmbH, Industriestraße 25,
+Für die angebotenen Funktionen – insbesondere Arbeitsumgebungen, Übungen, Tests
+und KI-Lernhilfen wie Lena – können Daten auf Ihrem Gerät, auch vollständig im
+Browser, auf Systemen der TU Graz in Österreich, auf unseren Servern bei Hetzner
+in Deutschland oder in einer Kombination davon verarbeitet und gespeichert
+werden. Dies dient den in Abschnitt 2 beschriebenen Zwecken und ändert den dort
+genannten Empfängerkreis nicht. Die Plattformdienste betreiben wir selbst.
+Hetzner Online GmbH, Industriestraße 25,
 91710 Gunzenhausen, Deutschland, stellt Server, Speicher und Sicherungen in
 Nürnberg und Falkenstein als Auftragsverarbeiterin nach Art. 28 DSGVO bereit.
-Die TU Graz betreibt Lernhilfe und Dienstadministration in Österreich. Für
+Die TU Graz stellt eigene Systeme für den Dienstbetrieb in Österreich bereit. Für
 Wiederherstellungskopien gelten die Löschregeln in Abschnitt 4.
 E-Mail-Benachrichtigungen werden über den Mailserver der TU Graz versendet.
 Behörden und Gerichte erhalten Daten nur aufgrund einer gesetzlichen Pflicht
@@ -101,20 +103,25 @@ derzeitigen Webseiten eingebunden.
 Wir verkaufen Ihre Daten nicht und nutzen sie weder für Werbung noch für das
 Training von Modellen.
 
-Arbeiten Sie auf Ihrem eigenen Gerät, sind die Berechnung und Speicherung dort
-vom Hochladen, Synchronisieren und Abgeben sowie von der Verarbeitung auf
-unseren Servern zu unterscheiden. Neue Verarbeitungszwecke, Empfänger oder
+Berechnung und Speicherung auf Ihrem Gerät sind vom Hochladen, Synchronisieren
+und Abgeben sowie von der Verarbeitung auf unseren Servern zu unterscheiden.
+Welche Verarbeitung lokal oder auf unseren Systemen erfolgt, ergibt sich aus
+der jeweiligen Funktion. Neue Verarbeitungszwecke, Empfänger oder
 Übermittlungen werden vor ihrer Einführung entsprechend den gesetzlichen
-Informationspflichten erläutert; diese Erklärung ist keine pauschale
+Informationspflichten erläutert. Diese Erklärung ist keine pauschale
 Einwilligung dafür.
 
 ## 4. Aufbewahrung und Löschung
+
+Die folgenden Fristen gelten für Daten, die unsere Plattformdienste speichern.
+Von Ihnen selbst angelegte lokale Kopien, etwa heruntergeladene oder exportierte
+Dateien, werden durch die Kontolöschung bei uns nicht gelöscht.
 
 | Daten | Frist oder Löschregel |
 |---|---|
 | Konto, Kursdaten, Abgaben, Repositories, Ergebnisse, Home-Dateien und Kursnachrichten | Bis zur Kontolöschung; die Löschung wird in den beteiligten Diensten bearbeitet. Weder der Austritt aus einem Kurs noch das Archivieren ist bereits eine Löschung. |
 | Lena-Schaltflächen-Anfrage und -Antwort | Höchstens 24 Stunden; die Antwort ist nur für die anfragende Person abrufbar. |
-| Lena-Antworten im Verlauf und Inferenz-Caches | Verlauf wie Kursnachrichten; Caches nach der in Abschnitt 2 beschriebenen Kapazitätsregel. |
+| Lena-Antworten im Verlauf und serverseitige Inferenz-Caches | Verlauf wie Kursnachrichten; Caches nach der in Abschnitt 2 beschriebenen Kapazitätsregel. |
 | Web- und Scanner-Zugriffslogs | Höchstens acht Wochen. |
 | Diagnose- und technische Sicherheitsaufzeichnungen | Je nach Dienst größenabhängige Rotation, bei der ältere Einträge überschrieben werden, oder keine automatische Alterslöschung; eine einheitliche Frist gibt es nicht. |
 | Anmelde- und Verwaltungsereignisse im Anmeldedienst | Höchstens 90 Tage, unabhängig von Diagnoseprotokollen. |
@@ -126,7 +133,7 @@ Pflicht erforderlich sind, werden gesondert aufbewahrt und auf diesen Zweck und
 die dafür erforderliche Dauer beschränkt.
 
 Bei Konten, die seit 24 Monaten nicht genutzt wurden, kündigen wir die Löschung
-mit angemessener Frist per E-Mail an; melden Sie sich innerhalb dieser Frist an,
+mit angemessener Frist per E-Mail an. Melden Sie sich innerhalb dieser Frist an,
 bleibt das Konto bestehen. Vertraglich vereinbarte längere Vorwarnfristen
 bleiben unberührt. Einen Löschantrag bearbeiten wir auch für die Daten im
 Anmeldedienst, in Git, im Workspace und im Dateispeicher. Müssen einzelne Daten
@@ -140,7 +147,7 @@ oder Angriffen wiederhergestellt werden kann (Art. 32 Abs. 1 lit. c DSGVO).
 ## 5. Cookies und Sicherheit
 
 Wir verwenden funktionale Cookies und lokalen Browserspeicher für Anmeldung,
-Sitzungsschutz und gewählte Darstellung, keine Werbe- oder Analyse-Cookies.
+Sitzungsschutz und gewählte Darstellung, ohne Werbe- oder Analyse-Cookies.
 Soweit technisch notwendig, gilt die Ausnahme nach § 165 Abs. 3 TKG 2021;
 ein Cookie-Banner ist dafür nicht erforderlich.
 
@@ -150,10 +157,11 @@ ein Cookie-Banner ist dafür nicht erforderlich.
 | Plattform-Zugangstoken / Erneuerungstoken | Eine Stunde / sieben Tage. |
 | Gewählte helle oder dunkle Darstellung | Bis Sie den lokalen Browserspeicher löschen. |
 
-Sie können die Speicherung im Browser steuern; ohne Sitzungscookies ist keine
-Anmeldung möglich. Webzugriffe sind TLS-verschlüsselt; die Programme der
-Nutzer*innen laufen in getrennten Containern mit Ressourcenbegrenzung. Melden
-Sie Sicherheitslücken vertraulich an security@computor.at.
+Sie können die Speicherung im Browser steuern. Ohne Sitzungscookies ist keine
+Anmeldung möglich. Webzugriffe sind TLS-verschlüsselt. Bei serverseitiger
+Programmausführung werden die Programme der Nutzer*innen voneinander getrennt
+und ihre Ressourcen begrenzt. Melden Sie Sicherheitslücken vertraulich an
+security@computor.at.
 
 ## 6. Ihre Rechte und Änderungen
 

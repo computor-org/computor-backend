@@ -1,10 +1,10 @@
 # Privacy Notice computor.at
 
-Version 1.7, dated 29 October 2026. The German version is authoritative.
+Version 1.8, dated 30 October 2026. The German version is authoritative.
 
 Computor is a free TU Graz learning service. Public material needs no account.
 For accounts, courses, submissions, workspaces, communication and learning help,
-we process the data below. There is no advertising, sale of data or external
+we process the data listed below. There is no advertising, sale of data or external
 behavioural tracking. Configured courses also route messages automatically to
 Lena AI learning assistance. You may request account deletion at any time at
 privacy@computor.at.
@@ -12,24 +12,19 @@ privacy@computor.at.
 ## 1. Controller and legal bases
 
 Graz University of Technology, Rechbauerstraße 12, 8010 Graz, Austria (“TU Graz”,
-“we”), is controller for computor.at, including sign-in, Git and workspaces.
-The Institute of Theoretical Physics – Computational Physics,
-Petersgasse 16, 8010 Graz, operates the service. Contact privacy@computor.at or
-datenschutz@tugraz.at. The data protection officer is x-tention
+“we”), is the controller for computor.at, including sign-in, Git and workspaces.
+The Institute of Theoretical Physics – Computational Physics, Petersgasse 16, 8010 Graz, operates the service. For privacy questions, contact privacy@computor.at or datenschutz@tugraz.at. The data protection officer is x-tention
 Informationstechnologie GmbH, Friedhofstraße 57, 4600 Wels,
 datenschutzbeauftragter@tugraz.at.
 
-The service fulfils TU Graz's statutory teaching, continuing education and
-science communication tasks. Necessary processing, including secure operation,
+The service fulfils TU Graz's statutory teaching, continuing education and science communication tasks. Necessary processing, including secure operation,
 relies on Art. 6(1)(e) GDPR with §§ 2 and 3 Universities Act 2002; Art. 32 GDPR
 requires appropriate security. Legally required disclosures rely on Art. 6(1)(c)
 GDPR, including reports under Articles 16–18 DSA where applicable. Accepting the
 Terms of Use is not data protection consent or permission for arbitrary future
 processing.
 
-An account requires a verified email address and password; without these you
-cannot sign in. The minimum account age is 14. We delete a younger person's
-account when we learn of it.
+An account requires a verified email address and password, without which sign-up is not possible. The minimum account age is 14. Accounts belonging to individuals who have not reached this age will be deleted immediately upon discovery.
 
 ## 2. Data, purposes and visibility
 
@@ -45,42 +40,45 @@ account when we learn of it.
 
 Technical server access serves operation, troubleshooting and abuse prevention
 through the designated operations and security roles. Tests and points are
-computed automatically but do not decide grades. The responsible teacher
-assesses work; there is no solely automated decision with legal or similarly significant effects under Art. 22
-GDPR.
+computed automatically.
 
 **Lena:** “Ask Lena” sends your question, selected text and visible assignment.
 In course messages you may mention @lena and reply in the thread. With automatic
 routing enabled, learner messages mentioning nobody else are also addressed to
 Lena when it is available and within the audience; a visible mention is added.
-Processing includes the message and earlier thread, plus the assignment, your
-latest submission and its tests for assignment messages. The reply is stored
-in that thread with the same audience. Lena neither executes code nor decides
-grades.
+Processing includes the message and earlier thread, plus the assignment
+description, your latest submission and its test results for assignment messages. The reply is stored
+in that thread with the same audience.
 
-Current Lena inference runs on TU Graz machines in Austria without an external
-AI provider, additional content logs or model training on your data. Bounded
-memory and disk caches reuse computations; learners cannot access them. Entries
-are replaced for capacity or cleared, without a fixed time expiry. Numeric size,
-status and timing measurements contain no questions, submitted text or answers.
+Lena uses the processing locations described in section 3. We use no external
+AI provider and do not use your data for additional content logs or model
+training. For server-side inference, bounded memory and disk caches reuse
+computations. These server-side caches are not accessible to learners and are
+replaced or emptied when capacity is required, with no fixed timeframe. Numeric
+size, status and timing measurements contain no questions, submitted text or
+answers.
 
 **Support:** Incoming support emails and reports are read in automatically,
 cleaned and assigned to a request. Local AI models may summarise and classify a
 request and suggest a draft reply. A member of the support team reviews and
-sends every reply; the AI does not decide on accounts, suspensions, submissions
-or grades. The models run on TU Graz machines in Austria and on our servers at
+sends every reply; the AI does not decide on accounts, suspensions or
+submissions. The models run on TU Graz machines in Austria and on our servers at
 Hetzner in Germany (section 3), without an external AI provider and without
 training models on your data. Summaries, classifications and drafts belong to
 the request and follow its deletion period (section 4).
 
 ## 3. Locations and additional ways of working
 
-Platform data are processed in Germany and Austria. We operate the platform
-services ourselves. Hetzner Online GmbH,
+Data for the offered functions – including workspaces, exercises, tests and AI
+learning aids such as Lena – may be processed and stored on your device,
+including entirely in the browser, on TU Graz systems in Austria, on our servers
+at Hetzner in Germany, or in any combination of these. This serves the purposes
+described in section 2 and does not change the audience stated there. We operate
+the platform services ourselves. Hetzner Online GmbH,
 Industriestraße 25, 91710 Gunzenhausen, Germany, provides servers, storage and
 backups in Nuremberg and Falkenstein as a processor under Art. 28 GDPR. TU Graz
-operates learning assistance and service administration in Austria. Section 4
-explains deletion of recovery copies. Email notifications use the TU Graz mail server.
+provides its own systems for service operation in Austria. Recovery
+copies are managed according to the rules in section 4. Email notifications use the TU Graz mail server.
 Authorities and courts receive data only when legally required or for legally
 specified serious-offence reports. Fonts come from our servers; no external
 advertising, tracking, analytics, content-delivery or AI services are embedded
@@ -89,16 +87,21 @@ in the current web pages.
 We do not sell your data or use it for advertising or model training.
 
 Device-local computation and storage differ from upload, sync, submission and
-hosted processing. New purposes, recipients or transfers are explained before
-introduction as required by law; this notice is not blanket consent for them.
+hosted processing. The feature in use determines which processing takes place
+locally or on our systems. New purposes, recipients or transfers are explained before
+introduction as required by law. This notice is not blanket consent for them.
 
 ## 4. Retention and deletion
+
+The following periods apply to data stored by our platform services. Deleting
+your account with us does not delete copies you make yourself, such as files you
+download or export to your device.
 
 | Data | Period or deletion rule |
 |---|---|
 | Account, course data, submissions, repositories, results, home files and course messages | Until account deletion, handled across the services involved. Leaving a course or archiving an account is not deletion. |
 | Lena button request and answer | At most 24 hours; the answer is retrievable only by the requester. |
-| Lena thread answers and inference caches | Threads follow course-message retention; caches follow the capacity rule in section 2. |
+| Lena thread answers and server-side inference caches | Threads follow course-message retention; caches follow the capacity rule in section 2. |
 | Web and scanner access logs | At most eight weeks. |
 | Diagnostics and technical security records | Depending on the service, size-based rotation that overwrites older entries, or no automatic age deletion; no uniform period. |
 | Sign-in service login and administrator events | At most 90 days, separately from diagnostic logs. |
@@ -109,7 +112,7 @@ Evidence needed for a specific security incident or legal obligation is
 separately restricted to that purpose and the period it requires.
 
 For accounts unused for 24 months, we give reasonable advance warning of
-deletion by email; signing in then keeps the account. Longer contractually
+deletion by email. Signing in during this period keeps the account. Longer contractually
 agreed warning periods remain unaffected. Deletion requests also cover
 sign-in, Git, workspaces and file storage. If specific data must remain
 for a concrete legal reason, we explain the reason and period and restrict them
@@ -133,8 +136,9 @@ a cookie banner.
 | Chosen light/dark appearance | Until you clear local browser storage. |
 
 Browser settings control storage; session cookies are necessary for sign-in.
-Web access uses TLS and user programs run in separate containers with resource
-limits. Report vulnerabilities confidentially to security@computor.at.
+Web access uses TLS. For server-side execution, user programs are separated from
+each other and their resources are limited. Report vulnerabilities confidentially
+to security@computor.at.
 
 ## 6. Rights and changes
 
@@ -146,7 +150,7 @@ GDPR); if services are restricted or discontinued, the terms also let you
 download your data.
 
 Write to privacy@computor.at or datenschutz@tugraz.at, preferably from your
-registered address so we can identify you securely. We normally respond within
+registered address so we can identify you correctly. We normally respond within
 one month and explain any legally permitted extension within that time
 (Art. 12(3) GDPR). You may complain to the Austrian Data Protection Authority,
 Barichgasse 40–42, 1030 Vienna, dsb@dsb.gv.at,
