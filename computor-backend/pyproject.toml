@@ -107,8 +107,9 @@ testing-worker = ["computor-testing"]
 exclude-newer = "2026-09-22T14:13:07Z"
 # Reviewed security fixes for JWT verification and template traversal, the
 # emSign CA distrust (certifi 2026.10.19), GitPython GHSA-83vg-56qc-22m7
-# (3.2.1) and Pillow 13.0.0 (testing worker).
-exclude-newer-package = { pyjwt = "2026-10-16T07:00:00Z", mako = "2026-10-16T07:00:00Z", certifi = "2026-10-21T00:00:00Z", gitpython = "2026-10-15T00:00:00Z", pillow = "2026-10-17T00:00:00Z" }
+# (3.2.1), Pillow 13.0.0 (testing worker) and dnspython GHSA-45c3-73f7-pv4m
+# (2.9.0).
+exclude-newer-package = { pyjwt = "2026-10-16T07:00:00Z", mako = "2026-10-16T07:00:00Z", certifi = "2026-10-21T00:00:00Z", gitpython = "2026-10-15T00:00:00Z", pillow = "2026-10-17T00:00:00Z", dnspython = "2026-10-10T00:00:00Z" }
 
 [tool.uv.sources]
 computor-client = { path = "../computor-client" }
