@@ -25,8 +25,9 @@ Graz”, “we”), operates computor.at through the Institute of Theoretical Ph
 These terms apply to registered users. Accepting them when you register creates
 a free usage contract for an indefinite period. Public learning material can be
 read without an account. For TU Graz courses, the relevant study regulations and
-course requirements apply. The [Privacy notice](/privacy/en) explains data
-processing. Merely acknowledging it is not consent under data protection law.
+course requirements take precedence. The [Privacy notice](/privacy/en) explains
+data processing. Merely acknowledging it is not consent under data protection
+law.
 
 You must be at least 14 years of age. We delete accounts of younger people when we learn of
 them. Each person may have only one non-transferable account. Protect your

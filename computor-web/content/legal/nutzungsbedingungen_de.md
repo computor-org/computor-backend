@@ -24,10 +24,10 @@ Computational Physics, Petersgasse 16, 8010 Graz. Kontaktangaben stehen im
 Die Nutzungsbedingungen gelten für registrierte Nutzer*innen. Mit Ihrer
 Zustimmung bei der Registrierung schließen Sie einen kostenlosen Nutzungsvertrag
 auf unbestimmte Zeit ab. Öffentliche Lernmaterialien können auch ohne Konto
-eingesehen werden. Bei Lehrveranstaltungen der TU Graz gelten die jeweiligen
-Studienvorschriften und Kursanforderungen. Die [Datenschutzerklärung](/privacy)
-erläutert die Datenverarbeitung. Reine Kenntnisnahme gilt nicht als
-datenschutzrechtliche Einwilligung.
+eingesehen werden. Bei Lehrveranstaltungen der TU Graz gelten vorrangig die
+jeweiligen Studienvorschriften und Kursanforderungen. Die
+[Datenschutzerklärung](/privacy) erläutert die Datenverarbeitung. Reine
+Kenntnisnahme gilt nicht als datenschutzrechtliche Einwilligung.
 
 Die Nutzung setzt ein Mindestalter von 14 Jahren voraus. Konten von Personen,
 die dieses Alter nicht erreicht haben, werden nach Feststellung unverzüglich
