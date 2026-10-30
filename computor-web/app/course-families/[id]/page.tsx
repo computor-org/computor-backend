@@ -16,6 +16,7 @@ import ConfirmDeleteDialog from '@/src/components/ConfirmDeleteDialog';
 import CascadeDeletePreview from '@/src/components/CascadeDeletePreview';
 import Button, { ButtonLink } from '@/src/components/ui/Button';
 import { displayName } from '@/src/utils/displayName';
+import { localized } from '@/src/utils/localizedText';
 import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 
@@ -70,7 +71,8 @@ export default function CourseFamilyDetailPage() {
     }),
     [familyId],
   );
-  const family = data?.family ?? null;
+  // Display only; the edit page keeps the source text it saves back.
+  const family = localized(data?.family ?? null, language);
   const courses = data?.courses ?? [];
   const familyName = displayName(family, t.family);
   const mayCreateCourse = family ? canCreateCourse(family.organization_id, familyId) : false;

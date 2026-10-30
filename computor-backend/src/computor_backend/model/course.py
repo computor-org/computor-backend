@@ -56,6 +56,9 @@ class CourseFamily(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     properties = Column(JSONB)
     title = Column(String(255))
     description = Column(String(4096))
+    # Other languages for the two strings above, as on Course (issue #550).
+    title_i18n = Column(JSONB)
+    description_i18n = Column(JSONB)
     path = Column(LtreeType, nullable=False)
     organization_id = Column(ForeignKey('organization.id', ondelete='CASCADE', onupdate='RESTRICT'), nullable=False)
 

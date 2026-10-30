@@ -989,6 +989,8 @@ export interface CourseFamilyPropertiesGet {
 export interface CourseFamilyCreate {
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   path: string;
   organization_id: string;
   properties?: CourseFamilyProperties | null;
@@ -1004,6 +1006,8 @@ export interface CourseFamilyGet {
   id: string;
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   path: string;
   organization_id: string;
   properties?: CourseFamilyPropertiesGet | null;
@@ -1013,6 +1017,8 @@ export interface CourseFamilyGet {
 export interface CourseFamilyList {
   id: string;
   title?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   organization_id: string;
   path: string;
 }
@@ -1020,6 +1026,8 @@ export interface CourseFamilyList {
 export interface CourseFamilyUpdate {
   title?: string | null;
   description?: string | null;
+  title_i18n?: Record<string, string> | null;
+  description_i18n?: Record<string, string> | null;
   path?: string | null;
   organization_id?: string | null;
   properties?: CourseFamilyProperties | null;

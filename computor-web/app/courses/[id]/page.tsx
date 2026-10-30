@@ -285,7 +285,7 @@ export default function CoursePage() {
   // Display only; the course edit page loads its own copy with the source text.
   const course = localized(data?.course ?? null, language);
   const organization = data?.organization ?? null;
-  const courseFamily = data?.courseFamily ?? null;
+  const courseFamily = localized(data?.courseFamily ?? null, language);
   const gitBinding = data?.gitBinding ?? null;
   const myRepo = data?.myRepo ?? null;
   const gitDescriptor = data?.gitDescriptor ?? null;

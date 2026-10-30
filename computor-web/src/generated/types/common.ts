@@ -3730,6 +3730,10 @@ export interface CourseFamilyConfig {
   path: string;
   /** Course family description */
   description?: string | null;
+  /** Course family title per language code, e.g. {'de': 'Data Science mit Python', 'en': 'Data Science with Python'} */
+  title_i18n?: Record<string, string> | null;
+  /** Course family description per language code */
+  description_i18n?: Record<string, string> | null;
   /** Course family-specific settings */
   settings?: Record<string, unknown> | null;
 }
