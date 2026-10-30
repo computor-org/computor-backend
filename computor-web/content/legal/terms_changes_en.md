@@ -4,7 +4,7 @@ Terms of Use version 1.6, valid from {{TERMS_EFFECTIVE_FROM}}
 
 For accounts created before version 1.6 was published,
 [version 1.6](/terms/en) replaces the previous version (1.0 to 1.5) from
-{{TERMS_EFFECTIVE_FROM}}. You do not need to do anything. Compared with version 1.0:
+{{TERMS_EFFECTIVE_FROM}} automatically. Compared with version 1.0:
 
 - **Sign-in** with email and password instead of GitHub (section 1).
 - **Additional services:** learning aids including AI (Lena through “Ask Lena” and
@@ -23,7 +23,7 @@ For accounts created before version 1.6 was published,
   consent (sections 5, 8).
 
 If you disagree, you may end the contract at any time and request deletion of
-your account at privacy@computor.at. Questions: contact@computor.at. The
+your account at privacy@computor.at. For questions, please contact contact@computor.at. The
 [Privacy notice 1.6](/privacy/en) is published at the same time. The German
 version is authoritative.
 

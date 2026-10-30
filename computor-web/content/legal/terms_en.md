@@ -2,10 +2,9 @@
 
 Version 1.6, valid from {{TERMS_EFFECTIVE_FROM}}
 
-This version applies to new usage contracts from its publication. For existing
-contracts under an earlier version it replaces that version from
-{{TERMS_EFFECTIVE_FROM}}, after notice under its change rule (section 11 of
-versions 1.0 to 1.3). [What changes](/terms/en/changes) · Earlier versions:
+For new usage agreements, this version is effective as of its publication. Previous versions of existing agreements will be replaced as of {{TERMS_EFFECTIVE_FROM}} in accordance with their change rule (section 11 of versions 1.0 through 1.3).
+
+[What changes](/terms/en/changes) · Earlier versions:
 [1.0](https://github.com/computor-org/computor-backend/blob/54ea77021304f1bd77ef4bf7c5712b5edfb6843f/computor-web/content/legal/terms_en.md),
 [1.1](https://github.com/computor-org/computor-backend/blob/93a7c2cde0d11186b2dbcd167ebabc851c882496/computor-web/content/legal/terms_en.md),
 [1.2](https://github.com/computor-org/computor-backend/blob/f166ccf38e58c03e6e0c9c6d68448f5127ed28a4/computor-web/content/legal/terms_en.md),
@@ -15,19 +14,14 @@ The German version is authoritative.
 ## 1. Provider, account and free service
 
 Graz University of Technology, Rechbauerstraße 12, 8010 Graz, Austria (“TU Graz”,
-“we”), operates computor.at through the Institute of
-Theoretical Physics – Computational Physics, Petersgasse 16, 8010 Graz.
-Contact details are in the [Imprint](/impressum). The learning service is free
-and funded by netidee.
+“we”), operates computor.at through the Institute of Theoretical Physics – Computational Physics, Petersgasse 16, 8010 Graz. Contact details are in the [Legal notice](/impressum). The learning service is free and funded by netidee.
 
-These terms apply to registered users. Accepting them at first sign-in creates
-a free usage contract for an indefinite period. Public learning material can be
+These terms apply to registered users. Accepting them at first sign-in creates a free usage contract for an indefinite period. Public learning material can be
 read without an account.
-For TU courses, study regulations and course requirements take precedence if
-there is a conflict. The [Privacy notice](/privacy/en) explains processing;
-acknowledging it is not consent under data protection law.
+For TU courses, the relevant study regulations and course requirements apply. The [Privacy notice](/privacy/en) explains data processing.
+Mereley acknowledging it is not consent under data protection law.
 
-You must be at least 14. We delete accounts of younger people when we learn of
+You must be at least 14 years of age. We delete accounts of younger people when we learn of
 them. Each person may have only one non-transferable account. Protect your
 password and email account and report suspected unauthorised access immediately
 to security@computor.at.
@@ -36,28 +30,27 @@ to security@computor.at.
 
 Computor offers courses and programming exercises with automatic tests,
 submission repositories, workspaces and additional tools, communication, and
-learning aids including AI. The service shows which features are available; new
+learning aids including AI. The service shows which features are available. New
 features and learning aids are added as additional services. Browser workspaces
 currently run on our servers; suitable tools on your device are an alternative.
 External services you choose have their own terms and possible charges; they do
 not replace the free service.
 
 Computing time, memory, network access, course places and the number and
-running time of workspaces are limited. Workspaces stop after about one hour
-without activity; their files remain. Capacity limits may temporarily prevent
+run-time of workspaces are limited. Workspaces stop after about one hour
+without activity, with their files remaining. Capacity limits may temporarily prevent
 access; there is no entitlement to a particular course place. We operate with
 the care customary for a university learning service and announce maintenance
 on the platform in advance where possible, but cannot promise uninterrupted
-availability or recovery of individual files. Keep important work through Git
+availability or recovery of individual files. Back up important work through Git
 or downloads.
 
 Tests and points are learning aids, not an examination certificate or proof of
-competence. If a course uses results for assessment, the teacher decides under
+competence. If a course uses results for assessments, the teacher decides under
 the applicable rules. The AI learning aid Lena currently answers through a
 button and course messages, including automatic routing in configured courses.
 It does not execute code or decide grades. The Privacy notice explains its
-context, audience and storage. Check AI answers because they may be wrong;
-availability and request limits depend on capacity.
+context, audience and storage. Check AI answers as they may be wrong. Availability and request limits depend on capacity.
 
 ## 3. Acceptable use and your content
 
@@ -69,7 +62,7 @@ for features that use agents.
 Do not bypass resource, access or participation limits, access other people's
 accounts or data, or try to escape the workspace. Illegal content, distributing
 malware, copyright infringement, child sexual abuse material, incitement to
-hatred, threats, harassment, insults and exposing other people are prohibited.
+hatred, threats, harassment, insults and humiliating other people are prohibited.
 Do not publish other people's submissions without consent or solutions to
 assessed exercises where the course prohibits it.
 
@@ -82,19 +75,19 @@ Privacy notice explains the data, purposes, authorised access and retention.
 
 Your code, texts and files remain yours. You grant TU Graz only the free,
 non-exclusive rights to process your content as needed to operate the service,
-including storing, executing, automatically testing and showing it to your
-course's teaching staff and tutors, and showing course messages to their audience.
+including storing, executing, automatically testing and providing it to your
+course's teaching staff and tutors, as well as showing course messages to their respective audience.
 These rights end on deletion; backup copies follow the deletion rules explained
 in the Privacy notice. Upload only content for which you hold the necessary
 rights.
 
 Unless stated otherwise, course texts and exercises are licensed under CC BY 4.0
 and course code under the MIT licence; the [software](https://github.com/computor-org)
-is open source. Third-party material is marked and may be under other licences.
+is open source. Third-party material is marked and may be subject to other licences.
 
 ## 4. Moderation and appeals
 
-We act on specific reports of legal or usage breaches; use [Report content](/report) for illegal content. Measures
+We act on specific reports of legal or usage breaches; use [Report content](/report) to report illegal content. Measures
 depend on severity: a warning, removing or disabling content, stopping a workspace,
 temporary account suspension or termination. Automated tools flag anomalies;
 a human decides on measures against you. A workspace may stop automatically
@@ -103,15 +96,15 @@ where there is acute danger.
 We explain by email the measure, facts, rules concerned, use of reports or
 automated detection, and remedies, unless law or an authority prohibits this
 (Art. 17 DSA). You may appeal to contact@computor.at within six months. Where
-possible, a person not involved in the original decision reviews the appeal; we
+possible, a person not involved in the original decision reviews the appeal; we then
 give you a reasoned outcome. You may go to court at any time. If we suspect a
 criminal offence threatening people's life or safety, we promptly inform the
 competent authorities (Art. 18 DSA).
 
 ## 5. Changing or ending the service or contract
 
-We may change and develop the platform where this is reasonable for you, in
-particular because the change is minor and objectively justified, for example by
+We may change and develop the platform where this is tolerable for you, in
+particular when the change is minor and objectively justified, for example by
 technical development, security, legal requirements or changed operating means.
 We announce substantial restrictions (such as dropping a course you are enrolled
 in, or the workspace service) and a planned closure at least 30 days in advance
@@ -152,8 +145,7 @@ to you.
 Austrian law applies without its conflict-of-law rules. This choice does not
 deprive consumers of the mandatory protection of the law of their habitual
 residence where Article 6 of the Rome I Regulation applies. Statutory
-jurisdiction rules remain unaffected. For businesses, the court in Graz with
-subject-matter jurisdiction is competent.
+jurisdiction rules remain unaffected. For businesses, the competent court in Graz has jurisdiction.
 
 ## 8. Changes to these terms and contact
 
@@ -162,12 +154,12 @@ operation change. We inform you at least 30 days before the changes take effect,
 by email and with a notice at sign-in, provide the new version and highlight the
 changes. Changes that do not put you in a worse position (such as
 clarifications, additional services or adjustments required by mandatory law)
-apply from the announced date. Changes that put you in a materially worse
+apply from the announced date. Changes that put you in a substantially worse
 position apply only if you expressly agree to them; we ask for this at sign-in.
 Merely continuing to use the platform is not agreement. Without your agreement
 the previous version continues to apply to you; we may then terminate the
 contract under section 5. Updates of the Privacy notice inform you and need no
-consent; we inform you of new processing before it starts.
+consent; we inform you of new processing before its start.
 
 General enquiries and appeals: contact@computor.at; illegal content:
 abuse@computor.at; privacy: privacy@computor.at or datenschutz@tugraz.at;

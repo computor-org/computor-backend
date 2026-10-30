@@ -58,8 +58,7 @@ Sie auf https://datenschutz.tugraz.at.
 
 ### Copyright und Lizenzen
 
-© Copyright – wenn nicht anders vermerkt – bei den Autorinnen und Autoren bzw.
-bei der Technischen Universität Graz.
+© Copyright – wenn nicht anders vermerkt – der Autorinnen und Autoren bzw. der Technischen Universität Graz.
 
 Soweit nicht anders angegeben, stehen Texte und Übungsaufgaben der Kurse unter
 der Lizenz Creative Commons Namensnennung 4.0 International (CC BY 4.0),
@@ -77,7 +76,7 @@ Code und sonstige Inhalte, die Nutzer*innen erstellen, bleiben deren Eigentum
 
 Alle Inhalte von computor.at wurden mit Sorgfalt und nach bestem Gewissen
 erstellt. Eine Gewähr für die Aktualität, Vollständigkeit und Richtigkeit
-sämtlicher Seiten kann jedoch nicht übernommen werden. Ein umgehendes Entfernen
+sämtlicher Seiten kann jedoch nicht geleistet werden. Ein umgehendes Entfernen
 von Inhalten erfolgt ab dem Zeitpunkt der Kenntnis einer konkreten
 Rechtsverletzung. Für die Nutzung der Plattform durch registrierte
 Nutzer*innen gelten die Haftungsregeln der [Nutzungsbedingungen](/terms).
@@ -150,8 +149,7 @@ please see https://datenschutz.tugraz.at.
 
 ### Copyright and licences
 
-© Copyright – unless otherwise indicated – of the authors or of Graz University
-of Technology.
+© Copyright – unless otherwise indicated – of the authors or of Graz University of Technology.
 
 Unless stated otherwise, course texts and exercises are licensed under Creative
 Commons Attribution 4.0 International (CC BY 4.0), and course code (code

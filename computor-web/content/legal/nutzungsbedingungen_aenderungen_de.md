@@ -3,8 +3,7 @@
 Nutzungsbedingungen Version 1.6, gültig ab {{TERMS_EFFECTIVE_FROM}}
 
 Für Konten, die vor der Veröffentlichung von Version 1.6 angelegt wurden, ersetzt
-[Version 1.6](/terms) ab {{TERMS_EFFECTIVE_FROM}} die bisherige Fassung (1.0 bis 1.5).
-Sie müssen nichts tun. Gegenüber Version 1.0 ändert sich:
+[Version 1.6](/terms) ab {{TERMS_EFFECTIVE_FROM}} die bisherige Fassung (1.0 bis 1.5) automatisch. Gegenüber Version 1.0 ändert sich:
 
 - **Anmeldung** mit E-Mail-Adresse und Passwort statt über GitHub (Abschnitt 1).
 - **Zusätzliche Leistungen:** Lernhilfen einschließlich KI (Lena über „Lena fragen“
@@ -24,8 +23,7 @@ Sie müssen nichts tun. Gegenüber Version 1.0 ändert sich:
   Zustimmung (Abschnitte 5, 8).
 
 Wenn Sie nicht einverstanden sind, können Sie den Vertrag jederzeit beenden und die
-Löschung Ihres Kontos unter privacy@computor.at verlangen. Fragen:
-contact@computor.at. Gleichzeitig erscheint die [Datenschutzerklärung 1.6](/privacy).
+Löschung Ihres Kontos unter privacy@computor.at verlangen. Für Fragen wenden Sie sich an contact@computor.at. Gleichzeitig erscheint die [Datenschutzerklärung 1.6](/privacy).
 
 Frühere Fassungen:
 [1.0](https://github.com/computor-org/computor-backend/blob/54ea77021304f1bd77ef4bf7c5712b5edfb6843f/computor-web/content/legal/nutzungsbedingungen_de.md),
