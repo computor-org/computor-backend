@@ -1,6 +1,6 @@
 # Nutzungsbedingungen computor.at
 
-Version 1.7, Stand 29.10.2026
+Version 1.8, Stand 30.10.2026
 
 Für neue Nutzungsverträge gilt diese Fassung ab Veröffentlichung. Für einen
 bestehenden Nutzungsvertrag gilt sie erst, wenn Sie ihr ausdrücklich zustimmen;
@@ -12,7 +12,8 @@ Abschnitt 8 genannten Frist zu, kann Ihr Vertrag enden.
 [1.1](https://github.com/computor-org/computor-backend/blob/93a7c2cde0d11186b2dbcd167ebabc851c882496/computor-web/content/legal/nutzungsbedingungen_de.md),
 [1.2](https://github.com/computor-org/computor-backend/blob/f166ccf38e58c03e6e0c9c6d68448f5127ed28a4/computor-web/content/legal/nutzungsbedingungen_de.md),
 [1.5](https://github.com/computor-org/computor-backend/blob/bcbe73611c806a67c7183efb7a717a9a386b5233/computor-web/content/legal/nutzungsbedingungen_de.md),
-[1.6](https://github.com/computor-org/computor-backend/blob/d7939109498abcfd08a72f82a3eaf9482137018a/computor-web/content/legal/nutzungsbedingungen_de.md).
+[1.6](https://github.com/computor-org/computor-backend/blob/d7939109498abcfd08a72f82a3eaf9482137018a/computor-web/content/legal/nutzungsbedingungen_de.md),
+[1.7](https://github.com/computor-org/computor-backend/blob/45f07fb44f0c5144c5161511296f5b391ef9370a/computor-web/content/legal/nutzungsbedingungen_de.md).
 
 ## 1. Anbieter, Konto und kostenloses Angebot
 
@@ -22,7 +23,7 @@ Computational Physics, Petersgasse 16, 8010 Graz. Kontaktangaben stehen im
 [Impressum](/impressum). Das von netidee geförderte Lernangebot ist kostenlos.
 
 Die Nutzungsbedingungen gelten für registrierte Nutzer*innen. Mit Ihrer
-Zustimmung bei der Registrierung schließen Sie einen kostenlosen Nutzungsvertrag
+Zustimmung bei der Registrierung schließen Sie einen unentgeltlichen Nutzungsvertrag
 auf unbestimmte Zeit ab. Öffentliche Lernmaterialien können auch ohne Konto
 eingesehen werden. Bei Lehrveranstaltungen der TU Graz gelten vorrangig die
 jeweiligen Studienvorschriften und Kursanforderungen. Die
@@ -32,25 +33,30 @@ Kenntnisnahme gilt nicht als datenschutzrechtliche Einwilligung.
 Die Nutzung setzt ein Mindestalter von 14 Jahren voraus. Konten von Personen,
 die dieses Alter nicht erreicht haben, werden nach Feststellung unverzüglich
 gelöscht. Konten sind personengebunden, nicht übertragbar und auf eines pro
-Person beschränkt. Zugangsdaten sind vertraulich zu behandeln. Bei vermutetem
-Fremdzugriff haben Sie sich unverzüglich bei security@computor.at zu melden.
+Person beschränkt. Schützen Sie Ihr Passwort und Ihr E-Mail-Konto und melden Sie
+den Verdacht eines unbefugten Zugriffs unverzüglich an security@computor.at.
 
 ## 2. Leistungen
 
 Computor bietet Kurse und Programmierübungen mit automatischen Tests,
-Abgabe-Repositories, Arbeitsumgebungen und zusätzliche Werkzeuge, Kommunikation
-sowie Lernhilfen einschließlich KI. Welche Funktionen verfügbar sind, steht im
-Angebot. Neue Funktionen und Lernhilfen werden als zusätzliche Leistungen
-hinzugefügt. Die über den Browser bereitgestellten Workspaces laufen derzeit auf
-unseren Servern; alternativ können Sie mit geeigneten Programmen auf Ihrem Gerät
-arbeiten. Für externe Dienste, die Sie selbst wählen, gelten deren eigene
+Abgabe-Repositories, Arbeitsumgebungen (Workspaces), zusätzliche Werkzeuge,
+Kommunikation und Lernhilfen einschließlich KI. Welche Funktionen, Sprachen und
+Umgebungen unterstützt werden, ergibt sich aus dem jeweiligen Angebot. Neue
+Funktionen und Lernhilfen kommen als zusätzliche Leistungen hinzu.
+
+Arbeitsumgebungen, Übungen, Tests und KI-Lernhilfen wie Lena können je nach
+bereitgestellter Funktion auf Ihrem Gerät, auch vollständig im Browser, auf
+Systemen der TU Graz in Österreich, auf unseren Servern bei Hetzner in Deutschland
+oder in einer Kombination davon ausgeführt werden. Für diese Funktionen werden
+Rechenleistung, Speicher und Netzwerkzugang der beteiligten Systeme genutzt.
+Für externe Dienste, die Sie selbst wählen, gelten deren eigene
 Bedingungen; sie können Kosten verursachen und ersetzen das kostenlose Angebot
 nicht.
 
 Rechenzeit, Speicher, Netzwerkzugang, Kursplätze sowie Anzahl und Laufzeit der
-Workspaces sind begrenzt. Workspaces stoppen nach einer gewissen Zeit ohne
-Aktivität, wobei ihre Dateien erhalten bleiben. Ist die Kapazität ausgeschöpft,
-kann der Zugang vorübergehend nicht möglich sein; einen Anspruch auf einen
+von uns gehosteten Workspaces sind begrenzt. Gehostete Workspaces stoppen nach
+einer gewissen Zeit ohne Aktivität, wobei ihre Dateien erhalten bleiben. Ist die
+Kapazität ausgeschöpft, kann der Zugang vorübergehend nicht möglich sein; einen Anspruch auf einen
 bestimmten Kursplatz gibt es nicht. Wir betreiben den Dienst mit der für ein
 universitäres Lernangebot üblichen Sorgfalt und weisen auf Wartungsarbeiten nach
 Möglichkeit im Voraus auf der Plattform hin, können jedoch weder eine
@@ -65,15 +71,14 @@ der Plattform; in entsprechend eingerichteten Kursen können Ihre Kursnachrichte
 auch automatisch an die KI weitergeleitet werden, die darauf antwortet. Über
 Noten entscheiden KI-Lernhilfen nicht. Den Umfang der Verarbeitung, den
 Empfängerkreis und die Speicherung erläutert die Datenschutzerklärung. Prüfen
-Sie KI-Antworten, da diese falsch sein könnten. Verfügbarkeit und Anfragegrenzen
+Sie KI-Antworten, da diese falsch sein können. Verfügbarkeit und Anfragegrenzen
 hängen von der vorhandenen Kapazität ab.
 
 ## 3. Zulässige Nutzung und eigene Inhalte
 
 Nutzen Sie die Plattform zum Lernen und Lehren. Untersagt sind die
-missbräuchliche Nutzung von Ressourcen (etwa unbefugtes Schürfen von
-Kryptowährungen), Spam sowie unbefugte Angriffe und Port- oder
-Schwachstellenscans. Netzwerkdienste, Proxys, VPN- und Tor-Knoten sowie
+missbräuchliche Nutzung von Ressourcen, Spam sowie unbefugte Angriffe und Port-
+oder Schwachstellenscans. Netzwerkdienste, Proxys, VPN- und Tor-Knoten sowie
 Sicherheitsübungen sind erlaubt, soweit der Kurs oder die Plattform sie vorsieht
 oder ausdrücklich gestattet; das gilt auch, wenn Sie dafür KI-Agenten einsetzen.
 Umgehen Sie keine Ressourcen-, Zugangs- oder Teilnahmebeschränkungen. Greifen
@@ -130,8 +135,8 @@ Per E-Mail teilen wir Ihnen die Maßnahme mit und nennen die zugrunde liegenden
 Tatsachen, die betroffenen Regeln, ob eine Meldung oder eine automatische
 Erkennung eingesetzt wurde, und wie Sie sich dagegen wehren können, sofern nicht
 ein Gesetz oder eine Behörde dies untersagt (Art. 17 DSA). Innerhalb von sechs
-Monaten können Sie bei contact@computor.at Einspruch einlegen. Über den
-Einspruch entscheidet ein Mensch. Im Anschluss erhalten Sie eine begründete
+Monaten können Sie bei contact@computor.at Beschwerde einbringen. Über die
+Beschwerde entscheidet ein Mensch. Im Anschluss erhalten Sie eine begründete
 Entscheidung. Sie können sich jederzeit auch an ein Gericht wenden. Besteht der
 Verdacht auf eine Straftat, die das Leben oder die Sicherheit von Menschen
 bedroht, informieren wir unverzüglich die zuständigen Behörden (Art. 18 DSA).
@@ -154,13 +159,13 @@ können wir Funktionen sofort einschränken; über den Grund und die
 voraussichtliche Dauer informieren wir Sie dann so bald wie möglich.
 
 Sie können den Nutzungsvertrag jederzeit beenden und unter privacy@computor.at
-die Löschung Ihres Kontos beantragen. Wir können den Nutzungsvertrag aus
+die Löschung Ihres Kontos verlangen. Wir können den Nutzungsvertrag aus
 sachlichen Gründen, etwa wenn die Plattform eingestellt wird, unter Einhaltung
 einer Frist von 30 Tagen per E-Mail kündigen. Bei schweren Verstößen gegen
 geltendes Recht oder gegen diese Nutzungsbedingungen oder wenn sich ein Verstoß
 trotz Hinweis wiederholt, können wir Ihr Konto vorübergehend sperren oder den
 Vertrag fristlos kündigen; auch dann erhalten Sie eine Begründung und können
-nach Abschnitt 4 Einspruch einlegen. Gesetzliche Rechte bleiben unberührt.
+nach Abschnitt 4 Beschwerde einbringen. Gesetzliche Rechte bleiben unberührt.
 
 Konten, bei denen sich 24 Monate lang niemand angemeldet hat, löschen wir nach
 Ankündigung per E-Mail mit einer Vorlaufzeit von mindestens 30 Tagen; eine

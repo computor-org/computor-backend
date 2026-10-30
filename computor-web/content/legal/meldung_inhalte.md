@@ -9,8 +9,8 @@ Version 1.2, Stand 29.10.2026
 Wenn Sie auf computor.at Inhalte finden, die Sie für
 rechtswidrig oder für einen Verstoß gegen unsere
 [Nutzungsbedingungen](/terms) halten, melden Sie diese bitte per E-Mail an
-**abuse@computor.at**. Meldungen können von jeder Person und Stelle - auch ohne
-Konto auf computor.at - eingereicht werden.
+**abuse@computor.at**. Meldungen können von jeder Person und Stelle – auch ohne
+Konto auf computor.at – eingereicht werden.
 
 Bitte geben Sie dabei folgende Informationen an:
 
@@ -70,7 +70,7 @@ Sicherheitslücken melden Sie bitte vertraulich an security@computor.at.
 
 If you find content on computor.at that you believe is
 illegal or violates our [Terms of Use](/terms), please report it by email to
-**abuse@computor.at**. Any individual or entity - even without an account on computor.at - can submit a report.
+**abuse@computor.at**. Any individual or entity – even without an account on computor.at – can submit a report.
 
 Please include the following information in your report:
 

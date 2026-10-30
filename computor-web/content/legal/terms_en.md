@@ -1,8 +1,8 @@
 # Terms of Use computor.at
 
-Version 1.7, dated 29 October 2026
+Version 1.8, dated 30 October 2026
 
-For new usage agreements, this version is effective as of its publication. It
+For new usage contracts, this version is effective as of its publication. It
 applies to an existing usage contract only once you expressly agree to it; until
 then the previous version applies to you. If you do not agree within the period
 stated in section 8, your contract may end.
@@ -12,7 +12,8 @@ stated in section 8, your contract may end.
 [1.1](https://github.com/computor-org/computor-backend/blob/93a7c2cde0d11186b2dbcd167ebabc851c882496/computor-web/content/legal/terms_en.md),
 [1.2](https://github.com/computor-org/computor-backend/blob/f166ccf38e58c03e6e0c9c6d68448f5127ed28a4/computor-web/content/legal/terms_en.md),
 [1.5](https://github.com/computor-org/computor-backend/blob/bcbe73611c806a67c7183efb7a717a9a386b5233/computor-web/content/legal/terms_en.md),
-[1.6](https://github.com/computor-org/computor-backend/blob/d7939109498abcfd08a72f82a3eaf9482137018a/computor-web/content/legal/terms_en.md).
+[1.6](https://github.com/computor-org/computor-backend/blob/d7939109498abcfd08a72f82a3eaf9482137018a/computor-web/content/legal/terms_en.md),
+[1.7](https://github.com/computor-org/computor-backend/blob/45f07fb44f0c5144c5161511296f5b391ef9370a/computor-web/content/legal/terms_en.md).
 The German version is authoritative.
 
 ## 1. Provider, account and free service
@@ -20,7 +21,7 @@ The German version is authoritative.
 Graz University of Technology, Rechbauerstraße 12, 8010 Graz, Austria (“TU
 Graz”, “we”), operates computor.at through the Institute of Theoretical Physics
 – Computational Physics, Petersgasse 16, 8010 Graz. Contact details are in the
-[Legal notice](/impressum). The learning service is free and funded by netidee.
+[Imprint](/impressum). The learning service is free and funded by netidee.
 
 These terms apply to registered users. Accepting them when you register creates
 a free usage contract for an indefinite period. Public learning material can be
@@ -38,16 +39,21 @@ to security@computor.at.
 
 Computor offers courses and programming exercises with automatic tests,
 submission repositories, workspaces and additional tools, communication, and
-learning aids including AI. The service shows which features are available. New
-features and learning aids are added as additional services. Browser workspaces
-currently run on our servers; suitable tools on your device are an alternative.
-External services you choose have their own terms and possible charges; they do
-not replace the free service.
+learning aids including AI. The current offering determines which features,
+languages and environments are supported. New features and learning aids are
+added as additional services.
+
+Depending on the feature provided, workspaces, exercises, tests and AI learning
+aids such as Lena may run on your device, including entirely in the browser, on
+TU Graz systems in Austria, on our servers at Hetzner in Germany, or in any
+combination of these. These functions use the computing power, storage and
+network access of the systems involved. External services you choose have their
+own terms and possible charges; they do not replace the free service.
 
 Computing time, memory, network access, course places and the number and
-run-time of workspaces are limited. Workspaces stop after a period without
-activity, with their files remaining. Capacity limits may temporarily prevent
-access; there is no entitlement to a particular course place. We operate with
+run-time of workspaces we host are limited. Hosted workspaces stop after a
+period without activity, with their files remaining. Capacity limits may
+temporarily prevent access; there is no entitlement to a particular course place. We operate with
 the care customary for a university learning service and point out maintenance
 on the platform in advance where possible, but cannot promise uninterrupted
 availability or recovery of individual files. Back up important work through Git
@@ -64,16 +70,15 @@ request limits depend on capacity.
 
 ## 3. Acceptable use and your content
 
-Use the platform to learn and teach. Resource abuse (such as unauthorised
-cryptocurrency mining), spam, unauthorised attacks and port or vulnerability
-scans are prohibited. Network services, proxies, VPN/Tor nodes and security
+Use the platform to learn and teach. Resource abuse, spam, unauthorised attacks
+and port or vulnerability scans are prohibited. Network services, proxies, VPN/Tor nodes and security
 exercises are allowed where the course or platform provides or expressly permits
 them, also when you use AI agents for them. Do not bypass resource, access or
 participation limits, access other people's accounts or data, or try to escape
 the workspace. Illegal content, distributing malware, copyright infringement,
 child sexual abuse material, incitement to hatred, threats,
-harassment, insults and humiliating other people are prohibited. Do not publish
-other people's submissions without consent or solutions to assessed exercises
+harassment, insults and publicly humiliating other people are prohibited. Do not
+publish other people's submissions without consent or solutions to assessed exercises
 where the course prohibits it.
 
 Security research needs prior agreement through security@computor.at. Report
@@ -117,7 +122,7 @@ DSA).
 
 ## 5. Changing or ending the service or contract
 
-We may change and develop the platform where this is tolerable for you, in
+We may change and develop the platform where this is reasonable for you, in
 particular when the change is minor and objectively justified, for example by
 technical development, security, legal requirements or changes in the resources
 available for operation.
