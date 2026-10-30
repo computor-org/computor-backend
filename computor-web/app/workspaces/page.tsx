@@ -20,7 +20,8 @@ import ConfirmDialog from '@/src/components/ConfirmDialog';
 import EmptyState from '@/src/components/EmptyState';
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
-import Button from '@/src/components/ui/Button';
+import Button, { ButtonLink } from '@/src/components/ui/Button';
+import { ApiError } from '@/src/api/client';
 import LearningOptions from '@/src/components/courses/LearningOptions';
 import {
   openLaunchTab,
@@ -51,6 +52,9 @@ const COPY = {
     emptyTitle: 'Keine Arbeitsumgebungen',
     emptyCreate: 'Wähle oben eine Art von Arbeitsumgebung aus, um deine erste zu erstellen.',
     emptyNone: 'Für dich wurde noch keine Arbeitsumgebung bereitgestellt. Wende dich an die Administration.',
+    noCourseTitle: 'Noch keine Arbeitsumgebung',
+    noCourse: 'Tritt zuerst einem Kurs bei, der Arbeitsumgebungen anbietet. Danach kannst du sie hier starten.',
+    joinCourse: 'Kurs beitreten',
     yours: 'Deine Arbeitsumgebungen',
     deleteTitle: 'Arbeitsumgebung löschen',
     delete: 'Löschen',
@@ -76,6 +80,9 @@ const COPY = {
     emptyTitle: 'No workspaces',
     emptyCreate: 'Pick a workspace type above to create your first one.',
     emptyNone: 'No workspaces have been provisioned for you yet. Please contact your administrator.',
+    noCourseTitle: 'No workspace yet',
+    noCourse: 'First join a course that offers workspaces. Then you can start one here.',
+    joinCourse: 'Join a course',
     yours: 'Your workspaces',
     deleteTitle: 'Delete Workspace',
     delete: 'Delete',
@@ -95,11 +102,23 @@ export default function WorkspacesPage() {
 
   // Workspace list with silent background polling (pauses on hidden tabs).
   const { data, loading, error, reload, refresh } = useResource(
-    async () => (await coderClient.listWorkspaces()).workspaces,
+    async () => {
+      try {
+        return { workspaces: (await coderClient.listWorkspaces()).workspaces, noCourse: false };
+      } catch (e) {
+        // Without a workspace role, the list is refused until the user is in a
+        // course that offers workspaces: something they fix themselves.
+        if (e instanceof ApiError && e.status === 403 && e.errorCode === 'AUTHZ_001') {
+          return { workspaces: [], noCourse: true };
+        }
+        throw e;
+      }
+    },
     [],
     { refetchInterval: 3000 },
   );
-  const workspaces = data ?? [];
+  const workspaces = data?.workspaces ?? [];
+  const noCourse = data?.noCourse ?? false;
   const runningCount = workspaces.filter(
     (ws) => categorizeStatus(ws.latest_build_status, ws.latest_build_transition) === 'running',
   ).length;
@@ -293,6 +312,12 @@ export default function WorkspacesPage() {
 
         {loading ? (
           <ListLoading>{t.loading}</ListLoading>
+        ) : noCourse ? (
+          <EmptyState
+            title={t.noCourseTitle}
+            description={t.noCourse}
+            action={<ButtonLink href="/courses/catalog">{t.joinCourse}</ButtonLink>}
+          />
         ) : !error && workspaces.length === 0 ? (
           <EmptyState
             icon={

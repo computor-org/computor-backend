@@ -266,6 +266,19 @@ test.describe('in German', () => {
     await expect(page.getByText('vscode', { exact: true })).toHaveCount(0);
     await expect(page).toHaveTitle('VS Code wird gestartet …');
   });
+
+  test('a learner in no course is sent to the catalog, not shown a permission error', async ({ page }) => {
+    await setup(page, [details({ status: 'stopped' })], { systemRoles: [] });
+    const refusal = "Workspace 'list' permission required. Contact your administrator.";
+    await page.route(`${API_ORIGIN}/coder/{workspaces,templates}`, (route) =>
+      json(route, { error_code: 'AUTHZ_001', message: refusal, detail: refusal }, 403));
+    await page.goto('/workspaces');
+    await expect(page.getByText(
+      'Tritt zuerst einem Kurs bei, der Arbeitsumgebungen anbietet. Danach kannst du sie hier starten.',
+    )).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Kurs beitreten' })).toHaveAttribute('href', '/courses/catalog');
+    await expect(page.getByText(refusal)).toHaveCount(0);
+  });
 });
 
 test('a workspace that is already running opens without the stopped notice', async ({ page }) => {
