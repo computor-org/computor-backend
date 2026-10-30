@@ -1560,13 +1560,17 @@ class InterpretedSolutionManager(BaseSolutionManager):
             if not script_path:
                 return self._create_error_solution(
                     StatusEnum.failed,
-                    tr("script_not_found_in", language=self.language_name, directory=_dir),
+                    tr("script_not_found_in", language=self.language_name),
                 )
 
         if not os.path.exists(script_path):
             return self._create_error_solution(
                 StatusEnum.failed,
-                tr("script_not_found", language=self.language_name, path=script_path),
+                tr(
+                    "script_not_found",
+                    language=self.language_name,
+                    file=os.path.relpath(script_path, _dir),
+                ),
             )
 
         # Collect variables to extract

@@ -261,12 +261,12 @@ MESSAGES = {
         "de": "Unerwarteter Fehler: {error}",
     },
     "script_not_found_in": {
-        "en": "No {language} script found in {directory}",
-        "de": "Im Verzeichnis {directory} wurde kein {language}-Skript gefunden",
+        "en": "No {language} script found in your submission",
+        "de": "In deiner Abgabe wurde kein {language}-Skript gefunden",
     },
     "script_not_found": {
-        "en": "{language} script not found: {path}",
-        "de": "Das {language}-Skript wurde nicht gefunden: {path}",
+        "en": "{language} script `{file}` not found in your submission",
+        "de": "Das {language}-Skript `{file}` wurde in deiner Abgabe nicht gefunden",
     },
     "variable_not_found_short": {
         "en": "Variable '{name}' not found in student solution",

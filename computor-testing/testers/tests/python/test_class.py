@@ -203,16 +203,19 @@ def get_solution(mm, pytestconfig, idx: int, where: Solution) -> dict:
             script_path = py_files[0]
         else:
             _error_solution["status"] = StatusEnum.failed
-            _error_solution["errormsg"] = f"No Python script found in {_dir}"
-            _error_solution["errors"] = [f"No .py files in {_dir}"]
+            _error_solution["errormsg"] = tr("script_not_found_in", language="Python")
+            _error_solution["errors"] = [_error_solution["errormsg"]]
             _solution[where] = _error_solution
             return _solution[where]
 
     if not os.path.exists(script_path):
         if where == Solution.student:
             _error_solution["status"] = StatusEnum.failed
-            _error_solution["errormsg"] = f"Python script not found: {script_path}"
-            _error_solution["errors"] = [f"File not found: {script_path}"]
+            # The learner creates this file; the temporary run directory means nothing to them.
+            _error_solution["errormsg"] = tr(
+                "script_not_found", language="Python", file=os.path.relpath(script_path, _dir)
+            )
+            _error_solution["errors"] = [_error_solution["errormsg"]]
             _solution[where] = _error_solution
             return _solution[where]
         else:
