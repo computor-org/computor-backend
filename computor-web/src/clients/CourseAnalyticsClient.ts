@@ -18,10 +18,14 @@ export class CourseAnalyticsClient extends BaseEndpointClient {
   /** Failing tests grouped by normalized message, newest `maxResults` imperfect runs. */
   async typicalErrors(
     courseId: string,
-    opts: { courseContentId?: string | null; maxResults?: number } = {},
+    opts: { courseContentId?: string | null; maxResults?: number; language?: 'de' | 'en' } = {},
   ): Promise<TypicalErrorsGet> {
     return this.client.get<TypicalErrorsGet>(this.buildPath('courses', courseId, 'typical-errors'), {
-      params: { course_content_id: opts.courseContentId ?? undefined, max_results: opts.maxResults },
+      params: {
+        course_content_id: opts.courseContentId ?? undefined,
+        max_results: opts.maxResults,
+        language: opts.language,
+      },
     });
   }
 
