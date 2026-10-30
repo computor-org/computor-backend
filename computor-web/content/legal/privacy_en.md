@@ -40,8 +40,7 @@ An account requires a verified email address and password, without which sign-up
 
 Technical server access serves operation, troubleshooting and abuse prevention
 through the designated operations and security roles. Tests and points are
-computed automatically but do not decide grades. Grading stays with the responsible lecturer; there is no solely automated decision with legal or similarly significant effects under Art. 22
-GDPR.
+computed automatically.
 
 **Lena:** “Ask Lena” sends your question, selected text and visible assignment.
 In course messages you may mention @lena and reply in the thread. With automatic
@@ -49,8 +48,7 @@ routing enabled, learner messages mentioning nobody else are also addressed to
 Lena when it is available and within the audience; a visible mention is added.
 Processing includes the message and earlier thread, plus the assignment
 description, your latest submission and its test results for assignment messages. The reply is stored
-in that thread with the same audience. Lena currently does not execute code and
-does not decide grades.
+in that thread with the same audience.
 
 Lena uses the processing locations described in section 3. We use no external
 AI provider and do not use your data for additional content logs or model
@@ -63,8 +61,8 @@ answers.
 **Support:** Incoming support emails and reports are read in automatically,
 cleaned and assigned to a request. Local AI models may summarise and classify a
 request and suggest a draft reply. A member of the support team reviews and
-sends every reply; the AI does not decide on accounts, suspensions, submissions
-or grades. The models run on TU Graz machines in Austria and on our servers at
+sends every reply; the AI does not decide on accounts, suspensions or
+submissions. The models run on TU Graz machines in Austria and on our servers at
 Hetzner in Germany (section 3), without an external AI provider and without
 training models on your data. Summaries, classifications and drafts belong to
 the request and follow its deletion period (section 4).

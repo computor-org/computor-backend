@@ -63,13 +63,11 @@ Möglichkeit im Voraus auf der Plattform hin, können jedoch weder eine
 unterbrechungsfreie Verfügbarkeit noch die Wiederherstellung einzelner Dateien
 zusagen. Sichern Sie wichtige Arbeiten mit Git oder durch Herunterladen.
 
-Tests und Punkte dienen dem Lernen und sind weder ein Prüfungszeugnis noch ein
-Kompetenznachweis. Zieht eine Lehrveranstaltung die Ergebnisse zur Beurteilung
-heran, entscheidet darüber die Lehrperson nach den geltenden Vorschriften.
+Tests und Punkte dienen dem Lernen.
 KI-gestützte Lernhilfen wie Lena antworten in den dafür vorgesehenen Funktionen
 der Plattform; in entsprechend eingerichteten Kursen können Ihre Kursnachrichten
-auch automatisch an die KI weitergeleitet werden, die darauf antwortet. Über
-Noten entscheiden KI-Lernhilfen nicht. Den Umfang der Verarbeitung, den
+auch automatisch an die KI weitergeleitet werden, die darauf antwortet. Den
+Umfang der Verarbeitung, den
 Empfängerkreis und die Speicherung erläutert die Datenschutzerklärung. Prüfen
 Sie KI-Antworten, da diese falsch sein können. Verfügbarkeit und Anfragegrenzen
 hängen von der vorhandenen Kapazität ab.

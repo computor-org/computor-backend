@@ -49,10 +49,7 @@ nach Feststellung unverzüglich gelöscht.
 
 Der technische Serverzugang der dafür vorgesehenen Betriebs- und
 Sicherheitsrollen dient dem Betrieb, der Fehlerbehebung und der
-Missbrauchsabwehr. Tests und Punkte werden automatisch berechnet, entscheiden
-aber nicht über Noten. Die Beurteilung obliegt der zuständigen Lehrperson, eine
-ausschließlich automatisierte Entscheidung mit rechtlicher oder ähnlich
-erheblicher Wirkung nach Art. 22 DSGVO findet nicht statt.
+Missbrauchsabwehr. Tests und Punkte werden automatisch berechnet.
 
 **Lena:** Die Schaltfläche „Lena fragen“ übermittelt Ihre Frage, ausgewählten
 Text und die sichtbare Aufgabenbeschreibung. In Kursnachrichten können Sie Lena
@@ -62,8 +59,7 @@ erwähnt wird, Lena zugeordnet, sofern Lena verfügbar ist und zum Empfängerkre
 gehört; dabei wird eine sichtbare Lena-Erwähnung ergänzt. Verarbeitet werden
 Nachricht und bisheriger Verlauf sowie bei Aufgaben die
 Aufgabenbeschreibung, Ihre letzte Abgabe und deren Testergebnisse. Die Antwort
-bleibt im selben Verlauf mit demselben Empfängerkreis gespeichert. Lena führt
-derzeit keinen Code aus und entscheidet nicht über Noten.
+bleibt im selben Verlauf mit demselben Empfängerkreis gespeichert.
 
 Für Lena gelten die in Abschnitt 3 beschriebenen Verarbeitungsorte. Wir setzen
 keinen externen KI-Anbieter ein und verwenden Ihre Daten weder für zusätzliche
@@ -78,7 +74,7 @@ Zeitfrist. Numerische Größen-, Status- und Zeitmesswerte enthalten keine Frage
 eingelesen, bereinigt und einer Anfrage zugeordnet. Lokale KI-Modelle können
 eine Anfrage zusammenfassen, einordnen und einen Antwortentwurf vorschlagen.
 Jede Antwort prüft und versendet eine Person aus dem Support-Team; die KI
-entscheidet nicht über Konto, Sperren, Abgaben oder Noten. Die Modelle laufen
+entscheidet nicht über Konto, Sperren oder Abgaben. Die Modelle laufen
 auf Rechnern der TU Graz in Österreich und auf unseren Servern bei Hetzner in
 Deutschland (Abschnitt 3), ohne externen KI-Anbieter und ohne Modelltraining
 mit Ihren Daten. Zusammenfassungen, Einordnungen und Entwürfe gehören zur

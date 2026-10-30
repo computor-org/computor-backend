@@ -59,12 +59,10 @@ on the platform in advance where possible, but cannot promise uninterrupted
 availability or recovery of individual files. Back up important work through Git
 or downloads.
 
-Tests and points are learning aids, not an examination certificate or proof of
-competence. If a course uses results for assessments, the teacher decides under
-the applicable rules. AI learning aids such as Lena answer in the platform
+Tests and points are learning aids. AI learning aids such as Lena answer in the platform
 features provided for them; in configured courses your course messages may
-also be forwarded automatically to the AI, which answers them. AI learning aids
-do not decide grades. The Privacy notice explains the scope of processing, the
+also be forwarded automatically to the AI, which answers them. The Privacy
+notice explains the scope of processing, the
 audience and storage. Check AI answers as they may be wrong. Availability and
 request limits depend on capacity.
 
