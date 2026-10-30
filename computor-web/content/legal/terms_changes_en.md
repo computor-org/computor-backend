@@ -30,8 +30,9 @@ period stated in section 8, your contract may end. Compared with version 1.6:
   requires, of processing your data for new purposes (sections 3, 8).
 
 If you disagree, you may end the contract at any time and request deletion of
-your account at privacy@computor.at. Questions: contact@computor.at. The
-[Privacy notice 1.7](/privacy/en) is published at the same time. The German
+your account at privacy@computor.at. For questions, please contact
+contact@computor.at. The [Privacy notice 1.7](/privacy/en) is published at the
+same time. The German
 version is authoritative.
 
 Earlier versions:

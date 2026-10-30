@@ -2,10 +2,11 @@
 
 Version 1.7, Stand 29.10.2026
 
-Für neue Nutzungsverträge gilt diese Fassung ab ihrer Veröffentlichung. Für
-einen bestehenden Nutzungsvertrag gilt sie erst, wenn Sie ihr ausdrücklich
-zustimmen; bis dahin gilt für Sie die bisherige Fassung. Stimmen Sie nicht
-innerhalb der in Abschnitt 8 genannten Frist zu, kann Ihr Vertrag enden.
+Für neue Nutzungsverträge gilt diese Fassung ab Veröffentlichung. Für einen
+bestehenden Nutzungsvertrag gilt sie erst, wenn Sie ihr ausdrücklich zustimmen;
+bis dahin gilt für Sie die bisherige Fassung. Stimmen Sie nicht innerhalb der in
+Abschnitt 8 genannten Frist zu, kann Ihr Vertrag enden.
+
 [Was sich ändert](/terms/changes) · Frühere Fassungen:
 [1.0](https://github.com/computor-org/computor-backend/blob/54ea77021304f1bd77ef4bf7c5712b5edfb6843f/computor-web/content/legal/nutzungsbedingungen_de.md),
 [1.1](https://github.com/computor-org/computor-backend/blob/93a7c2cde0d11186b2dbcd167ebabc851c882496/computor-web/content/legal/nutzungsbedingungen_de.md),
@@ -16,59 +17,56 @@ innerhalb der in Abschnitt 8 genannten Frist zu, kann Ihr Vertrag enden.
 ## 1. Anbieter, Konto und kostenloses Angebot
 
 Die Technische Universität Graz, Rechbauerstraße 12, 8010 Graz („TU Graz“,
-„wir“), betreibt computor.at über ihr Institut für Theoretische Physik –
-Computational Physics, Petersgasse 16, 8010 Graz. Die Kontaktangaben finden Sie
-im [Impressum](/impressum). Das Lernangebot wird von netidee gefördert und ist
-kostenlos.
+„wir“), betreibt computor.at über das Institut für Theoretische Physik –
+Computational Physics, Petersgasse 16, 8010 Graz. Kontaktangaben stehen im
+[Impressum](/impressum). Das von netidee geförderte Lernangebot ist kostenlos.
 
-Diese Nutzungsbedingungen gelten für registrierte Nutzer*innen. Indem Sie ihnen
-bei der Registrierung zustimmen, schließen Sie einen unentgeltlichen
-Nutzungsvertrag auf unbestimmte Zeit ab. Öffentliche Lernmaterialien können Sie
-ohne Konto lesen. Bei Lehrveranstaltungen der TU Graz gehen im Fall eines
-Widerspruchs die Studienvorschriften und die Anforderungen des jeweiligen Kurses
-vor. Wie wir Daten verarbeiten, erläutert die
-[Datenschutzerklärung](/privacy); dass Sie sie zur Kenntnis nehmen, ist keine
-Einwilligung im Sinne des Datenschutzrechts.
+Die Nutzungsbedingungen gelten für registrierte Nutzer*innen. Mit Ihrer
+Zustimmung bei der Registrierung schließen Sie einen kostenlosen Nutzungsvertrag
+auf unbestimmte Zeit ab. Öffentliche Lernmaterialien können auch ohne Konto
+eingesehen werden. Bei Lehrveranstaltungen der TU Graz gelten die jeweiligen
+Studienvorschriften und Kursanforderungen. Die [Datenschutzerklärung](/privacy)
+erläutert die Datenverarbeitung. Reine Kenntnisnahme gilt nicht als
+datenschutzrechtliche Einwilligung.
 
-Sie müssen mindestens 14 Jahre alt sein. Konten jüngerer Personen löschen wir,
-sobald wir davon erfahren. Jede Person darf nur ein Konto haben, das nicht
-übertragbar ist. Schützen Sie Ihr Passwort und Ihr E-Mail-Konto und melden Sie
-den Verdacht eines unbefugten Zugriffs sofort an security@computor.at.
+Die Nutzung setzt ein Mindestalter von 14 Jahren voraus. Konten von Personen,
+die dieses Alter nicht erreicht haben, werden nach Feststellung unverzüglich
+gelöscht. Konten sind personengebunden, nicht übertragbar und auf eines pro
+Person beschränkt. Zugangsdaten sind vertraulich zu behandeln. Bei vermutetem
+Fremdzugriff haben Sie sich unverzüglich bei security@computor.at zu melden.
 
 ## 2. Leistungen
 
 Computor bietet Kurse und Programmierübungen mit automatischen Tests,
-Abgabe-Repositories, Arbeitsumgebungen (Workspaces) und zusätzlichen Werkzeugen
-sowie Kommunikationsfunktionen und Lernhilfen, auch KI-gestützte. Welche
-Funktionen verfügbar sind, ergibt sich aus dem Angebot auf der Plattform; neue
-Funktionen und Lernhilfen kommen als zusätzliche Leistungen hinzu. Die im
-Browser bereitgestellten Workspaces laufen derzeit auf unseren Servern; Sie
-können stattdessen auch mit geeigneten Werkzeugen auf Ihrem eigenen Gerät
+Abgabe-Repositories, Arbeitsumgebungen und zusätzliche Werkzeuge, Kommunikation
+sowie Lernhilfen einschließlich KI. Welche Funktionen verfügbar sind, steht im
+Angebot. Neue Funktionen und Lernhilfen werden als zusätzliche Leistungen
+hinzugefügt. Die über den Browser bereitgestellten Workspaces laufen derzeit auf
+unseren Servern; alternativ können Sie mit geeigneten Programmen auf Ihrem Gerät
 arbeiten. Für externe Dienste, die Sie selbst wählen, gelten deren eigene
 Bedingungen; sie können Kosten verursachen und ersetzen das kostenlose Angebot
 nicht.
 
 Rechenzeit, Speicher, Netzwerkzugang, Kursplätze sowie Anzahl und Laufzeit der
-Workspaces sind begrenzt. Ein Workspace wird nach einer gewissen Zeit ohne
-Aktivität angehalten; seine Dateien bleiben erhalten. Ist die Kapazität
-ausgeschöpft, kann der Zugang vorübergehend nicht möglich sein; einen Anspruch
-auf einen bestimmten Kursplatz gibt es nicht. Wir betreiben den Dienst mit der
-für ein universitäres Lernangebot üblichen Sorgfalt und weisen auf
-Wartungsarbeiten nach Möglichkeit im Voraus auf der Plattform hin, können jedoch
-weder eine unterbrechungsfreie Verfügbarkeit noch die Wiederherstellung
-einzelner Dateien zusagen. Sichern Sie wichtige Arbeiten mit Git oder durch
-Herunterladen.
+Workspaces sind begrenzt. Workspaces stoppen nach einer gewissen Zeit ohne
+Aktivität, wobei ihre Dateien erhalten bleiben. Ist die Kapazität ausgeschöpft,
+kann der Zugang vorübergehend nicht möglich sein; einen Anspruch auf einen
+bestimmten Kursplatz gibt es nicht. Wir betreiben den Dienst mit der für ein
+universitäres Lernangebot üblichen Sorgfalt und weisen auf Wartungsarbeiten nach
+Möglichkeit im Voraus auf der Plattform hin, können jedoch weder eine
+unterbrechungsfreie Verfügbarkeit noch die Wiederherstellung einzelner Dateien
+zusagen. Sichern Sie wichtige Arbeiten mit Git oder durch Herunterladen.
 
 Tests und Punkte dienen dem Lernen und sind weder ein Prüfungszeugnis noch ein
 Kompetenznachweis. Zieht eine Lehrveranstaltung die Ergebnisse zur Beurteilung
 heran, entscheidet darüber die Lehrperson nach den geltenden Vorschriften.
 KI-gestützte Lernhilfen wie Lena antworten in den dafür vorgesehenen Funktionen
-der Plattform; in entsprechend eingerichteten Kursen können Ihre
-Kursnachrichten auch automatisch an die KI weitergeleitet werden, die darauf
-antwortet. Über Noten entscheiden KI-Lernhilfen nicht. Den Umfang
-der Verarbeitung, den Empfängerkreis und die Speicherung erläutert die
-Datenschutzerklärung. Prüfen Sie die Antworten der KI, denn sie können falsch
-sein; Verfügbarkeit und Anfragegrenzen hängen von der vorhandenen Kapazität ab.
+der Plattform; in entsprechend eingerichteten Kursen können Ihre Kursnachrichten
+auch automatisch an die KI weitergeleitet werden, die darauf antwortet. Über
+Noten entscheiden KI-Lernhilfen nicht. Den Umfang der Verarbeitung, den
+Empfängerkreis und die Speicherung erläutert die Datenschutzerklärung. Prüfen
+Sie KI-Antworten, da diese falsch sein könnten. Verfügbarkeit und Anfragegrenzen
+hängen von der vorhandenen Kapazität ab.
 
 ## 3. Zulässige Nutzung und eigene Inhalte
 
@@ -101,7 +99,7 @@ Graz lediglich das unentgeltliche, nicht ausschließliche Recht
 (Werknutzungsbewilligung) ein, Ihre Inhalte in dem für den Betrieb
 erforderlichen Umfang zu verarbeiten, insbesondere sie zu speichern,
 auszuführen, automatisch zu testen und den Lehrenden und Tutor*innen Ihres
-Kurses anzuzeigen sowie Kursnachrichten dem jeweiligen Empfängerkreis
+Kurses bereitzustellen sowie Kursnachrichten dem jeweiligen Empfängerkreis
 anzuzeigen. Dieses Recht endet mit der Löschung der Inhalte oder Ihres Kontos;
 für Sicherungskopien gelten die in der Datenschutzerklärung erläuterten
 Löschregeln. Laden Sie nur Inhalte hoch, für die Sie die erforderlichen Rechte
@@ -132,11 +130,11 @@ Per E-Mail teilen wir Ihnen die Maßnahme mit und nennen die zugrunde liegenden
 Tatsachen, die betroffenen Regeln, ob eine Meldung oder eine automatische
 Erkennung eingesetzt wurde, und wie Sie sich dagegen wehren können, sofern nicht
 ein Gesetz oder eine Behörde dies untersagt (Art. 17 DSA). Innerhalb von sechs
-Monaten können Sie bei contact@computor.at Beschwerde einbringen. Über die
-Beschwerde entscheidet ein Mensch; Sie erhalten eine begründete Entscheidung.
-Sie können sich jederzeit auch an ein Gericht wenden. Besteht der Verdacht auf
-eine Straftat, die das Leben oder die Sicherheit von Menschen bedroht,
-informieren wir unverzüglich die zuständigen Behörden (Art. 18 DSA).
+Monaten können Sie bei contact@computor.at Einspruch einlegen. Über den
+Einspruch entscheidet ein Mensch. Im Anschluss erhalten Sie eine begründete
+Entscheidung. Sie können sich jederzeit auch an ein Gericht wenden. Besteht der
+Verdacht auf eine Straftat, die das Leben oder die Sicherheit von Menschen
+bedroht, informieren wir unverzüglich die zuständigen Behörden (Art. 18 DSA).
 
 ## 5. Änderungen und Ende des Angebots oder Vertrags
 
@@ -156,19 +154,18 @@ können wir Funktionen sofort einschränken; über den Grund und die
 voraussichtliche Dauer informieren wir Sie dann so bald wie möglich.
 
 Sie können den Nutzungsvertrag jederzeit beenden und unter privacy@computor.at
-die Löschung Ihres Kontos verlangen. Wir können den Nutzungsvertrag aus
+die Löschung Ihres Kontos beantragen. Wir können den Nutzungsvertrag aus
 sachlichen Gründen, etwa wenn die Plattform eingestellt wird, unter Einhaltung
 einer Frist von 30 Tagen per E-Mail kündigen. Bei schweren Verstößen gegen
 geltendes Recht oder gegen diese Nutzungsbedingungen oder wenn sich ein Verstoß
 trotz Hinweis wiederholt, können wir Ihr Konto vorübergehend sperren oder den
 Vertrag fristlos kündigen; auch dann erhalten Sie eine Begründung und können
-nach Abschnitt 4 Beschwerde einbringen. Gesetzliche Rechte bleiben unberührt.
+nach Abschnitt 4 Einspruch einlegen. Gesetzliche Rechte bleiben unberührt.
 
-Konten, mit denen sich 24 Monate lang niemand eingeloggt hat, löschen wir,
-nachdem wir Ihnen die Löschung mindestens 30 Tage im Voraus per E-Mail
-mitgeteilt haben; loggen Sie sich innerhalb dieser Frist ein, bleibt das Konto
-bestehen. Wir löschen das Konto in allen beteiligten Diensten; bloßes
-Archivieren genügt nicht. Welche Daten aus
+Konten, bei denen sich 24 Monate lang niemand angemeldet hat, löschen wir nach
+Ankündigung per E-Mail mit einer Vorlaufzeit von mindestens 30 Tagen; eine
+Anmeldung während dieser Frist erhält das Konto. Wir löschen das Konto in allen
+beteiligten Diensten; bloßes Archivieren genügt nicht. Welche Daten aus
 gesetzlichen Gründen aufbewahrt werden und wie mit Sicherungskopien verfahren
 wird, erläutert die Datenschutzerklärung.
 

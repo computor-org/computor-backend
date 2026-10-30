@@ -35,8 +35,8 @@ Gegenüber Fassung 1.6 ändert sich Folgendes:
   vorschreibt, über die Verarbeitung Ihrer Daten für neue Zwecke (Abschnitt 8).
 
 Sind Sie nicht einverstanden, können Sie den Nutzungsvertrag jederzeit beenden
-und unter privacy@computor.at die Löschung Ihres Kontos verlangen. Fragen richten
-Sie bitte an contact@computor.at. Gleichzeitig erscheint die
+und unter privacy@computor.at die Löschung Ihres Kontos verlangen. Für Fragen
+wenden Sie sich an contact@computor.at. Gleichzeitig erscheint die
 [Datenschutzerklärung in Fassung 1.7](/privacy).
 
 Frühere Fassungen:

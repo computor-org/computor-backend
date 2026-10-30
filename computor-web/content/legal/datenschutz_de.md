@@ -8,7 +8,7 @@ die Kommunikation und die Lernhilfe verarbeiten wir die nachstehend genannten
 Daten. Es gibt keine Werbung, keinen Datenverkauf und kein externes
 Verhaltenstracking. In entsprechend eingerichteten Kursen werden Nachrichten
 auch automatisch der KI-Lernhilfe Lena zugeordnet. Die Löschung Ihres Kontos
-können Sie jederzeit unter privacy@computor.at verlangen.
+können Sie jederzeit unter privacy@computor.at beantragen.
 
 ## 1. Verantwortliche und Rechtsgrundlagen
 
@@ -30,10 +30,10 @@ Meldungen nach Art. 16–18 DSA, soweit anwendbar. Die Annahme der
 Nutzungsbedingungen ist keine datenschutzrechtliche Einwilligung und erlaubt
 keine beliebige künftige Verarbeitung.
 
-Für ein Konto benötigen wir eine bestätigte E-Mail-Adresse und ein Passwort;
-ohne diese Angaben ist keine Anmeldung möglich. Ein Konto setzt ein Mindestalter
-von 14 Jahren voraus. Erfahren wir, dass eine jüngere Person ein Konto hat,
-löschen wir es.
+Für ein Konto benötigen wir eine bestätigte E-Mail-Adresse und ein Passwort,
+ohne diese Angaben ist keine Anmeldung möglich. Das Mindestalter für Konten ist
+14 Jahre. Konten von Personen, die dieses Alter nicht erreicht haben, werden
+nach Feststellung unverzüglich gelöscht.
 
 ## 2. Daten, Zwecke und Sichtbarkeit
 
@@ -50,7 +50,7 @@ löschen wir es.
 Der technische Serverzugang der dafür vorgesehenen Betriebs- und
 Sicherheitsrollen dient dem Betrieb, der Fehlerbehebung und der
 Missbrauchsabwehr. Tests und Punkte werden automatisch berechnet, entscheiden
-aber nicht über Noten. Die Beurteilung obliegt der zuständigen Lehrperson; eine
+aber nicht über Noten. Die Beurteilung obliegt der zuständigen Lehrperson, eine
 ausschließlich automatisierte Entscheidung mit rechtlicher oder ähnlich
 erheblicher Wirkung nach Art. 22 DSGVO findet nicht statt.
 
@@ -60,7 +60,7 @@ mit @lena ansprechen und im Verlauf antworten. Ist die automatische Zuordnung
 aktiviert, werden auch Nachrichten von Lernenden, in denen keine andere Person
 erwähnt wird, Lena zugeordnet, sofern Lena verfügbar ist und zum Empfängerkreis
 gehört; dabei wird eine sichtbare Lena-Erwähnung ergänzt. Verarbeitet werden
-Nachricht und bisheriger Verlauf, bei Aufgaben zusätzlich die
+Nachricht und bisheriger Verlauf, sowie bei Aufgaben zusätzlich die
 Aufgabenbeschreibung, Ihre letzte Abgabe und deren Testergebnisse. Die Antwort
 bleibt im selben Verlauf mit demselben Empfängerkreis gespeichert. Lena führt
 keinen Code aus und entscheidet nicht über Noten.
@@ -68,7 +68,7 @@ keinen Code aus und entscheidet nicht über Noten.
 Die Inferenz für Lena läuft derzeit auf Rechnern der TU Graz in Österreich, ohne
 externen KI-Anbieter, ohne zusätzliche Protokollierung der Inhalte und ohne
 Modelltraining mit Ihren Daten. Begrenzte Zwischenspeicher (Caches) im
-Arbeitsspeicher und auf der Festplatte verwenden Berechnungen wieder; sie sind
+Arbeitsspeicher und auf der Festplatte verwenden Berechnungen wieder. Sie sind
 für Lernende nicht zugänglich und werden bei Kapazitätsbedarf ersetzt oder
 geleert, ohne feste Zeitfrist. Numerische Größen-, Status- und Zeitmesswerte
 enthalten keine Fragen, übermittelten Texte oder Antworten.
@@ -77,7 +77,7 @@ enthalten keine Fragen, übermittelten Texte oder Antworten.
 eingelesen, bereinigt und einer Anfrage zugeordnet. Lokale KI-Modelle können
 eine Anfrage zusammenfassen, einordnen und einen Antwortentwurf vorschlagen.
 Jede Antwort prüft und versendet eine Person aus dem Support-Team; die KI
-entscheidet nicht über Konto, Sperren, Abgaben oder Noten. Die Modelle laufen
+entscheidet nicht über Konto, Sperren, Abgaben oder Noten. Die Modelle laufen, ebenso wie Lena,
 auf Rechnern der TU Graz in Österreich und auf unseren Servern bei Hetzner in
 Deutschland (Abschnitt 3), ohne externen KI-Anbieter und ohne Modelltraining
 mit Ihren Daten. Zusammenfassungen, Einordnungen und Entwürfe gehören zur
@@ -105,7 +105,7 @@ Arbeiten Sie auf Ihrem eigenen Gerät, sind die Berechnung und Speicherung dort
 vom Hochladen, Synchronisieren und Abgeben sowie von der Verarbeitung auf
 unseren Servern zu unterscheiden. Neue Verarbeitungszwecke, Empfänger oder
 Übermittlungen werden vor ihrer Einführung entsprechend den gesetzlichen
-Informationspflichten erläutert; diese Erklärung ist keine pauschale
+Informationspflichten erläutert. Diese Erklärung ist keine pauschale
 Einwilligung dafür.
 
 ## 4. Aufbewahrung und Löschung
@@ -126,7 +126,7 @@ Pflicht erforderlich sind, werden gesondert aufbewahrt und auf diesen Zweck und
 die dafür erforderliche Dauer beschränkt.
 
 Bei Konten, die seit 24 Monaten nicht genutzt wurden, kündigen wir die Löschung
-mit angemessener Frist per E-Mail an; melden Sie sich innerhalb dieser Frist an,
+mit angemessener Frist per E-Mail an. Melden Sie sich innerhalb dieser Frist an,
 bleibt das Konto bestehen. Vertraglich vereinbarte längere Vorwarnfristen
 bleiben unberührt. Einen Löschantrag bearbeiten wir auch für die Daten im
 Anmeldedienst, in Git, im Workspace und im Dateispeicher. Müssen einzelne Daten
@@ -140,7 +140,7 @@ oder Angriffen wiederhergestellt werden kann (Art. 32 Abs. 1 lit. c DSGVO).
 ## 5. Cookies und Sicherheit
 
 Wir verwenden funktionale Cookies und lokalen Browserspeicher für Anmeldung,
-Sitzungsschutz und gewählte Darstellung, keine Werbe- oder Analyse-Cookies.
+Sitzungsschutz und gewählte Darstellung, ohne Werbe- oder Analyse-Cookies.
 Soweit technisch notwendig, gilt die Ausnahme nach § 165 Abs. 3 TKG 2021;
 ein Cookie-Banner ist dafür nicht erforderlich.
 
@@ -150,7 +150,7 @@ ein Cookie-Banner ist dafür nicht erforderlich.
 | Plattform-Zugangstoken / Erneuerungstoken | Eine Stunde / sieben Tage. |
 | Gewählte helle oder dunkle Darstellung | Bis Sie den lokalen Browserspeicher löschen. |
 
-Sie können die Speicherung im Browser steuern; ohne Sitzungscookies ist keine
+Sie können die Speicherung im Browser steuern. Ohne Sitzungscookies ist keine
 Anmeldung möglich. Webzugriffe sind TLS-verschlüsselt; die Programme der
 Nutzer*innen laufen in getrennten Containern mit Ressourcenbegrenzung. Melden
 Sie Sicherheitslücken vertraulich an security@computor.at.
