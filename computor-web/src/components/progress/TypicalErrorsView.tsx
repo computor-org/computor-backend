@@ -19,6 +19,7 @@ import { courseAnalyticsClient } from '@/src/clients/CourseAnalyticsClient';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
 import { formatDateTime, formatNumber } from '@/src/utils/locale';
 import { assignmentsOf } from '@/src/utils/courseAnalytics';
+import { useCourseTitles } from '@/src/hooks/useCourseTitles';
 import type { TypicalError } from 'types/generated';
 
 const SCAN_SIZES = [300, 1000, 2000];
@@ -103,6 +104,7 @@ export default function TypicalErrorsView({ courseId }: { courseId: string }) {
     return res;
   }, [courseId, contentId, maxResults]);
 
+  const { contentTitle } = useCourseTitles(courseId);
   const errors = data?.errors ?? [];
   const keyOf = (e: TypicalError) => `${e.course_content_id}|${e.test_name}|${e.message}`;
   const largest = errors.reduce((m, e) => Math.max(m, e.affected_students), 0);
@@ -133,7 +135,7 @@ export default function TypicalErrorsView({ courseId }: { courseId: string }) {
             >
               <option value="">{t.wholeCourse}</option>
               {assignments.map((a) => (
-                <option key={a.id} value={a.id}>{a.title}</option>
+                <option key={a.id} value={a.id}>{contentTitle(a.id, a.title)}</option>
               ))}
             </select>
             <label className="text-xs font-medium text-muted ml-4" htmlFor="te-scan">{t.scan}</label>
@@ -202,7 +204,7 @@ export default function TypicalErrorsView({ courseId }: { courseId: string }) {
                               onClick={() => setOpen(isOpen ? null : k)}
                               aria-expanded={isOpen}
                             >
-                              <Td className="py-2.5 text-body">{e.course_content_title || '—'}</Td>
+                              <Td className="py-2.5 text-body">{contentTitle(e.course_content_id, e.course_content_title || '—')}</Td>
                               <Td className="py-2.5 font-medium text-fg">{e.test_name}</Td>
                               <Td className="py-2.5 font-mono text-xs text-body break-all">{e.message}</Td>
                               <Td className="py-2.5 text-right tabular-nums font-medium">{e.affected_students}</Td>

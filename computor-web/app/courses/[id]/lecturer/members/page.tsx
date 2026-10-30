@@ -28,6 +28,7 @@ import {
   maxAssignableRole,
 } from '@/src/utils/courseRoles';
 import { memberName } from '@/src/utils/userName';
+import { courseGroupTitle } from '@/src/utils/courseGroups';
 
 const PAGE_SIZE = 25;
 const membersClient = new CourseMembersClient();
@@ -125,9 +126,9 @@ export default function CourseMembersPage() {
   const groups = data?.groups ?? [];
   const groupName = useMemo(() => {
     const map = new Map<string, string>();
-    for (const g of data?.groups ?? []) map.set(g.id, g.title || g.id);
+    for (const g of data?.groups ?? []) map.set(g.id, courseGroupTitle(g.title, language) || g.id);
     return map;
-  }, [data?.groups]);
+  }, [data?.groups, language]);
 
   const hasNext = members.length === PAGE_SIZE;
 
@@ -267,7 +268,7 @@ export default function CourseMembersPage() {
                             <option value="">{t.noGroup}</option>
                             {groups.map((g) => (
                               <option key={g.id} value={g.id}>
-                                {g.title || t.untitled}
+                                {courseGroupTitle(g.title, language) || t.untitled}
                               </option>
                             ))}
                           </select>

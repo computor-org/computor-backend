@@ -24,6 +24,7 @@ import Badge from '@/src/components/Badge';
 import VisibilitySelect, { type VisibilityValue } from '@/src/components/courses/VisibilitySelect';
 import type { CourseGet, CourseGitBindingGet, CourseGitBindingUpsert, GitServerGet } from 'types/generated';
 import { COURSE_FORM_COPY, STUDENT_REPO_MODES } from '@/src/components/courses/courseFormCopy';
+import { deliveryLabel, gitServerTypeLabel, lockReasonText } from '@/src/utils/courseGit';
 
 const coursesClient = new CoursesClient();
 const gitServersClient = new GitServersClient();
@@ -61,7 +62,7 @@ const COPY = {
     visibilityHint: 'Wenn du den Kurs verbirgst, verbirgst du alle Einheiten und Aufgaben darin. Einheiten und Aufgaben lassen sich auch einzeln verbergen.',
     selfRegistration: 'Selbstanmeldung',
     selfRegistrationHint: 'Unabhängig von der Sichtbarkeit oben: Diese verbirgt Kursinhalte vor Mitgliedern, die Selbstanmeldung entscheidet, wer Mitglied werden darf.',
-    selfRegistrationLocked: 'Nur Kursverantwortliche (Maintainer oder Owner) können das ändern, denn ein gelisteter Kurs wird allen Konten dieser Instanz angeboten.',
+    selfRegistrationLocked: 'Nur Maintainer und Eigentümer des Kurses können das ändern, denn ein gelisteter Kurs wird allen Konten dieser Instanz angeboten.',
     seats: 'Plätze für die Selbstanmeldung',
     seatsHint: 'Höchstzahl der Studierenden; mitgezählt werden alle, die als Studierende eingeschrieben sind, egal wie sie beigetreten sind. Leer bedeutet unbegrenzt.',
     nothingSaved: 'Es wurde nichts gespeichert.',
@@ -74,8 +75,8 @@ const COPY = {
     template: 'Vorlage',
     noGit: 'Dieser Kurs hat noch keine Git-Konfiguration. Richte sie ein, um Repositories für Studierende zu ermöglichen.',
     serversCentral: 'Die Liste der Git-Server wird zentral verwaltet und ist hier deshalb leer. Bitte eine Administratorin oder einen Administrator, den Server für diesen Kurs auszuwählen.',
-    deliveryGit: 'Git (Fork/Klon)',
-    deliveryDownload: 'Download',
+    deliveryGit: deliveryLabel('git', 'de'),
+    deliveryDownload: deliveryLabel('download', 'de'),
     templateServer: 'Git-Server (für die Vorlage)',
     templateServerHint: 'Bei einem verwalteten Server (Forgejo oder GitLab) lässt du die Vorlagenfelder leer; das Vorlagen-Repository wird automatisch angelegt.',
     none: '— keiner —',
@@ -125,8 +126,8 @@ const COPY = {
     template: 'Template',
     noGit: 'This course has no git configuration yet. Configure it to enable student repositories.',
     serversCentral: 'The list of git servers is managed centrally, so it is empty here. Ask an administrator to pick the server for this course.',
-    deliveryGit: 'git (fork/clone)',
-    deliveryDownload: 'download',
+    deliveryGit: deliveryLabel('git', 'en'),
+    deliveryDownload: deliveryLabel('download', 'en'),
     templateServer: 'Git server (for the template)',
     templateServerHint: 'For a managed server (Forgejo or GitLab), leave the template fields blank — the template repo is created automatically.',
     none: '— none —',
@@ -333,7 +334,7 @@ export default function CourseEditPage() {
 
   const serverLabel = (id?: string | null) => {
     const s = servers.find((x) => x.id === id);
-    return s ? `${s.name || s.base_url} (${s.type})` : id || '—';
+    return s ? `${s.name || s.base_url} (${gitServerTypeLabel(s.type)})` : id || '—';
   };
   const gitConfigured = binding && binding.delivery;
   const gitLocked = !!binding?.locked;
@@ -477,14 +478,14 @@ export default function CourseEditPage() {
                 }
                 note={
                   gitLocked
-                    ? `${binding?.lock_reason || t.lockedDefault} ${t.lockedNote}`
+                    ? `${lockReasonText(binding?.lock_reason, uiLanguage) || t.lockedDefault} ${t.lockedNote}`
                     : undefined
                 }
               >
                 {gitLocked ? (
                   <DescriptionList
                     items={[
-                      { term: t.deliveryTerm, value: binding!.delivery },
+                      { term: t.deliveryTerm, value: deliveryLabel(binding!.delivery, uiLanguage) },
                       { term: f.gitServer, value: binding!.git_server_id ? serverLabel(binding!.git_server_id) : '—' },
                       { term: f.repoModes, value: (binding!.student_repo_modes || []).map((m) => f.modes[m] ?? m).join(', ') || '—' },
                       { term: t.template, value: binding!.template_repo || '—', mono: true },

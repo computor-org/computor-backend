@@ -22,6 +22,7 @@ import { formatLimit } from '@/src/utils/limits';
 import { displayName } from '@/src/utils/displayName';
 import { deploymentBadge, deploymentStatusLabel } from '@/src/utils/deployment';
 import { CourseContentsClient } from '@/src/generated/clients/CourseContentsClient';
+import { localized } from '@/src/utils/localizedText';
 
 const contentsClient = new CourseContentsClient();
 
@@ -42,7 +43,7 @@ const COPY = {
     description: 'Beschreibung',
     noDescription: 'Keine Beschreibung.',
     placement: 'Einordnung',
-    path: 'Pfad',
+    path: 'Pfad in der Kursdatei',
     type: 'Typ',
     kind: 'Art',
     position: 'Position',
@@ -73,7 +74,7 @@ const COPY = {
     description: 'Description',
     noDescription: 'No description.',
     placement: 'Placement',
-    path: 'Path',
+    path: 'Path in the course file',
     type: 'Type',
     kind: 'Kind',
     position: 'Position',
@@ -124,7 +125,8 @@ export default function CourseContentDetailPage() {
     { enabled: canManage },
   );
 
-  const content = data?.content ?? null;
+  // Display only; the edit page keeps the source text it saves back.
+  const content = localized(data?.content ?? null, language);
   const name = displayName(content, t.content);
   const crumbs = useCourseCrumbs(
     courseId,
@@ -137,7 +139,7 @@ export default function CourseContentDetailPage() {
   }
 
   const badge = content ? deploymentBadge(content, language) : null;
-  const type = content?.course_content_type;
+  const type = localized(content?.course_content_type ?? null, language);
   const deployment = data?.deployment?.deployment ?? null;
   const history = data?.deployment?.history ?? [];
   // Hidden here, or hidden by a unit above this one / the course itself.
@@ -208,7 +210,7 @@ export default function CourseContentDetailPage() {
                 items={[
                   { term: t.path, value: content.path, mono: true },
                   { term: t.type, value: type ? displayName(type, type.slug) : '—' },
-                  { term: t.kind, value: content.course_content_kind_id },
+                  { term: t.kind, value: content.is_submittable ? t.assignment : t.unit },
                   { term: t.position, value: String(content.position) },
                 ]}
               />

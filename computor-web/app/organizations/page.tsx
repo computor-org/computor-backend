@@ -11,6 +11,7 @@ import ErrorBanner from '@/src/components/ErrorBanner';
 import { displayName } from '@/src/utils/displayName';
 import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
 import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
+import { organizationTypeLabel } from '@/src/utils/organizationType';
 
 const organizationsClient = new OrganizationsClient();
 const courseFamiliesClient = new CourseFamiliesClient();
@@ -86,7 +87,7 @@ export default function OrganizationsPage() {
               <div key={o.id} className="flex items-center justify-between gap-4 bg-surface border border-rule rounded-lg p-4 hover:border-accent-line hover:shadow-sm transition-all">
                 <Link href={`/organizations/${o.id}`} className="min-w-0 group flex-1">
                   <div className="text-sm font-medium text-fg truncate group-hover:text-accent-text">{displayName(o, t.untitled)}</div>
-                  <div className="text-xs text-muted">{o.organization_type}</div>
+                  <div className="text-xs text-muted">{organizationTypeLabel(o.organization_type, language)}</div>
                 </Link>
                 <Link href={`/course-families?organization_id=${o.id}`} className="text-sm text-accent-text hover:underline whitespace-nowrap">
                   {t.families(familyCounts[o.id] ?? 0)}

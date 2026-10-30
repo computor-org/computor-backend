@@ -18,6 +18,7 @@ import { displayName } from '@/src/utils/displayName';
 import { localized } from '@/src/utils/localizedText';
 import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
 import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
+import { organizationTypeLabel } from '@/src/utils/organizationType';
 
 const organizationsClient = new OrganizationsClient();
 const courseFamiliesClient = new CourseFamiliesClient();
@@ -90,7 +91,7 @@ export default function OrganizationDetailPage() {
         <PageHeader
           breadcrumbs={[{ label: t.crumb, href: '/organizations' }, { label: orgName }]}
           title={orgName}
-          subtitle={org && <span className="text-sm text-muted">{org.organization_type}</span>}
+          subtitle={org && <span className="text-sm text-muted">{organizationTypeLabel(org.organization_type, language)}</span>}
           actions={
             org ? (
               <>
