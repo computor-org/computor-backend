@@ -8,6 +8,7 @@ export default function Page() {
     <LegalPage
       doc="nutzungsbedingungen_de"
       lang="de"
+      translation="/terms/en"
       languages={[
         { label: 'Deutsch', href: '/terms', lang: 'de', current: true },
         { label: 'English', href: '/terms/en', lang: 'en', current: false },

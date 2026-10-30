@@ -8,6 +8,7 @@ export default function Page() {
     <LegalPage
       doc="datenschutz_de"
       lang="de"
+      translation="/privacy/en"
       languages={[
         { label: 'Deutsch', href: '/privacy', lang: 'de', current: true },
         { label: 'English', href: '/privacy/en', lang: 'en', current: false },

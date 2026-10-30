@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import AuthoritativeGermanNotice from '@/src/components/AuthoritativeGermanNotice';
 import BilingualLegalText from '@/src/components/BilingualLegalText';
 import DocumentLanguage from '@/src/components/DocumentLanguage';
 import LegalLinks from '@/src/components/LegalLinks';
@@ -33,6 +34,7 @@ export default function LegalPage({
   lang,
   languages,
   titles,
+  translation,
 }: {
   doc: LegalDocName;
   /** Language of the text, or undefined for a page holding DE and EN. */
@@ -40,6 +42,8 @@ export default function LegalPage({
   languages?: LanguageSwitch[];
   /** Set on a bilingual page: its title in each reading language. */
   titles?: BilingualText;
+  /** Set on an authoritative German text: the path of its English translation. */
+  translation?: string;
 }) {
   if (!HAS_OWN_LEGAL_PAGES) notFound();
   const { title, version, body } = loadLegalDoc(doc);
@@ -77,6 +81,7 @@ export default function LegalPage({
 
       <main className="flex-1 container mx-auto px-4 py-10">
         <article lang={lang} className="max-w-3xl mx-auto">
+          {translation ? <AuthoritativeGermanNotice translation={translation} /> : null}
           <h1 className="text-2xl sm:text-3xl font-bold text-fg break-words">{title}</h1>
           {version ? <p className="mt-2 text-sm text-muted">{version}</p> : null}
           {titles ? (

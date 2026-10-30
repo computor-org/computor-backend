@@ -187,3 +187,33 @@ test.describe('English profile, German course', () => {
     await expect(page.getByText('Aufgabe', { exact: true })).toHaveCount(0);
   });
 });
+
+// The German terms and privacy texts are authoritative and stay as they are;
+// an English reader is told so in English, and pointed to the translation.
+for (const [path, translation, heading] of [
+  ['/terms', '/terms/en', 'Nutzungsbedingungen computor.at'],
+  ['/privacy', '/privacy/en', 'Datenschutzerklärung computor.at'],
+] as const) {
+  test.describe(`${path} for an English browser`, () => {
+    test.use({ locale: 'en-US' });
+
+    test('says in English that the German text is authoritative and links the translation', async ({ page }) => {
+      await page.goto(path);
+      const notice = page.getByRole('note');
+      await expect(notice).toContainText('The German text below is the authoritative version.');
+      await expect(notice).toHaveAttribute('lang', 'en');
+      await expect(notice.getByRole('link', { name: 'Read the English translation' })).toHaveAttribute('href', translation);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(heading);
+    });
+  });
+
+  test.describe(`${path} for a German browser`, () => {
+    test.use({ locale: 'de-DE' });
+
+    test('shows the German text without the notice', async ({ page }) => {
+      await page.goto(path);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(heading);
+      await expect(page.getByRole('note')).toHaveCount(0);
+    });
+  });
+}
