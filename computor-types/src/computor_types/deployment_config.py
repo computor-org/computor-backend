@@ -266,6 +266,8 @@ class CourseFamilyConfig(BaseDeployment):
     name: str = Field(description="Course family display name")
     path: str = Field(description="Course family path/slug")
     description: Optional[str] = Field(None, description="Course family description")
+    title_i18n: Optional[Dict[str, str]] = Field(None, description="Course family title per language code, e.g. {'de': 'Data Science mit Python', 'en': 'Data Science with Python'}")
+    description_i18n: Optional[Dict[str, str]] = Field(None, description="Course family description per language code")
     settings: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Course family-specific settings")
 
 class CourseContentConfig(BaseDeployment):

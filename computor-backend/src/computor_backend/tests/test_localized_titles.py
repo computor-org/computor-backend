@@ -378,3 +378,56 @@ def test_localize_as_accepts_a_cached_dict():
     localized = localize_as(cached, CourseContentStudentList, "en")
     assert (localized.title, localized.description) == ("Week 1", "Basics")
     assert localize_as(cached, CourseContentStudentList, None) is cached
+
+
+# --- course families -------------------------------------------------------------------
+
+FAMILY_TITLES = {"de": "Data Science mit Python", "en": "Data Science with Python"}
+
+
+def test_course_family_responses_carry_the_maps():
+    from computor_types.course_families import CourseFamilyGet, CourseFamilyList
+
+    row = SimpleNamespace(
+        id="f-1", title="Data Science mit Python", description=None, path="python",
+        organization_id="o-1", properties=None, organization=None,
+        title_i18n=FAMILY_TITLES, description_i18n=None,
+        created_at=None, updated_at=None, created_by=None, updated_by=None,
+    )
+    for dto in (CourseFamilyGet, CourseFamilyList):
+        assert dto.model_validate(row).title_i18n == FAMILY_TITLES
+
+
+def test_course_family_update_sets_the_title_map():
+    from computor_types.course_families import CourseFamilyUpdate
+
+    update = CourseFamilyUpdate.model_validate({"title_i18n": FAMILY_TITLES})
+    assert update.model_dump(exclude_unset=True) == {"title_i18n": FAMILY_TITLES}
+
+
+def test_deployment_creates_a_course_family_with_its_title_map():
+    from computor_backend.business_logic.deployment import create_course_family_sync
+    from computor_backend.model.course import CourseFamily
+    from computor_backend.model.organization import Organization
+    from computor_types.deployment_config import CourseFamilyConfig
+
+    added = []
+
+    class _Query:
+        def __init__(self, model):
+            self.model = model
+
+        def filter(self, *_):
+            return self
+
+        def first(self):
+            return SimpleNamespace(id="o-1") if self.model is Organization else None
+
+    db = SimpleNamespace(
+        query=_Query, add=added.append, flush=lambda: None, commit=lambda: None,
+    )
+    config = CourseFamilyConfig(name="Data Science mit Python", path="python", title_i18n=FAMILY_TITLES)
+    create_course_family_sync(config.model_dump(), "o-1", None, db)
+    family = next(row for row in added if isinstance(row, CourseFamily))
+    assert family.title_i18n == FAMILY_TITLES
+    assert family.description_i18n is None

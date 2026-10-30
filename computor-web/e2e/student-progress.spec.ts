@@ -167,7 +167,7 @@ async function signIn(page: Page, { contents = CONTENTS, roles = ['_student'], s
     if (path === `/courses/${COURSE_ID}`) return json(route, COURSE);
     if (path === '/courses') return json(route, [COURSE]);
     if (path === '/organizations/o-1') return json(route, { id: 'o-1', title: 'TU Graz' });
-    if (path === '/course-families/f-1') return json(route, { id: 'f-1', title: 'Data Science mit Python' });
+    if (path === '/course-families/f-1') return json(route, { id: 'f-1', title: 'Data Science mit Python', title_i18n: { en: 'Data Science with Python' } });
     if (path.startsWith('/user/views')) return json(route, ['student']);
     if (path === '/user/scopes') return json(route, { is_admin: false, course: { [COURSE_ID]: roles } });
     if (path === '/user') {
@@ -260,6 +260,14 @@ test.describe('English learner', () => {
     await expect(card).toContainText('Continue with: Week 3 › Beta-Absorption (last tested: 0%)');
     await expect(card.getByRole('link', { name: 'Beta-Absorption', exact: true })).toBeVisible();
     await expect(card.getByRole('link', { name: 'Read task', exact: true })).toHaveCount(0);
+  });
+
+  test('the course family is named in English, in the breadcrumb and the details', async ({ page }) => {
+    await signIn(page);
+    await page.goto(`/courses/${COURSE_ID}`);
+    await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Data Science with Python' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Data Science with Python', { exact: true })).toHaveCount(2);
+    await expect(page.getByText('Data Science mit Python', { exact: true })).toHaveCount(0);
   });
 });
 

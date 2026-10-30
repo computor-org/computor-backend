@@ -9,6 +9,7 @@ import ListPageLayout, { ScrollArea, ListLoading } from '@/src/components/ListPa
 import PageHeader from '@/src/components/PageHeader';
 import ErrorBanner from '@/src/components/ErrorBanner';
 import { displayName } from '@/src/utils/displayName';
+import { localized } from '@/src/utils/localizedText';
 import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
 import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
 import { CoursesClient } from '@/src/generated/clients/CoursesClient';
@@ -60,7 +61,7 @@ export default function CourseFamiliesPage() {
     return { families, orgs, courseCounts };
   }, []);
 
-  const families = data?.families ?? [];
+  const families = (data?.families ?? []).map((family) => localized(family, language));
   const orgs = data?.orgs ?? [];
   const courseCounts = data?.courseCounts ?? {};
   const orgLabel = (id: string) => {

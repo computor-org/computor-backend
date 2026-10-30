@@ -81,6 +81,7 @@ def create_course_family_sync(
     from computor_backend.custom_types import Ltree
     from computor_backend.model.organization import Organization
     from computor_backend.model.course import CourseFamily, CourseFamilyMember
+    from computor_backend.business_logic.localization import i18n_map
 
     org = db.query(Organization).filter(Organization.id == organization_id).first()
     if not org:
@@ -98,6 +99,8 @@ def create_course_family_sync(
         family = CourseFamily(
             title=family_config.get("name"),
             description=family_config.get("description", "") or "",
+            title_i18n=i18n_map(family_config.get("title_i18n")),
+            description_i18n=i18n_map(family_config.get("description_i18n")),
             path=Ltree(family_config["path"]),
             organization_id=org.id,
             properties={},
