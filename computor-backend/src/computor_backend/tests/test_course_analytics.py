@@ -133,6 +133,32 @@ def test_typical_errors_count_students_and_occurrences():
     ]
 
 
+def _bilingual(name, de, en, run_language):
+    return {"name": name, "result": "FAILED", "resultMessage": {"de": de, "en": en}[run_language],
+            "resultMessageI18n": {"de": de, "en": en}}
+
+
+def test_same_failure_in_two_languages_is_one_group_in_the_readers_language():
+    de = "Fehlgeschlagen: Die Variable `x_start` wurde in deiner Lösung nicht gefunden"
+    en = "Failed: Variable `x_start` not found in student namespace"
+    runs = [
+        _run("r1", "a", report(collection("t", _bilingual("x_start", de, en, "de"))), 0),
+        _run("r2", "b", report(collection("t", _bilingual("x_start", de, en, "en"))), 10),
+        # Stored before the runner kept both languages: shown as stored.
+        _run("r3", "c", report(collection("t", sub("x_start", message=de))), 20),
+    ]
+    english = aggregate_typical_errors(runs, language="en")
+    assert [(e.message, e.affected_students) for e in english] == [
+        ("Failed: Variable `x_start` not found in student namespace", 2),
+        ("Fehlgeschlagen: Die Variable `x_start` wurde in deiner Lösung nicht gefunden", 1),
+    ]
+    assert {e.message for e in english[0].examples} == {en}
+    german = aggregate_typical_errors(runs, language="de")
+    assert german[0].message == "Fehlgeschlagen: Die Variable `x_start` wurde in deiner Lösung nicht gefunden"
+    assert german[0].affected_students == 2
+    assert extract_failures(runs[1].report, "de") == [("t / x_start", de)]
+
+
 def test_same_failure_twice_in_one_run_counts_once():
     rep = report(
         collection("t", sub("sum", message="assert 1 == 2")),
