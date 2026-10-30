@@ -6,7 +6,7 @@ These represent the output produced by computor-testing and consumed/stored
 by computor-backend in Result.result_json.
 """
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 from pydantic import Field
 
 from .testing import ComputorBase, StatusEnum, ResultEnum
@@ -32,6 +32,9 @@ class ComputorReportProperties(ComputorBase):
     summary: Optional[ComputorReportSummary] = Field(default=None)
     statusMessage: Optional[str] = Field(default=None)
     resultMessage: Optional[str] = Field(default=None)
+    # The same messages per reading language ("de", "en"); absent in older reports.
+    statusMessageI18n: Optional[Dict[str, str]] = Field(default=None)
+    resultMessageI18n: Optional[Dict[str, str]] = Field(default=None)
     details: Optional[str] = Field(default=None)
     setup: Optional[str] = Field(default=None)
     teardown: Optional[str] = Field(default=None)

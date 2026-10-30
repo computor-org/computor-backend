@@ -18,6 +18,7 @@ from ctexec.process import max_output_bytes
 from ctexec import InterpretedExecutor, ExecutorResult
 from ctexec.exceptions import ExecutionError
 from ctexec.safe_io import read_untrusted_bytes, read_untrusted_text
+from ctcore.i18n import tr
 
 # Import sandbox security analysis
 try:
@@ -413,7 +414,7 @@ class PyExecutor(InterpretedExecutor):
                 if not report.safe:
                     return {
                         "status": "BLOCKED",
-                        "errors": [f"Security check failed: {issue.message}"
+                        "errors": [tr("security_check_failed", issue=issue.message)
                                   for issue in report.issues[:5]],
                         "warnings": [],
                         "variables": {},

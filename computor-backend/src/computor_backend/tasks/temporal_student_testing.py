@@ -39,7 +39,7 @@ from computor_client import ComputorClient
 from computor_backend.utils.docker_utils import transform_localhost_url
 
 from computor_backend.tasks.worker_settings import get_worker_settings
-from computor_backend.testing.messages import runner_text
+from computor_backend.testing.messages import runner_error
 
 logger = logging.getLogger(__name__)
 
@@ -588,14 +588,14 @@ def execute_tests_activity(
                         "passed": 0,
                         "failed": 1,
                         "total": 1,
-                        "error": runner_text("report_rejected", test_config.get("language"), error=e),
+                        **runner_error("report_rejected", test_config.get("language"), error=e),
                     }
             else:
                 test_results = {
                     "passed": 0,
                     "failed": 1,
                     "total": 1,
-                    "error": runner_text("no_results", test_config.get("language")),
+                    **runner_error("no_results", test_config.get("language")),
                 }
 
         # Never hand worker-container paths back to the student (#239); this
@@ -608,7 +608,7 @@ def execute_tests_activity(
             test_results["result_value"] = compute_result_value(test_results)
             _, _, total, skipped = extract_test_counts(test_results)
             if total > 0 and skipped >= total:
-                test_results["error"] = runner_text("all_skipped", test_config.get("language"))
+                test_results.update(runner_error("all_skipped", test_config.get("language")))
         except Exception as e:
             logger.warning(f"Could not calculate result value: {e}")
             test_results["result_value"] = 0.0

@@ -94,3 +94,11 @@ def test_worker_message_follows_the_job_language(tmp_path, monkeypatch):
 
 def test_worker_message_is_english_otherwise(tmp_path, monkeypatch):
     assert _activity_result(tmp_path, monkeypatch, "en")["error"] == "No test results file found"
+
+
+def test_worker_message_is_stored_in_both_languages(tmp_path, monkeypatch):
+    result = _activity_result(tmp_path, monkeypatch, "de")
+    assert result["error_i18n"] == {
+        "de": "Es wurde keine Datei mit Testergebnissen gefunden",
+        "en": "No test results file found",
+    }

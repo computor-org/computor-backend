@@ -168,3 +168,63 @@ def test_fail_and_skip_label_follows_language(pytester, monkeypatch, language, f
     monkeypatch.setenv(ENV_VAR, language)
     assert learner_result_message(reports["test_fail"]) == failed
     assert learner_result_message(reports["test_skip"]) == skipped
+
+
+@pytest.fixture
+def bilingual():
+    from ctcore.i18n import enable_bilingual
+
+    enable_bilingual()
+    yield
+    enable_bilingual(False)
+
+
+def test_marked_messages_render_in_each_language(monkeypatch, bilingual):
+    from ctcore.i18n import bilingual_report, tr_outcome
+
+    monkeypatch.setenv(ENV_VAR, "de")
+    nested = tr("execution_failed", errors=tr("security_check_failed", issue="Blocked import: os"))
+    own = tr_outcome("AssertionError: " + tr("differs", name="x") + f"\n  {tr('label_expected')}: 5")
+    report = bilingual_report({"tests": [{"tests": [
+        {"resultMessage": tr_outcome("Failed: " + nested)},
+        {"resultMessage": own},
+        {"resultMessage": "AssertionError: lecturer or learner text"},
+    ]}]})
+    first, second, third = report["tests"][0]["tests"]
+    assert first["resultMessageI18n"] == {
+        "de": "Fehlgeschlagen: Die Ausführung ist fehlgeschlagen: "
+              "Die Sicherheitsprüfung ist fehlgeschlagen: Blocked import: os",
+        "en": "Failed: Execution failed: Security check failed: Blocked import: os",
+    }
+    assert first["resultMessage"] == first["resultMessageI18n"]["de"]
+    assert second["resultMessageI18n"]["en"] == "Variable `x` differs from expected:\n  expected: 5"
+    assert third == {"resultMessage": "AssertionError: lecturer or learner text"}
+
+
+@pytest.mark.parametrize("language", ["de", "en"])
+def test_tester_report_keeps_both_languages(tmp_path, language):
+    import json
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    (tmp_path / "test.yaml").write_text(
+        "type: python\nname: Files\nproperties:\n  tests:\n"
+        "  - {type: exist, name: files, tests: [{name: notes.txt}]}\n"
+    )
+    env = {**os.environ, ENV_VAR: language, "MPLBACKEND": "Agg"}
+    subprocess.run(
+        [sys.executable, "-m", "testers.cli", "python", "local", "-d", str(tmp_path), "-v", "0"],
+        cwd=Path(__file__).resolve().parents[1], env=env, capture_output=True, timeout=120,
+    )
+    report = json.loads((tmp_path / "output" / "testSummary.json").read_text())
+    (sub,) = report["tests"][0]["tests"]
+    assert sub["resultMessageI18n"] == {
+        "de": "Fehlgeschlagen: Die Datei 'notes.txt' wurde in deinem Abgabeverzeichnis nicht gefunden",
+        "en": "Failed: File 'notes.txt' not found in student directory",
+    }
+    assert sub["resultMessage"] == sub["resultMessageI18n"][language]
+    assert report["resultMessageI18n"]["de"] == "Einige oder alle Tests sind fehlgeschlagen"
+    assert report["resultMessage"] == report["resultMessageI18n"][language]
+    assert "\u2061" not in json.dumps(report, ensure_ascii=False)
