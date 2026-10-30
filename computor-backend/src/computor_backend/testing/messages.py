@@ -41,3 +41,15 @@ def runner_text(key: str, language: Optional[str], **values) -> str:
     entry = MESSAGES[key]
     code = (language or "").strip().lower().replace("_", "-").split("-")[0]
     return (entry.get(code) or entry["en"]).format(**values)
+
+
+def runner_error(key: str, language: Optional[str], **values) -> dict:
+    """``error`` in the run's language and ``error_i18n`` in every language.
+
+    A result is read later by people in other languages (a tutor, a learner
+    who switched); they read ``error_i18n``, older readers ``error``.
+    """
+    return {
+        "error": runner_text(key, language, **values),
+        "error_i18n": {code: runner_text(key, code, **values) for code in ("de", "en")},
+    }

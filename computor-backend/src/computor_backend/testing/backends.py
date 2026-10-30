@@ -16,7 +16,7 @@ import Pyro5.api
 import Pyro5.errors
 
 from computor_backend.tasks.worker_settings import get_worker_settings
-from computor_backend.testing.messages import runner_text
+from computor_backend.testing.messages import runner_error
 
 logger = logging.getLogger(__name__)
 
@@ -236,7 +236,7 @@ class MatlabTestingBackend(TestingBackend):
                     "passed": 0,
                     "failed": 1,
                     "total": 1,
-                    "error": runner_text(
+                    **runner_error(
                         "matlab_timeout", test_job_config.get("language"),
                         seconds=result.get('timeout_seconds', timeout_seconds),
                     ),
@@ -399,7 +399,7 @@ class ComputorTestingBackend(TestingBackend):
                 "passed": 0,
                 "failed": 1,
                 "total": 1,
-                "error": runner_text(
+                **runner_error(
                     "timed_out", test_job_config.get("language"),
                     seconds=backend_properties.get('timeout_seconds', 300),
                 ),
@@ -553,6 +553,6 @@ async def execute_tests_with_backend(
             "passed": 0,
             "failed": 1,
             "total": 1,
-            "error": runner_text("backend_error", test_job_config.get("language"), error=e),
+            **runner_error("backend_error", test_job_config.get("language"), error=e),
             "details": {"service_slug": service_slug, "error": str(e)}
         }

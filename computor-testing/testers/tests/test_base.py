@@ -897,7 +897,7 @@ def compare_variable_by_qualification(
             )
 
     else:
-        pytest.skip(f"Unsupported qualification: {qualification}")
+        pytest.skip(tr("unsupported_qualification", qualification=qualification))
 
 
 def _types_compatible(type1: type, type2: type) -> bool:
@@ -1195,19 +1195,19 @@ class BaseTestClass(ABC):
 
     def _test_structural(self, context: Dict[str, Any]):
         """Handle structural test type - override in subclass for language-specific logic."""
-        pytest.skip("Structural tests not implemented for this language")
+        pytest.skip(tr("structural_not_implemented"))
 
     def _test_error(self, context: Dict[str, Any]):
         """Handle error test type - override in subclass for language-specific logic."""
-        pytest.skip("Error tests not implemented for this language")
+        pytest.skip(tr("error_not_implemented"))
 
     def _test_warning(self, context: Dict[str, Any]):
         """Handle warning test type - override in subclass for language-specific logic."""
-        pytest.skip("Warning tests not implemented for this language")
+        pytest.skip(tr("warning_not_implemented"))
 
     def _test_linting(self, context: Dict[str, Any]):
         """Handle linting test type - override in subclass for language-specific logic."""
-        pytest.skip("Linting tests not implemented for this language")
+        pytest.skip(tr("linting_not_implemented"))
 
     @abstractmethod
     def _test_language_specific(self, context: Dict[str, Any]):
@@ -1691,7 +1691,7 @@ class InterpretedTestClass(BaseTestClass):
         elif testtype == TypeEnum.stdout:
             self._test_stdout(context)
         else:
-            pytest.skip(f"Test type `{testtype}` not implemented")
+            pytest.skip(tr("test_type_not_implemented", type=testtype))
 
     def _test_variable(self, context: Dict[str, Any]):
         """Handle variable/graphics test type using shared comparison."""

@@ -441,7 +441,7 @@ class TestComputorPython:
             elif sub.name and sub.name != '-':
                 file_pattern = sub.name
             else:
-                pytest.skip("No file pattern specified for exist test")
+                pytest.skip(tr("no_file_pattern"))
 
             student_path = os.path.join(dir_student, file_pattern)
             matches = globlib.glob(student_path)
@@ -470,7 +470,7 @@ class TestComputorPython:
                 pytest.fail(tr("python_file_not_found_structural"))
 
             if sub.allowedOccuranceRange is None and sub.countRequirement is None:
-                pytest.skip("allowedOccuranceRange not set")
+                pytest.skip(tr("occurrence_range_not_set"))
 
             if sub.pattern:
                 # Student-controlled: no symlinks/FIFOs, size-capped (#237).
@@ -531,4 +531,4 @@ class TestComputorPython:
             check_warning(sol_student, sub.pattern)
 
         else:
-            pytest.skip(f"Unknown test type: {testtype}")
+            pytest.skip(tr("test_type_not_implemented", type=testtype))

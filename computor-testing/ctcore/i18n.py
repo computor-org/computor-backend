@@ -10,9 +10,16 @@ never change a test outcome or raise.
 
 Only the message text is translated. Result keys, statuses and scores are
 produced elsewhere and are not touched by this module.
+
+A test run is read later by people in other languages (a tutor, a learner who
+switched), so the testers call ``enable_bilingual()``: ``tr()`` then wraps its
+text in invisible markers that remember the key and values, messages are built
+from these pieces as usual, and ``bilingual_report()`` renders every marked
+report message once per language before the report is written.
 """
 
 import os
+import re
 
 ENV_VAR = "COMPUTOR_TEST_LANGUAGE"
 DEFAULT_LANGUAGE = "en"
@@ -304,11 +311,66 @@ MESSAGES = {
         "en": "No execution result available",
         "de": "Es liegt kein Ergebnis der Ausführung vor",
     },
+    "security_check_failed": {
+        "en": "Security check failed: {issue}",
+        "de": "Die Sicherheitsprüfung ist fehlgeschlagen: {issue}",
+    },
+    "unknown_error": {"en": "Unknown error", "de": "Unbekannter Fehler"},
+    "setup_dependency_not_found": {
+        "en": "SetupCode-Dependency `{dependency}` not found",
+        "de": "Die Setup-Abhängigkeit `{dependency}` wurde nicht gefunden",
+    },
+    "entry_point_not_found": {
+        "en": "Entry point `{file}` not found in your submission",
+        "de": "Die Startdatei `{file}` wurde in deiner Abgabe nicht gefunden",
+    },
+    "max_execution_time": {
+        "en": "Maximum execution time of {seconds} seconds exceeded",
+        "de": "Die maximale Ausführungszeit von {seconds} Sekunden wurde überschritten",
+    },
+    "file_not_found_reference": {
+        "en": "File '{file}' not found in reference directory",
+        "de": "Die Datei '{file}' wurde im Referenzverzeichnis nicht gefunden",
+    },
+    # Skips caused by the test definition, not by the learner
+    "test_type_not_implemented": {
+        "en": "Test type `{type}` not implemented",
+        "de": "Der Testtyp `{type}` wird nicht unterstützt",
+    },
+    "unsupported_qualification": {
+        "en": "Unsupported qualification: {qualification}",
+        "de": "Nicht unterstützte Prüfart: {qualification}",
+    },
+    "structural_not_implemented": {
+        "en": "Structural tests not implemented for this language",
+        "de": "Strukturtests werden für diese Sprache nicht unterstützt",
+    },
+    "error_not_implemented": {
+        "en": "Error tests not implemented for this language",
+        "de": "Fehlertests werden für diese Sprache nicht unterstützt",
+    },
+    "warning_not_implemented": {
+        "en": "Warning tests not implemented for this language",
+        "de": "Warnungstests werden für diese Sprache nicht unterstützt",
+    },
+    "linting_not_implemented": {
+        "en": "Linting tests not implemented for this language",
+        "de": "Stilprüfungen werden für diese Sprache nicht unterstützt",
+    },
+    "no_file_pattern": {
+        "en": "No file pattern specified for exist test",
+        "de": "Für den Existenztest ist kein Dateimuster angegeben",
+    },
+    "occurrence_range_not_set": {
+        "en": "allowedOccuranceRange not set",
+        "de": "allowedOccuranceRange ist nicht gesetzt",
+    },
     # Outcome labels pytest puts in front of a fail or skip message
     "outcome_failed": {"en": "Failed: {detail}", "de": "Fehlgeschlagen: {detail}"},
     "outcome_skipped": {"en": "Skipped: {detail}", "de": "Übersprungen: {detail}"},
     # Summaries
     "tests_skipped": {"en": "Tests skipped", "de": "Tests übersprungen"},
+    "some_tests_skipped": {"en": "Some tests were skipped", "de": "Einige Tests wurden übersprungen"},
     "no_tests_specified": {"en": "No Tests specified", "de": "Keine Tests angegeben"},
     "all_tests_passed": {"en": "All tests passed", "de": "Alle Tests bestanden"},
     "some_tests_failed": {"en": "Some tests failed", "de": "Einige Tests sind fehlgeschlagen"},
@@ -341,6 +403,9 @@ _OUTCOME_LABELS = {"Failed: ": "outcome_failed", "Skipped: ": "outcome_skipped"}
 def tr_outcome(text):
     """``text`` with pytest's English "Failed: "/"Skipped: " label in the current language."""
     if isinstance(text, str):
+        # A raised AssertionError keeps its class name; for our own message it is noise.
+        if text.startswith(_ASSERTION_PREFIX) and text[len(_ASSERTION_PREFIX):].startswith(_ANCHOR):
+            return text[len(_ASSERTION_PREFIX):]
         for label, key in _OUTCOME_LABELS.items():
             if text.startswith(label):
                 return tr(key, detail=text[len(label):])
@@ -354,8 +419,113 @@ def get_language() -> str:
     return code or DEFAULT_LANGUAGE
 
 
+def _render_key(key: str, language: str, values: dict) -> str:
+    entry = MESSAGES[key]
+    template = entry.get(language) or entry[DEFAULT_LANGUAGE]
+    return template.format(**values)
+
+
 def tr(key: str, **values) -> str:
     """Render message ``key`` in the current language (English fallback)."""
-    entry = MESSAGES[key]
-    template = entry.get(get_language()) or entry[DEFAULT_LANGUAGE]
-    return template.format(**values)
+    text = _render_key(key, get_language(), values)
+    if not _bilingual:
+        return text
+    _pieces.append((key, values))
+    index = "".join(chr(_TAG_ZERO + int(d)) for d in str(len(_pieces) - 1))
+    return f"{_ANCHOR}{text}{_SEPARATOR}{index}{_TERMINATOR}"
+
+
+# Zero-width characters that a terminal does not show, so pytest's own log
+# stays readable; the piece's index is written in Unicode tag digits.
+_ANCHOR, _SEPARATOR, _TERMINATOR = "\u2061", "\u2062", "\u2063"
+_TAG_ZERO = 0xE0030
+_ASSERTION_PREFIX = "AssertionError: "
+_MARKER = re.compile("[\u2061\u2062\u2063\U000E0030-\U000E0039]")
+LANGUAGES = ("de", "en")
+_bilingual = False
+_pieces: list = []
+
+
+def enable_bilingual(enabled: bool = True) -> None:
+    """Make ``tr()`` return marked text that ``render()`` can show in any language."""
+    global _bilingual
+    _bilingual = enabled
+    _pieces.clear()
+
+
+def render(text: str, language: str) -> str:
+    """``text`` with every marked piece rendered in ``language``.
+
+    A piece whose values are lost (an unknown index) keeps the text it was
+    written with, so a damaged marker can never hide a message.
+    """
+    out, _ = _render_from(text, 0, language, inside=False)
+    return out
+
+
+def _render_from(text, pos, language, inside):
+    parts = []
+    while pos < len(text):
+        ch = text[pos]
+        if ch == _ANCHOR:
+            original, pos = _render_from(text, pos + 1, language, inside=True)
+            end = text.find(_TERMINATOR, pos)
+            if end < 0:
+                parts.append(original)
+                break
+            index = _decode_index(text[pos:end])
+            pos = end + 1
+            piece = _pieces[index] if index is not None and index < len(_pieces) else None
+            if piece is None:
+                parts.append(original)
+            else:
+                key, values = piece
+                parts.append(_render_key(
+                    key, language, {k: render(str(v), language) for k, v in values.items()}
+                ))
+        elif ch == _SEPARATOR and inside:
+            return "".join(parts), pos + 1
+        elif ch in (_SEPARATOR, _TERMINATOR):
+            pos += 1
+        else:
+            parts.append(ch)
+            pos += 1
+    return "".join(parts), pos
+
+
+def _decode_index(tags: str):
+    digits = [ord(c) - _TAG_ZERO for c in tags]
+    if not digits or any(not 0 <= d <= 9 for d in digits):
+        return None
+    return int("".join(map(str, digits)))
+
+
+def is_marked(text) -> bool:
+    return isinstance(text, str) and _ANCHOR in text
+
+
+# Report fields that carry learner-facing text; each gets a sibling
+# "<field>I18n" with one rendering per language.
+_MESSAGE_FIELDS = ("resultMessage", "statusMessage")
+
+
+def bilingual_report(node):
+    """Render the marked messages of a dumped report in place, recursively.
+
+    ``resultMessage``/``statusMessage`` keep the current language, so a
+    reader that knows nothing of the new fields sees what it saw before, and
+    gain ``resultMessageI18n``/``statusMessageI18n`` = {"de": ..., "en": ...}.
+    Any other string is rendered in the current language.
+    """
+    if isinstance(node, list):
+        return [bilingual_report(item) for item in node]
+    if not isinstance(node, dict):
+        return render(node, get_language()) if is_marked(node) else node
+    out = {}
+    for name, value in node.items():
+        if name in _MESSAGE_FIELDS and is_marked(value):
+            out[name] = _MARKER.sub("", render(value, get_language()))
+            out[name + "I18n"] = {lang: _MARKER.sub("", render(value, lang)) for lang in LANGUAGES}
+        else:
+            out[name] = bilingual_report(value)
+    return out

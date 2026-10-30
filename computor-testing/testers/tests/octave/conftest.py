@@ -26,7 +26,7 @@ from ctcore.models import (
     read_ca_file,
 )
 from ctcore.helpers import get_property_as_list
-from ctcore.i18n import tr, tr_summary
+from ctcore.i18n import bilingual_report, enable_bilingual, tr, tr_summary
 from ctcore.security import validate_path_in_root, validate_filename, PathValidationError
 
 from ..conftest_base import (
@@ -66,6 +66,7 @@ def pytest_configure(config: pytest.Config) -> None:
     Note: Octave tester has custom property inheritance logic that differs
     from the base implementation.
     """
+    enable_bilingual()
     now = datetime.datetime.now(timezone.utc)
     timestamp = now.isoformat()
 
@@ -374,7 +375,7 @@ def pytest_sessionfinish(session: pytest.Session):
 
     with open(reportfile, "w", encoding="utf-8") as file:
         json.dump(
-            report.model_dump(exclude_none=True),
+            bilingual_report(report.model_dump(exclude_none=True)),
             file, default=str, indent=indent
         )
 

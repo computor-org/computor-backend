@@ -42,7 +42,7 @@ from ctcore.models import (
     read_ca_file,
 )
 from ctcore.helpers import get_property_as_list
-from ctcore.i18n import tr, tr_outcome, tr_summary
+from ctcore.i18n import bilingual_report, enable_bilingual, tr, tr_outcome, tr_summary
 from ctcore.security import validate_path_in_root, validate_filename, validate_absolute_path, PathValidationError
 
 logger = logging.getLogger(__name__)
@@ -453,7 +453,7 @@ class BaseTesterConfig(ABC):
 
         with open(reportfile, "w", encoding="utf-8") as file:
             json.dump(
-                report.model_dump(exclude_none=True),
+                bilingual_report(report.model_dump(exclude_none=True)),
                 file, default=str, indent=indent
             )
 
@@ -616,6 +616,7 @@ def create_conftest_hooks(config_class: Type[BaseTesterConfig]) -> Dict[str, Cal
         tester_config.add_options(parser)
 
     def pytest_configure(config: pytest.Config):
+        enable_bilingual()
         tester_config.configure(config)
 
     def pytest_generate_tests(metafunc: pytest.Metafunc):
@@ -992,15 +993,15 @@ def finalize_session(session: pytest.Session, exitstatus: int) -> None:
     if failed > 0:
         report.status = StatusEnum.completed
         report.result = ResultEnum.failed
-        report.resultMessage = "Some or all tests failed"
+        report.resultMessage = tr("default_failure")
     elif passed == total and total > 0:
         report.status = StatusEnum.completed
         report.result = ResultEnum.passed
-        report.resultMessage = "Congratulations! All tests passed"
+        report.resultMessage = tr("default_success")
     else:
         report.status = StatusEnum.completed
         report.result = ResultEnum.passed if skipped == 0 else ResultEnum.skipped
-        report.resultMessage = "Some tests were skipped"
+        report.resultMessage = tr("some_tests_skipped")
 
     # Add environment info
     report.environment = {
@@ -1017,7 +1018,7 @@ def finalize_session(session: pytest.Session, exitstatus: int) -> None:
         if output_dir:
             os.makedirs(output_dir, exist_ok=True)
         with open(reportfile, "w") as f:
-            json.dump(report.model_dump(), f, indent=indent)
+            json.dump(bilingual_report(report.model_dump()), f, indent=indent)
 
 
 def get_report_header(config: pytest.Config) -> List[str]:
