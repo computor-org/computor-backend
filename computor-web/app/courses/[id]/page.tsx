@@ -31,6 +31,7 @@ import { localized } from '@/src/utils/localizedText';
 import { localizedRoleLabel } from '@/src/utils/courseRoles';
 import type { PersonalCloneCredentialGet } from 'types/generated';
 import { localeFor, languageName } from '@/src/utils/locale';
+import { deliveryLabel, lockReasonText } from '@/src/utils/courseGit';
 
 const coursesClient = new CoursesClient();
 const courseFamiliesClient = new CourseFamiliesClient();
@@ -647,7 +648,7 @@ export default function CoursePage() {
             {gitBinding ? (
               <DescriptionList
                 items={facts([
-                  { term: t.delivery, value: gitBinding.delivery },
+                  { term: t.delivery, value: deliveryLabel(gitBinding.delivery, language) },
                   gitBinding.default_branch && {
                     term: t.defaultBranch,
                     value: gitBinding.default_branch,
@@ -661,7 +662,7 @@ export default function CoursePage() {
                   {
                     term: t.status,
                     value: gitBinding.locked ? (
-                      <Badge tone="warning" title={gitBinding.lock_reason ?? undefined}>
+                      <Badge tone="warning" title={lockReasonText(gitBinding.lock_reason, language) ?? undefined}>
                         {t.locked}
                       </Badge>
                     ) : (

@@ -2,6 +2,7 @@
 
 import type { CourseGroupList } from 'types/generated';
 import { useUiLanguage } from '@/src/hooks/useUiLanguage';
+import { courseGroupTitle } from '@/src/utils/courseGroups';
 
 const CELL_CLS =
   'px-2 py-1 border border-rule-strong rounded-lg text-sm focus:ring-2 focus:ring-accent-line focus:border-transparent disabled:opacity-50';
@@ -31,7 +32,7 @@ export default function GroupSelect({
       <option value="">{de ? '— keine Gruppe —' : '— no group —'}</option>
       {groups.map((g) => (
         <option key={g.id} value={g.id}>
-          {g.title || g.id}
+          {courseGroupTitle(g.title, de ? 'de' : 'en') || g.id}
         </option>
       ))}
     </select>

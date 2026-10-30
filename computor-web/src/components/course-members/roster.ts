@@ -2,6 +2,7 @@ import type { CourseMembersClient } from '@/src/generated/clients/CourseMembersC
 import type { CourseGroupList, CourseMemberList } from 'types/generated';
 import { memberName } from '@/src/utils/userName';
 import type { UiLanguage } from '@/src/hooks/useUiLanguage';
+import { courseGroupTitle } from '@/src/utils/courseGroups';
 
 /** Rows per request. The API caps nothing; this is only how big a page we ask for. */
 const PAGE = 500;
@@ -84,7 +85,7 @@ export function buildRoster(
     .map((group) => ({
       group,
       key: group.id,
-      title: group.title || (de ? 'Gruppe ohne Titel' : 'Untitled group'),
+      title: courseGroupTitle(group.title, de ? 'de' : 'en') || (de ? 'Gruppe ohne Titel' : 'Untitled group'),
       members: sortMembers(buckets.get(group.id) ?? []),
     }))
     .sort((a, b) => byName(a.title, b.title));

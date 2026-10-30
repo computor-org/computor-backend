@@ -188,6 +188,93 @@ test.describe('English profile, German course', () => {
   });
 });
 
+// --- lecturer views whose payload carries only the source title ------------------------
+
+test.describe('English profile, German course, lecturer views', () => {
+  test.use({ locale: 'de-DE' });
+
+  const titles = (path: string, route: Route) => {
+    if (path === '/lecturers/course-contents') return json(route, [UNIT, LOOPS]);
+    if (path === '/course-content-types') return json(route, TYPES);
+  };
+
+  test('typical errors name the assignment in English, in the filter and the table', async ({ page }) => {
+    await signIn(page, 'en', (path, route) => titles(path, route) ?? (path === `/course-analytics/courses/${COURSE_ID}/typical-errors` && json(route, {
+      course_id: COURSE_ID, scanned_results: 1, total_failures: 1,
+      errors: [{ course_content_id: 'loops', course_content_title: 'Schleifen', test_name: 'variables / x', message: 'x wrong', occurrences: 1, affected_students: 1 }],
+    })));
+    await page.goto(`/courses/${COURSE_ID}/lecturer/typical-errors`);
+    await expect(page.getByRole('cell', { name: 'Loops' })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'Loops' })).toHaveCount(1);
+    await expect(page.getByText('Schleifen')).toHaveCount(0);
+  });
+
+  test('progress by content type names the type in English', async ({ page }) => {
+    await signIn(page, 'en', (path, route) => titles(path, route) ?? (path === '/course-member-gradings' && json(route, [{
+      course_member_id: 'm1', user_id: 'u2', given_name: 'Ada', family_name: 'Synthetic', total_max_assignments: 1,
+      total_submitted_assignments: 1, overall_progress_percentage: 100, latest_submission_at: null,
+      by_content_type: [{ course_content_type_id: 'task', course_content_type_slug: 'task', course_content_type_title: 'Aufgabe', course_content_type_color: 'green', max_assignments: 1, submitted_assignments: 1, progress_percentage: 100 }],
+    }])));
+    await page.goto(`/courses/${COURSE_ID}/lecturer/grading`);
+    await expect(page.getByText('Exercise', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Aufgabe', { exact: true })).toHaveCount(0);
+  });
+
+  test('a unit page reads in English and names its kind in words', async ({ page }) => {
+    await signIn(page, 'en', (path, route) => path === '/course-contents/u1' && json(route, {
+      ...UNIT, description: 'Grundlagen', description_i18n: { en: 'Basics' }, course_id: COURSE_ID,
+      course_content_type: TYPES[0], visible: true, visible_effective: true,
+    }));
+    await page.goto(`/courses/${COURSE_ID}/lecturer/assignments/u1`);
+    await expect(page.getByRole('heading', { name: 'Week 1' }).first()).toBeVisible();
+    await expect(page.getByText('Basics')).toBeVisible();
+    const placement = page.locator('dl');
+    await expect(placement).toContainText('Week');
+    await expect(placement).toContainText('Unit');
+    await expect(page.getByText(/Woche|Grundlagen/)).toHaveCount(0);
+    await expect(placement.getByText('unit', { exact: true })).toHaveCount(0);
+  });
+
+  test('the self-enrolment group reads in English', async ({ page }) => {
+    await signIn(page, 'en', (path, route) => {
+      if (path === '/course-groups') return json(route, [{ id: 'g1', title: 'Selbsteinschreibung', course_id: COURSE_ID }]);
+      if (path === '/course-members') return json(route, [{ id: 'm1', user_id: 'u2', course_id: COURSE_ID, course_group_id: 'g1', course_role_id: '_student', user: { given_name: 'Ada', family_name: 'Synthetic' } }]);
+    });
+    await page.goto(`/courses/${COURSE_ID}/lecturer/members`);
+    await expect(page.getByRole('cell', { name: 'Self-enrolment' })).toBeVisible();
+    await expect(page.getByText('Selbsteinschreibung')).toHaveCount(0);
+  });
+});
+
+test.describe('German profile, course git binding', () => {
+  test.use({ locale: 'de-DE' });
+
+  test('the locked git binding is described in German words', async ({ page }) => {
+    await signIn(page, 'de', (path, route) => {
+      if (path === '/git-servers') return json(route, []);
+      if (path === `/courses/${COURSE_ID}/git`) return json(route, {
+        course_id: COURSE_ID, delivery: 'git', default_branch: 'main', student_repo_modes: ['managed'], locked: true,
+        lock_reason: 'Student repositories have already been provisioned for this course.',
+      });
+    });
+    await page.goto(`/courses/${COURSE_ID}/edit`);
+    await expect(page.getByText('Für diesen Kurs wurden bereits Repositories für Studierende angelegt.', { exact: false })).toBeVisible();
+    await expect(page.getByText('Git (Fork/Klon)')).toBeVisible();
+    await expect(page.getByText('already been provisioned')).toHaveCount(0);
+    await expect(page.getByText('Maintainer oder Owner')).toHaveCount(0);
+  });
+});
+
+test('organization types read as words', async ({ page }) => {
+  await signIn(page, 'en', (path, route) => {
+    if (path === '/organizations') return json(route, [{ id: 'o1', title: 'TU Graz', path: 'tugraz', organization_type: 'organization' }]);
+    if (path === '/course-families') return json(route, []);
+  });
+  await page.goto('/organizations');
+  await expect(page.getByText('Organization', { exact: true })).toBeVisible();
+  await expect(page.getByText('organization', { exact: true })).toHaveCount(0);
+});
+
 // The German terms and privacy texts are authoritative. An English reader gets
 // the English translation, opened by a note that the German text applies and a
 // link to it; a German reader gets the German text.

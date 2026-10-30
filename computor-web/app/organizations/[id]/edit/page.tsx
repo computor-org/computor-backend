@@ -13,6 +13,7 @@ import FormPanel, { Field } from '@/src/components/FormPanel';
 import { inputCls, readOnlyInputCls } from '@/src/components/ui/tokens';
 import type { OrganizationGet, OrganizationType } from '@/src/generated/types/organizations';
 import { OrganizationsClient } from '@/src/generated/clients/OrganizationsClient';
+import { organizationTypeLabel } from '@/src/utils/organizationType';
 
 const organizationsClient = new OrganizationsClient();
 
@@ -125,8 +126,8 @@ export default function OrganizationEditPage() {
           </Field>
           <Field label={t.type}>
             <select value={orgType} onChange={(e) => setOrgType(e.target.value as OrganizationType)} className={inputCls}>
-              {ORG_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
+              {ORG_TYPES.map((type) => (
+                <option key={type} value={type}>{organizationTypeLabel(type, language)}</option>
               ))}
             </select>
           </Field>
