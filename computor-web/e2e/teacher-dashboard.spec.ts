@@ -144,7 +144,28 @@ const TUTOR_CONTENT = {
   submitted: true,
   status: 'not_reviewed',
   unreviewed_count: 1,
-  result: { id: 'r3', result: 1, result_json: { summary: { passed: 1, failed: 0, skipped: 0, total: 1 }, tests: [{ name: 'unit', result: 'PASSED', summary: { passed: 1, failed: 0, skipped: 0, total: 1 }, tests: [{ name: 'sum', result: 'PASSED' }] }] } },
+  result: {
+    id: 'r3',
+    result: 1,
+    result_json: {
+      summary: { passed: 1, failed: 1, skipped: 0, total: 2 },
+      tests: [
+        { name: 'unit', result: 'PASSED', summary: { passed: 1, failed: 0, skipped: 0, total: 1 }, tests: [{ name: 'sum', result: 'PASSED' }] },
+        // Run started by a German-reading learner; the runner stored both languages.
+        {
+          name: 'start', type: 'variable', result: 'FAILED', summary: { passed: 0, failed: 1, skipped: 0, total: 1 },
+          tests: [{
+            name: 'x_start', result: 'FAILED',
+            resultMessage: 'Fehlgeschlagen: Die Variable `x_start` wurde in deiner Lösung nicht gefunden',
+            resultMessageI18n: {
+              de: 'Fehlgeschlagen: Die Variable `x_start` wurde in deiner Lösung nicht gefunden',
+              en: 'Failed: Variable `x_start` not found in student namespace',
+            },
+          }],
+        },
+      ],
+    },
+  },
   submission_group: { id: GROUP, latest_submitted_artifact_id: ARTIFACT, gradings: [] },
 };
 
@@ -273,7 +294,7 @@ test('grade form converts percent to a fraction and validates', () => {
 // --- pages -------------------------------------------------------------------
 
 test('typical errors page groups failures and links examples to the student', async ({ page }) => {
-  await setup(page);
+  const calls = await setup(page);
   await page.goto(`/courses/${COURSE_ID}/lecturer/typical-errors`);
   await expect(page.getByRole('heading', { name: 'Typical errors' })).toBeVisible();
   const row = page.getByRole('row', { name: /unit \/ sum/ });
@@ -282,6 +303,9 @@ test('typical errors page groups failures and links examples to the student', as
   const link = page.getByRole('link', { name: 'Bob Synthetic' });
   await expect(link).toHaveAttribute('href', `/courses/${COURSE_ID}/lecturer/grading/${BOB}`);
   await expect(page.getByText('AssertionError: assert 7 == 2')).toBeVisible();
+  // Messages come back in the page's language.
+  const scan = calls.find((c) => c.path.endsWith('/typical-errors'));
+  expect(new URLSearchParams(scan?.search).get('language')).toBe('en');
   await shot(page, 'typical-errors');
 });
 
@@ -317,6 +341,8 @@ test('tutor queue opens the student grading page and saves a grade', async ({ pa
   await page.getByRole('row', { name: /Ada Synthetic/ }).click();
   await expect(page).toHaveURL(new RegExp(`/tutor/grading/${ADA}\\?content=${LOOPS}`));
   await expect(page.getByRole('heading', { name: 'Grade the latest submission' })).toBeVisible();
+  await expect(page.getByText('Failed: Variable `x_start` not found in student namespace')).toBeVisible();
+  await expect(page.getByText('Variables', { exact: true })).toBeVisible();
   await page.getByLabel('Grade (%)').fill('85');
   await page.getByLabel('Feedback for the student').fill('Well structured.');
   await page.getByRole('button', { name: 'Save grade' }).click();
