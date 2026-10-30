@@ -14,7 +14,6 @@ import time
 import logging
 import pytest
 from _pytest.terminal import TerminalReporter
-from _pytest._code.code import ExceptionChainRepr
 from colorama import Fore, Style
 from typing import List
 
@@ -38,6 +37,7 @@ from ..conftest_base import (
     build_report_properties,
     get_report_header,
     add_terminal_summary,
+    learner_result_message,
 )
 
 
@@ -237,17 +237,9 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
 
         testsub.result = _report.outcome.upper()
 
-        if _report.longrepr is not None:
-            if testsub.result == ResultEnum.skipped:
-                try:
-                    testsub.resultMessage = str(_report.longrepr[2])
-                except:
-                    testsub.resultMessage = str(_report.longrepr)
-            else:
-                longrepr: ExceptionChainRepr = _report.longrepr
-                chain = longrepr.chain[-1][1]
-                if chain is not None:
-                    testsub.resultMessage = chain.message
+        message = learner_result_message(_report)
+        if message is not None:
+            testsub.resultMessage = message
 
         testmain.timestamp = time.time()
 

@@ -190,7 +190,7 @@ MESSAGES = {
     },
     "dependency_not_satisfied": {
         "en": "Success-Dependency `{dependency}` not satisfied",
-        "de": "Übersprungen, weil die vorausgesetzten Tests `{dependency}` nicht bestanden sind",
+        "de": "Die vorausgesetzten Tests `{dependency}` sind nicht bestanden",
     },
     "setup_dependency_invalid": {
         "en": "SetupCode-Dependency `{dependency}` not valid",
@@ -304,6 +304,9 @@ MESSAGES = {
         "en": "No execution result available",
         "de": "Es liegt kein Ergebnis der Ausführung vor",
     },
+    # Outcome labels pytest puts in front of a fail or skip message
+    "outcome_failed": {"en": "Failed: {detail}", "de": "Fehlgeschlagen: {detail}"},
+    "outcome_skipped": {"en": "Skipped: {detail}", "de": "Übersprungen: {detail}"},
     # Summaries
     "tests_skipped": {"en": "Tests skipped", "de": "Tests übersprungen"},
     "no_tests_specified": {"en": "No Tests specified", "de": "Keine Tests angegeben"},
@@ -330,6 +333,18 @@ def tr_summary(text):
     """``text`` in the current language if it is one of our default summaries."""
     key = _DEFAULT_SUMMARIES.get(text) if isinstance(text, str) else None
     return tr(key) if key else text
+
+
+_OUTCOME_LABELS = {"Failed: ": "outcome_failed", "Skipped: ": "outcome_skipped"}
+
+
+def tr_outcome(text):
+    """``text`` with pytest's English "Failed: "/"Skipped: " label in the current language."""
+    if isinstance(text, str):
+        for label, key in _OUTCOME_LABELS.items():
+            if text.startswith(label):
+                return tr(key, detail=text[len(label):])
+    return text
 
 
 def get_language() -> str:
