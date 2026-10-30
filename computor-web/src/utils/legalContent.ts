@@ -91,3 +91,18 @@ export function loadLegalDoc(name: LegalDocName): LegalDoc {
   }
   return { title, version, body: lines.slice(start).join('\n').trim() + '\n' };
 }
+
+const VERSION_LINE = /^Version (\S+), (gültig ab|Stand) (\d{2})\.(\d{2})\.(\d{4})$/;
+
+/**
+ * The German "Version 1.1, gültig ab 25.10.2026" / "Version 1.2, Stand
+ * 29.10.2026" line of a bilingual text in English, with the date written as the
+ * English texts write it. A line of another shape comes back unchanged.
+ */
+export function englishVersionLine(line: string): string {
+  const match = VERSION_LINE.exec(line.trim());
+  if (!match) return line;
+  const [, version, kind, day, month, year] = match;
+  const date = formatEffectiveDate(`${year}-${month}-${day}`, 'en');
+  return `Version ${version}, ${kind === 'Stand' ? 'dated' : 'valid from'} ${date}`;
+}

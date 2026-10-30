@@ -6,8 +6,8 @@ import { fixedDocumentLanguage } from '../src/utils/requestLanguage';
 // screen reader or crawler without JavaScript read /privacy/en as German.
 
 const FIXED: [string, 'de' | 'en'][] = [
-  ['/privacy', 'de'], ['/privacy/en', 'en'],
-  ['/terms', 'de'], ['/terms/en', 'en'],
+  ['/privacy/de', 'de'], ['/privacy/en', 'en'],
+  ['/terms/de', 'de'], ['/terms/en', 'en'],
   ['/terms/changes', 'de'], ['/terms/en/changes', 'en'],
 ];
 
@@ -20,12 +20,16 @@ for (const [path, lang] of FIXED) {
   });
 }
 
-test('pages without a fixed language keep the reader\'s language', async ({ request }) => {
-  const response = await request.get('/impressum', { headers: { 'Accept-Language': 'en-US' } });
-  expect(await response.text()).toMatch(/<html lang="en"/);
-});
+// /terms and /privacy show the text in the reader's language (the German one applies).
+for (const path of ['/impressum', '/terms', '/privacy']) {
+  test(`${path} keeps the reader's language`, async ({ request }) => {
+    const response = await request.get(path, { headers: { 'Accept-Language': 'en-US' } });
+    expect(await response.text()).toMatch(/<html lang="en"/);
+  });
+}
 
 test('the route table ignores a trailing slash and knows no other page', () => {
   expect(fixedDocumentLanguage('/privacy/en/')).toBe('en');
   expect(fixedDocumentLanguage('/impressum')).toBeNull();
+  expect(fixedDocumentLanguage('/terms')).toBeNull();
 });

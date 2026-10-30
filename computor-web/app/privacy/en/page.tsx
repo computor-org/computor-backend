@@ -9,7 +9,7 @@ export default function Page() {
       doc="privacy_en"
       lang="en"
       languages={[
-        { label: 'Deutsch', href: '/privacy', lang: 'de', current: false },
+        { label: 'Deutsch', href: '/privacy/de', lang: 'de', current: false },
         { label: 'English', href: '/privacy/en', lang: 'en', current: true },
       ]}
     />

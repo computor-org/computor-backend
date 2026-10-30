@@ -3,14 +3,14 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import AuthoritativeGermanNotice from '@/src/components/AuthoritativeGermanNotice';
 import BilingualLegalText from '@/src/components/BilingualLegalText';
 import DocumentLanguage from '@/src/components/DocumentLanguage';
 import LegalLinks from '@/src/components/LegalLinks';
 import NetideeNotice from '@/src/components/NetideeNotice';
+import ReadingLanguageLegalText from '@/src/components/ReadingLanguageLegalText';
 import { legalMarkdownComponents } from '@/src/components/legalMarkdown';
 import { HAS_OWN_LEGAL_PAGES } from '@/src/config/legal';
-import { loadLegalDoc, splitBilingual, type BilingualText, type LegalDocName } from '@/src/utils/legalContent';
+import { englishVersionLine, loadLegalDoc, splitBilingual, type BilingualText, type LegalDocName } from '@/src/utils/legalContent';
 
 export interface LanguageSwitch {
   label: string;
@@ -34,19 +34,26 @@ export default function LegalPage({
   lang,
   languages,
   titles,
+  headings,
   translation,
 }: {
   doc: LegalDocName;
   /** Language of the text, or undefined for a page holding DE and EN. */
   lang?: string;
   languages?: LanguageSwitch[];
-  /** Set on a bilingual page: its title in each reading language. */
+  /** Set on a bilingual page, or with `translation`: its tab title in each reading language. */
   titles?: BilingualText;
-  /** Set on an authoritative German text: the path of its English translation. */
-  translation?: string;
+  /** Set on a bilingual page: its heading in each reading language. */
+  headings?: BilingualText;
+  /**
+   * Set on an authoritative German text: its English translation, shown to an
+   * English reader, and a route that always shows the German text.
+   */
+  translation?: { doc: LegalDocName; germanHref: string };
 }) {
   if (!HAS_OWN_LEGAL_PAGES) notFound();
-  const { title, version, body } = loadLegalDoc(doc);
+  const legalDoc = loadLegalDoc(doc);
+  const { title, version, body } = legalDoc;
   const reading = lang === 'en' ? 'en' : 'de';
 
   return (
@@ -80,14 +87,25 @@ export default function LegalPage({
       </header>
 
       <main className="flex-1 container mx-auto px-4 py-10">
-        <article lang={lang} className="max-w-3xl mx-auto">
-          {translation ? <AuthoritativeGermanNotice translation={translation} /> : null}
-          <h1 className="text-2xl sm:text-3xl font-bold text-fg break-words">{title}</h1>
-          {version ? <p className="mt-2 text-sm text-muted">{version}</p> : null}
-          {titles ? (
-            <BilingualLegalText sections={splitBilingual(body)} titles={titles} />
+        <article lang={translation ? undefined : lang} className="max-w-3xl mx-auto">
+          {translation && titles ? (
+            <ReadingLanguageLegalText
+              de={legalDoc}
+              en={loadLegalDoc(translation.doc)}
+              germanHref={translation.germanHref}
+              titles={titles}
+            />
+          ) : titles ? (
+            <BilingualLegalText
+              sections={splitBilingual(body)}
+              titles={titles}
+              headings={headings ?? { de: title, en: title }}
+              versions={version ? { de: version, en: englishVersionLine(version) } : null}
+            />
           ) : (
             <>
+              <h1 className="text-2xl sm:text-3xl font-bold text-fg break-words">{title}</h1>
+              {version ? <p className="mt-2 text-sm text-muted">{version}</p> : null}
               <DocumentLanguage language={reading} />
               <div className="prose markdown max-w-none mt-8">
                 <ReactMarkdown remarkPlugins={[remarkGfm]} components={legalMarkdownComponents}>
