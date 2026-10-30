@@ -15,5 +15,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/privacy', '/privacy/en', '/terms', '/terms/en', '/terms/changes', '/terms/en/changes'],
+  matcher: ['/privacy/de', '/privacy/en', '/terms/de', '/terms/en', '/terms/changes', '/terms/en/changes'],
 };

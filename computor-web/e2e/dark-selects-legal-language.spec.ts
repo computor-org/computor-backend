@@ -83,8 +83,9 @@ test('the English terms declare English', async ({ page }) => {
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 });
 
+// /privacy follows the reader (English here); /privacy/de is always German.
 test('the German privacy notice still declares German', async ({ page }) => {
-  await page.goto('/privacy');
+  await page.goto('/privacy/de');
   await expect(page.getByRole('heading', { level: 1, name: /datenschutz/i })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('lang', 'de');
 });

@@ -21,10 +21,16 @@ import { applyDocumentLanguage } from '@/src/utils/documentLanguage';
 export default function BilingualLegalText({
   sections,
   titles,
+  headings,
+  versions,
 }: {
   sections: BilingualText;
   /** What the tab calls the page in each reading language. */
   titles: BilingualText;
+  /** The page heading in each reading language. */
+  headings: BilingualText;
+  /** The version line in each reading language, if the text has one. */
+  versions: BilingualText | null;
 }) {
   const language = useUiLanguage();
   const { de: titleDe, en: titleEn } = titles;
@@ -37,17 +43,21 @@ export default function BilingualLegalText({
   if (language === 'en') parts.reverse();
 
   return (
-    <div className="prose markdown max-w-none mt-8">
-      {parts.map((part, i) => (
-        <Fragment key={part.lang}>
-          {i > 0 ? <hr /> : null}
-          <section lang={part.lang}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={legalMarkdownComponents}>
-              {part.body}
-            </ReactMarkdown>
-          </section>
-        </Fragment>
-      ))}
-    </div>
+    <>
+      <h1 lang={language} className="text-2xl sm:text-3xl font-bold text-fg break-words">{headings[language]}</h1>
+      {versions ? <p lang={language} className="mt-2 text-sm text-muted">{versions[language]}</p> : null}
+      <div className="prose markdown max-w-none mt-8">
+        {parts.map((part, i) => (
+          <Fragment key={part.lang}>
+            {i > 0 ? <hr /> : null}
+            <section lang={part.lang}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={legalMarkdownComponents}>
+                {part.body}
+              </ReactMarkdown>
+            </section>
+          </Fragment>
+        ))}
+      </div>
+    </>
   );
 }

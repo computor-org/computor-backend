@@ -5,6 +5,8 @@ import LegalPage from '@/src/components/LegalPage';
 // browser swaps in the English one with the section it puts in front.
 const TITLE = { de: 'Inhalte melden · Computor', en: 'Report content · Computor' };
 
+const HEADING = { de: 'Inhalte melden', en: 'Report content' };
+
 export const metadata: Metadata = { title: TITLE.de };
 
 export default function Page() {
@@ -12,6 +14,7 @@ export default function Page() {
     <LegalPage
       doc="meldung_inhalte"
       titles={TITLE}
+      headings={HEADING}
       languages={[
         { label: 'Deutsch', href: '#deutsch', lang: 'de', current: false },
         { label: 'English', href: '#english', lang: 'en', current: false },

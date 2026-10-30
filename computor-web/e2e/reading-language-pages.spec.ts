@@ -188,22 +188,26 @@ test.describe('English profile, German course', () => {
   });
 });
 
-// The German terms and privacy texts are authoritative and stay as they are;
-// an English reader is told so in English, and pointed to the translation.
-for (const [path, translation, heading] of [
-  ['/terms', '/terms/en', 'Nutzungsbedingungen computor.at'],
-  ['/privacy', '/privacy/en', 'Datenschutzerklärung computor.at'],
+// The German terms and privacy texts are authoritative. An English reader gets
+// the English translation, opened by a note that the German text applies and a
+// link to it; a German reader gets the German text.
+for (const [path, german, english] of [
+  ['/terms', 'Nutzungsbedingungen computor.at', 'Terms of Use computor.at'],
+  ['/privacy', 'Datenschutzerklärung computor.at', 'Privacy Notice computor.at'],
 ] as const) {
   test.describe(`${path} for an English browser`, () => {
     test.use({ locale: 'en-US' });
 
-    test('says in English that the German text is authoritative and links the translation', async ({ page }) => {
+    test('shows the English translation and links the authoritative German text', async ({ page }) => {
       await page.goto(path);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(english);
+      await expect(page.getByText('Version 1.7, dated 29 October 2026', { exact: false }).first()).toBeVisible();
       const notice = page.getByRole('note');
-      await expect(notice).toContainText('The German text below is the authoritative version.');
-      await expect(notice).toHaveAttribute('lang', 'en');
-      await expect(notice.getByRole('link', { name: 'Read the English translation' })).toHaveAttribute('href', translation);
-      await expect(page.getByRole('heading', { level: 1 })).toHaveText(heading);
+      await expect(notice).toContainText('Only the German text is authoritative.');
+      await notice.getByRole('link', { name: 'Read the German text' }).click();
+      await expect(page).toHaveURL(new RegExp(`${path}/de$`));
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(german);
+      await expect(page.getByRole('note')).toHaveCount(0);
     });
   });
 
@@ -212,8 +216,29 @@ for (const [path, translation, heading] of [
 
     test('shows the German text without the notice', async ({ page }) => {
       await page.goto(path);
-      await expect(page.getByRole('heading', { level: 1 })).toHaveText(heading);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(german);
+      await expect(page.getByText('Version 1.7, Stand 29.10.2026')).toBeVisible();
       await expect(page.getByRole('note')).toHaveCount(0);
     });
   });
+}
+
+// Bilingual legal pages keep both bodies, but name themselves and date their
+// version in the reading language.
+for (const [path, german, english, germanVersion, englishVersion] of [
+  ['/impressum', 'Impressum computor.at', 'Imprint computor.at', 'Version 1.1, gültig ab 25.10.2026', 'Version 1.1, valid from 25 October 2026'],
+  ['/accessibility', 'Barrierefreiheitserklärung computor.at', 'Accessibility statement computor.at', 'Version 1.2, Stand 29.10.2026', 'Version 1.2, dated 29 October 2026'],
+  ['/report', 'Inhalte melden', 'Report content', 'Version 1.2, Stand 29.10.2026', 'Version 1.2, dated 29 October 2026'],
+] as const) {
+  for (const [locale, heading, version] of [['en-US', english, englishVersion], ['de-DE', german, germanVersion]] as const) {
+    test.describe(`${path} for ${locale}`, () => {
+      test.use({ locale });
+
+      test(`is headed "${heading}" with "${version}"`, async ({ page }) => {
+        await page.goto(path);
+        await expect(page.getByRole('heading', { level: 1 })).toHaveText(heading);
+        await expect(page.getByText(version, { exact: true })).toBeVisible();
+      });
+    });
+  }
 }

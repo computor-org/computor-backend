@@ -80,7 +80,7 @@ test('no notice a week after the effective date', async ({ page }) => {
 
 // Terms 1.7 need consent at sign-in, so their pages carry a fixed date, not the notice date.
 test('the terms and changes pages show version 1.7', async ({ page }) => {
-  await page.goto('/terms');
+  await page.goto('/terms/de');
   await expect(page.getByText('Version 1.7, Stand 29.10.2026')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Was sich ändert' })).toHaveAttribute('href', '/terms/changes');
   await page.goto('/terms/en/changes');

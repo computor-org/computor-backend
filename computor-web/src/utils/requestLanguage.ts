@@ -13,9 +13,9 @@ export const DOCUMENT_LANGUAGE_HEADER = 'x-computor-document-language';
  * whatever the reader's language. Keep in step with the matcher in proxy.ts.
  */
 const FIXED_LANGUAGE_PATHS: Record<string, ReadingLanguage> = {
-  '/privacy': 'de',
+  '/privacy/de': 'de',
   '/privacy/en': 'en',
-  '/terms': 'de',
+  '/terms/de': 'de',
   '/terms/en': 'en',
   '/terms/changes': 'de',
   '/terms/en/changes': 'en',
