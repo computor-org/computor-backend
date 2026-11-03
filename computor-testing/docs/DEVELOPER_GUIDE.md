@@ -150,7 +150,7 @@ Create:
 ### Step 6: Register CLI
 
 In `testers/__init__.py`, add to `LANGUAGES` dict and update `list_testers()`.
-In `testers/cli.py`, add legacy CLI function if needed.
+In `testers/cli.py`, add a language-specific CLI entry point if needed.
 In `pyproject.toml`, add console script entry.
 
 ---
