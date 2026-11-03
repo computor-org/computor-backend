@@ -5,7 +5,6 @@ backend, Temporal, Postgres, Redis, MinIO, and a **real GitLab CE** in
 Docker, then drive the system end-to-end against that stack.
 
 > Tracked in [issue #106](https://github.com/computor-org/computor-backend/issues/106).
-> Milestones M1–M8 live on branch `feat/integration-tests`.
 
 ## Run semantics
 
@@ -63,8 +62,7 @@ integration-tests/
 ├── conftest.py                       # top-level fixtures
 ├── pyproject.toml
 ├── fixtures/                         # per-topic fixtures (gitlab, api, db, users, ...)
-├── helpers/                          # reusable assertions / workflow polling
-├── data/                             # dummy deployment configs, dummy users
+├── helpers/                          # reusable assertions / workflow polling (empty)
 ├── scripts/
 │   ├── wait_for_services.sh
 │   └── bootstrap_gitlab.py
@@ -88,16 +86,15 @@ Out of scope (deliberately excluded from the compose stack):
 - Coder workspace services (huge surface area; would blow up test runtime).
   `CODER_ENABLED=false` is hard-wired on the API container.
 - `computor-web` (Next.js) UI tests.
-- VSCode extension (`/Users/theta/computor/computor-vsc-extension`) —
-  will be pulled into this monorepo later.
+- The VS Code extension, which lives in its own repository.
 
 ## GitLab provider tests (no full stack required)
 
 `suites/04_deployment/test_gitlab_provider.py` (marker `gitlab`) drives the
 backend's `GitLabProviderClient` directly against a real GitLab — course
 structure (template/reference/students), idempotency, the student fork, and
-member grants. It needs only a GitLab (not the whole compose stack), e.g. the
-throwaway one in `../gitlab-local-test` on :8086.
+member grants. It needs only a GitLab (not the whole compose stack), e.g. a
+throwaway GitLab CE container on :8086.
 
 Configure via env or a gitignored `integration-tests/.env.gitlab-local`:
 

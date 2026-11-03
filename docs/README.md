@@ -14,6 +14,9 @@ Coder workspace integration.
 | **[git-integration.md](git-integration.md)** | How a course connects to git — in-system Forgejo vs. external GitLab, delivery modes, and configuring it from a deployment file. |
 | **[service-accounts.md](service-accounts.md)** | Machine identities — testing systems, integrations and AI agents: how to add one, the `meta.yaml`↔slug binding, API tokens and what their scopes do (and don't) restrict. |
 | **[figures.md](figures.md)** | How plots reach a student in a workspace that has no desktop: the figure-folder contract, the matplotlib backend, MATLAB's `+figurewatch`, and the viewer. |
+| **[consent-gate.md](consent-gate.md)** | The GDPR consent gate: policy versions, the `/consent` endpoints, the middleware and how to publish a privacy notice. |
+| **[public-learning.md](public-learning.md)** | The anonymous `/learn` course reader, public course registration, hosted-workspace capacity and the public Ask Lena form. |
+| **[tutor-mentions.md](tutor-mentions.md)** | The Lena tutor agent: `@lena` mentions, routing unaddressed messages and unit description drafts. |
 | **[teacher-guide.md](teacher-guide.md)** | For lecturers and tutors: course statistics, a student's attempt timeline and feedback history, typical errors, flags and the tutor grading pages. |
 | **[../ops/docs/SELF_UPDATE.md](../ops/docs/SELF_UPDATE.md)** | One-click system updates from the admin UI (System → Updates) or `./computor.sh update` — config, update flow, rollback, and the rules that keep changes update-friendly. |
 
@@ -57,10 +60,10 @@ See [development.md](development.md) for the full walkthrough.
 
 ## Conventions
 
-- **Branches**: `feat/*`, `fix/*`, `refactor/*`, `docs/*`. Branch off the active release
-  branch and PR back into it; use the same branch name across sibling repos.
-- **Commits**: [Conventional Commits](https://www.conventionalcommits.org/) —
-  `feat(scope): subject`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
+- **Branches**: `feat/*`, `fix/*`, `refactor/*`, `docs/*`. Branch off `main` and open the
+  PR against `main`; see [CONTRIBUTING.md](../CONTRIBUTING.md).
+- **Commits**: PRs are squash-merged, and the PR title becomes the commit subject — a
+  short sentence saying what the change does.
 - **Python**: PEP 8, 120-col lines, type hints on all signatures, `snake_case` files.
 - **DTOs**: suffix by role — `UserCreate`, `UserGet`, `UserList`, `UserUpdate`, `UserQuery`;
   interfaces end in `Interface`. See [backend-patterns.md](backend-patterns.md).
@@ -70,5 +73,4 @@ See [development.md](development.md) for the full walkthrough.
 ## Getting help
 
 - **Interactive API reference**: http://localhost:8000/docs (server running).
-- **Project overview / troubleshooting**: [`CLAUDE.md`](../CLAUDE.md).
 - **Ops** (Docker, env vars): [`ops/docs/`](../ops/docs/).

@@ -9,11 +9,11 @@ consumes generated TypeScript.
 | Package | Purpose | Depends on |
 |---------|---------|-----------|
 | **computor-types** | Pure Pydantic DTOs — the single source of truth for API contracts, `meta.yaml`/`test.yaml` formats, and deployment configs. Zero backend deps. | — |
-| **computor-testing** | Test-execution framework (`computor-tester`). One backend per language (Python, Octave/MATLAB, R, Julia, C, Fortran, Document). Re-exports its models from `computor-types`. | types |
+| **computor-testing** | Test-execution framework (`computor-test` CLI). One backend per language (Python, Octave, R, Julia, C, Fortran, Document); MATLAB runs in its own worker. Re-exports its models from `computor-types`. | types |
 | **computor-client** | Auto-generated async HTTP client (`httpx`). One endpoint client per entity. | types |
 | **computor-backend** | FastAPI server + business logic + Temporal workflows. | types, client |
 | **computor-web** | Next.js frontend (yarn). Consumes generated TS types/clients. | (generated) |
-| **computor-coder** | Terraform templates + scripts for provisioning Coder workspaces (not a Python package). | — |
+| **ops/coder** | Terraform templates + scripts for provisioning Coder workspaces (not a Python package). | — |
 
 The dependency rule: **types has no dependencies; everything else flows from it.** Never
 import SQLAlchemy or backend modules into `computor-types`.
@@ -33,7 +33,7 @@ HTTP request
    ▼  PostgreSQL
 
    tasks/     ⚡ Temporal workflows/activities — long-running & external work (git, testing).
-   services/  🔧 Infra clients — MinIO storage, GitLab/Forgejo helpers, Redis.
+   services/  🔧 Infra helpers — MinIO storage, git service, Redis-backed queues.
 ```
 
 **The core rule: thin endpoints, fat business logic.** An endpoint injects `Principal` and
@@ -52,8 +52,10 @@ async def get_artifact_endpoint(
 ```
 
 Other backend modules: `auth/` (external admin clients, e.g. Keycloak), `plugins/`
-(pluggable auth providers), `coder/` (workspace API), `generator/` (code generation),
-`exceptions/`, `middleware/`. Startup lives in `server.py`; config in `settings.py`;
+(pluggable auth providers), `coder/` (workspace API), `git_provider/` (Forgejo and
+GitLab clients), `generator/` (GitLab group builder), `scripts/` (code generators and
+maintenance scripts), `websocket/`, `support/`, `issue_reports/`, `exceptions/`,
+`middleware/`. Startup lives in `server.py`; config in `settings.py`;
 sessions in `database.py`.
 
 ## Data flow

@@ -45,7 +45,7 @@ tutor account to the course as `_tutor`.
 ## Unit description drafts
 
 Lecturers can ask Lena for a draft description of a unit, written from the
-assignments in it (computor-org/issues#559). The draft is only shown to the
+assignments in it. The draft is only shown to the
 lecturer; nothing is saved until they save it.
 
 | Route | Who |

@@ -3,7 +3,7 @@
 The rule across this repo: `src/X` is hand-written, `src/generated/X` is
 generated (same split as `src/clients/` vs `src/generated/clients/`). The
 code generators never write into this directory, and everything under
-`src/generated/` is wiped on the next `bash generate.sh` run — so nothing
+`src/generated/` is overwritten on the next `bash generate.sh` run — so nothing
 in here may be a copy of a backend DTO, and nothing generated may be edited.
 
 What belongs here:
@@ -26,8 +26,8 @@ Use `Omit` whenever a field's type changes; the bare intersection is only for
 re-requiring a field of the same type.
 
 When a hand-written type gains a full generated counterpart, re-export it and
-delete the local copy (`export type { X } from 'types/generated'`) — see the
-consent types and `WorkspaceRoleAssign` for the precedent. If a whole module
+delete the local copy (`export type { X } from 'types/generated'`) — see
+`WorkspaceRoleAssign` for the precedent. If a whole module
 of DTOs is missing from `types/generated`, the fix is a category branch in
 `computor-backend/src/computor_backend/scripts/generate_typescript_interfaces.py`
 plus a regeneration, not a new mirror here.

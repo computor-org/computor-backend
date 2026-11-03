@@ -8,15 +8,15 @@ generation), **the permission system** (RBAC), and **Temporal workflows** (async
 ## EntityInterface & DTOs
 
 `EntityInterface` (in `computor-types/…/base.py`) is the single source of truth for an
-entity's DTOs. One interface per entity references its five CRUD DTOs by name:
+entity's DTOs. One interface per entity references its five CRUD DTO classes:
 
 ```python
 class UserInterface(EntityInterface):
-    create = "UserCreate"
-    get    = "UserGet"
-    list   = "UserList"
-    update = "UserUpdate"
-    query  = "UserQuery"
+    create = UserCreate
+    get    = UserGet
+    list   = UserList
+    update = UserUpdate
+    query  = UserQuery
 ```
 
 | DTO | Used for | Shape |
@@ -32,8 +32,8 @@ class UserInterface(EntityInterface):
 imports. Keep field names identical across a family (`email`, not `email_address` in one).
 
 **Why it matters — code generation.** From these definitions, `bash generate.sh` produces
-the Python HTTP client (`computor-client`), TypeScript interfaces, TypeScript clients, and
-OpenAPI schema — end-to-end type safety from DB to frontend with no hand-written clients.
+the Python HTTP client (`computor-client`), TypeScript interfaces and TypeScript clients
+— end-to-end type safety from DB to frontend with no hand-written clients.
 `get_all_dtos()` discovers every interface for registration.
 
 On the backend, an interface is extended with backend concerns (SQLAlchemy `model`,
@@ -63,16 +63,20 @@ The common check:
 
 ```python
 def get_course(course_id: str, permissions: Principal, db: Session) -> CourseGet:
-    course = db.query(Course).filter_by(id=course_id).first()
+    course = (
+        check_course_permissions(permissions, Course, "_student", db)
+        .filter(Course.id == course_id)
+        .first()
+    )
     if not course:
         raise NotFoundException("Course not found")
-    check_course_permissions(permissions, course, "read", required_role="_student")
     return CourseGet.model_validate(course)
 ```
 
 Recurring shapes:
 
-- **Course-level** — `check_course_permissions(principal, course, action, required_role)`.
+- **Course-level** — `check_course_permissions(principal, Entity, minimum_role, db)` returns
+  a query over `Entity` limited to courses where the principal holds at least that role.
 - **Resource-owner** — staff (`_tutor`+) see everything; a student only their own rows
   (membership check on the submission group).
 - **Admin-only** — `if not permissions.is_admin: raise ForbiddenException(...)`.
@@ -110,7 +114,7 @@ Four pieces:
 - **Activity** (`@activity.defn`) — the actual work (DB, git, MinIO). Make it **idempotent**
   (check-if-exists before create) so retries are safe.
 - **Worker** — runs workflows+activities off a task queue (`computor-tasks`, `testing`,
-  `testing-matlab`, and — with Coder — `coder`).
+  `testing-matlab`, `support` with support mail, and — with Coder — `coder-tasks`).
 - **Client** — starts workflows from the API/business logic.
 
 ```python

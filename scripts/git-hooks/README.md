@@ -34,9 +34,15 @@ The hook also warns about:
 ## 📐 Architecture Check
 
 After the secret scan, the hook runs `scripts/check_forbidden_imports.py`, which blocks
-the commit if `computor-types`, `computor-cli`, or `computor-client` import backend-only
+the commit if `computor-types` or `computor-client` import backend-only
 packages (fastapi, sqlalchemy, `computor_backend`, …). Run it manually with
 `python3 scripts/check_forbidden_imports.py`.
+
+When the commit touches the backend API, `computor-types` or the generated client, the
+hook also runs `scripts/check_client_drift.py` and blocks if the committed Python client
+no longer matches the API (fix with `bash generate.sh python-client`). When it touches
+`computor-web/app/**/*.tsx`, it runs `computor-web/scripts/check-styling.mjs` and blocks
+if a file gains design-spec violations.
 
 ## 🛠️ Manual Installation
 

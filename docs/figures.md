@@ -107,29 +107,27 @@ for every MATLAB session in the image — including the background MATLAB that
 the MathWorks extension launches to run and debug code, which is where a
 student's plots actually come from.
 
-**It is `matlabrc.m` and not `startup.m`, and that is the whole reason this
-feature ever worked.** `startup.m` is the conventional place and was the
-original one, and it published nothing at all: MATLAB runs the *first*
+**It is `matlabrc.m` and not `startup.m`.** `startup.m` is the conventional
+place, but a file there publishes nothing: MATLAB runs the *first*
 `startup` on the search path, the userpath `~/Documents/MATLAB` comes before
 `$MATLABROOT/toolbox/local`, and the MathWorks base image ships a `startup.m`
 of its own into exactly that folder — a stub that copies proxy settings out of
 the environment. The shared home volume is seeded from that image, so every
-workspace had it, and Computor's file was shadowed in every session. `matlabrc`
+workspace has it, and a Computor `startup.m` would be shadowed in every session. `matlabrc`
 is the hook in the same directory that nothing claims, because MathWorks tells
 you not to edit it; it also runs before `startup.m`, so a student who writes
 one of their own keeps their figures.
 
-Two consequences worth remembering. The fix lives entirely in the image, so
-existing workspaces pick it up on a rebuild with no home-volume surgery. And
+Two consequences worth remembering. The hook lives entirely in the image, so
+workspaces pick it up on a rebuild without touching the home volume. And
 `matlabrc.m` is a vendor file: the append is only sound because R2025b's is a
 plain script with no trailing local functions, which is worth rechecking
-whenever the MATLAB version moves (it was rechecked when the image left
-R2024b, and still holds).
+whenever the MATLAB version moves.
 
 **No display is involved.** MATLAB exports figures perfectly well from a session
-that has none, which is how this is verified. The `Xvfb` the startup script used
-to attach is gone: it is what took the workspace down, because every MATLAB in
-the container inherited a `DISPLAY` that did not answer and blocked on it.
+that has none, which is how this is verified. The startup script attaches no
+`Xvfb`: every MATLAB in the container would inherit a `DISPLAY` and block on it
+whenever it does not answer.
 Software OpenGL is the only renderer here, so the bootstrap also silences the
 `MATLAB:hg:AutoSoftwareOpenGL` warning MATLAB otherwise prints the first time a
 student draws anything — the display-driver advice it links to cannot be acted
@@ -142,8 +140,8 @@ workspace where it is the problem rather than the fix. Nothing else reads it.
 about a figure that shows in its picture — data, text, colours, limits, scales,
 tick modes, the figure's own size — and exports when the hash moves. The
 obvious mechanism, a `MarkedClean` listener per axes, was measured wrong in both
-directions on a session with no display, and is why plots went stale and why the
-container ran out of CPU:
+directions on a session with no display: it leaves plots stale and runs the
+container out of CPU:
 
 | | R2024b | R2025b (the image) |
 |---|---|---|
@@ -153,8 +151,8 @@ container ran out of CPU:
 
 What the fingerprint leaves out is the geometry MATLAB recomputes when it
 renders — an axes `Position`, `PlotBoxAspectRatio` and their neighbours, which
-move on their own about a second after an export, and once carried the export
-loop by themselves. Their `…Mode` properties are hashed instead, so `axis equal`
+move on their own about a second after an export and would keep the export loop
+running by themselves. Their `…Mode` properties are hashed instead, so `axis equal`
 and `axis manual` still register. The figure's own `Position` is hashed: that
 one is the size of the exported image and the student's to set.
 

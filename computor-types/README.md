@@ -4,8 +4,10 @@ Pure Pydantic DTOs for the Computor platform.
 
 ## Installation
 
+The package is not published on PyPI; install it from the monorepo root:
+
 ```bash
-pip install computor-types
+pip install -e computor-types/
 ```
 
 ## Usage
@@ -41,15 +43,11 @@ This package contains all Pydantic DTOs used across the Computor platform:
 ## Development
 
 ```bash
-# Clone repository
-git clone https://github.com/computor/computor-types.git
-cd computor-types
+git clone https://github.com/computor-org/computor-backend.git
+cd computor-backend/computor-types
 
 # Install in editable mode
 pip install -e .[dev]
-
-# Run tests
-pytest
 
 # Type checking
 mypy src/computor_types
