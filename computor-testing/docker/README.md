@@ -17,16 +17,16 @@ This directory contains example Dockerfiles for running each language tester in 
 
 ## Building Images
 
-Build from the project root directory (parent of `computor-testing`):
+Build from the repository root (the images also copy `computor-types`):
 
 ```bash
 # Single language
-docker build -f docker/Dockerfile.python -t ct-python .
-docker build -f docker/Dockerfile.octave -t ct-octave .
-docker build -f docker/Dockerfile.r -t ct-r .
+docker build -f computor-testing/docker/Dockerfile.python -t ct-python .
+docker build -f computor-testing/docker/Dockerfile.octave -t ct-octave .
+docker build -f computor-testing/docker/Dockerfile.r -t ct-r .
 
 # Full image (all languages)
-docker build -f docker/Dockerfile.full -t ct-full .
+docker build -f computor-testing/docker/Dockerfile.full -t ct-full .
 ```
 
 ## Running Tests
@@ -80,5 +80,9 @@ When running a container, mount directories as:
 /sandbox/
 ├── submission/  (ro) - Student code to test
 ├── tests/       (ro) - Test configuration (test.yaml, reference/)
-└── output/      (rw) - Test results (report.json)
+└── output/      (rw) - Test results (testSummary.json)
 ```
+
+Results are written to `outputDirectory` of the specification, which defaults
+to `output/` next to `test.yaml`. To write them to `/sandbox/output`, pass a
+specification file with `-s` that sets `outputDirectory: /sandbox/output`.

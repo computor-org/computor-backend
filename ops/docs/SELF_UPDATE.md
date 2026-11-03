@@ -170,16 +170,14 @@ merely because HTTP health checks succeed. Do not remove the marker manually.
 This restores Keycloak only; application migrations must still follow the
 backward-compatibility rule above.
 
-### Rollout prerequisite
+### Updating from an executor without Keycloak recovery
 
-Keep the production self-updater disabled until issue
-[computor-org/issues#424](https://github.com/computor-org/issues/issues/424)
-is resolved and this executor, watcher image, mounts, and host directories have
-been deployed **while still using the current Keycloak version**. The running
-executor is sourced before checkout, so an upgrade cannot install its own
-backup/recovery protection. Do not simply enable an old sidecar and ask it to
-update to this change. Until that prerequisite is met, use the manual Keycloak
-runbook: maintenance, verified stop and dump, checkout, then `computor.sh up prod`.
+The running executor is sourced before checkout, so an update cannot install
+its own backup and recovery protection. If the deployed executor, watcher
+image, mounts and host directories predate this protection, first update to
+the current version **while keeping the current Keycloak version**, or use the
+manual Keycloak runbook: maintenance, verified stop and dump, checkout, then
+`computor.sh up prod`.
 
 ## Security notes
 

@@ -37,9 +37,9 @@ The dependency management system provides:
 The `deps-installer` CLI is included with the Computor Framework:
 
 ```bash
-# Install the framework (includes deps-installer)
-cd computor-testing
-pip install -e .
+# Install the framework (includes deps-installer); from the repository root,
+# since computor-types is not on PyPI
+pip install -e ./computor-types -e ./computor-testing
 
 # Verify installation
 deps-installer --version
@@ -515,7 +515,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install deps-installer
-        run: pip install ./computor-testing
+        run: pip install ./computor-types ./computor-testing
 
       - name: Validate dependencies
         run: deps-installer validate -f dependencies.yaml
