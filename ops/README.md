@@ -10,9 +10,10 @@ ops/
 │   ├── docker-compose.base.yaml      # Core shared services
 │   ├── docker-compose.dev.yaml       # Development-specific
 │   ├── docker-compose.prod.yaml      # Production-specific
-│   └── docker-compose.*.yaml         # Optional overlays (web, coder, keycloak,
-│                                     # forgejo, matlab, updater) — added
-│                                     # automatically by computor.sh from .env flags
+│   └── docker-compose.*.yaml         # Overlays (web, coder, keycloak, forgejo,
+│                                     # matlab, support-mail, temporal-tls/-auth,
+│                                     # updater, ...) — added automatically by
+│                                     # computor.sh from the environment and .env flags
 │
 ├── environments/              # Environment configuration template
 │   └── .env.common.template   # All variables; setup-env.sh generates .env from it
@@ -25,6 +26,14 @@ ops/
 ├── lib/                       # Shared bash library for ./computor.sh
 │   ├── common.sh              # env loading, COMPOSE_FILES assembly, maintenance
 │   └── update.sh              # self-update executor (see docs/SELF_UPDATE.md)
+│
+├── coder/                     # Coder workspace templates, daemon and host units
+├── forgejo/                   # Forgejo bootstrap and Keycloak login setup
+├── maintenance/               # Static maintenance and offline pages
+├── qa/                        # Local QA stack (see qa/README.md)
+├── temporal-auth/             # Temporal authorization (TEMPORAL_AUTH_ENABLED)
+├── temporal-tls/              # Certificate generation for Temporal mTLS
+├── tests/                     # Shell tests for ops scripts
 │
 └── docs/                      # Operational documentation
     ├── DOCKER_SETUP.md        # Complete Docker setup guide
@@ -68,7 +77,7 @@ From the project root directory:
 # Automated setup with defaults
 ./setup-env.sh --auto
 
-# Force overwrite existing configs
+# Recreate .env.common without asking (an existing .env is kept)
 ./setup-env.sh --force
 ```
 
@@ -109,18 +118,17 @@ separate env file.
 ### Development Services (dev.yaml)
 - Temporal UI
 - Development workers
-- Optional Keycloak SSO
 
-### Production Services (prod.yaml)
+### Production Services (prod.yaml, web.yaml)
 - Uvicorn API server
-- Frontend application
+- Frontend application (web.yaml)
 - Production workers
 
 ### Coder Services (coder.yaml)
-- Coder server
+- Coder server and its PostgreSQL
 - Docker registry
-- Workspace builders
-- Template provisioning
+- Workspace ingress
+- Coder Temporal worker (workspace and template provisioning)
 
 ## Legal profile and Keycloak terms (per deployment)
 
@@ -169,13 +177,12 @@ the terms page before any token is issued. For a new terms version, update
 `computor-at-terms.json` and the texts in `computor-web/content/legal/` and run
 the script; the signup dialog then shows the new version to new accounts only.
 Existing accounts get the new version through the change clause of their terms
-(§ 11 of 1.0–1.3, § 8 of 1.6), not through a Keycloak prompt: set
+(§ 11 of 1.0–1.3, § 8 from 1.6 on), not through a Keycloak prompt: set
 `NEXT_PUBLIC_TERMS_EFFECTIVE_FROM` (deploy day + 35 days) before the web build,
 which dates the pages and shows the sign-in notice, and send the notice email
 once from the support worker with
 `python -m computor_backend.support.terms_notice --effective-from DATE [--apply]`
-(dry run without `--apply`; a rerun sends nothing twice). computor-infra
-`prod/deploy.sh` scripts these steps.
+(dry run without `--apply`; a rerun sends nothing twice).
 
 ## Notes
 

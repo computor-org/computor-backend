@@ -31,7 +31,7 @@ scripts are served from Keycloak; no runtime CDN or CAPTCHA service is required.
 
 ## Deployment
 
-From a git-pinned checkout on the computor.at control host, stage the tested JAR
+From a git-pinned checkout on the control host, stage the tested JAR
 and run the targeted rollout:
 
 ```bash
@@ -55,8 +55,7 @@ signup/recovery; the form provides an explanation when it is disabled.
 Normal `computor.sh up` builds/stages the provider and its idp-setup one-shot
 reconciles policy when `KEYCLOAK_ABUSE_PROTECTION=true`. Other deployments leave
 this flag false. Theme-only rollout does not install the provider or enable the
-flows. The existing public policy/form verifier in computor-infra remains applicable;
-a full signup test must also solve the challenge.
+flows. A full signup test must also solve the challenge.
 
 ## Rollback
 

@@ -1,7 +1,6 @@
 # QA stack
 
-`qactl.sh` runs one isolated Computor stack for end-to-end QA
-([computor-org/issues#529](https://github.com/computor-org/issues/issues/529)):
+`qactl.sh` runs one isolated Computor stack for end-to-end QA:
 web, API, workers, Keycloak 26 with computor.at's signup policy, Forgejo, Coder
 with the VS Code workspace, and [Mailpit](https://mailpit.axllent.org/) as the
 only mailbox. It reuses the production and preview compose files and adds
@@ -83,7 +82,7 @@ The QA host has no GitLab credentials. Fetch the package where `glab` is
 signed in to gitlab.tugraz.at and copy only the archive:
 
 ```bash
-QA_INPUTS=~/qa-inputs ops/qa/fetch_examples.sh main mailuefterl:/mnt/storage/computor-qa-inputs
+QA_INPUTS=~/qa-inputs ops/qa/fetch_examples.sh main <qa-host>:/mnt/storage/computor-qa-inputs
 # writes examples-<commit12>.tar.gz (for qactl) and examples-<commit12>.zip (for the web upload)
 ```
 
@@ -101,8 +100,7 @@ worktree to that commit, rebuilds and restarts the web. A later
 - **New learner**: nobody. Register through the Keycloak form; the
   verification mail lands in Mailpit (`GET /api/v1/search?query=to:"…"`,
   `GET /api/v1/message/<ID>`). Email verification is on, so the password is
-  set after the link, as on computor.at
-  ([computor-org/issues#441](https://github.com/computor-org/issues/issues/441)).
+  set after the link, as on computor.at.
 - **Returning learner** `qa-returning@example.com`: enrolled in *Data Science
   mit Python – Grundlagen*, real test results on the first four assignments of
   week 1 (reference solutions on two, an empty file on basis2, the reference
@@ -151,13 +149,13 @@ This rehearses what a lecturer does on computor.at when the course content
 changes, with learners who already have progress. It uses the same web pages
 as on computor.at; only the baseline is scripted.
 
-1. Baseline = pinned production backend 74ba88d8, private examples
-   9bdb0b271afb and mirror 339bc4a79fc1. Resolve full commits, record deployed
-   identities independently, and keep the extension at its production ref.
+1. Baseline = the backend, private examples and mirror commits running in
+   production. Resolve full commits, record deployed identities independently,
+   and keep the extension at its production ref.
 
    ```bash
    # where glab is signed in
-   QA_INPUTS=~/qa-inputs ops/qa/fetch_examples.sh main mailuefterl:/mnt/storage/computor-qa-inputs
+   QA_INPUTS=~/qa-inputs ops/qa/fetch_examples.sh main <qa-host>:/mnt/storage/computor-qa-inputs
    # on the QA host
    ops/qa/qactl.sh deploy --backend-ref origin/main --vsix none --content-ref main \
        --examples /mnt/storage/computor-qa-inputs/examples-<main12>.tar.gz
@@ -172,7 +170,7 @@ as on computor.at; only the baseline is scripted.
 
    ```bash
    # Export full QA_BACKEND_COMMIT, QA_EXAMPLES_COMMIT, QA_MIRROR_COMMIT.
-   set -a; . <(ssh mailuefterl cat /mnt/storage/computor-qa/credentials.env); set +a
+   set -a; . <(ssh <qa-host> cat /mnt/storage/computor-qa/credentials.env); set +a
    QA_FILES_HOST=mailuefterl QA_PHASE=learners QA_LABEL=before QA_WORKSPACE=1 QA_SCREENS=~/rehearsal \
    QA_PLAYWRIGHT_FROM=/path/with/node_modules node ops/qa/smoke/course-update.mjs
    ```
@@ -230,7 +228,7 @@ as on computor.at; only the baseline is scripted.
 
 ## Nightly runs
 
-Scheduling belongs in computor-infra. A nightly job needs: a checkout of this
+Scheduling is outside this repository. A nightly job needs: a checkout of this
 repository on the QA host, `ops/qa/qactl.sh reset` (or `deploy` with the refs
 under test), the smoke run above with a Playwright install, and somewhere to
 keep the screenshots. It must not run while another job uses port 5000.

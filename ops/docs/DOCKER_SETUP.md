@@ -2,20 +2,21 @@
 
 ## Overview
 
-The Computor platform now uses a modular Docker Compose architecture that separates core services from optional components like Coder workspace management.
+The Computor platform uses a modular Docker Compose architecture that separates core services from optional components like Coder workspace management.
 
 ## Architecture
 
 ### File Structure
 
 ```
-computor-fullstack/
+computor-backend/
 ├── ops/docker/
 │   ├── docker-compose.base.yaml   # Core shared services
 │   ├── docker-compose.dev.yaml    # Development-specific services
 │   ├── docker-compose.prod.yaml   # Production-specific services
 │   ├── docker-compose.coder.yaml  # Optional Coder addon
-│   └── docker-compose.web.yaml    # Frontend (auto-loaded in prod)
+│   ├── docker-compose.web.yaml    # Frontend (auto-loaded in prod)
+│   └── docker-compose.*.yaml      # Further overlays (keycloak, forgejo, matlab, ...)
 ├── .env                            # Active environment file
 ├── setup-env.sh                    # Creates .env (generates .env.common with fresh secrets)
 └── computor.sh                     # Lifecycle CLI (up/down/status/maintenance/update/test)
@@ -34,18 +35,17 @@ computor-fullstack/
 **Development Services** (dev only):
 - Temporal UI
 - Development workers with hot reload
-- Optional Keycloak SSO
 
 **Production Services** (prod only):
 - Uvicorn API server
-- Frontend application
+- Frontend application (`docker-compose.web.yaml`)
 - Production workers
 
 **Optional Coder Services** (when enabled):
-- Coder server
-- Docker registry for workspaces
-- Workspace image builders
-- Template provisioning
+- Coder server and its PostgreSQL
+- Docker registry for workspace images
+- Workspace ingress
+- Coder Temporal worker (image builds and template provisioning)
 
 ## Quick Start
 
@@ -53,8 +53,8 @@ computor-fullstack/
 
 ```bash
 # Clone and navigate to the project
-git clone <repository>
-cd computor-fullstack
+git clone https://github.com/computor-org/computor-backend.git
+cd computor-backend
 
 # Run the setup script to create the .env file
 ./setup-env.sh
@@ -94,17 +94,16 @@ the script's overlay logic.
 
 ### Environment Files
 
-The system uses a layered environment configuration:
-
-1. **`.env.common`** - Shared variables for all environments
-2. **`.env.dev`** or **`.env.prod`** - Environment-specific overrides
-3. **`.env.coder`** - Coder-specific configuration (optional)
-4. **`.env`** - Consolidated file (auto-generated for backward compatibility)
+The runtime scripts read a single `.env` in the repository root.
+`./setup-env.sh` generates `.env.common` with fresh secrets from
+`ops/environments/.env.common.template` and copies it to `.env` if none
+exists. Dev vs. prod is the argument to `./computor.sh`, not a separate file.
+See [ENV_CONFIGURATION.md](ENV_CONFIGURATION.md).
 
 ### Templates vs Real Files
 
 - **Templates** (`*.template`) - Committed to git, contain placeholders
-- **Real files** (`.env.*`) - Gitignored, contain actual secrets
+- **Real files** (`.env`, `.env.common`) - Gitignored, contain actual secrets
 
 ### Key Configuration Variables
 
@@ -115,7 +114,7 @@ The system uses a layered environment configuration:
 - `API_ADMIN_PASSWORD` - Admin user password
 
 #### Coder Variables (when enabled)
-- `CODER_DOMAIN` - Your Coder instance domain
+- `CODER_URL` - How the backend reaches Coder (set by `setup-env.sh`)
 - `CODER_ADMIN_EMAIL` - Admin email address
 - `CODER_ADMIN_PASSWORD` - Admin password
 - `CODER_ADMIN_API_SECRET` - API access token
@@ -124,36 +123,23 @@ The system uses a layered environment configuration:
 
 ### Manual Docker Compose Commands
 
-`./computor.sh` is the supported entry point. If you really need to invoke
-compose directly:
+`./computor.sh` is the supported entry point. For ad-hoc read-only commands,
+reuse the file list it assembles (in prod a bare compose command fails
+interpolation, because public URLs are derived from `PUBLIC_DOMAIN` at launch):
 
 ```bash
-# Development
-docker compose \
-  -f ops/docker/docker-compose.base.yaml \
-  -f ops/docker/docker-compose.dev.yaml \
-  up -d
-
-# Production with Coder
-docker compose \
-  -f ops/docker/docker-compose.base.yaml \
-  -f ops/docker/docker-compose.prod.yaml \
-  -f ops/docker/docker-compose.web.yaml \
-  -f ops/docker/docker-compose.coder.yaml \
-  up -d
-
-# View logs
-docker compose \
-  -f ops/docker/docker-compose.base.yaml \
-  -f ops/docker/docker-compose.dev.yaml \
-  logs -f temporal-worker
+source ops/lib/common.sh
+load_env && derive_public_urls dev && pin_project_name && assemble_compose_files dev
+docker compose $COMPOSE_FILES logs -f temporal-worker
 ```
 
 ### Service URLs
 
-All non-Traefik service ports are bound to `127.0.0.1` only — they're reachable
+All service ports are bound to `127.0.0.1` by default — they're reachable
 from the host (and over SSH tunnels) but **not** from the surrounding network.
-Only Traefik on `${TRAEFIK_HTTP_PORT:-8080}` is exposed publicly.
+Traefik on `${TRAEFIK_HTTP_PORT:-8080}` is the public entrypoint behind a
+TLS-terminating proxy on the same host; set `TRAEFIK_BIND_ADDRESS=0.0.0.0` only
+if that proxy runs on another host, and firewall the port to it.
 
 #### Development (from the host)
 - Traefik / public entrypoint: http://localhost:8080
@@ -188,30 +174,6 @@ Each instance has its own data directory under `${SYSTEM_DEPLOYMENT_PATH}/`.
 
 All services share the `computor-network` Docker network for internal communication.
 
-## Migration from Old Structure
-
-If you're migrating from the old docker-compose structure:
-
-1. Backup your existing environment files:
-   ```bash
-   cp .env .env.backup
-   cp .env.dev .env.dev.old
-   cp .env.prod .env.prod.old
-   ```
-
-2. Run the setup script:
-   ```bash
-   ./setup-env.sh
-   ```
-
-3. Copy any custom values from your old files to the new ones
-
-4. Stop old services and start with new structure:
-   ```bash
-   docker-compose -f docker-compose-dev.yaml down
-   ./computor.sh up dev -d
-   ```
-
 ## Troubleshooting
 
 ### Port Conflicts
@@ -223,10 +185,10 @@ If you encounter port conflicts:
    netstat -tulpn | grep LISTEN
    ```
 
-2. Modify port mappings in `.env.common`:
+2. Modify port mappings in `.env`:
    ```bash
    TRAEFIK_HTTP_PORT=8081
-   POSTGRES_EXTERNAL_PORT=5433
+   POSTGRES_EXTERNAL_PORT=5434
    ```
 
 ### Permission Issues
@@ -237,7 +199,7 @@ If you see permission errors:
 # Fix ownership of deployment directory
 sudo chown -R $(whoami):$(whoami) /opt/computor
 
-# Or use a different path in .env.common:
+# Or use a different path in .env:
 SYSTEM_DEPLOYMENT_PATH=/home/$USER/computor-data
 ```
 
@@ -250,7 +212,7 @@ If Coder fails to start:
    getent group docker | cut -d: -f3
    ```
 
-2. Update `DOCKER_GID` in `.env.coder`
+2. Set `DOCKER_GID` in `.env` (left empty, `./computor.sh up` detects it)
 
 3. Ensure Docker socket is accessible:
    ```bash
@@ -262,10 +224,11 @@ If Coder fails to start:
 1. **Never commit `.env` files** to version control
 2. **Use strong passwords** — credential env vars (e.g. `POSTGRES_PASSWORD`,
    `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `TEMPORAL_POSTGRES_PASSWORD`,
-   `CODER_POSTGRES_*`) have **no defaults** — compose will fail to start if
-   any are missing.
-3. **All service ports bound to `127.0.0.1`** except Traefik's 8080 — services
-   are reachable from the host (and SSH tunnels) but not from the intranet.
+   `CODER_POSTGRES_*`) have **no defaults**; see
+   [ENV_CONFIGURATION.md](ENV_CONFIGURATION.md#fail-closed-variables).
+3. **All service ports bound to `127.0.0.1`** by default, Traefik included —
+   services are reachable from the host (and SSH tunnels) but not from the
+   network.
 4. **HTTPS** is expected to be terminated upstream (e.g. nginx in front of
    Traefik:8080). No TLS inside the compose stack.
 5. **Docker socket** is exposed read-only to Traefik via `tecnativa/docker-socket-proxy`
@@ -287,8 +250,9 @@ If Coder fails to start:
 ## Support
 
 For issues or questions:
-1. Check the logs: `docker-compose logs [service-name]`
-2. Review configuration: `docker-compose config`
+1. Check the logs: `docker compose $COMPOSE_FILES logs [service-name]`
+   (file list assembled as under *Manual Docker Compose Commands*)
+2. Review configuration: `docker compose $COMPOSE_FILES config`
 3. Consult the main documentation
 4. Open an issue on GitHub
 
@@ -299,17 +263,12 @@ from their own accounts. They need access to the deployment checkout, its `.git`
 and `.env`, the operator-managed configuration directories, and the Docker daemon.
 Running the command as the original checkout owner is unnecessary.
 
-For code.tugraz.at, the operator group is `ag-ai`; both `ert` and `thalerj` already
-belong to it. The infrastructure repository prepares existing files and default
-ACLs without changing their owners or the service/database UIDs:
+Put the operators in one group that owns the deployment checkout, its `.git`
+and `.env` through default ACLs, without changing file owners or the
+service/database UIDs, and set `core.sharedRepository=group`. Each operator
+then runs, with their own login, from the deployment checkout:
 
 ```bash
-# Once, as the current deployment owner with a valid Kerberos ticket:
-cd ~/infra/computor-infra/prod
-./share-deployment-access.sh code-tugraz
-
-# Each operator, on faepkub3, with their own login:
-cd /srv/docker/computor-backend
 ./computor.sh update check
 ./computor.sh update status
 ./computor.sh update run prod
@@ -321,18 +280,16 @@ before running it. The CLI checks writable Git state before acquiring an update
 lock and reports unreadable configuration with deployment-access instructions.
 Git ownership exceptions are scoped to the selected checkout for each script
 invocation. For manual Git commands in a shared checkout, use
-`git -c safe.directory=/srv/docker/computor-backend -C /srv/docker/computor-backend ...`.
+`git -c safe.directory=<checkout> -C <checkout> ...`.
 
 The shared group can read deployment secrets and modify deployed code; include
 only authorized operators. Default ACLs and `core.sharedRepository=group` keep
-new Git/source files usable by both operators, including under `umask 077`.
-The infrastructure release exporter reapplies the policy after its tree swap
-and preserves group access on atomic env/recovery writes. No blanket sudo rule
+new Git/source files usable by all operators, including under `umask 077`.
+Tooling that replaces the deployment tree must reapply the policy and keep
+group access on env and recovery files. No blanket sudo rule
 is needed for routine application administration. Host packages, nginx/TLS,
 SSH, systemd and group enrollment remain the host administrator's responsibility.
 
-For the optional updater sidecar, `COMPUTOR_DEPLOY_GID` is the numeric operator
-GID (507 on faepkub3). The bootstrap appends it to the deployment env. Both the
-watcher and detached runner receive this supplementary group as well as the
-Docker socket group. Existing automatic-updater enablement stays unchanged;
-rebuild/recreate its image when choosing to enable it with the corrected watcher.
+For the optional updater sidecar, set `COMPUTOR_DEPLOY_GID` in `.env` to the
+numeric operator GID. Both the watcher and detached runner receive this
+supplementary group as well as the Docker socket group.

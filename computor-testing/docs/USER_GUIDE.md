@@ -8,8 +8,10 @@ This guide is for **exercise authors** who write test.yaml files and use the fra
 
 ### 1. Install
 
+From the root of a `computor-backend` checkout (`computor-types` is not on PyPI):
+
 ```bash
-pip install -e /path/to/computor-testing
+pip install -e ./computor-types -e ./computor-testing
 ```
 
 ### 2. Check your environment
@@ -42,7 +44,9 @@ Your exercise directory should look like:
 ```
 my-exercise/
 ├── test.yaml                  # Test definitions (required)
-├── meta.yaml                  # Metadata (optional)
+├── meta.yaml                  # Metadata (required for upload to the platform)
+├── content/
+│   └── index_en.md            # Assignment text, one file per language
 ├── reference/                 # Reference solution
 │   └── solution.py
 ├── localTests/
@@ -89,7 +93,11 @@ properties:
 
 Properties set at the `properties:` level serve as defaults. They can be overridden at the test collection level, which can be overridden at the individual test level.
 
-> **Note:** Full property inheritance (parent -> child cascade) currently only works for Octave tests. For other languages, always set properties at the level where you need them.
+The cascade applies in all testers to `qualification`, `relativeTolerance`,
+`absoluteTolerance`, `typeCheck`, `shapeCheck`, `ignoreClass` and `verbosity`,
+and from `properties:` to the collections also to `timeout`,
+`storeGraphicsArtifacts` and `competency`. `allowedOccuranceRange` and
+`occuranceType` are not inherited; set them on each test that needs them.
 
 ---
 
@@ -141,10 +149,10 @@ Runs a script and compares workspace variables against expected values.
   name: Advanced Tests
   entryPoint: solution.py
   setUpCode:
-    - "x = 10"                     # Run before checking variables
+    - "x = 10"                     # Python and Octave: runs after the entry point
     - "y = compute(x)"
   tearDownCode:
-    - "cleanup()"                  # Run after checking
+    - "cleanup()"                  # Runs after setUpCode, before variables are read
   tests:
     - name: y
       value: 100
@@ -166,7 +174,7 @@ Runs a script and compares workspace variables against expected values.
 
 ### stdout - Output Comparison
 
-Available for: C, Fortran (primary), Python, Octave, R, Julia
+Available for: C, Fortran, Python, R, Julia
 
 ```yaml
 - type: stdout
@@ -175,7 +183,7 @@ Available for: C, Fortran (primary), Python, Octave, R, Julia
   tests:
     - name: greeting
       qualification: contains      # Check output contains this
-      value: "Hello"
+      pattern: "Hello"
 
     - name: exact
       qualification: matches       # Exact match
@@ -183,16 +191,23 @@ Available for: C, Fortran (primary), Python, Octave, R, Julia
 
     - name: pattern
       qualification: regexp        # Regex match
-      value: "Result: \\d+"
+      pattern: "Result: \\d+"
 
     - name: prefix
       qualification: startsWith
-      value: "Program"
+      pattern: "Program"
 
     - name: suffix
       qualification: endsWith
-      value: "Done."
+      pattern: "Done."
 ```
+
+Without a `qualification`, the output is compared with `value` or, if no
+`value` is given, with the output of the reference solution. C and Fortran
+trim the output before comparing and also accept `value` in place of
+`pattern`. Python compares the untrimmed output and takes the expected text
+for every qualification, including `matches`, from `pattern`. R and Julia
+support `contains` and `regexp` (and treat `matches` as a regular expression).
 
 ### structural - Code Structure
 
@@ -232,6 +247,12 @@ For Python, `name` is matched against the token stream, so dotted names such as
 ignored. Supplying a `pattern` instead switches to a regex over the raw file
 text, which does include comments and strings.
 
+R and Julia count `pattern` (or `name`) in the same way. Octave ignores
+`pattern` and counts the keyword or function given as `name`. C and Fortran
+apply the range to known keywords given as `name` (such as `for` or
+`malloc`); for any other test they only check that `pattern` (or `name`)
+occurs in the source.
+
 ### exitcode - Exit Code Check (C, Fortran)
 
 ```yaml
@@ -258,16 +279,30 @@ text, which does include comments and strings.
     - name: compiles_clean         # Should compile without errors
 ```
 
-### graphics - Plot Testing (Octave only)
+### graphics - Plot Testing (Python, Octave)
+
+Each `name` is an expression evaluated after the script has run. In Python it
+is prefixed with `plt.`; in Octave it is evaluated as written. The result is
+compared with `value` or with the reference solution.
+
+```yaml
+- type: graphics
+  name: Plot Tests
+  entryPoint: plot_script.py
+  tests:
+    - name: gcf().axes[0].get_xlabel()
+      value: "Time"
+    - name: gcf().axes[0].get_title()
+      value: "Data Plot"
+```
 
 ```yaml
 - type: graphics
   name: Plot Tests
   entryPoint: plot_script.m
   tests:
-    - name: has_xlabel
-    - name: has_ylabel
-    - name: has_title
+    - name: get(gca, 'XLim')
+      value: [0, 10]
 ```
 
 ### Document Test Types
@@ -337,45 +372,58 @@ properties:
 
 ## Token Exchange
 
-For Octave tests, you can use tokens that get replaced with actual filenames:
+In Octave tests, files found by earlier `exist` tests can be referenced as
+`#file_N#` (file name, counted from 1) in the `file` of a structural test:
 
 ```yaml
-- type: variable
-  name: File Processing
-  entryPoint: "#file_1#"           # Gets replaced with actual student file
+- type: exist
+  name: Script
   tests:
-    - name: data
-      value: [1, 2, 3]
+    - name: "*.m"                  # Whatever .m file the student submitted
+
+- type: structural
+  name: Loops
+  file: "#file_1#"                 # Replaced with the file found above
+  tests:
+    - name: for
+      allowedOccuranceRange: [1, 0]
 ```
 
 ---
 
 ## meta.yaml
 
-Optional metadata for the exercise:
+Metadata of the example, required when it is uploaded to the platform. The
+tester itself reads only `properties.testDependencies`.
 
 ```yaml
-identifier: itpcp.pgph.python.hello_world
+slug: physics.python.hello_world  # Unique, dot-separated identifier
 version: '1.0'
 title: Hello World in Python
 description: A simple Hello World program
+language: en
 license: CC BY-NC 4.0
+keywords: [python, basics]         # Shown as tags in the example library
+category: Basics
 
 authors:
   - name: Your Name
-    email: your.email@tugraz.at
-    affiliation: TU Graz
+    email: your.email@example.org
+    affiliation: Your Institute
 
 properties:
   studentSubmissionFiles:
     - solution.py
   executionBackend:
-    slug: itpcp.exec.python
+    language: python
     version: "3.12"
-    settings:
-      timeout: 60
-      memoryLimitMB: 256
 ```
+
+`executionBackend` takes either a `language` (python, octave, r, julia, c,
+cpp, fortran, document, matlab), matched against the test runners of the
+installation, with an optional `version`, or a `slug` that pins one specific
+runner. Its `settings` are stored but not applied by the testers; set
+`timeout` and compiler options in `test.yaml`.
 
 ---
 
@@ -387,7 +435,7 @@ properties:
 # Run tests
 computor-test <language> run -t <student_dir> -T <test.yaml> [-v 0-3]
 
-# Local testing (auto-finds test.yaml)
+# Local testing (test.yaml in the parent directory or in <solution_dir>)
 computor-test <language> local -d <solution_dir>
 
 # Check runtime
@@ -468,8 +516,15 @@ julia -e 'import Pkg; Pkg.add("JSON")'
 
 - Check timeout values - server may be slower
 - Ensure no hardcoded absolute paths in test.yaml
-- Check that all required packages are in dependencies.yaml
-- Verify the execution backend settings in meta.yaml
+- Check that the packages your code imports are installed on the platform's test runner; the platform does not read `dependencies.yaml`
+- Verify `executionBackend` in meta.yaml names a language or runner the installation provides
+
+### "Execution failed" with no further message
+
+Each student process runs with resource limits. `COMPUTOR_JOB_MAX_PROCESSES`
+(default 512) counts all processes and threads of your user, so on a busy
+workstation local runs can fail to start the interpreter. Set
+`COMPUTOR_JOB_MAX_PROCESSES=0` for local runs.
 
 ### "Path validation failed"
 

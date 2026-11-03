@@ -9,6 +9,7 @@ browser ──HTTPS:443──► nginx (your TLS cert) ──HTTP──► 127.0
                                                                            ├─ /api      → backend
                                                                            ├─ /auth     → Keycloak
                                                                            ├─ /forgejo  → Forgejo (if enabled)
+                                                                           ├─ /coder    → Coder workspaces (if enabled)
                                                                            ├─ /docs     → static docs
                                                                            └─ /          → web frontend
 ```
@@ -144,7 +145,7 @@ nginx -t && systemctl reload nginx
 | `proxy_buffer_size 128k` (+ buffers) | Keycloak login responses carry large `Set-Cookie` headers; small buffers → 502. |
 | `client_max_body_size 512M` | Every upload crosses this vhost: `git push` to Forgejo **and** API uploads (examples, submissions). The 1 MB default rejects them all with nginx's HTML 413 page. |
 | `error_page 502 504` + `internal` location | nginx answers 502/504 itself only when the stack is unreachable; the static page tells visitors the address is right and reloads every minute. It is self-contained, because nothing behind nginx is reachable at that moment. |
-| single `location /`, no path rewrite | Traefik owns `/api`, `/auth`, `/forgejo`, `/docs`; stripping paths breaks routing. |
+| single `location /`, no path rewrite | Traefik owns `/api`, `/auth`, `/forgejo`, `/coder`, `/docs`; stripping paths breaks routing. |
 
 ## Telling the two 413s apart
 
@@ -155,7 +156,7 @@ Uploads cross two independent size limits; the response body tells you which one
   never reached the stack. Fix in nginx, reload.
 - **JSON** `{"detail": {"error": "Request body too large. Maximum allowed size is …"}}`
   → the request passed nginx and hit the backend's own limiter, capped by
-  `MINIO_MAX_UPLOAD_SIZE` in `.env` (bytes; 20 MiB in prod). Raise the env var and
+  `MINIO_MAX_UPLOAD_SIZE` in `.env` (bytes; the template sets 20 MiB). Raise the env var and
   restart the backend. Note: the example-upload JSON base64-encodes binary files
   (~+33%), so a 20 MiB body cap fits roughly 15 MiB of actual example content.
 

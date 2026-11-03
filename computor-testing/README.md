@@ -6,10 +6,10 @@ A pytest-based testing framework for evaluating code submissions in multiple lan
 
 | Language | Command | Test Types |
 |----------|---------|------------|
-| Python | `computor-test python run` | variable, structural |
+| Python | `computor-test python run` | variable, graphics, stdout, structural |
 | Octave/MATLAB | `computor-test octave run` | variable, graphics, structural |
-| R | `computor-test r run` | variable, structural |
-| Julia | `computor-test julia run` | variable, structural |
+| R | `computor-test r run` | variable, stdout, structural |
+| Julia | `computor-test julia run` | variable, stdout, structural |
 | C/C++ | `computor-test c run` | stdout, exitcode, compile |
 | Fortran | `computor-test fortran run` | stdout, exitcode, compile |
 | Document/Text | `computor-test document run` | wordcount, linecount, keyword, section |
@@ -17,7 +17,7 @@ A pytest-based testing framework for evaluating code submissions in multiple lan
 ## Features
 
 - **Variable Testing**: Compare student variables against reference values with configurable tolerances
-- **stdout Testing**: Compare program output for compiled languages (C, Fortran)
+- **stdout Testing**: Compare program output (C, Fortran, Python, R, Julia)
 - **Graphics Testing**: Verify graphical output properties (axes, labels, data)
 - **Structural Testing**: Check for specific keywords/constructs in code
 - **Document Testing**: Analyze text files for word count, structure, keywords, and more
@@ -28,12 +28,15 @@ A pytest-based testing framework for evaluating code submissions in multiple lan
 
 ## Installation
 
+The package depends on `computor-types` from the same repository, which is not
+published on PyPI. From the root of a `computor-backend` checkout:
+
 ```bash
-# Install from directory
-pip install /path/to/computor-testing
+# Install both packages
+pip install ./computor-types ./computor-testing
 
 # Or for development (editable mode)
-pip install -e /path/to/computor-testing
+pip install -e ./computor-types -e ./computor-testing
 ```
 
 ## Requirements
@@ -156,8 +159,7 @@ properties:
       name: No loops allowed
       file: script.m
       tests:
-        - name: no_for
-          pattern: "\\bfor\\b"
+        - name: for              # Octave counts the keyword given as name
           allowedOccuranceRange: [0, 0]
 ```
 
@@ -246,8 +248,8 @@ properties:
 | Type | Languages | Description |
 |------|-----------|-------------|
 | `variable` | Octave, Python, R, Julia | Compare workspace variables |
-| `stdout` | C, Fortran | Compare program output |
-| `graphics` | Octave | Check graphical properties |
+| `stdout` | C, Fortran, Python, R, Julia | Compare program output |
+| `graphics` | Octave, Python | Check graphical properties |
 | `structural` | All | Count keyword/pattern occurrences |
 | `exist` | All | File existence check |
 | `error` | Interpreted | Error handling tests |
@@ -303,8 +305,7 @@ computor-testing/
 │   │   ├── c.py
 │   │   ├── fortran.py
 │   │   └── document.py
-│   ├── runners/      # Language-specific test runners
-│   │   └── ...
+│   ├── runners.py    # Language-specific tester classes
 │   └── tests/        # pytest test classes per language
 │       ├── python/
 │       ├── octave/
@@ -316,30 +317,33 @@ computor-testing/
 ├── sandbox/          # Execution backends
 │   ├── config.py     # RunnerBackend, RunnerSettings
 │   ├── backends.py   # LocalRunner, DockerRunner
+│   ├── launch.py     # Landlock/seccomp launcher for student processes
 │   └── cli.py        # sandbox CLI
 ├── blocks/           # Test YAML generation tools
 ├── dependencies/     # Package management
 └── pyproject.toml    # Package configuration
 ```
 
-## Execution Backends
+## Execution Limits and Sandbox
 
-Configure execution via environment variables:
+Every student process started by a tester gets resource limits, which can be
+tuned through environment variables (`0` disables a limit):
 
-```bash
-# Use local execution (default)
-export CT_RUNNER_BACKEND=local
+| Variable | Limit | Default |
+|----------|-------|---------|
+| `COMPUTOR_JOB_CPU_SECONDS` | CPU time per process | 60 |
+| `COMPUTOR_JOB_MEMORY_BYTES` | Address space | 2 GiB |
+| `COMPUTOR_JOB_MAX_PROCESSES` | Processes of the user (RLIMIT_NPROC) | 512 |
+| `COMPUTOR_JOB_MAX_FILE_SIZE` | Size of a written file | 64 MiB |
+| `COMPUTOR_JOB_MAX_OPEN_FILES` | Open files | 256 |
 
-# Use Docker for isolation
-export CT_RUNNER_BACKEND=docker
-export CT_RUNNER_DOCKER_IMAGE=ct-sandbox:latest
+With `COMPUTOR_SANDBOX_ENABLE=1`, as set by the testing worker, each student
+process additionally runs under the kernel sandbox in `sandbox/launch.py`
+(see [SECURITY.md](SECURITY.md)). Local runs leave it off.
 
-# Resource limits
-export CT_RUNNER_TIMEOUT=30
-export CT_RUNNER_MEMORY_MB=256
-```
-
-Check available backends:
+The `sandbox` CLI is a separate tool for trying commands under a local or
+Docker backend; its `CT_RUNNER_*` variables (`sandbox env`) configure only that
+CLI, not the testers:
 
 ```bash
 sandbox check
@@ -348,55 +352,42 @@ sandbox test
 
 ## meta.yaml Configuration
 
-The `meta.yaml` file configures exercise metadata and execution settings:
+The `meta.yaml` file describes the example when it is uploaded to the platform
+(model `CodeAbilityMeta` in `computor-types`):
 
 ```yaml
-identifier: itpcp.pgph.c.hello_world
+slug: physics.c.hello_world
 version: '1.0'
 title: Hello World in C
 description: A simple Hello World program
+language: en
 license: CC BY-NC 4.0
+keywords: [c, basics]
 
 authors:
-  - name: ITP Team
-    email: itp@tugraz.at
-    affiliation: TU Graz
+  - name: Your Name
+    email: your.email@example.org
+    affiliation: Your Institute
 
 properties:
   studentSubmissionFiles:
     - hello.c
   executionBackend:
-    slug: itpcp.exec.c
-    version: "13"
-    settings:
-      timeout: 60
-      compileTimeout: 30
-      memoryLimitMB: 256
-      compiler: gcc
-      flags: ["-Wall", "-Wextra"]
+    language: c
 ```
 
-### ExecutionBackend Settings
-
-| Setting | Type | Description |
-|---------|------|-------------|
-| `timeout` | float | Execution timeout in seconds |
-| `compileTimeout` | float | Compilation timeout (compiled languages) |
-| `memoryLimitMB` | int | Memory limit in megabytes |
-| `cpuLimit` | int | CPU time limit in seconds |
-| `maxProcesses` | int | Maximum processes/threads |
-| `env` | list | Environment variables (`KEY=VALUE`) |
-| `compiler` | string | Compiler to use (gcc, g++, gfortran) |
-| `flags` | list | Compiler/interpreter flags |
-
-**Priority:** `test.yaml` > `meta.yaml` > tester defaults
+`executionBackend` names either a `language` (python, octave, r, julia, c,
+cpp, fortran, document, matlab), which the platform matches against its
+registered test runners, optionally with a `version`, or a `slug` that pins one
+specific runner. `settings` is accepted and stored with the example but is not
+applied by the testers; set timeouts and compiler options in `test.yaml`.
 
 ## Assignment Directory Structure
 
 ```
 assignment/
 ├── test.yaml              # Test definitions
-├── meta.yaml              # Metadata (optional)
+├── meta.yaml              # Metadata (required for upload to the platform)
 ├── reference/             # Reference solution
 │   └── solution.m
 ├── localTests/
@@ -415,15 +406,17 @@ Tests produce `testSummary.json`:
   "timestamp": "2024-12-03T10:30:00.000000+00:00",
   "type": "julia",
   "duration": 15.72,
-  "environment": {
-    "julia_version": "1.10.0"
-  },
-  "resultMessage": "30/30 tests passed",
+  "status": "COMPLETED",
+  "result": "PASSED",
+  "resultMessage": "Congratulations! All tests passed",
   "tests": [
     {
-      "name": "result",
-      "result": "PASSED",
-      "message": "Variable matches expected value"
+      "name": "Variable Tests",
+      "type": "variable",
+      "summary": {"total": 1, "passed": 1, "failed": 0, "skipped": 0},
+      "tests": [
+        {"name": "result", "status": "COMPLETED", "result": "PASSED"}
+      ]
     }
   ]
 }
@@ -473,10 +466,9 @@ See [dependencies/README.md](dependencies/README.md) for full documentation.
 
 - [User Guide](docs/USER_GUIDE.md) - For exercise authors writing test.yaml files
 - [Developer Guide](docs/DEVELOPER_GUIDE.md) - For developers extending the framework
-- [Audit Report](docs/AUDIT_REPORT.md) - Code quality findings and recommendations
 - [Blocks README](blocks/README.md) - Block system for VSCode extension
 - [Dependencies README](dependencies/README.md) - Dependency management
-- [Security Policy](SECURITY.md) - Security considerations
+- [Security](SECURITY.md) - How student code is isolated
 
 ## License
 

@@ -32,7 +32,7 @@ This is a pytest-based testing framework for evaluating student code submissions
                     ┌───────────────────┴─────────────────────┐
                     │ ctcore: Pydantic models, path security   │
                     │ ctexec: runtime detection, env handling   │
-                    │ sandbox: Docker/local backend, rlimits   │
+                    │ sandbox: Landlock launcher, sandbox CLI  │
                     └─────────────────────────────────────────┘
 ```
 
@@ -43,7 +43,7 @@ This is a pytest-based testing framework for evaluating student code submissions
 | `ctcore/` | Shared Pydantic models, helpers, security | `models.py`, `helpers.py`, `security.py`, `stdio.py` |
 | `ctexec/` | Base executor classes, runtime detection | `base.py`, `interpreted.py`, `compiled.py`, `environment.py`, `runtime.py` |
 | `testers/` | Language-specific testers, CLI, pytest integration | `base.py`, `cli.py`, `runners.py`, `executors/`, `tests/` |
-| `sandbox/` | Execution backends (local, Docker), resource limits | `config.py`, `backends.py`, `executor.py`, `security.py` |
+| `sandbox/` | Kernel sandbox launcher for student processes, `sandbox` CLI backends (local, Docker) | `launch.py`, `config.py`, `backends.py`, `executor.py`, `security.py` |
 | `blocks/` | Test block definitions for VSCode extension | `models.py`, `cli.py` |
 | `dependencies/` | Package dependency management | `models.py`, `installer.py` |
 
@@ -55,7 +55,7 @@ This is a pytest-based testing framework for evaluating student code submissions
 2. **CLI** (`testers/cli.py`) creates a `PythonTester` and calls `.run()`
 3. **BaseTester.run()** writes a temp specification.yaml and invokes `pytest.main()`
 4. **conftest.py** hooks load `test.yaml` and `specification.yaml` into pytest stash
-5. **test_class.py::test_computor()** is parametrized with `(main_idx, sub_idx)` pairs
+5. **test_class.py::test_entrypoint()** is parametrized with `(main_idx, sub_idx)` pairs
 6. For each test case:
    - Executor runs student code in subprocess -> extracts variables via JSON
    - (Optionally) Executor runs reference code the same way
@@ -145,7 +145,7 @@ class YourLangTester(BaseTester):
 Create:
 - `testers/tests/yourlang/__init__.py`
 - `testers/tests/yourlang/conftest.py` (use `create_conftest_hooks`)
-- `testers/tests/yourlang/test_class.py` (implement `test_computor`)
+- `testers/tests/yourlang/test_class.py` (implement `test_entrypoint`)
 
 ### Step 6: Register CLI
 
@@ -162,7 +162,10 @@ In `pyproject.toml`, add console script entry.
 Test properties cascade: `properties` -> `test collection` -> `individual test`.
 A `None` value at a lower level inherits from the parent.
 
-**Important:** This inheritance is only fully implemented for Octave (`OctaveTesterConfig`). Other languages use `SimpleTesterConfig` which does NOT inherit. This is a known inconsistency (see AUDIT_REPORT.md).
+All tester configurations set `has_property_inheritance = True`; the inherited
+fields are listed in `BaseTesterConfig.sub_fields` and `main_fields`
+(`testers/tests/conftest_base.py`). `allowedOccuranceRange` and
+`occuranceType` are deliberately not inherited.
 
 ### Subprocess Isolation
 
@@ -176,7 +179,7 @@ Student code ALWAYS runs in a subprocess, never via in-process `exec()`. This is
 ### Environment Security
 
 The `ctexec/environment.py` module provides a minimal safe environment for subprocess execution. Key principles:
-- Start with minimal PATH, HOME=/tmp, UTF-8 locale
+- Start with minimal PATH, HOME=/tmp (R keeps the real HOME), UTF-8 locale
 - Block all known secret patterns (API keys, passwords, tokens)
 - Pass through only language-specific variables (PYTHONPATH, R_LIBS_USER, etc.)
 
@@ -186,7 +189,7 @@ The output `testSummary.json` follows the `ComputorReport` Pydantic model:
 - Top level: timestamp, type, duration, status, result, summary
 - `tests[]`: One entry per test collection (ComputorReportMain)
   - `tests[]`: One entry per individual test (ComputorReportSub)
-  - Each has: name, result (PASSED/FAILED/SKIPPED), message
+  - Each has: name, status, result (PASSED/FAILED/SKIPPED), resultMessage and resultMessageI18n
 
 ---
 
@@ -209,11 +212,7 @@ blocks/models.py (Python definitions)
 
 To add test types or qualifications for an existing language, edit the relevant `get_*_blocks()` function in `blocks/models.py`. To add a new language, create a new `get_yourlang_blocks()` function and register it in `get_all_blocks()`.
 
-### Current Limitations
-
-- Only Python, C, Octave, and R have block definitions
-- Julia, Fortran, and Document are missing
-- The blocks module needs significant extension to cover all test types (see AUDIT_REPORT.md section 3.4)
+Block definitions exist for all seven languages.
 
 ---
 
@@ -258,8 +257,11 @@ path = safe_join(root_dir, "student", "solution.py")
 ## Testing the Framework Itself
 
 ```bash
-# Install in development mode
-pip install -e computor-testing/
+# Install in development mode (from the repository root)
+pip install -e computor-types/ -e computor-testing/
+
+# Run the framework's own tests
+cd computor-testing && python -m pytest tests/
 
 # Check all runtimes
 computor-test check --all
@@ -279,7 +281,7 @@ sandbox test
 | File | Purpose |
 |------|---------|
 | `test.yaml` | Test definitions (required) |
-| `meta.yaml` | Exercise metadata (optional) |
+| `meta.yaml` | Exercise metadata (required for upload to the platform) |
 | `specification.yaml` | Execution configuration (optional, usually auto-generated) |
 | `testSummary.json` | Test results output |
 | `dependencies.yaml` | Package dependencies for the exercise |
@@ -288,9 +290,7 @@ sandbox test
 
 ## Known Issues & Gotchas
 
-1. **`allowedOccuranceRange`** is misspelled (should be "Occurrence") - this is baked into the API
-2. **Property inheritance** only works fully for Octave - other languages silently ignore parent-level settings
-3. **The `blocks` module** only covers 4 of 7 languages
-4. **Document test types** listed in README are not all in the TypeEnum - they work but aren't validated
-5. **Two execution systems** exist (ctexec and sandbox) with overlapping functionality
-6. **`meta.yaml` example in README** uses deprecated `slug` field - should be `identifier`
+1. **`allowedOccuranceRange`** and **`occuranceType`** are misspelled; the models also accept `allowedOccurrenceRange` and `occurrenceType`
+2. **Document test types** `avgwordlength` and `avgsentencelength` are handled in `testers/tests/document/test_class.py` but are not in `TypeEnum`, so a test.yaml using them fails validation
+3. **Two execution systems** exist (ctexec and sandbox) with overlapping functionality
+4. **Two meta.yaml models** exist in `computor-types`: `CodeAbilityMeta` (`slug`, read by the platform) and the proposed `ComputorMeta` (`identifier`), which the bundled `examples/` use

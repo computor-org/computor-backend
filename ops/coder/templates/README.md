@@ -12,7 +12,7 @@ A template directory must contain:
 | `template.json` | Manifest (see below). Its presence makes the directory a template. |
 | `*.tf` | Coder Terraform template. Terraform loads every `.tf` in the dir, so it is split by concern: `versions.tf` (providers), `variables.tf`, `main.tf` (data sources/locals/parameter), `agent.tf` (coder_agent + IDE modules), `container.tf` (workspace container + Traefik routing). |
 | `startup.sh.tftpl` | Agent startup script, loaded from `agent.tf` via `templatefile()`. Bash/awk vars use the single-`$` form; Terraform interpolation uses `${...}` and the passed vars map. |
-| `Dockerfile` | Optional. When present, the image build workflow builds & pushes it to the local registry. Templates that ship code-server MUST build `FROM computor-code-server:latest` (upstream code-server + the webview service-worker patch, built by `computor.sh` from `docker/code-server-base/` — issue #274), never from `ghcr.io/coder/code-server` directly. |
+| `Dockerfile` | Optional. When present, the image build workflow builds & pushes it to the local registry. Templates that ship code-server MUST build `FROM computor-code-server:latest` (upstream code-server + the webview service-worker patch, built by `computor.sh` from `docker/code-server-base/`), never from `ghcr.io/coder/code-server` directly. |
 
 `template.json` fields:
 
@@ -87,19 +87,6 @@ All templates mount the **same per-user volume** `coder-home-{owner-uuid}` at `/
   /home/coder/.local/share/code-server-{workspace}` so two running workspaces don't corrupt
   each other's editor state.
 
-### Migrating a pre-shared-home volume
-
-Homes used to be per-workspace (`coder-{workspace-uuid}-home`). Those volumes are left on disk,
-detached. To copy one into a user's new shared home:
-
-```bash
-# owner uuid = Coder user id (coder users list, or the workspace's coder.owner label)
-docker run --rm \
-  -v coder-<workspace-uuid>-home:/from \
-  -v coder-home-<owner-uuid>:/to \
-  alpine sh -c 'cp -a /from/. /to/'
-```
-
 ## Root and internet policy
 
 Both are **configuration, not image properties** — every template's image ships whatever it
@@ -153,8 +140,8 @@ what keeps the datastores out of reach.
 ## Extension updates
 
 The `vscode` and `matlab-vscode` images build the Computor extension from the
-`source_repos` ref at image build time: computor-vscode `main` (the 2027.3
-line) on backend `main`, `release/2026.10` on backend `release/2026.10`. On top
+`source_repos` ref at image build time: computor-vscode `main` on backend
+`main`, the matching release branch on a backend release branch. On top
 of that, each instance approves an extension version, and workspaces move to it
 in place: no rebuild, no new workspace, nothing in the home touched.
 
@@ -164,8 +151,7 @@ in place: no rebuild, no new workspace, nothing in the home touched.
 - **The pin**: each backend branch carries
   `computor-backend/src/computor_backend/coder/approved_extension.json`
   (version + sha256 of a computor-vscode GitHub release). An instance follows
-  the extension line of the branch it deploys: `main` (computor.at) pins
-  2027.3.x, `release/2026.10` (code.tugraz.at) pins 2026.10.x. At startup the
+  the extension line of the branch it deploys. At startup the
   backend registers the pinned release in its registry if it is missing: it
   downloads the release VSIX once and publishes it only if its sha256 matches
   the pin. A version an admin has yanked stays yanked.
@@ -241,7 +227,7 @@ startup leaves it alone.
 
 ## Pi agent workspace
 
-`pi` is an agent-harness workspace (issue computor-org/issues#431): the `bash` template with
+`pi` is an agent-harness workspace: the `bash` template with
 Node.js and the [pi coding agent](https://github.com/badlogic/pi-mono) baked in, and ttyd
 running `computor-pi` instead of a login shell. `computor-pi` starts pi in `~/workspace` and
 restarts it whenever it exits, so the user cannot leave the harness for a plain shell; shell

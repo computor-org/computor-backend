@@ -7,8 +7,8 @@ A Pydantic-based module that defines test case blocks (types, qualifications, fi
 The `blocks` CLI is included with the Computor Framework:
 
 ```bash
-cd computor-testing
-pip install -e .
+# from the repository root; computor-types is not on PyPI
+pip install -e ./computor-types -e ./computor-testing
 
 # Verify installation
 blocks --version
@@ -76,7 +76,7 @@ BlockRegistry
 │   ├── Test Types: variable, graphics, stdout, exist, structural
 │   └── Qualifications: verifyEqual, matches, contains, regexp, ...
 ├── R
-│   ├── Test Types: variable, stdout, exist, structural
+│   ├── Test Types: variable, stdout, exist, structural, error, warning
 │   └── Qualifications: verifyEqual, matches, contains, regexp, ...
 ├── Julia
 │   ├── Test Types: variable, stdout, exist, structural, error, warning
@@ -95,18 +95,18 @@ Each language supports different test types:
 
 | Test Type | Description | Languages |
 |-----------|-------------|-----------|
-| `variable` | Check variable values | Python, Octave, R |
-| `stdout` | Check program stdout | All |
-| `stderr` | Check program stderr | C/C++ |
-| `exitcode` | Check exit code | C/C++ |
+| `variable` | Check variable values | Python, Octave, R, Julia |
+| `stdout` | Check program stdout | All except Document |
+| `stderr` | Check program stderr | C/C++, Fortran |
+| `exitcode` | Check exit code | C/C++, Fortran |
 | `compile` | Test compilation | C/C++ |
 | `structural` | Check code structure | All |
-| `graphics` | Check plot properties | Octave |
+| `graphics` | Check plot properties | Python, Octave |
 | `exist` | Check file exists | All |
-| `error` | Expect errors | Python |
+| `error` | Expect errors | Python, R, Julia, Fortran |
 | `linting` | Code style checks | Python |
 | `runtime` | Execution time/memory | C/C++ |
-| `warning` | Expect warnings | Python, Julia, Fortran |
+| `warning` | Expect warnings | Python, R, Julia, Fortran |
 | `wordcount` | Check word count | Document |
 | `linecount` | Check line count | Document |
 | `section` | Check required sections | Document |
@@ -278,8 +278,8 @@ blocks export ./src/types --prefix itp
 | Standard Output | `stdout` | Check program prints expected output |
 | Output with Input | `stdout` | Check output after providing stdin input |
 | File Exists | `exist` | Check that required files exist |
-| Structural - Forbidden | `structural` | Forbid certain keywords or functions |
-| Structural - Required | `structural` | Require certain keywords or functions |
+| Structural - Forbidden Constructs | `structural` | Forbid certain keywords or functions |
+| Structural - Required Constructs | `structural` | Require certain keywords or functions |
 | Error Expected | `error` | Check that code raises an error |
 
 ### C/C++ Templates
@@ -663,6 +663,9 @@ def get_all_blocks() -> BlockRegistry:
             get_c_blocks(),
             get_octave_blocks(),
             get_r_blocks(),
+            get_julia_blocks(),
+            get_fortran_blocks(),
+            get_document_blocks(),
             get_rust_blocks(),  # Add new language
         ]
     )

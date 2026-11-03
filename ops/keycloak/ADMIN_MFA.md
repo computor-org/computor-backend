@@ -1,6 +1,6 @@
 # Mandatory TOTP for administrators and managers
 
-computor-org/issues#485. Every human account that holds `_admin` or any other
+Every human account that holds `_admin` or any other
 global role except `_workspace_user` (`_user_manager`, `_organization_manager`,
 `_example_manager`, `_git_manager`, `_service_manager`, `_workspace_maintainer`,
 custom roles) must sign in with a one-time code. Ordinary users keep password
@@ -22,8 +22,7 @@ sign-in.
   output), so the code is entered once per Keycloak session and survives
   SSO-cookie logins and token refreshes. Keycloak masks the value when it is
   read back; the config's alias ends in `-amr<maxAge>` to show what was
-  written. Until 2026-10-29 it was `0`: the evidence lasted the login second,
-  and administrators got `AUTHZ_007` a few minutes after signing in.
+  written.
 - Both flows are copies of the flows bound before. The script edits the
   copies while they are unbound and binds them together only after reading
   them back complete; the description of each copy records the flow it came
@@ -58,10 +57,9 @@ automation and break-glass. New tokens for an elevated account can only be
 created from a session with OTP or with another token.
 
 At rollout, list the active tokens of elevated users and revoke the ones that
-are not needed (read-only query):
+are not needed (read-only query, from the deployment checkout):
 
 ```bash
-cd /opt/computor/backend
 docker exec -i computor-postgres-1 sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
 SELECT u.email, t.id, t.name, t.token_prefix, t.created_at, t.expires_at, t.last_used_at
 FROM api_token t JOIN "user" u ON u.id = t.user_id
@@ -87,10 +85,9 @@ tokens (`workspace-auto-login:*`) are re-minted on the next provisioning.
 Sessions that existed before the rollout lose their elevated rights at once.
 Their holders sign out and sign in again.
 
-Check who still has to enrol (read-only):
+Check who still has to enrol (read-only, from the deployment checkout):
 
 ```bash
-cd /opt/computor/backend
 python3 ops/keycloak/setup_mfa.py --env .env --status
 ```
 
@@ -112,7 +109,7 @@ allowlisted at nginx and need their own second factor.
 - One admin locked out, another admin available: use "Lost authenticator".
 - No master-realm admin usable: create a temporary master admin with
   `docker exec -it computor-keycloak /opt/keycloak/bin/kc.sh bootstrap-admin user --username breakglass`
-  (Keycloak 26.7 command; it prompts for a password and writes to the same
+  (Keycloak 26 command; it prompts for a password and writes to the same
   Postgres). This has not been rehearsed against a running server. If it
   clashes with the running server, stop `computor-keycloak` and run the
   same command in a one-off container from the same image and environment.
@@ -124,8 +121,9 @@ allowlisted at nginx and need their own second factor.
 
 ## Turning it off (rollback)
 
+From the deployment checkout:
+
 ```bash
-cd /opt/computor/backend
 python3 ops/keycloak/setup_mfa.py --env .env --rollback   # rebinds the original flows, deletes the MFA copies
 echo KEYCLOAK_ADMIN_MFA=false >> .env
 ./computor.sh up prod -d                                   # recreates uvicorn without the gate
