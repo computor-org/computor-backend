@@ -288,7 +288,7 @@ for (const [path, german, english] of [
     test('shows the English translation and links the authoritative German text', async ({ page }) => {
       await page.goto(path);
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(english);
-      await expect(page.getByText('Version 1.7, dated 29 October 2026', { exact: false }).first()).toBeVisible();
+      await expect(page.getByText('Version 1.8, dated 30 October 2026', { exact: false }).first()).toBeVisible();
       const notice = page.getByRole('note');
       await expect(notice).toContainText('Only the German text is authoritative.');
       await notice.getByRole('link', { name: 'Read the German text' }).click();
@@ -304,7 +304,7 @@ for (const [path, german, english] of [
     test('shows the German text without the notice', async ({ page }) => {
       await page.goto(path);
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(german);
-      await expect(page.getByText('Version 1.7, Stand 29.10.2026')).toBeVisible();
+      await expect(page.getByText('Version 1.8, Stand 30.10.2026')).toBeVisible();
       await expect(page.getByRole('note')).toHaveCount(0);
     });
   });
