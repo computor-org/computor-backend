@@ -15,7 +15,7 @@ versioned, auditable, withdrawable consent (GDPR Art. 7).
   legitimate interest depends on what the privacy-policy text declares. The
   mechanism is identical; **the UI wording must match the policy text**.
   Confirm the exact legal basis and wording with whoever owns the privacy
-  policy before the first production policy version is published.
+  policy before publishing a policy version.
 
 ## Data model
 
@@ -33,11 +33,10 @@ Migration: `computor-backend/.../alembic/versions/dd2e3f4a5b6c_add_consent_table
   first-consent idempotent. Withdrawal sets `withdrawn_at` (row is kept).
   `policy_version` is a FK to `policy_versions.version`.
 
-**Deviation from the original task spec:** `user_consents.user_id` is the
-internal `user.id` UUID (FK, `ON DELETE CASCADE`), not the Keycloak `sub`.
-This backend resolves Keycloak identities to local users at login and only the
-internal id is available everywhere (Principal, Redis caches, triggers);
-storing `sub` would have broken referential integrity and local-account users.
+`user_consents.user_id` is the internal `user.id` UUID (FK, `ON DELETE
+CASCADE`), not the Keycloak `sub`: the backend resolves Keycloak identities to
+local users at login, and only the internal id is available everywhere
+(Principal, Redis caches, triggers).
 
 ## Policy texts (MinIO)
 
@@ -73,13 +72,12 @@ Note: this app has no global `/api` prefix (routers mount at root, e.g.
 so no middleware ever sees a resolved Principal. The gate resolves the user
 itself via the shared `middleware/principal_lookup.py`. Registration order in
 `server.py` (outermost first):
-`CORS → Maintenance → ConsentGate → UploadSizeLimiter`. The gate must stay
+`CORS → PublicLunaPrivacy → Maintenance → ConsentGate → UploadSizeLimiter`. The gate must stay
 inside CORS so its 403 responses carry CORS headers. The downstream app is
 invoked outside the gate's try block, so endpoint exceptions propagate
 normally (they are never swallowed by the fail-open handler).
 
-**Identity resolution** (`middleware/principal_lookup.py`, shared logic that
-`MaintenanceMiddleware` can migrate to later): credential precedence mirrors
+**Identity resolution** (`middleware/principal_lookup.py`): credential precedence mirrors
 `parse_authorization_header` exactly — `X-API-Token`, then `Authorization`,
 then the `ct_access_token` cookie only when no Authorization header is present
 — so the gate always judges the same identity the route authenticates.
@@ -98,10 +96,11 @@ effective policy version → gate inactive; otherwise Redis-cached consent check
 ```
 
 **Whitelist:** exact `/`, `/consent`, `/docs`, `/redoc`, `/openapi.json`,
-`/extensions-public`, `/extensions-getting-started`; prefixes `/consent/`,
-`/auth/`, `/password/`, `/invites/` (public registration), `/docs/`; plus
-GET-only `/user` and `/user/views` (the web UI needs the signed-in identity to
-render the consent page). Prefixes end with `/` deliberately so they cannot
+`/extensions-public`, `/extensions-getting-started`, `/public/courses`;
+prefixes `/consent/`, `/auth/`, `/password/`, `/invites/` (public
+registration), `/docs/`; plus GET-only `/user` and `/user/views` (the web UI
+needs the signed-in identity to render the consent page) and `/instance-info`
+(lets a blocked client find the web app). Prefixes end with `/` deliberately so they cannot
 cover sibling routes (`/docs` must not exempt `/documents`; a bare `/ws`
 prefix would have exempted `/workspaces/*` — WebSockets need no entry because
 non-HTTP scopes are skipped). The documents API (`/documents`) **is** gated.
@@ -122,11 +121,6 @@ take down the API.
 gate is also inactive as long as no `policy_versions` row is effective — a
 fresh deployment is not gated until the first policy is published.
 
-**Known limitation:** HTTP Basic credentials (dev `admin/admin`, some test
-suites) cannot be resolved without password verification and pass the gate.
-All real clients (web, VS Code extension) use SSO tokens/cookies or API tokens
-and are fully gated.
-
 ## Frontend (computor-web)
 
 - Interceptors in `src/utils/apiClient.ts` (`apiFetch`) and
@@ -143,17 +137,14 @@ and are fully gated.
 - Withdraw: Settings → "Privacy & Consent" (status, view notice, withdraw with
   confirmation; after withdrawal the user lands back on `/consent`).
 
-## ⚠️ Cross-client impact — VS Code extension (decide before merging)
+## VS Code extension
 
-The VS Code extension hits the same API and will receive
+The VS Code extension hits the same API and receives
 `403 {"error": "consent_required", "required_version": ...}` for unconsented
-users on every non-whitelisted call. **No extension-side handling exists yet.**
-Recommended minimal flow: detect the stable error body, show a notification
-("WISCode needs your consent — open the web UI"), deep-link to
-`{web}/consent`, and retry after the user returns. A headless consent path was
-deliberately not built — consent should be given on a page that shows the full
-notice. Track this as a follow-up issue for the extension before enabling the
-gate in production (i.e. before publishing the first policy version).
+users. It detects that body, shows a prompt that deep-links to the web app's
+`/consent` page (resolved via the whitelisted `GET /instance-info`), and the
+user consents there. There is deliberately no headless consent path: consent
+is given on a page that shows the full notice.
 
 ## Ops: publishing a policy version
 

@@ -101,7 +101,7 @@ The detail page shows, from top to bottom:
    newest first. A *Submission run* is a test run on an official submission;
    a *Grading* row shows the grade, its status, the written feedback and who
    gave it. Use the two filters to show one assignment or one kind of entry.
-6. **Content tree**: every assignment with its status and number of attempts.
+6. **Course content progress**: every assignment with its status and number of attempts.
 
 Use **Print** to get a paper or PDF copy of the page, for example for a
 consultation with the student.

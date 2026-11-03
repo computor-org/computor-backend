@@ -5,7 +5,7 @@ generation, and tests.
 
 ## Prerequisites
 
-- **Python 3.10+**, **Docker + Docker Compose**, **Git**
+- **Python 3.12**, **Docker + Docker Compose**, **Git**
 - Recommended: VS Code / PyCharm, an API client (HTTPie/Postman), a DB client (DBeaver)
 
 ## Setup
@@ -44,12 +44,12 @@ curl localhost:8000/docs # Swagger UI is up
 
 ```bash
 source .venv/bin/activate
-git pull                       # on the active release branch
+git pull                       # on main
 ./computor.sh up dev -d        # add --build to rebuild worker/images after code changes
 bash api.sh                    # terminal 1
 bash web.sh                    # terminal 2
 git checkout -b feat/your-thing
-# …work…  →  ./computor.sh test  →  git commit  →  push  →  PR into the release branch
+# …work…  →  ./computor.sh test  →  git commit  →  push  →  PR into main
 ./computor.sh down             # stop docker services (auto-detects dev/prod)
 ```
 
@@ -79,7 +79,9 @@ The full loop for a new entity (e.g. `Assignment`). Each step lives in the packa
 ## Migrations
 
 Alembic derives migrations from the SQLAlchemy models. Migration files live in
-`computor-backend/src/computor_backend/alembic/versions/`.
+`computor-backend/src/computor_backend/alembic/versions/`; run the `alembic` commands
+from `computor-backend/src/computor_backend` (where `alembic.ini` lives) with the `.env`
+variables exported.
 
 ```bash
 alembic revision --autogenerate -m "message"   # generate from model changes
@@ -128,17 +130,18 @@ pytest --cov=computor_backend             # coverage
 ```
 
 Write unit tests against `business_logic/` functions and integration tests against the API
-via `TestClient`. Common fixtures (`client`, `db`, `admin_token`, `test_course`) live in
-`tests/conftest.py`.
+via `TestClient`. Database fixtures (`database_url`, `engine`, `session`) live in
+`tests/conftest.py`; mock principals and sample data (`admin_principal`,
+`student_principal`, `test_client_factory`, …) in `tests/fixtures.py`.
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---------|-----|
 | Port already in use | `lsof -i :8000` → `kill -9 <PID>` |
-| Import errors for `computor_*` | Re-run the editable installs (order: types → client → cli → backend) |
+| Import errors for `computor_*` | Re-run the editable installs (order: types → client → backend) |
 | Worker runs old code | Rebuild: `./computor.sh up dev --build -d` (source is baked into worker images) |
 | DB connection fails | `docker ps | grep postgres`; check `.env` datastore hosts (dev = `localhost`) |
 | Migration "table already exists" / out of sync | `alembic current`; `alembic stamp head`; or reset the dev DB (above) |
 
-More project-wide issues: [`CLAUDE.md`](../CLAUDE.md) · Ops/env details: [`ops/docs/`](../ops/docs/).
+Ops/env details: [`ops/docs/`](../ops/docs/).

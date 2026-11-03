@@ -2,7 +2,7 @@
 
 `/learn` is an anonymous, first-party static course reader. It reads generated
 JSON and raster images under `/learning/`; it makes no API or GitHub requests.
-This feature adds no anonymous API endpoints or runtime database/storage access.
+The reader uses no API endpoints and no runtime database or storage access.
 The web app renders the course hierarchy, descriptions, math and DE/EN variants.
 GitHub is optional provenance and reuse information.
 
@@ -22,8 +22,8 @@ snapshot and does not follow later database visibility changes until rebuilt.
 
 Raw HTML, external/inline images and SVG are not rendered. KaTeX disables trusted
 commands and bounds expansion. Static assets carry nosniff and a sandboxed CSP.
-The public mirror currently refers to an absent pendulum image; its alt text is
-shown rather than fetching an unpublished file.
+An image that is not in the bundle is shown as its alt text rather than
+fetched.
 
 The reader can deploy by replacing only the frontend image. No database
 migration, API/worker restart or workspace-template rebuild is required.
@@ -34,18 +34,18 @@ deployment, repeat the same browser checks with `E2E_BASE_URL=https://computor.a
 to verify the actual public site without starting a local server. These checks
 read public pages and check rejected write methods only on the static catalog.
 
-The Next 16.3.6 standalone server denies unsupported static-file methods with
-`Allow: GET, HEAD`, but its default 405-page rendering currently throws
+The Next standalone server denies unsupported static-file methods with
+`Allow: GET, HEAD`, but its default 405-page rendering throws
 `NoFallbackError` and returns 500. Development returns 405. The production
 checks accept this known rejection only with the read-only Allow header and
 unchanged file bytes; successful writes always fail verification. Reproducer:
 POST/PUT/PATCH/DELETE `/learning/catalog.json` in the network-isolated image.
-The framework response-rendering repair belongs upstream; no dependency patch
-or application workaround is included here. Recheck this focused case on the
+The framework response-rendering repair belongs upstream; the application
+carries no workaround for it. Recheck this focused case on the
 next supported Next upgrade and restore the exact 405 expectation when fixed.
 
 A course opens on an explicit welcome/start content item when one exists.
-Until such an item exists, the reader shows the course description and a clear
+Without such an item, the reader shows the course description and a clear
 link to the first released exercise. Learners can then sign in to join the
 course or work in a hosted Coder workspace, local VS Code, or GitHub Codespaces.
 
@@ -70,8 +70,8 @@ group, which the backend creates on the first join. The course page then shows
 a "Hilfe & Kontakt" block (Lena instead of tutors, the support form, the
 guides) and lets the learner leave the course. Leaving keeps the membership
 with the role `_inactive`, which grants nothing, so submissions and results
-stay, and joining again restores it. After deploying this, move learners who
-joined earlier into the group once with
+stay, and joining again restores it. Learners who joined before the group
+existed are moved into it once with
 `python -m computor_backend.scripts.backfill_self_enrollment_group --apply`
 (without `--apply` it only reports what it would move).
 
@@ -87,11 +87,12 @@ rolling day, one outstanding per account, 20 waiting globally, and four active.
 Requests expire after 15 minutes; a completed answer remains available to its
 author for 24 hours. Queue operations are atomic in Redis and fail closed if
 Redis is unavailable. The worker pulls jobs over HTTPS, sends them through the
-restricted `luna-public` Slopgate credential to batched Qwen on faepmac2, and
+restricted model-gateway credential to the configured language model, and
 posts one answer. It has no general Computor API token, inbound listener, tool
 bridge, or code execution capability. Before enabling it, verify that the
 model host writes no content logs.
 Lena availability is off by default and the UI hides the form until enabled.
 
 The extension keeps its existing publisher and ID and uses supported server
-capabilities so one Marketplace version works with both 26.10 and main.
+capabilities so one Marketplace version works with every supported server
+release.

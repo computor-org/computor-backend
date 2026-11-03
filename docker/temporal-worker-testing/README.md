@@ -7,7 +7,7 @@ Handles test execution for multiple programming languages:
 
 ### Two Python Environments
 
-1. **Worker Environment** (Python 3.10)
+1. **Worker Environment** (Python 3.12)
    - Runs Temporal worker
    - Runs computor-testing framework CLI
    - Manages test orchestration
@@ -16,8 +16,9 @@ Handles test execution for multiple programming languages:
    - Runs actual student code
    - Has scientific/testing dependencies (numpy, scipy, matplotlib, etc.)
    - Isolated venv at `/home/worker/test-venv`
-   - Python version is baked into the worker [Dockerfile](Dockerfile); to change
-     it, edit the Dockerfile and rebuild — there is no runtime knob.
+   - Python version is baked into the
+     [testing-runtimes Dockerfile](../testing-runtimes/Dockerfile); to change it,
+     edit that Dockerfile and rebuild — there is no runtime knob.
 
 ## Configuration
 
@@ -33,7 +34,8 @@ PYTHON_TEST_REQUIREMENTS=
 
 ### Base Dependencies
 
-Automatically installed from `computor-testing/requirements.txt`:
+Installed at image build time from the hashed `computor-testing/requirements.lock`
+(compiled from `computor-testing/requirements.txt`), including:
 - numpy
 - scipy
 - matplotlib
@@ -49,46 +51,37 @@ Automatically installed from `computor-testing/requirements.txt`:
 PYTHON_TEST_REQUIREMENTS=pandas,scikit-learn,requests
 ```
 
-**Per-Service (future enhancement):**
-Configure in `deployment.yaml` service config:
-```yaml
-services:
-  - slug: itpcp.exec.py
-    config:
-      python_requirements: ["pandas>=2.0", "scikit-learn"]
-```
-(Not yet implemented - requires dynamic package installation)
-
 ## Startup Sequence
 
-1. Fetch service configuration from API
-2. Create test execution venv (Python 3.13)
-3. Install base dependencies from requirements.txt
-4. Install additional configured requirements
-5. Start Temporal worker
+1. Fetch service configuration from API (`GET /service-accounts/me`)
+2. Verify the pre-built test venv (Python 3.13 with the base dependencies;
+   recreated only if missing)
+3. Install additional configured requirements (`PYTHON_TEST_REQUIREMENTS`)
+4. Start Temporal worker
 
-Note: computor-testing is installed at Docker build time from the monorepo.
+Note: computor-testing and the test venv are installed at Docker build time from the monorepo.
 
 ## Development
 
 ### Building the Image
 
 ```bash
-docker-compose -f docker-compose-dev.yaml build temporal-worker-testing
+./computor.sh up dev --build -d
 ```
 
 ### Checking Installation
 
 ```bash
-docker exec -u worker computor-fullstack-temporal-worker-testing-1 \
+docker exec -u worker computor-temporal-worker-testing-1 \
   /home/worker/test-venv/bin/python --version
 
-docker exec -u worker computor-fullstack-temporal-worker-testing-1 \
+docker exec -u worker computor-temporal-worker-testing-1 \
   /home/worker/test-venv/bin/python -c "import numpy; print(numpy.__version__)"
 ```
 
 ### Changing the Test Python Version
 
-The test Python version is hard-coded in the [Dockerfile](Dockerfile) (see the
-`Python-3.13.1.tgz` download). To change it: update the URL/version in the
-Dockerfile, rebuild the worker image, and rebuild the pre-built test venv.
+The test Python version is pinned in the
+[testing-runtimes Dockerfile](../testing-runtimes/Dockerfile)
+(`PYTHON313_VERSION` and `PYTHON313_SHA256`). To change it, update both and
+rebuild with `./computor.sh up dev --build --build-base=testing-runtimes -d`.

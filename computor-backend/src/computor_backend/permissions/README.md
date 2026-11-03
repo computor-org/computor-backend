@@ -4,10 +4,6 @@ Authorization for the Computor backend: a **handler-registry** system that
 authenticates each request into a `Principal`, then answers "may this principal
 perform `<action>` on `<entity>`?" and builds permission-filtered queries.
 
-This is the live, integrated system used by the whole API — there is no separate
-"old" permission module (the former `api/permissions.py` and the
-`migration.py` / `integration.py` toggle layer were removed).
-
 ## Request flow
 
 ```
@@ -35,8 +31,8 @@ through the registered handler for the entity.
 - `handlers_user.py` / `handlers_course.py` / `handlers_scoped.py` /
   `handlers_misc.py` — concrete per-entity handlers (users/profiles, course &
   content & members & results, org/course-family scopes, read-only lookups &
-  examples). `handlers_impl.py` is a thin re-export shim kept so pre-split
-  imports keep working.
+  examples), plus `handlers_service.py` for service accounts and API tokens.
+  `handlers_impl.py` re-exports all of them for existing imports.
 - `core.py` — `initialize_permission_handlers()` (registers every entity),
   `check_permissions()` / `check_course_permissions()` /
   `check_course_family_permissions()`, `get_permitted_course_ids()`, the admin
@@ -51,12 +47,15 @@ through the registered handler for the entity.
 - `query_builders.py` — reusable membership/visibility query fragments.
 - `role_setup.py` — claim sets for the built-in system roles.
 - `api_token_cache.py` — API-token → principal cache.
+- `principal_invalidation.py` — drops a user's cached principals when someone
+  else changes their roles.
 
 ## Role hierarchy
 
 Course roles rank `_owner > _maintainer > _lecturer > _tutor > _student`;
 organization / course-family scope roles rank `_owner > _manager > _developer`;
-the system role is `_admin`. A check for role *R* is satisfied by *R or higher*
+system roles are `_admin` and the delegated roles seeded from `role_setup.py`
+(`_user_manager`, `_organization_manager`, …). A check for role *R* is satisfied by *R or higher*
 (`course_role_hierarchy.get_allowed_roles(R)`).
 
 ## Claim structure

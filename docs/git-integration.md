@@ -13,10 +13,10 @@ There are two providers and three delivery/hosting modes.
 | | **In-system Forgejo** | **External GitLab** | **Download** |
 |---|---|---|---|
 | `provider` | `forgejo` | `gitlab` | any / none |
-| `base_url` | omit (the managed instance) | required (e.g. `https://gitlab.tugraz.at`) | — |
+| `base_url` | omit (the managed instance) | required (e.g. `https://gitlab.example.org`) | — |
 | Where creds live | the system server's — nothing on the course | the **course's own** group token, on the binding | — |
 | Course home | one Forgejo org per course | a GitLab group under `parent_group_id` | template archive only |
-| Student access | forked repo + babysat clone token | student's own repo via their PAT | archive download, no repo |
+| Student access | forked repo + platform-issued clone token | student's own repo via their PAT | archive download, no repo |
 | `delivery` | `git` | `git` | `download` |
 
 - **In-system managed Forgejo** — the platform's own Forgejo, run as part of the stack. It
@@ -36,7 +36,7 @@ There are two providers and three delivery/hosting modes.
 - **CourseGitBinding** — one per course. Points at a `GitServer` and carries the
   course-specific bits: for GitLab, `parent_group_id` and an **encrypted** `token`
   (the group access token). Template/reference repo references live here too.
-- **CourseMemberRepository** — the 1:1 mapping of a course member to their student repo.
+- **CourseMemberGitRepository** — the 1:1 mapping of a course member to their student repo.
   (A separate, older per-submission-group home under `submission_group.properties` still
   exists for team assignments.)
 
@@ -74,7 +74,7 @@ The `git:` block on a course is a `CourseGitConfig`:
 | `provider` | all | `forgejo` or `gitlab`. `forgejo` with no `base_url` = the in-system managed Forgejo. |
 | `base_url` | GitLab | Server URL. Required for external GitLab; omit for managed Forgejo. |
 | `parent_group_id` | GitLab | Parent group id/path the course group is created under. |
-| `token` | GitLab | Group access token, stored **encrypted** on the binding. Supports `${ENV_VAR}`. |
+| `token` | GitLab | Group access token, stored **encrypted** on the binding (taken literally). |
 | `template_repo` / `template_url` | optional | Explicit template ref/URL (auto-derived for managed servers). |
 | `default_branch` | optional | Template default branch (defaults to `main`). |
 | `student_repo_modes` | optional | Allowed hosting modes: subset of `['managed', 'external', 'download']`. |
@@ -86,9 +86,9 @@ instances), **not** by a machine-specific `git_server_id` UUID — so the same f
 across systems. At deploy time the backend resolves `(provider, base_url)` to the registry
 server, creating a tokenless GitLab pointer if none exists yet.
 
-**Token handling.** `${ENV_VAR}` in `token` is expanded **client-side** (by the CLI / web
-uploader) before the request leaves — the backend receives the literal token, encrypts it,
-and stores it on the binding. See [Credentials & security](#credentials--security).
+**Token handling.** The backend does not expand `${ENV_VAR}` in `token`: it takes the
+value literally, encrypts it, and stores it on the binding, so a file uploaded via the web
+or VSCode must carry the real token. See [Credentials & security](#credentials--security).
 
 ### Example: in-system Forgejo
 
@@ -109,9 +109,9 @@ course:
   path: prog1
   git:
     provider: gitlab
-    base_url: https://gitlab.tugraz.at
+    base_url: https://gitlab.example.org
     parent_group_id: "12345"          # course group is created under this
-    token: ${GITLAB_PROG1_TOKEN}      # group token; expanded client-side, stored encrypted
+    token: glpat-xxxxxxxxxxxx         # group token; stored encrypted
     default_branch: main
 ```
 
@@ -128,7 +128,7 @@ course:
 ## Credentials & security
 
 - **Forgejo** uses the system server's credentials. Students never handle a token: each gets
-  a **babysat, per-user rotating clone token** minted on demand.
+  a **per-user clone token** that the platform mints on demand and rotates.
 - **GitLab** uses the course's own **group access token** (on the binding) for
   server-side operations — creating the course group, template/reference repos, and forking
   student repos. Students authenticate with their **own** GitLab PAT (registered via the
@@ -150,7 +150,7 @@ course:
   solution files, `additionalFiles`, `mediaFiles`, and exposed `meta.yaml`/`test.yaml`).
 - **Student repos are provisioned lazily** — on demand (e.g. the VSCode "Set up repository"
   action or first access), not eagerly on enrollment. On Forgejo the repo is forked and a
-  babysat clone token issued; on GitLab it is forked using the group token and the student is
+  clone token issued; on GitLab it is forked using the group token and the student is
   granted access with their own PAT.
 
 ## Relevant endpoints

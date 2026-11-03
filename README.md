@@ -1,6 +1,6 @@
 # Computor
 
-A university programming course management platform with automated GitLab integration for repository and group management.
+A university programming course management platform with git integration (in-system Forgejo or an external GitLab) for course, template and student repositories.
 
 ## Packages
 
@@ -14,6 +14,7 @@ for the course, workspace, and Lena paths.
 | `computor-types` | Pydantic DTOs - shared data structures for API contracts |
 | `computor-client` | Auto-generated async HTTP client library |
 | `computor-backend` | FastAPI server with business logic and Temporal workflows |
+| `computor-testing` | Test-execution framework that runs and grades student code per language |
 | `computor-web` | Next.js frontend application |
 
 ## Prerequisites
@@ -172,6 +173,10 @@ Start at **[docs/README.md](docs/README.md)** — the index and quick start. Fro
 - [Backend Patterns](docs/backend-patterns.md) — EntityInterface/DTOs, permissions, Temporal
 - [Git Integration](docs/git-integration.md) — course git: Forgejo vs. GitLab, deploy-from-file
 - [Self-Update](ops/docs/SELF_UPDATE.md) — one-click system updates from the admin UI / CLI
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

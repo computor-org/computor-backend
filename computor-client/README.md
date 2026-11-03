@@ -7,20 +7,23 @@ A type-safe async HTTP client library for the Computor platform.
 - **Async/await support** - Built on httpx for modern async Python
 - **Type-safe** - Full type hints and Pydantic model integration
 - **Auto-generated clients** - Endpoint clients generated from API definitions
-- **Authentication** - Built-in support for username/password and token authentication
+- **Authentication** - API tokens and SSO bearer tokens
 - **Automatic token refresh** - Seamless handling of expired tokens
 - **Comprehensive exceptions** - Detailed error handling with HTTP status mapping
 
 ## Installation
 
+The package is not published on PyPI; install it from the monorepo root
+(after `computor-types`):
+
 ```bash
-pip install computor-client
+pip install -e computor-client/
 ```
 
 Or install with development dependencies:
 
 ```bash
-pip install computor-client[dev]
+pip install -e "computor-client/[dev]"
 ```
 
 ## Quick Start
@@ -31,7 +34,7 @@ from computor_client import ComputorClient
 async def main():
     async with ComputorClient(
         base_url="http://localhost:8000",
-        api_token="ct_...",
+        api_token="ctp_...",
     ) as client:
         # List resources
         organizations = await client.organizations.list()
@@ -72,7 +75,7 @@ option** — it exposes no local credential-exchange endpoint.
 ```python
 async with ComputorClient(
     base_url="http://localhost:8000",
-    api_token="ct_...",          # sent as the X-API-Token header
+    api_token="ctp_...",          # sent as the X-API-Token header
 ) as client:
     ...
 ```
@@ -233,4 +236,4 @@ mypy src/computor_client
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT License - see the [LICENSE](../LICENSE) file at the repository root.

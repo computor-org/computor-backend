@@ -9,7 +9,7 @@ Backend API and services for the Computor platform.
 - Temporal.io workflow orchestration
 - Redis caching
 - MinIO object storage
-- GitLab integration
+- Git integration (in-system Forgejo or external GitLab)
 
 ## Installation
 

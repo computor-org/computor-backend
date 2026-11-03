@@ -15,7 +15,7 @@ User (is_service = true)  ──1:1──  Service  ──N:1──  ServiceType
 
 | Table | What it is |
 |---|---|
-| `user` with `is_service = true` | The **identity**. Has no password (the column was dropped when Keycloak SSO became the only human login) and holds **no roles**. |
+| `user` with `is_service = true` | The **identity**. Has no password (humans sign in only through Keycloak SSO) and holds **no roles**. |
 | `service` | The **metadata**: `slug`, `config`, `enabled`, `last_seen_at`. One row per service, 1:1 with its user. |
 | `service_type` | The **taxonomy**: an ltree `path` (`testing.temporal`, `agent`) plus a `category` that decides default token scopes. |
 | `api_token` | The **credential**, hung off the *user*, not the service. `ctp_<32 chars>`, stored SHA-256 hashed; only the 12-char prefix is kept in the clear. |
@@ -68,7 +68,7 @@ still land on whichever runner declares no version.
 
 The binding is resolved at upload (`api/examples.py:_resolve_testing_service_id`),
 at assignment (`lecturer_deployment:_link_testing_service`) and again at test time
-(`business_logic/testing_service.py:resolve_testing_service`) — all three now
+(`business_logic/testing_service.py:resolve_testing_service`) — all three
 delegate to the single rule above.
 
 `CourseContent.testing_service_id`, `ExampleVersion.testing_service_id` and
@@ -97,13 +97,6 @@ CLI; `matlab` talks to a MATLAB engine over Pyro5.
 Creating a `testing.*` service without a language is rejected at creation. If one
 somehow reaches dispatch without it, the run fails loudly naming the service and
 the valid values — it never guesses.
-
-> **Historical note.** Until 2026-07, `TestingBackendFactory` looked the *slug* up
-> in a hardcoded table of eight `itpcp.exec.*` names (and `ComputorTestingBackend`
-> kept a second copy of the same table). A service registered under any other slug
-> bound to examples correctly and then died at execution with "Unknown testing
-> backend", so adding a testing system meant a code change and a redeploy. Both
-> tables are gone. Adding a testing system is now a data change.
 
 ## Adding a service account
 
@@ -148,14 +141,12 @@ purpose: mint the new token, update the container's `API_TOKEN`, restart it, the
 revoke the old one.
 
 The token value is also validated with the same checker authentication uses
-(`ctp_` + exactly 32 url-safe base64 characters). A near-miss used to be stored
-happily and then rejected on every request as "Invalid API token format".
+(`ctp_` + exactly 32 url-safe base64 characters), so a near-miss is rejected at
+seeding rather than on every request.
 
 **Expiry is a cutoff, not a nudge.** `expires_days: 365` means that a year after
-first boot the worker stops authenticating and every test fails — and because
-the seeding check only asked "is there an unrevoked token", it kept reporting
-*already present* while the pipeline was dead. Startup now warns for the last 30
-days, and if the token has already lapsed while the deployment file still pins
+first boot the worker stops authenticating and every test fails. Startup warns
+for the last 30 days, and if the token has already lapsed while the deployment file still pins
 that same value, it extends the expiry (same secret, so nothing needs
 reconfiguring). Omit `expires_days` for a token that never expires.
 
@@ -167,7 +158,7 @@ docker-compose        Service (DB)                 worker container
   --queues=testing    config.temporal.task_queue    → config.language → runtime setup
 ```
 
-Three things must agree — and two of them are now checked for you:
+Three things must agree — and two of them are checked for you:
 
 1. The container's `API_TOKEN` must be an active token on the service's user.
 2. `config.temporal.task_queue` must equal the container's `--queues=` value.
@@ -201,8 +192,8 @@ Scaling *one* language across several containers does not need any of this —
 use `replicas` on the same queue.
 
 `last_seen_at` on the service is a heartbeat (`PUT /service-accounts/{id}/heartbeat`).
-The unified testing worker does not currently call it, so "never" there is not yet
-evidence of a problem.
+The unified testing worker does not call it, so "never" there is no evidence of a
+problem.
 
 ## Token scopes are additive — they never restrict
 
@@ -229,9 +220,9 @@ That asymmetry is why only admins may mint a token for another human, and why a
 ### …but there is a ceiling on what you may grant
 
 Because scopes only ever add authority, "who may mint" is not by itself enough:
-a `_service_manager` holds nothing but `service:*` and `api_token:*`, yet could
-once mint a service token carrying `result:update` or `user:create` and then
-authenticate as that service — forging grades in any course.
+a `_service_manager` holds nothing but `service:*` and `api_token:*`, and without
+a limit could mint a service token carrying `result:update` or `user:create` and
+then authenticate as that service — forging grades in any course.
 
 `assert_may_grant_scopes` (`business_logic/api_tokens.py`) closes that:
 
@@ -244,8 +235,8 @@ So provisioning a testing worker still works — `testing` category ⇒ its 15
 scopes — while a service manager cannot invent authority the type was never
 meant to have. The ceiling applies at every write: `POST /api-tokens`,
 `POST /api-tokens/admin/create`, and `PATCH /api-tokens/admin/{id}` (re-scoping
-is minting by another name). Because the same table is now also the allow-list,
-keep the defaults tight — `worker` deliberately no longer includes
+is minting by another name). Because the same table is also the allow-list,
+keep the defaults tight — `worker` deliberately excludes
 `course:create`/`course:update`.
 
 ## Governance
@@ -268,15 +259,17 @@ service), and without the mint guard they could issue themselves admin authority
 
 ## AI agents
 
-The `agent` ServiceType is seeded and usable today as **plumbing**: create an agent
+The `agent` ServiceType is seeded and usable as **plumbing**: create an agent
 service, mint it a token, and enrol it in a course from the service detail page.
 Enrolment gives it that course role's permissions through normal course-membership
 claims, independent of its token scopes. Because the `agent` type has
 `requires_workspace = false`, `_should_skip_service_account` skips the post-create
 hooks — no git repository is provisioned.
 
-There is **no agent runtime**: no LLM calls, no `@mention` activation, no websocket
-consumer. `DEFAULT_SERVICE_SCOPES` has no `agent` entry either, so agent tokens
+The backend contains **no agent runtime** and makes no LLM calls. The course tutor
+Lena runs as a separate `computor-agent` process under a configured tutor account
+(see [tutor-mentions.md](tutor-mentions.md)). `DEFAULT_SERVICE_SCOPES` has no
+`agent` entry, so agent tokens
 default to `[]` and an agent's authority comes from its course membership.
 
 ## Fields that look meaningful but are not

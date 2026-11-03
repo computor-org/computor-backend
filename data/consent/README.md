@@ -2,9 +2,11 @@
 
 This directory holds the **privacy-notice / consent policy versions** that back
 the consent gate (`computor-backend` `middleware/consent.py`). It sits parallel
-to `data/deployments/` but is **not** applied at startup — publishing a notice
-immediately re-gates every user, so it is always an explicit action via the
-web UI: **System → Privacy Notices → Publish** (admins only).
+to `data/deployments/`. On startup the backend publishes every version
+directory here that is not yet in the database (write-once, so re-runs are a
+no-op); `CONSENT_BOOTSTRAP_ENABLED=false` turns that off, and `CONSENT_DIR`
+points it at another directory. A notice can also be published by an admin in
+the web UI: **System → Privacy notices → Publish**.
 
 Publishing calls `POST /consent/policy-versions` (admin), which uploads the Markdown
 to MinIO (`policies/{version}/{lang}.md`) and inserts an **append-only** row.
@@ -43,8 +45,5 @@ Each `{lang}.md` is the full Markdown privacy notice for that language code
 - **Publishing gates users.** With `effective_from <= now`, every user who has
   not consented to the new version is redirected to `/consent` on their next
   request (within the ≤300 s cache TTL). Bump only for material changes.
-- **VS Code extension** has no consent handling yet — publishing a notice will
-  cause 403s there for unconsented users. Confirm the extension is handled
-  before publishing in production.
 - **Legal basis / wording** must match the policy text — see
-  `docs/consent-gate.md` before publishing the first production version.
+  `docs/consent-gate.md` before publishing a version.

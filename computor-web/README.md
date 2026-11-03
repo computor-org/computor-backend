@@ -14,7 +14,6 @@ The app talks to the Computor FastAPI backend. Configuration:
 | Env var | Default | Purpose |
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Backend API base URL. Baked in at build time (`NEXT_PUBLIC_*`), so set it when building the Docker image for production. |
-| `NEXT_PUBLIC_ANALYTICS_DEMO` | unset | `1` renders the lecturer analytics against synthetic data with no backend/auth — local UI development only, never set in production. |
 
 The production image is built from `docker/web/Dockerfile` at the monorepo root (yarn,
 `--frozen-lockfile`, standalone output); `./computor.sh` drives it and passes
@@ -37,7 +36,7 @@ src/hooks/              useResource (data fetching), usePermissions, …
 src/api/client.ts       APIClient used by all generated clients
 src/generated/          API clients + types generated from the backend
                         (do not edit by hand; regenerate via ../generate.sh)
-src/services/           Auth services (SSO + basic fallback)
+src/services/           Auth services (Keycloak SSO)
 e2e/                    Playwright tests (network-mocked, no backend needed)
 ```
 
@@ -52,7 +51,7 @@ Conventions:
 yarn test:e2e       # Playwright; starts its own next dev server on :3100
 ```
 
-The e2e tests mock the backend at the network layer (`e2e/fixtures.ts`), so they need no running API or database. First run: `npx playwright install chromium`.
+The e2e tests mock the backend at the network layer (`page.route` in each spec), so they need no running API or database. First run: `npx playwright install chromium`.
 
 ## Lint / build
 
