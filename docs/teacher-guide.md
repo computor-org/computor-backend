@@ -124,7 +124,7 @@ numbers by `<n>`, quoted values by `<str>`, file paths by `<path>` and memory
 addresses by `<addr>`. Plain names in quotes, such as `'np'` in
 "name 'np' is not defined", are kept because they usually name the actual
 problem. So "assert 3 == 4" and "assert 7 == 2" become one group,
-"assert <n> == <n>".
+`assert <n> == <n>`.
 
 Things to know:
 

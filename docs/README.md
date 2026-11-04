@@ -17,7 +17,7 @@ Coder workspace integration.
 | **[consent-gate.md](consent-gate.md)** | The GDPR consent gate: policy versions, the `/consent` endpoints, the middleware and how to publish a privacy notice. |
 | **[public-learning.md](public-learning.md)** | The anonymous `/learn` course reader, public course registration, hosted-workspace capacity and the public Ask Lena form. |
 | **[tutor-mentions.md](tutor-mentions.md)** | The Lena tutor agent: `@lena` mentions, routing unaddressed messages and unit description drafts. |
-| **[teacher-guide.md](teacher-guide.md)** | For lecturers and tutors: course statistics, a student's attempt timeline and feedback history, typical errors, flags and the tutor grading pages. |
+| **[teacher-guide.md](teacher-guide.md)** ([Deutsch](teacher-guide_de.md)) | For lecturers and tutors: course statistics, a student's attempt timeline and feedback history, typical errors, flags and the tutor grading pages. |
 | **[../ops/docs/SELF_UPDATE.md](../ops/docs/SELF_UPDATE.md)** | One-click system updates from the admin UI (System → Updates) or `./computor.sh update` — config, update flow, rollback, and the rules that keep changes update-friendly. |
 
 New here? Read them in that order. For a specific task, jump straight to the relevant doc.
