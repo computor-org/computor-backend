@@ -8,7 +8,7 @@ import Button from '@/src/components/ui/Button';
 import type { UiLanguage } from '@/src/hooks/useBrowserLanguage';
 
 // The learner documentation lives with the VS Code extension, which is also
-// what runs in the browser workspace. It is written in English only.
+// what runs in the browser workspace.
 const DOCS = 'https://github.com/computor-org/computor-vscode/blob/main/docs';
 const HELP = {
   browser: `${DOCS}/user-guide.md#student-guide`,
@@ -19,6 +19,15 @@ const HELP = {
   files: `${DOCS}/user-guide.md#keeping-a-copy-of-your-work`,
 };
 
+const HELP_DE: typeof HELP = {
+  browser: `${DOCS}/user-guide_de.md#leitfaden-für-studierende`,
+  local: `${DOCS}/user-guide_de.md#erste-schritte`,
+  course: `${DOCS}/help/student-course_de.md`,
+  unit: `${DOCS}/help/student-unit_de.md`,
+  assignment: `${DOCS}/help/student-assignment_de.md`,
+  files: `${DOCS}/user-guide_de.md#eine-kopie-deiner-arbeit-aufbewahren`,
+};
+
 const mention = (text: string) => <code className="rounded bg-canvas px-1 font-mono text-[0.9em]">{text}</code>;
 
 const COPY = {
@@ -27,7 +36,7 @@ const COPY = {
     lena: <>Fragen zum Kurs? Schreib {mention('@lena')} in die Nachrichten einer Aufgabe. Technische Probleme:</>,
     report: 'Problem melden',
     more: 'Mehr Hilfe',
-    guides: 'Anleitungen (auf Englisch)',
+    guides: 'Anleitungen',
     browser: 'Im Browser arbeiten',
     local: 'Mit VS Code auf dem eigenen Rechner arbeiten',
     structure: 'Kurse, Einheiten und Aufgaben:',
@@ -104,6 +113,7 @@ export default function SelfEnrollmentHelp({
   onLeave: () => Promise<void>;
 }) {
   const t = COPY[language];
+  const help = language === 'de' ? HELP_DE : HELP;
   const [confirming, setConfirming] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const from = encodeURIComponent(`/courses/${courseId}`);
@@ -133,19 +143,19 @@ export default function SelfEnrollmentHelp({
         <summary className="cursor-pointer text-accent-text hover:underline">{t.more}</summary>
         <ul className="mt-2 list-disc space-y-1 pl-5 marker:text-muted">
           <li>
-            {t.guides}: <External href={HELP.browser}>{t.browser}</External>
+            {t.guides}: <External href={help.browser}>{t.browser}</External>
             {', '}
-            <External href={HELP.local}>{t.local}</External>
+            <External href={help.local}>{t.local}</External>
           </li>
           <li>
-            {t.structure} <External href={HELP.course}>{t.course}</External>
+            {t.structure} <External href={help.course}>{t.course}</External>
             {', '}
-            <External href={HELP.unit}>{t.unit}</External>
+            <External href={help.unit}>{t.unit}</External>
             {', '}
-            <External href={HELP.assignment}>{t.assignment}</External>
+            <External href={help.assignment}>{t.assignment}</External>
           </li>
           <li>
-            <External href={HELP.files}>{t.files}</External>
+            <External href={help.files}>{t.files}</External>
             {t.filesHow}
           </li>
           <li>
