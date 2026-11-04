@@ -464,7 +464,7 @@ See [dependencies/README.md](dependencies/README.md) for full documentation.
 
 ## Documentation
 
-- [User Guide](docs/USER_GUIDE.md) - For exercise authors writing test.yaml files
+- [User Guide](docs/USER_GUIDE.md) ([Deutsch](docs/USER_GUIDE_de.md)) - For exercise authors writing test.yaml files
 - [Developer Guide](docs/DEVELOPER_GUIDE.md) - For developers extending the framework
 - [Blocks README](blocks/README.md) - Block system for VSCode extension
 - [Dependencies README](dependencies/README.md) - Dependency management
