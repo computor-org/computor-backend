@@ -6,6 +6,13 @@ The reader uses no API endpoints and no runtime database or storage access.
 The web app renders the course hierarchy, descriptions, math and DE/EN variants.
 GitHub is optional provenance and reuse information.
 
+The Python environment and course setup are described in the course guide in
+[English](https://github.com/computor-org/data-science-python/blob/main/docs/GETTING_STARTED.md)
+or [German](https://github.com/computor-org/data-science-python/blob/main/docs/GETTING_STARTED_de.md).
+Course help links follow the web interface's reading language, including the
+translated section anchors. The `/public/learning` metadata keeps its
+English `guide_url`; the web reader does not consume that endpoint.
+
 Every frontend `yarn build` regenerates the bundle from the public mirror pinned
 in `computor-web/learning-source.json`. The build downloads that exact commit
 and checks the archive SHA-256 before extraction. Updating course content means

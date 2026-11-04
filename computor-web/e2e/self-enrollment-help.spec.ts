@@ -28,16 +28,16 @@ function json(route: Route, body: unknown, status = 200) {
 
 type Enrollment = { self_registered: boolean; can_leave: boolean } | null;
 
-async function signIn(page: Page, enrollment: Enrollment) {
+async function signIn(page: Page, enrollment: Enrollment, language: string | null = null) {
   const calls: { method: string; path: string; body: string }[] = [];
   let left = false;
-  await page.addInitScript(() => {
+  await page.addInitScript((language) => {
     sessionStorage.setItem('auth_user', JSON.stringify({
       id: 'learner', username: 'learner', email: 'learner@example.org',
-      givenName: 'Course', familyName: 'Learner', role: 'student', systemRoles: [], language: null,
+      givenName: 'Course', familyName: 'Learner', role: 'student', systemRoles: [], language,
     }));
     sessionStorage.setItem('auth_provider', 'sso');
-  });
+  }, language);
   await page.route(`${API_ORIGIN}/**`, (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -60,7 +60,8 @@ async function signIn(page: Page, enrollment: Enrollment) {
       return json(route, { is_admin: false, course: left ? {} : { [COURSE_ID]: ['_student'] } });
     }
     if (path === '/user') {
-      return json(route, { id: 'learner', email: 'learner@example.org', given_name: 'Course', family_name: 'Learner', user_roles: [] });
+      return json(route, { id: 'learner', email: 'learner@example.org', given_name: 'Course', family_name: 'Learner',
+        profile: { language_code: language }, user_roles: [] });
     }
     if (path === '/instance-info') return json(route, { issue_reporting: { enabled: true, mode: 'tickets' } });
     if (path === '/issue-reports') {
@@ -90,10 +91,10 @@ test.describe('German learner', () => {
     await expect(page.getByRole('link', { name: 'Konto löschen' })).toHaveCount(0);
     await page.getByText('Mehr Hilfe', { exact: true }).click();
     await expect(page.getByRole('link', { name: 'Mit VS Code auf dem eigenen Rechner arbeiten' })).toHaveAttribute(
-      'href', /computor-vscode\/blob\/main\/docs\/user-guide\.md#getting-started$/,
+      'href', /computor-vscode\/blob\/main\/docs\/user-guide_de\.md#erste-schritte$/,
     );
     await expect(page.getByRole('link', { name: 'Eigene Dateien herunterladen' })).toHaveAttribute(
-      'href', /#keeping-a-copy-of-your-work$/,
+      'href', /user-guide_de\.md#eine-kopie-deiner-arbeit-aufbewahren$/,
     );
     await expect(page.getByRole('link', { name: 'Konto löschen' })).toHaveAttribute(
       'href', /^\/problem\?topic=delete-account/,
@@ -158,3 +159,35 @@ test('the English course page offers the same help', async ({ page }) => {
   await expect(page.getByText('More help', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Leave course' })).toBeVisible();
 });
+
+for (const { selected, locale, suffix, anchors } of [
+  { selected: 'de', locale: 'en-US', suffix: '_de',
+    anchors: ['leitfaden-für-studierende', 'erste-schritte', 'eine-kopie-deiner-arbeit-aufbewahren'] },
+  { selected: 'en', locale: 'de-AT', suffix: '',
+    anchors: ['student-guide', 'getting-started', 'keeping-a-copy-of-your-work'] },
+  { selected: 'fr', locale: 'fr-FR', suffix: '',
+    anchors: ['student-guide', 'getting-started', 'keeping-a-copy-of-your-work'] },
+]) {
+  test.describe(`Documentation for a ${selected} reader`, () => {
+    test.use({ locale });
+    test('opens guides in the interface language', async ({ page }) => {
+      await signIn(page, { self_registered: true, can_leave: true }, selected);
+      await page.goto(`/courses/${COURSE_ID}`);
+      const german = selected === 'de';
+      await page.getByText(german ? 'Mehr Hilfe' : 'More help', { exact: true }).click();
+      const docs = 'https://github.com/computor-org/computor-vscode/blob/main/docs';
+      const labels = german
+        ? ['Im Browser arbeiten', 'Mit VS Code auf dem eigenen Rechner arbeiten', 'Eigene Dateien herunterladen']
+        : ['Working in the browser', 'Working with VS Code on your own computer', 'Downloading your own files'];
+      for (const [index, label] of labels.entries()) {
+        const href = await page.getByRole('link', { name: label, exact: true }).getAttribute('href');
+        expect(decodeURI(href ?? '')).toBe(`${docs}/user-guide${suffix}.md#${anchors[index]}`);
+      }
+      const helpLabels = german ? ['Kurse', 'Einheiten', 'Aufgaben'] : ['Courses', 'Units', 'Assignments'];
+      for (const [index, name] of ['course', 'unit', 'assignment'].entries()) {
+        await expect(page.locator('details').getByRole('link', { name: helpLabels[index], exact: true }))
+          .toHaveAttribute('href', `${docs}/help/student-${name}${suffix}.md`);
+      }
+    });
+  });
+}
