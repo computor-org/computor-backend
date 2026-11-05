@@ -226,6 +226,8 @@ class TestComputorC(CompiledTestClass):
             elif value is not None:
                 if count != int(value):
                     pytest.fail(f"`{name}` found {count} times, expected {value}")
+            elif count == 0:
+                pytest.fail(f"`{name}` not found in source")
 
         elif name in analysis.get("functions", []):
             # Function exists

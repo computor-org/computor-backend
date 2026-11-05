@@ -260,8 +260,7 @@ def analyze_source(source_path: str, root: Optional[str] = None) -> Dict[str, An
                 'typedef', 'enum', 'union', 'malloc', 'free', 'new', 'delete']
 
     for kw in keywords:
-        count = len(re.findall(rf'\b{kw}\b', content_no_comments))
-        if count > 0:
-            analysis["keywords"][kw] = count
+        # Absent keywords stay as 0 so forbidden-keyword ranges can pass.
+        analysis["keywords"][kw] = len(re.findall(rf'\b{kw}\b', content_no_comments))
 
     return analysis
