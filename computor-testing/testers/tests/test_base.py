@@ -576,6 +576,8 @@ def apply_token_exchange_to_code(
     code_list: List[str], report: dict, where: str
 ) -> List[str]:
     """Apply token exchange to setup/teardown code lists."""
+    # where may be a Solution enum, whose f-string form is "Solution.student".
+    where = getattr(where, "value", where)
     file_list = report.get(f"{where}_file_list", [])
     command_list = report.get(f"{where}_command_list", [])
     return [token_exchange(code, file_list, command_list) for code in code_list]
