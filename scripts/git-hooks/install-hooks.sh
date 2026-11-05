@@ -5,12 +5,11 @@ set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 REPO_ROOT="$( cd "$SCRIPT_DIR/../.." && pwd )"
-GIT_HOOKS_DIR="$REPO_ROOT/.git/hooks"
 
 echo "🔧 Installing git hooks..."
 
-# Check if we're in a git repository
-if [ ! -d "$REPO_ROOT/.git" ]; then
+# In a worktree .git is a file; git resolves the shared hooks directory.
+if ! GIT_HOOKS_DIR="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-path hooks 2>/dev/null)"; then
     echo "❌ Error: Not in a git repository!"
     exit 1
 fi
