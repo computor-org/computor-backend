@@ -8,11 +8,13 @@ REPO_ROOT="$( cd "$SCRIPT_DIR/../.." && pwd )"
 
 echo "🔧 Installing git hooks..."
 
-# In a worktree .git is a file; git resolves the shared hooks directory.
-if ! GIT_HOOKS_DIR="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-path hooks 2>/dev/null)"; then
+# In a worktree .git is a file. Use the shared git dir, not --git-path hooks,
+# which follows a global core.hooksPath and would overwrite hooks of all repos.
+if ! GIT_COMMON_DIR="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; then
     echo "❌ Error: Not in a git repository!"
     exit 1
 fi
+GIT_HOOKS_DIR="$GIT_COMMON_DIR/hooks"
 
 # Create hooks directory if it doesn't exist
 mkdir -p "$GIT_HOOKS_DIR"
