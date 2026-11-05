@@ -293,10 +293,14 @@ ensure_maintenance_page() {
 activate_traefik_maintenance() {
     maintenance_paths
     mkdir -p "$TRAEFIK_DYNAMIC_DIR"
-    # Rewrite to the directory, not to index.html: the static server answers
-    # ".../index.html" with "301 Location: ./", which the browser resolves
-    # against the ORIGINAL url and caches permanently — /api/coder/workspaces
-    # became a cached redirect loop on /api/coder/ after the window closed.
+    # Every URL the browser asks for during the window gets this answer, and
+    # whatever it caches outlives the window:
+    #  - rewrite to the directory, not to index.html: the static server answers
+    #    ".../index.html" with "301 Location: ./", resolved against the ORIGINAL
+    #    url and cached permanently (/api/coder/workspaces looped on /api/coder/);
+    #  - no-store: the page itself carries an old Last-Modified and no
+    #    Cache-Control, so a browser would heuristically keep serving it for
+    #    /api/... for days after the window closed.
     cat > "$MAINTENANCE_CONFIG" << 'YAMLEOF'
 http:
   routers:
@@ -308,11 +312,16 @@ http:
       service: maintenance-page
       middlewares:
         - maintenance-rewrite
+        - maintenance-no-store
 
   middlewares:
     maintenance-rewrite:
       replacePath:
         path: "/_maintenance/"
+    maintenance-no-store:
+      headers:
+        customResponseHeaders:
+          Cache-Control: "no-store"
 
   services:
     maintenance-page:
