@@ -175,6 +175,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_public_workspace_capacity.py
           computor-backend/src/computor_backend/tests/test_admin_mfa_db.py
           computor-backend/src/computor_backend/tests/test_course_analytics_db.py
+          computor-backend/src/computor_backend/tests/test_member_deletion_db.py
           computor-backend/src/computor_backend/tests/test_support_tickets_db.py
           computor-backend/src/computor_backend/tests/test_course_deploy_i18n.py
           computor-backend/src/computor_backend/tests/test_sync_course_metadata.py

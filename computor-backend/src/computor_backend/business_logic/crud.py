@@ -673,6 +673,74 @@ def _validate_course_content_deletion(entity, db: Session):
             )
 
 
+def _release_submission_groups(course_member_ids, db: Session) -> int:
+    """
+    Free course members from the submission groups that pin them, before a delete.
+
+    Enrollment creates one submission group per assignment with the student as
+    its only member, and ``submission_group_member.course_member_id`` is
+    ``ondelete='RESTRICT'``. So even untouched groups blocked deleting the member,
+    or the user behind it, with an integrity error (computor-org/issues#608).
+
+    A group without submission artifacts, results or messages holds no work: a
+    group these members are alone in is deleted, and they leave a group they
+    share. A group that holds any of those still blocks; nothing is changed then.
+
+    Args:
+        course_member_ids: The course members about to be deleted
+        db: Database session
+
+    Returns:
+        How many of their groups hold work. When that is not zero, nothing was
+        changed and the caller refuses the delete.
+    """
+    from computor_backend.model.artifact import SubmissionArtifact
+    from computor_backend.model.course import SubmissionGroup, SubmissionGroupMember
+    from computor_backend.model.message import Message
+    from computor_backend.model.result import Result
+
+    if not course_member_ids:
+        return 0
+
+    group_ids = {
+        group_id for (group_id,) in db.query(SubmissionGroupMember.submission_group_id).filter(
+            SubmissionGroupMember.course_member_id.in_(course_member_ids),
+        ).distinct()
+    }
+    if not group_ids:
+        return 0
+
+    groups_with_work = set()
+    for model in (SubmissionArtifact, Result, Message):
+        groups_with_work.update(
+            group_id for (group_id,) in db.query(model.submission_group_id).filter(
+                model.submission_group_id.in_(group_ids),
+            ).distinct()
+        )
+    if groups_with_work:
+        return len(groups_with_work)
+
+    shared = {
+        group_id for (group_id,) in db.query(SubmissionGroupMember.submission_group_id).filter(
+            SubmissionGroupMember.submission_group_id.in_(group_ids),
+            SubmissionGroupMember.course_member_id.notin_(course_member_ids),
+        ).distinct()
+    }
+    # Bulk statements on purpose: rows loaded into the session would have the
+    # ORM NULL their NOT NULL keys on flush, the failure this replaces.
+    if shared:
+        db.query(SubmissionGroupMember).filter(
+            SubmissionGroupMember.submission_group_id.in_(shared),
+            SubmissionGroupMember.course_member_id.in_(course_member_ids),
+        ).delete(synchronize_session=False)
+    if group_ids - shared:
+        # Their member rows go with them (ondelete='CASCADE').
+        db.query(SubmissionGroup).filter(
+            SubmissionGroup.id.in_(group_ids - shared),
+        ).delete(synchronize_session=False)
+    return 0
+
+
 async def delete_entity(
     permissions: Principal,
     db: Session,
@@ -725,6 +793,28 @@ async def delete_entity(
         # Special validation for CourseContentType deletion
         elif db_type.__tablename__ == 'course_content_type':
             _validate_course_content_type_deletion(entity, db)
+
+        elif db_type.__tablename__ == 'course_member':
+            blocking = _release_submission_groups([entity.id], db)
+            if blocking:
+                raise BadRequestException(
+                    detail=f"Cannot delete this course member because their submission groups hold submissions, results or messages (groups: {blocking}).",
+                    context={"submission_group_count": blocking},
+                )
+
+        elif db_type.__tablename__ == 'user':
+            from computor_backend.model.course import CourseMember
+
+            member_ids = [
+                member_id for (member_id,) in
+                db.query(CourseMember.id).filter(CourseMember.user_id == entity.id)
+            ]
+            blocking = _release_submission_groups(member_ids, db)
+            if blocking:
+                raise BadRequestException(
+                    detail=f"Cannot delete this user because their submission groups hold submissions, results or messages (groups: {blocking}). Archive the user instead.",
+                    context={"submission_group_count": blocking},
+                )
 
         try:
             db.delete(entity)
