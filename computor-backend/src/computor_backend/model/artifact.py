@@ -169,9 +169,10 @@ class SubmissionGrade(Base):
         ForeignKey('submission_artifact.id', ondelete='CASCADE', onupdate='RESTRICT'),
         nullable=False
     )
+    # NULL: graded by the official tests (Course.submission_feedback != 'human').
     graded_by_course_member_id = Column(
         ForeignKey('course_member.id', ondelete='RESTRICT', onupdate='RESTRICT'),
-        nullable=False
+        nullable=True
     )
 
     # Grading data

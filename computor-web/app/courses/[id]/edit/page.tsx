@@ -18,6 +18,7 @@ import { inputCls, readOnlyInputCls } from '@/src/components/ui/tokens';
 import SectionCard, { SectionHint, SectionStatus } from '@/src/components/SectionCard';
 import PublicCourseField from '@/src/components/courses/PublicCourseField';
 import TutorAgentAutoRouteField from '@/src/components/courses/TutorAgentAutoRouteField';
+import SubmissionFeedbackField, { type SubmissionFeedback } from '@/src/components/courses/SubmissionFeedbackField';
 import DescriptionList from '@/src/components/DescriptionList';
 import Button from '@/src/components/ui/Button';
 import Badge from '@/src/components/Badge';
@@ -66,6 +67,7 @@ const COPY = {
     seats: 'Plätze für die Selbstanmeldung',
     seatsHint: 'Höchstzahl der Studierenden; mitgezählt werden alle, die als Studierende eingeschrieben sind, egal wie sie beigetreten sind. Leer bedeutet unbegrenzt.',
     nothingSaved: 'Es wurde nichts gespeichert.',
+    submissionFeedback: 'Bewertung der Abgaben',
     saving: 'Wird gespeichert …',
     save: 'Speichern',
     locked: 'Gesperrt',
@@ -117,6 +119,7 @@ const COPY = {
     seats: 'Self-registration seats',
     seatsHint: 'Maximum number of students; counts everyone enrolled as a student, however they joined. Empty = unlimited.',
     nothingSaved: 'Nothing was saved.',
+    submissionFeedback: 'Submission grading',
     saving: 'Saving…',
     save: 'Save',
     locked: 'Locked',
@@ -174,6 +177,7 @@ export default function CourseEditPage() {
   const [language, setLanguage] = useState('');
   const [isPublic, setIsPublic] = useState(false);
   const [autoRoute, setAutoRoute] = useState(false);
+  const [submissionFeedback, setSubmissionFeedback] = useState<SubmissionFeedback>('human');
   // Self-registration seat cap; empty = unlimited, same convention as budgets.
   const [maxSelfRegistrations, setMaxSelfRegistrations] = useState('');
   const [seatsError, setSeatsError] = useState<string | null>(null);
@@ -211,6 +215,7 @@ export default function CourseEditPage() {
       setLanguage(c.language_code || '');
       setIsPublic(c.public ?? false);
       setAutoRoute(c.tutor_agent_auto_route ?? false);
+      setSubmissionFeedback(c.submission_feedback ?? 'human');
       setMaxSelfRegistrations(
         c.max_self_registrations != null ? String(c.max_self_registrations) : '',
       );
@@ -283,6 +288,7 @@ export default function CourseEditPage() {
           ...(canSetPublic ? { public: isPublic } : {}),
           max_self_registrations: seatCap,
           tutor_agent_auto_route: autoRoute,
+          submission_feedback: submissionFeedback,
           max_test_runs: parseLimit(maxTestRuns),
           max_submissions: parseLimit(maxSubmissions),
           visible,
@@ -454,6 +460,13 @@ export default function CourseEditPage() {
                 )}
                 <Field label={f.aiTutor}>
                   <TutorAgentAutoRouteField value={autoRoute} onChange={setAutoRoute} />
+                </Field>
+                <Field label={t.submissionFeedback}>
+                  <SubmissionFeedbackField
+                    value={submissionFeedback}
+                    onChange={setSubmissionFeedback}
+                    label={t.submissionFeedback}
+                  />
                 </Field>
                 <div className="flex items-center gap-3">
                   <Button onClick={saveGeneral} loading={savingGeneral} loadingLabel={t.saving}>

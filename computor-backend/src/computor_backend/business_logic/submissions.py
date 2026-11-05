@@ -27,6 +27,7 @@ from computor_backend.model.artifact import (
 )
 from computor_backend.model.result import Result
 from computor_backend.model.course import (
+    Course,
     CourseContent,
     CourseMember,
     SubmissionGroup,
@@ -53,6 +54,8 @@ from computor_backend.storage_security import perform_full_file_validation, sani
 from computor_backend.storage_config import MAX_UPLOAD_SIZE, format_bytes
 from computor_backend.websocket import publish_submission_group_updated
 from computor_types.artifacts import SubmissionArtifactGet
+from computor_types.grading import GradingStatus
+from computor_types.tasks import ResultStatus
 from computor_types.submissions import SubmissionUploadResponseModel
 
 logger = logging.getLogger(__name__)
@@ -107,6 +110,68 @@ def announce_submission_group_updated(
             "Could not announce update of submission group %s", submission_group_id,
             exc_info=True,
         )
+
+
+# Course.submission_feedback values in which the official tests set the grade.
+TEST_GRADED_FEEDBACK = ("tests", "tests_and_lena")
+
+
+def grade_from_official_tests(
+    artifact_id: UUID | str,
+    db: Session,
+    cache: Cache | None = None,
+) -> Optional[SubmissionGrade]:
+    """Grade an official submission with its test result, if the course says so.
+
+    Runs from both ends because either may come last: the test finishing on an
+    artifact already submitted, and the editor marking an already tested
+    artifact submitted. Any existing grade wins, so a tutor's grade is never
+    replaced and a second call is a no-op.
+    """
+    row = (
+        db.query(SubmissionArtifact, Course.submission_feedback)
+        .join(SubmissionGroup, SubmissionGroup.id == SubmissionArtifact.submission_group_id)
+        .join(Course, Course.id == SubmissionGroup.course_id)
+        .filter(SubmissionArtifact.id == artifact_id)
+        # Serialises the two triggers so they cannot both insert a grade.
+        .with_for_update(of=SubmissionArtifact)
+        .first()
+    )
+    if row is None:
+        return None
+    artifact, feedback = row
+    if feedback not in TEST_GRADED_FEEDBACK or not artifact.submit:
+        return None
+    if db.query(SubmissionGrade.id).filter(SubmissionGrade.artifact_id == artifact.id).first():
+        return None
+    result = (
+        db.query(Result)
+        .filter(
+            Result.submission_artifact_id == artifact.id,
+            Result.status == int(ResultStatus.FINISHED),
+        )
+        .order_by(Result.created_at.desc())
+        .first()
+    )
+    if result is None:
+        return None
+    # The worker reports the score as ``result``; ``grade`` is its newer alias.
+    value = result.grade if result.grade is not None else result.result
+    if value is None:
+        return None
+
+    grade_obj = SubmissionGrade(
+        artifact_id=artifact.id,
+        graded_by_course_member_id=None,
+        grade=min(max(float(value), 0.0), 1.0),
+        status=int(GradingStatus.CORRECTED),
+    )
+    SubmissionGradeRepository(db, cache).create(grade_obj)
+    announce_submission_group_updated(
+        db, artifact.submission_group_id, grading=grade_obj.grade
+    )
+    logger.info("Graded artifact %s from test result %s", artifact.id, result.id)
+    return grade_obj
 
 
 def _sanitize_path_segment(segment: str, *, is_file: bool = False) -> str:
@@ -749,6 +814,8 @@ def update_artifact(
                 db, artifact.submission_group_id,
                 status="submitted" if artifact.submit else "not_submitted",
             )
+            if artifact.submit:
+                grade_from_official_tests(artifact.id, db, cache)
 
     logger.info("Updated submission artifact %s (cache invalidated)", artifact_id)
 
@@ -826,9 +893,9 @@ def update_grade(
     if not grade_obj:
         raise NotFoundException(detail="Grade not found")
 
-    # Check if user is the grader
+    # Check if user is the grader; a grade from the tests has none to match.
     principal_user_id = permissions.get_user_id()
-    if str(grade_obj.graded_by.user_id) != str(principal_user_id):
+    if grade_obj.graded_by is None or str(grade_obj.graded_by.user_id) != str(principal_user_id):
         raise ForbiddenException(detail="You can only update your own grades")
 
     updates: dict = {}
@@ -872,7 +939,7 @@ def delete_grade(
 
     # Check permissions
     principal_user_id = permissions.get_user_id()
-    if str(grade_obj.graded_by.user_id) != str(principal_user_id):
+    if grade_obj.graded_by is None or str(grade_obj.graded_by.user_id) != str(principal_user_id):
         # Check if user is instructor (higher permission needed to delete others' grades)
         course = grade_obj.artifact.submission_group.course
         is_instructor = check_course_permissions(
@@ -1169,6 +1236,8 @@ async def update_test_result(
             db, result.submission_group_id,
             result=map_int_to_task_status(result.status).value,
         )
+    if updates.get('status') == int(ResultStatus.FINISHED) and result.submission_artifact_id:
+        grade_from_official_tests(result.submission_artifact_id, db, cache)
 
     logger.info("Updated test result %s (cache invalidated)", test_id)
 

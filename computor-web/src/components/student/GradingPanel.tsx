@@ -37,6 +37,7 @@ const COPY = {
     staleStudent: 'Diese Bewertung gehört zu einer früheren Abgabe. Deine letzte Abgabe wurde noch nicht bewertet.',
     gradedBy: (by: string) => `Bewertet von ${by}`,
     graderUnknown: 'Bewertende Person unbekannt',
+    gradedByTests: 'Bewertet durch die offiziellen Tests',
     earlier: 'Frühere Bewertungen',
   },
   en: {
@@ -53,6 +54,7 @@ const COPY = {
     staleStudent: 'This grade was given on an earlier submission. Your most recent submission has not been graded yet.',
     gradedBy: (by: string) => `Graded by ${by}`,
     graderUnknown: 'Grader unknown',
+    gradedByTests: 'Graded by the official tests',
     earlier: 'Earlier grades',
   },
 };
@@ -75,6 +77,11 @@ function grader(g: SubmissionGroupGradingList, language: UiLanguage): string | n
   const role = g.graded_by_course_member?.course_role_id;
   const label = localizedRoleLabel(courseRoleLabel(role), language);
   return role ? `${name} · ${label}` : name;
+}
+
+/** A grade without a grader was taken from the official tests (course setting). */
+export function isTestGrade(g: SubmissionGroupGradingList | null | undefined): boolean {
+  return g != null && g.graded_by_course_member_id == null;
 }
 
 /**
@@ -135,7 +142,9 @@ function GradingRow({ entry }: { entry: SubmissionGroupGradingList }) {
         <GradingStatusBadge status={statusSlug(entry.status)} />
         <span className="text-xs text-subtle">{formatWhen(gradedAt(entry), language)}</span>
       </div>
-      <p className="text-xs text-muted">{by ? t.gradedBy(by) : t.graderUnknown}</p>
+      <p className="text-xs text-muted">
+        {by ? t.gradedBy(by) : isTestGrade(entry) ? t.gradedByTests : t.graderUnknown}
+      </p>
       {entry.feedback && <p className="text-sm text-body whitespace-pre-wrap">{entry.feedback}</p>}
     </div>
   );
@@ -205,7 +214,9 @@ export default function GradingPanel({
           <GradingStatusBadge status={status} />
           {current && <span className="text-xs text-subtle">{formatWhen(gradedAt(current), language)}</span>}
         </div>
-        <p className="text-xs text-muted">{by ? t.gradedBy(by) : t.graderUnknown}</p>
+        <p className="text-xs text-muted">
+          {by ? t.gradedBy(by) : isTestGrade(current) ? t.gradedByTests : t.graderUnknown}
+        </p>
         {current?.feedback && (
           <p className="text-sm text-body whitespace-pre-wrap">{current.feedback}</p>
         )}

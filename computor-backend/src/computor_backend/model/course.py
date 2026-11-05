@@ -150,6 +150,10 @@ class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
         # on the table and `title` is that endpoint's ORDER BY. Partial, so
         # only the handful of public rows are ever indexed.
         Index('ix_course_public_title', 'title', postgresql_where=text('public')),
+        CheckConstraint(
+            "submission_feedback IN ('tests', 'tests_and_lena', 'human')",
+            name='ck_course_submission_feedback',
+        ),
     )
 
     position = Column(Float(53), nullable=True)
@@ -197,6 +201,12 @@ class Course(UUIDPkMixin, VersionedMixin, AuditMixin, Base):
     # prepending a visible mention. Set per course at creation; NOT NULL with a
     # false default, like ``public``. See business_logic.messages.auto_route.
     tutor_agent_auto_route = Column(Boolean, nullable=False, server_default=text("false"))
+
+    # Who turns an official submission into a grade: ``tests`` and
+    # ``tests_and_lena`` take the test result as the grade at once (Lena may
+    # add AI feedback in the latter, never a grade); ``human`` leaves it to
+    # tutors. See business_logic.submissions.grade_from_official_tests.
+    submission_feedback = Column(String(20), nullable=False, server_default=text("'human'"))
 
     # Lifecycle: set when an owner archives the course. Archived courses vanish
     # from the student and tutor views and from the public catalog, and every

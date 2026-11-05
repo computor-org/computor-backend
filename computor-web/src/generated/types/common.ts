@@ -2296,7 +2296,7 @@ export interface SubmissionGradeList {
   updated_at?: string | null;
   id: string;
   artifact_id: string;
-  graded_by_course_member_id: string;
+  graded_by_course_member_id?: string | null;
   grade: number;
   status: GradingStatus;
   comment?: string | null;
@@ -2313,7 +2313,7 @@ export interface SubmissionGradeDetail {
   updated_at?: string | null;
   id: string;
   artifact_id: string;
-  graded_by_course_member_id: string;
+  graded_by_course_member_id?: string | null;
   grade: number;
   status: GradingStatus;
   comment?: string | null;
@@ -3006,7 +3006,7 @@ export interface SubmissionGroupGradingGet {
   updated_by?: string | null;
   id: string;
   submission_group_id: string;
-  graded_by_course_member_id: string;
+  graded_by_course_member_id?: string | null;
   result_id?: string | null;
   grading: number;
   status: GradingStatus;
@@ -3021,7 +3021,7 @@ export interface SubmissionGroupGradingList {
   id: string;
   submission_group_id: string;
   artifact_id?: string | null;
-  graded_by_course_member_id: string;
+  graded_by_course_member_id?: string | null;
   result_id?: string | null;
   grading: number;
   status: GradingStatus;
