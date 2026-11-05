@@ -673,6 +673,39 @@ def _validate_course_content_deletion(entity, db: Session):
             )
 
 
+def _count_messages_of_others_lost(db: Session, scope, user_id) -> int:
+    """
+    Count the messages by someone else that a delete would take with it.
+
+    ``message.author_id``, ``user_id`` and ``course_member_id`` are all
+    ``ondelete='CASCADE'``, and so is ``parent_id``. Deleting a user therefore
+    takes their messages, the messages addressed to them, and every reply below
+    those, whoever wrote it: a tutor's answer to a student's question would
+    vanish with the student. Callers refuse the delete when this is not zero,
+    before anything has been changed.
+
+    Args:
+        db: Database session
+        scope: Filter on Message selecting the messages the delete removes directly
+        user_id: The user being deleted, or the one behind the course member;
+            their own messages may go
+
+    Returns:
+        How many messages written by others would be deleted
+    """
+    from sqlalchemy import func, select
+    from computor_backend.model.message import Message
+
+    doomed = select(Message.id).where(scope).cte("doomed_messages", recursive=True)
+    replies = select(Message.id).where(Message.parent_id == doomed.c.id)
+    doomed = doomed.union_all(replies)
+    return db.query(func.count(Message.id)).filter(
+        Message.id.in_(select(doomed.c.id)),
+        Message.author_id.isnot(None),
+        Message.author_id != user_id,
+    ).scalar()
+
+
 def _release_submission_groups(course_member_ids, db: Session) -> int:
     """
     Free course members from the submission groups that pin them, before a delete.
@@ -795,6 +828,16 @@ async def delete_entity(
             _validate_course_content_type_deletion(entity, db)
 
         elif db_type.__tablename__ == 'course_member':
+            from computor_backend.model.message import Message
+
+            lost = _count_messages_of_others_lost(
+                db, Message.course_member_id == entity.id, entity.user_id,
+            )
+            if lost:
+                raise BadRequestException(
+                    detail=f"Cannot delete this course member because messages written by others would be deleted with them (messages: {lost}).",
+                    context={"message_count": lost},
+                )
             blocking = _release_submission_groups([entity.id], db)
             if blocking:
                 raise BadRequestException(
@@ -803,12 +846,28 @@ async def delete_entity(
                 )
 
         elif db_type.__tablename__ == 'user':
+            from sqlalchemy import or_
             from computor_backend.model.course import CourseMember
+            from computor_backend.model.message import Message
 
             member_ids = [
                 member_id for (member_id,) in
                 db.query(CourseMember.id).filter(CourseMember.user_id == entity.id)
             ]
+            lost = _count_messages_of_others_lost(
+                db,
+                or_(
+                    Message.author_id == entity.id,
+                    Message.user_id == entity.id,
+                    Message.course_member_id.in_(member_ids),
+                ),
+                entity.id,
+            )
+            if lost:
+                raise BadRequestException(
+                    detail=f"Cannot delete this user because messages written by others would be deleted with them (messages: {lost}). Archive the user instead.",
+                    context={"message_count": lost},
+                )
             blocking = _release_submission_groups(member_ids, db)
             if blocking:
                 raise BadRequestException(

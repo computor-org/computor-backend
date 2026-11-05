@@ -206,3 +206,64 @@ def test_a_group_holding_work_still_blocks_and_nothing_changes(db, course, work)
 
     assert db.get(CourseMember, member.id) is not None
     assert _group_count(db, [g.id for g in groups]) == 3
+
+
+# Messages: author_id, user_id, course_member_id and parent_id all cascade, so a
+# delete takes every reply below the doomed messages, whoever wrote it.
+
+
+def _message(db, course, author, **fields):
+    fields.setdefault("level", 0)
+    message = Message(title="T", content="C", author_id=author.id,
+                      course_id=course["course"].id, **fields)
+    db.add(message)
+    db.flush()
+    return message
+
+
+def _tutor(db):
+    tutor = User(given_name="Tutor", family_name="Synthetic", email=f"tutor.{uuid.uuid4().hex[:10]}@test.local")
+    db.add(tutor)
+    db.flush()
+    return tutor
+
+
+@pytest.mark.integration
+def test_a_reply_by_someone_else_blocks_deleting_the_author(db, course):
+    user, member, groups = course["enroll"]("dan")
+    question = _message(db, course, user)
+    _message(db, course, _tutor(db), parent_id=question.id, level=1)
+
+    with pytest.raises(BadRequestException) as exc:
+        _delete(db, User, user.id)
+
+    assert "messages written by others would be deleted with them (messages: 1)" in exc.value.detail
+    assert db.get(User, user.id) is not None
+    assert _group_count(db, [g.id for g in groups]) == 3
+    assert db.query(Message).filter(Message.course_id == course["course"].id).count() == 2
+
+
+@pytest.mark.integration
+def test_own_messages_without_replies_from_others_go_with_the_user(db, course):
+    user, _, _ = course["enroll"]("eve")
+    question = _message(db, course, user)
+    _message(db, course, user, parent_id=question.id, level=1)
+    user_id = user.id
+
+    _delete(db, User, user_id)
+
+    assert db.get(User, user_id) is None
+    assert db.query(Message).filter(Message.course_id == course["course"].id).count() == 0
+
+
+@pytest.mark.integration
+def test_a_message_addressed_to_the_member_blocks_deleting_the_membership(db, course):
+    _, member, groups = course["enroll"]("fay")
+    _message(db, course, _tutor(db), course_member_id=member.id)
+
+    with pytest.raises(BadRequestException) as exc:
+        _delete(db, CourseMember, member.id)
+
+    assert "messages written by others would be deleted with them (messages: 1)" in exc.value.detail
+    assert db.get(CourseMember, member.id) is not None
+    assert _group_count(db, [g.id for g in groups]) == 3
