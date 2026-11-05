@@ -485,20 +485,20 @@ test('the report form sends multipart with context and shows the ticket number',
   expect(body).toContain('"page":"/courses"');
 });
 
-test('the report form falls back to the contact address when reporting is off', async ({ page }) => {
+test('the report form falls back to the support address when reporting is off', async ({ page }) => {
   await setupReport(page, NO_TEAM, { reporting: { enabled: false, mode: 'off' } });
   await page.goto('/problem');
 
-  await expect(page.getByRole('link', { name: 'contact@computor.at' })).toHaveAttribute('href', 'mailto:contact@computor.at');
+  await expect(page.getByRole('link', { name: 'support@computor.at' })).toHaveAttribute('href', 'mailto:support@computor.at');
   await expect(page.getByRole('button', { name: 'Send report' })).toHaveCount(0);
 });
 
-test('signed out, the report page asks for sign-in and shows the contact address', async ({ page }) => {
+test('signed out, the report page asks for sign-in and shows the support address', async ({ page }) => {
   await setupReport(page, NO_TEAM, { signedIn: false });
   await page.goto('/problem');
 
   await expect(page.getByRole('heading', { name: 'Reporting needs a sign-in' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'contact@computor.at' })).toHaveAttribute('href', 'mailto:contact@computor.at');
+  await expect(page.getByRole('link', { name: 'support@computor.at' })).toHaveAttribute('href', 'mailto:support@computor.at');
   await expect(page.getByRole('main').getByRole('link', { name: 'Sign in' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Send report' })).toHaveCount(0);
 });
