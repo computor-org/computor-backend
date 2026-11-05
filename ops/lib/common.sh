@@ -318,6 +318,10 @@ activate_traefik_maintenance() {
     # Traefik watches this directory: never truncate its live route during a
     # recovery retry. It ignores the temporary file's non-YAML extension.
     pending=$(mktemp "${TRAEFIK_DYNAMIC_DIR}/.maintenance.XXXXXX.tmp") || return 1
+    # Every URL the browser asks for during the window gets this answer, and
+    # whatever it caches outlives the window. The page carries an old
+    # Last-Modified and no Cache-Control, so without no-store a browser would
+    # heuristically keep serving it for /api/... for days (issues#602).
     cat > "$pending" << 'YAMLEOF' || { rm -f "$pending"; return 1; }
 http:
   routers:
@@ -329,11 +333,16 @@ http:
       service: maintenance-page
       middlewares:
         - maintenance-rewrite
+        - maintenance-no-store
 
   middlewares:
     maintenance-rewrite:
       replacePath:
         path: "/_maintenance/"
+    maintenance-no-store:
+      headers:
+        customResponseHeaders:
+          Cache-Control: "no-store"
 
   services:
     maintenance-page:
