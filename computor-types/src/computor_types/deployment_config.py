@@ -348,8 +348,7 @@ class CourseGitConfig(BaseDeployment):
     )
     token: Optional[str] = Field(
         None,
-        description="GitLab group access token bound to this course (GitLab only; stored encrypted). "
-        "Supports ${ENV_VAR} interpolation at deploy time.",
+        description="GitLab group access token bound to this course (GitLab only; stored encrypted).",
     )
     template_repo: Optional[str] = Field(
         None, description="Explicit template repo/project ref (optional; auto-derived for managed servers)."

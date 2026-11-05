@@ -3795,7 +3795,7 @@ export interface CourseGitConfig {
   base_url?: string | null;
   /** GitLab parent group id/path the course group is created under (GitLab only). */
   parent_group_id?: string | null;
-  /** GitLab group access token bound to this course (GitLab only; stored encrypted). Supports ${ENV_VAR} interpolation at deploy time. */
+  /** GitLab group access token bound to this course (GitLab only; stored encrypted). */
   token?: string | null;
   /** Explicit template repo/project ref (optional; auto-derived for managed servers). */
   template_repo?: string | null;

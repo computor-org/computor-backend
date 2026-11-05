@@ -40,7 +40,7 @@ class ComputorClient:
         ```python
         async with ComputorClient(
             base_url="http://localhost:8000",
-            api_token="ct_...",
+            api_token="ctp_...",
         ) as client:
             # Use endpoint clients
             orgs = await client.organizations.list()
@@ -59,7 +59,7 @@ class ComputorClient:
 
     Or without context manager:
         ```python
-        client = ComputorClient(base_url="http://localhost:8000", api_token="ct_...")
+        client = ComputorClient(base_url="http://localhost:8000", api_token="ctp_...")
         # ... use client ...
         await client.close()
         ```
