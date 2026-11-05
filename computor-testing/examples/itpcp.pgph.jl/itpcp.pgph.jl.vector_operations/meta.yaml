@@ -1,7 +1,8 @@
-identifier: itpcp.pgph.jl.vector_operations
+slug: itpcp.pgph.jl.vector_operations
 version: '1.0'
 title: Vector Operations
 description: Julia programming exercise covering vector and matrix creation, 
+language: en
   aggregate functions, and element-wise operations.
 authors:
   - name: <given_name> <family_name>
@@ -11,25 +12,15 @@ maintainers:
   - name: <given_name> <family_name>
     email: <email>
     affiliation: <institute>
-courseMaterials:
-  - name: julia
+links:
+  - description: julia
     url: https://julialang.org/
-supportingMaterials:
-  - name: julia
+supportingMaterial:
+  - description: julia
     url: https://julialang.org/
 license: MIT
-content:
-  types: []
-  disciplines: []
-  topics: []
-  tools:
-    - julia
-  tags:
-    - julia
-    - vectors
-    - matrices
-    - arrays
-    - broadcasting
+keywords: [julia, vectors, matrices, arrays, broadcasting]
+category: Julia
 properties:
   studentSubmissionFiles:
     - vector_operations.jl

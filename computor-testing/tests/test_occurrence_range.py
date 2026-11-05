@@ -174,3 +174,33 @@ class TestCountSingleToken:
         path = write_py("for i in range(3):\n    pass\n")
         assert _count_single_token(path, "for", occurance_type="NAME") == 1
         assert _count_single_token(path, "for", occurance_type="OP") == 0
+
+
+# ---------------------------------------------------------------------------
+# C structural keyword counting
+# ---------------------------------------------------------------------------
+
+
+def _c_structural(tmp_path, source: str, name: str, allowed_range):
+    from testers.tests.c.test_class import TestComputorC  # type: ignore
+
+    (tmp_path / "main.c").write_text(source)
+    TestComputorC._test_structural(None, {
+        "main": None, "sub": None, "file": "main.c", "name": name,
+        "value": None, "pattern": None, "dir_student": str(tmp_path),
+        "allowed_occurance_range": allowed_range,
+    })
+
+
+class TestCStructuralKeyword:
+    def test_forbidden_keyword_absent_passes(self, tmp_path):
+        _c_structural(tmp_path, "int main(void) { return 0; }\n", "goto", [0, 0])
+
+    def test_forbidden_keyword_present_fails(self, tmp_path):
+        with pytest.raises(pytest.fail.Exception):
+            _c_structural(tmp_path, "int main(void) { goto end; end: return 0; }\n",
+                          "goto", [0, 0])
+
+    def test_required_keyword_absent_fails(self, tmp_path):
+        with pytest.raises(pytest.fail.Exception):
+            _c_structural(tmp_path, "int main(void) { return 0; }\n", "for", None)

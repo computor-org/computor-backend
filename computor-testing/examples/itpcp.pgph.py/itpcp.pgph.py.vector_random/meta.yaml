@@ -1,7 +1,8 @@
-identifier: itpcp.pgph.py.vector_random
+slug: itpcp.pgph.py.vector_random
 version: '1.0'
 title: Erzeugen von Zufallszahlen
 description: Description of the Assignment
+language: de
 authors:
   - name: <given_name> <family_name>
     email: <email>
@@ -10,21 +11,15 @@ maintainers:
   - name: <given_name> <family_name>
     email: <email>
     affiliation: <institute>
-courseMaterials:
-  - name: python
+links:
+  - description: python
     url: https://www.python.org/
-supportingMaterials:
-  - name: python
+supportingMaterial:
+  - description: python
     url: https://www.python.org/
 license: MIT
-content:
-  types: []
-  disciplines: []
-  topics: []
-  tools:
-    - python
-  tags:
-    - python
+keywords: [python]
+category: Python
 properties:
   studentSubmissionFiles:
     - vector_random.py

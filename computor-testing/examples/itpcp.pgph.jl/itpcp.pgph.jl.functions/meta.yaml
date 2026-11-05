@@ -1,7 +1,8 @@
-identifier: itpcp.pgph.jl.functions
+slug: itpcp.pgph.jl.functions
 version: '1.0'
 title: Functions
 description: Julia programming exercise covering function definitions, anonymous
+language: en
   functions (lambdas), recursion, and type annotations.
 authors:
   - name: <given_name> <family_name>
@@ -11,25 +12,15 @@ maintainers:
   - name: <given_name> <family_name>
     email: <email>
     affiliation: <institute>
-courseMaterials:
-  - name: julia
+links:
+  - description: julia
     url: https://julialang.org/
-supportingMaterials:
-  - name: julia
+supportingMaterial:
+  - description: julia
     url: https://julialang.org/
 license: MIT
-content:
-  types: []
-  disciplines: []
-  topics: []
-  tools:
-    - julia
-  tags:
-    - julia
-    - functions
-    - recursion
-    - lambdas
-    - type-annotations
+keywords: [julia, functions, recursion, lambdas, type-annotations]
+category: Julia
 properties:
   studentSubmissionFiles:
     - functions.jl

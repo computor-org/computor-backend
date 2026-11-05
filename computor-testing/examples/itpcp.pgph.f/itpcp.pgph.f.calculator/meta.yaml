@@ -1,7 +1,8 @@
-identifier: itpcp.pgph.f.calculator
+slug: itpcp.pgph.f.calculator
 version: '1.0'
 title: Simple Calculator in Fortran
 description: A calculator program demonstrating input/output and control 
+language: en
   structures in Fortran.
 authors:
   - name: <given_name> <family_name>
@@ -11,24 +12,15 @@ maintainers:
   - name: <given_name> <family_name>
     email: <email>
     affiliation: <institute>
-courseMaterials:
-  - name: Fortran programming tutorial
+links:
+  - description: Fortran programming tutorial
     url: https://fortran-lang.org/learn/
-supportingMaterials:
-  - name: Fortran select case statement
+supportingMaterial:
+  - description: Fortran select case statement
     url: https://fortran-lang.org/learn/quickstart/operators_control_flow
 license: CC BY-NC 4.0
-content:
-  types: []
-  disciplines: []
-  topics: []
-  tools:
-    - fortran
-  tags:
-    - fortran
-    - calculator
-    - input-output
-    - select-case
+keywords: [fortran, calculator, input-output, select-case]
+category: Fortran
 properties:
   studentSubmissionFiles:
     - calculator.f90

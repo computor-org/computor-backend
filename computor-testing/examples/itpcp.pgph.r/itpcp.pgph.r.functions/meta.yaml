@@ -1,7 +1,8 @@
-identifier: itpcp.pgph.r.functions
+slug: itpcp.pgph.r.functions
 version: '1.0'
 title: Functions in R
 description: In this example you will learn how to define and use functions in 
+language: en
   R. You will learn about function definition, default arguments, recursive 
   functions, and functions that operate on vectors.
 authors:
@@ -12,22 +13,17 @@ maintainers:
   - name: <given_name> <family_name>
     email: <email>
     affiliation: <institute>
-courseMaterials:
-  - name: R documentation
+links:
+  - description: R documentation
     url: https://www.r-project.org/
-supportingMaterials:
-  - name: r-function-definition
+supportingMaterial:
+  - description: r-function-definition
     url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/function.html
-  - name: r-return-function
+  - description: r-return-function
     url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/function.html
 license: CC BY-NC 4.0
-content:
-  types: []
-  disciplines: []
-  topics: []
-  tools:
-    - r
-  tags: []
+keywords: [r]
+category: R
 properties:
   studentSubmissionFiles:
     - functions.R

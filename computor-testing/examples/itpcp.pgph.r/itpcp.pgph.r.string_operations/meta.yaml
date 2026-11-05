@@ -1,7 +1,8 @@
-identifier: itpcp.pgph.r.string_operations
+slug: itpcp.pgph.r.string_operations
 version: '1.0'
 title: String Operations in R
 description: In this example you will learn how to work with strings in R 
+language: en
   including string concatenation, substring extraction, case conversion, pattern
   matching, and string splitting.
 authors:
@@ -12,24 +13,19 @@ maintainers:
   - name: <given_name> <family_name>
     email: <email>
     affiliation: <institute>
-courseMaterials:
-  - name: R documentation
+links:
+  - description: R documentation
     url: https://www.r-project.org/
-supportingMaterials:
-  - name: r-paste-function
+supportingMaterial:
+  - description: r-paste-function
     url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/paste.html
-  - name: r-substr-function
+  - description: r-substr-function
     url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/substr.html
-  - name: r-grep-function
+  - description: r-grep-function
     url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/grep.html
 license: CC BY-NC 4.0
-content:
-  types: []
-  disciplines: []
-  topics: []
-  tools:
-    - r
-  tags: []
+keywords: [r]
+category: R
 properties:
   studentSubmissionFiles:
     - string_operations.R

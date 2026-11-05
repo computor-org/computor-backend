@@ -291,6 +291,5 @@ sandbox test
 ## Known Issues & Gotchas
 
 1. **`allowedOccuranceRange`** and **`occuranceType`** are misspelled; the models also accept `allowedOccurrenceRange` and `occurrenceType`
-2. **Document test types** `avgwordlength` and `avgsentencelength` are handled in `testers/tests/document/test_class.py` but are not in `TypeEnum`, so a test.yaml using them fails validation
-3. **Two execution systems** exist (ctexec and sandbox) with overlapping functionality
-4. **Two meta.yaml models** exist in `computor-types`: `CodeAbilityMeta` (`slug`, read by the platform) and the proposed `ComputorMeta` (`identifier`), which the bundled `examples/` use
+2. **Two execution systems** exist (ctexec and sandbox) with overlapping functionality
+3. **Two meta.yaml models** exist in `computor-types`: `CodeAbilityMeta` (`slug`, read by the platform and used by the bundled `examples/`) and the proposed `ComputorMeta` (`identifier`)

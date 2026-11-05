@@ -1,19 +1,14 @@
+slug: itpcp.pgph.oct.vector_operations
 version: "1.0"
 title: Vector Operations
 description: Basic vector and matrix operations in Octave
+language: en
 authors:
   - name: <given_name> <family_name>
     email: <email>
     affiliation: <institute>
-content:
-  types: []
-  disciplines: []
-  topics: []
-  tools: []
-  tags:
-    - octave
-    - vectors
-    - matrices
+keywords: [octave, vectors, matrices]
+category: Octave
 properties:
   studentSubmissionFiles:
     - vector_operations.m

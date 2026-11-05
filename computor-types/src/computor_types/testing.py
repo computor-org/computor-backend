@@ -87,6 +87,8 @@ class TypeEnum(str, Enum):
     imagecount = "imagecount"
     codeblockcount = "codeblockcount"
     listitemcount = "listitemcount"
+    avgwordlength = "avgwordlength"
+    avgsentencelength = "avgsentencelength"
     pattern = "pattern"
 
 
