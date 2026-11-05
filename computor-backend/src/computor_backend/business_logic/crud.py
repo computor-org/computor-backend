@@ -673,6 +673,107 @@ def _validate_course_content_deletion(entity, db: Session):
             )
 
 
+def _count_messages_of_others_lost(db: Session, scope, user_id) -> int:
+    """
+    Count the messages by someone else that a delete would take with it.
+
+    ``message.author_id``, ``user_id`` and ``course_member_id`` are all
+    ``ondelete='CASCADE'``, and so is ``parent_id``. Deleting a user therefore
+    takes their messages, the messages addressed to them, and every reply below
+    those, whoever wrote it: a tutor's answer to a student's question would
+    vanish with the student. Callers refuse the delete when this is not zero,
+    before anything has been changed.
+
+    Args:
+        db: Database session
+        scope: Filter on Message selecting the messages the delete removes directly
+        user_id: The user being deleted, or the one behind the course member;
+            their own messages may go
+
+    Returns:
+        How many messages written by others would be deleted
+    """
+    from sqlalchemy import func, select
+    from computor_backend.model.message import Message
+
+    doomed = select(Message.id).where(scope).cte("doomed_messages", recursive=True)
+    replies = select(Message.id).where(Message.parent_id == doomed.c.id)
+    doomed = doomed.union_all(replies)
+    return db.query(func.count(Message.id)).filter(
+        Message.id.in_(select(doomed.c.id)),
+        Message.author_id.isnot(None),
+        Message.author_id != user_id,
+    ).scalar()
+
+
+def _release_submission_groups(course_member_ids, db: Session) -> int:
+    """
+    Free course members from the submission groups that pin them, before a delete.
+
+    Enrollment creates one submission group per assignment with the student as
+    its only member, and ``submission_group_member.course_member_id`` is
+    ``ondelete='RESTRICT'``. So even untouched groups blocked deleting the member,
+    or the user behind it, with an integrity error (computor-org/issues#608).
+
+    A group without submission artifacts, results or messages holds no work: a
+    group these members are alone in is deleted, and they leave a group they
+    share. A group that holds any of those still blocks; nothing is changed then.
+
+    Args:
+        course_member_ids: The course members about to be deleted
+        db: Database session
+
+    Returns:
+        How many of their groups hold work. When that is not zero, nothing was
+        changed and the caller refuses the delete.
+    """
+    from computor_backend.model.artifact import SubmissionArtifact
+    from computor_backend.model.course import SubmissionGroup, SubmissionGroupMember
+    from computor_backend.model.message import Message
+    from computor_backend.model.result import Result
+
+    if not course_member_ids:
+        return 0
+
+    group_ids = {
+        group_id for (group_id,) in db.query(SubmissionGroupMember.submission_group_id).filter(
+            SubmissionGroupMember.course_member_id.in_(course_member_ids),
+        ).distinct()
+    }
+    if not group_ids:
+        return 0
+
+    groups_with_work = set()
+    for model in (SubmissionArtifact, Result, Message):
+        groups_with_work.update(
+            group_id for (group_id,) in db.query(model.submission_group_id).filter(
+                model.submission_group_id.in_(group_ids),
+            ).distinct()
+        )
+    if groups_with_work:
+        return len(groups_with_work)
+
+    shared = {
+        group_id for (group_id,) in db.query(SubmissionGroupMember.submission_group_id).filter(
+            SubmissionGroupMember.submission_group_id.in_(group_ids),
+            SubmissionGroupMember.course_member_id.notin_(course_member_ids),
+        ).distinct()
+    }
+    # Bulk statements on purpose: rows loaded into the session would have the
+    # ORM NULL their NOT NULL keys on flush, the failure this replaces.
+    if shared:
+        db.query(SubmissionGroupMember).filter(
+            SubmissionGroupMember.submission_group_id.in_(shared),
+            SubmissionGroupMember.course_member_id.in_(course_member_ids),
+        ).delete(synchronize_session=False)
+    if group_ids - shared:
+        # Their member rows go with them (ondelete='CASCADE').
+        db.query(SubmissionGroup).filter(
+            SubmissionGroup.id.in_(group_ids - shared),
+        ).delete(synchronize_session=False)
+    return 0
+
+
 async def delete_entity(
     permissions: Principal,
     db: Session,
@@ -725,6 +826,54 @@ async def delete_entity(
         # Special validation for CourseContentType deletion
         elif db_type.__tablename__ == 'course_content_type':
             _validate_course_content_type_deletion(entity, db)
+
+        elif db_type.__tablename__ == 'course_member':
+            from computor_backend.model.message import Message
+
+            lost = _count_messages_of_others_lost(
+                db, Message.course_member_id == entity.id, entity.user_id,
+            )
+            if lost:
+                raise BadRequestException(
+                    detail=f"Cannot delete this course member because messages written by others would be deleted with them (messages: {lost}).",
+                    context={"message_count": lost},
+                )
+            blocking = _release_submission_groups([entity.id], db)
+            if blocking:
+                raise BadRequestException(
+                    detail=f"Cannot delete this course member because their submission groups hold submissions, results or messages (groups: {blocking}).",
+                    context={"submission_group_count": blocking},
+                )
+
+        elif db_type.__tablename__ == 'user':
+            from sqlalchemy import or_
+            from computor_backend.model.course import CourseMember
+            from computor_backend.model.message import Message
+
+            member_ids = [
+                member_id for (member_id,) in
+                db.query(CourseMember.id).filter(CourseMember.user_id == entity.id)
+            ]
+            lost = _count_messages_of_others_lost(
+                db,
+                or_(
+                    Message.author_id == entity.id,
+                    Message.user_id == entity.id,
+                    Message.course_member_id.in_(member_ids),
+                ),
+                entity.id,
+            )
+            if lost:
+                raise BadRequestException(
+                    detail=f"Cannot delete this user because messages written by others would be deleted with them (messages: {lost}). Archive the user instead.",
+                    context={"message_count": lost},
+                )
+            blocking = _release_submission_groups(member_ids, db)
+            if blocking:
+                raise BadRequestException(
+                    detail=f"Cannot delete this user because their submission groups hold submissions, results or messages (groups: {blocking}). Archive the user instead.",
+                    context={"submission_group_count": blocking},
+                )
 
         try:
             db.delete(entity)

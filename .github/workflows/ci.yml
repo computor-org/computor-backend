@@ -53,6 +53,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_keycloak_logout.py
           computor-backend/src/computor_backend/tests/test_admin_mfa.py
           computor-backend/src/computor_backend/tests/test_error_localization.py
+          computor-backend/src/computor_backend/tests/test_maintenance_route.py
           computor-backend/src/computor_backend/tests/test_student_testing_language.py
           computor-backend/src/computor_backend/tests/test_admin_mfa_setup.py
           computor-backend/src/computor_backend/tests/test_keycloak_abuse_setup.py
@@ -175,6 +176,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_public_workspace_capacity.py
           computor-backend/src/computor_backend/tests/test_admin_mfa_db.py
           computor-backend/src/computor_backend/tests/test_course_analytics_db.py
+          computor-backend/src/computor_backend/tests/test_member_deletion_db.py
           computor-backend/src/computor_backend/tests/test_support_tickets_db.py
           computor-backend/src/computor_backend/tests/test_course_deploy_i18n.py
           computor-backend/src/computor_backend/tests/test_sync_course_metadata.py
