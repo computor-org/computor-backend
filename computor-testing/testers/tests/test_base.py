@@ -131,6 +131,11 @@ def _shape_hint(actual_shape, expected_shape) -> str:
     return ""
 
 
+def _plain_index(idx) -> tuple:
+    # NumPy 2 reprs index components as np.int64(2); students should see (2,).
+    return tuple(int(i) for i in idx)
+
+
 def _format_array_diff(
     actual: np.ndarray,
     expected: np.ndarray,
@@ -182,7 +187,7 @@ def _format_array_diff(
             expected_nan = np.isnan(expected_f)
             nan_disagree = actual_nan ^ expected_nan
             if np.any(nan_disagree):
-                idxs = list(zip(*np.where(nan_disagree)))[:_MAX_DIFF_SAMPLES]
+                idxs = [_plain_index(i) for i in zip(*np.where(nan_disagree))][:_MAX_DIFF_SAMPLES]
                 lines.append("  " + tr("nan_disagreement", count=len(idxs)))
                 for idx in idxs:
                     a_val = "NaN" if actual_nan[idx] else _format_scalar(actual_f[idx])
@@ -198,9 +203,9 @@ def _format_array_diff(
                 finite_abs = np.where(both_finite, abs_diff, 0.0)
                 max_abs = float(finite_abs.max())
                 if max_abs > 0:
-                    max_abs_idx = np.unravel_index(
+                    max_abs_idx = _plain_index(np.unravel_index(
                         int(finite_abs.argmax()), finite_abs.shape
-                    )
+                    ))
                     lines.append(
                         "  " + tr("max_abs_diff", value=f"{max_abs:.6g}", index=max_abs_idx)
                     )
@@ -214,7 +219,7 @@ def _format_array_diff(
                         )
                     if np.any(rel > 0):
                         max_rel = float(rel.max())
-                        max_rel_idx = np.unravel_index(int(rel.argmax()), rel.shape)
+                        max_rel_idx = _plain_index(np.unravel_index(int(rel.argmax()), rel.shape))
                         lines.append(
                             "  " + tr("max_rel_diff", value=f"{max_rel:.6g}", index=max_rel_idx)
                         )
@@ -228,7 +233,7 @@ def _format_array_diff(
                 equal_nan=True,
             )
             mismatch_mask = ~close & both_finite
-            mismatch_idxs = list(zip(*np.where(mismatch_mask)))
+            mismatch_idxs = [_plain_index(i) for i in zip(*np.where(mismatch_mask))]
             if mismatch_idxs:
                 shown = mismatch_idxs[:_MAX_DIFF_SAMPLES]
                 lines.append("  " + tr("mismatching_elements", count=len(mismatch_idxs)))
@@ -243,7 +248,7 @@ def _format_array_diff(
     else:
         # Non-numeric: show first few unequal element pairs.
         ne_mask = actual != expected
-        ne_idxs = list(zip(*np.where(np.asarray(ne_mask))))
+        ne_idxs = [_plain_index(i) for i in zip(*np.where(np.asarray(ne_mask)))]
         shown = ne_idxs[:_MAX_DIFF_SAMPLES]
         if shown:
             lines.append(
