@@ -4,7 +4,7 @@ Uses only the standard library (imaplib, smtplib, ssl, email). The service
 credential is scoped on the mail host (computor-infra prod/TEAMMAIL.md):
 IMAP rights list/read/write-flags/seen everywhere plus insert into ``Sent``,
 reachable only from the support worker's network; SMTP sender restricted to
-the five team addresses.
+the team addresses.
 
 The import never changes flags (folders are SELECTed read-only and fetched
 with BODY.PEEK); Dovecot stays the archive. After a reply is sent, its copy

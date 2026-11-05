@@ -13,7 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 SUPPORT_TASK_QUEUE = "support"
 DEFAULT_TEAM_ADDRESSES = (
-    "contact@computor.at abuse@computor.at privacy@computor.at "
+    "contact@computor.at support@computor.at abuse@computor.at privacy@computor.at "
     "security@computor.at postmaster@computor.at"
 )
 
@@ -25,7 +25,7 @@ def _split(value: Optional[str]) -> List[str]:
 class SupportSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="SUPPORT_", extra="ignore")
 
-    # The five team addresses: the only permitted reply senders.
+    # The team addresses: the only permitted reply senders.
     team_addresses: str = DEFAULT_TEAM_ADDRESSES
     # Tickets that involve one of these addresses are visible to _admin only.
     # Empty disables the restriction.

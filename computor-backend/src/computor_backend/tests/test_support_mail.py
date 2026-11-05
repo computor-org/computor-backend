@@ -154,6 +154,12 @@ class TestReply:
                         to=["a@example.org"], subject="s", body="b", in_reply_to=None,
                         references=[], ticket_number=1)
 
+    def test_support_address_may_reply(self):
+        msg = build_reply(self._settings(), sender_name="", from_address="support@computor.at",
+                          to=["a@example.org"], subject="s", body="b", in_reply_to=None,
+                          references=[], ticket_number=1)
+        assert str(msg["From"]) == '"via computor.at" <support@computor.at>'
+
     def test_existing_re_prefix_not_doubled(self):
         msg = build_reply(self._settings(), sender_name="", from_address="abuse@computor.at",
                           to=["a@example.org"], subject="RE: hi", body="b", in_reply_to=None,

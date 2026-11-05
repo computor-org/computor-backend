@@ -77,7 +77,7 @@ services:
       - SUPPORT_WELCOME_MAIL_ENABLED=${SUPPORT_WELCOME_MAIL_ENABLED:-false}
       - SUPPORT_SITE_URL=${SUPPORT_SITE_URL:-https://computor.at}
       - SUPPORT_MAIL_TLS_VERIFY=${SUPPORT_MAIL_TLS_VERIFY:-true}
-      - SUPPORT_TEAM_ADDRESSES=${SUPPORT_TEAM_ADDRESSES:-contact@computor.at abuse@computor.at privacy@computor.at security@computor.at postmaster@computor.at}
+      - SUPPORT_TEAM_ADDRESSES=${SUPPORT_TEAM_ADDRESSES:-contact@computor.at support@computor.at abuse@computor.at privacy@computor.at security@computor.at postmaster@computor.at}
       - SUPPORT_RESTRICTED_ADDRESSES=${SUPPORT_RESTRICTED_ADDRESSES-security@computor.at}
     depends_on:
       - temporal

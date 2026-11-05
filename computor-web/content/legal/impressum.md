@@ -34,7 +34,7 @@ Projektleitung: Assoc.Prof. Dr. Christopher Albert
 - Sicherheitslücken: security@computor.at
 - Fehler und Verbesserungsvorschläge: „Problem melden“ in der Web-App und in
   der VS-Code-Erweiterung (nach Anmeldung, siehe [Problem melden](/problem))
-  oder contact@computor.at
+  oder support@computor.at
 
 Das Angebot computor.at wird vom ITPcp im Rahmen der
 Lehre, Weiterbildung und Wissenschaftskommunikation der TU Graz betrieben.
@@ -126,7 +126,7 @@ Project lead: Assoc.Prof. Dr. Christopher Albert
 - Security vulnerabilities: security@computor.at
 - Bugs and suggestions: "Report a problem" in the web app and in the VS Code
   extension (after signing in, see [Report a problem](/problem)) or
-  contact@computor.at
+  support@computor.at
 
 computor.at is operated by ITPcp as part of TU Graz's
 teaching, continuing education and science communication.

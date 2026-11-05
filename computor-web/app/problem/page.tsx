@@ -21,7 +21,7 @@ import {
   type ReportReceipt,
 } from '@/src/clients/SupportClient';
 
-const CONTACT = 'contact@computor.at';
+const CONTACT = 'support@computor.at';
 
 // Preset ticket categories (issues#458). The topic travels in the report
 // context and the preset title becomes the ticket subject the team sees.
