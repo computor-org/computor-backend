@@ -1112,6 +1112,8 @@
         "imagecount",
         "codeblockcount",
         "listitemcount",
+        "avgwordlength",
+        "avgsentencelength",
         "pattern"
       ],
       "title": "TypeEnum",

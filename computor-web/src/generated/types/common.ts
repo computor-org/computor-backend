@@ -4548,7 +4548,7 @@ export type MergeMethod = "rebase_merge" | "merge" | "ff";
 
 export type QualificationEnum = "verifyEqual" | "matches" | "contains" | "startsWith" | "endsWith" | "count" | "regexp" | "matchesLine" | "containsLine" | "lineCount" | "regexpMultiline" | "numericOutput" | "exitCode";
 
-export type TypeEnum = "variable" | "graphics" | "structural" | "linting" | "exist" | "error" | "warning" | "help" | "stdout" | "stderr" | "stdio" | "exitcode" | "compile" | "runtime" | "wordcount" | "paragraphcount" | "section" | "linkcount" | "keyword" | "uniquewords" | "linecount" | "charcount" | "sentencecount" | "headingcount" | "imagecount" | "codeblockcount" | "listitemcount" | "pattern";
+export type TypeEnum = "variable" | "graphics" | "structural" | "linting" | "exist" | "error" | "warning" | "help" | "stdout" | "stderr" | "stdio" | "exitcode" | "compile" | "runtime" | "wordcount" | "paragraphcount" | "section" | "linkcount" | "keyword" | "uniquewords" | "linecount" | "charcount" | "sentencecount" | "headingcount" | "imagecount" | "codeblockcount" | "listitemcount" | "avgwordlength" | "avgsentencelength" | "pattern";
 
 export type StatusEnum = "SCHEDULED" | "COMPLETED" | "TIMEDOUT" | "CRASHED" | "CANCELLED" | "SKIPPED" | "FAILED";
 
