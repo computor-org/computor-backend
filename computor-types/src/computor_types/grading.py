@@ -75,7 +75,8 @@ class SubmissionGroupGradingGet(BaseEntityGet):
     """Full grading information."""
     id: str
     submission_group_id: str
-    graded_by_course_member_id: str
+    # None: graded by the official tests, not by a person.
+    graded_by_course_member_id: Optional[str] = None
     result_id: Optional[str] = None
     grading: float
     status: GradingStatus
@@ -98,7 +99,8 @@ class SubmissionGroupGradingList(BaseModel):
     # that, and with it the client's ability to tell a grade on the current
     # submission from one left on an earlier attempt.
     artifact_id: Optional[str] = None
-    graded_by_course_member_id: str
+    # None: graded by the official tests, not by a person.
+    graded_by_course_member_id: Optional[str] = None
     result_id: Optional[str] = None
     grading: float
     status: GradingStatus

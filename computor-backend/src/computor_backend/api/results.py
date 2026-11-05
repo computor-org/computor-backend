@@ -27,14 +27,17 @@ from computor_types.results import (
     ResultQuery,
 )
 from computor_backend.interfaces.result import ResultInterface
-from computor_types.tasks import TaskStatus, map_int_to_task_status
+from computor_types.tasks import ResultStatus, TaskStatus, map_int_to_task_status
 from computor_backend.permissions.auth import get_current_principal
 from computor_backend.permissions.principal import Principal
 from computor_backend.repositories.result import ResultRepository
 
 # Import business logic
 from computor_backend.business_logic.results import get_result_status
-from computor_backend.business_logic.submissions import announce_submission_group_updated
+from computor_backend.business_logic.submissions import (
+    announce_submission_group_updated,
+    grade_from_official_tests,
+)
 
 result_router = APIRouter(prefix="/results", tags=["results"])
 
@@ -156,6 +159,8 @@ async def update_result(
             db, result.submission_group_id,
             result=map_int_to_task_status(result.status).value,
         )
+    if updates.get('status') == int(ResultStatus.FINISHED) and result.submission_artifact_id:
+        grade_from_official_tests(result.submission_artifact_id, db, cache)
 
     # Fetch result_json from MinIO for response
     from computor_backend.services.result_storage import retrieve_result_json

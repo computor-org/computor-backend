@@ -203,12 +203,15 @@ def announced(monkeypatch):
     recorder = Recorder()
     monkeypatch.setattr(submissions_bl, "announce_submission_group_updated", recorder)
     monkeypatch.setattr(results_api, "announce_submission_group_updated", recorder)
+    # Test-based grading has its own tests; these fakes model announcements only.
+    monkeypatch.setattr(submissions_bl, "grade_from_official_tests", lambda *a, **k: None)
+    monkeypatch.setattr(results_api, "grade_from_official_tests", lambda *a, **k: None)
     return recorder
 
 
 def test_worker_result_patch_announces(monkeypatch, announced):
     # PATCH /results/{id} is how the test worker reports a finished run.
-    db_result = SimpleNamespace(id="r-1", submission_group_id="g-1", status=0)
+    db_result = SimpleNamespace(id="r-1", submission_group_id="g-1", submission_artifact_id=None, status=0)
     monkeypatch.setattr(results_api, "require_public_result_writer", lambda p: None)
     monkeypatch.setattr(
         "computor_backend.permissions.core.check_permissions",
@@ -269,7 +272,9 @@ def test_test_result_create_announces(monkeypatch, announced):
 
 
 def test_test_result_update_announces(monkeypatch, announced):
-    result = SimpleNamespace(id="r-1", submission_group_id="g-1", course_member_id="cm-1", status=0)
+    result = SimpleNamespace(
+        id="r-1", submission_group_id="g-1", submission_artifact_id=None, course_member_id="cm-1", status=0,
+    )
     db = FakeDb({submissions_bl.Result: result})
     monkeypatch.setattr(submissions_bl, "require_public_result_writer", lambda p: None)
     monkeypatch.setattr(

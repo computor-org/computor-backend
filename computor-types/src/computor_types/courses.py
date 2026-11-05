@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator, ConfigDict
-from typing import Dict, Optional
+from typing import Dict, Literal, Optional
 from datetime import datetime
 
 
@@ -9,6 +9,11 @@ from computor_types.gitlab import GitLabConfig, GitLabConfigGet
 from computor_types.base import BaseEntityGet, EntityInterface, ListQuery
 
 from computor_types.custom_types import Ltree
+
+# Who grades an official submission: the official tests (``tests``), the tests
+# with short AI feedback from Lena that never changes the grade
+# (``tests_and_lena``), or tutors, with the tests only a hint (``human``).
+SubmissionFeedback = Literal["tests", "tests_and_lena", "human"]
 
 class CourseProperties(BaseModel):
     gitlab: Optional[GitLabConfig] = None
@@ -58,6 +63,8 @@ class CourseCreate(BaseModel):
     # Address student messages that mention nobody to the tutor agent (Lena)
     # with a visible @mention. NOT NULL DEFAULT false, like ``public``.
     tutor_agent_auto_route: Optional[bool] = None
+    # NOT NULL DEFAULT 'human'; Optional so an omitted key takes the default.
+    submission_feedback: Optional[SubmissionFeedback] = None
 
     @field_validator('position', mode='before')
     @classmethod
@@ -97,6 +104,8 @@ class CourseGet(BaseEntityGet,CourseCreate):
     # Address student messages that mention nobody to the tutor agent (Lena)
     # with a visible @mention. NOT NULL DEFAULT false, like ``public``.
     tutor_agent_auto_route: Optional[bool] = None
+    # NOT NULL DEFAULT 'human'; Optional so an omitted key takes the default.
+    submission_feedback: Optional[SubmissionFeedback] = None
     # Set once an owner archives the course: hidden from students and tutors,
     # submissions and test runs closed, reversible. Read-only here; use
     # ``PATCH /courses/{id}/archive`` / ``/unarchive``.
@@ -175,6 +184,8 @@ class CourseUpdate(BaseModel):
     # Omit to leave the flag alone; like ``public`` an explicit ``null`` is
     # rejected by the NOT NULL column.
     tutor_agent_auto_route: Optional[bool] = None
+    # Omit to leave it alone; an explicit ``null`` is rejected (NOT NULL).
+    submission_feedback: Optional[SubmissionFeedback] = None
 
 
     @field_validator('position', mode='before')

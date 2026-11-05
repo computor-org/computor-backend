@@ -167,7 +167,10 @@ def _fetch_grading_history(submission_group, db: Session) -> List[SubmissionGrou
             id=str(grade.id),
             submission_group_id=str(submission_group.id),
             artifact_id=str(grade.artifact_id),
-            graded_by_course_member_id=str(grade.graded_by_course_member_id),
+            graded_by_course_member_id=(
+                str(grade.graded_by_course_member_id)
+                if grade.graded_by_course_member_id else None
+            ),
             result_id=None,
             grading=grade.grade,
             status=GradingStatus(grade.status),

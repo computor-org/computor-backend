@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { currentGrading, isStaleGrading, statusSlug } from '../src/components/student/GradingPanel';
+import { currentGrading, isStaleGrading, isTestGrade, statusSlug } from '../src/components/student/GradingPanel';
 import {
   gradingStatusLabel,
   gradingStatusTone,
@@ -109,4 +109,10 @@ test('a grader with no name is null, never a raw uuid', () => {
   expect(graderName({ user_id: 'u1', user: { given_name: 'Ada' } })).toBe('Ada');
   expect(graderName({ user_id: 'u1' })).toBeNull();
   expect(graderName(null)).toBeNull();
+});
+
+test('a grading without a grader is the official tests, not an unknown person', () => {
+  expect(isTestGrade(grading({ graded_by_course_member_id: null }))).toBe(true);
+  expect(isTestGrade(grading({}))).toBe(false);
+  expect(isTestGrade(null)).toBe(false);
 });

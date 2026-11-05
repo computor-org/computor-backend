@@ -1351,6 +1351,7 @@ export interface CourseCreate {
   public?: boolean | null;
   max_self_registrations?: number | null;
   tutor_agent_auto_route?: boolean | null;
+  submission_feedback?: "tests" | "tests_and_lena" | "human" | null;
 }
 
 export interface CourseGet {
@@ -1370,6 +1371,7 @@ export interface CourseGet {
   public?: boolean | null;
   max_self_registrations?: number | null;
   tutor_agent_auto_route?: boolean | null;
+  submission_feedback?: "tests" | "tests_and_lena" | "human" | null;
   /** Creation timestamp */
   created_at?: string | null;
   /** Update timestamp */
@@ -1413,6 +1415,7 @@ export interface CourseUpdate {
   public?: boolean | null;
   max_self_registrations?: number | null;
   tutor_agent_auto_route?: boolean | null;
+  submission_feedback?: "tests" | "tests_and_lena" | "human" | null;
 }
 
 export interface CourseQuery {

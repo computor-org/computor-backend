@@ -102,7 +102,8 @@ class SubmissionGradeList(BaseEntityList):
     """List item representation for submission grades."""
     id: str
     artifact_id: str
-    graded_by_course_member_id: str
+    # None: graded by the official tests, not by a person.
+    graded_by_course_member_id: Optional[str] = None
     grade: float
     status: GradingStatus
     comment: Optional[str] = None

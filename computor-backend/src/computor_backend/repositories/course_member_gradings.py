@@ -866,8 +866,9 @@ class CourseMemberGradingsRepository:
             JOIN member_submission_groups msg ON msg.course_content_id = sc.content_id
             JOIN submission_artifact sa ON sa.submission_group_id = msg.submission_group_id
             JOIN submission_grade sg ON sg.artifact_id = sa.id
-            JOIN course_member cm ON cm.id = sg.graded_by_course_member_id
-            JOIN "user" u ON u.id = cm.user_id
+            -- LEFT: a grade from the official tests has no grader.
+            LEFT JOIN course_member cm ON cm.id = sg.graded_by_course_member_id
+            LEFT JOIN "user" u ON u.id = cm.user_id
             ORDER BY sc.content_id, sg.graded_at DESC
         ),
         test_runs_counts AS (

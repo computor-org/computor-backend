@@ -349,7 +349,8 @@ def cmd_content() -> None:
         log(f"deployed {name}: course {course_id} applied={result.get('applied')}")
         if result.get("errors"):
             log(f"  deploy messages: {result.get('errors')}")
-        api.patch(f"/courses/{course_id}", json={"public": True, "language_code": "de"})
+        api.patch(f"/courses/{course_id}", json={"public": True, "language_code": "de",
+                                                 "submission_feedback": "tests"})
         release_course(api, course_id, path)
         ensure_lecturer(api, course_id, path)
 
