@@ -1,7 +1,8 @@
-identifier: itpcp.pgph.jl.simple_computations
+slug: itpcp.pgph.jl.simple_computations
 version: '1.0'
 title: Simple Computations
 description: Basic Julia programming exercise covering arithmetic operations, 
+language: en
   mathematical functions, and array broadcasting.
 authors:
   - name: <given_name> <family_name>
@@ -11,25 +12,15 @@ maintainers:
   - name: <given_name> <family_name>
     email: <email>
     affiliation: <institute>
-courseMaterials:
-  - name: julia
+links:
+  - description: julia
     url: https://julialang.org/
-supportingMaterials:
-  - name: julia
+supportingMaterial:
+  - description: julia
     url: https://julialang.org/
 license: MIT
-content:
-  types: []
-  disciplines: []
-  topics: []
-  tools:
-    - julia
-  tags:
-    - julia
-    - arithmetic
-    - broadcasting
-    - math-functions
-    - arrays
+keywords: [julia, arithmetic, broadcasting, math-functions, arrays]
+category: Julia
 properties:
   studentSubmissionFiles:
     - simple_computations.jl

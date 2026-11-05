@@ -1,7 +1,8 @@
-identifier: itpcp.pgph.doc.essay_requirements
+slug: itpcp.pgph.doc.essay_requirements
 version: '1.0'
 title: Essay Requirements Check
 description: This example demonstrates how to use the document testing framework
+language: en
   (doctester) to verify that a student essay meets minimum requirements 
   including word count, paragraph structure, required sections, references, and 
   vocabulary diversity.
@@ -13,23 +14,14 @@ maintainers:
   - name: <given_name> <family_name>
     email: <email>
     affiliation: <institute>
-supportingMaterials:
-  - name: markdown-guide
+supportingMaterial:
+  - description: markdown-guide
     url: https://www.markdownguide.org/
-  - name: academic-writing-guide
+  - description: academic-writing-guide
     url: https://owl.purdue.edu/owl/general_writing/academic_writing/
 license: CC BY-NC 4.0
-content:
-  types: []
-  disciplines: []
-  topics: []
-  tools: []
-  tags:
-    - document-testing
-    - essay
-    - word-count
-    - structure
-    - markdown
+keywords: [document-testing, essay, word-count, structure, markdown]
+category: Document
 properties:
   studentSubmissionFiles:
     - essay.md

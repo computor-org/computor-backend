@@ -1,7 +1,8 @@
-identifier: itpcp.pgph.c.calculator
+slug: itpcp.pgph.c.calculator
 version: '1.0'
 title: Simple Calculator in C
 description: A calculator program demonstrating basic arithmetic operations and user input in C.
+language: en
 authors:
   - name: <given_name> <family_name>
     email: <email>
@@ -10,24 +11,15 @@ maintainers:
   - name: <given_name> <family_name>
     email: <email>
     affiliation: <institute>
-courseMaterials:
-  - name: C programming tutorial
+links:
+  - description: C programming tutorial
     url: https://www.learn-c.org/
-supportingMaterials:
-  - name: scanf documentation
+supportingMaterial:
+  - description: scanf documentation
     url: https://en.cppreference.com/w/c/io/fscanf
 license: CC BY-NC 4.0
-content:
-  types: []
-  disciplines: []
-  topics: []
-  tools:
-    - c
-  tags:
-    - c
-    - calculator
-    - arithmetic
-    - scanf
+keywords: [c, calculator, arithmetic, scanf]
+category: C
 properties:
   studentSubmissionFiles:
     - calculator.c

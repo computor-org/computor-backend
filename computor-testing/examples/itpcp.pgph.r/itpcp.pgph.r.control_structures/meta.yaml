@@ -1,7 +1,8 @@
-identifier: itpcp.pgph.r.control_structures
+slug: itpcp.pgph.r.control_structures
 version: '1.0'
 title: Control Structures in R
 description: In this example you will learn how to use control structures in R 
+language: en
   including if-else statements, for loops, while loops, and switch statements. 
   You will also learn about break and next statements.
 authors:
@@ -12,24 +13,19 @@ maintainers:
   - name: <given_name> <family_name>
     email: <email>
     affiliation: <institute>
-courseMaterials:
-  - name: R documentation
+links:
+  - description: R documentation
     url: https://www.r-project.org/
-supportingMaterials:
-  - name: r-control-flow
+supportingMaterial:
+  - description: r-control-flow
     url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/Control.html
-  - name: r-if-statement
+  - description: r-if-statement
     url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/if.html
-  - name: r-for-loop
+  - description: r-for-loop
     url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/for.html
 license: CC BY-NC 4.0
-content:
-  types: []
-  disciplines: []
-  topics: []
-  tools:
-    - r
-  tags: []
+keywords: [r]
+category: R
 properties:
   studentSubmissionFiles:
     - control_structures.R

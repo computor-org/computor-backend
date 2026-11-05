@@ -1,7 +1,8 @@
-identifier: itpcp.pgph.f.hello_world
+slug: itpcp.pgph.f.hello_world
 version: '1.0'
 title: Hello World in Fortran
 description: A simple Hello World program to introduce Fortran programming 
+language: en
   basics.
 authors:
   - name: <given_name> <family_name>
@@ -11,23 +12,15 @@ maintainers:
   - name: <given_name> <family_name>
     email: <email>
     affiliation: <institute>
-courseMaterials:
-  - name: Fortran programming tutorial
+links:
+  - description: Fortran programming tutorial
     url: https://fortran-lang.org/learn/
-supportingMaterials:
-  - name: Fortran print statement
+supportingMaterial:
+  - description: Fortran print statement
     url: https://fortran-lang.org/learn/quickstart/hello_world
 license: CC BY-NC 4.0
-content:
-  types: []
-  disciplines: []
-  topics: []
-  tools:
-    - fortran
-  tags:
-    - fortran
-    - hello-world
-    - basics
+keywords: [fortran, hello-world, basics]
+category: Fortran
 properties:
   studentSubmissionFiles:
     - hello.f90

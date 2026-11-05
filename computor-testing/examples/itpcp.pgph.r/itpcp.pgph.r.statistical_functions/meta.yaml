@@ -1,7 +1,8 @@
-identifier: itpcp.pgph.r.statistical_functions
+slug: itpcp.pgph.r.statistical_functions
 version: '1.0'
 title: Statistical Functions in R
 description: In this example you will learn how to use R's built-in statistical 
+language: en
   functions. You will learn about mean, median, standard deviation, variance, 
   quantiles, correlation, and covariance.
 authors:
@@ -12,26 +13,21 @@ maintainers:
   - name: <given_name> <family_name>
     email: <email>
     affiliation: <institute>
-courseMaterials:
-  - name: R documentation
+links:
+  - description: R documentation
     url: https://www.r-project.org/
-supportingMaterials:
-  - name: r-mean-function
+supportingMaterial:
+  - description: r-mean-function
     url: https://stat.ethz.ch/R-manual/R-devel/library/base/html/mean.html
-  - name: r-sd-function
+  - description: r-sd-function
     url: https://stat.ethz.ch/R-manual/R-devel/library/stats/html/sd.html
-  - name: r-quantile-function
+  - description: r-quantile-function
     url: https://stat.ethz.ch/R-manual/R-devel/library/stats/html/quantile.html
-  - name: r-cor-function
+  - description: r-cor-function
     url: https://stat.ethz.ch/R-manual/R-devel/library/stats/html/cor.html
 license: CC BY-NC 4.0
-content:
-  types: []
-  disciplines: []
-  topics: []
-  tools:
-    - r
-  tags: []
+keywords: [r]
+category: R
 properties:
   studentSubmissionFiles:
     - statistical_functions.R

@@ -1,19 +1,14 @@
+slug: itpcp.pgph.oct.simple_plot
 version: "1.0"
 title: Simple Plot
 description: Basic plotting with sine and cosine in Octave
+language: en
 authors:
   - name: <given_name> <family_name>
     email: <email>
     affiliation: <institute>
-content:
-  types: []
-  disciplines: []
-  topics: []
-  tools: []
-  tags:
-    - octave
-    - plotting
-    - trigonometry
+keywords: [octave, plotting, trigonometry]
+category: Octave
 properties:
   studentSubmissionFiles:
     - simple_plot.m

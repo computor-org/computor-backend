@@ -1,7 +1,8 @@
-identifier: itpcp.pgph.f.factorial
+slug: itpcp.pgph.f.factorial
 version: '1.0'
 title: Factorial in Fortran
 description: A factorial program demonstrating recursive functions in Fortran.
+language: en
 authors:
   - name: <given_name> <family_name>
     email: <email>
@@ -10,24 +11,15 @@ maintainers:
   - name: <given_name> <family_name>
     email: <email>
     affiliation: <institute>
-courseMaterials:
-  - name: Fortran programming tutorial
+links:
+  - description: Fortran programming tutorial
     url: https://fortran-lang.org/learn/
-supportingMaterials:
-  - name: Fortran procedures and functions
+supportingMaterial:
+  - description: Fortran procedures and functions
     url: https://fortran-lang.org/learn/quickstart/organising_code
 license: CC BY-NC 4.0
-content:
-  types: []
-  disciplines: []
-  topics: []
-  tools:
-    - fortran
-  tags:
-    - fortran
-    - factorial
-    - recursion
-    - functions
+keywords: [fortran, factorial, recursion, functions]
+category: Fortran
 properties:
   studentSubmissionFiles:
     - factorial.f90
