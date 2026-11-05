@@ -16,7 +16,9 @@ from computor_backend.api import results as results_api
 from computor_backend.business_logic import profiles as profiles_bl
 from computor_backend.business_logic import submissions as submissions_bl
 from computor_backend.model.artifact import SubmissionArtifact, SubmissionGrade
+from computor_backend.exceptions import ForbiddenException
 from computor_backend.model.course import SubmissionGroup
+from computor_backend.permissions.principal import Principal
 from computor_backend.websocket import event_publisher
 from computor_backend.websocket.event_publisher import (
     publish_submission_group_updated,
@@ -271,11 +273,14 @@ def test_test_result_create_announces(monkeypatch, announced):
     assert announced.calls == [((db, "g-1"), {"result": "queued"})]
 
 
-def test_test_result_update_announces(monkeypatch, announced):
+def _update_test_result_as(monkeypatch, permissions, runner_user_id="u-runner"):
     result = SimpleNamespace(
         id="r-1", submission_group_id="g-1", submission_artifact_id=None, course_member_id="cm-1", status=0,
     )
-    db = FakeDb({submissions_bl.Result: result})
+    db = FakeDb({
+        submissions_bl.Result: result,
+        submissions_bl.CourseMember: SimpleNamespace(id="cm-1", user_id=runner_user_id),
+    })
     monkeypatch.setattr(submissions_bl, "require_public_result_writer", lambda p: None)
     monkeypatch.setattr(
         "computor_backend.repositories.result.ResultRepository",
@@ -283,13 +288,34 @@ def test_test_result_update_announces(monkeypatch, announced):
             update=lambda eid, updates: (setattr(result, "status", updates["status"]), result)[1]
         ),
     )
-    permissions = SimpleNamespace(get_user_id=lambda: "u-1", has_claim=lambda c: True, is_service=False)
-
     asyncio.run(submissions_bl.update_test_result(
         "r-1", "finished", None, None, None, None, permissions, db
     ))
+    return db
+
+
+def test_test_result_update_announces(monkeypatch, announced):
+    db = _update_test_result_as(monkeypatch, Principal(user_id="u-1", is_admin=True))
 
     assert announced.calls == [((db, "g-1"), {"result": "finished"})]
+
+
+@pytest.mark.parametrize("permissions", [
+    Principal(user_id="u-1", is_admin=True),
+    Principal(user_id="u-1", is_service=True),
+    Principal(user_id="u-runner"),
+], ids=["admin", "service", "runner"])
+def test_test_result_update_allowed(monkeypatch, announced, permissions):
+    _update_test_result_as(monkeypatch, permissions)
+
+    assert len(announced.calls) == 1
+
+
+def test_test_result_update_forbidden_for_other_user(monkeypatch, announced):
+    with pytest.raises(ForbiddenException):
+        _update_test_result_as(monkeypatch, Principal(user_id="u-other"))
+
+    assert announced.calls == []
 
 
 def test_submit_flag_announces(monkeypatch, announced):

@@ -1195,7 +1195,7 @@ async def update_test_result(
 
     # Check permissions - either admin (service account) or the test runner
     user_id = permissions.get_user_id()
-    is_admin = permissions.has_claim("_admin") or permissions.is_service
+    is_admin = permissions.is_admin or permissions.is_service
 
     if not is_admin:
         # Check if user is the one who ran the test
