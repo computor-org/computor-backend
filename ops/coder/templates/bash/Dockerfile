@@ -1,6 +1,6 @@
 # Minimal Debian workspace with a browser terminal (ttyd).
 # No code-server, no VSIX — the workspace app is the terminal itself.
-FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
+FROM debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
