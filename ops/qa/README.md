@@ -70,16 +70,16 @@ an update.
 
 The stack gets its content the way computor.at does. The runnable examples
 (exercise texts, `test.yaml`, `localTests` with reference solutions and the
-full `meta.yaml`) live in the private GitLab repository
-`codeability/development/examples` under `python/`. The public mirror
+full `meta.yaml`) live in the private GitHub repository
+[computor-org/examples](https://github.com/computor-org/examples) under `python/`. The public mirror
 [data-science-python](https://github.com/computor-org/data-science-python)
 has the text-only examples, the course manifests `courses/python-*.yaml` and
 the snapshot behind the `/learn` reader. The examples are uploaded through the
 examples API, the courses through `deploy-course`, and both are released like
 the lecturer tools do.
 
-The QA host has no GitLab credentials. Fetch the package where `glab` is
-signed in to gitlab.tugraz.at and copy only the archive:
+The QA host has no GitHub credentials for it. Fetch the package where `gh` is
+signed in with access to the repository and copy only the archive:
 
 ```bash
 QA_INPUTS=~/qa-inputs ops/qa/fetch_examples.sh main <qa-host>:/mnt/storage/computor-qa-inputs
@@ -154,7 +154,7 @@ as on computor.at; only the baseline is scripted.
    and keep the extension at its production ref.
 
    ```bash
-   # where glab is signed in
+   # where gh can read computor-org/examples
    QA_INPUTS=~/qa-inputs ops/qa/fetch_examples.sh main <qa-host>:/mnt/storage/computor-qa-inputs
    # on the QA host
    ops/qa/qactl.sh deploy --backend-ref origin/main --vsix none --content-ref main \

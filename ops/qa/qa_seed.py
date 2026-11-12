@@ -8,7 +8,7 @@ HTTP API for everything a person or the testing worker would do:
   baseline   persona users linked to their Keycloak ids, the admin role and an
              admin API token (printed as QA_ADMIN_API_TOKEN=... for qactl)
   content    the runnable examples package in /qa/examples (the python/
-             directory of GitLab codeability/development/examples, with tests
+             directory of the private computor-org/examples, with tests
              and reference solutions) uploaded through the examples API, the
              three course YAMLs of data-science-python (/qa/content) deployed
              under one course family, published in the catalog, assignments and
@@ -254,7 +254,7 @@ def example_files(directory: Path) -> dict[str, str]:
 def example_directories() -> tuple[list[Path], bool]:
     """The example directories to upload and whether they are runnable.
 
-    computor.at's examples come from GitLab codeability/development/examples
+    computor.at's examples come from the private GitHub computor-org/examples
     (``python/<slug>/`` with test.yaml, localTests and the full meta.yaml);
     ``qactl.sh`` extracts that package to /qa/examples. Without it, the public
     data-science-python mirror is the fallback, and its test runs error.

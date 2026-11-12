@@ -26,8 +26,8 @@
 #   data/             SYSTEM_DEPLOYMENT_PATH of the stack
 #   src/backend       detached worktree of the deployed backend ref
 #   src/content       data-science-python at the deployed content ref
-#   src/examples      the runnable examples package (python/ of GitLab
-#                     codeability/development/examples), from deploy --examples
+#   src/examples      the runnable examples package (python/ of the private
+#                     computor-org/examples), from deploy --examples
 #   vsix/             the VSIX baked into the workspace image, if any
 #   deployed.env      backend/VSIX and baseline import refs; excludes lecturer edits
 set -euo pipefail
@@ -607,17 +607,16 @@ fetch_content() {
 }
 
 # The runnable examples, as computor.at has them: the python/ directory of
-# GitLab codeability/development/examples with test.yaml, localTests and the
-# full meta.yaml (the public mirror has none of them). The repository is
-# private, so the archive is fetched where GitLab credentials are
-# (ops/qa/fetch_examples.sh) and only the file comes to the QA host. GitLab
-# names the top directory examples-<ref>-<commit>[-python].
+# the private computor-org/examples with test.yaml, localTests and the full
+# meta.yaml (the public mirror has none of them). The archive is fetched where
+# GitHub credentials are (ops/qa/fetch_examples.sh) and only the file comes to
+# the QA host. Its top directory is examples-<ref>-<commit>[-python].
 install_examples() {
     local archive=$1 tmp top commit
     [ -f "$archive" ] || die "no such examples archive: $archive"
     top=$(tar -tzf "$archive" | sed -n 1p | cut -d/ -f1)
     commit=$(grep -oE '[0-9a-f]{40}' <<< "$top" | tail -n 1 || true)
-    [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || die "$archive is not a GitLab archive of the examples (top directory $top)"
+    [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || die "$archive is not an examples package from fetch_examples.sh (top directory $top)"
     tmp=$(mktemp -d "$QA_HOME/.examples.XXXXXX")
     tar -xzf "$archive" -C "$tmp" --strip-components=2 "$top/python"
     [ -n "$(find "$tmp" -mindepth 2 -maxdepth 2 -name test.yaml -print -quit)" ] \
