@@ -12,7 +12,7 @@
 # without a registry — but template builds fail if computor.sh has not built
 # this image first.
 # Pinned by version + digest (supply chain, GHSA-vx42-ghc9-gw65); bump deliberately.
-FROM ghcr.io/coder/code-server:4.144.0@sha256:b9e8056bb74bd0c4f90284c7559eddeccd38400cfedc28e64c9d3ca50fef1f83
+FROM ghcr.io/coder/code-server:4.145.2@sha256:09565f9e07f5624554e295e8bab0e2fec4a7c533eb3cff459ed6596a4d3d7c1c
 
 USER root
 COPY patch-webview-host.js /tmp/patch-webview-host.js
