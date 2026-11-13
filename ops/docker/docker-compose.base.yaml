@@ -28,7 +28,7 @@ services:
   # Docker-provider command flags and socket access live in dev/prod overlays:
   # dev mounts the socket directly; prod proxies it via tecnativa/docker-socket-proxy.
   traefik:
-    image: traefik:v3.7.15@sha256:0f6150202bc1fed72a7bd2107460eaa510e5b8a905f3fdb5b84f2c8619c33368
+    image: traefik:v3.7.16@sha256:1336e85aaed293bd63d005086e0dd013b04078b26aaeb1c18b26a2f928af7e65
     restart: unless-stopped
     security_opt:
       - "no-new-privileges:true"
@@ -84,7 +84,7 @@ services:
 
   # Redis cache
   redis:
-    image: "redis:8.10.2-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0"
+    image: "redis:8.10.2-alpine@sha256:9f8d2d789b9a1d1e3f283f979aa9cbf393373806472e1ccd460e2f9c869b833b"
     security_opt:
       - "no-new-privileges:true"
     logging:
@@ -189,7 +189,7 @@ services:
   # /data once (top level last, so an interrupted run is simply repeated) and
   # is a no-op afterwards. Same pinned image, run as root, only for chown.
   minio-init:
-    image: cgr.dev/chainguard/minio:latest@sha256:e234321fd3abff7fb968b0674056e883b702aa1ad93a0d4d795cb6c21fa46407
+    image: cgr.dev/chainguard/minio:latest@sha256:db3f583fa49121942168bd6383a773b2cde3384c9a99bf7193560b9a0f3a28fd
     security_opt:
       - "no-new-privileges:true"
     network_mode: none
@@ -223,7 +223,7 @@ services:
     # github.com/chainguard-images/images. Runs as uid 65532 (see minio-init);
     # entrypoint is the minio binary, so `command` is unchanged. `mc` ships in
     # the image, so the `mc ready local` healthcheck keeps working.
-    image: cgr.dev/chainguard/minio:latest@sha256:e234321fd3abff7fb968b0674056e883b702aa1ad93a0d4d795cb6c21fa46407
+    image: cgr.dev/chainguard/minio:latest@sha256:db3f583fa49121942168bd6383a773b2cde3384c9a99bf7193560b9a0f3a28fd
     security_opt:
       - "no-new-privileges:true"
     logging:
