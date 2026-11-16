@@ -85,6 +85,8 @@ services:
 
   temporal:
     image: temporalio/auto-setup:1.29.3@sha256:9be7b8d98f60d00f4f2ff74731c071a17848d8182bbc8429e314a24c94ea105b
+    # auto-setup.sh exits after setup; an init reaps it, which temporal-server as PID 1 does not.
+    init: true
     networks: [computor-it]
     ports:
       - "${IT_TEMPORAL_PORT:-17233}:7233"
