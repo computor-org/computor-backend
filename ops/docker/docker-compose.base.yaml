@@ -150,6 +150,8 @@ services:
   # Temporal server
   temporal:
     image: temporalio/auto-setup:1.29.7@sha256:f14912b699cf73015ad5c4fc18d522d4b014db90e794039214dfb7c022c2644f
+    # auto-setup.sh exits after setup; an init reaps it, which temporal-server as PID 1 does not.
+    init: true
     security_opt:
       - "no-new-privileges:true"
     logging:
