@@ -36,7 +36,7 @@ services:
   # ---- Infrastructure -----------------------------------------------------
 
   postgres:
-    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
+    image: postgres:16.15@sha256:f9a7b9ebf6f56201f949db745e47bc423c0f0f8294bafe991cc10bf74b029657
     networks: [computor-it]
     ports:
       - "${IT_POSTGRES_PORT:-15432}:5432"
@@ -54,7 +54,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:8.10.2-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
+    image: redis:8.10.3-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3
     networks: [computor-it]
     ports:
       - "${IT_REDIS_PORT:-16379}:6379"
@@ -68,7 +68,7 @@ services:
       retries: 10
 
   temporal-postgres:
-    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
+    image: postgres:16.15@sha256:f9a7b9ebf6f56201f949db745e47bc423c0f0f8294bafe991cc10bf74b029657
     networks: [computor-it]
     environment:
       TZ: UTC
@@ -108,7 +108,7 @@ services:
       start_period: 30s
 
   temporal-ui:
-    image: temporalio/ui:2.57.0@sha256:d944f959d0923c35cd991a17a0edbe087770eff843724b181933e0cfdd563ab2
+    image: temporalio/ui:2.58.1@sha256:ac3c13eddb4547d830991bb5eee93a5d97140134522b7297fdb2be1fe25ef925
     networks: [computor-it]
     ports:
       - "${IT_TEMPORAL_UI_PORT:-18088}:8080"
@@ -122,7 +122,7 @@ services:
   # /data once (top level last, so an interrupted run is simply repeated) and
   # is a no-op afterwards. Same pinned image, run as root, only for chown.
   minio-init:
-    image: cgr.dev/chainguard/minio:latest@sha256:e234321fd3abff7fb968b0674056e883b702aa1ad93a0d4d795cb6c21fa46407
+    image: cgr.dev/chainguard/minio:latest@sha256:16b824a0016ffad3dfa8b059755f83800aa42ca68fe86f1782cabd0c5a16d322
     network_mode: none
     user: "0:0"
     entrypoint: ["sh", "-c"]
@@ -148,7 +148,7 @@ services:
     restart: "no"
 
   minio:
-    image: cgr.dev/chainguard/minio:latest@sha256:e234321fd3abff7fb968b0674056e883b702aa1ad93a0d4d795cb6c21fa46407
+    image: cgr.dev/chainguard/minio:latest@sha256:16b824a0016ffad3dfa8b059755f83800aa42ca68fe86f1782cabd0c5a16d322
     networks: [computor-it]
     ports:
       - "${IT_MINIO_API_PORT:-19000}:9000"
