@@ -144,8 +144,14 @@ COPY --from=vsix-builder --chown=coder:coder /tmp/extension.vsix /opt/code-serve
 
 USER coder
 
-# Install extensions and clean up VSIX
+# Install extensions and clean up VSIX. The Open VSX build of ms-python.python
+# is "universal" and ships no python-env-tools/bin/pet, so the
+# ms-python.vscode-python-envs extension it pulls in fails to spawn pet in a
+# loop and leaves the interpreter badge on "Initializing virtual environments"
+# (computor-org/issues#484). ms-python.python does not need it, because
+# python.useEnvironmentsExtension defaults to false.
 RUN code-server --extensions-dir /opt/code-server/extensions --install-extension /opt/code-server/extension.vsix --force \
     && code-server --extensions-dir /opt/code-server/extensions --install-extension ms-python.python --force \
     && code-server --extensions-dir /opt/code-server/extensions --install-extension ms-toolsai.jupyter --force \
+    && code-server --extensions-dir /opt/code-server/extensions --uninstall-extension ms-python.vscode-python-envs \
     && rm /opt/code-server/extension.vsix
