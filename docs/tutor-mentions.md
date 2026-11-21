@@ -39,8 +39,34 @@ mentions nobody, the message is not a reply to Lena (her follow-up handling
 already covers those), and Lena is in the message's audience. From there it is
 an ordinary mention, so the worker needs no change. Edits are never rewritten.
 
-Lena must be a course member for the audience gate to accept her; add the
-tutor account to the course as `_tutor`.
+Lena must be a course member for the audience gate to accept her; see the
+next section.
+
+## Enrolling Lena in a course
+
+Lena answers only in courses where the tutor account is a member with the
+`_tutor` role or higher, and a new course has no such member (issues#618).
+The web UI therefore offers **Enrol Lena as AI tutor in this course** when a
+course is created (checked by default) and on its edit page. Without it, the
+auto-routing checkbox above is disabled, since routing to a tutor who is not
+in the course reaches nobody.
+
+| Route | Who |
+|---|---|
+| `GET /courses/{id}/tutor-agent` | `_lecturer` or higher in the course |
+| `PUT /courses/{id}/tutor-agent` `{"enrolled": true\|false}` | `_lecturer` or higher in the course |
+
+Both answer `{available, enrolled, course_role_id, name}`. `available` is
+false while `TUTOR_AGENT_USER_ID` does not name an active user; `PUT` is then
+refused with 400. `GET /instance-info` carries `tutor_agent_name`, so the
+create form knows before the course exists.
+
+`enrolled: true` adds a `_tutor` membership. A membership with a higher role,
+given in the member list, already counts and is left alone; a `_student`
+membership is refused rather than promoted. `enrolled: false` removes only a
+`_tutor` membership, under the member list's delete guards. Both calls are
+idempotent. The running worker picks a new course up at its next catch-up
+scan, within a minute (computor-agent#49).
 
 ## Unit description drafts
 

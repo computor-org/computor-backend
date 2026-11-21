@@ -15,8 +15,11 @@ state of this deployment, and NOT consent-exempt. It is kept out of
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
 from computor_backend.business_logic import build_info
+from computor_backend.business_logic.course_tutor_agent import tutor_agent_name, tutor_agent_user
+from computor_backend.database import get_db
 from computor_backend.git_server.config import get_git_server_settings
 from computor_backend.issue_reports.config import get_issue_report_settings
 from computor_backend.issue_reports.health import current_health
@@ -78,6 +81,7 @@ def _issue_reporting() -> IssueReportingInfo:
 @instance_router.get("/instance-info", response_model=InstanceInfoGet, tags=["instance"])
 async def get_instance_info(
     principal: Annotated[Principal, Depends(get_current_principal)],
+    db: Annotated[Session, Depends(get_db, scope="function")],
 ) -> InstanceInfoGet:
     """Public navigation URLs for this Computor instance."""
     # The web app is served at the root of PUBLIC_DOMAIN; WEB_APP_URL overrides
@@ -92,10 +96,15 @@ async def get_instance_info(
         else None
     )
 
+    # Lets the course form offer "enrol Lena" before the course exists
+    # (issues#618); the per-course state is GET /courses/{id}/tutor-agent.
+    agent = tutor_agent_user(db)
+
     return InstanceInfoGet(
         web_url=web_url,
         forgejo_url=forgejo_url,
         issue_reporting=_issue_reporting(),
+        tutor_agent_name=tutor_agent_name(agent) if agent is not None else None,
     )
 
 

@@ -6,6 +6,7 @@ import { CoursesClient } from '@/src/generated/clients/CoursesClient';
 import { CourseFamiliesClient } from '@/src/generated/clients/CourseFamiliesClient';
 import { GitServersClient } from '@/src/generated/clients/GitServersClient';
 import { SystemClient } from '@/src/generated/clients/SystemClient';
+import { InstanceClient } from '@/src/generated/clients/InstanceClient';
 import { useAuth } from '@/src/contexts/AuthContext';
 import { usePermissions } from '@/src/hooks/usePermissions';
 import { useSearchParam } from '@/src/hooks/useSearchParam';
@@ -15,6 +16,7 @@ import Forbidden from '@/src/components/Forbidden';
 import FormPanel, { Field } from '@/src/components/FormPanel';
 import ConfirmDeployWarningsDialog from '@/src/components/courses/ConfirmDeployWarningsDialog';
 import TutorAgentAutoRouteField from '@/src/components/courses/TutorAgentAutoRouteField';
+import TutorAgentEnrolField from '@/src/components/courses/TutorAgentEnrolField';
 import DeploymentCheckReport, { type DeployCheckStatus } from '@/src/components/courses/DeploymentCheckReport';
 import { fileInputCls, inputCls } from '@/src/components/ui/tokens';
 import type { CourseFamilyList, CourseGitBindingUpsert } from '@/src/generated/types/courses';
@@ -27,6 +29,7 @@ const coursesClient = new CoursesClient();
 const courseFamiliesClient = new CourseFamiliesClient();
 const gitServersClient = new GitServersClient();
 const systemClient = new SystemClient();
+const instanceClient = new InstanceClient();
 
 const COPY = {
   de: {
@@ -123,6 +126,11 @@ function CreateInner() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [autoRoute, setAutoRoute] = useState(false);
+  // The deployment's AI tutor (issues#618); null when it has none, and then
+  // there is nothing to enrol. On by default: a course without it leaves
+  // @mentions of the tutor unanswered.
+  const [agentName, setAgentName] = useState<string | null>(null);
+  const [enrolAgent, setEnrolAgent] = useState(true);
   const [gitEnabled, setGitEnabled] = useState(true);
   const [serverId, setServerId] = useState('');
   const [delivery, setDelivery] = useState<'git' | 'download'>('git');
@@ -181,6 +189,14 @@ function CreateInner() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, isAuthenticated, canConfigureGit]);
+
+  useEffect(() => {
+    if (authLoading || !isAuthenticated) return;
+    instanceClient
+      .getInstanceInfoInstanceInfoGet()
+      .then((info) => setAgentName(info.tutor_agent_name ?? null))
+      .catch(() => setAgentName(null));
+  }, [authLoading, isAuthenticated]);
 
   // Check the file automatically, as soon as there is something to check. The
   // user never has to ask what the upload will do — and, because a file that
@@ -271,6 +287,21 @@ function CreateInner() {
     }
   }
 
+  // Enrol the AI tutor in the new course (issues#618). Best-effort like the
+  // deploy above: the course exists either way, and the edit page shows the
+  // switch's real state, so a failed call can be retried there.
+  async function enrolTutorAgent(courseId: string) {
+    if (!agentName || !enrolAgent) return;
+    try {
+      await coursesClient.setCourseTutorAgentEndpointCoursesCourseIdTutorAgentPut({
+        courseId,
+        body: { enrolled: true },
+      });
+    } catch {
+      /* best-effort; ignore */
+    }
+  }
+
   /** Submit — but never past unacknowledged warnings. */
   function onSubmit() {
     if (hasFile && warnings.length > 0 && !createdCourseId) {
@@ -298,6 +329,7 @@ function CreateInner() {
             body: { tutor_agent_auto_route: true },
           });
         }
+        await enrolTutorAgent(res.course_id);
         // Git comes from the uploaded file's `git:` block (applied server-side by
         // deploy-course). Do NOT also call configureGit here — that would clobber
         // the file's binding with the manual UI selection (and 409 once the file's
@@ -332,6 +364,7 @@ function CreateInner() {
       });
       // One step: configure git immediately so a course is never left without it.
       await configureGit(course.id);
+      await enrolTutorAgent(course.id);
       await triggerDeploy(course.id);
       // Creating a course enrols the creator as its `_owner` (issue #386). The
       // server has already dropped the stale caches; re-pull /user/scopes so the
@@ -414,7 +447,24 @@ function CreateInner() {
         )}
 
         <Field label={f.aiTutor}>
-          <TutorAgentAutoRouteField value={autoRoute} onChange={setAutoRoute} />
+          <div className="space-y-3">
+            {agentName && (
+              <TutorAgentEnrolField
+                name={agentName}
+                value={enrolAgent}
+                onChange={(next) => {
+                  setEnrolAgent(next);
+                  // Routing to a tutor who is not in the course reaches nobody.
+                  if (!next) setAutoRoute(false);
+                }}
+              />
+            )}
+            <TutorAgentAutoRouteField
+              value={autoRoute}
+              onChange={setAutoRoute}
+              disabled={!!agentName && !enrolAgent}
+            />
+          </div>
         </Field>
 
         {hasFile && canConfigureGit && (

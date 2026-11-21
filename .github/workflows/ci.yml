@@ -31,6 +31,7 @@ jobs:
           computor-backend/src/computor_backend/tests/test_canonical_zip_hash.py
           computor-backend/src/computor_backend/tests/test_temporal_client.py
           computor-backend/src/computor_backend/tests/test_plain_mentions.py
+          computor-backend/src/computor_backend/tests/test_course_tutor_agent.py
           computor-backend/src/computor_backend/tests/test_coder_forwardauth.py
           computor-backend/src/computor_backend/tests/test_coder_provision_errors.py
           computor-backend/src/computor_backend/tests/test_coder_image_cleanup.py
@@ -230,7 +231,7 @@ jobs:
       - run: yarn test:public-learning
       - run: yarn build
       - run: npx playwright install --with-deps chromium
-      - run: yarn test:e2e e2e/public-learning.spec.ts e2e/course-card-layout.spec.ts e2e/workspace-launch.spec.ts e2e/teacher-dashboard.spec.ts e2e/support-tickets.spec.ts e2e/student-description-language.spec.ts e2e/self-enrollment-help.spec.ts e2e/public-landing.spec.ts e2e/student-progress.spec.ts e2e/reading-language-pages.spec.ts e2e/test-feedback-language.spec.ts --workers=2
+      - run: yarn test:e2e e2e/public-learning.spec.ts e2e/course-card-layout.spec.ts e2e/workspace-launch.spec.ts e2e/teacher-dashboard.spec.ts e2e/support-tickets.spec.ts e2e/student-description-language.spec.ts e2e/self-enrollment-help.spec.ts e2e/public-landing.spec.ts e2e/student-progress.spec.ts e2e/reading-language-pages.spec.ts e2e/test-feedback-language.spec.ts e2e/course-tutor-agent.spec.ts --workers=2
 
   keycloak-abuse:
     # Required jobs run in the merge queue, not on pull request events.

@@ -72,6 +72,11 @@ class InstanceInfoGet(BaseModel):
         None,
         description="Problem-reporting capability of this deployment.",
     )
+    tutor_agent_name: Optional[str] = Field(
+        None,
+        description="Display name of this deployment's AI tutor (e.g. Lena), "
+        "which can be enrolled in a course; null if none is configured.",
+    )
 
 
 class InstanceStatusGet(BaseModel):

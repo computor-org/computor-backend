@@ -44,7 +44,16 @@ from computor_backend.business_logic.course_registration import (
 )
 from computor_backend.api._pagination import paginated_list
 from computor_types.cascade_deletion import CascadeDeleteResult
-from computor_types.courses import CoursePublicList, CoursePublicQuery
+from computor_types.courses import (
+    CoursePublicList,
+    CoursePublicQuery,
+    CourseTutorAgentGet,
+    CourseTutorAgentUpdate,
+)
+from computor_backend.business_logic.course_tutor_agent import (
+    get_course_tutor_agent,
+    set_course_tutor_agent,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -301,3 +310,40 @@ async def delete_course_endpoint(
     await invalidate_request_principal(request, what="deleting a course")
 
     return result
+
+
+@course_router.router.get(
+    "/{course_id}/tutor-agent",
+    response_model=CourseTutorAgentGet,
+    summary="Whether the AI tutor serves this course",
+)
+async def get_course_tutor_agent_endpoint(
+    course_id: UUID,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db, scope="function"),
+) -> CourseTutorAgentGet:
+    """Is the deployment's AI tutor (Lena) a member of this course (issues#618)?
+
+    ``_lecturer`` or higher in the course, like the switch below.
+    """
+    return get_course_tutor_agent(str(course_id), permissions, db)
+
+
+@course_router.router.put(
+    "/{course_id}/tutor-agent",
+    response_model=CourseTutorAgentGet,
+    summary="Enrol the AI tutor in this course, or remove it",
+)
+async def set_course_tutor_agent_endpoint(
+    course_id: UUID,
+    body: CourseTutorAgentUpdate,
+    permissions: Annotated[Principal, Depends(get_current_principal)],
+    db: Session = Depends(get_db, scope="function"),
+) -> CourseTutorAgentGet:
+    """Add the AI tutor (Lena) as ``_tutor`` of the course, or remove it (issues#618).
+
+    The tutor agent only answers in courses it is a member of. A membership
+    with a higher role, given in the member list, counts as enrolled and is
+    not changed here. 400 when the deployment has no tutor agent configured.
+    """
+    return await set_course_tutor_agent(str(course_id), body.enrolled, permissions, db)
