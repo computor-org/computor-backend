@@ -18,12 +18,13 @@ import { inputCls, readOnlyInputCls } from '@/src/components/ui/tokens';
 import SectionCard, { SectionHint, SectionStatus } from '@/src/components/SectionCard';
 import PublicCourseField from '@/src/components/courses/PublicCourseField';
 import TutorAgentAutoRouteField from '@/src/components/courses/TutorAgentAutoRouteField';
+import TutorAgentEnrolField from '@/src/components/courses/TutorAgentEnrolField';
 import SubmissionFeedbackField, { type SubmissionFeedback } from '@/src/components/courses/SubmissionFeedbackField';
 import DescriptionList from '@/src/components/DescriptionList';
 import Button from '@/src/components/ui/Button';
 import Badge from '@/src/components/Badge';
 import VisibilitySelect, { type VisibilityValue } from '@/src/components/courses/VisibilitySelect';
-import type { CourseGet, CourseGitBindingGet, CourseGitBindingUpsert, GitServerGet } from 'types/generated';
+import type { CourseGet, CourseGitBindingGet, CourseGitBindingUpsert, CourseTutorAgentGet, GitServerGet } from 'types/generated';
 import { COURSE_FORM_COPY, STUDENT_REPO_MODES } from '@/src/components/courses/courseFormCopy';
 import { deliveryLabel, gitServerTypeLabel, lockReasonText } from '@/src/utils/courseGit';
 
@@ -177,6 +178,10 @@ export default function CourseEditPage() {
   const [language, setLanguage] = useState('');
   const [isPublic, setIsPublic] = useState(false);
   const [autoRoute, setAutoRoute] = useState(false);
+  // Whether the AI tutor is a member of the course (issues#618); null when
+  // the state could not be read, and then the switch is not offered.
+  const [agent, setAgent] = useState<CourseTutorAgentGet | null>(null);
+  const [enrolAgent, setEnrolAgent] = useState(false);
   const [submissionFeedback, setSubmissionFeedback] = useState<SubmissionFeedback>('human');
   // Self-registration seat cap; empty = unlimited, same convention as budgets.
   const [maxSelfRegistrations, setMaxSelfRegistrations] = useState('');
@@ -222,6 +227,11 @@ export default function CourseEditPage() {
       setMaxTestRuns(c.max_test_runs != null ? String(c.max_test_runs) : '');
       setMaxSubmissions(c.max_submissions != null ? String(c.max_submissions) : '');
       setVisible(c.visible ?? null);
+      const a = await coursesClient
+        .getCourseTutorAgentEndpointCoursesCourseIdTutorAgentGet({ courseId })
+        .catch(() => null);
+      setAgent(a);
+      setEnrolAgent(a?.enrolled ?? false);
       const srv = await gitServersClient.listGitServersEndpointGitServersGet({}).catch(() => [] as GitServerGet[]);
       setServers(srv);
       // The binding endpoint 404s when a course has none yet — treat as null.
@@ -295,6 +305,14 @@ export default function CourseEditPage() {
         },
       });
       setCourse(updated);
+      if (agent?.available && enrolAgent !== agent.enrolled) {
+        setAgent(
+          await coursesClient.setCourseTutorAgentEndpointCoursesCourseIdTutorAgentPut({
+            courseId,
+            body: { enrolled: enrolAgent },
+          }),
+        );
+      }
       setGeneralMsg(t.saved);
     } catch (e) {
       setGeneralMsg(e instanceof Error ? e.message : t.saveFailed);
@@ -459,7 +477,25 @@ export default function CourseEditPage() {
                   </p>
                 )}
                 <Field label={f.aiTutor}>
-                  <TutorAgentAutoRouteField value={autoRoute} onChange={setAutoRoute} />
+                  <div className="space-y-3">
+                    {agent?.available && agent.name && (
+                      <TutorAgentEnrolField
+                        name={agent.name}
+                        value={enrolAgent}
+                        onChange={(next) => {
+                          setEnrolAgent(next);
+                          // Routing to a tutor who is not in the course reaches nobody.
+                          if (!next) setAutoRoute(false);
+                        }}
+                      />
+                    )}
+                    <TutorAgentAutoRouteField
+                      value={autoRoute}
+                      onChange={setAutoRoute}
+                      // Can still be switched off when it is on without the tutor.
+                      disabled={!!agent?.available && !enrolAgent && !autoRoute}
+                    />
+                  </div>
                 </Field>
                 <Field label={t.submissionFeedback}>
                   <SubmissionFeedbackField

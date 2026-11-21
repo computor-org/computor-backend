@@ -196,6 +196,29 @@ class CourseUpdate(BaseModel):
         return value
 
 
+class CourseTutorAgentGet(BaseModel):
+    """Whether the deployment's AI tutor (Lena) serves a course (issues#618).
+
+    ``GET``/``PUT /courses/{id}/tutor-agent``. The tutor agent answers only in
+    courses where its user is a member with ``_tutor`` or a higher role.
+    """
+    # The deployment has a tutor agent (TUTOR_AGENT_USER_ID names an active
+    # user). When false, the switch is refused and the UI hides it.
+    available: bool
+    # Its user is a member of the course with ``_tutor`` or a higher role.
+    enrolled: bool
+    # Its role in the course, when it is a member at all.
+    course_role_id: Optional[str] = None
+    # Display name of the tutor agent, e.g. "Lena".
+    name: Optional[str] = None
+
+
+class CourseTutorAgentUpdate(BaseModel):
+    # True adds the tutor agent as ``_tutor``; false removes a ``_tutor``
+    # membership. Other roles are changed in the member list.
+    enrolled: bool
+
+
 class CourseQuery(ListQuery):
     id: Optional[str] = None
     title: Optional[str] = None

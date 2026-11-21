@@ -1418,6 +1418,17 @@ export interface CourseUpdate {
   submission_feedback?: "tests" | "tests_and_lena" | "human" | null;
 }
 
+export interface CourseTutorAgentGet {
+  available: boolean;
+  enrolled: boolean;
+  course_role_id?: string | null;
+  name?: string | null;
+}
+
+export interface CourseTutorAgentUpdate {
+  enrolled: boolean;
+}
+
 export interface CourseQuery {
   skip?: number | null;
   limit?: number | null;

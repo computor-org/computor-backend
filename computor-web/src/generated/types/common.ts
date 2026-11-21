@@ -1852,6 +1852,8 @@ export interface InstanceInfoGet {
   forgejo_url?: string | null;
   /** Problem-reporting capability of this deployment. */
   issue_reporting?: IssueReportingInfo | null;
+  /** Display name of this deployment's AI tutor (e.g. Lena), which can be enrolled in a course; null if none is configured. */
+  tutor_agent_name?: string | null;
 }
 
 /**

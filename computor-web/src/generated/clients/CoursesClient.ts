@@ -3,7 +3,7 @@
  * Endpoint: /courses
  */
 
-import type { CascadeDeleteResult, CourseCreate, CourseGet, CourseGitBindingGet, CourseGitBindingUpsert, CourseList, CoursePublicList, CourseStudentWorkspacesResponse, CourseUpdate, CourseWorkspaceSettingsGet, CourseWorkspaceSettingsUpdate, StudentWorkspaceProvisionRequest, StudentWorkspaceProvisionResponse, WorkspaceActionResponse } from 'types/generated';
+import type { CascadeDeleteResult, CourseCreate, CourseGet, CourseGitBindingGet, CourseGitBindingUpsert, CourseList, CoursePublicList, CourseStudentWorkspacesResponse, CourseTutorAgentGet, CourseTutorAgentUpdate, CourseUpdate, CourseWorkspaceSettingsGet, CourseWorkspaceSettingsUpdate, StudentWorkspaceProvisionRequest, StudentWorkspaceProvisionResponse, WorkspaceActionResponse } from 'types/generated';
 import { APIClient, apiClient } from 'api/client';
 import { BaseEndpointClient } from './baseClient';
 
@@ -163,6 +163,32 @@ export class CoursesClient extends BaseEndpointClient {
       user_id: userId,
     };
     return this.client.get<void>(this.buildPath(courseId, 'template'), { params: queryParams });
+  }
+
+  /**
+   * Whether the AI tutor serves this course
+   * Is the deployment's AI tutor (Lena) a member of this course (issues#618)?
+   * ``_lecturer`` or higher in the course, like the switch below.
+   */
+  async getCourseTutorAgentEndpointCoursesCourseIdTutorAgentGet({ courseId, userId }: { courseId: string; userId?: string | null }): Promise<CourseTutorAgentGet> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.get<CourseTutorAgentGet>(this.buildPath(courseId, 'tutor-agent'), { params: queryParams });
+  }
+
+  /**
+   * Enrol the AI tutor in this course, or remove it
+   * Add the AI tutor (Lena) as ``_tutor`` of the course, or remove it (issues#618).
+   * The tutor agent only answers in courses it is a member of. A membership
+   * with a higher role, given in the member list, counts as enrolled and is
+   * not changed here. 400 when the deployment has no tutor agent configured.
+   */
+  async setCourseTutorAgentEndpointCoursesCourseIdTutorAgentPut({ courseId, userId, body }: { courseId: string; userId?: string | null; body: CourseTutorAgentUpdate }): Promise<CourseTutorAgentGet> {
+    const queryParams: Record<string, unknown> = {
+      user_id: userId,
+    };
+    return this.client.put<CourseTutorAgentGet>(this.buildPath(courseId, 'tutor-agent'), body, { params: queryParams });
   }
 
   /**
