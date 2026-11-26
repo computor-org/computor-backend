@@ -10,7 +10,7 @@ services:
   # `socket-proxy`, so dev and prod are wired identically and the ingress never
   # needs the raw socket.
   coder-socket-proxy:
-    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
+    image: tecnativa/docker-socket-proxy:3.4@sha256:027f9fa5ee70be5836eeaa10ce889d7a83f34a8db16a7f412818b92997e0beab
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-socket-proxy
     networks:
       - computor-network
@@ -49,7 +49,7 @@ services:
   # to the public domain, and the public domain never has to resolve inside
   # a workspace.
   workspace-ingress:
-    image: traefik:v3.7.15@sha256:0f6150202bc1fed72a7bd2107460eaa510e5b8a905f3fdb5b84f2c8619c33368
+    image: traefik:v3.7.19@sha256:a6c0194dda77bcb804824580f36fa7edc56e315b1acfe933366c8b52844a78a4
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}workspace-ingress
     restart: unless-stopped
     # Least privilege (#421): nobody, no capabilities, immutable root
@@ -108,7 +108,7 @@ services:
 
   # Dedicated PostgreSQL database for Coder (separate from main DB)
   coder-postgres:
-    image: postgres:16.15@sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54
+    image: postgres:16.15@sha256:f9a7b9ebf6f56201f949db745e47bc423c0f0f8294bafe991cc10bf74b029657
     networks:
       - computor-network
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-postgres
@@ -143,7 +143,7 @@ services:
     # Pinned by version + digest: >= 2.36.4 is required (GHSA-vx42-ghc9-gw65).
     # Keep in lockstep with CODER_VERSION in docker/coder-runtime/Dockerfile.
     # Never downgrade: Coder DB migrations are forward-only.
-    image: ghcr.io/coder/coder:v2.38.4@sha256:e5f4489f3fac3ee6d975552d989458b50882e78f0560d4f91253053f3797a019
+    image: ghcr.io/coder/coder:v2.39.5@sha256:40fade40473a8a143d762f8ba0be07c0239be9932651f22046c0c0b21800552d
     # Also on BOTH isolated workspace networks so workspace agents can reach
     # coder:7080 (CODER_ACCESS_URL) without workspaces touching
     # computor-network. The offline one is not optional: an agent that cannot
@@ -239,7 +239,7 @@ services:
   # haproxy.cfg.template; reachable only on the internal
   # coder-provisioner-docker network.
   coder-provisioner-socket-proxy:
-    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
+    image: tecnativa/docker-socket-proxy:3.4@sha256:027f9fa5ee70be5836eeaa10ce889d7a83f34a8db16a7f412818b92997e0beab
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-provisioner-socket-proxy
     networks:
       - coder-provisioner-docker
@@ -283,7 +283,7 @@ services:
   # switches of the upstream image are not consulted by it. Reachable only on
   # the internal coder-worker-docker network.
   coder-worker-socket-proxy:
-    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
+    image: tecnativa/docker-socket-proxy:3.4@sha256:027f9fa5ee70be5836eeaa10ce889d7a83f34a8db16a7f412818b92997e0beab
     container_name: ${CONTAINER_NAME_PREFIX:-computor-}coder-worker-socket-proxy
     networks:
       - coder-worker-docker
