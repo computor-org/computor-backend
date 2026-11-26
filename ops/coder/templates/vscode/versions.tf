@@ -2,11 +2,11 @@ terraform {
   required_providers {
     coder = {
       source  = "coder/coder"
-      version = "2.19.0"
+      version = "2.20.0"
     }
     docker = {
       source  = "kreuzwerker/docker"
-      version = "4.6.0"
+      version = "4.7.0"
     }
     # Only so Terraform can plan the removal of the resources the retired
     # registry.coder.com jetbrains module left in existing workspaces' state
